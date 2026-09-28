@@ -72,12 +72,38 @@ function Write-TestResult {
 }
 
 function Invoke-Linter {
-  param([string]$Path)
+  param([string]$Path, [string]$ScriptPath = $linter, [switch]$Cli)
 
-  $output = & pwsh -NoProfile -File $linter -Path $Path 2>&1
-  return [pscustomobject]@{
-    ExitCode = $LASTEXITCODE
-    Output   = ($output | Out-String)
+  if ($Cli) {
+    $output = & pwsh -NoProfile -File $ScriptPath -Path $Path 2>&1
+    return [pscustomobject]@{
+      ExitCode = $LASTEXITCODE
+      Output   = ($output | Out-String)
+    }
+  }
+
+  $runner = [System.Management.Automation.PowerShell]::Create()
+  try {
+    $null = $runner.AddCommand($ScriptPath).AddParameter('Path', $Path)
+    $result = $runner.Invoke()
+    $output = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $result) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+    foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+    if ($runner.Streams.Error.Count -gt 0) {
+      throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+    }
+    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    if ($null -eq $exitCode) {
+      throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+    }
+    return [pscustomobject]@{
+      ExitCode = [int]$exitCode
+      Output   = ($output -join [Environment]::NewLine)
+    }
+  }
+  finally {
+    $runner.Dispose()
   }
 }
 
@@ -105,16 +131,19 @@ function Test-Rejects {
   param([string]$TestName, [string]$Path, [string]$ExpectedMessage)
 
   $result = Invoke-Linter -Path $Path
+  if ($result.ExitCode -eq 1) {
+    if (-not $result.Output.Contains($ExpectedMessage)) {
+      Write-TestResult -TestName $TestName -Passed $false -Message "rejected, but not for the reason under test. Expected to contain '$ExpectedMessage'. Got: $($result.Output)"
+      return
+    }
+    Write-TestResult -TestName $TestName -Passed $true
+    return
+  }
   if ($result.ExitCode -eq 0) {
     Write-TestResult -TestName $TestName -Passed $false -Message 'linter accepted a manifest it must reject'
     return
   }
-  # .Contains, not -like: -like reads square brackets as a wildcard character class.
-  if (-not $result.Output.Contains($ExpectedMessage)) {
-    Write-TestResult -TestName $TestName -Passed $false -Message "rejected, but not for the reason under test. Expected to contain '$ExpectedMessage'. Got: $($result.Output)"
-    return
-  }
-  Write-TestResult -TestName $TestName -Passed $true
+  Write-TestResult -TestName $TestName -Passed $false -Message "expected exit 1, got $($result.ExitCode): $($result.Output)"
 }
 
 Write-Host ''
@@ -124,8 +153,30 @@ Write-Host ''
 try {
   Write-Info "Workspace: $workspace"
 
+  $harnessScript = Join-Path $workspace 'harness.ps1'
+  Set-Content -LiteralPath $harnessScript -Value "param([string]`$Path) Write-Host 'harness-zero'; exit 0"
+  $harnessResult = Invoke-Linter -Path $realManifest -ScriptPath $harnessScript
+  Write-TestResult -TestName 'a runspace observes exit 0 and output' `
+    -Passed ($harnessResult.ExitCode -eq 0 -and $harnessResult.Output.Contains('harness-zero'))
+  Set-Content -LiteralPath $harnessScript -Value "param([string]`$Path) Write-Host 'harness-one'; exit 1"
+  $harnessResult = Invoke-Linter -Path $realManifest -ScriptPath $harnessScript
+  Write-TestResult -TestName 'a runspace observes exit 1 and output' `
+    -Passed ($harnessResult.ExitCode -eq 1 -and $harnessResult.Output.Contains('harness-one'))
+  Set-Content -LiteralPath $harnessScript -Value "param([string]`$Path) Write-Host 'harness-missing-exit'"
+  $missingExitFailed = $false
+  try { $null = Invoke-Linter -Path $realManifest -ScriptPath $harnessScript }
+  catch { $missingExitFailed = $_.Exception.Message.Contains('without an exit code') }
+  Write-TestResult -TestName 'a missing runspace exit fails the harness' -Passed $missingExitFailed
+  Set-Content -LiteralPath $harnessScript -Value "param([string]`$Path) Write-Error 'harness-error'; exit 0"
+  $errorFailed = $false
+  try { $null = Invoke-Linter -Path $realManifest -ScriptPath $harnessScript }
+  catch { $errorFailed = $_.Exception.Message.Contains('PowerShell error') }
+  Write-TestResult -TestName 'a PowerShell error fails the harness' -Passed $errorFailed
+
   # ── Green half ────────────────────────────────────────────────────────────
-  Test-Accepts -TestName 'the repository manifest passes' -Path $realManifest
+  $realResult = Invoke-Linter -Path $realManifest -Cli
+  Write-TestResult -TestName 'the repository manifest passes through pwsh -File' `
+    -Passed ($realResult.ExitCode -eq 0) -Message "exit $($realResult.ExitCode): $($realResult.Output)"
 
   $minimal = New-Manifest -Name 'minimal' -Content @'
 {

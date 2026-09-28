@@ -85,12 +85,48 @@ function ConvertTo-Flat {
 }
 
 function Invoke-Validator {
-  param([string]$Root)
+  param([string]$Root, [string]$ScriptPath = $validator, [switch]$Cli)
 
-  $output = & pwsh -NoProfile -File $validator -RepoRoot $Root 2>&1
-  return [pscustomobject]@{
-    ExitCode = $LASTEXITCODE
-    Output   = ConvertTo-Flat -Text ($output | Out-String)
+  if ($Cli) {
+    $output = & pwsh -NoProfile -File $ScriptPath -RepoRoot $Root 2>&1
+    return [pscustomobject]@{
+      ExitCode = $LASTEXITCODE
+      Output   = ConvertTo-Flat -Text ($output | Out-String)
+    }
+  }
+
+  $runner = [System.Management.Automation.PowerShell]::Create()
+  try {
+    $null = $runner.AddCommand($ScriptPath).AddParameter('RepoRoot', $Root)
+    $failure = $null
+    $result = @()
+    try { $result = $runner.Invoke() }
+    catch { $failure = $_.Exception }
+    $output = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $result) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+    foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+    if ($null -ne $failure) {
+      $output.Add($failure.Message)
+      return [pscustomobject]@{
+        ExitCode = 1
+        Output   = ConvertTo-Flat -Text ($output -join [Environment]::NewLine)
+      }
+    }
+    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    if ($null -eq $exitCode) {
+      throw "Validator returned without an exit code. $($output -join [Environment]::NewLine)"
+    }
+    if ($runner.Streams.Error.Count -gt 0 -and [int]$exitCode -eq 0) {
+      throw "Validator emitted a PowerShell error with exit 0. $($output -join [Environment]::NewLine)"
+    }
+    return [pscustomobject]@{
+      ExitCode = [int]$exitCode
+      Output   = ConvertTo-Flat -Text ($output -join [Environment]::NewLine)
+    }
+  }
+  finally {
+    $runner.Dispose()
   }
 }
 
@@ -142,6 +178,10 @@ function Test-Rejects {
     Write-TestResult -TestName $TestName -Passed $false -Message 'validator accepted a configuration it must reject'
     return
   }
+  if ($result.ExitCode -ne 1) {
+    Write-TestResult -TestName $TestName -Passed $false -Message "expected exit 1, got $($result.ExitCode): $($result.Output)"
+    return
+  }
   # .Contains, not -like: -like reads square brackets as a wildcard character class, and these
   # messages quote "[language]" entries.
   if (-not $result.Output.Contains((ConvertTo-Flat -Text $ExpectedMessage))) {
@@ -158,8 +198,34 @@ Write-Host ''
 try {
   Write-Info "Workspace: $workspace"
 
+  $harnessScript = Join-Path $workspace 'harness.ps1'
+  Set-Content -LiteralPath $harnessScript -Value "param([string]`$RepoRoot) Write-Host 'harness-zero'; exit 0"
+  $harnessResult = Invoke-Validator -Root $repoRoot -ScriptPath $harnessScript
+  Write-TestResult -TestName 'runspace preserves exit 0 and output' `
+    -Passed ($harnessResult.ExitCode -eq 0 -and $harnessResult.Output.Contains('harness-zero'))
+  Set-Content -LiteralPath $harnessScript -Value "param([string]`$RepoRoot) Write-Host 'harness-one'; exit 1"
+  $harnessResult = Invoke-Validator -Root $repoRoot -ScriptPath $harnessScript
+  Write-TestResult -TestName 'runspace preserves exit 1 and output' `
+    -Passed ($harnessResult.ExitCode -eq 1 -and $harnessResult.Output.Contains('harness-one'))
+  Set-Content -LiteralPath $harnessScript -Value "param([string]`$RepoRoot) Write-Host 'harness-missing-exit'"
+  $missingExitFailed = $false
+  try { $null = Invoke-Validator -Root $repoRoot -ScriptPath $harnessScript }
+  catch { $missingExitFailed = $_.Exception.Message.Contains('without an exit code') }
+  Write-TestResult -TestName 'runspace rejects a missing exit' -Passed $missingExitFailed
+  Set-Content -LiteralPath $harnessScript -Value "param([string]`$RepoRoot) `$ErrorActionPreference = 'Stop'; Write-Error 'harness-error'"
+  $harnessResult = Invoke-Validator -Root $repoRoot -ScriptPath $harnessScript
+  Write-TestResult -TestName 'runspace classifies a terminating diagnostic as exit 1' `
+    -Passed ($harnessResult.ExitCode -eq 1 -and $harnessResult.Output.Contains('harness-error'))
+  Set-Content -LiteralPath $harnessScript -Value "param([string]`$RepoRoot) Write-Error 'harness-error'; exit 0"
+  $errorFailed = $false
+  try { $null = Invoke-Validator -Root $repoRoot -ScriptPath $harnessScript }
+  catch { $errorFailed = $_.Exception.Message.Contains('PowerShell error with exit 0') }
+  Write-TestResult -TestName 'runspace rejects an error with exit 0' -Passed $errorFailed
+
   # ── Green half ────────────────────────────────────────────────────────────
-  Test-Accepts -TestName 'this repository passes' -Root $repoRoot
+  $realResult = Invoke-Validator -Root $repoRoot -Cli
+  Write-TestResult -TestName 'this repository passes through pwsh -File' `
+    -Passed ($realResult.ExitCode -eq 0) -Message "exit $($realResult.ExitCode): $($realResult.Output)"
   Test-Accepts -TestName 'a verbatim copy passes' -Root (New-ConfigFixture -Name 'baseline')
 
   # ── Red halves: missing inputs ────────────────────────────────────────────
