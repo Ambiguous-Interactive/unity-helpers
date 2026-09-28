@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            if (localChangedCount > 0)
+            if (0 < localChangedCount)
             {
                 try
                 {
