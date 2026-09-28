@@ -141,7 +141,7 @@ What does not auto‑fix:
 ## Run Checks Locally
 
 - Install tools once:
-  - `npm ci` (or `npm i --no-audit --no-fund`)
+  - `npm ci` installs the tool versions pinned in `package-lock.json`.
   - `dotnet tool restore`
   - `npm run hooks:install`: installs git hooks. The install script also configures `push.autoSetupRemote=true` and `push.default=simple` locally, so `git push` on a new branch sets tracking automatically.
 - Verify all tools: `npm run verify:tools`
@@ -158,6 +158,11 @@ What does not auto‑fix:
 - Verify Markdown/code links: `npm run lint:doc-links` (cross-platform wrapper that locates PowerShell automatically)
   - The wrapper lives at `scripts/run-doc-link-lint.js` so you can also run `node ./scripts/run-doc-link-lint.js --verbose` if you are not using npm scripts.
   - The underlying PowerShell script validates intra-repo Markdown links _and_ any `docs/...` references inside source files or scripts. The `lint-doc-links` GitHub Actions workflow runs it on every PR, so run it locally before pushing large doc updates.
+
+When updating npm tools, change the versions in `package.json`, then run
+`npm install --package-lock-only --ignore-scripts --no-audit --no-fund` and commit both files.
+Run `npm ci` and the relevant checks before committing. The lock keeps local and CI tools on the
+same dependency versions; it is excluded from the published Unity package.
 
 ## Style and Naming
 

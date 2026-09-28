@@ -73,9 +73,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # package-lock.json is GITIGNORED here, so the cached path is the exception rather than the
-      # rule and `cache: npm` on its own fails the job outright with "Dependencies lock file is not
-      # found". Same shape as validate-formatting.yml, for the same reason.
+      # The committed lock pins tools and enables npm caching. Keep the fallback for older refs.
       - name: Setup Node.js (cached)
         if: ${{ hashFiles('unity-helpers/package-lock.json') != '' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
