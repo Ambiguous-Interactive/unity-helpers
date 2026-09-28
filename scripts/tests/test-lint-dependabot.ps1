@@ -73,22 +73,42 @@ $tempBase = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } el
 $tempDir = Join-Path $tempBase "test-lint-dependabot-$(Get-Random)"
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
-# Helper: invoke the lint script via `pwsh -NoProfile -File` — the SAME invocation
-# path the pre-commit hook uses in production. Using the in-process call operator `&`
-# tolerates arg-binding patterns (like POSIX `--`) that `pwsh -File` does NOT, so
-# previous versions of this test masked a real CLI bug. See bash-pwsh-invocation skill.
+# Content fixtures run the full script in fresh runspaces; CLI fixtures below retain
+# pwsh -File argument binding, which the in-process call operator cannot reproduce.
+function Invoke-IsolatedScript {
+    param([string]$ScriptPath, [string]$FixturePath)
+    $runner = [System.Management.Automation.PowerShell]::Create()
+    try {
+        $null = $runner.AddCommand($ScriptPath)
+        if ($FixturePath) { $null = $runner.AddParameter('Paths', $FixturePath) }
+        $result = $runner.Invoke()
+        $output = [System.Collections.Generic.List[string]]::new()
+        foreach ($item in $result) { $output.Add($item.ToString()) }
+        foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+        foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+        if ($runner.Streams.Error.Count -gt 0) {
+            throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+        }
+        $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+        if ($null -eq $exitCode) {
+            throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+        }
+        return @{ ExitCode = [int]$exitCode; Output = ($output -join [Environment]::NewLine) }
+    } finally {
+        $runner.Dispose()
+    }
+}
+
 function Invoke-LintOnContent {
-    param([string]$YamlContent)
+    param([string]$YamlContent, [switch]$UseCli)
     $fixturePath = Join-Path $tempDir "dependabot-$(Get-Random).yml"
     Set-Content -Path $fixturePath -Value $YamlContent -NoNewline
     Write-Info "Testing fixture: $fixturePath"
-    try {
+    if ($UseCli) {
         $output = & pwsh -NoProfile -File $lintScriptPath -Paths $fixturePath *>&1
-        $exitCode = $LASTEXITCODE
-        return @{ ExitCode = $exitCode; Output = ($output | Out-String) }
-    } catch {
-        return @{ ExitCode = -1; Output = "Exception invoking linter: $_" }
+        return @{ ExitCode = $LASTEXITCODE; Output = ($output | Out-String) }
     }
+    return Invoke-IsolatedScript -ScriptPath $lintScriptPath -FixturePath $fixturePath
 }
 
 # Helper: run the lint script against two fixture strings, via pwsh -File
@@ -112,6 +132,34 @@ Write-Host "Testing lint-dependabot.ps1..." -ForegroundColor White
 
 try {
 
+$harnessPath = Join-Path $tempDir 'harness.ps1'
+foreach ($expectedExit in @(0, 1, 7)) {
+    Set-Content -LiteralPath $harnessPath -Value "Write-Host 'harness-output'; exit $expectedExit"
+    $result = Invoke-IsolatedScript -ScriptPath $harnessPath
+    Write-TestResult "Harness_Exit$expectedExit" ($result.ExitCode -eq $expectedExit -and $result.Output -match 'harness-output') "Expected exact exit $expectedExit with captured host output."
+}
+
+foreach ($control in @(
+    @{ Name = 'MissingExit'; Content = "Write-Host 'no-exit'"; ExpectedError = 'without an exit code' },
+    @{ Name = 'TerminatingError'; Content = "throw 'harness-terminating-error'"; ExpectedError = 'harness-terminating-error' },
+    @{ Name = 'NonTerminatingError'; Content = "Write-Error 'harness-stream-error' -ErrorAction Continue; exit 0"; ExpectedError = 'harness-stream-error' }
+)) {
+    Set-Content -LiteralPath $harnessPath -Value $control.Content
+    $rejected = $false
+    try {
+        $null = Invoke-IsolatedScript -ScriptPath $harnessPath
+    } catch {
+        $rejected = $_.Exception.Message -match $control.ExpectedError
+    }
+    Write-TestResult "Harness_$($control.Name)Fails" $rejected 'Harness failures must not satisfy linter expectations.'
+}
+
+Set-Content -LiteralPath $harnessPath -Value '$global:dependabotHarnessState = 1; exit 1'
+$null = Invoke-IsolatedScript -ScriptPath $harnessPath
+Set-Content -LiteralPath $harnessPath -Value "if (Get-Variable dependabotHarnessState -ErrorAction SilentlyContinue) { exit 1 }; exit 0"
+$result = Invoke-IsolatedScript -ScriptPath $harnessPath
+Write-TestResult 'Harness_RunspacesAreIsolated' ($result.ExitCode -eq 0) 'Each fixture must start with fresh session state.'
+
 # ── Pass_ValidConfig ─────────────────────────────────────────────────────────
 Write-Host "`n  Section: Valid configurations" -ForegroundColor White
 
@@ -132,7 +180,7 @@ updates:
       - wallstop
 '@
 
-$result = Invoke-LintOnContent $validConfig
+$result = Invoke-LintOnContent $validConfig -UseCli
 Write-TestResult "Pass_ValidConfig" ($result.ExitCode -eq 0) "Expected exit 0, got $($result.ExitCode). Output: $($result.Output)"
 
 # ── Pass_GroupsWithPatterns ───────────────────────────────────────────────────
@@ -186,7 +234,7 @@ updates:
 
 $result = Invoke-LintOnTwoContents $validConfig $invalidForMulti
 $hasDEP005multi = $result.Output -match 'DEP005'
-Write-TestResult "Fail_MultipleFilesOneInvalid" ($result.ExitCode -ne 0 -and $hasDEP005multi) "Expected non-zero + DEP005 when one of two files is invalid. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Fail_MultipleFilesOneInvalid" ($result.ExitCode -eq 1 -and $hasDEP005multi) "Expected exit 1 + DEP005 when one of two files is invalid. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Fail_MissingVersion ───────────────────────────────────────────────────────
 Write-Host "`n  Section: Error detection" -ForegroundColor White
@@ -201,7 +249,7 @@ updates:
 
 $result = Invoke-LintOnContent $noVersionConfig
 $hasDEP001 = $result.Output -match 'DEP001'
-Write-TestResult "Fail_MissingVersion" ($result.ExitCode -ne 0 -and $hasDEP001) "Expected non-zero + DEP001. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Fail_MissingVersion" ($result.ExitCode -eq 1 -and $hasDEP001) "Expected exit 1 + DEP001. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Fail_VersionAfterUpdates ──────────────────────────────────────────────────
 # version: 2 must appear BEFORE updates:, not after
@@ -216,7 +264,7 @@ version: 2
 
 $result = Invoke-LintOnContent $versionAfterUpdatesConfig
 $hasDEP001pos = $result.Output -match 'DEP001'
-Write-TestResult "Fail_VersionAfterUpdates" ($result.ExitCode -ne 0 -and $hasDEP001pos) "Expected non-zero + DEP001 when version: 2 is after updates:. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Fail_VersionAfterUpdates" ($result.ExitCode -eq 1 -and $hasDEP001pos) "Expected exit 1 + DEP001 when version: 2 is after updates:. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Pass_VersionAfterOtherTopLevelKey ─────────────────────────────────────────
 # A config with another top-level key (e.g. 'registries:') before 'version: 2'
@@ -296,7 +344,7 @@ updates:
 
 $result = Invoke-LintOnContent $nestedVersionConfig
 $hasDEP001nested = $result.Output -match 'DEP001'
-Write-TestResult "Fail_NestedVersionDoesNotSatisfyDEP001" ($result.ExitCode -ne 0 -and $hasDEP001nested) "Expected non-zero + DEP001 when version: 2 is nested. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Fail_NestedVersionDoesNotSatisfyDEP001" ($result.ExitCode -eq 1 -and $hasDEP001nested) "Expected exit 1 + DEP001 when version: 2 is nested. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Fail_MissingUpdatesSection ────────────────────────────────────────────────
 # A file with version: 2 but no 'updates:' section must fail with DEP007.
@@ -306,7 +354,7 @@ version: 2
 
 $result = Invoke-LintOnContent $noUpdatesSectionConfig
 $hasDEP007 = $result.Output -match 'DEP007'
-Write-TestResult "Fail_MissingUpdatesSection" ($result.ExitCode -ne 0 -and $hasDEP007) "Expected non-zero + DEP007 when updates: section is absent. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Fail_MissingUpdatesSection" ($result.ExitCode -eq 1 -and $hasDEP007) "Expected exit 1 + DEP007 when updates: section is absent. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Pass_DEP006LineNumberAccuracy ─────────────────────────────────────────────
 # DEP006 error must reference the group item's declaration line, not the
@@ -328,7 +376,7 @@ $hasDEP006 = $result.Output -match 'DEP006'
 # The group item 'bad-group:' is on line 8 of the fixture.
 # Ensure the reported line is NOT 0 (uninitialized) and the error text says DEP006.
 $lineNumIsNonZero = $result.Output -match 'DEP006: .* \(near line [1-9]\d*\)'
-Write-TestResult "Pass_DEP006LineNumberAccuracy" ($result.ExitCode -ne 0 -and $hasDEP006 -and $lineNumIsNonZero) "Expected non-zero + DEP006 with non-zero line number. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Pass_DEP006LineNumberAccuracy" ($result.ExitCode -eq 1 -and $hasDEP006 -and $lineNumIsNonZero) "Expected exit 1 + DEP006 with non-zero line number. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Fail_MultiEcosystemGroups ─────────────────────────────────────────────────
 $multiGroupsConfig = @'
@@ -348,7 +396,7 @@ updates:
 
 $result = Invoke-LintOnContent $multiGroupsConfig
 $hasDEP002 = $result.Output -match 'DEP002'
-Write-TestResult "Fail_MultiEcosystemGroups" ($result.ExitCode -ne 0 -and $hasDEP002) "Expected non-zero + DEP002. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Fail_MultiEcosystemGroups" ($result.ExitCode -eq 1 -and $hasDEP002) "Expected exit 1 + DEP002. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Fail_MultiEcosystemGroupKey ───────────────────────────────────────────────
 $multiGroupKeyConfig = @'
@@ -363,7 +411,7 @@ updates:
 
 $result = Invoke-LintOnContent $multiGroupKeyConfig
 $hasDEP003 = $result.Output -match 'DEP003'
-Write-TestResult "Fail_MultiEcosystemGroupKey" ($result.ExitCode -ne 0 -and $hasDEP003) "Expected non-zero + DEP003. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Fail_MultiEcosystemGroupKey" ($result.ExitCode -eq 1 -and $hasDEP003) "Expected exit 1 + DEP003. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Fail_PatternsAtWrongLevel ─────────────────────────────────────────────────
 $patternsWrongConfig = @'
@@ -379,7 +427,7 @@ updates:
 
 $result = Invoke-LintOnContent $patternsWrongConfig
 $hasDEP004 = $result.Output -match 'DEP004'
-Write-TestResult "Fail_PatternsAtWrongLevel" ($result.ExitCode -ne 0 -and $hasDEP004) "Expected non-zero + DEP004. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Fail_PatternsAtWrongLevel" ($result.ExitCode -eq 1 -and $hasDEP004) "Expected exit 1 + DEP004. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Fail_MissingSchedule ──────────────────────────────────────────────────────
 $noScheduleConfig = @'
@@ -393,7 +441,7 @@ updates:
 
 $result = Invoke-LintOnContent $noScheduleConfig
 $hasDEP005 = $result.Output -match 'DEP005'
-Write-TestResult "Fail_MissingSchedule" ($result.ExitCode -ne 0 -and $hasDEP005) "Expected non-zero + DEP005. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Fail_MissingSchedule" ($result.ExitCode -eq 1 -and $hasDEP005) "Expected exit 1 + DEP005. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Fail_GroupsMissingPatterns ────────────────────────────────────────────────
 $groupsNoPatternsConfig = @'
@@ -410,7 +458,7 @@ updates:
 
 $result = Invoke-LintOnContent $groupsNoPatternsConfig
 $hasDEP006 = $result.Output -match 'DEP006'
-Write-TestResult "Fail_GroupsMissingPatterns" ($result.ExitCode -ne 0 -and $hasDEP006) "Expected non-zero + DEP006. Exit: $($result.ExitCode), Output: $($result.Output)"
+Write-TestResult "Fail_GroupsMissingPatterns" ($result.ExitCode -eq 1 -and $hasDEP006) "Expected exit 1 + DEP006. Exit: $($result.ExitCode), Output: $($result.Output)"
 
 # ── Pass_GroupsWithComments ────────────────────────────────────────────────────
 # Inline comments and blank lines inside groups: must NOT trigger false DEP006.
@@ -483,8 +531,8 @@ $hasDEP003r = $result.Output -match 'DEP003'
 $hasDEP004r = $result.Output -match 'DEP004'
 $hasDEP005r = $result.Output -match 'DEP005'
 $allDetected = $hasDEP002r -and $hasDEP003r -and $hasDEP004r -and $hasDEP005r
-Write-TestResult "Regression_OriginalBrokenConfig" ($result.ExitCode -ne 0 -and $allDetected) (
-    "Expected non-zero with DEP002/DEP003/DEP004/DEP005. Exit: $($result.ExitCode). " +
+Write-TestResult "Regression_OriginalBrokenConfig" ($result.ExitCode -eq 1 -and $allDetected) (
+    "Expected exit 1 with DEP002/DEP003/DEP004/DEP005. Exit: $($result.ExitCode). " +
     "DEP002=$hasDEP002r DEP003=$hasDEP003r DEP004=$hasDEP004r DEP005=$hasDEP005r. Output: $($result.Output)"
 )
 
