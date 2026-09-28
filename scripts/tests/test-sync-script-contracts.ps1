@@ -276,7 +276,7 @@ function Run-AgentValidationContractTests {
   # asserted against that registry by scripts/tests/test-run-contract-tests.js. What belongs here is
   # the delegation itself: a chain reappearing in package.json is how the registry would stop
   # describing what runs.
-  $fastTestsDelegateToRunner = $fastTestScript -ceq 'node scripts/run-contract-tests.js'
+  $fastTestsDelegateToRunner = $fastTestScript -ceq 'node scripts/run-contract-tests.js --direct'
   Write-TestResult `
     -TestName 'The fast test aggregate delegates to the concurrent contract runner' `
     -Passed $fastTestsDelegateToRunner `
@@ -288,7 +288,7 @@ function Run-AgentValidationContractTests {
     -Passed $hookTestsAreSplit `
     -Message "hook regressions = $hookRegressionScript"
 
-  $expectedFullTestScript = 'node scripts/run-contract-tests.js --include-hook-regressions'
+  $expectedFullTestScript = 'node scripts/run-contract-tests.js --include-hook-regressions --direct'
   $fullTestsComposeBothAggregates = $fullTestScript -ceq $expectedFullTestScript
   Write-TestResult `
     -TestName 'Full CI test aggregate retains fast and exhaustive hook suites' `
