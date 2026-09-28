@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Sprites
 {
 #if UNITY_EDITOR
+    using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
@@ -213,6 +214,123 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 undone.maxTextureSize,
                 "Expected undo to restore original max size."
             );
+        }
+
+        [Test]
+        public void AppliesExplicitPathsAndReportsNoOpWithoutWindow()
+        {
+            string firstPath = (Root + "/batch_first.png").SanitizePath();
+            string secondPath = (Root + "/batch_second.png").SanitizePath();
+            CreatePng(firstPath, 8, 8, Color.white);
+            CreatePng(secondPath, 8, 8, Color.white);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+
+            TextureSettingsApplierAPI.Config config = new()
+            {
+                applyReadWriteEnabled = true,
+                readWriteEnabled = true,
+            };
+            List<string> paths = new() { firstPath.Replace('/', '\\'), secondPath };
+
+            Assert.IsTrue(
+                TextureSettingsApplierAPI.TryApplyTextureSettings(
+                    paths,
+                    in config,
+                    out int changed,
+                    out bool canceled,
+                    out string error
+                ),
+                error
+            );
+            Assert.AreEqual(2, changed);
+            Assert.IsFalse(canceled);
+            Assert.IsTrue((AssetImporter.GetAtPath(firstPath) as TextureImporter).isReadable);
+            Assert.IsTrue((AssetImporter.GetAtPath(secondPath) as TextureImporter).isReadable);
+
+            Assert.IsTrue(
+                TextureSettingsApplierAPI.TryApplyTextureSettings(
+                    paths,
+                    in config,
+                    out changed,
+                    out canceled,
+                    out error
+                ),
+                error
+            );
+            Assert.AreEqual(0, changed);
+            Assert.IsFalse(canceled);
+        }
+
+        [Test]
+        public void CancellationPersistsCompletedTextureAndReportsPartialResult()
+        {
+            string firstPath = (Root + "/cancel_first.png").SanitizePath();
+            string secondPath = (Root + "/cancel_second.png").SanitizePath();
+            CreatePng(firstPath, 8, 8, Color.white);
+            CreatePng(secondPath, 8, 8, Color.white);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+
+            TextureSettingsApplierAPI.Config config = new()
+            {
+                applyReadWriteEnabled = true,
+                readWriteEnabled = true,
+            };
+            List<string> paths = new() { firstPath, secondPath };
+
+            Assert.IsTrue(
+                TextureSettingsApplierAPI.TryApplyTextureSettings(
+                    paths,
+                    in config,
+                    out int changed,
+                    out bool canceled,
+                    out string error,
+                    cancelRequested: (index, total, path) => index == 1
+                ),
+                error
+            );
+            Assert.AreEqual(1, changed);
+            Assert.IsTrue(canceled);
+            Assert.IsTrue((AssetImporter.GetAtPath(firstPath) as TextureImporter).isReadable);
+            Assert.IsFalse((AssetImporter.GetAtPath(secondPath) as TextureImporter).isReadable);
+        }
+
+        [Test]
+        public void CallbackFailurePersistsCompletedTextureAndClearsProgress()
+        {
+            string firstPath = (Root + "/failure_first.png").SanitizePath();
+            string secondPath = (Root + "/failure_second.png").SanitizePath();
+            CreatePng(firstPath, 8, 8, Color.white);
+            CreatePng(secondPath, 8, 8, Color.white);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+
+            TextureSettingsApplierAPI.Config config = new()
+            {
+                applyReadWriteEnabled = true,
+                readWriteEnabled = true,
+            };
+            List<string> paths = new() { firstPath, secondPath };
+            bool completed = false;
+
+            Assert.IsFalse(
+                TextureSettingsApplierAPI.TryApplyTextureSettings(
+                    paths,
+                    in config,
+                    out int changed,
+                    out bool canceled,
+                    out string error,
+                    cancelRequested: (index, total, path) =>
+                        index == 1
+                            ? throw new System.InvalidOperationException("callback failed")
+                            : false,
+                    beforeReimport: () => completed = true
+                )
+            );
+            Assert.AreEqual(1, changed);
+            Assert.IsFalse(canceled);
+            Assert.IsTrue(completed);
+            StringAssert.Contains("callback failed", error);
+            Assert.IsTrue((AssetImporter.GetAtPath(firstPath) as TextureImporter).isReadable);
+            Assert.IsFalse((AssetImporter.GetAtPath(secondPath) as TextureImporter).isReadable);
         }
 
         private void CreatePng(string relPath, int w, int h, Color c)

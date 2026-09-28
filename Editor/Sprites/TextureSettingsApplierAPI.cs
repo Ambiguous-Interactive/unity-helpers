@@ -5,8 +5,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 {
 #if UNITY_EDITOR
     using System;
+    using System.Collections.Generic;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Programmatic API for applying generic texture importer settings (non-sprite specific)
@@ -14,6 +18,111 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </summary>
     public static class TextureSettingsApplierAPI
     {
+        /// <summary>Applies texture settings to explicit asset paths and persists changed importers.</summary>
+        /// <remarks>
+        /// Cancellation retains completed changes. Reimport and asset-database side effects cannot
+        /// be fully reversed by Unity Undo; a failure may leave earlier textures changed.
+        /// </remarks>
+        public static bool TryApplyTextureSettings(
+            IReadOnlyList<string> assetPaths,
+            in Config config,
+            out int changedCount,
+            out bool canceled,
+            out string error,
+            Func<int, int, string, bool> cancelRequested = null,
+            TextureImporterSettings buffer = null,
+            Action beforeReimport = null
+        )
+        {
+            if (assetPaths == null)
+            {
+                changedCount = 0;
+                canceled = false;
+                error = "Asset paths are required.";
+                return false;
+            }
+
+            int localChangedCount = 0;
+            bool localCanceled = false;
+            string localError = null;
+            using PooledResource<List<TextureImporter>> changedLease =
+                Buffers<TextureImporter>.List.Get(out List<TextureImporter> changed);
+            try
+            {
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                {
+                    for (int index = 0; index < assetPaths.Count; ++index)
+                    {
+                        string path = assetPaths[index].SanitizePath();
+                        if (
+                            cancelRequested != null
+                            && cancelRequested(index, assetPaths.Count, path)
+                        )
+                        {
+                            localCanceled = true;
+                            break;
+                        }
+
+                        if (
+                            TryUpdateTextureSettings(
+                                path,
+                                in config,
+                                out TextureImporter importer,
+                                buffer
+                            )
+                            && importer != null
+                        )
+                        {
+                            changed.Add(importer);
+                            ++localChangedCount;
+                        }
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                localError = $"Texture settings apply failed: {exception.Message}";
+            }
+
+            try
+            {
+                beforeReimport?.Invoke();
+            }
+            catch (Exception exception)
+            {
+                localError ??= $"Texture settings completion callback failed: {exception.Message}";
+            }
+
+            foreach (TextureImporter importer in changed)
+            {
+                try
+                {
+                    importer.SaveAndReimport();
+                }
+                catch (Exception exception)
+                {
+                    localError ??= $"Texture reimport failed: {exception.Message}";
+                }
+            }
+
+            if (localChangedCount > 0)
+            {
+                try
+                {
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                }
+                catch (Exception exception)
+                {
+                    localError ??= $"Texture settings save failed: {exception.Message}";
+                }
+            }
+            changedCount = localChangedCount;
+            canceled = localCanceled;
+            error = localError;
+            return localError == null;
+        }
+
         public static bool WillTextureSettingsChange(
             string assetPath,
             in Config config,

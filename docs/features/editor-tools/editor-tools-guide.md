@@ -222,9 +222,9 @@ Settings that tend to travel together:
 `Switch`, ...). Each entry has its own apply toggles, so you can cap Android at `1024` while
 Standalone keeps `2048`.
 
-Nothing on disk is rewritten — only import settings — and the change is recorded as a single
-`Apply Texture Settings` undo step. **Require Changes Before Apply** (on by default) skips the
-reimport entirely when nothing would differ.
+Source image bytes stay unchanged; Unity saves importer settings and reimports changed textures.
+The settings change is recorded as an `Apply Texture Settings` undo step. **Require Changes Before
+Apply** (on by default) skips the reimport entirely when nothing would differ.
 
 #### Applying texture settings from a script
 
@@ -233,13 +233,13 @@ The same logic is public, so a build step or a custom importer can use it direct
 <!-- doc-sample: compiles-editor -->
 
 ```csharp
-using UnityEditor;
+using System.Collections.Generic;
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Editor.Sprites;
 
 public static class TileImportStandard
 {
-    public static void ApplyTo(string assetPath)
+    public static bool ApplyTo(IReadOnlyList<string> assetPaths)
     {
         TextureSettingsApplierAPI.Config config = new()
         {
@@ -260,28 +260,31 @@ public static class TileImportStandard
             },
         };
 
-        if (!TextureSettingsApplierAPI.WillTextureSettingsChange(assetPath, in config))
-        {
-            return;
-        }
-
         if (
-            TextureSettingsApplierAPI.TryUpdateTextureSettings(
-                assetPath,
+            !TextureSettingsApplierAPI.TryApplyTextureSettings(
+                assetPaths,
                 in config,
-                out TextureImporter importer
+                out int changed,
+                out bool canceled,
+                out string error
             )
         )
         {
-            importer.SaveAndReimport();
+            Debug.LogError(error);
+            return false;
         }
+
+        Debug.Log($"Updated {changed} texture importers.");
+        return !canceled;
     }
 }
 ```
 
 `Config` is a struct with no defaults, so every field you care about must be set explicitly, and the
-API never calls `SaveAndReimport()` for you — that is deliberate, so you can batch a whole folder
-inside one `AssetDatabase.StartAssetEditing()` block. The default-platform name string is
+batch API reimports and saves changed textures. Its optional cancellation callback keeps completed
+changes and reports `canceled`; an error can also leave earlier textures changed. For one texture,
+`WillTextureSettingsChange` and `TryUpdateTextureSettings` remain available. The latter returns an
+importer for the caller to reimport. The default-platform name string is
 `"DefaultTexturePlatform"`.
 
 > **Visual Reference**
