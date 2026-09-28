@@ -78,10 +78,35 @@ function New-McpFixture {
   return $dir
 }
 
+function Invoke-IsolatedScript {
+  param([string]$ScriptPath, [string]$FixtureRoot)
+  $runner = [System.Management.Automation.PowerShell]::Create()
+  try {
+    $null = $runner.AddCommand($ScriptPath)
+    if ($FixtureRoot) { $null = $runner.AddParameter('RepoRoot', $FixtureRoot) }
+    $result = $runner.Invoke()
+    $output = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $result) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+    foreach ($item in $runner.Streams.Warning) { $output.Add($item.Message) }
+    foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+    if ($runner.Streams.Error.Count -gt 0) {
+      throw "Validator emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+    }
+    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    if ($null -eq $exitCode) { $exitCode = 0 }
+    return [pscustomobject]@{ ExitCode = [int]$exitCode; Output = ($output -join [Environment]::NewLine) }
+  }
+  finally { $runner.Dispose() }
+}
+
 function Invoke-Validator {
-  param([string]$FixtureRoot)
-  $out = & pwsh -NoProfile -File $validator -RepoRoot $FixtureRoot 2>&1
-  return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($out -join "`n") }
+  param([string]$FixtureRoot, [switch]$UseCli)
+  if ($UseCli) {
+    $output = & pwsh -NoProfile -File $validator -RepoRoot $FixtureRoot 2>&1
+    return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($output -join "`n") }
+  }
+  return Invoke-IsolatedScript -ScriptPath $validator -FixtureRoot $FixtureRoot
 }
 
 # Gitignore that covers all machine-local config paths (mirrors the real repo).
@@ -110,6 +135,32 @@ if (-not (Test-Path -LiteralPath $validator)) {
   Write-Host "Validator not found at $validator" -ForegroundColor Red
   exit 1
 }
+
+$harnessPath = Join-Path ([System.IO.Path]::GetTempPath()) ("mcp-runspace-harness-$PID-$([guid]::NewGuid().ToString('N')).ps1")
+try {
+  foreach ($expectedExit in @(0, 1)) {
+    Set-Content -LiteralPath $harnessPath -Value "Write-Host 'harness-output'; exit $expectedExit"
+    $harnessResult = Invoke-IsolatedScript -ScriptPath $harnessPath
+    Write-TestResult "Runspace exit $expectedExit is preserved" `
+      ($harnessResult.ExitCode -eq $expectedExit -and $harnessResult.Output.Contains('harness-output'))
+  }
+  foreach ($control in @(
+    @{ Name = 'terminating error'; Content = "throw 'harness-terminating-error'"; ExpectedError = 'harness-terminating-error' },
+    @{ Name = 'nonterminating error'; Content = "Write-Error 'harness-stream-error' -ErrorAction Continue; exit 0"; ExpectedError = 'harness-stream-error' }
+  )) {
+    Set-Content -LiteralPath $harnessPath -Value $control.Content
+    $rejected = $false
+    try { $null = Invoke-IsolatedScript -ScriptPath $harnessPath }
+    catch { $rejected = $_.Exception.Message.Contains($control.ExpectedError) }
+    Write-TestResult "Runspace $($control.Name) is rejected" $rejected
+  }
+  Set-Content -LiteralPath $harnessPath -Value '$global:mcpHarnessState = 1; exit 1'
+  $null = Invoke-IsolatedScript -ScriptPath $harnessPath
+  Set-Content -LiteralPath $harnessPath -Value 'if (Get-Variable mcpHarnessState -ErrorAction SilentlyContinue) { exit 1 }; exit 0'
+  $harnessResult = Invoke-IsolatedScript -ScriptPath $harnessPath
+  Write-TestResult 'Runspaces are isolated' ($harnessResult.ExitCode -eq 0)
+}
+finally { Remove-Item -LiteralPath $harnessPath -ErrorAction SilentlyContinue }
 
 # --- Test 1: clean fixture passes ---
 $f1 = New-McpFixture -GitIgnore $cleanGitIgnore -Files @{
@@ -143,8 +194,8 @@ $f3 = New-McpFixture -GitIgnore $cleanGitIgnore -Files @{
   'scripts/mcp/unity-mcp.mjs' = $bridgeScript
 }
 try {
-  $r3 = Invoke-Validator -FixtureRoot $f3
-  Write-TestResult 'Bad URL -> UNH-MCP-INVALID' (($r3.ExitCode -ne 0) -and ($r3.Output -match 'UNH-MCP-INVALID')) $r3.Output
+  $r3 = Invoke-Validator -FixtureRoot $f3 -UseCli
+  Write-TestResult 'Bad URL -> UNH-MCP-INVALID' (($r3.ExitCode -eq 1) -and ($r3.Output -match 'UNH-MCP-INVALID')) $r3.Output
 }
 finally { Remove-Item -Recurse -Force -LiteralPath $f3 -ErrorAction SilentlyContinue }
 
@@ -277,7 +328,7 @@ try {
 finally { Remove-Item -Recurse -Force -LiteralPath $f10 -ErrorAction SilentlyContinue }
 
 # --- Test 11: regression smoke test against the real repo ---
-$r11 = Invoke-Validator -FixtureRoot $repoRoot
+$r11 = Invoke-Validator -FixtureRoot $repoRoot -UseCli
 Write-TestResult 'Real repository passes (exit 0)' ($r11.ExitCode -eq 0) $r11.Output
 
 Write-Host ''
