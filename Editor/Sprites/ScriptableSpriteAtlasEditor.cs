@@ -863,15 +863,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private void CreateNewScriptableSpriteAtlas()
         {
             DirectoryHelper.EnsureDirectoryExists(NewAtlasConfigDirectory);
-            ScriptableSpriteAtlas newAtlasConfig = CreateInstance<ScriptableSpriteAtlas>();
             string path = AssetDatabase.GenerateUniqueAssetPath(
                 Path.Combine(NewAtlasConfigDirectory, "NewScriptableSpriteAtlas.asset")
             );
 
-            AssetDatabaseBatchHelper.EnsureAssetParentFolder(path);
-            AssetDatabase.CreateAsset(newAtlasConfig, path);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+            if (
+                !ScriptableSpriteAtlasGenerator.TryCreateConfig(
+                    path,
+                    out ScriptableSpriteAtlas newAtlasConfig,
+                    out string error
+                )
+            )
+            {
+                this.LogError($"Failed to create sprite atlas configuration: {error}");
+                return;
+            }
 
             EditorUtility.FocusProjectWindow();
             Selection.activeObject = newAtlasConfig;

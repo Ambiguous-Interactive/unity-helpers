@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `ScriptableSpriteAtlasGenerator.TrySetSourceTexturesUncompressed` to preview or apply source sprite import settings without opening the atlas window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
+- Add `ScriptableSpriteAtlasGenerator.TryCreateConfig` and `TrySetSourceTexturesUncompressed` to create atlas configs and manage source sprite import settings without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `DisposableScope` for allocation-free `using` cleanup with copy-safe, reverse-order disposal ([#875](https://github.com/Ambiguous-Interactive/unity-helpers/issues/875)).
 - Add `SpriteSettingsApplierAPI.TrySaveProfiles` and `TryLoadProfiles` so editor scripts can persist sprite settings without opening the window, with explicit overwrite and independent profile copies ([#862](https://github.com/Ambiguous-Interactive/unity-helpers/issues/862)).
 - Add `UnityMethodAnalyzerReportExportAPI` so editor scripts can save Markdown and JSON findings with compiler coverage status without opening the window ([#861](https://github.com/Ambiguous-Interactive/unity-helpers/issues/861)).
@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix sprite atlas generation losing unsaved config sprite entries while creating an atlas asset ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Fix the Sprite Atlas Generator's Force Uncompressed action so its default-platform compression setting stays uncompressed after reimport ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Fix editor folder discovery and atlas generation so paths with Windows separators work from scripts and batch mode ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Fix `DurableFile` ownership so append, create, and delete operations cannot change a destination during a staged write; competing operations also report failure without crashing Windows IL2CPP players ([#871](https://github.com/Ambiguous-Interactive/unity-helpers/issues/871)).

@@ -1078,6 +1078,14 @@ Closing the window releases its cached state.
    or **Generate + Pack** to do both.
 
 Scripts and batch jobs can use the same configuration without opening the window. Call
+`ScriptableSpriteAtlasGenerator.TryCreateConfig("Assets/Data/CharacterAtlas.asset", out config, out error)`
+to create a config at an explicit path outside an active asset batch. The parent folder must exist;
+the API refuses an occupied
+path at preflight. External writers are not locked out between that check and Unity asset creation.
+The window chooses a unique path before calling this API.
+Creation writes an asset file, which Unity Undo cannot fully reverse. If finalization fails after
+creation, the returned config remains at that path for inspection.
+Call
 `ScriptableSpriteAtlasGenerator.Scan(config, toAdd, toRemove)` to preview folder changes, then
 `Synchronize(config, toAdd, toRemove)` to add found sprites while keeping existing manual entries.
 Source folder paths in the config accept forward or back slashes.

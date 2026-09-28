@@ -21,6 +21,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// <summary>Generates and checks sprite atlases from configuration assets.</summary>
     public static class ScriptableSpriteAtlasGenerator
     {
+        /// <summary>Creates a sprite atlas configuration at an explicit project asset path.</summary>
+        /// <remarks>The parent folder must exist, and the call must be outside an asset batch. Asset-file creation cannot be fully reversed by Unity Undo. If finalization fails after creation, the created asset remains at the requested path for inspection.</remarks>
+        public static bool TryCreateConfig(
+            string assetPath,
+            out ScriptableSpriteAtlas config,
+            out string error
+        )
+        {
+            (bool succeeded, ScriptableSpriteAtlas created, string failure) = CreateConfig(
+                assetPath
+            );
+            config = created;
+            error = failure;
+            return succeeded;
+        }
+
         /// <summary>Finds sprites to add to and remove from a configuration.</summary>
         public static bool Scan(
             ScriptableSpriteAtlas config,
@@ -163,7 +179,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             bool normalized = RemoveNullSprites(config);
-            bool changed = GenerateCore(config);
+            (bool changed, bool succeeded) = GenerateCore(config);
+            if (!succeeded)
+            {
+                return false;
+            }
             if (changed || normalized)
             {
                 AssetDatabase.SaveAssets();
@@ -201,11 +221,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         succeeded = false;
                         continue;
                     }
-                    if (GenerateCore(config))
+                    normalized |= RemoveNullSprites(config);
+                    (bool coreChanged, bool coreSucceeded) = GenerateCore(config);
+                    if (!coreSucceeded)
+                    {
+                        succeeded = false;
+                    }
+                    if (coreChanged)
                     {
                         ++generated;
                     }
-                    normalized |= RemoveNullSprites(config);
                 }
             }
             if (0 < generated || normalized)
@@ -350,7 +375,111 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
             bool normalized = RemoveNullSprites(config);
-            return GenerateCore(config) || normalized;
+            (bool changed, bool succeeded) = GenerateCore(config);
+            return succeeded && (changed || normalized);
+        }
+
+        private static ValueTuple<bool, ScriptableSpriteAtlas, string> CreateConfig(
+            string assetPath
+        )
+        {
+            if (
+                string.IsNullOrWhiteSpace(assetPath)
+                || !string.Equals(assetPath, assetPath.Trim(), StringComparison.Ordinal)
+            )
+            {
+                return (
+                    false,
+                    null,
+                    "A configuration asset path without surrounding whitespace is required."
+                );
+            }
+
+            string path = assetPath.SanitizePath();
+            if (
+                !path.StartsWith("Assets/", StringComparison.Ordinal)
+                || !string.Equals(
+                    Path.GetExtension(path),
+                    ".asset",
+                    StringComparison.OrdinalIgnoreCase
+                )
+                || path.Contains("//")
+            )
+            {
+                return (false, null, "Configuration path must be an .asset file under Assets.");
+            }
+
+            string[] segments = path.Split('/');
+            foreach (string segment in segments)
+            {
+                if (
+                    string.Equals(segment, ".", StringComparison.Ordinal)
+                    || string.Equals(segment, "..", StringComparison.Ordinal)
+                    || string.IsNullOrWhiteSpace(segment)
+                )
+                {
+                    return (false, null, "Configuration path contains an invalid segment.");
+                }
+            }
+
+            if (AssetDatabaseBatchHelper.IsCurrentlyBatching)
+            {
+                return (false, null, "Create the configuration outside an asset batch.");
+            }
+
+            ScriptableSpriteAtlas created = null;
+            try
+            {
+                string parent = Path.GetDirectoryName(path).SanitizePath();
+                if (!AssetDatabase.IsValidFolder(parent))
+                {
+                    return (false, null, $"Configuration parent folder '{parent}' does not exist.");
+                }
+
+                string fullPath = Path.Combine(Path.GetDirectoryName(Application.dataPath), path);
+                if (
+                    File.Exists(fullPath)
+                    || Directory.Exists(fullPath)
+                    || AssetDatabase.LoadMainAssetAtPath(path) != null
+                )
+                {
+                    return (false, null, $"Configuration path '{path}' is already occupied.");
+                }
+
+                created = ScriptableObject.CreateInstance<ScriptableSpriteAtlas>();
+                AssetDatabase.CreateAsset(created, path);
+                if (!EditorUtility.IsPersistent(created))
+                {
+                    return (
+                        false,
+                        null,
+                        $"Unity did not create a configuration asset at '{path}'."
+                    );
+                }
+
+                Undo.RegisterCreatedObjectUndo(created, "Create Sprite Atlas Configuration");
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                return (true, created, string.Empty);
+            }
+            catch (Exception exception)
+            {
+                bool persisted = created != null && EditorUtility.IsPersistent(created);
+                return persisted
+                    ? (
+                        false,
+                        created,
+                        $"Configuration asset was created at '{path}', but finalization failed: {exception.Message}"
+                    )
+                    : (false, null, exception.Message);
+            }
+            finally
+            {
+                if (created != null && !EditorUtility.IsPersistent(created))
+                {
+                    Object.DestroyImmediate(created);
+                }
+            }
         }
 
         private static ValueTuple<bool, int, string> SetSourceTexturesUncompressed(
@@ -1259,12 +1388,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return true;
         }
 
-        private static bool GenerateCore(ScriptableSpriteAtlas config)
+        private static ValueTuple<bool, bool> GenerateCore(ScriptableSpriteAtlas config)
         {
+            if (EditorUtility.IsDirty(config))
+            {
+                try
+                {
+                    AssetDatabase.SaveAssets();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError(
+                        $"'{config.name}': Failed to save sprite atlas configuration before generation: {exception.Message}",
+                        config
+                    );
+                    return (false, false);
+                }
+            }
             List<string> differences = new List<string>();
             if (TryFindDrift(config, differences) && differences.Count == 0)
             {
-                return false;
+                return (false, true);
             }
             string outputPath = config.FullOutputPath;
             SpriteAtlas atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(outputPath);
@@ -1277,7 +1421,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         $"'{config.name}': Output path '{outputPath}' is occupied by another asset.",
                         config
                     );
-                    return false;
+                    return (false, false);
                 }
                 atlas = new SpriteAtlas();
             }
@@ -1350,27 +1494,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 AssetDatabaseBatchHelper.EnsureAssetParentFolder(outputPath);
                 AssetDatabase.CreateAsset(atlas, outputPath);
+                bool pendingInBatch =
+                    0 < AssetDatabaseBatchHelper.CurrentBatchDepth
+                    && EditorUtility.IsPersistent(atlas)
+                    && IsOutputOccupied(outputPath);
                 if (
                     !string.Equals(
                         AssetDatabase.GetAssetPath(atlas),
                         outputPath,
                         StringComparison.Ordinal
-                    )
+                    ) && !pendingInBatch
                 )
                 {
                     Debug.LogError(
                         $"'{config.name}': Failed to create Sprite Atlas at '{outputPath}'.",
                         config
                     );
-                    Object.DestroyImmediate(atlas);
-                    return false;
+                    if (!EditorUtility.IsPersistent(atlas))
+                    {
+                        Object.DestroyImmediate(atlas);
+                    }
+                    return (false, false);
                 }
             }
             else
             {
                 EditorUtility.SetDirty(atlas);
             }
-            return true;
+            return (true, true);
         }
 
         private static void ApplyPlatform(

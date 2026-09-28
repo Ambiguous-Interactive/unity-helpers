@@ -65,6 +65,156 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
+        public void CreateConfigUsesExplicitPathAndPreservesOccupiedAsset()
+        {
+            string path = Path.Combine(Root, "CreatedConfig.asset").SanitizePath();
+            Assert.IsTrue(
+                ScriptableSpriteAtlasGenerator.TryCreateConfig(
+                    path.Replace('/', '\\'),
+                    out ScriptableSpriteAtlas created,
+                    out string createError
+                ),
+                createError
+            );
+            TrackAssetPath(path);
+            try
+            {
+                Assert.IsTrue(created != null);
+                Assert.AreEqual(path, AssetDatabase.GetAssetPath(created));
+                Assert.AreSame(created, AssetDatabase.LoadAssetAtPath<ScriptableSpriteAtlas>(path));
+
+                byte[] originalBytes = File.ReadAllBytes(RelToFull(path));
+                Assert.IsFalse(
+                    ScriptableSpriteAtlasGenerator.TryCreateConfig(
+                        path,
+                        out ScriptableSpriteAtlas duplicate,
+                        out string duplicateError
+                    )
+                );
+                Assert.IsTrue(duplicate == null);
+                StringAssert.Contains("occupied", duplicateError);
+                CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(path)));
+                Assert.AreSame(created, AssetDatabase.LoadAssetAtPath<ScriptableSpriteAtlas>(path));
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(path);
+            }
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("  ")]
+        [TestCase("Packages/Other.asset")]
+        [TestCase("Assets/../Other.asset")]
+        [TestCase("Assets/./Other.asset")]
+        [TestCase("Assets//Other.asset")]
+        [TestCase("Assets/Other.txt")]
+        [TestCase(" Assets/Other.asset")]
+        [TestCase("Assets/Other.asset ")]
+        public void CreateConfigRejectsInvalidPath(string path)
+        {
+            Assert.IsFalse(
+                ScriptableSpriteAtlasGenerator.TryCreateConfig(
+                    path,
+                    out ScriptableSpriteAtlas created,
+                    out string error
+                )
+            );
+            Assert.IsTrue(created == null);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(error));
+        }
+
+        [Test]
+        public void CreateConfigRejectsMissingParentFolder()
+        {
+            string path = Path.Combine(Root, "MissingFolder", "Other.asset").SanitizePath();
+            Assert.IsFalse(
+                ScriptableSpriteAtlasGenerator.TryCreateConfig(
+                    path,
+                    out ScriptableSpriteAtlas created,
+                    out string error
+                )
+            );
+            Assert.IsTrue(created == null);
+            StringAssert.Contains("does not exist", error);
+            Assert.IsFalse(File.Exists(RelToFull(path)));
+        }
+
+        [Test]
+        public void CreateConfigRejectsActiveAssetBatchWithoutWriting()
+        {
+            string path = Path.Combine(Root, "BatchRejectedConfig.asset").SanitizePath();
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            {
+                Assert.IsFalse(
+                    ScriptableSpriteAtlasGenerator.TryCreateConfig(
+                        path,
+                        out ScriptableSpriteAtlas created,
+                        out string error
+                    )
+                );
+                Assert.IsTrue(created == null);
+                StringAssert.Contains("outside an asset batch", error);
+                Assert.IsFalse(File.Exists(RelToFull(path)));
+            }
+            Assert.IsFalse(File.Exists(RelToFull(path)));
+        }
+
+        [Test]
+        public void GenerateWithoutRefreshPersistsDirtyConfigBeforeCreatingAtlas()
+        {
+            string configPath = Path.Combine(Root, "BatchConfig.asset").SanitizePath();
+            string atlasPath = Path.Combine(Root, "BatchGenerated.spriteatlas").SanitizePath();
+            Assert.IsTrue(
+                ScriptableSpriteAtlasGenerator.TryCreateConfig(
+                    configPath,
+                    out ScriptableSpriteAtlas config,
+                    out string error
+                ),
+                error
+            );
+            TrackAssetPath(configPath);
+            TrackAssetPath(atlasPath);
+            try
+            {
+                config.outputSpriteAtlasDirectory = Root;
+                config.outputSpriteAtlasName = "BatchGenerated";
+                EditorUtility.SetDirty(config);
+
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                {
+                    bool generated = ScriptableSpriteAtlasGenerator.GenerateWithoutRefresh(config);
+                    Assert.IsTrue(
+                        generated,
+                        $"Atlas file exists during batch: {File.Exists(RelToFull(atlasPath))}"
+                    );
+                }
+                AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
+                Assert.IsTrue(AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath) != null);
+                Assert.AreEqual(Root, config.outputSpriteAtlasDirectory);
+                Assert.AreEqual("BatchGenerated", config.outputSpriteAtlasName);
+
+                config.sourceFolderEntries.Add(new SourceFolderEntry { folderPath = Root });
+                EditorUtility.SetDirty(config);
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                {
+                    Assert.IsFalse(ScriptableSpriteAtlasGenerator.GenerateWithoutRefresh(config));
+                }
+                AssetDatabaseBatchHelper.RefreshIfNotBatching();
+                ScriptableSpriteAtlas reloaded =
+                    AssetDatabase.LoadAssetAtPath<ScriptableSpriteAtlas>(configPath);
+                Assert.AreEqual(1, reloaded.sourceFolderEntries.Count);
+                Assert.AreEqual(Root, reloaded.sourceFolderEntries[0].folderPath);
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(atlasPath);
+                AssetDatabase.DeleteAsset(configPath);
+            }
+        }
+
+        [Test]
         public void GeneratesSpriteAtlasAssetFromConfig()
         {
             string spritePath = Path.Combine(Root, "icon.png").SanitizePath();
