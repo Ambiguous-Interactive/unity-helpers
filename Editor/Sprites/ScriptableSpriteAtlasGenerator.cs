@@ -82,6 +82,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return true;
         }
 
+        /// <summary>Previews or applies uncompressed import settings to the source textures in a config.</summary>
+        /// <remarks>Applying can partially change textures on failure. The count covers completed final reimports. Unity Undo cannot fully reverse import side effects.</remarks>
+        public static bool TrySetSourceTexturesUncompressed(
+            ScriptableSpriteAtlas config,
+            bool applyChanges,
+            out int changedTextures,
+            out string error,
+            Action<string, int, int> progress = null
+        )
+        {
+            (bool succeeded, int changed, string failure) = SetSourceTexturesUncompressed(
+                config,
+                applyChanges,
+                progress
+            );
+            changedTextures = changed;
+            error = failure;
+            return succeeded;
+        }
+
         /// <summary>Applies a scan result to a configuration asset.</summary>
         public static bool Synchronize(
             ScriptableSpriteAtlas config,
@@ -331,6 +351,191 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             bool normalized = RemoveNullSprites(config);
             return GenerateCore(config) || normalized;
+        }
+
+        private static ValueTuple<bool, int, string> SetSourceTexturesUncompressed(
+            ScriptableSpriteAtlas config,
+            bool applyChanges,
+            Action<string, int, int> progress
+        )
+        {
+            if (config == null || config.spritesToPack == null)
+            {
+                return (false, 0, "A sprite atlas config with a sprite list is required.");
+            }
+
+            int changedTextures = 0;
+            string error = null;
+            bool succeeded = true;
+            using PooledResource<List<TextureImporter>> changedLease =
+                Buffers<TextureImporter>.List.Get(out List<TextureImporter> changedImporters);
+            try
+            {
+                using PooledResource<HashSet<string>> pathLease = Buffers<string>.HashSet.Get(
+                    out HashSet<string> seenPaths
+                );
+                using PooledResource<List<string>> pathListLease = Buffers<string>.List.Get(
+                    out List<string> paths
+                );
+                using PooledResource<List<TextureImporter>> importerLease =
+                    Buffers<TextureImporter>.List.Get(out List<TextureImporter> candidates);
+
+                foreach (Sprite sprite in config.spritesToPack)
+                {
+                    if (sprite == null || sprite.texture == null)
+                    {
+                        continue;
+                    }
+
+                    string path = AssetDatabase.GetAssetPath(sprite.texture);
+                    if (string.IsNullOrWhiteSpace(path))
+                    {
+                        return (false, 0, $"No asset path exists for sprite '{sprite.name}'.");
+                    }
+                    if (seenPaths.Add(path))
+                    {
+                        paths.Add(path);
+                    }
+                }
+
+                foreach (string path in paths)
+                {
+                    TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                    if (importer == null)
+                    {
+                        return (false, 0, $"No texture importer exists at '{path}'.");
+                    }
+
+                    TextureImporterPlatformSettings settings =
+                        importer.GetDefaultPlatformTextureSettings();
+                    TextureImporterFormat format = importer.DoesSourceTextureHaveAlpha()
+                        ? TextureImporterFormat.RGBA32
+                        : TextureImporterFormat.RGB24;
+                    if (
+                        importer.crunchedCompression
+                        || importer.textureCompression != TextureImporterCompression.Uncompressed
+                        || settings.format != format
+                        || settings.textureCompression != TextureImporterCompression.Uncompressed
+                        || settings.crunchedCompression
+                        || settings.compressionQuality != 100
+                        || !settings.overridden
+                    )
+                    {
+                        candidates.Add(importer);
+                    }
+                }
+
+                if (!applyChanges)
+                {
+                    return (true, candidates.Count, null);
+                }
+
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                {
+                    for (int index = 0; index < candidates.Count; ++index)
+                    {
+                        TextureImporter importer = candidates[index];
+                        string path = importer.assetPath;
+                        progress?.Invoke(path, index + 1, candidates.Count);
+
+                        TextureImporterPlatformSettings settings =
+                            importer.GetDefaultPlatformTextureSettings();
+                        TextureImporterFormat format = importer.DoesSourceTextureHaveAlpha()
+                            ? TextureImporterFormat.RGBA32
+                            : TextureImporterFormat.RGB24;
+                        Undo.RecordObject(importer, "Set Sprite Texture To Uncompressed");
+                        changedImporters.Add(importer);
+                        importer.crunchedCompression = false;
+                        importer.textureCompression = TextureImporterCompression.Uncompressed;
+                        settings.format = format;
+                        settings.textureCompression = TextureImporterCompression.Uncompressed;
+                        settings.crunchedCompression = false;
+                        settings.compressionQuality = 100;
+                        settings.overridden = true;
+                        importer.SetPlatformTextureSettings(settings);
+                        EditorUtility.SetDirty(importer);
+                        importer.SaveAndReimport();
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                succeeded = false;
+                error = exception.Message;
+            }
+
+            foreach (TextureImporter importer in changedImporters)
+            {
+                string path;
+                try
+                {
+                    path = importer.assetPath;
+                    importer.SaveAndReimport();
+                    ++changedTextures;
+                }
+                catch (Exception exception)
+                {
+                    succeeded = false;
+                    error = string.IsNullOrWhiteSpace(error)
+                        ? exception.Message
+                        : error + " Final import failed: " + exception.Message;
+                    continue;
+                }
+
+                try
+                {
+                    TextureImporter saved = AssetImporter.GetAtPath(path) as TextureImporter;
+                    if (saved == null)
+                    {
+                        throw new InvalidOperationException(
+                            $"No texture importer exists at '{path}'."
+                        );
+                    }
+                    TextureImporterPlatformSettings settings =
+                        saved.GetDefaultPlatformTextureSettings();
+                    TextureImporterFormat expectedFormat = saved.DoesSourceTextureHaveAlpha()
+                        ? TextureImporterFormat.RGBA32
+                        : TextureImporterFormat.RGB24;
+                    if (
+                        saved.textureCompression != TextureImporterCompression.Uncompressed
+                        || saved.crunchedCompression
+                        || settings.textureCompression != TextureImporterCompression.Uncompressed
+                        || settings.crunchedCompression
+                        || settings.format != expectedFormat
+                        || settings.compressionQuality != 100
+                        || !settings.overridden
+                    )
+                    {
+                        throw new InvalidOperationException(
+                            $"Uncompressed import settings did not persist at '{path}'."
+                        );
+                    }
+                }
+                catch (Exception exception)
+                {
+                    succeeded = false;
+                    error = string.IsNullOrWhiteSpace(error)
+                        ? exception.Message
+                        : error + " Final verification failed: " + exception.Message;
+                }
+            }
+
+            if (0 < changedImporters.Count)
+            {
+                try
+                {
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                }
+                catch (Exception exception)
+                {
+                    succeeded = false;
+                    error = string.IsNullOrWhiteSpace(error)
+                        ? exception.Message
+                        : error + " Final refresh failed: " + exception.Message;
+                }
+            }
+            return (succeeded, changedTextures, error);
         }
 
         private static void AppendNonEmptyStrings(

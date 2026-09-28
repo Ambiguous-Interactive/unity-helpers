@@ -177,6 +177,155 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
+        public void SourceTextureImportSettingsPreviewAndApplyWithoutWindow()
+        {
+            string spritePath = Root + "/uncompressed-source.png";
+            string opaquePath = Root + "/opaque-source.png";
+            CreatePng(spritePath, 8, 8, new Color(1f, 0f, 0f, 0.5f));
+            CreatePng(opaquePath, 8, 8, Color.red, TextureFormat.RGB24);
+            AssetDatabase.ImportAsset(spritePath, ImportAssetOptions.ForceSynchronousImport);
+            AssetDatabase.ImportAsset(opaquePath, ImportAssetOptions.ForceSynchronousImport);
+            TextureImporter importer = AssetImporter.GetAtPath(spritePath) as TextureImporter;
+            TextureImporter opaqueImporter = AssetImporter.GetAtPath(opaquePath) as TextureImporter;
+            Assert.That(importer, Is.Not.Null);
+            Assert.That(opaqueImporter, Is.Not.Null);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.textureCompression = TextureImporterCompression.Compressed;
+            importer.crunchedCompression = true;
+            importer.SaveAndReimport();
+            opaqueImporter.textureType = TextureImporterType.Sprite;
+            opaqueImporter.textureCompression = TextureImporterCompression.Compressed;
+            opaqueImporter.crunchedCompression = true;
+            opaqueImporter.SaveAndReimport();
+
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
+            Sprite opaqueSprite = AssetDatabase.LoadAssetAtPath<Sprite>(opaquePath);
+            Assert.That(sprite, Is.Not.Null);
+            Assert.That(opaqueSprite, Is.Not.Null);
+            ScriptableSpriteAtlas config = Track(
+                ScriptableObject.CreateInstance<ScriptableSpriteAtlas>()
+            );
+            config.spritesToPack.Add(sprite);
+            config.spritesToPack.Add(sprite);
+            config.spritesToPack.Add(opaqueSprite);
+            string fullPath = RelToFull(spritePath);
+            string opaqueFullPath = RelToFull(opaquePath);
+            byte[] pngBefore = File.ReadAllBytes(fullPath);
+            byte[] opaquePngBefore = File.ReadAllBytes(opaqueFullPath);
+            byte[] metaBefore = File.ReadAllBytes(fullPath + ".meta");
+            byte[] opaqueMetaBefore = File.ReadAllBytes(opaqueFullPath + ".meta");
+
+            Assert.That(
+                ScriptableSpriteAtlasGenerator.TrySetSourceTexturesUncompressed(
+                    config,
+                    false,
+                    out int previewCount,
+                    out string previewError
+                ),
+                Is.True,
+                previewError
+            );
+            Assert.That(previewCount, Is.EqualTo(2));
+            Assert.That(
+                importer.textureCompression,
+                Is.EqualTo(TextureImporterCompression.Compressed)
+            );
+            CollectionAssert.AreEqual(pngBefore, File.ReadAllBytes(fullPath));
+            CollectionAssert.AreEqual(metaBefore, File.ReadAllBytes(fullPath + ".meta"));
+            CollectionAssert.AreEqual(opaquePngBefore, File.ReadAllBytes(opaqueFullPath));
+            CollectionAssert.AreEqual(
+                opaqueMetaBefore,
+                File.ReadAllBytes(opaqueFullPath + ".meta")
+            );
+
+            Assert.That(
+                ScriptableSpriteAtlasGenerator.TrySetSourceTexturesUncompressed(
+                    config,
+                    true,
+                    out int appliedCount,
+                    out string applyError,
+                    (path, index, total) =>
+                    {
+                        if (index == 2)
+                        {
+                            throw new System.InvalidOperationException(
+                                "Injected second texture failure."
+                            );
+                        }
+                    }
+                ),
+                Is.False,
+                applyError
+            );
+            Assert.That(appliedCount, Is.EqualTo(1));
+            StringAssert.Contains("Injected second texture failure.", applyError);
+            importer = AssetImporter.GetAtPath(spritePath) as TextureImporter;
+            Assert.That(
+                importer.textureCompression,
+                Is.EqualTo(TextureImporterCompression.Uncompressed)
+            );
+            AssetDatabase.ImportAsset(spritePath, ImportAssetOptions.ForceSynchronousImport);
+            importer = AssetImporter.GetAtPath(spritePath) as TextureImporter;
+            Assert.That(importer, Is.Not.Null);
+            Assert.That(importer.crunchedCompression, Is.False);
+            Assert.That(
+                importer.textureCompression,
+                Is.EqualTo(TextureImporterCompression.Uncompressed)
+            );
+            TextureImporterPlatformSettings settings = importer.GetDefaultPlatformTextureSettings();
+            Assert.That(settings.overridden, Is.True);
+            Assert.That(settings.format, Is.EqualTo(TextureImporterFormat.RGBA32));
+            Assert.That(
+                settings.textureCompression,
+                Is.EqualTo(TextureImporterCompression.Uncompressed)
+            );
+            Assert.That(settings.crunchedCompression, Is.False);
+            Assert.That(settings.compressionQuality, Is.EqualTo(100));
+            CollectionAssert.AreEqual(pngBefore, File.ReadAllBytes(fullPath));
+
+            opaqueImporter = AssetImporter.GetAtPath(opaquePath) as TextureImporter;
+            Assert.That(
+                opaqueImporter.textureCompression,
+                Is.EqualTo(TextureImporterCompression.Compressed)
+            );
+
+            Assert.That(
+                ScriptableSpriteAtlasGenerator.TrySetSourceTexturesUncompressed(
+                    config,
+                    true,
+                    out int repeatCount,
+                    out string repeatError
+                ),
+                Is.True,
+                repeatError
+            );
+            Assert.That(repeatCount, Is.EqualTo(1));
+            AssetDatabase.ImportAsset(opaquePath, ImportAssetOptions.ForceSynchronousImport);
+            opaqueImporter = AssetImporter.GetAtPath(opaquePath) as TextureImporter;
+            Assert.That(
+                opaqueImporter.textureCompression,
+                Is.EqualTo(TextureImporterCompression.Uncompressed)
+            );
+            Assert.That(
+                opaqueImporter.GetDefaultPlatformTextureSettings().format,
+                Is.EqualTo(TextureImporterFormat.RGB24)
+            );
+            CollectionAssert.AreEqual(opaquePngBefore, File.ReadAllBytes(opaqueFullPath));
+
+            Assert.That(
+                ScriptableSpriteAtlasGenerator.TrySetSourceTexturesUncompressed(
+                    config,
+                    true,
+                    out int noOpCount,
+                    out string noOpError
+                ),
+                Is.True,
+                noOpError
+            );
+            Assert.That(noOpCount, Is.Zero);
+        }
+
+        [Test]
         public void SpriteCollectionHelpersPreserveValidSpriteOrder()
         {
             Texture2D texture = Track(new Texture2D(2, 2));
@@ -252,11 +401,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.DoesNotThrow(() => ScriptableSpriteAtlasEditor.SortAtlasConfigs(null));
         }
 
-        private void CreatePng(string relPath, int w, int h, Color c)
+        private void CreatePng(
+            string relPath,
+            int w,
+            int h,
+            Color c,
+            TextureFormat format = TextureFormat.RGBA32
+        )
         {
             string dir = Path.GetDirectoryName(relPath)?.SanitizePath();
             EnsureFolder(dir);
-            Texture2D t = new(w, h, TextureFormat.RGBA32, false);
+            Texture2D t = new(w, h, format, false);
             try
             {
                 Color[] pix = new Color[w * h];

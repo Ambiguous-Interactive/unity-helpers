@@ -64,6 +64,14 @@ namespace WallstopStudios.UnityHelpers.Tests
                     );
                     Assert.DoesNotThrow(() => operation());
                 }
+                else if (windowType == typeof(ScriptableSpriteAtlasEditor) && calculateStats)
+                {
+                    ExpectError(
+                        LogType.Error,
+                        "Failed to set source sprite import settings.*Injected processing failure"
+                    );
+                    Assert.DoesNotThrow(() => operation());
+                }
                 else
                 {
                     InvalidOperationException actual = Assert.Throws<InvalidOperationException>(

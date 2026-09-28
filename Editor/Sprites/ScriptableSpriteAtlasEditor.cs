@@ -340,11 +340,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            using PooledResource<List<Sprite>> spritesToProcessLease = Buffers<Sprite>.List.Get(
-                out List<Sprite> spritesToProcess
+            using PooledResource<List<Sprite>> spritesLease = Buffers<Sprite>.List.Get(
+                out List<Sprite> sprites
             );
-            AppendSpritesWithTextures(config.spritesToPack, spritesToProcess);
-            if (spritesToProcess.Count == 0)
+            AppendSpritesWithTextures(config.spritesToPack, sprites);
+            if (sprites.Count == 0)
             {
                 this.LogWarn(
                     $"'{config.name}': No valid sprites with textures in the list to modify."
@@ -356,149 +356,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            int modifiedCount = 0;
-            int errorCount = 0;
-            using PooledResource<HashSet<string>> processedAssetPathsLease =
-                Buffers<string>.HashSet.Get(out HashSet<string> processedAssetPaths);
-            using PooledResource<List<TextureImporter>> importersLease =
-                Buffers<TextureImporter>.List.Get(out List<TextureImporter> importers);
+            int changedTextures = 0;
+            string error = null;
+            bool succeeded;
+            try
             {
-                try
-                {
-                    using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-                    {
-                        for (int i = 0; i < spritesToProcess.Count; ++i)
-                        {
-                            Sprite sprite = spritesToProcess[i];
-                            Utils.EditorUi.ShowProgress(
-                                "Modifying Source Sprite Import Settings",
-                                $"Processing: {sprite.name} ({i + 1}/{spritesToProcess.Count})",
-                                (float)(i + 1) / spritesToProcess.Count
-                            );
-
-                            string assetPath = AssetDatabase.GetAssetPath(sprite.texture);
-                            if (string.IsNullOrWhiteSpace(assetPath))
-                            {
-                                this.LogWarn(
-                                    $"Could not find asset path for sprite's texture: {sprite.name}. Skipping."
-                                );
-                                errorCount++;
-                                continue;
-                            }
-
-                            if (!processedAssetPaths.Add(assetPath))
-                            {
-                                continue;
-                            }
-
-                            TextureImporter importer =
-                                AssetImporter.GetAtPath(assetPath) as TextureImporter;
-                            if (importer == null)
-                            {
-                                this.LogWarn(
-                                    $"Could not get TextureImporter for asset: {assetPath} (from sprite: {sprite.name}). Skipping."
-                                );
-                                errorCount++;
-                                continue;
-                            }
-
-                            bool undoRecorded = false;
-                            bool settingsActuallyModified = false;
-
-                            void EnsureUndoRecorded()
-                            {
-                                if (undoRecorded)
-                                {
-                                    return;
-                                }
-                                Undo.RecordObject(importer, "Set Sprite Texture To Uncompressed");
-                                undoRecorded = true;
-                            }
-
-                            if (importer.crunchedCompression)
-                            {
-                                EnsureUndoRecorded();
-                                importer.crunchedCompression = false;
-                                settingsActuallyModified = true;
-                            }
-
-                            if (
-                                importer.textureCompression
-                                != TextureImporterCompression.Uncompressed
-                            )
-                            {
-                                EnsureUndoRecorded();
-                                importer.textureCompression =
-                                    TextureImporterCompression.Uncompressed;
-                                settingsActuallyModified = true;
-                            }
-
-                            TextureImporterPlatformSettings platformSettings =
-                                importer.GetDefaultPlatformTextureSettings();
-                            bool platformSettingsChangedThisTime = false;
-                            TextureImporterFormat targetFormat =
-                                importer.DoesSourceTextureHaveAlpha()
-                                    ? TextureImporterFormat.RGBA32
-                                    : TextureImporterFormat.RGB24;
-
-                            if (platformSettings.format != targetFormat)
-                            {
-                                platformSettings.format = targetFormat;
-                                platformSettingsChangedThisTime = true;
-                            }
-                            if (platformSettings.crunchedCompression)
-                            {
-                                platformSettings.crunchedCompression = false;
-                                platformSettingsChangedThisTime = true;
-                            }
-                            if (platformSettings.compressionQuality != 100)
-                            {
-                                platformSettings.compressionQuality = 100;
-                                platformSettingsChangedThisTime = true;
-                            }
-
-                            if (platformSettingsChangedThisTime || !platformSettings.overridden)
-                            {
-                                EnsureUndoRecorded();
-                                platformSettings.overridden = true;
-                                importer.SetPlatformTextureSettings(platformSettings);
-                                settingsActuallyModified = true;
-                            }
-
-                            if (settingsActuallyModified)
-                            {
-                                importer.SaveAndReimport();
-                                importers.Add(importer);
-                                modifiedCount++;
-                                this.Log(
-                                    $"Set import settings for texture: {assetPath} (from sprite: {sprite.name}) to uncompressed ({targetFormat})."
-                                );
-                            }
-                        }
-                    }
-                }
-                finally
-                {
-                    Utils.EditorUi.ClearProgress();
-                }
-
-                foreach (TextureImporter importer in importers)
-                {
-                    importer.SaveAndReimport();
-                }
-
-                if (0 < modifiedCount || 0 < errorCount)
-                {
-                    AssetDatabase.SaveAssets();
-                    AssetDatabase.Refresh();
-                }
-
-                string summaryMessage =
-                    $"Finished processing source sprite textures for '{config.name}'.\n"
-                    + $"Successfully modified importers for: {modifiedCount} textures.\n"
-                    + $"Errors/Skipped duplicates: {errorCount + (spritesToProcess.Count - processedAssetPaths.Count)}.";
-                this.Log($"{summaryMessage}");
+                succeeded = ScriptableSpriteAtlasGenerator.TrySetSourceTexturesUncompressed(
+                    config,
+                    true,
+                    out changedTextures,
+                    out error,
+                    (path, index, total) =>
+                        Utils.EditorUi.ShowProgress(
+                            "Modifying Source Sprite Import Settings",
+                            $"Processing: {Path.GetFileName(path)} ({index}/{total})",
+                            (float)index / total
+                        )
+                );
             }
+            finally
+            {
+                Utils.EditorUi.ClearProgress();
+            }
+
+            if (!succeeded)
+            {
+                this.LogError(
+                    $"Failed to set source sprite import settings for '{config.name}': {error}"
+                );
+            }
+            this.Log(
+                $"Finished processing source sprite textures for '{config.name}'. Modified importers: {changedTextures}."
+            );
         }
 
         internal void SyncListToScanResult(ScriptableSpriteAtlas config, ScanResult result)

@@ -1096,6 +1096,16 @@ That command skips packing and exits with code 1 if a config has an invalid or o
 Generation and packing write assets and may trigger imports; Unity Undo cannot reverse all file and
 import effects.
 
+`ScriptableSpriteAtlasGenerator.TrySetSourceTexturesUncompressed(config, applyChanges, out count, out error)`
+previews how many distinct source textures need uncompressed importer settings when `applyChanges`
+is `false`, and applies those settings without a window or prompt when it is `true`. It disables
+crunch and compression, sets the default platform to RGB24 or RGBA32 based on source alpha, and leaves PNG bytes
+untouched. Applying reimports textures, so Unity Undo cannot fully reverse the import effects.
+If a later texture fails, the call returns `false` with an error and the count of textures whose
+final reimport succeeded. Earlier changes can remain in place, and a failed import may need
+inspection. The API also reports failure if Unity reimports a texture but its resulting settings
+do not match the requested values.
+
 A character atlas that picks up every new idle frame automatically:
 
 ```text
