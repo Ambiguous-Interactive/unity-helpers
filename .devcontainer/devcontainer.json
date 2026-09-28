@@ -13,7 +13,13 @@
   },
   // Docker Desktop provides host.docker.internal natively; on a plain Linux Docker host this
   // mapping is what lets the container reach MCP bridges running beside Unity on the host.
-  "runArgs": ["--add-host=host.docker.internal:host-gateway"],
+  "runArgs": [
+    "--add-host=host.docker.internal:host-gateway",
+    "--cpus=6",
+    "--memory=16g",
+    "--memory-swap=20g",
+    "--pids-limit=4096"
+  ],
   // Features to add to the dev container
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
