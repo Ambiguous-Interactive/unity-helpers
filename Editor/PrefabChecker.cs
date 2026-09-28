@@ -147,7 +147,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         return false;
                     }
 
-                    if (prefabMissingScripts > 0)
+                    if (0 < prefabMissingScripts)
                     {
                         changedPrefabs++;
                         missingScripts += prefabMissingScripts;
@@ -194,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     );
                 }
 
-                if (found > 0 && !dryRun)
+                if (0 < found && !dryRun)
                 {
                     int removed = 0;
                     foreach (Transform transform in transforms)
