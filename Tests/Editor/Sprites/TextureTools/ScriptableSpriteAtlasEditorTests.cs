@@ -107,6 +107,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsTrue(ScriptableSpriteAtlasGenerator.Scan(config, toAdd, toRemove));
             Assert.AreEqual(1, toAdd.Count);
             Assert.IsEmpty(toRemove);
+            string backslashFolder = Root.Replace('/', '\\');
+            config.sourceFolderEntries[0].folderPath = backslashFolder;
+            Assert.IsTrue(ScriptableSpriteAtlasGenerator.Scan(config, toAdd, toRemove));
+            Assert.AreEqual(1, toAdd.Count);
+            Assert.IsEmpty(toRemove);
+            Assert.AreEqual(backslashFolder, config.sourceFolderEntries[0].folderPath);
+            config.sourceFolderEntries[0].folderPath = Root;
             Assert.IsTrue(ScriptableSpriteAtlasGenerator.Synchronize(config, toAdd, toRemove));
             config.spritesToPack.Add(null);
             TrackAssetPath(atlasPath);

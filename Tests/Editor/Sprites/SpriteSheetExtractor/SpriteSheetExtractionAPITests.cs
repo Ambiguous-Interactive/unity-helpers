@@ -398,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         public void DiscoveryAndWindowFindSameSpriteTexture()
         {
             SpriteSheetDiscoveryResult discovery = SpriteSheetExtractionAPI.Discover(
-                new[] { Root, Root },
+                new[] { Root.Replace('/', '\\'), Root.Replace('/', '\\') },
                 "^source$"
             );
             SpriteSheetDiscoveryResult invalid = SpriteSheetExtractionAPI.Discover(

@@ -584,7 +584,8 @@ progress bar. **Apply to Standalone / Android / iOS** additionally writes a plat
 the same size. **Fit Mode** is not persisted across a domain reload — re-select it after a
 recompile.
 
-Scripts and batch-mode jobs can run the same operation without opening the window:
+Scripts and batch-mode jobs can run the same operation without opening the window. Folder paths
+accept forward or back slashes:
 
 ```csharp
 List<string> textureGuids = new();
@@ -905,7 +906,7 @@ output and includes the cleanup error in `Errors`.
 
 Use `SpriteSheetExtractionAPI.Discover` with folder asset paths and an optional filename regex to
 get the same sprite texture list as the window. Its result includes warnings for invalid folders
-and an error for an invalid or timed-out regex.
+and an error for an invalid or timed-out regex. Folder paths accept forward or back slashes.
 
 `SpriteSheetReferenceReplacementAPI.Run` accepts an explicit map from source sprites to extracted
 sprites and explicit asset paths. It previews matching references by default; pass
@@ -1079,6 +1080,7 @@ Closing the window releases its cached state.
 Scripts and batch jobs can use the same configuration without opening the window. Call
 `ScriptableSpriteAtlasGenerator.Scan(config, toAdd, toRemove)` to preview folder changes, then
 `Synchronize(config, toAdd, toRemove)` to add found sprites while keeping existing manual entries.
+Source folder paths in the config accept forward or back slashes.
 If a source folder or filter is invalid, `Scan` returns `false` with empty results; fix the config
 before synchronizing.
 Pass `removeUnmatchedSprites: true` to remove every sprite absent from the scanned folders, including
@@ -1236,8 +1238,9 @@ until you tick **Enable Auto-fix options** — the gate is deliberate, because t
 Editor scripts can call `PrefabChecker.TryRemoveMissingScripts` with explicit `Assets` folders. A
 dry run counts affected prefabs and missing scripts without changing assets; an apply run removes
 missing slots from prefab roots and children. The call opens no window or dialog, and reports an
-error through its final output parameter. It may leave earlier prefabs repaired if a later prefab
-fails. Applying the repair writes prefab files, which Unity Undo cannot fully reverse.
+error through its final output parameter. Folder paths accept forward or back slashes. It may leave
+earlier prefabs repaired if a later prefab fails. Applying the repair writes prefab files, which
+Unity Undo cannot fully reverse.
 
 ```csharp
 bool repaired = PrefabChecker.TryRemoveMissingScripts(

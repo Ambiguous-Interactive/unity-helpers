@@ -129,6 +129,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             Assert.That(found, Is.True, error);
             Assert.That(guids, Does.Contain(AssetDatabase.AssetPathToGUID(path)));
 
+            List<string> folderGuids = new();
+            found = FitTextureSizeAPI.TryFindTextures(
+                new[] { Root.Replace('/', '\\') },
+                false,
+                folderGuids,
+                out error
+            );
+            Assert.That(found, Is.True, error);
+            Assert.That(folderGuids, Does.Contain(AssetDatabase.AssetPathToGUID(path)));
+
             FitTextureSizeAPI.Options options = new() { FitMode = FitMode.GrowOnly };
             FitTextureSizeAPI.Result preview = FitTextureSizeAPI.Run(guids, options, false);
             Assert.That(preview.Succeeded, Is.True, preview.Error);

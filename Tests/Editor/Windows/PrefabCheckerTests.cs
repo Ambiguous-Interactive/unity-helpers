@@ -131,9 +131,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 Assert.AreNotEqual(originalYaml, missingYaml);
                 File.WriteAllText(fullPath, missingYaml);
                 AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceSynchronousImport);
+                string windowsFolder = folder.Replace('/', '\\');
 
                 bool preview = PrefabChecker.TryRemoveMissingScripts(
-                    new[] { folder, folder },
+                    new[] { folder, windowsFolder },
                     true,
                     out int previewPrefabs,
                     out int previewScripts,
@@ -152,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 try
                 {
                     applied = PrefabChecker.TryRemoveMissingScripts(
-                        new[] { folder },
+                        new[] { windowsFolder },
                         false,
                         out changedPrefabs,
                         out removedScripts,
@@ -254,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                         return false;
                     };
                     EditorUi.ProgressClearedForTesting = () => clearCalls++;
-                    found = PrefabChecker.ScanFolders(new[] { folder }, options);
+                    found = PrefabChecker.ScanFolders(new[] { folder.Replace('/', '\\') }, options);
                 }
                 finally
                 {

@@ -173,6 +173,9 @@ namespace MyGame.Editor
 
 ## Run it
 
+`ValidationTargets.Enumerate` accepts `Assets` folders with forward or back slashes, including
+folders passed to batch validation.
+
 ```csharp
 [MenuItem("MyGame/Validate Audio")]
 private static void ValidateAudio()

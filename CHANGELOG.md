@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix editor folder discovery and atlas generation so paths with Windows separators work from scripts and batch mode ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Fix `DurableFile` ownership so append, create, and delete operations cannot change a destination during a staged write; competing operations also report failure without crashing Windows IL2CPP players ([#871](https://github.com/Ambiguous-Interactive/unity-helpers/issues/871)).
 - Fix Image Blur and Sprite Sheet Extractor output publication so a competing staged-file writer cannot change the destination during publication ([#871](https://github.com/Ambiguous-Interactive/unity-helpers/issues/871)).
 - Fix Sprite Sheet Animation Creator so declining an import-settings prompt leaves the texture importer unchanged ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).

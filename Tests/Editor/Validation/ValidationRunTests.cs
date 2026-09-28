@@ -486,6 +486,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.AreEqual(AssetDatabase.AssetPathToGUID(assetPath), targets[0].AssetGuid);
             Assert.AreEqual(typeof(DroppedSerializedFieldAsset), targets[0].MainAssetType);
             Assert.IsTrue(targets[0].IsValid());
+
+            List<ValidationTarget> backslashTargets = ValidationTargets.Enumerate(
+                folder.Replace('/', '\\')
+            );
+            Assert.AreEqual(1, backslashTargets.Count);
+            Assert.AreEqual(targets[0], backslashTargets[0]);
         }
 
         [Test]

@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using System;
     using System.Collections.Generic;
     using UnityEditor;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Builds the asset list a <see cref="ValidationRun"/> walks, without loading anything.
@@ -53,9 +54,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     List<string> existing = new List<string>(searchInFolders.Length);
                     foreach (string folder in searchInFolders)
                     {
-                        if (!string.IsNullOrEmpty(folder) && AssetDatabase.IsValidFolder(folder))
+                        string normalizedFolder = NormalizeFolder(folder);
+                        if (
+                            !string.IsNullOrEmpty(normalizedFolder)
+                            && AssetDatabase.IsValidFolder(normalizedFolder)
+                        )
                         {
-                            existing.Add(folder);
+                            existing.Add(normalizedFolder);
                         }
                     }
 
@@ -97,6 +102,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             return targets;
+        }
+
+        internal static string NormalizeFolder(string folder)
+        {
+            return folder.SanitizePath();
         }
     }
 #endif

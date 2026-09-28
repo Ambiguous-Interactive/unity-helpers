@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor
     using System.Text.RegularExpressions;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -62,19 +63,21 @@ namespace WallstopStudios.UnityHelpers.Editor
                             continue;
                         }
 
-                        if (AssetDatabase.IsValidFolder(path))
+                        string normalizedPath = path.SanitizePath();
+                        if (AssetDatabase.IsValidFolder(normalizedPath))
                         {
-                            folders.Add(path);
+                            folders.Add(normalizedPath);
                             continue;
                         }
 
-                        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                        TextureImporter importer =
+                            AssetImporter.GetAtPath(normalizedPath) as TextureImporter;
                         if (
                             importer != null
                             && (!onlySprites || importer.textureType == TextureImporterType.Sprite)
                         )
                         {
-                            string guid = AssetDatabase.AssetPathToGUID(path);
+                            string guid = AssetDatabase.AssetPathToGUID(normalizedPath);
                             if (!string.IsNullOrWhiteSpace(guid))
                             {
                                 guids.Add(guid);

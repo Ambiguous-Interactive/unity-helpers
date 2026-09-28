@@ -77,6 +77,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         public static Result Run(string[] commandLine)
         {
             List<string> folders = Helpers.GetCommandLineArguments(commandLine, FolderArgument);
+            for (int index = 0; index < folders.Count; index++)
+            {
+                folders[index] = ValidationTargets.NormalizeFolder(folders[index]);
+            }
             string outputPath = Helpers.GetCommandLineArgument(commandLine, OutputArgument);
             string suppressionsPath = Helpers.GetCommandLineArgument(
                 commandLine,

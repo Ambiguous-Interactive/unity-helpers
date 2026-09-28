@@ -474,10 +474,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            if (
-                string.IsNullOrWhiteSpace(entry.folderPath)
-                || !AssetDatabase.IsValidFolder(entry.folderPath)
-            )
+            string folderPath = entry.folderPath.SanitizePath();
+            if (string.IsNullOrWhiteSpace(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
             {
                 Debug.LogError(
                     $"'{config.name}': Invalid or empty folder path '{entry.folderPath}' prevents a complete scan.",
@@ -604,13 +602,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     bool searchedByLabels =
                         includeLabelFilter
-                        && TryFindLabelFilteredAssets(config, entry, includeLabels, guidList);
+                        && TryFindLabelFilteredAssets(
+                            config,
+                            entry,
+                            folderPath,
+                            includeLabels,
+                            guidList
+                        );
 
                     if (!searchedByLabels)
                     {
                         string[] defaultGuids = AssetDatabase.FindAssets(
                             "t:Texture2D",
-                            new[] { entry.folderPath }
+                            new[] { folderPath }
                         );
                         if (defaultGuids != null && 0 < defaultGuids.Length)
                         {
@@ -824,6 +828,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private static bool TryFindLabelFilteredAssets(
             ScriptableSpriteAtlas config,
             SourceFolderEntry entry,
+            string folderPath,
             IReadOnlyList<string> includeLabels,
             List<string> guidList
         )
@@ -856,7 +861,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
 
-                    string[] guids = AssetDatabase.FindAssets(query, new[] { entry.folderPath });
+                    string[] guids = AssetDatabase.FindAssets(query, new[] { folderPath });
                     if (guids != null && 0 < guids.Length)
                     {
                         guidList.AddRange(guids);
@@ -880,10 +885,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             }
 
                             string query = $"t:Texture2D l:{label}";
-                            string[] guids = AssetDatabase.FindAssets(
-                                query,
-                                new[] { entry.folderPath }
-                            );
+                            string[] guids = AssetDatabase.FindAssets(query, new[] { folderPath });
                             if (guids == null || guids.Length == 0)
                             {
                                 continue;

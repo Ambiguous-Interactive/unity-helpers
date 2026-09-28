@@ -161,7 +161,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             for (int i = 0; i < folderCount; ++i)
             {
                 string folder = folderAssetPaths[i];
-                if (string.IsNullOrWhiteSpace(folder) || !AssetDatabase.IsValidFolder(folder))
+                string normalizedFolder = folder.SanitizePath();
+                if (
+                    string.IsNullOrWhiteSpace(normalizedFolder)
+                    || !AssetDatabase.IsValidFolder(normalizedFolder)
+                )
                 {
                     result.AddWarning($"Skipping invalid folder: '{folder}'.");
                     continue;
@@ -169,7 +173,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 try
                 {
-                    string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { folder });
+                    string[] guids = AssetDatabase.FindAssets(
+                        "t:Texture2D",
+                        new[] { normalizedFolder }
+                    );
                     foreach (string guid in guids)
                     {
                         string assetPath = AssetDatabase.GUIDToAssetPath(guid);
