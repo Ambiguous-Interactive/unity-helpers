@@ -376,7 +376,6 @@ __pycache__/
 *.pyc
 
 package-lock.json
-!/package-lock.json
 package-lock.json.meta
 
 # Plugins
