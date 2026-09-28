@@ -16,7 +16,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
     internal sealed class AnalyzerPolicyWindow : EditorWindow
     {
-        internal const string RulesetAssetPath = "Assets/" + RulesetFileName;
         private const string RulesetFileName = "Default.ruleset";
 
         private static readonly GUIContent EnableContent = new(
@@ -31,99 +30,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             "Refresh",
             "Read Assets/Default.ruleset again."
         );
-        private static readonly AnalyzerPolicy[] Policies =
-        {
-            new(
-                "WUH001",
-                "Lookup factory allocation",
-                "Reports method groups that allocate a delegate on every cache lookup."
-            ),
-            new(
-                "WUH002",
-                "Nested serialized collection",
-                "Reports nested collections that Unity silently fails to serialize."
-            ),
-            new(
-                "WUH003",
-                "Unity object null propagation",
-                "Reports CLR null propagation that misses destroyed Unity objects."
-            ),
-            new(
-                "WUH004",
-                "Unity object null assertion",
-                "Reports NUnit null assertions that miss destroyed Unity objects."
-            ),
-            new(
-                "WUH005",
-                "UnityEngine.Random",
-                "Reports global random state that isolated tests cannot replay."
-            ),
-            new(
-                "WUH006",
-                "Discarded effect handle",
-                "Reports an EffectHandle that cannot later remove an infinite effect."
-            ),
-            new(
-                "WUH007",
-                "Discarded coroutine handle",
-                "Reports a coroutine handle that cannot later stop its routine."
-            ),
-            new(
-                "WUH008",
-                "Untested Try out value",
-                "Reports a Try-pattern out value read without testing success."
-            ),
-            new(
-                "WUH009",
-                "Teardown base-call order",
-                "Reports teardown work that runs after its base teardown."
-            ),
-            new(
-                "WUH010",
-                "Dictionary indexer read",
-                "Reports reads that throw when a key is absent. This policy is opt-in by default."
-            ),
-            new(
-                "WUH011",
-                "Comparer mutation after use",
-                "Reports serialized comparer modes changed after collection construction."
-            ),
-            new(
-                "WUH012",
-                "Unchecked serialized row",
-                "Reports a serialized row dereferenced without a null test."
-            ),
-            new(
-                "WUH013",
-                "Index-only counting loop",
-                "Reports counting loops that can be allocation-free foreach loops. This policy is opt-in by default."
-            ),
-            new(
-                "WUH014",
-                "Assigning disposable struct",
-                "Reports disposable structs whose Dispose mutates a copy."
-            ),
-            new(
-                "WUH015",
-                "Invalid Unity callback",
-                "Reports Unity lifecycle methods whose signature prevents invocation."
-            ),
-            new(
-                "WUH016",
-                "Hidden Unity callback",
-                "Reports Unity callbacks that hide an inherited callback."
-            ),
-            new(
-                "WUH017",
-                "GetComponent null comparison",
-                "Reports GetComponent probes that allocate instead of using TryGetComponent."
-            ),
-            new(
-                "WUH018",
-                "Implicit string equality",
-                "Reports string equality whose comparison policy is unstated. This policy is opt-in by default."
-            ),
-        };
+        private static readonly AnalyzerPolicy[] Policies = AnalyzerPolicyAPI.Policies;
 
         private Vector2 _scrollPosition;
         private AnalyzerPolicyState _state;
@@ -216,10 +123,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private void ApplyState(AnalyzerPolicyState state)
         {
             if (
-                !AnalyzerPolicyRuleset.TryWrite(
-                    GetRulesetPath(),
-                    state,
-                    Policies,
+                !AnalyzerPolicyAPI.TrySetEnabled(
+                    state == AnalyzerPolicyState.Enabled,
                     out string message
                 )
             )
@@ -229,7 +134,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return;
             }
 
-            AssetDatabase.ImportAsset(RulesetAssetPath, ImportAssetOptions.ForceUpdate);
             RefreshState();
         }
 

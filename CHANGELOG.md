@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `AnalyzerPolicyAPI.TrySetEnabled` so editor scripts can enable or disable Unity Helpers analyzer policies without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `ScriptableSpriteAtlasGenerator.TryCreateConfig` and `TrySetSourceTexturesUncompressed` to create atlas configs and manage source sprite import settings without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `DisposableScope` for allocation-free `using` cleanup with copy-safe, reverse-order disposal ([#875](https://github.com/Ambiguous-Interactive/unity-helpers/issues/875)).
 - Add `SpriteSettingsApplierAPI.TrySaveProfiles` and `TryLoadProfiles` so editor scripts can persist sprite settings without opening the window, with explicit overwrite and independent profile copies ([#862](https://github.com/Ambiguous-Interactive/unity-helpers/issues/862)).

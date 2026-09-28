@@ -1324,6 +1324,12 @@ so commit it when the policy should be shared with the team. The window lists ev
 with a short explanation; the [Analyzer reference](../../performance/analyzers.md) has examples and
 fixes.
 
+Editor scripts and batch mode can call `AnalyzerPolicyAPI.TrySetEnabled(true, out string message)`
+to enable all Unity Helpers policies in `Assets/Default.ruleset`, or pass `false` to disable them.
+The overload accepting an asset path manages another `.ruleset` under `Assets`. Both calls import
+the written ruleset immediately and return `false` with a message when the path, ruleset, write, or
+import fails. Ruleset file changes cannot be reversed through Unity Undo.
+
 ### Unity Method Analyzer
 
 `Tools > Wallstop Studios > Unity Helpers > Unity Method Analyzer`

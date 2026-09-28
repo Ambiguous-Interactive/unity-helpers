@@ -7,7 +7,8 @@ finds are not specific to either.
 Open `Tools > Wallstop Studios > Unity Helpers > Analyzer Policies` to inspect the complete policy
 set and enable or disable it for user code. The window manages only the Unity Helpers block in
 `Assets/Default.ruleset`, preserves unrelated analyzer configuration, and reports configuration
-drift before repairing it.
+drift before repairing it. Editor scripts can call `AnalyzerPolicyAPI.TrySetEnabled` with an
+explicit enabled state and optional `.ruleset` asset path for the same prompt-free operation.
 
 | Id                                                                       | Reports                                                           |
 | ------------------------------------------------------------------------ | ----------------------------------------------------------------- |

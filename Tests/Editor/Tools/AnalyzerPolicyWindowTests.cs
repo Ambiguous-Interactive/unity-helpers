@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
+    using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Tools;
 
@@ -148,6 +149,110 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
             StringAssert.Contains("left unchanged", malformedMessage);
             Assert.AreEqual(malformed, File.ReadAllText(path));
+        }
+
+        [Test]
+        public void ExplicitAssetRulesetWritesAndImportsWithoutOpeningWindow()
+        {
+            Assert.That(
+                AnalyzerPolicyAPI.DefaultRulesetAssetPath,
+                Is.EqualTo("Assets/Default.ruleset")
+            );
+            string folderName = nameof(AnalyzerPolicyWindowTests) + Guid.NewGuid().ToString("N");
+            string folderPath = "Assets/" + folderName;
+            Assert.That(AssetDatabase.CreateFolder("Assets", folderName), Is.Not.Empty);
+            try
+            {
+                string assetPath = folderPath + "/Default.ruleset";
+                string fullPath = Path.Combine(Application.dataPath, folderName, "Default.ruleset");
+                Assert.That(
+                    AnalyzerPolicyAPI.TrySetEnabled(assetPath, true, out string createMessage),
+                    Is.True,
+                    createMessage
+                );
+                Assert.That(File.Exists(fullPath), Is.True);
+                Assert.That(AssetDatabase.AssetPathToGUID(assetPath), Is.Not.Empty);
+                File.WriteAllText(
+                    fullPath,
+                    "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                        + "<RuleSet Name=\"Existing\" ToolsVersion=\"15.0\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n"
+                        + "  <Rules AnalyzerId=\"Microsoft.CodeAnalysis.CSharp\" RuleNamespace=\"Microsoft.CodeAnalysis.CSharp\">\n"
+                        + "    <Rule Id=\"CS0618\" Action=\"Error\" />\n"
+                        + "  </Rules>\n"
+                        + "</RuleSet>\n"
+                );
+
+                Assert.That(
+                    AnalyzerPolicyAPI.TrySetEnabled(
+                        assetPath.Replace('/', '\\'),
+                        true,
+                        out string enableMessage
+                    ),
+                    Is.True,
+                    enableMessage
+                );
+                Assert.That(AssetDatabase.AssetPathToGUID(assetPath), Is.Not.Empty);
+                string enabledContent = File.ReadAllText(fullPath);
+                Assert.That(enabledContent, Does.Contain("Id=\"CS0618\" Action=\"Error\""));
+                Assert.That(enabledContent, Does.Contain("Id=\"WUH001\" Action=\"Warning\""));
+                Assert.That(enabledContent, Does.Contain("Id=\"WUH018\" Action=\"Warning\""));
+
+                Assert.That(
+                    AnalyzerPolicyAPI.TrySetEnabled(assetPath, false, out string disableMessage),
+                    Is.True,
+                    disableMessage
+                );
+                string disabledContent = File.ReadAllText(fullPath);
+                Assert.That(disabledContent, Does.Contain("Id=\"CS0618\" Action=\"Error\""));
+                Assert.That(disabledContent, Does.Contain("Id=\"WUH001\" Action=\"None\""));
+                Assert.That(disabledContent, Does.Contain("Id=\"WUH018\" Action=\"None\""));
+
+                const string malformed = "<RuleSet><Rules>";
+                File.WriteAllText(fullPath, malformed);
+                Assert.That(
+                    AnalyzerPolicyAPI.TrySetEnabled(assetPath, true, out string malformedMessage),
+                    Is.False
+                );
+                Assert.That(malformedMessage, Does.Contain("left unchanged"));
+                Assert.That(File.ReadAllText(fullPath), Is.EqualTo(malformed));
+                Assert.That(
+                    AnalyzerPolicyAPI.TrySetEnabled(
+                        folderPath + "/../outside.ruleset",
+                        true,
+                        out string escapedPathMessage
+                    ),
+                    Is.False
+                );
+                Assert.That(escapedPathMessage, Is.Not.Empty);
+                Assert.That(
+                    AnalyzerPolicyAPI.TrySetEnabled(null, true, out string nullPathMessage),
+                    Is.False
+                );
+                Assert.That(nullPathMessage, Is.Not.Empty);
+                Assert.That(
+                    AnalyzerPolicyAPI.TrySetEnabled(
+                        folderPath + "/missing/Other.ruleset",
+                        true,
+                        out string missingFolderMessage
+                    ),
+                    Is.False
+                );
+                Assert.That(missingFolderMessage, Is.Not.Empty);
+                Assert.That(
+                    AnalyzerPolicyAPI.TrySetEnabled(
+                        folderPath + "/not-ruleset.txt",
+                        true,
+                        out string extensionMessage
+                    ),
+                    Is.False
+                );
+                Assert.That(extensionMessage, Is.Not.Empty);
+                Assert.That(File.ReadAllText(fullPath), Is.EqualTo(malformed));
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(folderPath);
+            }
         }
 
         private string GetRulesetPath()
