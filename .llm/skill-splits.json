@@ -167,7 +167,7 @@
     },
     {
       "name": "git-staging-helpers",
-      "sha256": "f79028665a0c62b8e99bc74b72f6006c85927f8c26e4b2de2708ecc09001d8a8",
+      "sha256": "85c00ab02482cdcdd04b44bed1bed1b5910365ee73a3fc2fb790dbb770aaef94",
       "parts": ["git-staging-helpers-part-1.md", "git-staging-helpers-part-2.md"],
       "routerSha256": "b34eebfdffced07107347edf5e497d2c596edbe3b3e9dff538e2137216ef6460"
     },

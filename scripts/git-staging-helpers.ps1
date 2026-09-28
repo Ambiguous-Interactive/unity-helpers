@@ -13,7 +13,7 @@
 #   GIT_LOCK_MAX_ATTEMPTS - Max retry attempts for git add (default: 30)
 #   GIT_LOCK_INITIAL_DELAY_MS - Initial retry delay in milliseconds (default: 50)
 #   GIT_LOCK_MAX_DELAY_MS - Max retry delay in milliseconds (default: 3000)
-#   GIT_LOCK_WAIT_TIMEOUT_MS - Max wait for index lock polling (default: 30000)
+#   GIT_LOCK_WAIT_TIMEOUT_MS - Max lock wait; retry pre-wait caps at 5000ms (default: 30000)
 #   GIT_LOCK_POLL_INTERVAL_MS - Lock polling interval in milliseconds (default: 50)
 #   GIT_LOCK_INITIAL_WAIT_MS - Initial wait for lock at hook start (default: 10000)
 #
@@ -138,8 +138,9 @@ function Wait-ForGitIndexLock {
 
     $elapsed = 0
     while ((Test-Path -LiteralPath $IndexLockPath) -and $elapsed -lt $MaxWaitMilliseconds) {
-        Start-Sleep -Milliseconds $PollIntervalMilliseconds
-        $elapsed += $PollIntervalMilliseconds
+        $sleepMilliseconds = [Math]::Min($PollIntervalMilliseconds, $MaxWaitMilliseconds - $elapsed)
+        Start-Sleep -Milliseconds $sleepMilliseconds
+        $elapsed += $sleepMilliseconds
     }
 
     return -not (Test-Path -LiteralPath $IndexLockPath)
@@ -321,7 +322,10 @@ function Invoke-GitAddWithRetry {
             # Wait for any existing lock to be released before attempting
             if ($IndexLockPath -and (Test-Path -LiteralPath $IndexLockPath)) {
                 Write-GitStagingVerbose "index.lock exists before attempt $attempt, waiting..."
-                $lockCleared = Wait-ForGitIndexLock -IndexLockPath $IndexLockPath -MaxWaitMilliseconds 5000 -PollIntervalMilliseconds 50
+                $lockCleared = Wait-ForGitIndexLock `
+                    -IndexLockPath $IndexLockPath `
+                    -MaxWaitMilliseconds ([Math]::Min(5000, $script:GitLockWaitTimeoutMs)) `
+                    -PollIntervalMilliseconds $script:GitLockPollIntervalMs
                 if (-not $lockCleared) {
                     if (-not $Quiet) {
                         Write-GitStagingWarning "index.lock still exists after waiting; attempting git add anyway (attempt $attempt/$MaxAttempts)"

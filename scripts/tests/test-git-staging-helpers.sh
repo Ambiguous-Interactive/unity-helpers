@@ -271,6 +271,16 @@ for index_kind in ordinary relative; do
             if (Wait-ForGitIndexLock -IndexLockPath $info.IndexLockPath -MaxWaitMilliseconds 0) {
                 throw "Changing location hid the captured index lock"
             }
+            $script:requestedSleep = -1
+            function Start-Sleep {
+                param([int]$Milliseconds)
+                $script:requestedSleep = $Milliseconds
+                if ($Milliseconds -gt 1) { throw "Lock polling exceeded its one-millisecond deadline" }
+            }
+            if (Wait-ForGitIndexLock -IndexLockPath $info.IndexLockPath -MaxWaitMilliseconds 1 -PollIntervalMilliseconds 5000) {
+                throw "The held index lock was reported clear"
+            }
+            if ($script:requestedSleep -ne 1) { throw "The capped lock wait was not exercised" }
             Remove-Item -LiteralPath $expected
             if (-not (Wait-ForGitIndexLock -IndexLockPath $info.IndexLockPath -MaxWaitMilliseconds 0)) {
                 throw "Released index is still reported locked"

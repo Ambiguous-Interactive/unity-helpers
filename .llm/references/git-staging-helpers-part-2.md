@@ -62,7 +62,7 @@ Configure the git staging helpers via environment variables:
 | `GIT_LOCK_MAX_ATTEMPTS`     | `30`                                  | Maximum retry attempts                     |
 | `GIT_LOCK_INITIAL_DELAY_MS` | `50`                                  | Initial backoff delay (ms)                 |
 | `GIT_LOCK_MAX_DELAY_MS`     | `3000`                                | Maximum backoff delay cap (ms)             |
-| `GIT_LOCK_WAIT_TIMEOUT_MS`  | `30000`                               | Max wait for lock per attempt (ms)         |
+| `GIT_LOCK_WAIT_TIMEOUT_MS`  | `30000`                               | Max lock wait; retry cap 5000 ms           |
 | `GIT_LOCK_POLL_INTERVAL_MS` | `50`                                  | Lock polling frequency (ms)                |
 | `GIT_LOCK_INITIAL_WAIT_MS`  | `10000`                               | Initial wait at hook start (ms)            |
 | `GIT_HELPERS_LOCK_FILE`     | `/tmp/unity-helpers-git-staging.lock` | Bash flock file path                       |
