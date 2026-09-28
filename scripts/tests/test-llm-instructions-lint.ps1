@@ -352,7 +352,7 @@ try {
     $contextMutation = $contextText.Replace('GitHub MCP server **FIRST**', 'GitHub MCP server when convenient')
     $contextMutationApplied = -not [string]::Equals($contextText, $contextMutation, [System.StringComparison]::Ordinal)
     [System.IO.File]::WriteAllText($contextPolicyFile, $contextMutation, (New-Object System.Text.UTF8Encoding($false)))
-    & pwsh -NoProfile -File $lintScript | Out-Null
+    & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
     Write-TestResult "Lint.FailsWithoutGitHubMcpPriority" ($contextMutationApplied -and $LASTEXITCODE -ne 0) `
       "Lint should fail when the context policy no longer makes GitHub MCP first; mutation applied=$contextMutationApplied"
   }
@@ -419,7 +419,7 @@ try {
       $githubOperationsMutation,
       [System.StringComparison]::Ordinal)
     [System.IO.File]::WriteAllText($githubOperationsSkill, $githubOperationsMutation, (New-Object System.Text.UTF8Encoding($false)))
-    & pwsh -NoProfile -File $lintScript | Out-Null
+    & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
     Write-TestResult "Lint.FailsWithoutSkillFallbackAnnouncement" `
       ($githubOperationsMutationApplied -and $LASTEXITCODE -ne 0) `
       "Lint should fail after github-operations.md's fallback announcement is removed; mutation applied=$githubOperationsMutationApplied"
@@ -435,7 +435,7 @@ try {
     $agentsText = [System.IO.File]::ReadAllText($agentsFile)
     $agentsMutation = $agentsText.Replace('](./.llm/context.md)', '](./.llm/missing.md)')
     [System.IO.File]::WriteAllText($agentsFile, $agentsMutation, (New-Object System.Text.UTF8Encoding($false)))
-    & pwsh -NoProfile -File $lintScript | Out-Null
+    & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
     Write-TestResult "Lint.FailsWhenAgentEntrypointDrifts" ($LASTEXITCODE -ne 0) `
       "Lint should fail when an agent entrypoint stops delegating to context.md"
   }
