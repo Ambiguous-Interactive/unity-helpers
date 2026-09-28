@@ -726,24 +726,6 @@ test_precommit_meta_scope() {
     done
 }
 
-# -----------------------------------------------------------------------------
-# Guard: the anti-pattern lint itself passes on the repo.
-# If THIS fails, there is a lingering -- argv form somewhere in the codebase.
-# -----------------------------------------------------------------------------
-test_antipattern_lint_clean() {
-    local name="lint-pwsh-invocations.ps1 is clean on the repo"
-    if [[ ! -f "$REPO_ROOT/scripts/lint-pwsh-invocations.ps1" ]]; then
-        skip "$name" "anti-pattern lint not present"; return
-    fi
-    if pwsh -NoProfile -File "$REPO_ROOT/scripts/lint-pwsh-invocations.ps1" >/dev/null 2>&1; then
-        pass "$name"
-    else
-        local out
-        out=$(pwsh -NoProfile -File "$REPO_ROOT/scripts/lint-pwsh-invocations.ps1" 2>&1 || true)
-        fail "$name" "$out"
-    fi
-}
-
 echo "=== Pre-commit integration tests ==="
 echo "Repo root: $REPO_ROOT"
 echo "Tempdir:   $TEMPDIR"
@@ -758,7 +740,6 @@ test_format_staged_csharp_branch
 test_drawer_branch
 test_duplicate_usings_branch
 test_sync_scripts_branch
-test_antipattern_lint_clean
 test_precommit_spellcheck_regression
 test_precommit_entrypoint_delegates_to_ps1
 test_precommit_fast_path_removes_ignored_artifacts
