@@ -166,25 +166,52 @@ function New-TestRepo {
 function Invoke-Linter {
   param(
     [string]$RepoDir,
-    [switch]$Verbose
+    [string]$ScriptPath = $lintScript,
+    [switch]$Verbose,
+    [switch]$Cli
   )
 
-  $lintScript = Join-Path $PSScriptRoot '..' 'lint-gitignore-docs.ps1'
-
-  $linterArgs = @($lintScript)
-  if ($Verbose) { $linterArgs += '-VerboseOutput' }
-
-  try {
-    Push-Location $RepoDir
-    $output = & pwsh -NoProfile -File @linterArgs 2>&1
-    $exitCode = $LASTEXITCODE
-  } finally {
-    Pop-Location
+  if ($Cli) {
+    $linterArgs = @($ScriptPath)
+    if ($Verbose) { $linterArgs += '-VerboseOutput' }
+    try {
+      Push-Location $RepoDir
+      $output = & pwsh -NoProfile -File @linterArgs 2>&1
+      $exitCode = $LASTEXITCODE
+    } finally {
+      Pop-Location
+    }
+    return @{ ExitCode = $exitCode; Output = ($output -join "`n") }
   }
 
-  return @{
-    ExitCode = $exitCode
-    Output = ($output -join "`n")
+  $runner = [System.Management.Automation.PowerShell]::Create()
+  try {
+    $null = $runner.AddCommand('Set-Location').AddParameter('LiteralPath', $RepoDir)
+    $null = $runner.AddStatement().AddCommand($ScriptPath)
+    if ($Verbose) { $null = $runner.AddParameter('VerboseOutput', $true) }
+    $failure = $null
+    $result = @()
+    try { $result = $runner.Invoke() }
+    catch { $failure = $_.Exception }
+    $output = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $result) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+    foreach ($item in $runner.Streams.Warning) { $output.Add($item.Message) }
+    foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+    if ($null -ne $failure) {
+      $output.Add($failure.Message)
+      return @{ ExitCode = 1; Output = ($output -join "`n") }
+    }
+    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    if ($null -eq $exitCode) {
+      throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+    }
+    if ($runner.Streams.Error.Count -gt 0 -and [int]$exitCode -eq 0) {
+      throw "Linter emitted a PowerShell error with exit 0. $($output -join [Environment]::NewLine)"
+    }
+    return @{ ExitCode = [int]$exitCode; Output = ($output -join "`n") }
+  } finally {
+    $runner.Dispose()
   }
 }
 
@@ -196,6 +223,48 @@ function Remove-TestRepo {
 # ---- Test Cases ----
 
 Write-Host "Testing lint-gitignore-docs.ps1..." -ForegroundColor White
+
+$lintScript = Join-Path $PSScriptRoot '..' 'lint-gitignore-docs.ps1'
+$harnessRepo = New-TestRepo
+try {
+  $harnessScript = Join-Path $harnessRepo 'harness.ps1'
+  Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-zero'; exit 0"
+  $harnessResult = Invoke-Linter -RepoDir $harnessRepo -ScriptPath $harnessScript
+  Write-TestResult 'Runspace_ExitZeroAndHostOutput' `
+    ($harnessResult.ExitCode -eq 0 -and $harnessResult.Output.Contains('harness-zero'))
+  Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-one'; exit 1"
+  $harnessResult = Invoke-Linter -RepoDir $harnessRepo -ScriptPath $harnessScript
+  Write-TestResult 'Runspace_ExitOneAndHostOutput' `
+    ($harnessResult.ExitCode -eq 1 -and $harnessResult.Output.Contains('harness-one'))
+  Set-Content -LiteralPath $harnessScript -Value "Write-Warning 'harness-warning'; exit 0"
+  $harnessResult = Invoke-Linter -RepoDir $harnessRepo -ScriptPath $harnessScript
+  Write-TestResult 'Runspace_WarningOutput' `
+    ($harnessResult.ExitCode -eq 0 -and $harnessResult.Output.Contains('harness-warning'))
+  Set-Content -LiteralPath $harnessScript -Value "`$global:FixtureState = 'dirty'; exit 0"
+  $null = Invoke-Linter -RepoDir $harnessRepo -ScriptPath $harnessScript
+  Set-Content -LiteralPath $harnessScript -Value "if (Get-Variable -Name FixtureState -Scope Global -ErrorAction SilentlyContinue) { exit 1 }; exit 0"
+  $harnessResult = Invoke-Linter -RepoDir $harnessRepo -ScriptPath $harnessScript
+  Write-TestResult 'Runspace_FreshGlobalState' ($harnessResult.ExitCode -eq 0)
+  Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-missing-exit'"
+  $missingExitFailed = $false
+  try { $null = Invoke-Linter -RepoDir $harnessRepo -ScriptPath $harnessScript }
+  catch { $missingExitFailed = $_.Exception.Message.Contains('without an exit code') }
+  Write-TestResult 'Runspace_RejectsMissingExit' $missingExitFailed
+  Set-Content -LiteralPath $harnessScript -Value "`$ErrorActionPreference = 'Stop'; Write-Error 'harness-error'"
+  $harnessResult = Invoke-Linter -RepoDir $harnessRepo -ScriptPath $harnessScript
+  Write-TestResult 'Runspace_TerminatingDiagnosticIsExitOne' `
+    ($harnessResult.ExitCode -eq 1 -and $harnessResult.Output.Contains('harness-error'))
+  Set-Content -LiteralPath $harnessScript -Value "Write-Error 'harness-error'; exit 0"
+  $errorFailed = $false
+  try { $null = Invoke-Linter -RepoDir $harnessRepo -ScriptPath $harnessScript }
+  catch { $errorFailed = $_.Exception.Message.Contains('PowerShell error with exit 0') }
+  Write-TestResult 'Runspace_RejectsErrorWithExitZero' $errorFailed
+  $cliResult = Invoke-Linter -RepoDir $harnessRepo -Verbose -Cli
+  Write-TestResult 'RealCli_VerboseBindingAndExitZero' `
+    ($cliResult.ExitCode -eq 0 -and $cliResult.Output.Contains('Check 1:'))
+} finally {
+  Remove-TestRepo $harnessRepo
+}
 
 # ==== Test Group 1: Clean scenarios (should pass) ====
 Write-Host "`nTest group: Clean scenarios (should pass)" -ForegroundColor Magenta
