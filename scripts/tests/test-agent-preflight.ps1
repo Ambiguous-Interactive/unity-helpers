@@ -121,7 +121,8 @@ function Invoke-Preflight {
         [Parameter(Mandatory = $true)]
         [string]$RepoPath,
         [string[]]$Arguments,
-        [hashtable]$EnvOverrides
+        [hashtable]$EnvOverrides,
+        [switch]$UseCli
     )
 
     $previousValues = @{}
@@ -140,20 +141,103 @@ function Invoke-Preflight {
 
     Push-Location $RepoPath
     try {
-        $output = & pwsh -NoProfile -File scripts/agent-preflight.ps1 @Arguments 2>&1
-        return @{
-            ExitCode = $LASTEXITCODE
-            Output = ($output -join "`n")
+        if ($UseCli) {
+            $output = & pwsh -NoProfile -File scripts/agent-preflight.ps1 @Arguments 2>&1
+            return @{
+                ExitCode = $LASTEXITCODE
+                Output = ($output -join "`n")
+            }
         }
+
+        return Invoke-IsolatedPreflight -ScriptPath (Join-Path $RepoPath 'scripts/agent-preflight.ps1') -Arguments $Arguments
     }
     finally {
         Pop-Location
 
         if ($null -ne $EnvOverrides) {
             foreach ($key in $EnvOverrides.Keys) {
-                [Environment]::SetEnvironmentVariable($key, $previousValues[$key])
+                if ($null -eq $previousValues[$key]) {
+                    Remove-Item -Path "Env:$key" -ErrorAction SilentlyContinue
+                }
+                else {
+                    [Environment]::SetEnvironmentVariable($key, $previousValues[$key])
+                }
             }
         }
+    }
+}
+
+function Invoke-IsolatedPreflight {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ScriptPath,
+        [string[]]$Arguments
+    )
+
+    if ($null -eq $Arguments) {
+        $Arguments = @()
+    }
+
+    $runner = [System.Management.Automation.PowerShell]::Create()
+    try {
+        $null = $runner.AddScript('param($WorkingDirectory) Set-Location -LiteralPath $WorkingDirectory').AddArgument((Split-Path -Parent (Split-Path -Parent $ScriptPath)))
+        $null = $runner.Invoke()
+        if ($runner.HadErrors) {
+            throw "Runspace failed to enter fixture repository: $($runner.Streams.Error -join [Environment]::NewLine)"
+        }
+
+        $runner.Commands.Clear()
+        $null = $runner.AddCommand($ScriptPath)
+        for ($index = 0; $index -lt $Arguments.Count; $index++) {
+            $name = $Arguments[$index].TrimStart('-')
+            if ($name -eq 'Fix') {
+                $null = $runner.AddParameter('Fix')
+                continue
+            }
+
+            if ($name -ne 'Paths' -and $name -ne 'PathList') {
+                throw "Unsupported preflight fixture argument: $($Arguments[$index])"
+            }
+
+            if ($index + 1 -ge $Arguments.Count) {
+                throw "Missing value for preflight fixture argument: $($Arguments[$index])"
+            }
+
+            $index++
+            $null = $runner.AddParameter($name, $Arguments[$index])
+        }
+
+        $result = $runner.Invoke()
+        $output = [System.Collections.Generic.List[string]]::new()
+        foreach ($item in $result) {
+            $output.Add($item.ToString())
+        }
+        foreach ($item in $runner.Streams.Information) {
+            $output.Add($item.MessageData.ToString())
+        }
+        foreach ($item in $runner.Streams.Warning) {
+            $output.Add($item.Message)
+        }
+        foreach ($item in $runner.Streams.Error) {
+            $output.Add($item.ToString())
+        }
+
+        if ($runner.Streams.Error.Count -gt 0) {
+            throw "Preflight emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+        }
+
+        $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+        if ($null -eq $exitCode) {
+            throw 'Preflight did not set an exit code.'
+        }
+
+        return @{
+            ExitCode = [int]$exitCode
+            Output = ($output -join "`n")
+        }
+    }
+    finally {
+        $runner.Dispose()
     }
 }
 
@@ -346,11 +430,56 @@ exit 0
 
 Write-Host 'Testing agent-preflight.ps1...' -ForegroundColor White
 
+Write-Host "`nTest group: isolated runspace harness" -ForegroundColor Magenta
+$harnessRepo = New-TestRepo -ConfigurePushDefaults
+$harnessPath = Join-Path $harnessRepo 'scripts/runspace-harness.ps1'
+try {
+    foreach ($expectedExit in @(0, 1)) {
+        Set-Content -LiteralPath $harnessPath -Value "Write-Host 'harness-output'; exit $expectedExit"
+        $harnessResult = Invoke-IsolatedPreflight -ScriptPath $harnessPath
+        Write-TestResult "RunspaceExit$expectedExit" ($harnessResult.ExitCode -eq $expectedExit -and $harnessResult.Output.Contains('harness-output')) 'Expected exact exit code and host output'
+    }
+
+    foreach ($control in @(
+        @{ Name = 'TerminatingError'; Content = "throw 'harness-terminating-error'"; ExpectedError = 'harness-terminating-error' },
+        @{ Name = 'NonterminatingError'; Content = "Write-Error 'harness-stream-error' -ErrorAction Continue; exit 0"; ExpectedError = 'harness-stream-error' }
+    )) {
+        Set-Content -LiteralPath $harnessPath -Value $control.Content
+        $rejected = $false
+        try {
+            $null = Invoke-IsolatedPreflight -ScriptPath $harnessPath
+        }
+        catch {
+            $rejected = $_.Exception.Message.Contains($control.ExpectedError)
+        }
+        Write-TestResult "Runspace$($control.Name)" $rejected 'Expected PowerShell error to fail the harness'
+    }
+
+    Set-Content -LiteralPath $harnessPath -Value "Write-Host 'harness-missing-exit'"
+    $missingExitRejected = $false
+    try {
+        $null = Invoke-IsolatedPreflight -ScriptPath $harnessPath
+    }
+    catch {
+        $missingExitRejected = $_.Exception.Message.Contains('did not set an exit code')
+    }
+    Write-TestResult 'RunspaceMissingExitFails' $missingExitRejected 'Expected a script without an explicit exit to fail the harness'
+
+    Set-Content -LiteralPath $harnessPath -Value '$global:preflightHarnessState = 1; exit 1'
+    $null = Invoke-IsolatedPreflight -ScriptPath $harnessPath
+    Set-Content -LiteralPath $harnessPath -Value 'if (Get-Variable preflightHarnessState -Scope Global -ErrorAction SilentlyContinue) { exit 1 }; exit 0'
+    $harnessResult = Invoke-IsolatedPreflight -ScriptPath $harnessPath
+    Write-TestResult 'RunspacesAreIsolated' ($harnessResult.ExitCode -eq 0) 'Expected a fresh global session for each invocation'
+}
+finally {
+    Remove-Item -LiteralPath $harnessRepo -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # Test 1: No changed files should exit successfully
 Write-Host "`nTest group: baseline behavior" -ForegroundColor Magenta
 $repo1 = New-TestRepo -ConfigurePushDefaults
 try {
-    $result1 = Invoke-Preflight -RepoPath $repo1 -Arguments @()
+    $result1 = Invoke-Preflight -RepoPath $repo1 -Arguments @() -UseCli
     Write-TestResult 'NoChanges_ExitCode0' ($result1.ExitCode -eq 0) "Expected exit code 0, got $($result1.ExitCode)"
     Write-TestResult 'NoChanges_Message' ($result1.Output -match 'No changed files detected') 'Expected no-changes message'
 }
@@ -368,7 +497,7 @@ foreach ($metaSubject in @('Runtime/MyFeature.cs', 'Samples~/Example/MyFeature.c
         $filePath = Join-Path $runtimeDir 'MyFeature.cs'
         Set-Content -Path $filePath -Value 'public sealed class MyFeature {}' -Encoding UTF8
 
-        $result2 = Invoke-Preflight -RepoPath $repo2 -Arguments @('-Paths', $metaSubject)
+        $result2 = Invoke-Preflight -RepoPath $repo2 -Arguments @('-Paths', $metaSubject) -UseCli:($metaSubject -eq 'Runtime/MyFeature.cs')
         Write-TestResult "MissingMeta_ExitCode1_$metaSubject" ($result2.ExitCode -eq 1) "Expected exit code 1, got $($result2.ExitCode)"
         Write-TestResult "MissingMeta_ErrorMessage_$metaSubject" ($result2.Output -match 'Missing \.meta files detected') 'Expected missing meta error message'
         Write-TestResult "MissingMeta_ListsPath_$metaSubject" ($result2.Output -match [regex]::Escape($metaSubject)) 'Expected missing path to be listed in output'
@@ -438,7 +567,7 @@ public sealed class NewLinePath {}
         Pop-Location
     }
 
-    $result3Newline = Invoke-Preflight -RepoPath $repo3Newline -Arguments @('-Fix')
+    $result3Newline = Invoke-Preflight -RepoPath $repo3Newline -Arguments @('-Fix') -UseCli
     Write-TestResult 'NewlinePathFix_ExitCode0' ($result3Newline.ExitCode -eq 0) "Expected exit code 0 for newline path recovery, got $($result3Newline.ExitCode). Output: $($result3Newline.Output)"
     Write-TestResult 'NewlinePathFix_FileMetaCreated' (Test-Path -LiteralPath "$newlinePath.meta") 'Expected exact newline-path .meta companion to be created'
 
@@ -715,6 +844,7 @@ MonoImporter:
         Pop-Location
     }
 
+    $previousLockAttempts = [Environment]::GetEnvironmentVariable('GIT_LOCK_MAX_ATTEMPTS')
     $result7 = Invoke-Preflight -RepoPath $repo7 -Arguments @('-Fix', '-Paths', 'Runtime/LockCase.cs') -EnvOverrides @{
         GIT_LOCK_MAX_ATTEMPTS = '2'
         GIT_LOCK_INITIAL_DELAY_MS = '1'
@@ -727,6 +857,7 @@ MonoImporter:
     Write-TestResult 'LockContention_ExitCode1' ($result7.ExitCode -eq 1) "Expected exit code 1, got $($result7.ExitCode)"
     Write-TestResult 'LockContention_ErrorMessage' ($result7.Output -match 'Failed to stage one or more \.meta companion files') 'Expected lock contention staging failure message'
     Write-TestResult 'LockContention_RecoveryHint' ($result7.Output -match 'Close other git operations') 'Expected actionable recovery hint in output'
+    Write-TestResult 'LockContention_EnvironmentRestored' ([Environment]::GetEnvironmentVariable('GIT_LOCK_MAX_ATTEMPTS') -eq $previousLockAttempts) 'Expected fixture override to be restored after the runspace'
 }
 finally {
     Remove-Item -Path $repo7 -Recurse -Force -ErrorAction SilentlyContinue
