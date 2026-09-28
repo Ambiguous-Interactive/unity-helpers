@@ -134,14 +134,14 @@ const diagnosticsSource = fs.readFileSync(
   ),
   "utf8"
 );
-const policyWindowSource = fs.readFileSync(
-  path.join(root, "Editor", "Tools", "AnalyzerPolicyWindow.cs"),
+const policyCatalogSource = fs.readFileSync(
+  path.join(root, "Editor", "Tools", "AnalyzerPolicyAPI.cs"),
   "utf8"
 );
 const descriptorIds = [...diagnosticsSource.matchAll(/^\s+"(WUH\d{3})",\r?$/gm)].map(
   (match) => match[1]
 );
-const catalogIds = [...policyWindowSource.matchAll(/new\(\s*"(WUH\d{3})",/g)].map(
+const catalogIds = [...policyCatalogSource.matchAll(/new\(\s*"(WUH\d{3})",/g)].map(
   (match) => match[1]
 );
 check(

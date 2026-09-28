@@ -95,7 +95,7 @@ expect_fail() {
         fail "$name" "gate accepted a corpus it must reject: $GATE_OUTPUT"
         return
     fi
-    if ! printf '%s' "$GATE_OUTPUT" | grep -qF -- "$expected"; then
+    if ! grep -qF -- "$expected" <<< "$GATE_OUTPUT"; then
         fail "$name" "rejected, but not for the reason under test. Expected to contain '$expected'. Got: $GATE_OUTPUT"
         return
     fi
@@ -112,7 +112,7 @@ expect_pass "the repository docs/ passes" "$REAL_DOCS"
 # The count is the empty-corpus guard's green half: a run that reports a number
 # is a run that walked a corpus, which "no issues found" alone cannot show.
 run_gate "$REAL_DOCS"
-if printf '%s' "$GATE_OUTPUT" | grep -qE 'Markdown files scanned: .*[1-9]'; then
+if grep -qE 'Markdown files scanned: .*[1-9]' <<< "$GATE_OUTPUT"; then
     pass "a passing run reports how many files it scanned"
 else
     fail "a passing run reports how many files it scanned" "expected a non-zero scan count, got: $GATE_OUTPUT"
@@ -168,7 +168,7 @@ expect_fail "a backtick fence with a comma attribute is rejected" "$BACKTICK" "V
 
 run_gate "$BACKTICK"
 for fragment in "guide.md:3" '```csharp,ignore' "(remove ',ignore')"; do
-    if printf '%s' "$GATE_OUTPUT" | grep -qF -- "$fragment"; then
+    if grep -qF -- "$fragment" <<< "$GATE_OUTPUT"; then
         pass "the report names $fragment"
     else
         fail "the report names $fragment" "not present in: $GATE_OUTPUT"
