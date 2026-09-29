@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.CompilerServices;
     using System.Runtime.Serialization;
     using DataStructure.Adapters;
+    using Helper;
     using ProtoBuf;
     using Utils;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -185,14 +186,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return (bits & signBit) != 0 ? ~bits : bits | signBit;
         }
 
-        private static T[] GetEnumValues<T>()
-            where T : unmanaged, Enum
-        {
-            return EnumValues<T>.Values;
-        }
-
         private static void EnsureEnumHasAvailableValues<T>(
-            T[] enumValues,
+            ReadOnlySpan<T> enumValues,
             ReadOnlySpan<T> exclusions
         )
             where T : unmanaged, Enum
@@ -219,7 +214,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
                 foreach (T exclusion in exclusions)
                 {
-                    if (Array.IndexOf(enumValues, exclusion) < 0)
+                    if (!SpanContains(enumValues, exclusion))
                     {
                         continue;
                     }
@@ -252,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             using PooledResource<HashSet<T>> pooledSet = Buffers<T>.HashSet.Get(out HashSet<T> set);
             foreach (T exclusion in exclusions)
             {
-                if (Array.IndexOf(enumValues, exclusion) < 0)
+                if (!SpanContains(enumValues, exclusion))
                 {
                     continue;
                 }
@@ -265,7 +260,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
-        private static void EnsureEnumHasAvailableValues<T>(T[] enumValues, HashSet<T> exclusions)
+        private static void EnsureEnumHasAvailableValues<T>(
+            ReadOnlySpan<T> enumValues,
+            HashSet<T> exclusions
+        )
             where T : struct, Enum
         {
             if (enumValues.Length == 0)
@@ -313,7 +311,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int PopulateAllowedValues<T>(
-            T[] enumValues,
+            ReadOnlySpan<T> enumValues,
             ReadOnlySpan<T> exclusions,
             Span<T> destination
         )
@@ -333,7 +331,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int PopulateAllowedValues<T>(
-            T[] enumValues,
+            ReadOnlySpan<T> enumValues,
             HashSet<T> exclusions,
             Span<T> destination
         )
@@ -1134,7 +1132,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public T NextEnum<T>()
             where T : unmanaged, Enum
         {
-            T[] enumValues = GetEnumValues<T>();
+            ReadOnlySpan<T> enumValues = EnumValues<T>.Values;
             if (enumValues.Length == 0)
             {
                 throw new InvalidOperationException(
@@ -1192,7 +1190,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         )
             where T : unmanaged, Enum
         {
-            T[] enumValues = GetEnumValues<T>();
+            ReadOnlySpan<T> enumValues = EnumValues<T>.Values;
 
             using PooledResource<HashSet<T>> bufferResource = Buffers<T>.HashSet.Get(
                 out HashSet<T> set
@@ -1468,6 +1466,17 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 1 => values[0],
                 2 => NextBool() ? values[0] : values[1],
                 _ => values[Next(count)],
+            };
+        }
+
+        private T RandomOf<T>(ReadOnlySpan<T> values)
+        {
+            return values.Length switch
+            {
+                0 => default,
+                1 => values[0],
+                2 => NextBool() ? values[0] : values[1],
+                _ => values[Next(values.Length)],
             };
         }
 
@@ -1770,12 +1779,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private T NextEnumExceptInternal<T>(ReadOnlySpan<T> exclusions)
             where T : unmanaged, Enum
         {
-            T[] enumValues = GetEnumValues<T>();
+            ReadOnlySpan<T> enumValues = EnumValues<T>.Values;
             EnsureEnumHasAvailableValues(enumValues, exclusions);
             return SelectEnumValue(enumValues, exclusions);
         }
 
-        private T SelectEnumValue<T>(T[] enumValues, ReadOnlySpan<T> exclusions)
+        private T SelectEnumValue<T>(ReadOnlySpan<T> enumValues, ReadOnlySpan<T> exclusions)
             where T : unmanaged, Enum
         {
             if (exclusions.IsEmpty)
@@ -1809,7 +1818,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return index == 1 ? temp[0] : temp[Next(index)];
         }
 
-        private T SelectEnumValue<T>(T[] enumValues, HashSet<T> exclusions)
+        private T SelectEnumValue<T>(ReadOnlySpan<T> enumValues, HashSet<T> exclusions)
             where T : unmanaged, Enum
         {
             if (exclusions == null || exclusions.Count == 0)
@@ -1849,20 +1858,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             NextBytes(guidBytes);
             SetUuidV4Bits(guidBytes);
             return guidBytes;
-        }
-
-        /// <summary>
-        /// The values of one enum type, materialized once by its own static initializer.
-        /// </summary>
-        /// <typeparam name="T">The enum type.</typeparam>
-        /// <remarks>
-        /// A closed generic type gets its own copy of this field, so the lookup that a dictionary
-        /// keyed by <see cref="Type"/> would perform on every roll costs nothing at all.
-        /// </remarks>
-        private static class EnumValues<T>
-            where T : unmanaged, Enum
-        {
-            internal static readonly T[] Values = (T[])Enum.GetValues(typeof(T));
         }
     }
 }

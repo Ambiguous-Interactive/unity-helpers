@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using Core.Extension;
+    using Core.Helper;
     using UnityEngine;
 
     /// <summary>
@@ -20,8 +21,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     public sealed class AnimatorEnumStateMachine<T>
         where T : struct, IConvertible, IComparable, IFormattable
     {
-        private static readonly T[] Values = InitializeValues();
-
         /// <summary>
         /// Gets or sets the currently active enum value. Setting the value toggles the underlying
         /// boolean parameters so that only the matching state remains true.
@@ -33,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             get => _value;
             set
             {
-                foreach (T possibleValue in Values)
+                foreach (T possibleValue in EnumValuesCache<T>.Values)
                 {
                     string valueName = possibleValue.ToString(CultureInfo.InvariantCulture);
                     if (_availableBools.Contains(valueName))
@@ -77,6 +76,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="animator"/> is null.</exception>
         public AnimatorEnumStateMachine(Animator animator, T defaultValue = default)
         {
+            _ = EnumValuesCache<T>.Values;
             if (animator == null)
             {
                 throw new ArgumentNullException(nameof(animator));
@@ -98,17 +98,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             _value = defaultValue;
-        }
-
-        private static T[] InitializeValues()
-        {
-            Array enumValues = Enum.GetValues(typeof(T));
-            T[] result = new T[enumValues.Length];
-            for (int i = 0; i < enumValues.Length; i++)
-            {
-                result[i] = (T)enumValues.GetValue(i);
-            }
-            return result;
         }
 
         /// <summary>

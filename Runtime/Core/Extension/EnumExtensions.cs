@@ -58,8 +58,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         static EnumNameCache()
         {
-            T[] values = (T[])Enum.GetValues(typeof(T));
+            ReadOnlySpan<T> values = EnumValues<T>.Values;
             string[] names = Enum.GetNames(typeof(T));
+            int valueCount = values.Length;
 
             bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(
                 values,
@@ -78,7 +79,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 arrayLength = windowLength;
                 namesArray = new string[arrayLength];
 
-                for (int i = 0; i < values.Length; i++)
+                for (int i = 0; i < valueCount; i++)
                 {
                     T value = values[i];
                     if (EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
@@ -211,8 +212,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             Type type = typeof(T);
             FieldInfo[] fields = type.GetFields(BindingFlags.Public | BindingFlags.Static);
-            T[] fieldValues = new T[fields.Length];
-            for (int i = 0; i < fields.Length; i++)
+            int fieldCount = fields.Length;
+            T[] fieldValues = new T[fieldCount];
+            for (int i = 0; i < fieldCount; i++)
             {
                 fieldValues[i] = (T)fields[i].GetValue(null);
             }
@@ -234,7 +236,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 arrayLength = windowLength;
                 namesArray = new string[arrayLength];
 
-                for (int i = 0; i < fields.Length; i++)
+                for (int i = 0; i < fieldCount; i++)
                 {
                     FieldInfo field = fields[i];
                     string name = field.IsAttributeDefined(
@@ -256,17 +258,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 namesDict = new ConcurrentDictionary<ulong, string>(
                     Environment.ProcessorCount,
-                    fields.Length
+                    fieldCount
                 );
             }
             else
             {
                 namesDict = new ConcurrentDictionary<ulong, string>(
                     Environment.ProcessorCount,
-                    fields.Length
+                    fieldCount
                 );
 
-                for (int i = 0; i < fields.Length; i++)
+                for (int i = 0; i < fieldCount; i++)
                 {
                     FieldInfo field = fields[i];
                     string name = field.IsAttributeDefined(
@@ -723,12 +725,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// member look billions of slots wide and silently demoted it to the dictionary.
         /// </remarks>
         public static bool TryComputeArrayWindow(
-            T[] values,
+            ReadOnlySpan<T> values,
             out ulong minValue,
             out int arrayLength
         )
         {
-            if (values == null || values.Length == 0)
+            if (values.IsEmpty)
             {
                 minValue = 0;
                 arrayLength = 0;

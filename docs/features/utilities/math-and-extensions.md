@@ -1281,6 +1281,36 @@ Use `HasFlagNoAlloc` in:
 - Frequently-called methods
 - Performance-critical code paths
 
+### Cached Enum Values and Name Ordering
+
+`EnumValues<T>.Values` in `WallstopStudios.UnityHelpers.Core.Helper` exposes a
+`ReadOnlySpan<T>` cached once per enum type. Reading and iterating the view allocates
+nothing after initialization. Values use the unsigned numeric ordering of
+`Enum.GetValues`, including repeated values for aliases; an empty enum returns an
+empty span. Call `ToArray()` when you need your own mutable copy.
+
+`EnumNameComparer<T>.Instance` orders values by `ToCachedName()` using ordinal,
+case-sensitive comparison, independent of the current culture. Aliases compare
+equal because they share the same numeric value and cached name. Undefined values
+and flags combinations follow `ToCachedName()` formatting. Name-cache initialization
+may allocate; warmed comparisons of declared values do not. Undefined values and
+flags combinations outside the bounded name cache may allocate on every comparison.
+
+```csharp
+foreach (DayOfWeek day in EnumValues<DayOfWeek>.Values)
+{
+    Debug.Log(day.ToCachedName());
+}
+
+DayOfWeek[] days = EnumValues<DayOfWeek>.Values.ToArray();
+Array.Sort(days, EnumNameComparer<DayOfWeek>.Instance);
+```
+
+`EnumValues<T>` supports generic callers constrained to `struct, Enum`;
+`EnumNameComparer<T>` requires an unmanaged enum for cached name lookup. A span
+cannot be stored in a class field or kept across an `await` or coroutine yield;
+retrieve the view where you use it.
+
 ### Fast Enum-to-String Conversion
 
 **The problem:** `enum.ToString()` is slow (reflection) and allocates every call.

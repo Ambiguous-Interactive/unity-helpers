@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
 
@@ -47,6 +48,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             T[] values = (T[])Enum.GetValues(typeof(T));
             string[] names = Enum.GetNames(typeof(T));
+            CollectionAssert.AreEqual(values, EnumValues<T>.Values.ToArray());
 
             for (int i = 0; i < values.Length; i++)
             {
