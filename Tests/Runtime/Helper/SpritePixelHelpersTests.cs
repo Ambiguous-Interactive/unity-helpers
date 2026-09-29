@@ -229,6 +229,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void ReadableCompressedTextureCanBeRotatedAndExtracted()
+        {
+            if (!SystemInfo.SupportsTextureFormat(TextureFormat.DXT1))
+            {
+                Assert.Ignore("DXT1 is unavailable on this graphics device.");
+            }
+
+            Texture2D source = Track(new Texture2D(8, 8, TextureFormat.RGBA32, false));
+            Color32[] pixels = new Color32[64];
+            for (int i = 0; i < pixels.Length; ++i)
+            {
+                int x = i % 8;
+                int y = i / 8;
+                if (x < 4 && y < 4)
+                {
+                    pixels[i] = new Color32(255, 0, 0, 255);
+                }
+                else if (x < 4)
+                {
+                    pixels[i] = new Color32(0, 255, 0, 255);
+                }
+                else if (y < 4)
+                {
+                    pixels[i] = new Color32(0, 0, 255, 255);
+                }
+                else
+                {
+                    pixels[i] = new Color32(255, 255, 255, 255);
+                }
+            }
+            source.SetPixels32(pixels);
+            source.Apply();
+            source.Compress(false);
+            if (source.format == TextureFormat.RGBA32)
+            {
+                Assert.Ignore("This graphics device did not compress the source texture.");
+            }
+
+            Texture2D quarterTurn = Track(source.RotateTexture90(true));
+            Texture2D halfTurn = Track(source.RotateTexture180());
+            Sprite sprite = Track(
+                Sprite.Create(source, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f))
+            );
+            Texture2D extracted = Track(sprite.ExtractSpriteRect());
+
+            Assert.IsTrue(quarterTurn != null);
+            Assert.IsTrue(halfTurn != null);
+            Assert.IsTrue(extracted != null);
+            Assert.AreEqual(TextureFormat.RGBA32, quarterTurn.format);
+            Assert.AreEqual(TextureFormat.RGBA32, halfTurn.format);
+            Assert.AreEqual(TextureFormat.RGBA32, extracted.format);
+            Color32[] decoded = source.GetPixels32();
+            Color32[] quarterPixels = quarterTurn.GetPixels32();
+            Color32[] halfPixels = halfTurn.GetPixels32();
+            Color32[] extractedPixels = extracted.GetPixels32();
+            Assert.AreEqual(decoded[7], quarterPixels[0]);
+            Assert.AreEqual(decoded[63], halfPixels[0]);
+            Assert.AreEqual(decoded[0], extractedPixels[0]);
+            Assert.AreEqual(decoded[27], extractedPixels[15]);
+        }
+
+        [Test]
         public void ExtractSpriteRectReturnsNullForNullSprite()
         {
             Assert.IsTrue(((Sprite)null).ExtractSpriteRect() == null);
