@@ -74,6 +74,7 @@
          assembly than the one it describes, an orphaned entry silently dropped instead of
          retired, and an automatic pass that rewrites an unchanged file forever. -->
     <Compile Include="$(RepoRoot)/Editor/Tools/WProtoSubtypeTagManifestFile.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Helper/PathHelper.cs" />
     <Compile Include="*.cs" />
     <Compile
       Include="$(RepoRoot)/Tests/Core/DictionaryAssertions.cs"
