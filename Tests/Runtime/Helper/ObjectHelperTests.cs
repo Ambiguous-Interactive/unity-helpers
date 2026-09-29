@@ -117,6 +117,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             yield break;
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RendererTraversalTracksSiblingChangesFromExclusion(bool addSibling)
+        {
+            GameObject root = Track(new GameObject("Root"));
+            GameObject first = Track(new GameObject("First", typeof(SpriteRenderer)));
+            GameObject later = Track(new GameObject("Later", typeof(SpriteRenderer)));
+            GameObject added = Track(new GameObject("Added", typeof(SpriteRenderer)));
+            first.transform.SetParent(root.transform);
+            later.transform.SetParent(root.transform);
+            SpriteRenderer firstRenderer = first.GetComponent<SpriteRenderer>();
+            SpriteRenderer laterRenderer = later.GetComponent<SpriteRenderer>();
+            SpriteRenderer addedRenderer = added.GetComponent<SpriteRenderer>();
+            firstRenderer.enabled = false;
+            laterRenderer.enabled = false;
+            addedRenderer.enabled = false;
+
+            root.transform.EnableRendererRecursively<SpriteRenderer>(
+                true,
+                renderer =>
+                {
+                    if (renderer == firstRenderer)
+                    {
+                        if (addSibling)
+                        {
+                            added.transform.SetParent(root.transform);
+                        }
+                        else
+                        {
+                            later.transform.SetParent(null);
+                        }
+                    }
+                    return false;
+                }
+            );
+
+            Assert.That(firstRenderer.enabled, Is.True);
+            Assert.That(root.transform.childCount, Is.EqualTo(addSibling ? 3 : 1));
+            Assert.That(laterRenderer.enabled, Is.EqualTo(addSibling));
+            Assert.That(addedRenderer.enabled, Is.EqualTo(addSibling));
+        }
+
         [UnityTest]
         public IEnumerator EnableRendererRecursively()
         {

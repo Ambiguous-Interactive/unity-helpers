@@ -245,7 +245,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                     return false;
                 }
 
-                for (int i = 0; i < patternArgs.Length; i++)
+                int patternArgsLength = patternArgs.Length;
+                for (int i = 0; i < patternArgsLength; i++)
                 {
                     Type patternArg = patternArgs[i];
                     Type concreteArg = concreteArgs[i];
@@ -370,7 +371,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             if (hasNestedGenerics)
             {
                 Type[] openedArgs = new Type[genericArgs.Length];
-                for (int i = 0; i < genericArgs.Length; i++)
+                int genericArgsLength = genericArgs.Length;
+                for (int i = 0; i < genericArgsLength; i++)
                 {
                     Type arg = genericArgs[i];
                     if (arg.IsGenericType && !arg.IsGenericTypeDefinition)
@@ -493,7 +495,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
                 sb.Append(name);
                 sb.Append('<');
-                for (int i = 1; i < args.Length; i++)
+                int argsLength = args.Length;
+                for (int i = 1; i < argsLength; i++)
                 {
                     sb.Append(',');
                 }
@@ -516,7 +519,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
                 sb.Append(name);
                 sb.Append('<');
-                for (int i = 0; i < args.Length; i++)
+                int argsLength2 = args.Length;
+                for (int i = 0; i < argsLength2; i++)
                 {
                     if (0 < i)
                     {
@@ -659,7 +663,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return true;
             }
 
-            for (int i = 0; i < trimmed.Length; i++)
+            int trimmedLength = trimmed.Length;
+            for (int i = 0; i < trimmedLength; i++)
             {
                 char c = trimmed[i];
                 if (c != ',' && !char.IsWhiteSpace(c))
@@ -679,7 +684,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             int count = 1;
-            for (int i = 0; i < argsSection.Length; i++)
+            int argsSectionLength = argsSection.Length;
+            for (int i = 0; i < argsSectionLength; i++)
             {
                 if (argsSection[i] == ',')
                 {
@@ -717,7 +723,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             int depth = 0;
             int start = 0;
 
-            for (int i = 0; i < argsSection.Length; i++)
+            int argsSectionLength = argsSection.Length;
+            for (int i = 0; i < argsSectionLength; i++)
             {
                 char c = argsSection[i];
                 if (c == '<')

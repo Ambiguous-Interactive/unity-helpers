@@ -404,7 +404,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             using (PauseBatch())
             {
                 string current = segments[0];
-                for (int i = 1; i < segments.Length; i++)
+                int segmentsLength = segments.Length;
+                for (int i = 1; i < segmentsLength; i++)
                 {
                     string next = current + "/" + segments[i];
                     if (

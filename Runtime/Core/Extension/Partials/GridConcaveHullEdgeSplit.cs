@@ -249,7 +249,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 FastVector3Int to = current.to;
                 int nextIndex = -1;
-                for (int i = 0; i < concaveHullEdges.Count; ++i)
+                int concaveHullEdgesCount = concaveHullEdges.Count;
+                for (int i = 0; i < concaveHullEdgesCount; ++i)
                 {
                     HullEdge edge = concaveHullEdges[i];
                     if (edge.from == to)
@@ -262,7 +263,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 if (nextIndex < 0)
                 {
                     int reverseIndex = -1;
-                    for (int i = 0; i < concaveHullEdges.Count; ++i)
+                    int concaveHullEdgesCount2 = concaveHullEdges.Count;
+                    for (int i = 0; i < concaveHullEdgesCount2; ++i)
                     {
                         HullEdge edge = concaveHullEdges[i];
                         if (edge.to == to)
@@ -530,7 +532,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 Vector2 to = current.to;
                 int nextIndex = -1;
-                for (int i = 0; i < concaveHullEdges.Count; ++i)
+                int concaveHullEdgesCount = concaveHullEdges.Count;
+                for (int i = 0; i < concaveHullEdgesCount; ++i)
                 {
                     HullEdgeV2 e = concaveHullEdges[i];
                     if (e.from == to)
@@ -542,7 +545,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 if (nextIndex < 0)
                 {
                     int reverseIndex = -1;
-                    for (int i = 0; i < concaveHullEdges.Count; ++i)
+                    int concaveHullEdgesCount4 = concaveHullEdges.Count;
+                    for (int i = 0; i < concaveHullEdgesCount4; ++i)
                     {
                         HullEdgeV2 e = concaveHullEdges[i];
                         if (e.to == to)

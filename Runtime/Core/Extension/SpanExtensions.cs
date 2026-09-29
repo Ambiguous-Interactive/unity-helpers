@@ -210,7 +210,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            for (int i = 0; i < span.Length; ++i)
+            int spanLength = span.Length;
+            for (int i = 0; i < spanLength; ++i)
             {
                 span[i] = factory(i);
             }
@@ -296,7 +297,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return -1;
             }
 
-            for (int i = 0; i < span.Length; ++i)
+            int spanLength = span.Length;
+            for (int i = 0; i < spanLength; ++i)
             {
                 if (predicate(span[i]))
                 {
@@ -333,7 +335,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return -1;
             }
 
-            for (int i = 0; i < span.Length; ++i)
+            int spanLength = span.Length;
+            for (int i = 0; i < spanLength; ++i)
             {
                 if (predicate(span[i], state))
                 {

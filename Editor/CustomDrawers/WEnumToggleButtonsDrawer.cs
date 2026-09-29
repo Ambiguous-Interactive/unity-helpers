@@ -800,7 +800,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             ulong targetMask = 0UL;
-            for (int index = 0; index < toggleSet.Options.Count; index += 1)
+            int toggleSetOptionsCount = toggleSet.Options.Count;
+            for (int index = 0; index < toggleSetOptionsCount; index += 1)
             {
                 ToggleOption option = toggleSet.Options[index];
                 if (option.FlagValue == 0UL)
@@ -832,7 +833,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             ulong combined = 0UL;
-            for (int index = 0; index < toggleSet.Options.Count; index += 1)
+            int toggleSetOptionsCount = toggleSet.Options.Count;
+            for (int index = 0; index < toggleSetOptionsCount; index += 1)
             {
                 ToggleOption option = toggleSet.Options[index];
                 if (option.FlagValue == 0UL)
@@ -901,7 +903,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 out List<ToggleOption> options
             );
 
-            for (int index = 0; index < values.Length; index += 1)
+            int valuesLength = values.Length;
+            for (int index = 0; index < valuesLength; index += 1)
             {
                 object value = values.GetValue(index);
                 if (value == null)
@@ -966,7 +969,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 int[] values = intDropDownAttribute.Options ?? Array.Empty<int>();
                 ToggleOption[] options = new ToggleOption[values.Length];
-                for (int index = 0; index < values.Length; index += 1)
+                int valuesLength = values.Length;
+                for (int index = 0; index < valuesLength; index += 1)
                 {
                     int value = values[index];
                     string label = FormatOption(value);
@@ -986,7 +990,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 string[] values =
                     stringInListAttribute.GetOptions(context) ?? Array.Empty<string>();
                 ToggleOption[] options = new ToggleOption[values.Length];
-                for (int index = 0; index < values.Length; index += 1)
+                int valuesLength3 = values.Length;
+                for (int index = 0; index < valuesLength3; index += 1)
                 {
                     string value = values[index] ?? string.Empty;
                     string label = FormatOption(value);
@@ -1007,7 +1012,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             ToggleOption[] options = new ToggleOption[values.Length];
-            for (int index = 0; index < values.Length; index += 1)
+            int valuesLength = values.Length;
+            for (int index = 0; index < valuesLength; index += 1)
             {
                 object value = values[index];
                 string label = FormatOption(value);

@@ -46,5 +46,6 @@
     <Rule Id="WUH010" Action="Warning" />
     <Rule Id="WUH013" Action="Warning" />
     <Rule Id="WUH018" Action="Warning" />
+    <Rule Id="WUH019" Action="None" />
   </Rules>
 </RuleSet>

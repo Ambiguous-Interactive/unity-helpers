@@ -1120,7 +1120,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 int worstIndex = 0;
                 EntryDistance worst = candidates[0];
 
-                for (int i = 1; i < candidates.Count; ++i)
+                int candidatesCount = candidates.Count;
+                for (int i = 1; i < candidatesCount; ++i)
                 {
                     EntryDistance candidate = candidates[i];
                     if (0 < EntryDistanceComparer.Instance.Compare(candidate, worst))

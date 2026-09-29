@@ -723,7 +723,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private void UpdateOptionFocus()
         {
-            for (int i = 0; i < _optionsContainer.childCount; i++)
+            int optionsContainerChildCount = _optionsContainer.childCount;
+            for (int i = 0; i < optionsContainerChildCount; i++)
             {
                 VisualElement child = _optionsContainer[i];
                 if (i == _focusedOptionIndex)
@@ -798,14 +799,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (string.IsNullOrEmpty(_searchText))
             {
-                for (int i = 0; i < _data.DisplayLabels.Length; i++)
+                int dataDisplayLabelsLength = _data.DisplayLabels.Length;
+                for (int i = 0; i < dataDisplayLabelsLength; i++)
                 {
                     _filteredIndices.Add(i);
                 }
             }
             else
             {
-                for (int i = 0; i < _data.DisplayLabels.Length; i++)
+                int dataDisplayLabelsLength2 = _data.DisplayLabels.Length;
+                for (int i = 0; i < dataDisplayLabelsLength2; i++)
                 {
                     string label = GetNormalizedLabel(i);
                     if (0 <= label.IndexOf(_searchText, StringComparison.OrdinalIgnoreCase))
@@ -998,7 +1001,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             int count = 0;
-            for (int i = 0; i < _data.DisplayLabels.Length; i++)
+            int dataDisplayLabelsLength = _data.DisplayLabels.Length;
+            for (int i = 0; i < dataDisplayLabelsLength; i++)
             {
                 string label = GetNormalizedLabel(i);
                 if (0 <= label.IndexOf(_searchText, StringComparison.OrdinalIgnoreCase))

@@ -106,6 +106,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Implicit string equality",
                 "Reports string equality whose comparison policy is unstated. This policy is opt-in by default."
             ),
+            new(
+                "WUH019",
+                "Repeated stable loop bound",
+                "Reports counting loops that repeatedly read a stable size. This policy is opt-in by default."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

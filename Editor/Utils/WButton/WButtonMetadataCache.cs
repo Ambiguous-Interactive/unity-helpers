@@ -336,7 +336,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             WButtonParameterMetadata[] parameters = new WButtonParameterMetadata[
                 rawParameters.Length
             ];
-            for (int index = 0; index < rawParameters.Length; index++)
+            int rawParametersLength = rawParameters.Length;
+            for (int index = 0; index < rawParametersLength; index++)
             {
                 ParameterInfo parameter = rawParameters[index];
                 if (

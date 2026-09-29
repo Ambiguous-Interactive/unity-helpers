@@ -204,7 +204,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 using PooledResource<List<RTreeNode>> nextLevelResource =
                     Buffers<RTreeNode>.List.Get(out List<RTreeNode> nextLevel);
-                for (int i = 0; i < currentLevel.Count; i += branchFactor)
+                int currentLevelCount = currentLevel.Count;
+                for (int i = 0; i < currentLevelCount; i += branchFactor)
                 {
                     int childCount = Math.Min(branchFactor, currentLevel.Count - i);
                     RTreeNode[] children = new RTreeNode[childCount];
@@ -306,7 +307,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             int worstIndex = 0;
             double worstDistanceSquared = list[0].distanceSquared;
-            for (int i = 1; i < list.Count; ++i)
+            int listCount = list.Count;
+            for (int i = 1; i < listCount; ++i)
             {
                 double distanceSquared = list[i].distanceSquared;
                 if (worstDistanceSquared < distanceSquared)
@@ -931,7 +933,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 RTreeNode lastChild = children[lastChildIndex];
                 int endIndex = lastChild._startIndex + lastChild._count;
                 BoundingBox3D nodeBounds = children[0].boundary;
-                for (int i = 1; i < children.Length; ++i)
+                int childrenLength = children.Length;
+                for (int i = 1; i < childrenLength; ++i)
                 {
                     nodeBounds = nodeBounds.ExpandToInclude(children[i].boundary);
                 }

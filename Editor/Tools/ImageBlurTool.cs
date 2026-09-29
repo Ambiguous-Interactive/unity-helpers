@@ -114,7 +114,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     pixels.Length,
                     out Color[] premultiplied
                 );
-                for (int i = 0; i < pixels.Length; i++)
+                int pixelsLength = pixels.Length;
+                for (int i = 0; i < pixelsLength; i++)
                 {
                     premultiplied[i] = TextureResampling.Premultiply(pixels[i]);
                 }

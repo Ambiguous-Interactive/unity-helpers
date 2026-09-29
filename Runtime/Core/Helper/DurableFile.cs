@@ -1193,7 +1193,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static SemaphoreSlim[] CreateGates()
         {
             SemaphoreSlim[] gates = new SemaphoreSlim[GateCount];
-            for (int i = 0; i < gates.Length; ++i)
+            int gatesLength = gates.Length;
+            for (int i = 0; i < gatesLength; ++i)
             {
                 gates[i] = new SemaphoreSlim(1, 1);
             }

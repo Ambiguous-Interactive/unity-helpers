@@ -158,6 +158,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 result[i] = items[i];
             }
 
+            // A custom random generator can shorten the source during selection.
             for (int i = count; i < items.Count; ++i)
             {
                 int j = random.Next(0, i + 1);

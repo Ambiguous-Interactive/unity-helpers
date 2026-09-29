@@ -385,7 +385,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             do
             {
                 removed = false;
-                for (int i = 0; 2 < hull.Count && i < hull.Count; ++i)
+                int hullCount = hull.Count;
+                for (int i = 0; 2 < hullCount && i < hullCount; ++i)
                 {
                     int prev = (i - 1 + hull.Count) % hull.Count;
                     int next = (i + 1) % hull.Count;
@@ -550,7 +551,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 hull.Add(lowerPoint);
             }
-            for (int i = 1; i < upper.Count - 1; ++i)
+            int upperCount = upper.Count;
+            for (int i = 1; i < upperCount - 1; ++i)
             {
                 hull.Add(upper[i]);
             }

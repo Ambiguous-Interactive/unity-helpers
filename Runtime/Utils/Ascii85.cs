@@ -50,7 +50,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 Array.Clear(chunk, 0, chunk.Length);
                 int chunkLength = 0;
 
-                for (int i = 0; i < 4 && index < data.Length; ++i)
+                int dataLength = data.Length;
+                for (int i = 0; i < 4 && index < dataLength; ++i)
                 {
                     chunk[i] = data[index++];
                     chunkLength++;
@@ -69,7 +70,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
 
                 Array.Clear(encoded, 0, encoded.Length);
-                for (int i = 0; i < encoded.Length; ++i)
+                int encodedLength = encoded.Length;
+                for (int i = 0; i < encodedLength; ++i)
                 {
                     encoded[i] = (char)(val / Pow85[i] + '!');
                     val %= Pow85[i];
@@ -107,7 +109,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 Array.Fill(chunk, (char)117);
                 int chunkLen = 0;
 
-                for (int i = 0; i < 5 && index < encoded.Length; ++i)
+                int encodedLength = encoded.Length;
+                for (int i = 0; i < 5 && index < encodedLength; ++i)
                 {
                     chunk[i] = encoded[index++];
                     chunkLen++;

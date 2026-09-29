@@ -684,7 +684,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 builder.Append(type.GetGenericTypeDefinition().FullName).Append('[');
                 Type[] arguments = type.GetGenericArguments();
-                for (int index = 0; index < arguments.Length; index++)
+                int argumentsLength = arguments.Length;
+                for (int index = 0; index < argumentsLength; index++)
                 {
                     if (0 < index)
                     {
@@ -830,7 +831,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
 
-            for (int i = 0; i < indexParams.Length; i++)
+            int indexParamsLength = indexParams.Length;
+            for (int i = 0; i < indexParamsLength; i++)
             {
                 if (indexParams[i].ParameterType != expectedIndexParameterTypes[i])
                 {

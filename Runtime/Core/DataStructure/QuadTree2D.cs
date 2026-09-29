@@ -243,7 +243,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private static void SortChildrenByDistance(List<QuadTreeNode> nodes, Vector2 searchPosition)
         {
-            for (int i = 1; i < nodes.Count; ++i)
+            int nodesCount = nodes.Count;
+            for (int i = 1; i < nodesCount; ++i)
             {
                 QuadTreeNode value = nodes[i];
                 double valueDistance = GetSqrDistance(value, searchPosition);

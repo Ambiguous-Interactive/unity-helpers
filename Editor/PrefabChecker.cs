@@ -747,7 +747,8 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             try
             {
-                for (int idx = 0; idx < guids.Length; idx++)
+                int guidsLength = guids.Length;
+                for (int idx = 0; idx < guidsLength; idx++)
                 {
                     if (
                         interactive

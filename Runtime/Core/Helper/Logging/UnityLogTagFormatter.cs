@@ -640,7 +640,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
             decorationsAtPriority.RemoveAt(index);
             _decorationLookup.Remove(removed.Tag);
 
-            for (int i = index; i < decorationsAtPriority.Count; ++i)
+            int decorationsAtPriorityCount = decorationsAtPriority.Count;
+            for (int i = index; i < decorationsAtPriorityCount; ++i)
             {
                 DecorationEntry entry = decorationsAtPriority[i];
                 _decorationLookup[entry.Tag] = (priority, i);

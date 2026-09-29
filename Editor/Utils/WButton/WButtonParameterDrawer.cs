@@ -35,11 +35,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
 
             bool anyChanged = false;
-            for (
-                int parameterIndex = 0;
-                parameterIndex < primaryParameters.Length;
-                parameterIndex++
-            )
+            int primaryParametersLength = primaryParameters.Length;
+            for (int parameterIndex = 0; parameterIndex < primaryParametersLength; parameterIndex++)
             {
                 WButtonParameterState primaryState = primaryParameters[parameterIndex];
                 WButtonParameterMetadata metadata = primaryState.Metadata;
@@ -288,7 +285,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             {
                 value = Array.CreateInstance(elementType, updatedLength);
                 primaryState.CurrentValue = value;
-                for (int targetIndex = 1; targetIndex < states.Length; targetIndex++)
+                int statesLength = states.Length;
+                for (int targetIndex = 1; targetIndex < statesLength; targetIndex++)
                 {
                     WButtonParameterState targetState = states[targetIndex].Parameters[
                         parameterIndex
@@ -299,7 +297,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
             if (value != null)
             {
-                for (int elementIndex = 0; elementIndex < value.Length; elementIndex++)
+                int valueLength = value.Length;
+                for (int elementIndex = 0; elementIndex < valueLength; elementIndex++)
                 {
                     object elementValue = value.GetValue(elementIndex);
                     GUIContent elementLabel = ElementLabelCache.GetOrAdd(
@@ -315,7 +314,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     if (EditorGUI.EndChangeCheck())
                     {
                         value.SetValue(updatedElement, elementIndex);
-                        for (int targetIndex = 1; targetIndex < states.Length; targetIndex++)
+                        int statesLength2 = states.Length;
+                        for (int targetIndex = 1; targetIndex < statesLength2; targetIndex++)
                         {
                             WButtonParameterState targetState = states[targetIndex].Parameters[
                                 parameterIndex
@@ -433,7 +433,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
 
             object baseline = states[0].Parameters[parameterIndex].CurrentValue;
-            for (int index = 1; index < states.Length; index++)
+            int statesLength = states.Length;
+            for (int index = 1; index < statesLength; index++)
             {
                 object value = states[index].Parameters[parameterIndex].CurrentValue;
                 if (!WButtonValueUtility.ValuesEqual(baseline, value))

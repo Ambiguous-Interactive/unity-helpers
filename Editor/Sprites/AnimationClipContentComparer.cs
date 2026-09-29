@@ -165,7 +165,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 return false;
             }
-            for (int i = 0; i < a.Length; i++)
+            int aLength = a.Length;
+            for (int i = 0; i < aLength; i++)
             {
                 AnimationEvent evtA = a[i];
                 AnimationEvent evtB = b[i];
@@ -257,7 +258,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Array.Sort(sourceBindings, CompareEditorCurveBinding);
             Array.Sort(destBindings, CompareEditorCurveBinding);
 
-            for (int i = 0; i < sourceBindings.Length; i++)
+            int sourceBindingsLength = sourceBindings.Length;
+            for (int i = 0; i < sourceBindingsLength; i++)
             {
                 EditorCurveBinding srcBinding = sourceBindings[i];
                 EditorCurveBinding dstBinding = destBindings[i];
@@ -301,7 +303,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Array.Sort(sourceBindings, CompareEditorCurveBinding);
             Array.Sort(destBindings, CompareEditorCurveBinding);
 
-            for (int i = 0; i < sourceBindings.Length; i++)
+            int sourceBindingsLength = sourceBindings.Length;
+            for (int i = 0; i < sourceBindingsLength; i++)
             {
                 EditorCurveBinding srcBinding = sourceBindings[i];
                 EditorCurveBinding dstBinding = destBindings[i];
@@ -398,7 +401,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            for (int i = 0; i < keysA.Length; i++)
+            int keysALength = keysA.Length;
+            for (int i = 0; i < keysALength; i++)
             {
                 Keyframe kA = keysA[i];
                 Keyframe kB = keysB[i];
@@ -452,7 +456,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            for (int i = 0; i < a.Length; i++)
+            int aLength = a.Length;
+            for (int i = 0; i < aLength; i++)
             {
                 ObjectReferenceKeyframe kA = a[i];
                 ObjectReferenceKeyframe kB = b[i];

@@ -503,7 +503,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
 
                 object[] boxedValues = new object[typedValues.Length];
-                for (int index = 0; index < typedValues.Length; index += 1)
+                int typedValuesLength = typedValues.Length;
+                for (int index = 0; index < typedValuesLength; index += 1)
                 {
                     boxedValues[index] = typedValues[index];
                 }
@@ -686,7 +687,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             if (result is Array array)
             {
                 object[] boxed = new object[array.Length];
-                for (int i = 0; i < array.Length; i++)
+                int arrayLength = array.Length;
+                for (int i = 0; i < arrayLength; i++)
                 {
                     boxed[i] = array.GetValue(i);
                 }

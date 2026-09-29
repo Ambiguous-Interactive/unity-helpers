@@ -10,40 +10,41 @@ set and enable or disable it for user code. The window manages only the Unity He
 drift before repairing it. Editor scripts can call `AnalyzerPolicyAPI.TrySetEnabled` with an
 explicit enabled state and optional `.ruleset` asset path for the same prompt-free operation.
 
-| Id                                                                       | Reports                                                           |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| [`WUH001`](#wuh001-a-lookup-factory-passed-as-a-method-group)            | A lookup factory passed as a method group                         |
-| [`WUH002`](#wuh002-a-nested-collection-unity-does-not-serialize)         | A nested collection Unity does not serialize                      |
-| [`WUH003`](#wuh003-null-propagation-on-a-unityengineobject)              | `?.` / `?[]` / `??` / `??=` / `is null` on a `UnityEngine.Object` |
-| [`WUH004`](#wuh004-a-null-assertion-that-passes-over-a-destroyed-object) | An NUnit null assertion that passes over a destroyed object       |
-| [`WUH005`](#wuh005-unityenginerandom)                                    | `UnityEngine.Random`, which no test can replay in isolation       |
-| [`WUH006`](#wuh006-a-discarded-effecthandle)                             | A discarded `EffectHandle`                                        |
-| [`WUH007`](#wuh007-a-discarded-coroutine-handle)                         | A discarded coroutine handle                                      |
-| [`WUH008`](#wuh008-a-tryxxx-out-value-read-without-testing-the-call)     | A `TryXxx` `out` value read without testing the call              |
-| [`WUH009`](#wuh009-a-teardowns-base-call-that-is-not-last)               | A teardown's `base` call that is not last                         |
-| [`WUH010`](#wuh010-a-dictionary-indexer-read-opt-in)                     | A dictionary indexer read (**off by default**)                    |
-| [`WUH011`](#wuh011-changing-a-serialized-string-comparer-after-use)      | A comparer mode changed after collection construction             |
-| [`WUH012`](#wuh012-a-serialized-row-dereferenced-without-a-test)         | A serialized row dereferenced without a null test                 |
-| [`WUH013`](#wuh013-a-counting-loop-that-could-be-a-foreach)              | A counting loop that could be a `foreach` (**off by default**)    |
-| [`WUH014`](#wuh014-a-disposable-structs-dispose-that-assigns)            | A disposable `struct` whose `Dispose` assigns                     |
-| [`WUH015`](#wuh015-an-invalid-unity-lifecycle-signature)                 | A Unity callback with an invalid signature                        |
-| [`WUH016`](#wuh016-a-hidden-inherited-unity-callback)                    | A Unity callback hides an ancestor callback                       |
-| [`WUH017`](#wuh017-a-getcomponent-compared-against-null)                 | A `GetComponent` compared against null                            |
-| [`WUH018`](#wuh018-implicit-string-equality-opt-in)                      | String equality without an explicit policy (**off by default**)   |
+| Id                                                                       | Reports                                                               |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| [`WUH001`](#wuh001-a-lookup-factory-passed-as-a-method-group)            | A lookup factory passed as a method group                             |
+| [`WUH002`](#wuh002-a-nested-collection-unity-does-not-serialize)         | A nested collection Unity does not serialize                          |
+| [`WUH003`](#wuh003-null-propagation-on-a-unityengineobject)              | `?.` / `?[]` / `??` / `??=` / `is null` on a `UnityEngine.Object`     |
+| [`WUH004`](#wuh004-a-null-assertion-that-passes-over-a-destroyed-object) | An NUnit null assertion that passes over a destroyed object           |
+| [`WUH005`](#wuh005-unityenginerandom)                                    | `UnityEngine.Random`, which no test can replay in isolation           |
+| [`WUH006`](#wuh006-a-discarded-effecthandle)                             | A discarded `EffectHandle`                                            |
+| [`WUH007`](#wuh007-a-discarded-coroutine-handle)                         | A discarded coroutine handle                                          |
+| [`WUH008`](#wuh008-a-tryxxx-out-value-read-without-testing-the-call)     | A `TryXxx` `out` value read without testing the call                  |
+| [`WUH009`](#wuh009-a-teardowns-base-call-that-is-not-last)               | A teardown's `base` call that is not last                             |
+| [`WUH010`](#wuh010-a-dictionary-indexer-read-opt-in)                     | A dictionary indexer read (**off by default**)                        |
+| [`WUH011`](#wuh011-changing-a-serialized-string-comparer-after-use)      | A comparer mode changed after collection construction                 |
+| [`WUH012`](#wuh012-a-serialized-row-dereferenced-without-a-test)         | A serialized row dereferenced without a null test                     |
+| [`WUH013`](#wuh013-a-counting-loop-that-could-be-a-foreach)              | A counting loop that could be a `foreach` (**off by default**)        |
+| [`WUH014`](#wuh014-a-disposable-structs-dispose-that-assigns)            | A disposable `struct` whose `Dispose` assigns                         |
+| [`WUH015`](#wuh015-an-invalid-unity-lifecycle-signature)                 | A Unity callback with an invalid signature                            |
+| [`WUH016`](#wuh016-a-hidden-inherited-unity-callback)                    | A Unity callback hides an ancestor callback                           |
+| [`WUH017`](#wuh017-a-getcomponent-compared-against-null)                 | A `GetComponent` compared against null                                |
+| [`WUH018`](#wuh018-implicit-string-equality-opt-in)                      | String equality without an explicit policy (**off by default**)       |
+| [`WUH019`](#wuh019-repeated-stable-loop-bound-opt-in)                    | A counting loop repeatedly reading a stable size (**off by default**) |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
 
-|                     | `WPROTO###`                                                  | `WUH###`                                    |
-| ------------------- | ------------------------------------------------------------ | ------------------------------------------- |
-| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code    |
-| Severity            | Error: the alternative is an exception from a shipped player | **Warning, always**                         |
-| Can fail your build | Yes, and it should                                           | **No**                                      |
-| Default             | On                                                           | On, except `WUH010`, `WUH013`, and `WUH018` |
+|                     | `WPROTO###`                                                  | `WUH###`                                              |
+| ------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
+| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code              |
+| Severity            | Error: the alternative is an exception from a shipped player | **Warning, always**                                   |
+| Can fail your build | Yes, and it should                                           | **No**                                                |
+| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, and `WUH019` |
 
 **A `WUH###` diagnostic will never fail your build.** Taking a package upgrade cannot turn a green
 build red over one of these. If your project treats warnings as errors, see
-[Turning one off](#turning-one-off). `WUH010`, `WUH013`, and `WUH018` go further and are off until you ask for them, because
+[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, and `WUH019` go further and are off until you ask for them, because
 their shapes are correct code far more often than they are defects.
 
 ## `WUH001`: a lookup factory passed as a method group
@@ -774,7 +775,55 @@ the diagnostic is an explicit-policy audit, not a claim that ordinal comparison 
 The package enables this rule, together with `WUH010` and `WUH013`, in every package-owned .NET
 project. Both analyzer implementations and their tooling self-host the shipped analyzer binaries;
 the five Unity source gates cover Runtime, Editor, integrations, runtime tests, and editor tests.
-All owned code therefore enforces every `WUH###` policy while the consumer default remains unchanged.
+All owned code therefore enforces these shared policies while the consumer defaults remain unchanged.
+
+## `WUH019`: repeated stable loop bound (opt-in)
+
+Cache a stable `Length`, `LongLength`, `Count`, `childCount`, `arraySize`, or array dimension
+(`GetLength` / `GetLongLength` with a constant dimension) in a named local before
+an indexed loop. This avoids repeated getters and makes a snapshot explicit. Keep `foreach` when
+an allocation-free enumeration fits; `WUH013` still applies independently.
+
+```xml
+<Rule Id="WUH019" Action="Warning" />
+```
+
+```csharp
+int rowCount = rows.Count;
+for (int index = 0; index < rowCount; index++)
+{
+    output[index] = rows[index];
+}
+```
+
+The semantic check covers arrays, strings, spans, memory, concrete standard-library collection getters, Unity `Transform.childCount`, and `SerializedProperty.arraySize`. It checks `for`
+conditions, including arithmetic bounds. A borrowed interface `Count` getter can itself execute
+user code, so it is not diagnosed; cache such a source only after proving its concrete ownership. It leaves virtual, interface, and unknown getters and receiver expressions alone.
+It does not advise hoisting a conditionally evaluated bound ahead of a null guard, a receiver
+replacement, direct collection mutation, an alias or unknown-code escape, callbacks over mutable
+collections, aliases declared before traversal, concurrent collections, or traversal that yields
+or awaits while a caller can mutate the collection. Mutable collection loops that invoke other code are conservative: standard collection calls can
+invoke user equality code, and separate parameters can alias the same collection at runtime. The
+analyzer does not prove a call graph pure. Callback-sensitive loops accept only known primitive
+operation shapes; unknown constructions, implicit disposal or enumeration, dynamic access, custom
+event accessors, interpolation, deconstruction, and user operators are left alone.
+Unknown interface and callback-capable dictionary indexers also retain live bounds. Concrete
+`List<T>` indexers have no callback dispatch. Field receivers used around unknown calls are
+conservative because those calls can replace fields.
+Array element writes are safe: they do not change the length. Known array dimensions are stable;
+a changing dimension argument is not a cacheable bound.
+
+Live bounds remain deliberate in pool purges, callback-driven collection walks, serialized-array
+rows removed while traversal continues, iterators, and activation traversals whose Unity callbacks
+can change the hierarchy. Do not cache these sizes without changing the traversal contract.
+A suppression should name the changing state when a callback or alias is outside the analyzer's view.
+
+The policy is off by default. Production TypeCheck, EditorCheck, and IntegrationCheck enable it
+through `Generator~/ProductionCheckProjects.ruleset`, which imports the shared policies. Test and
+tooling projects keep the shared ruleset. WUH019 promotion is limited to those production projects: explicitly listing a diagnostic in
+`WarningsAsErrors` enables it even when a shared ruleset says `None`.
+The excluded-production-source loop audit runs both WUH013 and WUH019 and requires a reporting
+control for each, so old host reference gaps cannot silently bypass either rule.
 
 ## Turning one off
 

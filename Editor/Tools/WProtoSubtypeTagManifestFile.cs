@@ -264,7 +264,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 );
 
             bool editor = false;
-            for (int index = 1; index < segments.Length; index++)
+            int segmentsLength = segments.Length;
+            for (int index = 1; index < segmentsLength; index++)
             {
                 if (string.Equals(segments[index], "Editor", StringComparison.Ordinal))
                 {

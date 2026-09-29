@@ -57,7 +57,8 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             FrameRate = clip.frameRate;
             AnimationEvent[] events = clip.events ?? Array.Empty<AnimationEvent>();
-            for (int i = 0; i < events.Length; i++)
+            int eventsLength = events.Length;
+            for (int i = 0; i < eventsLength; i++)
             {
                 AnimationEvent existing = events[i];
                 _events.Add(new AnimationEventItem(existing) { originalIndex = i });
@@ -365,7 +366,8 @@ namespace WallstopStudios.UnityHelpers.Editor
         public AnimationEvent[] BuildEventArray()
         {
             AnimationEvent[] arr = new AnimationEvent[_events.Count];
-            for (int i = 0; i < _events.Count; i++)
+            int eventsCount = _events.Count;
+            for (int i = 0; i < eventsCount; i++)
             {
                 arr[i] = _events[i].animationEvent;
             }

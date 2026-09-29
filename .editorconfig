@@ -1000,3 +1000,7 @@ dotnet_diagnostic.CS1711.severity = none
 dotnet_diagnostic.CS1712.severity = none
 dotnet_diagnostic.CS1723.severity = none
 dotnet_diagnostic.CS1734.severity = none
+
+# The vendored 7-Zip SDK retains upstream traversal; this package policy owns our sources.
+[Runtime/Utils/SevenZip/**/*.cs]
+dotnet_diagnostic.WUH019.severity = none

@@ -67,7 +67,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             WButtonMethodState[] states = context.States;
             UnityEngine.Object[] targets = context.Targets;
 
-            for (int index = 0; index < states.Length; index++)
+            int statesLength = states.Length;
+            for (int index = 0; index < statesLength; index++)
             {
                 WButtonMethodState state = states[index];
                 UnityEngine.Object target = targets[index];
@@ -595,7 +596,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             object[] builtArguments = new object[parameters.Length];
             CancellationTokenSource builtCancellationSource = null;
 
-            for (int index = 0; index < parameters.Length; index++)
+            int parametersLength = parameters.Length;
+            for (int index = 0; index < parametersLength; index++)
             {
                 WButtonParameterMetadata parameter = parameters[index];
                 WButtonParameterState parameterState = state.Parameters[index];

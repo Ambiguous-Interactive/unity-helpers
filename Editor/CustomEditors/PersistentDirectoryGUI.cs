@@ -127,7 +127,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         int remaining = allPaths.Length - topN;
                         if (0 < remaining)
                         {
-                            for (int idx = topN; idx < allPaths.Length; idx++)
+                            int allPathsLength = allPaths.Length;
+                            for (int idx = topN; idx < allPathsLength; idx++)
                             {
                                 DirectoryUsageData dirData = allPaths[idx];
                                 Rect moreHistoryButtonRect = new(
@@ -461,6 +462,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 
             using (new EditorGUI.IndentLevelScope())
             {
+                // Path selection can apply properties and resize the array through OnValidate.
                 for (int i = 0; i < listProp.arraySize; i++)
                 {
                     SerializedProperty elementProp = listProp.GetArrayElementAtIndex(i);
@@ -525,6 +527,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 
             using (new EditorGUI.IndentLevelScope())
             {
+                // Path selection can apply properties and resize the array through OnValidate.
                 for (int i = 0; i < listProp.arraySize; i++)
                 {
                     SerializedProperty elementProp = listProp.GetArrayElementAtIndex(i);
@@ -788,7 +791,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     int remaining = allPaths.Length - topN;
                     if (0 < remaining)
                     {
-                        for (int idx = topN; idx < allPaths.Length; idx++)
+                        int allPathsLength = allPaths.Length;
+                        for (int idx = topN; idx < allPathsLength; idx++)
                         {
                             DirectoryUsageData dirData = allPaths[idx];
                             if (

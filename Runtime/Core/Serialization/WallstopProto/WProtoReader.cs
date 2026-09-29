@@ -905,7 +905,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             // Offset indexing measured faster than slicing this varint scan.
             int count = 0;
-            for (int index = _position; index < _buffer.Length; index++)
+            int bufferLength = _buffer.Length;
+            for (int index = _position; index < bufferLength; index++)
             {
                 if ((_buffer[index] & 0x80) == 0)
                 {

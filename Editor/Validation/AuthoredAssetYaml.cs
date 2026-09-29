@@ -350,7 +350,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             int separator = -1;
-            for (int index = 0; index < content.Length; ++index)
+            int contentLength = content.Length;
+            for (int index = 0; index < contentLength; ++index)
             {
                 char character = content[index];
                 if (character == ':')
@@ -493,7 +494,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static bool IsZeroGuid(string guid)
         {
-            for (int index = 0; index < guid.Length; ++index)
+            int guidLength = guid.Length;
+            for (int index = 0; index < guidLength; ++index)
             {
                 if (guid[index] != '0')
                 {

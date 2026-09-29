@@ -491,7 +491,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < (platformOverrides?.Count ?? 0); i++)
+            int platformOverrideCount = platformOverrides?.Count ?? 0;
+            for (int i = 0; i < platformOverrideCount; i++)
             {
                 PlatformOverrideEntry p = platformOverrides[i];
                 string existing = p?.platformName;

@@ -57,7 +57,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return false;
             }
 
-            for (int index = 0; index < leftArray.Length; index++)
+            int leftArrayLength = leftArray.Length;
+            for (int index = 0; index < leftArrayLength; index++)
             {
                 object leftElement = leftArray.GetValue(index);
                 object rightElement = rightArray.GetValue(index);

@@ -413,7 +413,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             int writeIndex = 0;
 
-            for (int i = 0; i < source.Count; ++i)
+            int sourceCount = source.Count;
+            for (int i = 0; i < sourceCount; ++i)
             {
                 Component candidate = source[i];
                 if (candidate == null)

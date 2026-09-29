@@ -197,7 +197,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 return false;
             }
 
-            for (int i = 0; i < ownFrames.Length; ++i)
+            int ownFramesLength = ownFrames.Length;
+            for (int i = 0; i < ownFramesLength; ++i)
             {
                 if (ownFrames[i] != otherFrames[i])
                 {

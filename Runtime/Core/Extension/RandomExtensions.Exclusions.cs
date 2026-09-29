@@ -340,6 +340,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (exceptions is IReadOnlyList<T> exceptionList)
             {
+                // Hashing can shorten the caller's exclusion list.
                 for (int i = 0; i < exceptionList.Count; ++i)
                 {
                     exclude.Add(exceptionList[i]);
@@ -360,6 +361,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
             int n = 0;
+            // Hashing can shorten the caller's source list.
             for (int i = 0; i < source.Count; ++i)
             {
                 T v = source[i];
@@ -403,6 +405,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
             int n = 0;
+            // Hashing can shorten the caller's source list.
             for (int i = 0; i < source.Count; ++i)
             {
                 T v = source[i];

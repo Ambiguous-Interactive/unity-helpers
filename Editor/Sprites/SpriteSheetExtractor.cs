@@ -1419,7 +1419,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private static void AddUniqueSorted(List<int> list, int value)
         {
             int insertIndex = 0;
-            for (int i = 0; i < list.Count; ++i)
+            int listCount = list.Count;
+            for (int i = 0; i < listCount; ++i)
             {
                 if (list[i] == value)
                 {

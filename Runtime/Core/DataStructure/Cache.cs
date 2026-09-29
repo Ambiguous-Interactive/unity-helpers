@@ -263,7 +263,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             keys.Clear();
             float currentTime = _timeProvider();
-            for (int i = 0; i < _entries.Length; i++)
+            int entriesLength = _entries.Length;
+            for (int i = 0; i < entriesLength; i++)
             {
                 if (_entries[i].IsAlive && !IsExpired(i, currentTime))
                 {
@@ -547,6 +548,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
+            // Eviction callbacks and destination setters can change the requested keys.
             for (int i = 0; i < keys.Count; i++)
             {
                 TKey key = keys[i];
@@ -588,6 +590,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
+            // Set dispatches eviction callbacks before the next input entry is read.
             for (int i = 0; i < entries.Count; i++)
             {
                 KeyValuePair<TKey, TValue> entry = entries[i];
@@ -631,7 +634,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     return;
                 }
                 float currentTime = _timeProvider();
-                for (int i = 0; i < _entries.Length; i++)
+                int entriesLength = _entries.Length;
+                for (int i = 0; i < entriesLength; i++)
                 {
                     if (_entries[i].IsAlive && IsExpired(i, currentTime))
                     {
@@ -751,7 +755,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private void InitializeFreeList()
         {
             _freeListHead = 0;
-            for (int i = 0; i < _entries.Length - 1; i++)
+            int entriesLength = _entries.Length;
+            for (int i = 0; i < entriesLength - 1; i++)
             {
                 _entries[i].NextIndex = i + 1;
             }
@@ -913,7 +918,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void ClearEntriesUnlocked()
         {
-            for (int i = 0; i < _entries.Length; i++)
+            int entriesLength = _entries.Length;
+            for (int i = 0; i < entriesLength; i++)
             {
                 if (_entries[i].IsAlive)
                 {
@@ -1209,7 +1215,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private int SelectVictim()
         {
             float currentTime = _timeProvider();
-            for (int i = 0; i < _entries.Length; i++)
+            int entriesLength = _entries.Length;
+            for (int i = 0; i < entriesLength; i++)
             {
                 if (_entries[i].IsAlive && IsExpired(i, currentTime))
                 {
@@ -1240,7 +1247,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int minFrequency = int.MaxValue;
             float oldestAccess = float.MaxValue;
 
-            for (int i = 0; i < _entries.Length; i++)
+            int entriesLength = _entries.Length;
+            for (int i = 0; i < entriesLength; i++)
             {
                 ref CacheEntry entry = ref _entries[i];
                 if (!entry.IsAlive)
@@ -1272,7 +1280,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int targetCount = Random.Next(0, _count);
             int current = 0;
 
-            for (int i = 0; i < _entries.Length; i++)
+            int entriesLength = _entries.Length;
+            for (int i = 0; i < entriesLength; i++)
             {
                 if (_entries[i].IsAlive)
                 {

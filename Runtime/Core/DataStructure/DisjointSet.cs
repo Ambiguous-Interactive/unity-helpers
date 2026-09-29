@@ -169,7 +169,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int memberCount = 0;
-            for (int i = 0; i < _parent.Length; i++)
+            int parentLength = _parent.Length;
+            for (int i = 0; i < parentLength; i++)
             {
                 if (TryFind(i, out int currentRoot) && currentRoot == root)
                 {
@@ -199,7 +200,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return results;
             }
 
-            for (int i = 0; i < _parent.Length; i++)
+            int parentLength = _parent.Length;
+            for (int i = 0; i < parentLength; i++)
             {
                 if (TryFind(i, out int currentRoot) && currentRoot == root)
                 {
@@ -287,7 +289,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public void Reset()
         {
-            for (int i = 0; i < _parent.Length; i++)
+            int parentLength = _parent.Length;
+            for (int i = 0; i < parentLength; i++)
             {
                 _parent[i] = i;
                 _rank[i] = 0;

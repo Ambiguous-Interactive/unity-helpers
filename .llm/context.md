@@ -70,11 +70,13 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     inside a shipped player. `WUH###`
     (`Generator~/WallstopStudios.UnityHelpers.Analyzers`) reports an allocation or footgun in code
     that already works, so it is **capped at `DiagnosticSeverity.Warning` and suppressible**:
-    taking a package upgrade must never fail a consumer's build. On by default, with three exceptions --
+    taking a package upgrade must never fail a consumer's build. On by default, with four exceptions --
     `WUH010` (a dictionary read by indexer), `WUH013` (a counting loop that can use `foreach`),
-    and `WUH018` (string equality whose comparison policy is implicit) remain opt-in for consumers
+    `WUH018` (string equality whose comparison policy is implicit), and `WUH019` (repeated stable loop bounds) remain opt-in for consumers
     because their correct shapes are ubiquitous. **The package opts into WUH010, WUH013, and WUH018
-    in its shared check-project ruleset**. Every owned `Generator~` project self-hosts both shipped analyzer assemblies and promotes every `WUH###`; the five Unity source gates cover Runtime, Editor, integrations, and both test trees without changing consumer defaults.
+    in its shared check-project ruleset; WUH019 is enabled by the production-only ruleset for
+    Runtime, Editor, and integration checks. The excluded-source loop audit covers both WUH013
+    and WUH019 with reporting controls.** Every owned `Generator~` project self-hosts both shipped analyzer assemblies and promotes shared `WUH###` policies; WUH019 promotion is limited to production checks; the five Unity source gates cover Runtime, Editor, integrations, and both test trees without changing consumer defaults.
     Retain indexed loops when the index is needed or enumeration changes behavior.
     Both DLLs are committed under `Runtime/Analyzers`, byte-compared in CI, and **an edit to
     either is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)

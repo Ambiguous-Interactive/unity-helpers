@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 {
     using System;
     using System.Collections.Generic;
+    using System.Collections.ObjectModel;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -266,6 +267,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.True(bag.TryRestoreRemaining(remaining));
             Assert.AreEqual(2, bag.RemainingCount);
             Assert.False(bag.TryRestoreRemaining(new[] { "common", "rare", "rare" }));
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void WeightedShuffleBagCopyStopsWhenDestinationCallbackClearsBag(bool configured)
+        {
+            WeightedShuffleBag<int> bag = new();
+            Assert.That(bag.TryAdd(10, 2), Is.True);
+            Assert.That(bag.TryAdd(20, 1), Is.True);
+            ObservableCollection<int> destination = new();
+            destination.CollectionChanged += (sender, args) => bag.Clear();
+
+            bool copied = configured
+                ? bag.TryCopyConfiguredTicketsTo(destination)
+                : bag.TryCopyRemainingTicketsTo(destination);
+
+            Assert.That(copied, Is.True);
+            CollectionAssert.AreEqual(new[] { 10 }, destination);
+            Assert.That(bag.Count, Is.Zero);
+            Assert.That(bag.RemainingCount, Is.Zero);
         }
 
         [Test]

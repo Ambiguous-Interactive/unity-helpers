@@ -201,7 +201,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     return false;
                 }
 
-                for (int index = 0; index < current.Length; ++index)
+                int currentLength = current.Length;
+                for (int index = 0; index < currentLength; ++index)
                 {
                     if (current[index] != original[index])
                     {

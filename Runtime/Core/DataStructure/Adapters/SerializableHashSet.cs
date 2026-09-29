@@ -897,6 +897,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             bool hasDuplicates = false;
             bool encounteredNullReference = false;
             bool supportsNullCheck = TypeSupportsNullReferences(typeof(T));
+            // Hashing and logging callbacks can rebuild the serialized items.
             for (int index = 0; index < _items.Length; index++)
             {
                 T value = _items[index];

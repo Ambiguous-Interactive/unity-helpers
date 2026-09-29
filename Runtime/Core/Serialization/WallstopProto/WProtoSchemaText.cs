@@ -503,7 +503,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return false;
                 }
 
-                for (int i = 1; i < name.Length; ++i)
+                int nameLength = name.Length;
+                for (int i = 1; i < nameLength; ++i)
                 {
                     if (!IsAsciiIdentifierCharacter(name[i]))
                     {
@@ -1101,7 +1102,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     KeyValuePair<string, string>
                 >(values.Length);
                 HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
-                for (int i = 0; i < values.Length; ++i)
+                int valuesLength = values.Length;
+                for (int i = 0; i < valuesLength; ++i)
                 {
                     // Unsigned enums may exceed long.MaxValue; preserve their underlying width.
                     string raw = unsigned

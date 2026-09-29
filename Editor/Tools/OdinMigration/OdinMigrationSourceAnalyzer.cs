@@ -986,7 +986,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
             int declarationStart = position;
             int angleDepth = 0;
-            for (; position < source.Length; position++)
+            int sourceLength = source.Length;
+            for (; position < sourceLength; position++)
             {
                 char character = source[position];
                 if (character == '<')
@@ -1292,7 +1293,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             internal LineMap(string source)
             {
                 List<int> starts = new List<int> { 0 };
-                for (int index = 0; index < source.Length; index++)
+                int sourceLength = source.Length;
+                for (int index = 0; index < sourceLength; index++)
                 {
                     if (source[index] == '\r')
                     {
@@ -1431,7 +1433,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     return false;
                 }
-                for (int index = 0; index < expected.Length; index++)
+                int expectedLength = expected.Length;
+                for (int index = 0; index < expectedLength; index++)
                 {
                     if (source[start + index] != expected[index])
                     {

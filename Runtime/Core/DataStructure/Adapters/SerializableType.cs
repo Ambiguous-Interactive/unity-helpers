@@ -867,7 +867,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return false;
             }
 
-            for (int index = 0; index < left.Length; index++)
+            int leftLength = left.Length;
+            for (int index = 0; index < leftLength; index++)
             {
                 if (!string.Equals(left[index], right[index], StringComparison.Ordinal))
                 {
@@ -1152,7 +1153,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 _assemblyQualifiedNames = new string[_descriptors.Length];
                 _displayNames = new string[_descriptors.Length];
                 _tooltips = new string[_descriptors.Length];
-                for (int index = 0; index < _descriptors.Length; index++)
+                int descriptorsLength = _descriptors.Length;
+                for (int index = 0; index < descriptorsLength; index++)
                 {
                     _assemblyQualifiedNames[index] = _descriptors[index].AssemblyQualifiedName;
                     _displayNames[index] = _descriptors[index].DisplayName;
@@ -1214,7 +1216,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 builder.Append('<');
 
                 Type[] arguments = type.GetGenericArguments();
-                for (int index = 0; index < arguments.Length; index++)
+                int argumentsLength = arguments.Length;
+                for (int index = 0; index < argumentsLength; index++)
                 {
                     if (0 < index)
                     {

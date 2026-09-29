@@ -491,7 +491,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             int limit = Math.Min(maxCount, source.Count);
             int writeIndex = 0;
 
-            for (int i = 0; i < source.Count && writeIndex < limit; ++i)
+            int sourceCount = source.Count;
+            for (int i = 0; i < sourceCount && writeIndex < limit; ++i)
             {
                 Component candidate = source[i];
                 if (candidate == null)

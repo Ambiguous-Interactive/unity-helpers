@@ -417,7 +417,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _selected = -1;
             if (selectedId != null)
             {
-                for (int index = 0; index < _visible.Count; index++)
+                int visibleCount = _visible.Count;
+                for (int index = 0; index < visibleCount; index++)
                 {
                     if (string.Equals(_visible[index].Id, selectedId, StringComparison.Ordinal))
                     {

@@ -291,7 +291,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             GenericMenu menu = new();
-            for (int i = 0; i < options.Length; i++)
+            int optionsLength = options.Length;
+            for (int i = 0; i < optionsLength; i++)
             {
                 int capturedIndex = i;
                 bool isSelected = i == currentIndex && !hasMultipleDifferentValues;

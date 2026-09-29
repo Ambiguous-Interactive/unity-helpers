@@ -25,7 +25,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             string[] cases = new string[run.Findings.Count];
             int failures = 0;
             int suppressed = 0;
-            for (int index = 0; index < cases.Length; index++)
+            int casesLength = cases.Length;
+            for (int index = 0; index < casesLength; index++)
             {
                 ValidationFinding finding = run.Findings[index];
                 bool skipped = effective.IsSuppressed(in finding);

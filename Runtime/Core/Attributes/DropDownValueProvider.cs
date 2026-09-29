@@ -140,7 +140,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
             );
 
-            for (int index = 0; index < methods.Length; index += 1)
+            int methodsLength = methods.Length;
+            for (int index = 0; index < methodsLength; index += 1)
             {
                 MethodInfo candidate = methods[index];
                 if (!string.Equals(candidate.Name, methodName, StringComparison.Ordinal))
@@ -398,7 +399,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         )
         {
             List<object> normalized = new();
-            for (int index = 0; index < values.Length; index += 1)
+            int valuesLength = values.Length;
+            for (int index = 0; index < valuesLength; index += 1)
             {
                 object current = values[index];
                 if (TryConvertValue(current, valueType, out object converted))
@@ -495,7 +497,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
             );
 
-            for (int index = 0; index < methods.Length; index += 1)
+            int methodsLength = methods.Length;
+            for (int index = 0; index < methodsLength; index += 1)
             {
                 MethodInfo candidate = methods[index];
                 if (!string.Equals(candidate.Name, methodName, StringComparison.Ordinal))
@@ -606,7 +609,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             Type[] interfaces = type.GetInterfaces();
-            for (int index = 0; index < interfaces.Length; index += 1)
+            int interfacesLength = interfaces.Length;
+            for (int index = 0; index < interfacesLength; index += 1)
             {
                 Type candidate = interfaces[index];
                 if (

@@ -87,7 +87,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             Transform transform = component.transform;
-            for (int i = 0; i < transform.childCount; ++i)
+            int transformChildCount = transform.childCount;
+            for (int i = 0; i < transformChildCount; ++i)
             {
                 Transform child = transform.GetChild(i);
                 child.GetComponentsInChildren(true, internalBuffer);
@@ -169,7 +170,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 buffer.Add(transform);
             }
 
-            for (int i = 0; i < transform.childCount; ++i)
+            int transformChildCount = transform.childCount;
+            for (int i = 0; i < transformChildCount; ++i)
             {
                 buffer.Add(transform.GetChild(i));
             }
@@ -359,7 +361,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             while (iteration.TryDequeue(out (Transform current, int depth) item))
             {
-                for (int i = 0; i < item.current.childCount; ++i)
+                int itemcurrentChildCount = item.current.childCount;
+                for (int i = 0; i < itemcurrentChildCount; ++i)
                 {
                     Transform childTransform = item.current.GetChild(i);
                     int childDepth = item.depth + 1;
@@ -379,7 +382,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             List<Transform> buffer
         )
         {
-            for (int i = 0; i < transform.childCount; ++i)
+            int transformChildCount = transform.childCount;
+            for (int i = 0; i < transformChildCount; ++i)
             {
                 Transform child = transform.GetChild(i);
                 buffer.Add(child);

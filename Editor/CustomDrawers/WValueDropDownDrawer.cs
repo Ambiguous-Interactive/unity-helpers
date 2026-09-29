@@ -377,7 +377,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             object[] options
         )
         {
-            for (int index = 0; index < options.Length; index += 1)
+            int optionsLength = options.Length;
+            for (int index = 0; index < optionsLength; index += 1)
             {
                 if (OptionMatches(property, valueType, options[index]))
                 {
@@ -601,7 +602,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             object current = target;
             string[] pathParts = propertyPath.Split('.');
 
-            for (int i = 0; i < pathParts.Length; i++)
+            int pathPartsLength = pathParts.Length;
+            for (int i = 0; i < pathPartsLength; i++)
             {
                 if (current == null)
                 {
@@ -878,7 +880,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 )
                 {
                     bool match = true;
-                    for (int i = 0; i < options.Length && match; i++)
+                    int optionsLength = options.Length;
+                    for (int i = 0; i < optionsLength && match; i++)
                     {
                         if (!Equals(cached.sourceOptions[i], options[i]))
                         {
@@ -903,7 +906,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static string[] BuildDisplayLabelsUncached(object[] options)
         {
             string[] labels = new string[options.Length];
-            for (int index = 0; index < options.Length; index += 1)
+            int optionsLength = options.Length;
+            for (int index = 0; index < optionsLength; index += 1)
             {
                 labels[index] = FormatOptionCached(options[index]);
             }
@@ -1170,7 +1174,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             string[] pathParts = propertyPath.Split('.');
             object current = target;
 
-            for (int i = 0; i < pathParts.Length - 1; i++)
+            int pathPartsLength = pathParts.Length;
+            for (int i = 0; i < pathPartsLength - 1; i++)
             {
                 if (current == null)
                 {
@@ -1350,7 +1355,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            for (int index = 0; index < property.enumNames.Length; index += 1)
+            int propertyenumNamesLength = property.enumNames.Length;
+            for (int index = 0; index < propertyenumNamesLength; index += 1)
             {
                 if (string.Equals(property.enumNames[index], optionName, StringComparison.Ordinal))
                 {
@@ -1617,7 +1623,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 string propertyPath = property.propertyPath;
 
                 GenericMenu menu = new();
-                for (int i = 0; i < options.Length; i++)
+                int optionsLength = options.Length;
+                for (int i = 0; i < optionsLength; i++)
                 {
                     int capturedIndex = i;
                     bool isSelected = i == currentIndex && !property.hasMultipleDifferentValues;

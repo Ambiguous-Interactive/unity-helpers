@@ -15,7 +15,13 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningLevel>9999</WarningLevel>
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)CheckProjects.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet
+      Condition="'$(MSBuildProjectName)' == 'WallstopStudios.UnityHelpers.TypeCheck' or '$(MSBuildProjectName)' == 'WallstopStudios.UnityHelpers.EditorCheck' or '$(MSBuildProjectName)' == 'WallstopStudios.UnityHelpers.IntegrationCheck'"
+      >$(MSBuildThisFileDirectory)ProductionCheckProjects.ruleset</CodeAnalysisRuleSet>
     <WarningsAsErrors>$(WarningsAsErrors);WUH001;WUH002;WUH003;WUH004;WUH005;WUH006;WUH007;WUH008;WUH009;WUH010;WUH011;WUH012;WUH013;WUH014;WUH015;WUH016;WUH017;WUH018</WarningsAsErrors>
+    <WarningsAsErrors
+      Condition="'$(MSBuildProjectName)' == 'WallstopStudios.UnityHelpers.TypeCheck' or '$(MSBuildProjectName)' == 'WallstopStudios.UnityHelpers.EditorCheck' or '$(MSBuildProjectName)' == 'WallstopStudios.UnityHelpers.IntegrationCheck'"
+      >$(WarningsAsErrors);WUH019</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

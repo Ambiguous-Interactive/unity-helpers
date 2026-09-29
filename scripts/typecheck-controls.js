@@ -194,6 +194,7 @@ const CONTROLS = Object.freeze([
     fileName: "WallstopCheckControlAnalyzers.cs",
     render: analyzerControl,
     expected: ["WPROTO001", "WUH003", "WUH013"],
+    productionExpected: ["WUH019"],
     meaning:
       "the shipped generators and analyzers report, including the package counting-loop opt-in"
   },
@@ -208,7 +209,7 @@ const CONTROLS = Object.freeze([
     id: "excluded-loops",
     fileName: "WallstopCheckControlExcludedLoops.cs",
     render: excludedLoopControl,
-    expected: ["WUH013"],
+    expected: ["WUH013", "WUH019"],
     projectIds: ["editor"],
     property: "WallstopCountingLoopAuditControl",
     meaning: "the persistent audit rejects counting loops in sources outside normal compilation"
@@ -307,20 +308,29 @@ function isNuGetMigrationStartupRace(attempt) {
  * The verdict on one control build: null when it behaved, otherwise the sentence explaining what
  * the gate failed to say. Pure, so its own self-test can drive every branch without a compiler.
  */
+function expectedDiagnostics(project, control) {
+  return control.expected.concat(
+    control.productionExpected && ["runtime", "editor", "integrations"].includes(project.id)
+      ? control.productionExpected
+      : []
+  );
+}
+
 function classify(project, control, attempt) {
   const reported = diagnosticsIn(attempt.output);
-  const missing = control.expected.filter((id) => !reported.has(id));
-  const unexpected = [...reported].filter((id) => !control.expected.includes(id)).sort();
+  const expected = expectedDiagnostics(project, control);
+  const missing = expected.filter((id) => !reported.has(id));
+  const unexpected = [...reported].filter((id) => !expected.includes(id)).sort();
   if (attempt.exitCode === 0) {
     return (
       `${project.id} ${control.id}: the build SUCCEEDED with a control defect in it. ` +
-      `Expected ${control.expected.join(" and ")} so that ${control.meaning}.`
+      `Expected ${expected.join(" and ")} so that ${control.meaning}.`
     );
   }
   if (missing.length !== 0) {
     return (
       `${project.id} ${control.id}: the build failed but never reported ${missing.join(", ")}. ` +
-      `Expected ${control.expected.join(" and ")} so that ${control.meaning}. ` +
+      `Expected ${expected.join(" and ")} so that ${control.meaning}. ` +
       `Reported: ${[...reported].sort().join(", ") || "nothing"}.`
     );
   }
@@ -358,7 +368,7 @@ async function runProject(project, controlRoot, verbose, buildControl = build) {
     }
     messages.push(
       `  [PASS] ${project.id}: the ${control.id} control over ${project.tree} reported ` +
-        `${control.expected.join(", ")} and nothing else\n`
+        `${expectedDiagnostics(project, control).join(", ")} and nothing else\n`
     );
   }
   return { failures, messages };

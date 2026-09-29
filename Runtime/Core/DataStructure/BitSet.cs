@@ -280,7 +280,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public void SetAll()
         {
-            for (int i = 0; i < _bits.Length; i++)
+            int bitsLength = _bits.Length;
+            for (int i = 0; i < bitsLength; i++)
             {
                 _bits[i] = ulong.MaxValue;
             }
@@ -306,7 +307,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public void FlipAll()
         {
-            for (int i = 0; i < _bits.Length; i++)
+            int bitsLength = _bits.Length;
+            for (int i = 0; i < bitsLength; i++)
             {
                 _bits[i] = ~_bits[i];
             }
@@ -480,7 +482,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 Resize(other._capacity);
             }
 
-            for (int i = 0; i < _bits.Length; i++)
+            int bitsLength = _bits.Length;
+            for (int i = 0; i < bitsLength; i++)
             {
                 _bits[i] &= other._bits[i];
             }

@@ -304,7 +304,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 _permutations.Shuffle(random);
             }
-            for (int i = 0; i < _doubledPermutations.Length; ++i)
+            int doubledPermutationsLength = _doubledPermutations.Length;
+            for (int i = 0; i < doubledPermutationsLength; ++i)
             {
                 _doubledPermutations[i] = _permutations[i % _permutations.Length];
             }

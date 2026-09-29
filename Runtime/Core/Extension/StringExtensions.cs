@@ -364,7 +364,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             );
             _ = stringBuilder.Append(char.ToLowerInvariant(pascalCase[0]));
 
-            for (int i = 1; i < pascalCase.Length; ++i)
+            int pascalCaseLength = pascalCase.Length;
+            for (int i = 1; i < pascalCaseLength; ++i)
             {
                 _ = stringBuilder.Append(pascalCase[i]);
             }
@@ -438,7 +439,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             );
 
             bool separatorPending = false;
-            for (int i = 0; i < delimited.Length; ++i)
+            int delimitedLength = delimited.Length;
+            for (int i = 0; i < delimitedLength; ++i)
             {
                 char current = delimited[i];
                 bool isAsciiAlphanumeric =
@@ -715,7 +717,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 out StringBuilder currentWord
             );
 
-            for (int i = 0; i < input.Length; ++i)
+            int inputLength = input.Length;
+            for (int i = 0; i < inputLength; ++i)
             {
                 char current = input[i];
 
@@ -875,7 +878,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             CaseTokenKind? currentKind = null;
             CharacterCategory lastCategory = CharacterCategory.None;
 
-            for (int i = 0; i < value.Length; ++i)
+            int valueLength = value.Length;
+            for (int i = 0; i < valueLength; ++i)
             {
                 char current = value[i];
                 bool isSeparator = WordSeparators.Contains(current) || char.IsWhiteSpace(current);
@@ -1039,7 +1043,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             bool hasDigit = false;
             bool hasUppercase = false;
 
-            for (int i = 0; i < value.Length; ++i)
+            int valueLength = value.Length;
+            for (int i = 0; i < valueLength; ++i)
             {
                 char c = value[i];
                 if (char.IsDigit(c))
@@ -1067,7 +1072,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             bool needsSanitization = false;
-            for (int i = 0; i < value.Length; ++i)
+            int valueLength = value.Length;
+            for (int i = 0; i < valueLength; ++i)
             {
                 if (CharsToStrip.Contains(value[i]))
                 {
@@ -1086,7 +1092,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 out StringBuilder builder
             );
 
-            for (int i = 0; i < value.Length; ++i)
+            for (int i = 0; i < valueLength; ++i)
             {
                 char c = value[i];
                 if (!CharsToStrip.Contains(c))
@@ -1116,7 +1122,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     : char.ToLowerInvariant(firstChar)
             );
 
-            for (int i = 1; i < word.Length; ++i)
+            int wordLength = word.Length;
+            for (int i = 1; i < wordLength; ++i)
             {
                 char c = word[i];
                 _ = builder.Append(char.ToLowerInvariant(c));
@@ -1153,7 +1160,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int firstMark = -1;
-            for (int i = 0; i < decomposed.Length; ++i)
+            int decomposedLength = decomposed.Length;
+            for (int i = 0; i < decomposedLength; ++i)
             {
                 if (
                     CharUnicodeInfo.GetUnicodeCategory(decomposed[i])
@@ -1175,7 +1183,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 out StringBuilder builder
             );
             builder.Append(decomposed, 0, firstMark);
-            for (int i = firstMark; i < decomposed.Length; ++i)
+            int decomposedLength2 = decomposed.Length;
+            for (int i = firstMark; i < decomposedLength2; ++i)
             {
                 char current = decomposed[i];
                 if (CharUnicodeInfo.GetUnicodeCategory(current) != UnicodeCategory.NonSpacingMark)
@@ -1210,7 +1219,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             bool previousHadUppercase = false;
             bool forceDelimiter = false;
 
-            for (int i = 0; i < tokens.Count; ++i)
+            int tokensCount = tokens.Count;
+            for (int i = 0; i < tokensCount; ++i)
             {
                 CaseToken token = tokens[i];
                 if (token.Kind == CaseTokenKind.Separator)
@@ -1231,7 +1241,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 bool isNumeric = true;
                 bool hasLetter = false;
-                for (int j = 0; j < sanitized.Length; ++j)
+                int sanitizedLength = sanitized.Length;
+                for (int j = 0; j < sanitizedLength; ++j)
                 {
                     char c = sanitized[j];
                     if (!char.IsDigit(c))
@@ -1249,7 +1260,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 bool tokenHasUppercase = token.HasUppercase;
 
                 bool nextWordHasUppercase = false;
-                for (int lookahead = i + 1; lookahead < tokens.Count; ++lookahead)
+                int tokensCount2 = tokens.Count;
+                for (int lookahead = i + 1; lookahead < tokensCount2; ++lookahead)
                 {
                     CaseToken lookaheadToken = tokens[lookahead];
                     if (lookaheadToken.Kind == CaseTokenKind.Separator)
@@ -1312,7 +1324,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            for (int i = 0; i < value.Length; ++i)
+            int valueLength = value.Length;
+            for (int i = 0; i < valueLength; ++i)
             {
                 char c = value[i];
                 if (CharsToStrip.Contains(c))
@@ -1347,7 +1360,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             bool firstLetterHandled = false;
-            for (int i = 0; i < word.Length; ++i)
+            int wordLength = word.Length;
+            for (int i = 0; i < wordLength; ++i)
             {
                 char c = word[i];
                 if (!firstLetterHandled && char.IsLetter(c))
@@ -1381,7 +1395,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            for (int i = 0; i < value.Length; ++i)
+            int valueLength = value.Length;
+            for (int i = 0; i < valueLength; ++i)
             {
                 char c = value[i];
                 _ = builder.Append(char.IsLetter(c) ? char.ToLowerInvariant(c) : c);
@@ -1396,7 +1411,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             bool foundLetter = false;
-            for (int i = 0; i < value.Length; ++i)
+            int valueLength = value.Length;
+            for (int i = 0; i < valueLength; ++i)
             {
                 char c = value[i];
                 if (!char.IsLetter(c))
@@ -1427,7 +1443,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             );
 
             bool previousWasSpace = false;
-            for (int i = 0; i < value.Length; ++i)
+            int valueLength = value.Length;
+            for (int i = 0; i < valueLength; ++i)
             {
                 char c = value[i];
                 if (char.IsWhiteSpace(c))
@@ -1570,7 +1587,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             bool hasSeenLetter = false;
 
-            for (int i = 0; i < value.Length; ++i)
+            int valueLength = value.Length;
+            for (int i = 0; i < valueLength; ++i)
             {
                 char c = value[i];
 
@@ -1756,7 +1774,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             bool containsSpecialCharacter = false;
-            for (int i = 0; i < value.Length; ++i)
+            int valueLength = value.Length;
+            for (int i = 0; i < valueLength; ++i)
             {
                 char c = value[i];
                 if (c == CombiningDotAbove || c == CapitalIWithDot)
@@ -1776,7 +1795,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 out StringBuilder builder
             );
 
-            for (int i = 0; i < value.Length; ++i)
+            int valueLength11 = value.Length;
+            for (int i = 0; i < valueLength11; ++i)
             {
                 char c = value[i];
                 if (c == CombiningDotAbove)

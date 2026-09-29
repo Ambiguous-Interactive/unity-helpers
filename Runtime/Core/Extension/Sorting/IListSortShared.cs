@@ -246,7 +246,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             where TComparer : IComparer<T>
         {
             int[] indices = { first, second, third, fourth, fifth };
-            for (int i = 1; i < indices.Length; ++i)
+            int indicesLength = indices.Length;
+            for (int i = 1; i < indicesLength; ++i)
             {
                 int candidate = indices[i];
                 T candidateValue = array[candidate];

@@ -964,7 +964,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static string ToHex(byte[] digest)
         {
             char[] hex = new char[digest.Length * 2];
-            for (int i = 0; i < digest.Length; ++i)
+            int digestLength = digest.Length;
+            for (int i = 0; i < digestLength; ++i)
             {
                 hex[i * 2] = HexDigits[digest[i] >> 4];
                 hex[(i * 2) + 1] = HexDigits[digest[i] & 0xF];

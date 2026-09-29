@@ -176,7 +176,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 }
             }
 
-            for (int i = 0; i < found.Length; i++)
+            int foundLength = found.Length;
+            for (int i = 0; i < foundLength; i++)
             {
                 if (!found[i])
                 {

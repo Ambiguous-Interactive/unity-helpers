@@ -379,7 +379,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                             source.Length,
                             out premultiplied
                         );
-                        for (int j = 0; j < source.Length; j++)
+                        int sourceLength = source.Length;
+                        for (int j = 0; j < sourceLength; j++)
                         {
                             premultiplied[j] = TextureResampling.Premultiply(source[j]);
                         }

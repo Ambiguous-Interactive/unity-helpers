@@ -27,6 +27,85 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             _currentTime = 0f;
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SetAllTracksInputChangesFromEvictionCallbacks(bool appendEntry)
+        {
+            List<KeyValuePair<int, int>> entries = new()
+            {
+                new KeyValuePair<int, int>(1, 2),
+                new KeyValuePair<int, int>(2, 3),
+            };
+            CacheOptions<int, int> options = new()
+            {
+                OnEviction = (_, _, reason) =>
+                {
+                    if (reason == EvictionReason.Replaced)
+                    {
+                        if (appendEntry)
+                        {
+                            entries.Add(new KeyValuePair<int, int>(3, 4));
+                        }
+                        else
+                        {
+                            entries.Clear();
+                        }
+                    }
+                },
+            };
+            using Cache<int, int> cache = new(options);
+            cache.Set(1, 1);
+
+            cache.SetAll(entries);
+
+            Assert.That(cache.TryGet(1, out int replaced), Is.True);
+            Assert.That(replaced, Is.EqualTo(2));
+            Assert.That(cache.TryGet(2, out _), Is.EqualTo(appendEntry));
+            Assert.That(cache.TryGet(3, out int appended), Is.EqualTo(appendEntry));
+            if (appendEntry)
+            {
+                Assert.That(appended, Is.EqualTo(4));
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void GetAllTracksKeyChangesFromExpirationCallbacks(bool appendKey)
+        {
+            List<int> keys = new() { 1, 2 };
+            Dictionary<int, int> results = new();
+            CacheOptions<int, int> options = new()
+            {
+                TimeProvider = () => _currentTime,
+                OnEviction = (_, _, reason) =>
+                {
+                    if (reason == EvictionReason.Expired)
+                    {
+                        if (appendKey)
+                        {
+                            keys.Add(3);
+                        }
+                        else
+                        {
+                            keys.Clear();
+                        }
+                    }
+                },
+            };
+            using Cache<int, int> cache = new(options);
+            cache.Set(1, 1, 1f);
+            cache.Set(2, 2);
+            cache.Set(3, 3);
+            _currentTime = 2f;
+
+            cache.GetAll(keys, results);
+
+            CollectionAssert.AreEquivalent(
+                appendKey ? new[] { 2, 3 } : Array.Empty<int>(),
+                results.Keys
+            );
+        }
+
         [Test]
         public void ConstructorWithDefaultOptionsUsesDefaults()
         {

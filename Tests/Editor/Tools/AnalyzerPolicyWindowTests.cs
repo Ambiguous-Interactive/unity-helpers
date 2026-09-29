@@ -45,7 +45,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 Path.GetFullPath(Path.Combine(Application.dataPath, "Default.ruleset")),
                 AnalyzerPolicyWindow.GetRulesetPath()
             );
-            Assert.AreEqual(18, policies.Count);
+            Assert.AreEqual(19, policies.Count);
             for (int index = 0; index < policies.Count; ++index)
             {
                 Assert.AreEqual($"WUH{index + 1:000}", policies[index].Id);
@@ -98,6 +98,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             StringAssert.Contains("Id=\"CS0618\" Action=\"Error\"", contents);
             StringAssert.Contains("Id=\"WUH001\" Action=\"Warning\"", contents);
             StringAssert.Contains("Id=\"WUH018\" Action=\"Warning\"", contents);
+            StringAssert.Contains("Id=\"WUH019\" Action=\"Warning\"", contents);
 
             File.WriteAllText(
                 path,

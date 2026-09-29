@@ -282,7 +282,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             if (_count != 0 || _tombstones != 0)
             {
-                for (int index = 0; index < _keys.Length; ++index)
+                int keysLength = _keys.Length;
+                for (int index = 0; index < keysLength; ++index)
                 {
                     _keys[index] = EmptySlot;
                 }
@@ -413,7 +414,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            for (int index = 0; index < oldKeys.Length; ++index)
+            int oldKeysLength = oldKeys.Length;
+            for (int index = 0; index < oldKeysLength; ++index)
             {
                 int stored = oldKeys[index];
                 if (MinimumAllowedKey <= stored)

@@ -1396,7 +1396,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return folderPath;
             }
 
-            for (int i = 1; i < parts.Length; i++)
+            int partsLength = parts.Length;
+            for (int i = 1; i < partsLength; i++)
             {
                 string desiredName = parts[i];
 
@@ -1596,7 +1597,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
 
-            for (int i = 1; i < parts.Length; i++)
+            int partsLength = parts.Length;
+            for (int i = 1; i < partsLength; i++)
             {
                 string desired = parts[i];
 

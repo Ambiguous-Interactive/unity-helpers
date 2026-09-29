@@ -127,7 +127,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private static ulong StableUtf8Hash64(string value)
         {
             ulong hash = Fnv64OffsetBasis;
-            for (int index = 0; index < value.Length; ++index)
+            int valueLength = value.Length;
+            for (int index = 0; index < valueLength; ++index)
             {
                 char character = value[index];
                 uint scalar = character;

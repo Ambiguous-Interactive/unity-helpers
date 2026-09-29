@@ -2236,7 +2236,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return Type.EmptyTypes;
             }
             Type[] types = new Type[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
+            int parametersLength = parameters.Length;
+            for (int i = 0; i < parametersLength; i++)
             {
                 types[i] = parameters[i]?.GetType();
             }
@@ -2262,7 +2263,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             Type[] expectedTypes
         )
         {
-            for (int i = 0; i < parameters.Length; i++)
+            int parametersLength = parameters.Length;
+            for (int i = 0; i < parametersLength; i++)
             {
                 if (parameters[i].ParameterType != expectedTypes[i])
                 {
@@ -4055,7 +4057,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     method.DeclaringType
                 );
 
-                for (int i = 0; i < parameters.Length; i++)
+                int parametersLength = parameters.Length;
+                for (int i = 0; i < parametersLength; i++)
                 {
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Ldc_I4, i);
@@ -4109,7 +4112,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ILGenerator il = dynamicMethod.GetILGenerator();
                 ParameterInfo[] parameters = method.GetParameters();
 
-                for (int i = 0; i < parameters.Length; i++)
+                int parametersLength = parameters.Length;
+                for (int i = 0; i < parametersLength; i++)
                 {
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldc_I4, i);
@@ -4163,7 +4167,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ILGenerator il = dynamicMethod.GetILGenerator();
                 ParameterInfo[] parameters = constructor.GetParameters();
 
-                for (int i = 0; i < parameters.Length; i++)
+                int parametersLength = parameters.Length;
+                for (int i = 0; i < parametersLength; i++)
                 {
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldc_I4, i);
@@ -4276,7 +4281,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ParameterInfo[] parameters = method.GetParameters();
                 Expression[] paramExpressions = new Expression[parameters.Length];
 
-                for (int i = 0; i < parameters.Length; i++)
+                int parametersLength = parameters.Length;
+                for (int i = 0; i < parametersLength; i++)
                 {
                     Expression argExpression = Expression.ArrayIndex(
                         argsParam,
@@ -4330,7 +4336,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ParameterInfo[] parameters = method.GetParameters();
                 Expression[] paramExpressions = new Expression[parameters.Length];
 
-                for (int i = 0; i < parameters.Length; i++)
+                int parametersLength = parameters.Length;
+                for (int i = 0; i < parametersLength; i++)
                 {
                     Expression argExpression = Expression.ArrayIndex(
                         argsParam,
@@ -4375,7 +4382,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ParameterInfo[] parameters = constructor.GetParameters();
                 Expression[] paramExpressions = new Expression[parameters.Length];
 
-                for (int i = 0; i < parameters.Length; i++)
+                int parametersLength = parameters.Length;
+                for (int i = 0; i < parametersLength; i++)
                 {
                     Expression argExpression = Expression.ArrayIndex(
                         argsParam,
@@ -4491,7 +4499,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 ParameterInfo[] indices = property.GetIndexParameters();
                 Expression[] indexExpressions = new Expression[indices.Length];
-                for (int i = 0; i < indices.Length; i++)
+                int indicesLength = indices.Length;
+                for (int i = 0; i < indicesLength; i++)
                 {
                     Expression element = Expression.ArrayIndex(argsParam, Expression.Constant(i));
                     Type indexType = indices[i].ParameterType;
@@ -4548,7 +4557,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 ParameterInfo[] indices = property.GetIndexParameters();
                 Expression[] indexExpressions = new Expression[indices.Length];
-                for (int i = 0; i < indices.Length; i++)
+                int indicesLength = indices.Length;
+                for (int i = 0; i < indicesLength; i++)
                 {
                     Expression element = Expression.ArrayIndex(argsParam, Expression.Constant(i));
                     Type indexType = indices[i].ParameterType;
@@ -4562,7 +4572,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     : Expression.Convert(valueParam, property.PropertyType);
 
                 Expression[] arguments = new Expression[indexExpressions.Length + 1];
-                for (int i = 0; i < indexExpressions.Length; i++)
+                int indexExpressionsLength = indexExpressions.Length;
+                for (int i = 0; i < indexExpressionsLength; i++)
                 {
                     arguments[i] = indexExpressions[i];
                 }
@@ -5235,7 +5246,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             ParameterInfo[] indices = property.GetIndexParameters();
-            for (int i = 0; i < indices.Length; i++)
+            int indicesLength = indices.Length;
+            for (int i = 0; i < indicesLength; i++)
             {
                 il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldc_I4, i);
@@ -5280,7 +5292,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             ParameterInfo[] indices = property.GetIndexParameters();
-            for (int i = 0; i < indices.Length; i++)
+            int indicesLength = indices.Length;
+            for (int i = 0; i < indicesLength; i++)
             {
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Ldc_I4, i);

@@ -181,7 +181,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                for (int index = 0; index < AuthoredAssetYaml.AuthoredExtensions.Count; ++index)
+                int authoredAssetYamlAuthoredExtensionsCount = AuthoredAssetYaml
+                    .AuthoredExtensions
+                    .Count;
+                for (int index = 0; index < authoredAssetYamlAuthoredExtensionsCount; ++index)
                 {
                     if (
                         !path.EndsWith(

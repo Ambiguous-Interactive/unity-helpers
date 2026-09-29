@@ -315,7 +315,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
 
             string[] pathParts = normalizedPath.Split('/');
-            for (int i = 0; i < pathParts.Length; i++)
+            int pathPartsLength = pathParts.Length;
+            for (int i = 0; i < pathPartsLength; i++)
             {
                 if (
                     pathParts[i].Equals("Packages", StringComparison.OrdinalIgnoreCase)

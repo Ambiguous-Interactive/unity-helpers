@@ -378,7 +378,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int writeIndex = 1;
-            for (int readIndex = 1; readIndex < points.Count; ++readIndex)
+            int pointsCount = points.Count;
+            for (int readIndex = 1; readIndex < pointsCount; ++readIndex)
             {
                 Vector2 previous = points[writeIndex - 1];
                 Vector2 current = points[readIndex];
@@ -406,7 +407,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int writeIndex = 1;
-            for (int readIndex = 1; readIndex < points.Count; ++readIndex)
+            int pointsCount = points.Count;
+            for (int readIndex = 1; readIndex < pointsCount; ++readIndex)
             {
                 Vector3Int previous = points[writeIndex - 1];
                 Vector3Int current = points[readIndex];
@@ -434,7 +436,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int writeIndex = 1;
-            for (int readIndex = 1; readIndex < points.Count; ++readIndex)
+            int pointsCount = points.Count;
+            for (int readIndex = 1; readIndex < pointsCount; ++readIndex)
             {
                 FastVector3Int previous = points[writeIndex - 1];
                 FastVector3Int current = points[readIndex];
@@ -468,7 +471,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int lowestIndex = -1;
             float lowestY = float.MaxValue;
-            for (int i = 0; i < points.Count; ++i)
+            int pointsCount = points.Count;
+            for (int i = 0; i < pointsCount; ++i)
             {
                 Vector2 candidateWorld = grid.CellToWorld(points[i]);
                 if (lowestIndex < 0 || candidateWorld.y < lowestY)
@@ -702,7 +706,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int lowestIndex = -1;
             float lowestY = float.MaxValue;
             Vector2 lowestPoint = default;
-            for (int i = 0; i < points.Count; ++i)
+            int pointsCount = points.Count;
+            for (int i = 0; i < pointsCount; ++i)
             {
                 Vector2 candidate = points[i];
                 if (

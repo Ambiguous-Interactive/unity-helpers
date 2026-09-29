@@ -56,7 +56,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static ulong CalculateAllFlagsMask(EnumShared.ToggleOption[] options)
         {
             ulong mask = 0UL;
-            for (int index = 0; index < options.Length; index += 1)
+            int optionsLength = options.Length;
+            for (int index = 0; index < optionsLength; index += 1)
             {
                 EnumShared.ToggleOption option = options[index];
                 if (option.FlagValue != 0UL)
@@ -98,7 +99,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     out List<EnumShared.ToggleOption> options
                 );
 
-            for (int index = 0; index < values.Length; index += 1)
+            int valuesLength = values.Length;
+            for (int index = 0; index < valuesLength; index += 1)
             {
                 object value = values.GetValue(index);
                 if (value == null)
@@ -317,7 +319,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 out List<string> outOfView
             );
 
-            for (int index = 0; index < options.Length; index += 1)
+            int optionsLength = options.Length;
+            for (int index = 0; index < optionsLength; index += 1)
             {
                 EnumShared.ToggleOption option = options[index];
                 if (!IsOptionActive(option, currentMask, isFlags))

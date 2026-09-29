@@ -84,7 +84,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         public static bool IsPositionInside(List<Vector2> hull, Vector2 position)
         {
             bool isPositionInside = false;
-            for (int i = 0; i < hull.Count; ++i)
+            int hullCount = hull.Count;
+            for (int i = 0; i < hullCount; ++i)
             {
                 Vector2 oldVector = hull[i];
                 int nextIndex = (i + 1) % hull.Count;

@@ -136,7 +136,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return -1;
             }
 
-            for (int i = 0; i < runs.Count; ++i)
+            int runsCount = runs.Count;
+            for (int i = 0; i < runsCount; ++i)
             {
                 (int start, int length) run = runs[i];
                 ref PowerSortPlusNode node = ref nodes[i];
@@ -148,7 +149,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 node.active = true;
             }
 
-            for (int i = runs.Count; i < nodes.Length; ++i)
+            int nodesLength = nodes.Length;
+            for (int i = runs.Count; i < nodesLength; ++i)
             {
                 ref PowerSortPlusNode node = ref nodes[i];
                 node.active = false;

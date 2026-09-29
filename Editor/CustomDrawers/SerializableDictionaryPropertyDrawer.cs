@@ -2672,7 +2672,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return -1;
             }
 
-            for (int i = 0; i < cache.entries.Count; i++)
+            int cacheentriesCount = cache.entries.Count;
+            for (int i = 0; i < cacheentriesCount; i++)
             {
                 if (cache.entries[i].arrayIndex == globalIndex)
                 {
@@ -2709,7 +2710,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 if (currentIndex < desiredIndex)
                 {
-                    for (int j = i + 1; j < orderedIndices.Count; j++)
+                    int orderedIndicesCount2 = orderedIndices.Count;
+                    for (int j = i + 1; j < orderedIndicesCount2; j++)
                     {
                         if (currentIndex < orderedIndices[j] && orderedIndices[j] <= desiredIndex)
                         {
@@ -2719,7 +2721,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
                 else
                 {
-                    for (int j = i + 1; j < orderedIndices.Count; j++)
+                    int orderedIndicesCount3 = orderedIndices.Count;
+                    for (int j = i + 1; j < orderedIndicesCount3; j++)
                     {
                         if (desiredIndex <= orderedIndices[j] && orderedIndices[j] < currentIndex)
                         {
@@ -3608,7 +3611,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             keyBuilder.Append(propertyPath);
             keyBuilder.Append('|');
 
-            for (int index = 0; index < targets.Length; index++)
+            int targetsLength = targets.Length;
+            for (int index = 0; index < targetsLength; index++)
             {
                 long id = targets[index] != null ? targets[index].GetUnityObjectId() : 0;
                 keyBuilder.Append(id);
@@ -4853,7 +4857,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 .Split(PropertyPathSeparators, StringSplitOptions.RemoveEmptyEntries);
 
             object current = target;
-            for (int index = 0; index < elements.Length - 1; index++)
+            int elementsLength = elements.Length;
+            for (int index = 0; index < elementsLength - 1; index++)
             {
                 current = GetPathComponentValue(current, elements[index]);
                 if (current == null)
@@ -10076,7 +10081,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     string formattedKey = FormatDuplicateKeyDisplay(entry.Key);
                     string tooltip = BuildDuplicateTooltip(formattedKey, indices);
 
-                    for (int occurrence = 0; occurrence < indices.Count; occurrence++)
+                    int indicesCount = indices.Count;
+                    for (int occurrence = 0; occurrence < indicesCount; occurrence++)
                     {
                         int arrayIndex = indices[occurrence];
                         DuplicateKeyInfo info = new()
@@ -10180,7 +10186,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _summaryBuilder.Append(formattedKey);
                 _summaryBuilder.Append(" at entries ");
 
-                for (int index = 0; index < _summaryIndicesScratch.Count; index++)
+                int summaryIndicesScratchCount = _summaryIndicesScratch.Count;
+                for (int index = 0; index < summaryIndicesScratchCount; index++)
                 {
                     if (0 < index)
                     {

@@ -65,10 +65,23 @@ A counting loop is the right shape in exactly four cases:
 4. **The body mutates the collection or writes back through the indexer.** `foreach` throws on the
    first and cannot do the second for a struct element.
 
-When a counting loop reads an `IReadOnlyList<T>` or `IList<T>` that remains stable during the
-walk, read `Count` once before the loop and reuse that value for the bound, array sizing, and
-progress callbacks. This avoids repeated interface dispatch and keeps those values consistent.
-Keep a live `Count` only when the loop intentionally responds to collection size changes.
+When a counting loop reads a stable size, cache `Length`, `LongLength`, `Count`, `childCount`,
+`arraySize`, or a constant array dimension (`GetLength` / `GetLongLength`) in a named local before
+the loop. Reuse it for sizing and progress callbacks when they share that snapshot. Prefer natural
+names within each method; reuse an existing snapshot only if intervening work cannot change it.
+This avoids repeated getters, including interface dispatch for `IReadOnlyList<T>` and `IList<T>`.
+
+Keep live bounds when traversal responds to size changes: removals that continue iterating,
+pool drains, callbacks that mutate the collection or hierarchy, and iterators that can observe
+caller changes between `MoveNext` calls. Hoisting a bound past its null guard also changes behavior.
+Do not infer a stable size from a property name alone. A borrowed interface getter can execute
+user code; cache it only when concrete caller ownership proves the source remains stable.
+
+`WUH019` is opt-in for consumers and enabled in production TypeCheck, EditorCheck, and
+IntegrationCheck through `Generator~/ProductionCheckProjects.ruleset`. The excluded-production
+loop audit holds WUH013 and WUH019 with reporting controls. Shared test and tooling projects
+retain the shared ruleset. Explicit WUH019 warning promotion is production-only because naming
+a diagnostic in `WarningsAsErrors` overrides ruleset suppression.
 
 `WUH013` remains **off by default for consumers**; all five package check projects opt in through
 `Generator~/CheckProjects.ruleset` ([#671](https://github.com/Ambiguous-Interactive/unity-helpers/issues/671)).

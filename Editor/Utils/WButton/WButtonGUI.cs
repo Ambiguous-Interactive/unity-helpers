@@ -704,7 +704,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return false;
             }
 
-            for (int i = 0; i < targets.Length; i++)
+            int targetsLength = targets.Length;
+            for (int i = 0; i < targetsLength; i++)
             {
                 if (!ReferenceEquals(contextTargets[i], targets[i]))
                 {
@@ -1723,7 +1724,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
         private static void ReadInstanceIds(UnityEngine.Object[] targets, Span<long> destination)
         {
-            for (int i = 0; i < targets.Length; i++)
+            int targetsLength = targets.Length;
+            for (int i = 0; i < targetsLength; i++)
             {
                 UnityEngine.Object target = targets[i];
                 destination[i] = target != null ? target.GetUnityObjectId() : 0;

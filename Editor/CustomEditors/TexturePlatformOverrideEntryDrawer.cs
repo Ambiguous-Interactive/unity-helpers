@@ -28,7 +28,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             }
 
             string[] arr = new string[known.Length + 1];
-            for (int i = 0; i < known.Length; i++)
+            int knownLength = known.Length;
+            for (int i = 0; i < knownLength; i++)
             {
                 arr[i] = known[i];
             }
@@ -96,7 +97,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                 return choices.Length - 1; // Empty string means Custom (user explicitly selected Custom)
             }
 
-            for (int i = 0; i < choices.Length - 1; i++)
+            int choicesLength = choices.Length;
+            for (int i = 0; i < choicesLength - 1; i++)
             {
                 if (string.Equals(choices[i], name, System.StringComparison.Ordinal))
                 {
@@ -165,7 +167,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                 bool wasMixed = isMixed;
 
                 GenericMenu menu = new();
-                for (int i = 0; i < choices.Length; i++)
+                int choicesLength = choices.Length;
+                for (int i = 0; i < choicesLength; i++)
                 {
                     int capturedIndex = i;
                     bool isSelected = !wasMixed && i == currentIndex;

@@ -185,7 +185,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 using PooledResource<List<RTreeNode>> nextLevelResource =
                     Buffers<RTreeNode>.List.Get(out List<RTreeNode> nextLevel);
-                for (int i = 0; i < currentLevel.Count; i += branchFactor)
+                int currentLevelCount = currentLevel.Count;
+                for (int i = 0; i < currentLevelCount; i += branchFactor)
                 {
                     int childCount = Math.Min(branchFactor, currentLevel.Count - i);
                     RTreeNode[] children = new RTreeNode[childCount];
@@ -314,7 +315,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             int worstIndex = 0;
             double worstDistanceSquared = candidates[0].distanceSquared;
-            for (int i = 1; i < candidates.Count; ++i)
+            int candidatesCount = candidates.Count;
+            for (int i = 1; i < candidatesCount; ++i)
             {
                 double distanceSquared = candidates[i].distanceSquared;
                 if (worstDistanceSquared < distanceSquared)
@@ -903,7 +905,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 RTreeNode lastChild = children[lastChildIndex];
                 int endIndex = lastChild._startIndex + lastChild._count;
                 Bounds nodeBounds = children[0].boundary;
-                for (int i = 1; i < children.Length; ++i)
+                int childrenLength = children.Length;
+                for (int i = 1; i < childrenLength; ++i)
                 {
                     nodeBounds = SpatialQueryMath.Union(nodeBounds, children[i].boundary);
                 }

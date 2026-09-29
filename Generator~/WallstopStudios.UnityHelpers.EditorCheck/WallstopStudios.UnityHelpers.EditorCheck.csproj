@@ -316,7 +316,7 @@
   <ItemGroup Condition="'$(WallstopCheckControl)' != ''">
     <Compile Include="$(WallstopCheckControl)" />
   </ItemGroup>
-  <!-- WUH013 also covers production sources excluded only for old host reference gaps.
+  <!-- WUH013 and WUH019 also cover production sources excluded only for old host reference gaps.
        This audit does not certify their API binding; its in-compilation reporting control proves
        those known compiler errors cannot silently disable the counting-loop diagnostic. -->
   <Target Name="AuditExcludedCountingLoops" AfterTargets="Build">

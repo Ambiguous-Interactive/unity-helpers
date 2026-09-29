@@ -151,7 +151,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             foreach (Profile profile in profiles)
             {
                 int[] normalized = new int[Categories.Length];
-                for (int index = 0; index < normalized.Length; index++)
+                int normalizedLength = normalized.Length;
+                for (int index = 0; index < normalizedLength; index++)
                     normalized[index] =
                         profile.triggers != null && index < profile.triggers.Length
                             ? Math.Max(0, Math.Min(2, profile.triggers[index]))

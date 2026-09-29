@@ -917,7 +917,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
                 return -1;
             }
 
-            for (int i = 0; i < _pageChoices.Count && i < _pageOptionIndices.Count; i++)
+            int pageChoicesCount = _pageChoices.Count;
+            int pageOptionIndicesCount = _pageOptionIndices.Count;
+            for (int i = 0; i < pageChoicesCount && i < pageOptionIndicesCount; i++)
             {
                 if (string.Equals(_pageChoices[i], optionLabel, StringComparison.Ordinal))
                 {

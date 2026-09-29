@@ -671,9 +671,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                                     ) && parentDef.ChildGroups.Contains(definition)
                                 )
                                 {
+                                    int definitionPropertyPathsCount = definition
+                                        .PropertyPaths
+                                        .Count;
                                     for (
                                         int memberIndex = 0;
-                                        memberIndex < definition.PropertyPaths.Count;
+                                        memberIndex < definitionPropertyPathsCount;
                                         memberIndex++
                                     )
                                     {

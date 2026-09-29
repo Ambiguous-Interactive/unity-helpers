@@ -280,7 +280,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
 
             string[] names = new string[values.Length];
 
-            for (int i = 0; i < values.Length; i++)
+            int valuesLength = values.Length;
+            for (int i = 0; i < valuesLength; i++)
             {
                 object enumValue = values.GetValue(i);
 

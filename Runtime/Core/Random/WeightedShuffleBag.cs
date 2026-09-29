@@ -43,6 +43,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
+            // Destination callbacks can clear the bag while copying its tickets.
             for (int i = 0; i < source.Count; ++i)
             {
                 destination.Add(source[i]);
@@ -255,6 +256,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 AddCount(counts, entry, ref nullCount);
             }
 
+            // Ticket hashing can shorten the caller's remaining-ticket list.
             for (int i = 0; i < remainingTickets.Count; ++i)
             {
                 if (!RemoveCount(counts, remainingTickets[i], ref nullCount))

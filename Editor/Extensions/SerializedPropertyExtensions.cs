@@ -83,7 +83,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
             Type type = obj.GetType();
             string[] pathParts = GetTrimmedPathParts(property.propertyPath, property.name);
 
-            for (int i = 0; i < pathParts.Length - 1; ++i)
+            int pathPartsLength = pathParts.Length;
+            for (int i = 0; i < pathPartsLength - 1; ++i)
             {
                 string fieldName = pathParts[i];
 
@@ -180,7 +181,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
             Type type = obj.GetType();
             string[] pathParts = GetCachedPathParts(property.propertyPath);
 
-            for (int i = 0; i < pathParts.Length; ++i)
+            int pathPartsLength = pathParts.Length;
+            for (int i = 0; i < pathPartsLength; ++i)
             {
                 string fieldName = pathParts[i];
 

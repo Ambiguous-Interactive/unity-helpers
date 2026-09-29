@@ -463,7 +463,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         + " failure(s), "
                         + unused
                         + " unused suppression(s).";
-                    for (int index = 0; index < Problems.Count; index++)
+                    int problemsCount = Problems.Count;
+                    for (int index = 0; index < problemsCount; index++)
                     {
                         text += "\n  " + Problems[index];
                     }

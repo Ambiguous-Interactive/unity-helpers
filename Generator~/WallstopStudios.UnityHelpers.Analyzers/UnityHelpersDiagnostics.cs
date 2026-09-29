@@ -495,5 +495,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
             );
+        internal static readonly DiagnosticDescriptor RepeatedStableLoopBound =
+            new DiagnosticDescriptor(
+                "WUH019",
+                "Counting loop repeatedly reads a stable bound",
+                "Cache '{0}' in a named local before this counting loop. Retain a live bound when traversal intentionally responds to size changes. WUH019 is off by default; enable it in your analyzer ruleset.",
+                "Performance",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: false
+            );
     }
 }

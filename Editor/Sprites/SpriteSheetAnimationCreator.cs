@@ -264,7 +264,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             float firstValue = curve.keys[0].value;
-            for (int i = 1; i < curve.keys.Length; ++i)
+            int curvekeysLength = curve.keys.Length;
+            for (int i = 1; i < curvekeysLength; ++i)
             {
                 if (!Mathf.Approximately(curve.keys[i].value, firstValue))
                 {
@@ -742,7 +743,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _spriteSelectionDragCurrentIndex
             );
 
-            for (int i = 0; i < _spriteThumbnailsContainer.childCount; i++)
+            int spriteThumbnailsContainerChildCount = _spriteThumbnailsContainer.childCount;
+            for (int i = 0; i < spriteThumbnailsContainerChildCount; i++)
             {
                 VisualElement thumb = _spriteThumbnailsContainer.ElementAt(i);
                 if (thumb.userData is int thumbIndex)
@@ -773,7 +775,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void ClearSpriteSelectionHighlight()
         {
-            for (int i = 0; i < _spriteThumbnailsContainer.childCount; i++)
+            int spriteThumbnailsContainerChildCount = _spriteThumbnailsContainer.childCount;
+            for (int i = 0; i < spriteThumbnailsContainerChildCount; i++)
             {
                 VisualElement thumb = _spriteThumbnailsContainer.ElementAt(i);
                 thumb.style.backgroundColor = _defaultThumbnailBackgroundColor;

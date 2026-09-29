@@ -195,7 +195,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 Vector3Int first = points[0];
                 Vector3Int last = points[^1];
                 bool allColinear = true;
-                for (int i = 1; i < points.Count - 1; ++i)
+                int pointsCount = points.Count;
+                for (int i = 1; i < pointsCount - 1; ++i)
                 {
                     long cross = Turn(first, last, points[i]);
                     if (cross != 0)
@@ -264,7 +265,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 hull.Add(lowerPoint);
             }
-            for (int i = 1; i < upper.Count - 1; ++i)
+            int upperCount = upper.Count;
+            for (int i = 1; i < upperCount - 1; ++i)
             {
                 hull.Add(upper[i]);
             }
@@ -313,7 +315,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 FastVector3Int first = points[0];
                 FastVector3Int last = points[^1];
                 bool allColinear = true;
-                for (int i = 1; i < points.Count - 1; ++i)
+                int pointsCount = points.Count;
+                for (int i = 1; i < pointsCount - 1; ++i)
                 {
                     long cross = Turn(first, last, points[i]);
                     if (cross != 0)
@@ -385,7 +388,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 hull.Add(lowerPoint);
             }
-            for (int i = 1; i < upper.Count - 1; ++i)
+            int upperCount = upper.Count;
+            for (int i = 1; i < upperCount - 1; ++i)
             {
                 hull.Add(upper[i]);
             }
@@ -439,7 +443,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             FastVector3Int start = points[0];
-            for (int i = 1; i < points.Count; ++i)
+            int pointsCount = points.Count;
+            for (int i = 1; i < pointsCount; ++i)
             {
                 FastVector3Int w = points[i];
                 if (w.x < start.x || (w.x == start.x && w.y < start.y))
@@ -563,7 +568,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             colinear.Count,
                             out float[] distances
                         );
-                        for (int i = 0; i < colinear.Count; ++i)
+                        int colinearCount = colinear.Count;
+                        for (int i = 0; i < colinearCount; ++i)
                         {
                             distances[i] = DistanceSquared(current, colinear[i]);
                         }
@@ -668,7 +674,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             do
             {
                 removed = false;
-                for (int i = 0; 2 < hull.Count && i < hull.Count; ++i)
+                int hullCount = hull.Count;
+                for (int i = 0; 2 < hullCount && i < hullCount; ++i)
                 {
                     int prevIndex = (i - 1 + hull.Count) % hull.Count;
                     int nextIndex = (i + 1) % hull.Count;
@@ -703,7 +710,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             do
             {
                 removed = false;
-                for (int i = 0; 2 < hull.Count && i < hull.Count; ++i)
+                int hullCount = hull.Count;
+                for (int i = 0; 2 < hullCount && i < hullCount; ++i)
                 {
                     int prevIndex = (i - 1 + hull.Count) % hull.Count;
                     int nextIndex = (i + 1) % hull.Count;

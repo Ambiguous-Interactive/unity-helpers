@@ -152,7 +152,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal void ClearAll()
         {
             PoolBucket<T>[] snapshot = Volatile.Read(ref _buckets);
-            for (int i = 0; i < snapshot.Length; ++i)
+            int snapshotLength = snapshot.Length;
+            for (int i = 0; i < snapshotLength; ++i)
             {
                 Volatile.Read(ref snapshot[i])?.Clear();
             }

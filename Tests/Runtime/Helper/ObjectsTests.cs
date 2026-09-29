@@ -290,6 +290,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void EnumerableHashCodeReadsLiveCountAfterItemHashingShortensList()
+        {
+            List<CustomStruct> values = new();
+            values.Add(new CustomStruct(7, () => values.RemoveAt(1)));
+            values.Add(new CustomStruct(99));
+
+            int result = Objects.EnumerableHashCode(values);
+            int expected = Objects.EnumerableHashCode(new[] { new CustomStruct(7) });
+
+            Assert.That(result, Is.EqualTo(expected));
+            Assert.That(values.Count, Is.EqualTo(1));
+        }
+
+        [Test]
         public void EnumerableHashCodeReturnsZeroForNull()
         {
             Assert.AreEqual(0, Objects.EnumerableHashCode<int>(null));
@@ -434,14 +448,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         private readonly struct CustomStruct
         {
             private readonly int _value;
+            private readonly Action _onHash;
 
-            public CustomStruct(int value)
+            public CustomStruct(int value, Action onHash = null)
             {
                 _value = value;
+                _onHash = onHash;
             }
 
             public override int GetHashCode()
             {
+                _onHash?.Invoke();
                 return _value;
             }
         }

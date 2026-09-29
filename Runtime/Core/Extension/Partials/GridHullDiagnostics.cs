@@ -151,7 +151,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return 0;
             }
             double area = 0d;
-            for (int i = 0; i < convexHull.Count; ++i)
+            int convexHullCount = convexHull.Count;
+            for (int i = 0; i < convexHullCount; ++i)
             {
                 Vector2 a = convexHull[i];
                 Vector2 b = convexHull[(i + 1) % convexHull.Count];
@@ -175,7 +176,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return true;
             }
             int requiredSide = expectedSide;
-            for (int i = 0; i < convexHull.Count; ++i)
+            int convexHullCount = convexHull.Count;
+            for (int i = 0; i < convexHullCount; ++i)
             {
                 Vector2 lhs = convexHull[i];
                 Vector2 rhs = convexHull[(i + 1) % convexHull.Count];
@@ -270,7 +272,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int requiredSide = expectedSide;
             Vector3 pointWorld = grid.CellToWorld(point);
-            for (int i = 0; i < convexHull.Count; ++i)
+            int convexHullCount = convexHull.Count;
+            for (int i = 0; i < convexHullCount; ++i)
             {
                 FastVector3Int lhs = convexHull[i];
                 FastVector3Int rhs = convexHull[(i + 1) % convexHull.Count];
@@ -315,7 +318,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int requiredSide = expectedSide;
             Vector3 pointWorld = grid.CellToWorld(point);
-            for (int i = 0; i < convexHull.Count; ++i)
+            int convexHullCount = convexHull.Count;
+            for (int i = 0; i < convexHullCount; ++i)
             {
                 Vector3Int lhs = convexHull[i];
                 Vector3Int rhs = convexHull[(i + 1) % convexHull.Count];

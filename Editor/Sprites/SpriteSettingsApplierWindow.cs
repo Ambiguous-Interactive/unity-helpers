@@ -77,7 +77,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             HashSet<string> allowedExtensions = new(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < _spriteFileExtensionsProp.arraySize; i++)
+            int spriteFileExtensionsPropArraySize = _spriteFileExtensionsProp.arraySize;
+            for (int i = 0; i < spriteFileExtensionsPropArraySize; i++)
             {
                 string ext = _spriteFileExtensionsProp.GetArrayElementAtIndex(i).stringValue;
                 if (string.IsNullOrWhiteSpace(ext))
@@ -120,7 +121,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            for (int i = 0; i < _spritesProp.arraySize; i++)
+            int spritesPropArraySize = _spritesProp.arraySize;
+            for (int i = 0; i < spritesPropArraySize; i++)
             {
                 Sprite sprite =
                     _spritesProp.GetArrayElementAtIndex(i).objectReferenceValue as Sprite;

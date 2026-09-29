@@ -326,7 +326,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            for (int i = 0; i < left.Count; ++i)
+            int leftCount = left.Count;
+            for (int i = 0; i < leftCount; ++i)
             {
                 if (left[i] != right[i])
                 {
@@ -355,7 +356,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            for (int i = 0; i < left.Count; ++i)
+            int leftCount = left.Count;
+            for (int i = 0; i < leftCount; ++i)
             {
                 if (!ReferenceEquals(left[i], right[i]))
                 {
@@ -640,7 +642,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                     return false;
                 }
 
-                for (int i = 0; i < modifications.Count; ++i)
+                int modificationsCount = modifications.Count;
+                for (int i = 0; i < modificationsCount; ++i)
                 {
                     if (modifications[i] != other.modifications[i])
                     {
@@ -667,7 +670,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                     return false;
                 }
 
-                for (int i = 0; i < effectTags.Count; ++i)
+                int effectTagsCount = effectTags.Count;
+                for (int i = 0; i < effectTagsCount; ++i)
                 {
                     if (
                         !string.Equals(effectTags[i], other.effectTags[i], StringComparison.Ordinal)

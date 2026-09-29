@@ -404,9 +404,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     continue;
                 }
 
+                int segmentIndicesLength = segment.Indices.Length;
                 for (
                     int indexPosition = 0;
-                    indexPosition < segment.Indices.Length;
+                    indexPosition < segmentIndicesLength;
                     indexPosition += 1
                 )
                 {
@@ -684,7 +685,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 out List<int> indices
             );
 
-            for (int index = 0; index < rawSegments.Length; index += 1)
+            int rawSegmentsLength = rawSegments.Length;
+            for (int index = 0; index < rawSegmentsLength; index += 1)
             {
                 string raw = rawSegments[index];
                 if (string.IsNullOrEmpty(raw))
@@ -766,7 +768,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             Type[] interfaces = type.GetInterfaces();
-            for (int index = 0; index < interfaces.Length; index += 1)
+            int interfacesLength = interfaces.Length;
+            for (int index = 0; index < interfacesLength; index += 1)
             {
                 Type candidate = interfaces[index];
                 if (

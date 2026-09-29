@@ -217,7 +217,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                         ResolvedRelationalFieldMetadata[] resolvedFields =
                             new ResolvedRelationalFieldMetadata[fields.Length];
 
-                        for (int i = 0; i < fields.Length; i++)
+                        int fieldsLength = fields.Length;
+                        for (int i = 0; i < fieldsLength; i++)
                         {
                             RelationalFieldMetadata field = fields[i];
                             Type elementType = null;
@@ -626,7 +627,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return lengthComparison;
             }
 
-            for (int i = 0; i < leftFields.Length; i++)
+            int leftFieldsLength = leftFields.Length;
+            for (int i = 0; i < leftFieldsLength; i++)
             {
                 int fieldComparison = string.CompareOrdinal(leftFields[i], rightFields[i]);
                 if (fieldComparison != 0)
@@ -647,7 +649,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            for (int i = 0; i < left.Length; i++)
+            int leftLength = left.Length;
+            for (int i = 0; i < leftLength; i++)
             {
                 if (!string.Equals(left[i], right[i], StringComparison.Ordinal))
                 {
@@ -670,7 +673,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            for (int i = 0; i < left.Length; i++)
+            int leftLength = left.Length;
+            for (int i = 0; i < leftLength; i++)
             {
                 if (CompareTypeFieldMetadata(left[i], right[i]) != 0)
                 {
@@ -693,7 +697,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            for (int i = 0; i < left.Length; i++)
+            int leftLength = left.Length;
+            for (int i = 0; i < leftLength; i++)
             {
                 if (CompareRelationalTypeMetadata(left[i], right[i]) != 0)
                 {
@@ -716,7 +721,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            for (int i = 0; i < left.Length; i++)
+            int leftLength = left.Length;
+            for (int i = 0; i < leftLength; i++)
             {
                 AutoLoadSingletonEntry leftEntry = left[i];
                 AutoLoadSingletonEntry rightEntry = right[i];
@@ -784,7 +790,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return lengthComparison;
             }
 
-            for (int i = 0; i < leftFields.Length; i++)
+            int leftFieldsLength = leftFields.Length;
+            for (int i = 0; i < leftFieldsLength; i++)
             {
                 int fieldComparison = CompareRelationalFieldMetadata(leftFields[i], rightFields[i]);
                 if (fieldComparison != 0)

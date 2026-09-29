@@ -37,7 +37,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             unreadable.Sort(StringComparer.Ordinal);
 
             int kept = 1;
-            for (int index = 1; index < unreadable.Count; ++index)
+            int unreadableCount = unreadable.Count;
+            for (int index = 1; index < unreadableCount; ++index)
             {
                 if (
                     string.Equals(unreadable[index], unreadable[kept - 1], StringComparison.Ordinal)

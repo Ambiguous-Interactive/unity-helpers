@@ -1380,7 +1380,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             keyBuilder.Append(propertyPath);
             keyBuilder.Append('|');
 
-            for (int index = 0; index < targets.Length; index++)
+            int targetsLength = targets.Length;
+            for (int index = 0; index < targetsLength; index++)
             {
                 long id = targets[index] != null ? targets[index].GetUnityObjectId() : 0;
                 keyBuilder.Append(id);
@@ -1471,7 +1472,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return -1;
             }
 
-            for (int i = 0; i < cache.entries.Count; i++)
+            int cacheentriesCount = cache.entries.Count;
+            for (int i = 0; i < cacheentriesCount; i++)
             {
                 if (cache.entries[i].arrayIndex == globalIndex)
                 {
@@ -2532,7 +2534,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static void AppendIndexList(StringBuilder builder, List<int> indices)
         {
-            for (int i = 0; i < indices.Count; i++)
+            int indicesCount = indices.Count;
+            for (int i = 0; i < indicesCount; i++)
             {
                 if (0 < i)
                 {
@@ -3049,7 +3052,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 if (currentIndex < desiredIndex)
                 {
-                    for (int j = i + 1; j < orderedIndices.Count; j++)
+                    int orderedIndicesCount2 = orderedIndices.Count;
+                    for (int j = i + 1; j < orderedIndicesCount2; j++)
                     {
                         if (currentIndex < orderedIndices[j] && orderedIndices[j] <= desiredIndex)
                         {
@@ -3059,7 +3063,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
                 else
                 {
-                    for (int j = i + 1; j < orderedIndices.Count; j++)
+                    int orderedIndicesCount3 = orderedIndices.Count;
+                    for (int j = i + 1; j < orderedIndicesCount3; j++)
                     {
                         if (desiredIndex <= orderedIndices[j] && orderedIndices[j] < currentIndex)
                         {

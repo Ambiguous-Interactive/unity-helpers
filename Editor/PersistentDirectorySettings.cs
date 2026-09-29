@@ -733,7 +733,8 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
 
             DirectoryUsageData[] sortedDirectories = new DirectoryUsageData[list.Count];
-            for (int i = 0; i < list.Count; i++)
+            int listCount = list.Count;
+            for (int i = 0; i < listCount; i++)
             {
                 sortedDirectories[i] = list[i];
             }

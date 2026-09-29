@@ -896,7 +896,8 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         {
             char[] buffer = new char[key.Length];
             int n = 0;
-            for (int i = 0; i < key.Length; i++)
+            int keyLength = key.Length;
+            for (int i = 0; i < keyLength; i++)
             {
                 char c = key[i];
                 if (char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '.')

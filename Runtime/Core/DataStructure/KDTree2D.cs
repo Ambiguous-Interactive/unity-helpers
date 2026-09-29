@@ -198,7 +198,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             if (axis == 0)
             {
-                for (int i = 1; i < span.Length; ++i)
+                int spanLength = span.Length;
+                for (int i = 1; i < spanLength; ++i)
                 {
                     int currentIndex = span[i];
                     float currentValue = entries[currentIndex].position.x;
@@ -215,7 +216,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             else
             {
-                for (int i = 1; i < span.Length; ++i)
+                int spanLength2 = span.Length;
+                for (int i = 1; i < spanLength2; ++i)
                 {
                     int currentIndex = span[i];
                     float currentValue = entries[currentIndex].position.y;

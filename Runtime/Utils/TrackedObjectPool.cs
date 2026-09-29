@@ -268,7 +268,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private int IndexOfInFlight(T taken)
         {
-            for (int i = 0; i < _inFlight.Count; ++i)
+            int inFlightCount = _inFlight.Count;
+            for (int i = 0; i < inFlightCount; ++i)
             {
                 // Reference equality distinguishes different destroyed objects that Unity equality treats as null.
                 if (ReferenceEquals(_inFlight[i], taken))

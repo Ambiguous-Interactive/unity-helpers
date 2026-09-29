@@ -336,7 +336,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 name = name.Replace(invalidCharacter, '_');
             }
             char[] characters = name.ToCharArray();
-            for (int index = 0; index < characters.Length; index++)
+            int charactersLength = characters.Length;
+            for (int index = 0; index < charactersLength; index++)
             {
                 if (char.IsControl(characters[index]))
                 {

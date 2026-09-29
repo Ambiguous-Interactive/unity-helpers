@@ -134,7 +134,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             string[] result = new string[options.Length];
-            for (int i = 0; i < options.Length; i++)
+            int optionsLength = options.Length;
+            for (int i = 0; i < optionsLength; i++)
             {
                 result[i] = options[i] as string ?? options[i]?.ToString() ?? string.Empty;
             }

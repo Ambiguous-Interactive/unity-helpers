@@ -100,7 +100,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             entries.Sort(AtlasConfigNameComparison);
-            for (int index = 0; index < entries.Count; ++index)
+            int entriesCount = entries.Count;
+            for (int index = 0; index < entriesCount; ++index)
             {
                 configs[index] = entries[index].Config;
             }
@@ -683,7 +684,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                     );
 
                                 bool pathExists = false;
-                                for (int j = 0; j < sourceFolderEntriesProp.arraySize; j++)
+                                int sourceFolderEntriesPropArraySize =
+                                    sourceFolderEntriesProp.arraySize;
+                                for (int j = 0; j < sourceFolderEntriesPropArraySize; j++)
                                 {
                                     SerializedProperty entryProp =
                                         sourceFolderEntriesProp.GetArrayElementAtIndex(j);
@@ -921,7 +924,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             foreach (Sprite sprite in result.spritesToAdd)
             {
                 bool alreadyExists = false;
-                for (int i = 0; i < spritesListProp.arraySize; ++i)
+                int spritesListPropArraySize = spritesListProp.arraySize;
+                for (int i = 0; i < spritesListPropArraySize; ++i)
                 {
                     if (spritesListProp.GetArrayElementAtIndex(i).objectReferenceValue == sprite)
                     {

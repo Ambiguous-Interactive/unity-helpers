@@ -100,7 +100,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     )
                     .ToList();
                 /*
-                    Known host API gaps leave compiler errors. Require WUH013 to report a control
+                    Known host API gaps leave compiler errors. Require both loop policies to report a control
                     beside an unresolved API in this same compilation before certifying subjects.
                 */
                 trees.Add(
@@ -117,33 +117,39 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                         .WithAllowUnsafe(true)
                         .WithSpecificDiagnosticOptions(
-                            ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
-                                "WUH013",
-                                ReportDiagnostic.Warn
-                            )
+                            ImmutableDictionary<string, ReportDiagnostic>
+                                .Empty.Add("WUH013", ReportDiagnostic.Warn)
+                                .Add("WUH019", ReportDiagnostic.Warn)
                         )
                 );
                 ImmutableArray<Diagnostic> diagnostics = compilation
                     .WithAnalyzers(
-                        ImmutableArray.Create<DiagnosticAnalyzer>(new CountingLoopAnalyzer())
+                        ImmutableArray.Create<DiagnosticAnalyzer>(
+                            new CountingLoopAnalyzer(),
+                            new LoopBoundAnalyzer()
+                        )
                     )
                     .GetAnalyzerDiagnosticsAsync()
                     .GetAwaiter()
                     .GetResult();
-                if (
-                    diagnostics.Count(diagnostic =>
-                        string.Equals(diagnostic.Id, "WUH013", System.StringComparison.Ordinal)
-                        && string.Equals(
-                            diagnostic.Location.SourceTree?.FilePath,
-                            ControlPath,
-                            System.StringComparison.Ordinal
-                        )
-                    ) != 1
-                )
+                foreach (string diagnosticId in new[] { "WUH013", "WUH019" })
                 {
-                    throw new InvalidOperationException(
-                        "WUH013 did not report the positive control alongside an unresolved API; the audit cannot certify its subjects."
-                    );
+                    if (
+                        diagnostics.Count(diagnostic =>
+                            string.Equals(diagnostic.Id, diagnosticId, StringComparison.Ordinal)
+                            && string.Equals(
+                                diagnostic.Location.SourceTree?.FilePath,
+                                ControlPath,
+                                StringComparison.Ordinal
+                            )
+                        ) != 1
+                    )
+                    {
+                        throw new InvalidOperationException(
+                            diagnosticId
+                                + " did not report the positive control alongside an unresolved API; the audit cannot certify its subjects."
+                        );
+                    }
                 }
 
                 HashSet<string> subjectPaths = new HashSet<string>(
@@ -159,7 +165,10 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     }
 
                     if (
-                        !string.Equals(diagnostic.Id, "WUH013", System.StringComparison.Ordinal)
+                        (
+                            !string.Equals(diagnostic.Id, "WUH013", StringComparison.Ordinal)
+                            && !string.Equals(diagnostic.Id, "WUH019", StringComparison.Ordinal)
+                        )
                         || !subjectPaths.Contains(
                             diagnostic.Location.SourceTree?.FilePath ?? string.Empty
                         )
@@ -170,7 +179,9 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
 
                     findings++;
                     Console.Error.WriteLine(
-                        diagnostic.ToString().Replace("warning WUH013", "error WUH013")
+                        diagnostic
+                            .ToString()
+                            .Replace("warning " + diagnostic.Id, "error " + diagnostic.Id)
                     );
                 }
 

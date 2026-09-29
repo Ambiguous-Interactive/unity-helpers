@@ -135,7 +135,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             int[] result = new int[options.Length];
-            for (int i = 0; i < options.Length; i++)
+            int optionsLength = options.Length;
+            for (int i = 0; i < optionsLength; i++)
             {
                 if (options[i] is int intValue)
                 {

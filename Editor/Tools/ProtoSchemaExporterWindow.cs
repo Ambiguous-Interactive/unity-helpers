@@ -1031,7 +1031,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     return false;
                 }
 
-                for (int index = 1; index < segment.Length; index++)
+                int segmentLength = segment.Length;
+                for (int index = 1; index < segmentLength; index++)
                 {
                     char character = segment[index];
                     if (

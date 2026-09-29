@@ -584,7 +584,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             AddLabel(triggerHeader, "Asset category", "sentinel-trigger-label");
             foreach (string triggerName in new[] { "On change", "On save", "Manual" })
                 AddLabel(triggerHeader, triggerName, "sentinel-trigger");
-            for (int index = 0; index < ValidationWorkspaceSettings.Categories.Length; index++)
+            int validationWorkspaceSettingsCategoriesLength = ValidationWorkspaceSettings
+                .Categories
+                .Length;
+            for (int index = 0; index < validationWorkspaceSettingsCategoriesLength; index++)
             {
                 int categoryIndex = index;
                 VisualElement row = Element(_settingsContent, "sentinel-rule-row", "dx-row");

@@ -62,7 +62,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 );
                 HashSet<string> expectedDestinations = new(StringComparer.OrdinalIgnoreCase);
                 HashSet<string> sourcePaths = new(StringComparer.OrdinalIgnoreCase);
-                for (int index = 0; index < sourceGuids.Length; index++)
+                int sourceGuidsLength = sourceGuids.Length;
+                for (int index = 0; index < sourceGuidsLength; index++)
                 {
                     string sourcePath = AssetDatabase.GUIDToAssetPath(sourceGuids[index]);
                     if (
@@ -120,7 +121,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         new[] { destinationRoot }
                     );
                     HashSet<string> destinationPaths = new(StringComparer.OrdinalIgnoreCase);
-                    for (int index = 0; index < destinationGuids.Length; index++)
+                    int destinationGuidsLength = destinationGuids.Length;
+                    for (int index = 0; index < destinationGuidsLength; index++)
                     {
                         string destinationPath = AssetDatabase.GUIDToAssetPath(
                             destinationGuids[index]

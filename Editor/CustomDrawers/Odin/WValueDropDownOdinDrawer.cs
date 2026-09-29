@@ -29,7 +29,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return -1;
             }
 
-            for (int i = 0; i < options.Length; i++)
+            int optionsLength = options.Length;
+            for (int i = 0; i < optionsLength; i++)
             {
                 if (DropDownShared.ValuesMatch(currentValue, options[i]))
                 {
@@ -43,7 +44,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static string[] GetDisplayOptions(object[] options)
         {
             string[] displayOptions = new string[options.Length];
-            for (int i = 0; i < options.Length; i++)
+            int optionsLength = options.Length;
+            for (int i = 0; i < optionsLength; i++)
             {
                 displayOptions[i] = DropDownShared.FormatOption(options[i]);
             }
@@ -183,7 +185,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             GenericMenu menu = new();
-            for (int i = 0; i < options.Length; i++)
+            int optionsLength = options.Length;
+            for (int i = 0; i < optionsLength; i++)
             {
                 int capturedIndex = i;
                 bool isSelected = i == currentIndex && !hasMultipleDifferentValues;

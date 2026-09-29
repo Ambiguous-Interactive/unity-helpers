@@ -210,7 +210,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (sourceRegion != null)
                 {
-                    for (int index = 0; index < sourceRegion.Length; ++index)
+                    int sourceRegionLength = sourceRegion.Length;
+                    for (int index = 0; index < sourceRegionLength; ++index)
                     {
                         region[index] = sourceRegion[index];
                     }

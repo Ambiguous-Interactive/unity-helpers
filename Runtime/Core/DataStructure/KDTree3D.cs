@@ -208,7 +208,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            for (int i = 1; i < span.Length; ++i)
+            int spanLength = span.Length;
+            for (int i = 1; i < spanLength; ++i)
             {
                 int currentIndex = span[i];
                 float currentValue = axisValues[currentIndex];

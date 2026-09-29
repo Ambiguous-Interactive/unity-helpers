@@ -95,7 +95,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 WButtonParameterState[] states = new WButtonParameterState[
                     parameterMetadata.Length
                 ];
-                for (int index = 0; index < parameterMetadata.Length; index++)
+                int parameterMetadataLength = parameterMetadata.Length;
+                for (int index = 0; index < parameterMetadataLength; index++)
                 {
                     states[index] = new WButtonParameterState(parameterMetadata[index]);
                 }

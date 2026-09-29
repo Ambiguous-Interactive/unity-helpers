@@ -1604,7 +1604,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             int groupCount = 1;
 
-            for (int i = 1; i < sortedPositions.Count; ++i)
+            int sortedPositionsCount = sortedPositions.Count;
+            for (int i = 1; i < sortedPositionsCount; ++i)
             {
                 // Compare to PREVIOUS position, not group start
                 if (tolerance < sortedPositions[i] - sortedPositions[i - 1])
@@ -1898,7 +1899,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
 
             const int maxDistance = int.MaxValue / 2;
-            for (int i = 0; i < pixels.Length; ++i)
+            int pixelsLength = pixels.Length;
+            for (int i = 0; i < pixelsLength; ++i)
             {
                 distance[i] = pixels[i].a <= alphaThresholdByte ? 0 : maxDistance;
             }
@@ -2068,7 +2070,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Vector2Int peak = rawMaxima[idx];
                 localMaxima.Add(peak);
 
-                for (int j = i + 1; j < sortedIndices.Count; ++j)
+                int sortedIndicesCount = sortedIndices.Count;
+                for (int j = i + 1; j < sortedIndicesCount; ++j)
                 {
                     int otherIdx = sortedIndices[j];
                     if (suppressed[otherIdx])
@@ -2227,7 +2230,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 out int[] intensity
             );
 
-            for (int i = 0; i < pixels.Length; ++i)
+            int pixelsLength = pixels.Length;
+            for (int i = 0; i < pixelsLength; ++i)
             {
                 Color32 c = pixels[i];
                 intensity[i] = alphaThresholdByte < c.a ? c.r + c.g + c.b : 0;

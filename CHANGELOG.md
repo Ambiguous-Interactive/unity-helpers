@@ -9,8 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add opt-in `WUH019` to suggest caching stable loop bounds while keeping live bounds for changing collections ([#894](https://github.com/Ambiguous-Interactive/unity-helpers/issues/894)).
+- Add cached read-only enum values and an ordinal enum-name comparer for allocation-free iteration and warmed name ordering ([#889](https://github.com/Ambiguous-Interactive/unity-helpers/issues/889)).
+
 ### Fixed
 
+- Fix the Pool Purging settings foldout so hysteresis and spike threshold stay with the other global options ([#883](https://github.com/Ambiguous-Interactive/unity-helpers/issues/883)).
 - Fix disposal lease slot growth when a lease is acquired on one thread and disposed on another ([#888](https://github.com/Ambiguous-Interactive/unity-helpers/issues/888)).
 - Fix sprite pixel helpers for readable compressed textures and avoid reading a full atlas when extracting one sprite ([#886](https://github.com/Ambiguous-Interactive/unity-helpers/issues/886)).
 - Fix UI pointer helpers so hits on other objects and invalid canvas raycast positions do not return points off the target rectangle ([#884](https://github.com/Ambiguous-Interactive/unity-helpers/issues/884)).

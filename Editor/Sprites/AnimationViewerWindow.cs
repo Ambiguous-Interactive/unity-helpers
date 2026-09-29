@@ -772,7 +772,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     _loadedClipsContainer.Remove(_loadedClipDropPlaceholder);
                 }
 
-                for (int i = 0; i < _loadedClipsContainer.childCount; i++)
+                int loadedClipsContainerChildCount = _loadedClipsContainer.childCount;
+                for (int i = 0; i < loadedClipsContainerChildCount; i++)
                 {
                     VisualElement child = _loadedClipsContainer[i];
                     if (child == _draggedLoadedClipElement)
@@ -1008,7 +1009,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     _framesContainer.Remove(_frameDropPlaceholder);
                 }
 
-                for (int i = 0; i < _framesContainer.childCount; i++)
+                int framesContainerChildCount = _framesContainer.childCount;
+                for (int i = 0; i < framesContainerChildCount; i++)
                 {
                     VisualElement child = _framesContainer[i];
                     if (child == _draggedFrameElement)
