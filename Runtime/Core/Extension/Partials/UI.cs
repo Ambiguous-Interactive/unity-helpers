@@ -174,13 +174,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 #endif
 
-        /// <summary>Tries to resolve a raycast hit or pointer position in world space.</summary>
+        /// <summary>Tries to resolve a pointer position on the target rectangle's plane.</summary>
         /// <param name="pointerEventData">The pointer event to resolve.</param>
         /// <param name="rectangle">The target rectangle.</param>
         /// <param name="worldPoint">The resolved world point, or the default vector on failure.</param>
         /// <returns>
-        /// <see langword="true" /> when a valid raycast hit exists or the pointer reaches the
-        /// rectangle's plane.
+        /// <see langword="true" /> when the target has a usable raycast hit or the pointer reaches
+        /// the rectangle's plane.
         /// </returns>
         /// <example>
         /// <code>
@@ -202,22 +202,43 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
+            Canvas canvas = rectangle.GetComponentInParent<Canvas>();
+            Canvas rootCanvas = canvas != null ? canvas.rootCanvas : null;
+            bool useRaycast =
+                rootCanvas == null
+                || (
+                    rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay
+                    && (
+                        rootCanvas.renderMode != RenderMode.ScreenSpaceCamera
+                        || rootCanvas.worldCamera != null
+                    )
+                );
             RaycastResult currentRaycast = pointerEventData.pointerCurrentRaycast;
-            if (currentRaycast.isValid && IsFinite(currentRaycast.worldPosition))
+            if (
+                useRaycast
+                && currentRaycast.isValid
+                && currentRaycast.gameObject == rectangle.gameObject
+                && IsFinite(currentRaycast.worldPosition)
+            )
             {
                 worldPoint = currentRaycast.worldPosition;
                 return true;
             }
 
             RaycastResult pressRaycast = pointerEventData.pointerPressRaycast;
-            if (pressRaycast.isValid && IsFinite(pressRaycast.worldPosition))
+            if (
+                useRaycast
+                && pressRaycast.isValid
+                && pressRaycast.gameObject == rectangle.gameObject
+                && IsFinite(pressRaycast.worldPosition)
+            )
             {
                 worldPoint = pressRaycast.worldPosition;
                 return true;
             }
 
             Vector2 screenPoint = ClampToScreen(pointerEventData.position);
-            if (!TryResolveEventCamera(pointerEventData, rectangle, out Camera eventCamera))
+            if (!TryResolveEventCamera(pointerEventData, rootCanvas, out Camera eventCamera))
             {
                 worldPoint = default;
                 return false;
@@ -282,16 +303,30 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static bool TryResolveEventCamera(
             PointerEventData pointerEventData,
-            RectTransform rectangle,
+            Canvas rootCanvas,
             out Camera eventCamera
         )
         {
-            Canvas canvas = rectangle.GetComponentInParent<Canvas>();
-            Canvas rootCanvas = canvas != null ? canvas.rootCanvas : null;
             if (rootCanvas != null && rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
             {
                 eventCamera = null;
                 return true;
+            }
+
+            if (rootCanvas != null)
+            {
+                Camera canvasCamera = rootCanvas.worldCamera;
+                if (canvasCamera != null)
+                {
+                    eventCamera = canvasCamera;
+                    return true;
+                }
+
+                if (rootCanvas.renderMode == RenderMode.ScreenSpaceCamera)
+                {
+                    eventCamera = null;
+                    return true;
+                }
             }
 
             Camera enterEventCamera = pointerEventData.enterEventCamera;
@@ -308,21 +343,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return true;
             }
 
-            if (rootCanvas == null)
-            {
-                eventCamera = null;
-                return true;
-            }
-
-            Camera worldCamera = rootCanvas.worldCamera;
-            if (worldCamera == null)
-            {
-                eventCamera = null;
-                return false;
-            }
-
-            eventCamera = worldCamera;
-            return true;
+            eventCamera = null;
+            return rootCanvas == null;
         }
 
         private static Vector2 ClampToScreen(Vector2 point)
