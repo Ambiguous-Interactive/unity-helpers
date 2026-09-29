@@ -136,6 +136,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         /// Default relative output directory for failed test results (empty = project root).
         /// </summary>
         public const string DefaultFailedTestsOutputDirectory = "";
+        internal const string PoolPurgingFoldoutKey = "PoolPurging";
+
         private const float SettingsLabelWidth = 260f;
         private const float SettingsMinFieldWidth = 110f;
         private const float CustomColorDrawerMinColorFieldWidth = 42f;
@@ -150,7 +152,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         private const string FailedTestsExporterHelpText =
             "When enabled, the Failed Tests Exporter hooks into the Unity Test Runner to capture test failures and export them to a text file in a configurable directory (defaults to the project root).";
 
-        private const string PoolPurgingFoldoutKey = "PoolPurging";
         private const string FailedTestsExporterFoldoutKey = "FailedTestsExporter";
 
         internal static event Action OnSettingsSaved;
@@ -820,7 +821,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         [WGroup(
             PoolPurgingFoldoutKey,
             displayName: "Pool Purging",
-            autoIncludeCount: 6,
+            autoIncludeCount: WGroupAttribute.InfiniteAutoInclude,
             collapsible: true,
             startCollapsed: true
         )]
@@ -2135,7 +2136,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     patternsProperty.ClearArray();
                     IReadOnlyList<string> defaults =
                         SerializableTypeCatalog.GetDefaultIgnorePatterns();
-                    for (int index = 0; index < defaults.Count; index++)
+                    int defaultCount = defaults.Count;
+                    for (int index = 0; index < defaultCount; index++)
                     {
                         SerializedProperty patternProperty = AppendSerializableTypePatternElement(
                             patternsProperty
@@ -3651,7 +3653,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         );
                         IReadOnlyList<WGroupDrawOperation> operations = layout.Operations;
 
-                        for (int index = 0; index < operations.Count; index++)
+                        int operationCount = operations.Count;
+                        for (int index = 0; index < operationCount; index++)
                         {
                             WGroupDrawOperation operation = operations[index];
                             if (operation.Type == WGroupDrawOperationType.Group)
@@ -4243,7 +4246,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             if (_serializableTypeIgnorePatterns.Count == 0)
             {
                 IReadOnlyList<string> defaults = SerializableTypeCatalog.GetDefaultIgnorePatterns();
-                for (int index = 0; index < defaults.Count; index++)
+                int defaultCount = defaults.Count;
+                for (int index = 0; index < defaultCount; index++)
                 {
                     _serializableTypeIgnorePatterns.Add(
                         new SerializableTypeIgnorePattern(defaults[index])

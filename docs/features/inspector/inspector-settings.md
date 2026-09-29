@@ -31,7 +31,9 @@ The `UnityHelpersSettings` asset provides project-wide configuration for paginat
 
 **Note:** The asset is created automatically on first use. If missing, any inspector feature will generate it.
 When Unity loads saved settings, it validates the saved test output directory and applies the saved
-pool purging options. Any normalized defaults are saved after the Editor becomes idle.
+pool purging options. The **Pool Purging** foldout keeps all nine global options together,
+including hysteresis and spike threshold. **Per-Type Pool Settings** has a separate foldout.
+Any normalized defaults are saved after the Editor becomes idle.
 
 ![Project Settings window showing Unity Helpers settings](../../images/inspector/unity-helper-settings.png)
 

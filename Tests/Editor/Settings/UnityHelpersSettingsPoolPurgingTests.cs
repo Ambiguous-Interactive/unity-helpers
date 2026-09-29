@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Settings;
+    using WallstopStudios.UnityHelpers.Editor.Utils.WGroup;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -73,6 +74,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             _serializedSettings?.Dispose();
             _serializedSettings = null;
+        }
+
+        [Test]
+        public void PoolPurgingFoldoutContainsEveryGlobalOption()
+        {
+            WGroupLayoutBuilder.ClearCache();
+            WGroupLayout layout = WGroupLayoutBuilder.Build(_serializedSettings, "m_Script");
+            Assert.That(
+                layout.TryGetGroup(
+                    UnityHelpersSettings.PoolPurgingFoldoutKey,
+                    out WGroupDefinition group
+                ),
+                Is.True
+            );
+            Assert.That(
+                group.PropertyPaths,
+                Is.EquivalentTo(
+                    new[]
+                    {
+                        nameof(UnityHelpersSettings._poolPurgingEnabled),
+                        nameof(UnityHelpersSettings._poolIdleTimeoutSeconds),
+                        nameof(UnityHelpersSettings._poolMinRetainCount),
+                        nameof(UnityHelpersSettings._poolWarmRetainCount),
+                        nameof(UnityHelpersSettings._poolMaxSize),
+                        nameof(UnityHelpersSettings._poolBufferMultiplier),
+                        nameof(UnityHelpersSettings._poolRollingWindowSeconds),
+                        nameof(UnityHelpersSettings._poolHysteresisSeconds),
+                        nameof(UnityHelpersSettings._poolSpikeThresholdMultiplier),
+                    }
+                )
+            );
         }
 
         [Test]
