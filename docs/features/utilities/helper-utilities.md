@@ -1324,7 +1324,8 @@ Debug.Log($"Texture changed: {changed}");
 `SpriteHelpers.RotateTexture90`, `RotateTexture180` and `ExtractSpriteRect` produce a new texture
 and leave the source untouched. They preserve writable source formats and use RGBA32 for readable
 compressed sources. A quarter turn swaps dimensions. Sprite extraction reads a small sprite's
-rectangle directly from its atlas and uses the lower-memory full-texture path for large regions.
+rectangle directly when supported, and uses the lower-memory full-texture path for large regions
+or formats such as Crunch that reject region reads.
 
 <!-- doc-sample: compiles -->
 

@@ -194,9 +194,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             Color32[] region = new Color32[width * height];
             try
             {
+                Color[] sourceRegion = null;
                 if ((long)width * height * 4 <= (long)texture.width * texture.height)
                 {
-                    Color[] sourceRegion = texture.GetPixels(startX, startY, width, height);
+                    try
+                    {
+                        sourceRegion = texture.GetPixels(startX, startY, width, height);
+                    }
+                    catch (Exception exception)
+                        when (exception is ArgumentException || exception is UnityException)
+                    {
+                        sourceRegion = null;
+                    }
+                }
+
+                if (sourceRegion != null)
+                {
                     for (int index = 0; index < sourceRegion.Length; ++index)
                     {
                         region[index] = sourceRegion[index];
