@@ -265,7 +265,7 @@ jobs:
       # visible to the repository; the licensed jobs below depend on this job so
       # an impossible label set fails instead of queueing forever.
       - name: Require an online Unity runner
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@84b8d875ab1968716ef95b5b56d10307609237ca # v1.16.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@84b8d875ab1968716ef95b5b56d10307609237ca  # v1.16.0
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
