@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix disposal lease slot growth when a lease is acquired on one thread and disposed on another ([#888](https://github.com/Ambiguous-Interactive/unity-helpers/issues/888)).
+- Fix sprite pixel helpers for readable compressed textures and avoid reading a full atlas when extracting one sprite ([#886](https://github.com/Ambiguous-Interactive/unity-helpers/issues/886)).
+- Fix UI pointer helpers so hits on other objects and invalid canvas raycast positions do not return points off the target rectangle ([#884](https://github.com/Ambiguous-Interactive/unity-helpers/issues/884)).
+- Fix editor test-runner detection so project paths and log filenames containing test flag names do not suppress confirmation dialogs ([#885](https://github.com/Ambiguous-Interactive/unity-helpers/issues/885)).
+- Fix `SemaphoreLease` so a stray permit release raises `SemaphoreFullException` when its lease is disposed ([#887](https://github.com/Ambiguous-Interactive/unity-helpers/issues/887)).
+
 ## [3.6.2] - 2026-09-28
 
 ### Added

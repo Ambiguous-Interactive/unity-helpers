@@ -203,7 +203,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
                 Task.WaitAll(racers);
 
                 totalWinners += Volatile.Read(ref winners);
-                DisposalLeases.Release(lease.SlotForTests);
+                DisposalLeases.Release(lease.SlotForTests, lease.OwnerThreadIdForTests);
             }
 
             Assert.That(
@@ -252,7 +252,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
                         }
 
                         liveSlots.TryRemove(slot, out int _);
-                        DisposalLeases.Release(slot);
+                        DisposalLeases.Release(slot, lease.OwnerThreadIdForTests);
 
                         if (wins == 1)
                         {
@@ -301,6 +301,64 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
                 .Wait();
 
             Assert.That(claimed, Is.EqualTo(Count));
+        }
+
+        [Test]
+        public void CrossThreadClaimsRecycleSlotsForReuse()
+        {
+            const int Count = 256;
+            using BlockingCollection<DisposalLease> pending = new(1);
+            using BlockingCollection<bool> completed = new(1);
+            int before = DisposalLeases.SlotsCreated;
+            int failures = 0;
+
+            Thread producer = new(() =>
+            {
+                DisposalLease previous = default;
+                for (int i = 0; i < Count; ++i)
+                {
+                    DisposalLease lease = DisposalLeases.Acquire();
+                    if (previous.TryClaim())
+                    {
+                        Interlocked.Increment(ref failures);
+                    }
+                    previous = lease;
+                    if (!pending.TryAdd(lease, 5000))
+                    {
+                        lease.TryClaim();
+                        Interlocked.Increment(ref failures);
+                        break;
+                    }
+                    if (!completed.TryTake(out bool claimed, 5000) || !claimed)
+                    {
+                        Interlocked.Increment(ref failures);
+                        break;
+                    }
+                }
+            });
+            producer.Start();
+
+            for (int i = 0; i < Count; ++i)
+            {
+                if (!pending.TryTake(out DisposalLease lease, 5000))
+                {
+                    Interlocked.Increment(ref failures);
+                    break;
+                }
+                if (!completed.TryAdd(lease.TryClaim(), 5000))
+                {
+                    Interlocked.Increment(ref failures);
+                    break;
+                }
+            }
+            Assert.IsTrue(producer.Join(10000), "The cross-thread claim worker did not finish.");
+
+            Assert.That(failures, Is.Zero);
+            Assert.That(
+                DisposalLeases.SlotsCreated - before,
+                Is.LessThanOrEqualTo(2),
+                "Cross-thread claims left reusable slots unavailable."
+            );
         }
 #endif
     }

@@ -37,8 +37,8 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// was constructed:
     /// <list type="bullet">
     /// <item><description>
-    /// <c>new SemaphoreSlim(1, 1)</c> — an extra release throws <c>SemaphoreFullException</c>,
-    /// which <see cref="Dispose"/> swallows. The count survives.
+    /// <c>new SemaphoreSlim(1, 1)</c> — a stray release throws
+    /// <c>SemaphoreFullException</c> when the lease is disposed. The count survives.
     /// </description></item>
     /// <item><description>
     /// <c>new SemaphoreSlim(1)</c> — the maximum defaults to <see cref="int.MaxValue"/>, so an
@@ -51,9 +51,8 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// corruption into a loud exception.
     /// </para>
     /// <para>
-    /// <b><see cref="Dispose"/> never throws</b>, including when the semaphore itself has already
-    /// been disposed. Disposal runs from a <c>finally</c>, so a throw there would replace the
-    /// exception the caller was already unwinding with.
+    /// <see cref="Dispose"/> ignores a semaphore disposed during teardown. A stray release from
+    /// another caller raises <c>SemaphoreFullException</c> when this lease is disposed.
     /// </para>
     /// </remarks>
     /// <example>
@@ -97,8 +96,8 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
 
         /// <summary>
         /// Returns the permit. Safe to call more than once, and safe to call on more than one copy
-        /// of the same lease; only the first call releases. Never throws, including when the
-        /// semaphore has already been disposed.
+        /// of the same lease; only the first call releases. A disposed semaphore is ignored, but
+        /// a stray release from another caller raises <see cref="SemaphoreFullException"/>.
         /// </summary>
         public void Dispose()
         {
@@ -112,9 +111,9 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             {
                 semaphore.Release();
             }
-            catch
+            catch (ObjectDisposedException)
             {
-                // Disposal must preserve the original exception; these failures mean the permit is already accounted for.
+                // The semaphore was torn down before this lease could return its permit.
             }
         }
     }

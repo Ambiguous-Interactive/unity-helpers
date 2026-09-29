@@ -63,13 +63,21 @@ namespace WallstopStudios.UnityHelpers.Utils
             get => _slot;
         }
 
+        internal int OwnerThreadIdForTests
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _ownerThreadId;
+        }
+
         // Slot 0 is never handed out, so `default` reads as "not held" without a second field.
         private readonly int _slot;
+        private readonly int _ownerThreadId;
         private readonly long _generation;
 
-        internal DisposalLease(int slot, long generation)
+        internal DisposalLease(int slot, int ownerThreadId, long generation)
         {
             _slot = slot;
+            _ownerThreadId = ownerThreadId;
             _generation = generation;
         }
 
@@ -100,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return false;
             }
 
-            DisposalLeases.Release(_slot);
+            DisposalLeases.Release(_slot, _ownerThreadId);
             return true;
         }
     }
@@ -116,12 +124,9 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// process. A single growable array would move a live counter out from under a concurrent claim.
     /// </para>
     /// <para>
-    /// Recycling is per-thread, through an intrusive free list threaded on
-    /// <c>_freeNext</c>. A thread that acquires and releases in balance — which is what a
-    /// <c>using</c> block does — reuses its own slots with no atomics and no contention at all, so
-    /// there is no process-wide free-list head for many threads to fight over. A thread holding
-    /// slots it never reuses costs 12 bytes each, and a thread that only ever acquires simply
-    /// creates fresh slots.
+    /// Recycling uses a thread-local intrusive free list for balanced calls. A lease claimed on a
+    /// different thread enters a shared list, where any thread can reuse it. The common
+    /// same-thread path does not take a lock. A lease that is never disposed keeps its slot.
     /// </para>
     /// <para>
     /// Reusing a slot for a new owner is safe on its own terms: a generation only ever advances, so
@@ -129,9 +134,8 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// recycling hazard a plain free list would otherwise have.
     /// </para>
     /// <para>
-    /// A lease that is never disposed keeps its slot. That costs 12 bytes, cannot grow with reuse,
-    /// and the same accident already loses whatever the lease was guarding. Tracking live owners in
-    /// a set instead would allocate on every acquire, which is what this design exists to avoid.
+    /// A lease that is never disposed keeps its slot and whatever resource it guarded. Reused slots
+    /// do not grow the table. Tracking live owners in a set instead would allocate on every acquire.
     /// </para>
     /// </remarks>
     internal static class DisposalLeases
@@ -151,8 +155,14 @@ namespace WallstopStudios.UnityHelpers.Utils
 #if SINGLE_THREADED
         private static int _freeHead;
 #else
+        private static readonly object ForeignFreeGate = new();
+        private static int _foreignFreeHead;
+
         [ThreadStatic]
         private static int _freeHead;
+
+        [ThreadStatic]
+        private static int _currentThreadId;
 #endif
 
         /// <summary>
@@ -175,8 +185,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// which already advanced the generation past every lease that was outstanding on it.
         /// </description></item>
         /// <item><description>
-        /// A slot is pushed onto the free list of the thread that claimed it, so the last write to
-        /// its generation was made by this same thread and is already visible to it.
+        /// A slot is pushed onto a local or shared free list only after its previous holder claims
+        /// it. The shared-list lock publishes that claim to its next acquirer.
         /// </description></item>
         /// <item><description>
         /// A brand-new slot has never been leased at all.
@@ -202,14 +212,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             else
             {
-#if SINGLE_THREADED
-                slot = _nextNewSlot++;
-#else
-                slot = Interlocked.Increment(ref _nextNewSlot) - 1;
-#endif
-                EnsureBlock(slot >> BlockShift);
+                slot = AcquireSlow();
             }
 
+#if !SINGLE_THREADED
+            int ownerThreadId = CurrentThreadId();
+#else
+            const int ownerThreadId = 0;
+#endif
             ref long generation = ref GenerationRef(slot);
             long acquired = generation + 1;
 #if SINGLE_THREADED
@@ -217,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 #else
             Volatile.Write(ref generation, acquired);
 #endif
-            return new DisposalLease(slot, acquired);
+            return new DisposalLease(slot, ownerThreadId, acquired);
         }
 
         /// <summary>
@@ -263,23 +273,52 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Puts a slot back on the calling thread's free list.
+        /// Puts a slot on the calling thread's local list or the shared foreign list.
         /// </summary>
         /// <remarks>
-        /// Deliberately unsynchronized, and it does not need to be. <c>_freeHead</c> is
-        /// <see cref="ThreadStaticAttribute"/>, so this touches only the calling thread's own list
-        /// and no other thread can observe it. The <c>_freeNext</c> links live in a shared array,
-        /// but two threads can never write the same entry: a slot reaches here only through a
-        /// winning <see cref="TryClaim"/>, and the compare-and-swap elects exactly one winner, so
-        /// at most one thread owns any given slot at any moment. Distinct <c>int</c> elements of an
-        /// array are independent and aligned, so there is nothing left to tear.
+        /// The local path is unsynchronized. The foreign path uses a lock so another thread can
+        /// acquire the slot without corrupting the shared free list. A winning
+        /// <see cref="TryClaim"/> is the only caller allowed to release a slot.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void Release(int slot)
+        internal static void Release(int slot, int ownerThreadId)
         {
+#if !SINGLE_THREADED
+            if (ownerThreadId != CurrentThreadId())
+            {
+                ReleaseForeign(slot);
+
+                return;
+            }
+#endif
             SetFreeNext(slot, _freeHead);
             _freeHead = slot;
         }
+
+#if !SINGLE_THREADED
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ReleaseForeign(int slot)
+        {
+            lock (ForeignFreeGate)
+            {
+                SetFreeNext(slot, _foreignFreeHead);
+                _foreignFreeHead = slot;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int CurrentThreadId()
+        {
+            int current = _currentThreadId;
+            if (current == 0)
+            {
+                current = Thread.CurrentThread.ManagedThreadId;
+                _currentThreadId = current;
+            }
+
+            return current;
+        }
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ref long GenerationRef(int slot)
@@ -297,6 +336,33 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static void SetFreeNext(int slot, int next)
         {
             Volatile.Read(ref _freeNext)[slot >> BlockShift][slot & BlockMask] = next;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static int AcquireSlow()
+        {
+            int slot = 0;
+#if !SINGLE_THREADED
+            lock (ForeignFreeGate)
+            {
+                slot = _foreignFreeHead;
+                if (slot != 0)
+                {
+                    _foreignFreeHead = FreeNextOf(slot);
+                }
+            }
+            if (slot != 0)
+            {
+                return slot;
+            }
+#endif
+#if SINGLE_THREADED
+            slot = _nextNewSlot++;
+#else
+            slot = Interlocked.Increment(ref _nextNewSlot) - 1;
+#endif
+            EnsureBlock(slot >> BlockShift);
+            return slot;
         }
 
         private static void EnsureBlock(int block)
