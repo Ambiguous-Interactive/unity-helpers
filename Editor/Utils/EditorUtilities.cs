@@ -26,8 +26,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// arguments.
         /// </summary>
         /// <returns>
-        /// True when any command-line argument mentions <c>runTests</c>, <c>testResults</c> or
-        /// <c>testPlatform</c>, case-insensitively. False when none do, when the session was
+        /// True when a command-line argument is exactly <c>-runTests</c>, <c>-testResults</c> or
+        /// <c>-testPlatform</c>, case-insensitively. False when none do, when the session was
         /// started from the in-editor Test Runner window, or when the command line cannot be read.
         /// </returns>
         /// <remarks>
@@ -40,22 +40,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             try
             {
-                string[] args = Environment.GetCommandLineArgs();
-                foreach (string a in args)
-                {
-                    if (
-                        0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                        || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                        || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                    )
-                    {
-                        return true;
-                    }
-                }
+                return IsTestRunnerCommandLine(Environment.GetCommandLineArgs());
             }
             catch
             {
                 return false;
+            }
+        }
+
+        internal static bool IsTestRunnerCommandLine(string[] args)
+        {
+            if (args == null)
+            {
+                return false;
+            }
+
+            foreach (string argument in args)
+            {
+                if (
+                    string.Equals(argument, "-runTests", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(argument, "-testResults", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(argument, "-testPlatform", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    return true;
+                }
             }
 
             return false;

@@ -71,6 +71,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
         }
 
         [Test]
+        public void StrayReleaseWhileLeaseIsHeldThrowsOnDisposal()
+        {
+            using SemaphoreSlim semaphore = new(1, 1);
+            SemaphoreLease lease = semaphore.Acquire();
+            semaphore.Release();
+
+            Assert.Throws<SemaphoreFullException>(() => lease.Dispose());
+            Assert.IsFalse(lease.IsHeld);
+            Assert.AreEqual(1, semaphore.CurrentCount);
+        }
+
+        [Test]
         public void ADisposedSemaphoreDoesNotMaskTheCallersException()
         {
             SemaphoreSlim semaphore = new(1, 1);

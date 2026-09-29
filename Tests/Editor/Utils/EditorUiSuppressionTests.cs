@@ -51,29 +51,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
-        public void IsInvokedByTestRunnerAgreesWithCommandLineTokens()
+        public void IsInvokedByTestRunnerDoesNotThrow()
         {
-            bool expected = false;
-            foreach (string argument in Environment.GetCommandLineArgs())
-            {
-                if (
-                    0 <= argument.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= argument.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= argument.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    expected = true;
-                    break;
-                }
-            }
-
-            // A public environment query must answer without throwing even on a locked-down host.
             Assert.DoesNotThrow(() => EditorUtilities.IsInvokedByTestRunner());
-            Assert.AreEqual(
-                expected,
-                EditorUtilities.IsInvokedByTestRunner(),
-                "The predicate disagreed with the command-line tokens it documents."
-            );
+        }
+
+        [TestCase("-runTests")]
+        [TestCase("-testResults")]
+        [TestCase("-testPlatform")]
+        [TestCase("-RUNTESTS")]
+        public void TestRunnerFlagsAreMatchedExactly(string flag)
+        {
+            Assert.IsTrue(EditorUtilities.IsTestRunnerCommandLine(new[] { flag }));
+        }
+
+        [TestCase("-projectPath", "/projects/TestPlatformer")]
+        [TestCase("-logFile", "/logs/runTests.txt")]
+        [TestCase("-projectPath", "/projects/testResults")]
+        [TestCase("-projectPath", "/projects/testPlatform")]
+        public void TestRunnerWordsInArgumentValuesDoNotSuppressEditorDialogs(
+            string option,
+            string value
+        )
+        {
+            Assert.IsFalse(EditorUtilities.IsTestRunnerCommandLine(new[] { option, value }));
         }
 
         [Test]

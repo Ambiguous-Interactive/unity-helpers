@@ -3124,6 +3124,69 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
+        public void PointerRaycastOnAnotherObjectFallsBackToTargetPlane()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            RectTransform rectangle = CreateRectangle();
+            Camera camera = Track(new GameObject("FallbackCamera")).AddComponent<Camera>();
+            camera.transform.position = new Vector3(0f, 0f, -10f);
+            PhysicsRaycaster raycaster = camera.gameObject.AddComponent<PhysicsRaycaster>();
+            GameObject other = Track(new GameObject("OtherHit"));
+            Vector2 screenPoint = new(Screen.width * 0.5f, Screen.height * 0.5f);
+            PointerEventData pointerEventData = new(eventSystem)
+            {
+                position = screenPoint,
+                pointerCurrentRaycast = new RaycastResult
+                {
+                    gameObject = other,
+                    module = raycaster,
+                    worldPosition = new Vector3(0f, 0f, 20f),
+                },
+            };
+
+            Assert.IsTrue(
+                RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    rectangle,
+                    screenPoint,
+                    camera,
+                    out Vector3 expected
+                )
+            );
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
+            Assert.IsTrue(pointerEventData.TryGetLocalPoint(rectangle, out Vector2 localPoint));
+            Assert.AreEqual((Vector2)rectangle.InverseTransformPoint(expected), localPoint);
+        }
+
+        [Test]
+        public void PointerPressRaycastOnTargetWinsAfterForeignCurrentHit()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            RectTransform rectangle = CreateRectangle();
+            Camera camera = Track(new GameObject("PressCamera")).AddComponent<Camera>();
+            PhysicsRaycaster raycaster = camera.gameObject.AddComponent<PhysicsRaycaster>();
+            Vector3 expected = new(-4f, 7f, 2f);
+            PointerEventData pointerEventData = new(eventSystem)
+            {
+                pointerCurrentRaycast = new RaycastResult
+                {
+                    gameObject = Track(new GameObject("OtherHit")),
+                    module = raycaster,
+                    worldPosition = new Vector3(0f, 0f, 20f),
+                },
+                pointerPressRaycast = new RaycastResult
+                {
+                    gameObject = rectangle.gameObject,
+                    module = raycaster,
+                    worldPosition = expected,
+                },
+            };
+
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
+        }
+
+        [Test]
         public void PointerNonFiniteRaycastFallsBackToClampedScreenPoint()
         {
             EventSystem eventSystem = CreateEventSystem();
@@ -3186,6 +3249,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
+        public void PointerCanvasUsesItsOwnCameraAfterForeignRaycast()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            Camera canvasCamera = Track(new GameObject("CanvasCamera")).AddComponent<Camera>();
+            canvasCamera.transform.position = new Vector3(0f, 0f, -10f);
+            Camera foreignCamera = Track(new GameObject("ForeignCamera")).AddComponent<Camera>();
+            foreignCamera.transform.position = new Vector3(6f, 0f, -10f);
+            PhysicsRaycaster foreignRaycaster =
+                foreignCamera.gameObject.AddComponent<PhysicsRaycaster>();
+            GameObject canvasObject = Track(new GameObject("Canvas", typeof(RectTransform)));
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = canvasCamera;
+            RectTransform rectangle = CreateRectangle(canvasObject.transform);
+            Vector2 screenPoint = new(Screen.width * 0.5f, Screen.height * 0.5f);
+            PointerEventData pointerEventData = new(eventSystem)
+            {
+                position = screenPoint,
+                pointerCurrentRaycast = new RaycastResult
+                {
+                    gameObject = Track(new GameObject("ForeignHit")),
+                    module = foreignRaycaster,
+                    worldPosition = new Vector3(6f, 0f, 20f),
+                },
+            };
+
+            Assert.IsTrue(
+                RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    rectangle,
+                    screenPoint,
+                    canvasCamera,
+                    out Vector3 expected
+                )
+            );
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
+        }
+
+        [Test]
         public void PointerOverlayCanvasUsesCameraFreeConversion()
         {
             EventSystem eventSystem = CreateEventSystem();
@@ -3195,6 +3297,74 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             RectTransform rectangle = CreateRectangle(canvasObject.transform);
             Vector2 screenPoint = new(Screen.width * 0.25f, Screen.height * 0.75f);
             PointerEventData pointerEventData = new(eventSystem) { position = screenPoint };
+
+            Assert.IsTrue(
+                RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    rectangle,
+                    screenPoint,
+                    null,
+                    out Vector3 expected
+                )
+            );
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
+        }
+
+        [Test]
+        public void PointerOverlayCanvasIgnoresZeroWorldPositionFromValidRaycast()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            GameObject canvasObject = Track(new GameObject("OverlayCanvas", typeof(RectTransform)));
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            RectTransform rectangle = CreateRectangle(canvasObject.transform);
+            Camera camera = Track(new GameObject("RaycastCamera")).AddComponent<Camera>();
+            PhysicsRaycaster raycaster = camera.gameObject.AddComponent<PhysicsRaycaster>();
+            Vector2 screenPoint = new(Screen.width * 0.25f, Screen.height * 0.75f);
+            PointerEventData pointerEventData = new(eventSystem)
+            {
+                position = screenPoint,
+                pointerCurrentRaycast = new RaycastResult
+                {
+                    gameObject = rectangle.gameObject,
+                    module = raycaster,
+                    worldPosition = Vector3.zero,
+                },
+            };
+
+            Assert.IsTrue(
+                RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    rectangle,
+                    screenPoint,
+                    null,
+                    out Vector3 expected
+                )
+            );
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
+        }
+
+        [Test]
+        public void PointerCameraCanvasWithoutCameraIgnoresZeroWorldPosition()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            GameObject canvasObject = Track(new GameObject("CameraCanvas", typeof(RectTransform)));
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            RectTransform rectangle = CreateRectangle(canvasObject.transform);
+            Camera camera = Track(new GameObject("RaycastCamera")).AddComponent<Camera>();
+            PhysicsRaycaster raycaster = camera.gameObject.AddComponent<PhysicsRaycaster>();
+            Vector2 screenPoint = new(Screen.width * 0.75f, Screen.height * 0.25f);
+            PointerEventData pointerEventData = new(eventSystem)
+            {
+                position = screenPoint,
+                pointerCurrentRaycast = new RaycastResult
+                {
+                    gameObject = rectangle.gameObject,
+                    module = raycaster,
+                    worldPosition = Vector3.zero,
+                },
+            };
 
             Assert.IsTrue(
                 RectTransformUtility.ScreenPointToWorldPointInRectangle(
@@ -3227,6 +3397,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(Vector3.zero, worldPoint);
             Assert.IsFalse(pointerEventData.TryGetLocalPoint(rectangle, out Vector2 localPoint));
             Assert.AreEqual(Vector2.zero, localPoint);
+        }
+
+        [Test]
+        public void PointerWorldCanvasWithoutAssignedCameraUsesEventCamera()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            GameObject canvasObject = Track(new GameObject("WorldCanvas", typeof(RectTransform)));
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            RectTransform rectangle = CreateRectangle(canvasObject.transform);
+            Camera camera = Track(new GameObject("EventCamera")).AddComponent<Camera>();
+            camera.transform.position = new Vector3(0f, 0f, -10f);
+            PhysicsRaycaster raycaster = camera.gameObject.AddComponent<PhysicsRaycaster>();
+            Vector2 screenPoint = new(Screen.width * 0.5f, Screen.height * 0.5f);
+            PointerEventData pointerEventData = new(eventSystem)
+            {
+                position = screenPoint,
+                pointerCurrentRaycast = new RaycastResult
+                {
+                    gameObject = Track(new GameObject("ForeignHit")),
+                    module = raycaster,
+                    worldPosition = new Vector3(0f, 0f, 20f),
+                },
+            };
+
+            Assert.IsTrue(
+                RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    rectangle,
+                    screenPoint,
+                    camera,
+                    out Vector3 expected
+                )
+            );
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
         }
 
         /// <summary>

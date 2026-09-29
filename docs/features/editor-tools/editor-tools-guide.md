@@ -2071,8 +2071,9 @@ an empty string when it cannot determine one — always have a fallback, as abov
 internal Unity API by reflection, so treat the empty-string case as normal rather than exceptional.
 
 `IsInvokedByTestRunner()` reports whether this editor process was launched with Unity Test Runner
-command-line arguments, by looking for `runTests`, `testResults` or `testPlatform` in the command
-line. A run started from the in-editor Test Runner window does not carry those arguments and is not
+command-line flags. It matches `-runTests`, `-testResults` or `-testPlatform` exactly, so a project
+path or log filename containing those words does not suppress editor prompts. A run started from
+the in-editor Test Runner window does not carry those arguments and is not
 detected — this answers "was this editor launched to run tests", not "is a test session running
 right now". A window's `OnEnable` runs during a command-line test session too, so work that
 consumes fixtures or writes logs should be gated on it — together with `Application.isBatchMode`

@@ -754,26 +754,32 @@ if (_gate.TryAcquire(TimeSpan.FromMilliseconds(50), out SemaphoreLease lease))
 ```
 
 `SemaphoreLease` is a struct, so an uncontended acquire allocates nothing.
+Its shared disposal slots are recycled when a lease is disposed on another thread, including after
+an `await` that resumes on a worker thread.
 
-**Disposal is tracked and idempotent.** Disposing a lease twice returns one permit, not two. That
-matters more than it sounds: an extra `Release()` raises the permit count above the semaphore's
-maximum and quietly lets two callers into a section built for one. `IsHeld` reports whether a lease
-still owns a permit, and a lease from a failed `TryAcquire` is not held, so disposing it is a no-op.
+**Disposal is tracked and idempotent.** Disposing a lease twice returns one permit, not two. Without
+an explicit maximum, a stray `Release()` can raise the permit count above the intended limit and
+let two callers into a section built for one. `IsHeld` reports whether a lease still owns a permit,
+and a lease from a failed `TryAcquire` is not held, so disposing it is a no-op.
 
 **Copying a lease is safe.** Assigning it to another variable, capturing it, or passing it by value
 produces copies that all point at the same permit, and exactly one of them releases it — whichever is
 disposed first. The claim is held outside the struct, where every copy reads the same state, so
 `IsHeld` reports false on every copy once any of them has released.
 
-**Construct semaphores with an explicit maximum.** It does not make copying safe, but it decides
-whether the mistake is loud-free or silent:
+**Construct semaphores with an explicit maximum.** Copying is safe through the lease's shared claim.
+The maximum determines what happens when another caller releases a permit while a lease is held:
 
-| Constructor               | A copied lease disposed twice                                                                                                                |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `new SemaphoreSlim(1, 1)` | The extra release throws and `Dispose` swallows it. Count survives.                                                                          |
-| `new SemaphoreSlim(1)`    | Maximum defaults to `int.MaxValue`, so the extra release **succeeds**; the count silently rises to 2 and a second caller enters the section. |
+| Constructor               | Another caller releases while a lease is held                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `new SemaphoreSlim(1, 1)` | A stray release raises `SemaphoreFullException` when the lease is disposed. Count survives.                                          |
+| `new SemaphoreSlim(1)`    | Maximum defaults to `int.MaxValue`, so the lease's release succeeds; the count rises to 2 and a second caller can enter the section. |
 
-Acquire directly into a `using` and let the lease die there, and neither case can arise.
+Disposing a lease after its semaphore has been disposed is safe. A full semaphore during lease
+disposal indicates another caller released a permit it did not own; that error is allowed to throw.
+
+Acquire directly into a `using` and let the lease dispose there. Do not call `Release()` separately
+for a permit held by a lease.
 
 `Acquire()` and `AcquireAsync()` throw `ArgumentNullException` on a null semaphore rather than
 handing back a lease that is not held: a silently unlocked critical section surfaces far from its
@@ -1316,8 +1322,10 @@ Debug.Log($"Texture changed: {changed}");
 ### Texture and Sprite Pixel Helpers
 
 `SpriteHelpers.RotateTexture90`, `RotateTexture180` and `ExtractSpriteRect` produce a new texture
-and leave the source untouched. Each preserves the source's format and swaps dimensions for a
-quarter turn.
+and leave the source untouched. They preserve writable source formats and use RGBA32 for readable
+compressed sources. A quarter turn swaps dimensions. Sprite extraction reads a small sprite's
+rectangle directly when supported, and uses the lower-memory full-texture path for large regions
+or formats such as Crunch that reject region reads.
 
 <!-- doc-sample: compiles -->
 
