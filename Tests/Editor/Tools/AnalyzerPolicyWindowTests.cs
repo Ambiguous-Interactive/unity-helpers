@@ -77,6 +77,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
         }
 
+        private static void ResizePolicyWindow(
+            AnalyzerPolicyWindow window,
+            float width,
+            float height
+        )
+        {
+            window.position = new Rect(100f, 100f, width, height);
+            window.rootVisualElement.style.width = width;
+            window.rootVisualElement.style.height = height;
+        }
+
+        private static void AssertViewportDimensions(
+            AnalyzerPolicyWindow window,
+            float width,
+            float height
+        )
+        {
+            IResolvedStyle viewport = window.rootVisualElement.resolvedStyle;
+            string dimensions =
+                "Requested viewport "
+                + width
+                + "x"
+                + height
+                + "; resolved viewport "
+                + viewport.width
+                + "x"
+                + viewport.height
+                + "; graphics device "
+                + SystemInfo.graphicsDeviceType
+                + ".";
+            Assert.That(window.rootVisualElement.panel != null, Is.True, dimensions);
+            Assert.That(viewport.width, Is.EqualTo(width).Within(0.5f), dimensions);
+            Assert.That(viewport.height, Is.EqualTo(height).Within(0.5f), dimensions);
+        }
+
         private static void AssertCardInsideWindow(AnalyzerPolicyWindow window)
         {
             Rect rootBounds = window.rootVisualElement.worldBound;
@@ -746,9 +781,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public IEnumerator NarrowWindowStacksExamplesAndKeepsPinnedCardAndToolbarInsideBounds()
         {
             AnalyzerPolicyWindow window = CreatePolicyWindow();
-            window.position = new Rect(100f, 100f, 420f, 400f);
+            ResizePolicyWindow(window, 420f, 400f);
             yield return null;
             yield return null;
+            AssertViewportDimensions(window, 420f, 400f);
             Button title = window.GetPolicyRow("WUH016").Q<Button>();
             title.Focus();
             yield return null;
@@ -826,9 +862,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 search.worldBound.xMax,
                 window.rootVisualElement.worldBound.xMax + 0.5f
             );
-            window.position = new Rect(100f, 100f, 750f, 640f);
+            ResizePolicyWindow(window, 750f, 640f);
             yield return null;
             yield return null;
+            AssertViewportDimensions(window, 750f, 640f);
             Assert.That(
                 window.ExamplesContainer.style.flexDirection.value,
                 Is.EqualTo(FlexDirection.Row)
@@ -842,9 +879,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public IEnumerator PinnedExamplesSurviveOtherControlsSearchAndResizeUntilExplicitlyDismissed()
         {
             AnalyzerPolicyWindow window = CreatePolicyWindow();
-            window.position = new Rect(100f, 100f, 750f, 640f);
+            ResizePolicyWindow(window, 750f, 640f);
             yield return null;
             yield return null;
+            AssertViewportDimensions(window, 750f, 640f);
             Button title = window.GetPolicyRow("WUH001").Q<Button>();
             title.Focus();
             yield return null;
@@ -934,9 +972,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 Is.EqualTo(DisplayStyle.Flex),
                 "Filtering the anchor should keep the pinned reference visible."
             );
-            window.position = new Rect(100f, 100f, 760f, 640f);
+            ResizePolicyWindow(window, 760f, 640f);
             yield return null;
             yield return null;
+            AssertViewportDimensions(window, 760f, 640f);
             Assert.That(
                 window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y,
                 Is.EqualTo(pinnedTop).Within(0.5f),
@@ -997,9 +1036,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public IEnumerator UnpinnedExamplesRetainPositionWhenTheirAnchorIsFilteredOut()
         {
             AnalyzerPolicyWindow window = CreatePolicyWindow();
-            window.position = new Rect(100f, 100f, 750f, 640f);
+            ResizePolicyWindow(window, 750f, 640f);
             yield return null;
             yield return null;
+            AssertViewportDimensions(window, 750f, 640f);
             Button title = window.GetPolicyRow("WUH001").Q<Button>();
             title.Focus();
             yield return null;
@@ -1039,9 +1079,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y,
                 Is.EqualTo(cardTop).Within(0.5f)
             );
-            window.position = new Rect(100f, 100f, 760f, 640f);
+            ResizePolicyWindow(window, 760f, 640f);
             yield return null;
             yield return null;
+            AssertViewportDimensions(window, 760f, 640f);
             Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
             Assert.That(
                 window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y,
