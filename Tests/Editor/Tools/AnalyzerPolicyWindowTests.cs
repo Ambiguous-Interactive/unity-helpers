@@ -77,6 +77,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
         }
 
+        private static void PumpPolicyLayout(AnalyzerPolicyWindow window)
+        {
+            IPanel panel = window.rootVisualElement.panel;
+            Assert.That(panel != null, Is.True);
+            panel.Pick(Vector2.zero);
+        }
+
         private static void ResizePolicyWindow(
             AnalyzerPolicyWindow window,
             float width,
@@ -86,6 +93,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window.position = new Rect(100f, 100f, width, height);
             window.rootVisualElement.style.width = width;
             window.rootVisualElement.style.height = height;
+            PumpPolicyLayout(window);
         }
 
         private static void AssertViewportDimensions(
@@ -94,6 +102,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             float height
         )
         {
+            PumpPolicyLayout(window);
             IResolvedStyle viewport = window.rootVisualElement.resolvedStyle;
             string dimensions =
                 "Requested viewport "
@@ -616,6 +625,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             AnalyzerPolicyWindow window = CreatePolicyWindow();
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.rootVisualElement.panel != null, Is.True);
             string path = GetRulesetPath();
             DropdownField dropdown = window.GetSeverityField("WUH001");
@@ -625,6 +635,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.That(File.Exists(path), Is.False);
             dropdown.value = "Error";
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(File.ReadAllText(path), Does.Contain("Id=\"WUH001\" Action=\"Error\""));
             string external = File.ReadAllText(path).Replace("Action=\"Error\"", "Action=\"Info\"");
             File.WriteAllText(path, external);
@@ -640,6 +651,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             AnalyzerPolicyWindow window = CreatePolicyWindow();
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.rootVisualElement.panel != null, Is.True);
             ToolbarSearchField search = window.rootVisualElement.Q<ToolbarSearchField>();
             (string Query, string ExpectedId)[] cases =
@@ -653,6 +665,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 search.value = query;
                 yield return null;
+                PumpPolicyLayout(window);
                 foreach (AnalyzerPolicy policy in AnalyzerPolicyWindow.GetPolicies())
                 {
                     DisplayStyle expected = string.Equals(
@@ -672,6 +685,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             }
             search.value = string.Empty;
             yield return null;
+            PumpPolicyLayout(window);
             foreach (AnalyzerPolicy policy in AnalyzerPolicyWindow.GetPolicies())
             {
                 Assert.That(
@@ -689,10 +703,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 AnalyzerPolicyWindow window = CreatePolicyWindow();
                 yield return null;
+                PumpPolicyLayout(window);
                 Assert.That(window.rootVisualElement.panel != null, Is.True);
                 Button title = window.GetPolicyRow("WUH001").Q<Button>();
+                PumpPolicyLayout(window);
                 title.Focus();
                 yield return null;
+                PumpPolicyLayout(window);
                 Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
                 Assert.That(window.DetailsCard.Q<Label>().text, Does.Contain("WUH001"));
                 using (
@@ -704,21 +721,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                     title.SendEvent(enter);
                 }
                 yield return null;
+                PumpPolicyLayout(window);
                 window.CopyFixButton.Focus();
                 yield return null;
+                PumpPolicyLayout(window);
+                Assert.That(
+                    window.rootVisualElement.panel.focusController.focusedElement,
+                    Is.SameAs(window.CopyFixButton)
+                );
                 using (NavigationSubmitEvent copy = NavigationSubmitEvent.GetPooled())
                 {
+                    copy.target = window.CopyFixButton;
                     window.CopyFixButton.SendEvent(copy);
                 }
                 yield return null;
+                PumpPolicyLayout(window);
                 Assert.That(
                     AnalyzerPolicyExamples.TryGet("WUH001", out _, out string goodCode),
                     Is.True
                 );
                 Assert.That(GUIUtility.systemCopyBuffer, Is.EqualTo(goodCode));
                 Button otherTitle = window.GetPolicyRow("WUH002").Q<Button>();
+                PumpPolicyLayout(window);
                 otherTitle.Focus();
                 yield return null;
+                PumpPolicyLayout(window);
                 Assert.That(window.DetailsCard.Q<Label>().text, Does.Contain("WUH001"));
                 using (
                     KeyDownEvent escape = KeyDownEvent.GetPooled(
@@ -729,6 +756,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                     window.rootVisualElement.SendEvent(escape);
                 }
                 yield return null;
+                PumpPolicyLayout(window);
                 Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.None));
                 Assert.That(File.Exists(GetRulesetPath()), Is.False);
             }
@@ -758,16 +786,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             AnalyzerPolicyWindow window = CreatePolicyWindow();
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.rootVisualElement.panel != null, Is.True);
             DropdownField dropdown = window.GetSeverityField("WUH001");
             ToolbarButton enable = window.rootVisualElement.Q<ToolbarButton>();
+            PumpPolicyLayout(window);
             enable.Focus();
             yield return null;
+            PumpPolicyLayout(window);
+            Assert.That(
+                window.rootVisualElement.panel.focusController.focusedElement,
+                Is.SameAs(enable)
+            );
             using (NavigationSubmitEvent submit = NavigationSubmitEvent.GetPooled())
             {
+                submit.target = enable;
                 enable.SendEvent(submit);
             }
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(File.Exists(GetRulesetPath()), Is.True);
             Assert.That(dropdown.value, Is.EqualTo("Warning"));
             Assert.That(ReferenceEquals(dropdown, window.GetSeverityField("WUH001")), Is.True);
@@ -783,11 +820,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             AnalyzerPolicyWindow window = CreatePolicyWindow();
             ResizePolicyWindow(window, 420f, 400f);
             yield return null;
+            PumpPolicyLayout(window);
             yield return null;
+            PumpPolicyLayout(window);
             AssertViewportDimensions(window, 420f, 400f);
             Button title = window.GetPolicyRow("WUH016").Q<Button>();
+            PumpPolicyLayout(window);
             title.Focus();
             yield return null;
+            PumpPolicyLayout(window);
             using (
                 KeyDownEvent enter = KeyDownEvent.GetPooled(
                     new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
@@ -797,7 +838,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 title.SendEvent(enter);
             }
             yield return null;
+            PumpPolicyLayout(window);
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(
                 window.ExamplesContainer.style.flexDirection.value,
                 Is.EqualTo(FlexDirection.Column)
@@ -864,7 +907,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
             ResizePolicyWindow(window, 750f, 640f);
             yield return null;
+            PumpPolicyLayout(window);
             yield return null;
+            PumpPolicyLayout(window);
             AssertViewportDimensions(window, 750f, 640f);
             Assert.That(
                 window.ExamplesContainer.style.flexDirection.value,
@@ -881,11 +926,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             AnalyzerPolicyWindow window = CreatePolicyWindow();
             ResizePolicyWindow(window, 750f, 640f);
             yield return null;
+            PumpPolicyLayout(window);
             yield return null;
+            PumpPolicyLayout(window);
             AssertViewportDimensions(window, 750f, 640f);
             Button title = window.GetPolicyRow("WUH001").Q<Button>();
+            PumpPolicyLayout(window);
             title.Focus();
             yield return null;
+            PumpPolicyLayout(window);
             using (
                 KeyDownEvent enter = KeyDownEvent.GetPooled(
                     new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
@@ -895,6 +944,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 title.SendEvent(enter);
             }
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.DetailsCard.Q<Button>().text, Is.EqualTo("Unpin"));
             Toolbar toolbar = window.rootVisualElement.Q<Toolbar>();
             ToolbarSearchField search = toolbar.Q<ToolbarSearchField>();
@@ -923,6 +973,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                     target.SendEvent(pointer);
                 }
                 yield return null;
+                PumpPolicyLayout(window);
                 Assert.That(
                     window.DetailsCard.style.display.value,
                     Is.EqualTo(DisplayStyle.Flex),
@@ -943,26 +994,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                     target.SendEvent(pointer);
                 }
                 yield return null;
+                PumpPolicyLayout(window);
             }
             severity.value = "Error";
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.GetAction("WUH002"), Is.EqualTo("Error"));
+            PumpPolicyLayout(window);
             refresh.Focus();
             yield return null;
+            PumpPolicyLayout(window);
+            Assert.That(
+                window.rootVisualElement.panel.focusController.focusedElement,
+                Is.SameAs(refresh)
+            );
             using (NavigationSubmitEvent submit = NavigationSubmitEvent.GetPooled())
             {
+                submit.target = refresh;
                 refresh.SendEvent(submit);
             }
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
             Button otherTitle = window.GetPolicyRow("WUH002").Q<Button>();
+            PumpPolicyLayout(window);
             otherTitle.Focus();
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.DetailsCard.Q<Label>().text, Does.Contain("WUH001"));
             float pinnedTop =
                 window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y;
             search.value = "WUH002";
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(
                 window.GetPolicyRow("WUH001").style.display.value,
                 Is.EqualTo(DisplayStyle.None)
@@ -974,7 +1038,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
             ResizePolicyWindow(window, 760f, 640f);
             yield return null;
+            PumpPolicyLayout(window);
             yield return null;
+            PumpPolicyLayout(window);
             AssertViewportDimensions(window, 760f, 640f);
             Assert.That(
                 window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y,
@@ -982,8 +1048,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 "Resizing after filtering should retain the pinned card position."
             );
             AssertCardInsideWindow(window);
+            PumpPolicyLayout(window);
             otherTitle.Focus();
             yield return null;
+            PumpPolicyLayout(window);
             using (
                 KeyDownEvent replace = KeyDownEvent.GetPooled(
                     new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
@@ -993,6 +1061,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 otherTitle.SendEvent(replace);
             }
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.DetailsCard.Q<Label>().text, Does.Contain("WUH002"));
             using (
                 KeyDownEvent escape = KeyDownEvent.GetPooled(
@@ -1003,9 +1072,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 window.rootVisualElement.SendEvent(escape);
             }
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.None));
+            PumpPolicyLayout(window);
             otherTitle.Focus();
             yield return null;
+            PumpPolicyLayout(window);
             using (
                 KeyDownEvent enter = KeyDownEvent.GetPooled(
                     new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
@@ -1015,20 +1087,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 otherTitle.SendEvent(enter);
             }
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
             Button close = window.DetailsCard.Query<Button>().ToList()[2];
             Assert.That(close.text, Is.EqualTo("×"));
+            PumpPolicyLayout(window);
             close.Focus();
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(
                 window.rootVisualElement.panel.focusController.focusedElement,
                 Is.SameAs(close)
             );
             using (NavigationSubmitEvent dismiss = NavigationSubmitEvent.GetPooled())
             {
+                dismiss.target = close;
                 close.SendEvent(dismiss);
             }
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.None));
         }
 
@@ -1038,11 +1115,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             AnalyzerPolicyWindow window = CreatePolicyWindow();
             ResizePolicyWindow(window, 750f, 640f);
             yield return null;
+            PumpPolicyLayout(window);
             yield return null;
+            PumpPolicyLayout(window);
             AssertViewportDimensions(window, 750f, 640f);
             Button title = window.GetPolicyRow("WUH001").Q<Button>();
+            PumpPolicyLayout(window);
             title.Focus();
             yield return null;
+            PumpPolicyLayout(window);
             using (
                 KeyDownEvent enter = KeyDownEvent.GetPooled(
                     new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
@@ -1052,27 +1133,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 title.SendEvent(enter);
             }
             yield return null;
+            PumpPolicyLayout(window);
             Button pin = window.DetailsCard.Q<Button>();
             Assert.That(pin.text, Is.EqualTo("Unpin"));
             ToolbarSearchField search = window.rootVisualElement.Q<ToolbarSearchField>();
             search.value = "WUH002";
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(
                 window.GetPolicyRow("WUH001").style.display.value,
                 Is.EqualTo(DisplayStyle.None)
             );
             float cardTop = window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y;
+            PumpPolicyLayout(window);
             pin.Focus();
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(
                 window.rootVisualElement.panel.focusController.focusedElement,
                 Is.SameAs(pin)
             );
             using (NavigationSubmitEvent unpin = NavigationSubmitEvent.GetPooled())
             {
+                unpin.target = pin;
                 pin.SendEvent(unpin);
             }
             yield return null;
+            PumpPolicyLayout(window);
             Assert.That(pin.text, Is.EqualTo("Pin"));
             Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
             Assert.That(
@@ -1081,7 +1168,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
             ResizePolicyWindow(window, 760f, 640f);
             yield return null;
+            PumpPolicyLayout(window);
             yield return null;
+            PumpPolicyLayout(window);
             AssertViewportDimensions(window, 760f, 640f);
             Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
             Assert.That(
@@ -1129,6 +1218,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 window.Show,
                 SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null
             );
+            ResizePolicyWindow(window, 750f, 640f);
             return window;
         }
 
