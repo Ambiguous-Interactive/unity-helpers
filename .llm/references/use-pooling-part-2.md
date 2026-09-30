@@ -56,57 +56,62 @@ public void MaybeProcessItems(bool shouldProcess)
 
 ## Pattern: Populating from IEnumerable
 
-When materializing an `IEnumerable<T>` into a pooled list, **always use `AddRange`** instead of `foreach` + `Add`:
+Prefer `AddRange` when the source implements `ICollection<T>` for the pooled destination's exact
+element type. An arbitrary `IEnumerable<T>` does not guarantee the bulk-copy path.
 
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
 
-// ❌ BAD: foreach allocates an enumerator, no capacity pre-allocation
+// With an ICollection<T> source, AddRange can reserve capacity and copy directly.
 using PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> result);
 foreach (T item in source)
 {
     result.Add(item);  // May trigger multiple resizes
 }
 
-// ✅ GOOD: AddRange is optimized for performance
+// Preferred when source implements ICollection<T> for this result's T.
 using PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> result);
 result.AddRange(source);
 ```
 
-**Why AddRange is better:**
+**Why the `ICollection<T>` path helps:**
 
 1. **Capacity pre-allocation**: If source is `ICollection<T>`, AddRange queries `Count` first
-2. **Bulk copy**: For arrays and `List<T>`, uses `Array.Copy` which is much faster
+2. **Bulk copy**: For arrays and `List<T>`, copies directly instead of calling `Add` for each element
 3. **Potential zero-allocation**: May avoid enumerator allocation entirely
 4. **Fewer resizes**: Pre-allocated capacity means fewer or no list resizes
 
+`List<Derived>` does not implement `ICollection<Base>`. Passing it to `List<Base>.AddRange` uses
+the covariant enumerable fallback and boxes its struct enumerator for nonempty transfers. Keep `foreach` over the
+concrete typed source for that transfer. Reserve destination capacity when its required size is known.
+
 ### When to Use for Loop Instead
 
-Use indexed `for` loops only when you must **transform** or **filter** each element:
+Use a per-element loop when you must **transform** or **filter** elements. Prefer typed `foreach` unless the body needs the index:
 
 ```csharp
-// ✅ TRANSFORMATION: Must use for loop
-for (int i = 0; i < guids.Length; i++)
+// ✅ TRANSFORMATION: Process each element
+foreach (string guid in guids)
 {
-    paths.Add(ConvertGuidToPath(guids[i]));  // Transforming - can't use AddRange
+    paths.Add(ConvertGuidToPath(guid));  // Transforming - can't use AddRange
 }
 
-// ✅ FILTERING: Must use for loop
-for (int i = 0; i < items.Length; i++)
+// ✅ FILTERING: Process each element
+foreach (T item in items)
 {
-    if (items[i].IsValid)
+    if (item.IsValid)
     {
-        filtered.Add(items[i]);  // Filtering - can't use AddRange
+        filtered.Add(item);  // Filtering - can't use AddRange
     }
 }
 ```
 
-| Scenario                | Use                                             |
-| ----------------------- | ----------------------------------------------- |
-| Copy all elements as-is | `AddRange(source)`                              |
-| Transform each element  | `for` loop + `Add(Transform(item))`             |
-| Filter elements         | `for` loop + conditional `Add`                  |
-| Transform AND filter    | `for` loop + conditional `Add(Transform(item))` |
+| Scenario                | Use                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| Copy all elements as-is | `AddRange` for `ICollection<T>`; typed `foreach` for differing list element types |
+| Transform each element  | `foreach` + `Add(Transform(item))`                                                |
+| Filter elements         | `foreach` + conditional `Add`                                                     |
+| Transform AND filter    | `foreach` + conditional `Add(Transform(item))`                                    |
 
 ---
 

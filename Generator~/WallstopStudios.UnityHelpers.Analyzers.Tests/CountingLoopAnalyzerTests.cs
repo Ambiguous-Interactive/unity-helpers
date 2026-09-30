@@ -104,6 +104,213 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             Assert.AreEqual(DiagnosticSeverity.Warning, reported[0].Severity);
         }
 
+        [TestCase(
+            "struct",
+            "public",
+            "",
+            "public bool MoveNext() { return false; } public string Current { get { return null; } }",
+            "",
+            1
+        )]
+        [TestCase(
+            "class",
+            "public",
+            "",
+            "public bool MoveNext() { return false; } public string Current { get { return null; } }",
+            "",
+            0
+        )]
+        [TestCase(
+            "struct",
+            "private",
+            "",
+            "public bool MoveNext() { return false; } public string Current { get { return null; } }",
+            "",
+            0
+        )]
+        [TestCase(
+            "struct",
+            "public",
+            "int unused",
+            "public bool MoveNext() { return false; } public string Current { get { return null; } }",
+            "",
+            0
+        )]
+        [TestCase(
+            "struct",
+            "public",
+            "",
+            "public int MoveNext() { return 0; } public string Current { get { return null; } }",
+            "",
+            0
+        )]
+        [TestCase(
+            "struct",
+            "public",
+            "",
+            "public bool MoveNext() { return false; } private string Current { get { return null; } }",
+            "",
+            0
+        )]
+        [TestCase(
+            "struct",
+            "public",
+            "",
+            "public bool MoveNext() { return false; } public string Current { get { return null; } }",
+            "rows.Change();",
+            0
+        )]
+        public void ConcreteEnumerationUsesTheCompilerPattern(
+            string enumeratorKind,
+            string accessibility,
+            string parameters,
+            string enumeratorMembers,
+            string body,
+            int expected
+        )
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(
+                "public sealed class Rows { public int Count { get { return 0; } } "
+                    + "public string this[int index] { get { return null; } } public void Change() { } "
+                    + accessibility
+                    + " Enumerator GetEnumerator("
+                    + parameters
+                    + ") { return new Enumerator(); } "
+                    + "public "
+                    + enumeratorKind
+                    + " Enumerator { "
+                    + enumeratorMembers
+                    + " } } "
+                    + "public static void Walk(Rows rows) { for (int index = 0; index < rows.Count; ++index) { "
+                    + body
+                    + " System.Console.WriteLine(rows[index]); } }"
+            );
+
+            Assert.AreEqual(expected, reported.Length);
+            if (0 < expected)
+            {
+                Assert.AreEqual(DiagnosticId, reported[0].Id);
+            }
+        }
+
+        [TestCase("int count = rows.Length;", "", "", 1)]
+        [TestCase("int count = rows.Length;", "", "count--;", 0)]
+        [TestCase("int count = rows.Length;", "", "Change(ref count);", 0)]
+        [TestCase("int count = rows.Length;", "", "rows = new string[0];", 0)]
+        [TestCase("int count = rows.Length;", "rows = new string[0];", "", 0)]
+        [TestCase("int count = rows.Length - 1;", "", "", 0)]
+        [TestCase("int count = 2;", "", "", 0)]
+        [TestCase("int count = rows.Length, other = 1;", "", "", 0)]
+        public void CachedBoundsRequireAnUnchangedFullSequenceSnapshot(
+            string declaration,
+            string between,
+            string mutation,
+            int expected
+        )
+        {
+            Assert.AreEqual(
+                expected,
+                Analyze(
+                    "private static void Change(ref int value) { value--; } "
+                        + "public static void Walk(string[] rows) { "
+                        + declaration
+                        + between
+                        + " for (int index = 0; index < count; ++index) { "
+                        + mutation
+                        + " System.Console.WriteLine(rows[index]); } }"
+                ).Length
+            );
+        }
+
+        [Test]
+        public void DictionaryIntegerKeysAreNotSequentialElements()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static void Walk(System.Collections.Generic.Dictionary<int, string> rows) { "
+                        + "for (int index = 0; index < rows.Count; ++index) { System.Console.WriteLine(rows[index]); } }"
+                )
+            );
+        }
+
+        [TestCase("", 1)]
+        [TestCase(
+            "public new System.Collections.Generic.IEnumerator<string> GetEnumerator() { return null; }",
+            0
+        )]
+        public void InheritedEnumerationRespectsHiddenMembers(string derivedMember, int expected)
+        {
+            Assert.AreEqual(
+                expected,
+                Analyze(
+                    "public class Rows { public int Count { get { return 0; } } "
+                        + "public string this[int index] { get { return null; } } "
+                        + "public Enumerator GetEnumerator() { return new Enumerator(); } "
+                        + "public struct Enumerator { public bool MoveNext() { return false; } public string Current { get { return null; } } } } "
+                        + "public sealed class DerivedRows : Rows { "
+                        + derivedMember
+                        + " } "
+                        + "public static void Walk(DerivedRows rows) { for (int index = 0; index < rows.Count; ++index) { System.Console.WriteLine(rows[index]); } }"
+                ).Length
+            );
+        }
+
+        [TestCase("System.Collections.Generic.List<string>", 1)]
+        [TestCase("System.Collections.Generic.IReadOnlyList<string>", 0)]
+        public void CachedCountRetainsTheConcreteTypeRequirement(string type, int expected)
+        {
+            Assert.AreEqual(
+                expected,
+                Analyze(
+                    "public static void Walk("
+                        + type
+                        + " rows) { int count = rows.Count; "
+                        + "for (int index = 0; index < count; ++index) { System.Console.WriteLine(rows[index]); } }"
+                ).Length
+            );
+        }
+
+        [TestCase("var alias = rows; alias.Clear();")]
+        [TestCase(
+            "System.Collections.Generic.List<string> alias = null; alias = rows; alias.Clear();"
+        )]
+        [TestCase("var aliases = new[] { rows }; aliases[0].Clear();")]
+        [TestCase("var alias = (rows, 1); alias.Item1.Clear();")]
+        [TestCase(
+            "var alias = rows ?? new System.Collections.Generic.List<string>(); alias.Clear();"
+        )]
+        public void SequenceAliasesInsideTheBodyCanChangeEnumeration(string mutation)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static void Walk(System.Collections.Generic.List<string> rows) { int count = rows.Count; "
+                        + "for (int index = 0; index < count; ++index) { "
+                        + mutation
+                        + " System.Console.WriteLine(rows[index]); } }"
+                )
+            );
+        }
+
+        [Test]
+        public void MultidimensionalArraysDoNotWalkOneIndexedDimension()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static void Walk(string[,] rows) { for (int index = 0; index < rows.Length; ++index) { System.Console.WriteLine(rows[index, 0]); } }"
+                )
+            );
+        }
+
+        [Test]
+        public void MultipleLoopInitializersAreNotASingleForwardWalk()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static void Walk(string[] rows) { for (int index = 0, count = rows.Length; index < rows.Length; ++index) { System.Console.WriteLine(rows[index]); } }"
+                )
+            );
+        }
+
         /// <summary>
         /// Two instances walked in step are two sequences, not one. Comparing the field symbol
         /// alone made <c>this.rows[i]</c> and <c>other.rows[i]</c> look identical, so every
@@ -302,12 +509,15 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
 
         [TestCase("holder = replacement;")]
         [TestCase("Replace(ref holder, replacement);")]
+        [TestCase("var alias = holder; alias.rows = replacement.rows;")]
+        [TestCase("Expose(holder, replacement);")]
         public void ReplacingTheSequenceReceiverIsNotReported(string mutation)
         {
             Assert.IsEmpty(
                 Analyze(
                     "public sealed class Holder { public string[] rows; } "
                         + "private static void Replace(ref Holder value, Holder replacement) { value = replacement; } "
+                        + "private static void Expose(Holder value, Holder replacement) { value.rows = replacement.rows; } "
                         + "public static void Walk(Holder holder, Holder replacement) { for (int index = 0; index < holder.rows.Length; ++index) { "
                         + mutation
                         + " System.Console.WriteLine(holder.rows[index]); } }"

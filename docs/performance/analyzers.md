@@ -594,7 +594,13 @@ a field the Unity serializer accepts: a `[NonSerialized]` field, a private field
 `foreach` over an **array** or a **`List<T>`** allocates nothing: the array form compiles to an
 indexed loop, and `List<T>` returns a struct enumerator the JIT keeps on the stack. So a counting
 loop over either, whose body only ever uses the index to reach into that same sequence, says less
-than `foreach` does for no benefit.
+than `foreach` does for no benefit. Other concrete collections also qualify when the compiler
+binds a public `GetEnumerator()` returning a value type, and its element type matches the indexer.
+The compiler checks `MoveNext` and `Current`, including inherited and hidden members; a method
+called `GetEnumerator` alone is insufficient. Integer-keyed dictionaries do not qualify because
+their indexer returns values while enumeration returns key/value pairs.
+This rule proves the enumeration shape avoids boxing; it does not measure allocations inside
+a custom collection's enumerator methods.
 
 ```csharp
 // WUH013: the index is only ever used to index rows.
@@ -618,7 +624,13 @@ It is not reported when:
   collection with it;
 - the walk is not the ordinary forward one: a non-zero start, a stride other than one, or backwards;
 - the body writes to the sequence, replaces it, or directly mutates the iterated list, including
-  in-place compaction through a different index.
+  in-place compaction through a different index;
+- the body calls an unknown instance method on a custom collection, or exposes the sequence through
+  a local, tuple, array, assignment, or argument that may permit mutation through an alias.
+
+A bound cached in a single local declaration immediately before the loop also qualifies, such
+as `int count = rows.Count;`. The rule keeps indexed traversal when the body changes that local,
+when other statements intervene, or when the cached expression covers only part of the sequence.
 
 The discriminator is the sequence's **type**, which is why this cannot be a source linter: the loop
 over `List<T>` and the identical loop over `IReadOnlyList<T>` are the same tokens and opposite
@@ -632,6 +644,9 @@ A persistent audit found 12 additional sites in Editor files excluded from norma
 for old Unity reference gaps, with three more pool loops in `SINGLE_THREADED`, bringing the complete inventory to 321. The audit checks all ten
 excluded production files and requires a reporting control beside an unresolved API in the same
 compilation. Its separate negative control proves those sources can fail the gate.
+The custom-enumerator and cached-bound extension also covers NativeArray color scans,
+TypeCache discovery, and pooled component collection. These traversals keep their element order;
+no player throughput improvement is claimed.
 Ordinary reads now use `foreach`; mutation-sensitive loops keep indexed traversal. If a callback
 can mutate the sequence indirectly, keep the indexed loop with a narrowly scoped suppression
 that explains the callback path. Negative controls require `WUH013` to fail every check tree.

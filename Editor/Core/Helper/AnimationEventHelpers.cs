@@ -22,9 +22,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
             Dictionary<Type, List<MethodInfo>> typesToMethods = new();
 
             TypeCache.TypeCollection monoTypes = TypeCache.GetTypesDerivedFrom<MonoBehaviour>();
-            for (int i = 0; i < monoTypes.Count; i++)
+            foreach (Type type in monoTypes)
             {
-                Type type = monoTypes[i];
                 if (type == null || !type.IsClass || type.IsAbstract)
                 {
                     continue;

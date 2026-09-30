@@ -44,6 +44,67 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             RelationalComponentCollector.FallbackOnly = false;
         }
 
+        [TestCase(
+            typeof(Component),
+            true,
+            TestName = "Collection.Children.Component.PreservesOrder"
+        )]
+        [TestCase(
+            typeof(Component),
+            false,
+            TestName = "Collection.Parents.Component.PreservesOrder"
+        )]
+        [TestCase(
+            typeof(SpriteRenderer),
+            true,
+            TestName = "Collection.Children.Derived.PreservesOrder"
+        )]
+        [TestCase(
+            typeof(SpriteRenderer),
+            false,
+            TestName = "Collection.Parents.Derived.PreservesOrder"
+        )]
+        [TestCase(
+            typeof(MeshRenderer),
+            true,
+            TestName = "Collection.Children.Empty.PreservesPrefix"
+        )]
+        [TestCase(
+            typeof(MeshRenderer),
+            false,
+            TestName = "Collection.Parents.Empty.PreservesPrefix"
+        )]
+        public void CollectionPreservesDestinationPrefixAndQueryOrder(
+            System.Type elementType,
+            bool collectChildren
+        )
+        {
+            Component source = collectChildren
+                ? BuildChildHierarchy(3, 2)
+                : BuildParentHierarchy(3);
+            Component[] expected = collectChildren
+                ? source.GetComponentsInChildren(elementType, true)
+                : source.GetComponentsInParent(elementType, true);
+            List<Component> destination = new() { source };
+            RelationalComponentCollector collector = RelationalComponentCollector.For(
+                elementType,
+                source
+            );
+            Assert.IsTrue(collector != null);
+
+            int count = collectChildren
+                ? collector.CollectChildrenInto(source, true, destination)
+                : collector.CollectParentsInto(source, true, destination);
+
+            Assert.AreEqual(expected.Length, count);
+            Assert.AreEqual(expected.Length + 1, destination.Count);
+            Assert.AreSame(source, destination[0]);
+            for (int index = 0; index < expected.Length; ++index)
+            {
+                Assert.AreSame(expected[index], destination[index + 1]);
+            }
+        }
+
         [Test]
         [TestCase(1, 1)]
         [TestCase(1, 3)]

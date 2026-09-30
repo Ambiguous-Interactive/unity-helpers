@@ -48,70 +48,75 @@ using (Dictionary<K, V>.Enumerator enumerator = dict.GetEnumerator())
 
 ## Prefer AddRange Over foreach + Add
 
-When populating a list from an `IEnumerable<T>`, **always prefer `AddRange`** over `foreach` + `Add`:
+Prefer `AddRange` when the source implements `ICollection<T>` for the destination's exact element
+type. That interface gives the bulk-copy path. A source without it uses enumeration instead.
 
 ```csharp
-// ❌ BAD: foreach allocates an enumerator, no capacity pre-allocation
+// With an ICollection<T> source, AddRange can reserve capacity and copy directly.
 using var lease = Buffers<T>.List.Get(out List<T> result);
 foreach (T item in source)
 {
     result.Add(item);  // May trigger multiple resizes
 }
 
-// ✅ GOOD: AddRange is optimized for performance
+// Preferred when source implements ICollection<T> for this result's T.
 using var lease = Buffers<T>.List.Get(out List<T> result);
 result.AddRange(source);
 ```
 
-**Why AddRange is better:**
+**Why the `ICollection<T>` path helps:**
 
 1. **Capacity pre-allocation**: If source is `ICollection<T>`, AddRange queries `Count` first and ensures capacity
-2. **Bulk copy**: For arrays and `List<T>`, uses `Array.Copy` which is much faster than individual adds
+2. **Bulk copy**: For arrays and `List<T>`, copies directly instead of calling `Add` for each element
 3. **Potential zero-allocation**: If source already has the items in contiguous memory, no enumerator needed
 4. **Fewer resizes**: Pre-allocated capacity means fewer or no list resizes during population
 
+`List<Derived>` does not implement `ICollection<Base>`. Passing it to `List<Base>.AddRange` uses
+the covariant enumerable fallback and boxes its struct enumerator for nonempty transfers. Keep `foreach` over the
+concrete typed source for that transfer. Reserve destination capacity when its required size is known.
+
 ### When to Use for Loop Instead of AddRange
 
-Use indexed `for` loops only when you must **transform** or **filter** each element:
+Use a per-element loop when you must **transform** or **filter** elements. Prefer typed `foreach` unless the body needs the index:
 
 ```csharp
-// ✅ TRANSFORMATION: Must use for loop - each element needs conversion
+// ✅ TRANSFORMATION: Process each element to transform it
 using var lease = Buffers<string>.GetList(guids.Length, out List<string> paths);
-for (int i = 0; i < guids.Length; i++)
+foreach (string guid in guids)
 {
-    paths.Add(ConvertGuidToPath(guids[i]));  // Can't use AddRange - transforming each element
+    paths.Add(ConvertGuidToPath(guid));  // Can't use AddRange - transforming each element
 }
 
-// ✅ FILTERING: Must use for loop - conditionally adding elements
+// ✅ FILTERING: Test each element before adding it
 using var lease = Buffers<T>.GetList(items.Length, out List<T> filtered);
-for (int i = 0; i < items.Length; i++)
+foreach (T item in items)
 {
-    if (items[i].IsValid)
+    if (item.IsValid)
     {
-        filtered.Add(items[i]);  // Can't use AddRange - filtering
+        filtered.Add(item);  // Can't use AddRange - filtering
     }
 }
 
-// ❌ BAD: Using for loop when AddRange would work
+// Avoid this indexed copy when source implements ICollection<T>.
 using var lease = Buffers<T>.GetList(source.Count, out List<T> result);
 for (int i = 0; i < source.Count; i++)
 {
     result.Add(source[i]);  // Should use AddRange!
 }
 
-// ✅ GOOD: Use AddRange for straight copies
+// Use AddRange for a source implementing ICollection<T> for this result's T.
 using var lease = Buffers<T>.GetList(source.Count, out List<T> result);
 result.AddRange(source);
 ```
 
 **Decision guide:**
 
-| Scenario                | Use                                             |
-| ----------------------- | ----------------------------------------------- |
-| Copy all elements as-is | `AddRange(source)`                              |
-| Transform each element  | `for` loop + `Add(Transform(item))`             |
-| Filter elements         | `for` loop + conditional `Add`                  |
-| Transform AND filter    | `for` loop + conditional `Add(Transform(item))` |
+| Scenario                | Use                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| Copy all elements as-is | `AddRange` for `ICollection<T>`; typed `foreach` for differing list element types |
+| Transform each element  | `foreach` + `Add(Transform(item))`                                                |
+| Filter elements         | `foreach` + conditional `Add`                                                     |
+| Transform AND filter    | `foreach` + conditional `Add(Transform(item))`                                    |
 
 ---
 

@@ -538,7 +538,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (sprite != null)
                     {
                         string path = AssetDatabase.GetAssetPath(sprite);
-                        if (!string.IsNullOrEmpty(path))
+                        if (!string.IsNullOrWhiteSpace(path))
                         {
                             entry.framePaths.Add(path);
                         }
@@ -598,7 +598,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 foreach (string path in entry.framePaths)
                 {
-                    if (string.IsNullOrEmpty(path))
+                    if (string.IsNullOrWhiteSpace(path))
                     {
                         continue;
                     }
@@ -629,11 +629,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <summary>
         /// Saves the current configuration to a JSON file in the specified folder.
         /// </summary>
-        /// <param name="folderPath">The folder path to save the config to.</param>
+        /// <param name="folderPath">The nonblank folder path to save the config to.</param>
         /// <returns>True if the config was saved successfully, false otherwise.</returns>
         internal bool SaveConfig(string folderPath)
         {
-            if (string.IsNullOrEmpty(folderPath))
+            if (string.IsNullOrWhiteSpace(folderPath))
             {
                 return false;
             }
@@ -701,11 +701,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <summary>
         /// Loads the configuration from a JSON file in the specified folder.
         /// </summary>
-        /// <param name="folderPath">The folder path to load the config from.</param>
+        /// <param name="folderPath">The nonblank folder path to load the config from.</param>
         /// <returns>True if the config was loaded successfully, false otherwise.</returns>
         internal bool LoadConfig(string folderPath)
         {
-            if (string.IsNullOrEmpty(folderPath))
+            if (string.IsNullOrWhiteSpace(folderPath))
             {
                 return false;
             }
@@ -856,7 +856,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             strictNumericOrdering = false;
             animationData.Clear();
 
-            if (!string.IsNullOrEmpty(folderPath))
+            if (!string.IsNullOrWhiteSpace(folderPath))
             {
                 _loadedConfigs.Remove(folderPath);
             }
@@ -881,7 +881,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <returns>True if the config was deleted, false otherwise.</returns>
         internal bool DeleteConfig(string folderPath)
         {
-            if (string.IsNullOrEmpty(folderPath))
+            if (string.IsNullOrWhiteSpace(folderPath))
             {
                 return false;
             }

@@ -405,6 +405,65 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             ).SetName("Pivot.Differ.BottomCenterToTopCenter.ReturnsTrue");
         }
 
+        [TestCase(null, TestName = "FindMatchingSettings.Path.Null.ReturnsNone")]
+        [TestCase("", TestName = "FindMatchingSettings.Path.Empty.ReturnsNone")]
+        [TestCase(" ", TestName = "FindMatchingSettings.Path.Space.ReturnsNone")]
+        [TestCase("\t\r\n", TestName = "FindMatchingSettings.Path.ControlWhitespace.ReturnsNone")]
+        [TestCase(
+            "\u2003\u00a0",
+            TestName = "FindMatchingSettings.Path.UnicodeWhitespace.ReturnsNone"
+        )]
+        public void FindMatchingSettingsRejectsBlankAssetPaths(string assetPath)
+        {
+            SpriteSettings profile = new() { matchBy = SpriteSettings.MatchMode.Any };
+            List<SpriteSettingsApplierAPI.PreparedProfile> prepared =
+                SpriteSettingsApplierAPI.PrepareProfiles(new List<SpriteSettings> { profile });
+            Assert.IsTrue(
+                SpriteSettingsApplierAPI.FindMatchingSettings(assetPath, prepared) == null
+            );
+        }
+
+        [TestCase(
+            "Assets/My Sprites/UI Icon.png",
+            " ",
+            true,
+            TestName = "FindMatchingSettings.Path.InternalSpaces.PreservesLiteralName"
+        )]
+        [TestCase(
+            "Assets/Icons/Icon.png",
+            "",
+            true,
+            TestName = "FindMatchingSettings.Path.Normal.MatchesAny"
+        )]
+        [TestCase(
+            "Assets/Icons/Icon.png",
+            " ",
+            false,
+            TestName = "FindMatchingSettings.Name.Space.DoesNotBroadenMatch"
+        )]
+        public void FindMatchingSettingsPreservesValidPathsAndLiteralNames(
+            string assetPath,
+            string name,
+            bool expectedMatch
+        )
+        {
+            SpriteSettings profile = new() { matchBy = SpriteSettings.MatchMode.Any, name = name };
+            List<SpriteSettingsApplierAPI.PreparedProfile> prepared =
+                SpriteSettingsApplierAPI.PrepareProfiles(new List<SpriteSettings> { profile });
+            SpriteSettings result = SpriteSettingsApplierAPI.FindMatchingSettings(
+                assetPath,
+                prepared
+            );
+            if (expectedMatch)
+            {
+                Assert.AreSame(profile, result);
+            }
+            else
+            {
+                Assert.IsTrue(result == null);
+            }
+        }
+
         [TestCaseSource(nameof(FilterModeMatchingCases))]
         public void DetectsFilterModeChangeCorrectly(
             FilterMode spriteFilterMode,

@@ -218,17 +218,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             CollectionAssert.AreEqual(original, File.ReadAllBytes(fullPath));
         }
 
-        [Test]
-        public void SaveConfigWithNullPathReturnsFalse()
+        [TestCase(null, TestName = "SaveConfig.Path.Null.ReturnsFalse")]
+        [TestCase("", TestName = "SaveConfig.Path.Empty.ReturnsFalse")]
+        [TestCase(" ", TestName = "SaveConfig.Path.Space.ReturnsFalse")]
+        [TestCase("\t\r\n", TestName = "SaveConfig.Path.ControlWhitespace.ReturnsFalse")]
+        [TestCase("\u2003\u00a0", TestName = "SaveConfig.Path.UnicodeWhitespace.ReturnsFalse")]
+        public void SaveConfigWithBlankPathReturnsFalse(string folderPath)
         {
-            bool result = _window.SaveConfig(null);
-            Assert.IsFalse(result);
-        }
-
-        [Test]
-        public void SaveConfigWithEmptyPathReturnsFalse()
-        {
-            bool result = _window.SaveConfig(string.Empty);
+            bool result = _window.SaveConfig(folderPath);
             Assert.IsFalse(result);
         }
 
@@ -255,17 +252,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.AreEqual("Loaded_", _window.autoParseNamePrefix);
         }
 
-        [Test]
-        public void LoadConfigWithNullPathReturnsFalse()
+        [TestCase(null, TestName = "LoadConfig.Path.Null.ReturnsFalse")]
+        [TestCase("", TestName = "LoadConfig.Path.Empty.ReturnsFalse")]
+        [TestCase(" ", TestName = "LoadConfig.Path.Space.ReturnsFalse")]
+        [TestCase("\t\r\n", TestName = "LoadConfig.Path.ControlWhitespace.ReturnsFalse")]
+        [TestCase("\u2003\u00a0", TestName = "LoadConfig.Path.UnicodeWhitespace.ReturnsFalse")]
+        public void LoadConfigWithBlankPathReturnsFalse(string folderPath)
         {
-            bool result = _window.LoadConfig(null);
-            Assert.IsFalse(result);
-        }
-
-        [Test]
-        public void LoadConfigWithEmptyPathReturnsFalse()
-        {
-            bool result = _window.LoadConfig(string.Empty);
+            bool result = _window.LoadConfig(folderPath);
             Assert.IsFalse(result);
         }
 
@@ -384,10 +378,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.IsFalse(File.Exists(fullPath));
         }
 
-        [Test]
-        public void DeleteConfigWithNullPathReturnsFalse()
+        [TestCase(null, TestName = "DeleteConfig.Path.Null.ReturnsFalse")]
+        [TestCase("", TestName = "DeleteConfig.Path.Empty.ReturnsFalse")]
+        [TestCase(" ", TestName = "DeleteConfig.Path.Space.ReturnsFalse")]
+        [TestCase("\t\r\n", TestName = "DeleteConfig.Path.ControlWhitespace.ReturnsFalse")]
+        [TestCase("\u2003\u00a0", TestName = "DeleteConfig.Path.UnicodeWhitespace.ReturnsFalse")]
+        public void DeleteConfigWithBlankPathReturnsFalse(string folderPath)
         {
-            bool result = _window.DeleteConfig(null);
+            bool result = _window.DeleteConfig(folderPath);
             Assert.IsFalse(result);
         }
 

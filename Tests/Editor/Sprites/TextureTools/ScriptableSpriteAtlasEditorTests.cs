@@ -475,6 +475,100 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.That(noOpCount, Is.Zero);
         }
 
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void SourceTextureFailureBeforeMutationPreservesAssetBytes(
+            bool applyChanges,
+            bool failProgress
+        )
+        {
+            string spritePath = Root + "/preflight-source.png";
+            CreatePng(spritePath, 8, 8, Color.red);
+            AssetDatabase.ImportAsset(spritePath, ImportAssetOptions.ForceSynchronousImport);
+            TextureImporter importer = AssetImporter.GetAtPath(spritePath) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.textureCompression = TextureImporterCompression.Compressed;
+            importer.SaveAndReimport();
+
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
+            Assert.IsTrue(sprite != null);
+            ScriptableSpriteAtlas config = Track(
+                ScriptableObject.CreateInstance<ScriptableSpriteAtlas>()
+            );
+            config.spritesToPack.Add(sprite);
+            if (!failProgress)
+            {
+                Texture2D transientTexture = Track(new Texture2D(2, 2));
+                Sprite transientSprite = Track(
+                    Sprite.Create(transientTexture, new Rect(0f, 0f, 2f, 2f), Vector2.zero)
+                );
+                transientSprite.name = "TransientSprite";
+                config.spritesToPack.Add(transientSprite);
+            }
+
+            string fullPath = RelToFull(spritePath);
+            byte[] pngBefore = File.ReadAllBytes(fullPath);
+            byte[] metaBefore = File.ReadAllBytes(fullPath + ".meta");
+            int progressCalls = 0;
+            Assert.IsFalse(
+                ScriptableSpriteAtlasGenerator.TrySetSourceTexturesUncompressed(
+                    config,
+                    applyChanges,
+                    out int changedCount,
+                    out string error,
+                    (path, index, total) =>
+                    {
+                        ++progressCalls;
+                        Assert.AreEqual(spritePath, path);
+                        Assert.AreEqual(1, index);
+                        Assert.AreEqual(1, total);
+                        throw new System.InvalidOperationException(
+                            "Injected first texture failure."
+                        );
+                    }
+                )
+            );
+
+            Assert.AreEqual(0, changedCount);
+            Assert.AreEqual(failProgress ? 1 : 0, progressCalls);
+            StringAssert.Contains(
+                failProgress ? "Injected first texture failure." : "No asset path exists",
+                error
+            );
+            Assert.AreEqual(TextureImporterCompression.Compressed, importer.textureCompression);
+            CollectionAssert.AreEqual(pngBefore, File.ReadAllBytes(fullPath));
+            CollectionAssert.AreEqual(metaBefore, File.ReadAllBytes(fullPath + ".meta"));
+            CollectionAssert.Contains(config.spritesToPack, sprite);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SourceTextureInvalidConfigReturnsFailureWithoutProgress(bool destroyedConfig)
+        {
+            ScriptableSpriteAtlas config = null;
+            if (destroyedConfig)
+            {
+                config = Track(ScriptableObject.CreateInstance<ScriptableSpriteAtlas>());
+                Object.DestroyImmediate(config); // UNH-SUPPRESS: Exercises destroyed config rejection.
+            }
+
+            int progressCalls = 0;
+            Assert.IsFalse(
+                ScriptableSpriteAtlasGenerator.TrySetSourceTexturesUncompressed(
+                    config,
+                    true,
+                    out int changedCount,
+                    out string error,
+                    (path, index, total) => ++progressCalls
+                )
+            );
+            Assert.AreEqual(0, changedCount);
+            Assert.AreEqual(0, progressCalls);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(error));
+        }
+
         [Test]
         public void SpriteCollectionHelpersPreserveValidSpriteOrder()
         {

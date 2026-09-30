@@ -845,7 +845,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             string path = AssetDatabase.GetAssetPath(_selectedSpriteSheet);
-            if (string.IsNullOrEmpty(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
                 Utils.EditorUi.Info("Error", "Selected texture is not an asset.");
                 return;

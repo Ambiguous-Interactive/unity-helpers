@@ -472,9 +472,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             TypeCache.TypeCollection candidates =
                 TypeCache.GetTypesDerivedFrom<AssetPostprocessor>();
             List<Type> inEditorAssembly = new();
-            for (int i = 0; i < candidates.Count; i++)
+            foreach (Type candidate in candidates)
             {
-                Type candidate = candidates[i];
                 if (candidate == null || candidate.IsAbstract)
                 {
                     continue;

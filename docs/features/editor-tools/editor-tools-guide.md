@@ -4,10 +4,44 @@
 build clips from a naming convention, apply one set of import settings to 400 textures, or find the
 serialized field Unity is silently throwing away — 30+ editor tools in all.
 
-Everything here lives under `Tools > Wallstop Studios > Unity Helpers` unless stated otherwise. Two
-tools also expose a public C# API you can drive from your own editor scripts:
-[Texture Settings Applier](#texture-settings-applier) and
-[Sprite Settings Applier](#sprite-settings-applier).
+Everything here lives under `Tools > Wallstop Studios > Unity Helpers` unless stated otherwise.
+Most asset operations also have public C# APIs for editor scripts and batch jobs. The window audit
+below records the callable operations and the remaining scope of
+[#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821).
+
+## Programmatic window operations
+
+This inventory covers the 21 `EditorWindow` and `ScriptableWizard` types in the package. It records
+API availability, not proof that every operation has passed its side-effect tests. Window layout,
+selection, previews, prompts, and persisted UI state remain window concerns.
+
+| Window or wizard                     | Callable operation or remaining work                                                                                                                                              |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AnimationEventEditor`               | `AnimationEventSaveAPI.TrySave` saves events.                                                                                                                                     |
+| `FitTextureSizeWindow`               | `FitTextureSizeAPI` discovers textures and previews or applies size changes.                                                                                                      |
+| `MultiFileSelectorPersistenceWindow` | `MultiFileSelectorPersistenceManager` configures and runs cleanup.                                                                                                                |
+| `TextureSettingsApplierWindow`       | `TextureSettingsApplierAPI` previews and applies importer settings.                                                                                                               |
+| `PrefabChecker`                      | `ScanFolders` scans; `TryRemoveMissingScripts` previews or repairs prefabs.                                                                                                       |
+| `TextureResizerWizard`               | `TextureResizerAPI.TryResizeTextures` previews or writes resized textures.                                                                                                        |
+| `SpriteCropper`                      | `SpriteCropperAPI` discovers, crops, and replaces references.                                                                                                                     |
+| `AnimationViewerWindow`              | `AnimationClipFrameSaveAPI.TrySaveFrames` writes frame edits.                                                                                                                     |
+| `AnimationCreatorWindow`             | `AnimationCreatorAPI.TryCreateClip` and `TryCreateAsset` create clips.                                                                                                            |
+| `SpriteSheetExtractor`               | `SpriteSheetExtractionAPI` extracts; `SpriteSheetReferenceReplacementAPI` replaces references.                                                                                    |
+| `AnimationCopierWindow`              | `AnimationCopierAPI` analyzes and applies selected copy/delete operations.                                                                                                        |
+| `ScriptableSpriteAtlasEditor`        | `ScriptableSpriteAtlasGenerator` creates configs, scans, synchronizes, generates, checks drift, packs, and changes source import settings.                                        |
+| `SpriteSheetAnimationCreator`        | `SpriteSheetAnimationAPI` discovers frames and creates clips.                                                                                                                     |
+| `SpritePivotAdjuster`                | `SpritePivotAdjusterAPI` discovers textures and previews or applies pivots.                                                                                                       |
+| `SpriteSettingsApplierWindow`        | `SpriteSettingsApplierAPI` previews and applies settings and loads/saves profiles.                                                                                                |
+| `ValidationWindow`                   | `ValidationScheduler` runs checks; `ValidationReportExportAPI` writes reports. Project rule creation, profile changes, and rule preferences remain internal workspace operations. |
+| `WDropDownPopupWindow`               | UI selection callback; callers can assign the serialized property directly with Unity's undo and apply APIs.                                                                      |
+| `ImageBlurTool`                      | `ImageBlurAPI` creates blurred textures and asset output.                                                                                                                         |
+| `AnalyzerPolicyWindow`               | `AnalyzerPolicyAPI` changes analyzer enablement and severity.                                                                                                                     |
+| `UnityMethodAnalyzerWindow`          | Analysis APIs find issues; `UnityMethodAnalyzerReportExportAPI` writes reports.                                                                                                   |
+| `ProtoSchemaExporterWindow`          | `ProtoSchemaExporter` discovers contracts and writes schemas.                                                                                                                     |
+
+The sweep remains open for [Sentinel workspace mutation APIs](https://github.com/Ambiguous-Interactive/unity-helpers/issues/901)
+and direct side-effect evidence for the remaining actions. The dropdown is a UI control rather than an asset processing tool; this
+classification does not change its public popup entry points.
 
 ---
 
@@ -357,6 +391,10 @@ filtering, in one pass.
 **Save Profiles Asset** writes the rule set to a `SpriteSettingsProfileCollection` asset so the rest
 of the team gets the same rules; **Load Profiles Asset** reads one back. There is no
 `Assets > Create` entry for that asset — the button is how you make one.
+
+Profile matching rejects null, empty, and whitespace-only asset paths. Spaces inside a path remain
+valid. Profile names used by `Any` matching are literal filename filters, so a name containing a
+space continues to match only filenames containing that space.
 
 Editor scripts can save and load the same profile assets without opening the window:
 
@@ -747,6 +785,8 @@ caller can inspect or remove it.
 - **Configuration Persistence** saves the whole window state to `.animation-creator.json` in a source
   folder, so the next person to import that folder gets your settings. A staging failure keeps the
   previous config; on platforms without `File.Replace`, a failed fallback swap can still lose it.
+  Null, empty, and whitespace-only config folders are rejected before file access; folders with
+  spaces inside their names remain valid.
 
 > **Visual Demo**
 >
@@ -758,6 +798,15 @@ Next: adjust the results in [Sprite Animation Editor](#sprite-animation-editor-a
 or add events with [Animation Event Editor](#animation-event-editor).
 
 ---
+
+The sprite and animation path audit distinguishes raw inputs from normalized paths. Sprite Cropper
+and Sprite Pivot Adjuster already normalize blank inputs to `null`; their later null/empty guards
+check that normalized result. Sprite profile patterns are trimmed before empty checks. Literal
+filename filters, regex test input and captures, animation name prefixes and suffixes, and stored
+JSON retain null/empty checks because whitespace is data. Profile ownership GUIDs retain exact
+identity semantics. A blanket empty-string lint would reject these valid contracts, so this audit
+uses input tests and review instead. The wider Runtime/Editor guard audit remains open in
+[#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867).
 
 ### Animation Copier
 

@@ -39,32 +39,40 @@ LINQ methods allocate iterator objects and delegate objects on every call.
 
 ## Collection Building Patterns
 
-| Forbidden                        | Use Instead                     | Reason                                    |
-| -------------------------------- | ------------------------------- | ----------------------------------------- |
-| `foreach` + `.Add()` on unknown  | `.AddRange()` when available    | `AddRange` pre-allocates and uses memcopy |
-| `for` loop + `.Add()` repeatedly | Pre-size with capacity + `.Add` | Avoids resize/copy on every add           |
-| Building without known capacity  | Pass capacity to constructor    | Avoids multiple internal resizes          |
+| Forbidden                          | Use Instead                         | Reason                                    |
+| ---------------------------------- | ----------------------------------- | ----------------------------------------- |
+| Indexed copy from `ICollection<T>` | `.AddRange()` for destination's `T` | Reserves capacity and copies directly     |
+| `for` loop + `.Add()` repeatedly   | Pre-size with capacity + `.Add`     | Avoids resize/copy on every add           |
+| Building without known capacity    | Pass capacity to constructor        | Avoids multiple internal resizes          |
 
 ### AddRange vs Foreach+Add
 
 ```csharp
-// Forbidden - O(n) individual Add calls, potential resizes
+// For an ICollection<T> source, AddRange can reserve capacity and copy directly.
 foreach (var item in source)
 {
     destination.Add(item);
 }
 
-// Preferred - Single operation, pre-allocates, uses Array.Copy
+// Preferred when source implements ICollection<T> for the destination's exact T.
 destination.AddRange(source);
 
-// If source is IEnumerable<T> (not ICollection<T>), AddRange may still enumerate
-// In that case, prefer explicit capacity + Add pattern:
-destination.Capacity = destination.Count + expectedCount;
-for (int i = 0; i < source.Length; i++)
+// A source without ICollection<T> uses enumeration rather than bulk copying.
+// For a concrete typed source with a known size, capacity + foreach avoids interface boxing:
+int requiredCapacity = destination.Count + expectedCount;
+if (destination.Capacity < requiredCapacity)
 {
-    destination.Add(source[i]);
+    destination.Capacity = requiredCapacity;
+}
+foreach (var item in source)
+{
+    destination.Add(item);
 }
 ```
+
+`List<Derived>` does not implement `ICollection<Base>`. Passing it to `List<Base>.AddRange` uses
+the covariant enumerable fallback and boxes its struct enumerator for nonempty transfers. Keep `foreach` over the
+concrete typed source for that transfer; do not recommend `AddRange` solely because it exists.
 
 ---
 
