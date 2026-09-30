@@ -39,15 +39,14 @@ const evaluate = new Function(
   "github",
   `return Boolean(${job.if.replace(/^\s*\$\{\{\s*|\s*\}\}\s*$/g, "")});`
 );
-function event(overrides = {}, repositoryOverrides = {}) {
+function event(overrides = {}) {
   return {
     event_name: "schedule",
     repository: "Ambiguous-Interactive/unity-helpers",
+    repository_id: "737391131",
     ref: "refs/heads/main",
     ref_protected: true,
-    event: {
-      repository: { id: 737391131, fork: false, default_branch: "main", ...repositoryOverrides }
-    },
+    event: { schedule: "29 10 * * 3" },
     ...overrides
   };
 }
@@ -93,28 +92,37 @@ async function main() {
     "The same repository ID after rename or transfer must dispatch to its current context"
   );
   assert.equal(calls.length, 2);
+  await runScheduledDispatch(event({ repository_id: 737391131 }), dispatch);
+  assert.deepEqual(
+    calls[2],
+    calls[0],
+    "Numeric repository ID coercion must retain the canonical dispatch"
+  );
+  assert.equal(calls.length, 3);
 
   const denied = [
     ["push", event({ event_name: "push" })],
     ["pull request", event({ event_name: "pull_request", ref: "refs/pull/42/merge" })],
     ["manual", event({ event_name: "workflow_dispatch" })],
+    ["missing event name", event({ event_name: undefined })],
     [
       "other repository ID",
-      event({ repository: "Ambiguous-Interactive/another-project" }, { id: 123 })
+      event({ repository: "Ambiguous-Interactive/another-project", repository_id: "123" })
     ],
-    ["missing repository ID", event({}, { id: undefined })],
-    ["outside fork", event({ repository: "outsider/unity-helpers" }, { id: 456, fork: true })],
-    ["fork flag", event({}, { fork: true })],
-    ["changed default branch", event({}, { default_branch: "release" })],
+    ["wrong numeric repository ID", event({ repository_id: 123 })],
+    ["missing repository ID", event({ repository_id: undefined })],
+    ["outside fork", event({ repository: "outsider/unity-helpers", repository_id: "456" })],
+    ["changed default branch", event({ ref: "refs/heads/release" })],
     ["feature branch", event({ ref: "refs/heads/feature" })],
     ["tag", event({ ref: "refs/tags/main" })],
+    ["missing ref", event({ ref: undefined })],
     ["unprotected branch", event({ ref_protected: false })],
     ["missing protection evidence", event({ ref_protected: undefined })]
   ];
   for (const [name, input] of denied) {
     assert.equal(evaluate(input), false, `${name} must be denied`);
     await runScheduledDispatch(input, dispatch);
-    assert.equal(calls.length, 2, `${name} must never call the API`);
+    assert.equal(calls.length, 3, `${name} must never call the API`);
   }
 
   const deniedError = new Error("Dispatch access denied");
@@ -126,7 +134,7 @@ async function main() {
     "A rejected dispatch must fail the scheduler"
   );
   console.log(
-    `Scheduled benchmark workflow: canonical and renamed dispatches and ${denied.length} denied inputs passed.`
+    `Scheduled benchmark workflow: minimal schedule payload, string/numeric IDs, renamed dispatch and ${denied.length} denied inputs passed.`
   );
 }
 

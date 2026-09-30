@@ -14,11 +14,10 @@ jobs:
   dispatch:
     name: Dispatch canonical benchmarks
     # The stable repository ID preserves canonical ownership across renames and transfers.
+    # Schedules run only on the default branch; the stable ID also excludes forks.
     if: >-
       ${{ github.event_name == 'schedule' &&
-          github.event.repository.id == 737391131 &&
-          !github.event.repository.fork &&
-          github.event.repository.default_branch == 'main' &&
+          github.repository_id == '737391131' &&
           github.ref == 'refs/heads/main' && github.ref_protected }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
