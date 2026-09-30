@@ -128,7 +128,7 @@ Before submitting code, verify:
 - [ ] Enum dictionary keys use custom comparer or cast to int
 - [ ] Hash codes use `Objects.HashCode()`, not hand-rolled
 - [ ] Lists pre-allocated when size is known
-- [ ] `AddRange` used instead of `foreach` + `Add` for copying
+- [ ] `AddRange` bulk copies from `ICollection<T>` for the destination's exact `T`; differing concrete list element types retain typed `foreach` to avoid enumerator boxing
 
 ---
 

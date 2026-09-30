@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix editor test-runner detection so project paths and log filenames containing test flag names do not suppress confirmation dialogs ([#885](https://github.com/Ambiguous-Interactive/unity-helpers/issues/885)).
 - Fix `SemaphoreLease` so a stray permit release raises `SemaphoreFullException` when its lease is disposed ([#887](https://github.com/Ambiguous-Interactive/unity-helpers/issues/887)).
 
+### Improved
+
+- Improve parent and child collection transfers with bulk copying for `Component` fields while retaining typed enumeration for derived components ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
+
 ## [3.6.2] - 2026-09-28
 
 ### Added

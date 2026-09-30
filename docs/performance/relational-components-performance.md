@@ -4,6 +4,8 @@ Relational component attributes (`[SiblingComponent]`, `[ParentComponent]`, `[Ch
 
 Numbers below are grouped by operating system. A section reading `pending` means nobody has run this suite on that platform, not that the attributes are slow there.
 
+Parent and child queries use pooled typed buffers. A buffer containing `Component` appends through `List<Component>.AddRange`; buffers containing derived components retain typed enumeration. A `List<DerivedComponent>` does not implement `ICollection<Component>`, so passing it to `AddRange` misses the bulk-copy path and boxes its enumerator. Both transfer paths preserve query order and existing destination entries. The benchmark tables below predate this transfer change.
+
 ## Windows (Editor/Player)
 
 <!-- RELATIONAL_COMPONENTS_WINDOWS_START -->

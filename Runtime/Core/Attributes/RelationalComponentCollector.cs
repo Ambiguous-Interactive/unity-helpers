@@ -178,9 +178,16 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             private static int Drain(List<TElement> buffer, List<Component> destination)
             {
                 int count = buffer.Count;
-                foreach (TElement component in buffer)
+                if (buffer is List<Component> sameElementTypeBuffer)
                 {
-                    destination.Add(component);
+                    destination.AddRange(sameElementTypeBuffer);
+                }
+                else
+                {
+                    foreach (TElement component in buffer)
+                    {
+                        destination.Add(component);
+                    }
                 }
 
                 return count;
