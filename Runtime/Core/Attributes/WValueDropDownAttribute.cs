@@ -156,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// The inspector queries the provider each time it renders the field, keeping the dropdown synchronised with external data.
         /// </remarks>
         /// <param name="providerType">Type that defines the provider method (static or instance).</param>
-        /// <param name="methodName">Name of the parameterless method that supplies the dropdown values.</param>
+        /// <param name="methodName">Name of the parameterless method that supplies the dropdown values; blank names return no options.</param>
         public WValueDropDownAttribute(Type providerType, string methodName)
         {
             ProviderType = providerType;
@@ -170,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
-            if (string.IsNullOrEmpty(methodName))
+            if (string.IsNullOrWhiteSpace(methodName))
             {
                 Debug.LogWarning($"{AttributeName}: Method name cannot be null or empty.");
                 ValueType = typeof(object);
@@ -245,7 +245,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// Static methods are preferred; if no static method is found, the system falls back to instance method resolution.
         /// </remarks>
         /// <param name="providerType">Type containing the provider method (static or instance).</param>
-        /// <param name="methodName">Parameterless method returning an array or enumerable of values.</param>
+        /// <param name="methodName">Parameterless method returning an array or enumerable of values; blank names return no options.</param>
         /// <param name="valueType">Target value type for the decorated property.</param>
         public WValueDropDownAttribute(Type providerType, string methodName, Type valueType)
         {
@@ -260,7 +260,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
-            if (string.IsNullOrEmpty(methodName))
+            if (string.IsNullOrWhiteSpace(methodName))
             {
                 Debug.LogWarning($"{AttributeName}: Method name cannot be null or empty.");
                 _getOptions = EmptyFactory;
@@ -311,7 +311,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// Uses a method on the decorated object's type to obtain the allowed values.
         /// The method can be instance or static, must be parameterless, and return an array or IEnumerable.
         /// </summary>
-        /// <param name="methodName">Method name declared on the target object's type.</param>
+        /// <param name="methodName">Method name declared on the target object's type; blank names return no options.</param>
         /// <param name="valueType">Target value type for the decorated property.</param>
         public WValueDropDownAttribute(string methodName, Type valueType)
         {
@@ -340,7 +340,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         private static Type InferInstanceMethodValueType(Type providerType, string methodName)
         {
-            if (providerType == null || string.IsNullOrEmpty(methodName))
+            if (providerType == null || string.IsNullOrWhiteSpace(methodName))
             {
                 return null;
             }
@@ -404,7 +404,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             string methodName
         )
         {
-            if (providerType == null || string.IsNullOrEmpty(methodName))
+            if (providerType == null || string.IsNullOrWhiteSpace(methodName))
             {
                 return new MethodValidationResult(false, false, null);
             }

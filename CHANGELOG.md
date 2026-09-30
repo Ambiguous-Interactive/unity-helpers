@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix dropdown providers so blank method names return no options before method discovery ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank animation configuration folders and sprite profile asset paths so they stop before file access or profile matching ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank multi-file selector paths and saved directories, reject blank sprite extension filters, and prevent test run summaries from claiming blank paths ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix the Pool Purging settings foldout so hysteresis and spike threshold stay with the other global options ([#883](https://github.com/Ambiguous-Interactive/unity-helpers/issues/883)).

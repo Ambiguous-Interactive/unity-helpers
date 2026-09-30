@@ -267,6 +267,10 @@ public string difficulty = "Normal";
 
 ### Provider Methods
 
+Null, empty, and whitespace-only method names produce a warning and no options before method
+discovery. Method names are exact identifiers; surrounding whitespace is not trimmed. String option
+values remain literal data, including whitespace-only values and spaces inside labels.
+
 <!-- doc-sample: compiles -->
 
 ```csharp
