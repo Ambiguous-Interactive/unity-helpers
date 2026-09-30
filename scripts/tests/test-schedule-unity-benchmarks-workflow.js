@@ -45,7 +45,9 @@ function event(overrides = {}, repositoryOverrides = {}) {
     repository: "Ambiguous-Interactive/unity-helpers",
     ref: "refs/heads/main",
     ref_protected: true,
-    event: { repository: { fork: false, default_branch: "main", ...repositoryOverrides } },
+    event: {
+      repository: { id: 737391131, fork: false, default_branch: "main", ...repositoryOverrides }
+    },
     ...overrides
   };
 }
@@ -54,32 +56,54 @@ async function runScheduledDispatch(githubEvent, dispatch) {
   if (!evaluate(githubEvent)) {
     return;
   }
+  const [owner, repo] = githubEvent.repository.split("/");
   await new AsyncFunction("github", "context", step.with.script)(
     { rest: { actions: { createWorkflowDispatch: dispatch } } },
-    { repo: { owner: "Ambiguous-Interactive", repo: "unity-helpers" } }
+    { repo: { owner, repo } }
   );
 }
 
 async function main() {
-  let calls = 0;
+  const calls = [];
   const dispatch = async (args) => {
-    calls++;
-    assert.deepEqual(args, {
-      owner: "Ambiguous-Interactive",
-      repo: "unity-helpers",
-      workflow_id: "unity-benchmarks.yml",
-      ref: "main"
-    });
+    calls.push(args);
   };
   await runScheduledDispatch(event(), dispatch);
-  assert.equal(calls, 1, "The scheduled canonical protected branch must dispatch once");
+  assert.deepEqual(
+    calls,
+    [
+      {
+        owner: "Ambiguous-Interactive",
+        repo: "unity-helpers",
+        workflow_id: "unity-benchmarks.yml",
+        ref: "main"
+      }
+    ],
+    "The scheduled canonical protected branch must dispatch once"
+  );
+  await runScheduledDispatch(event({ repository: "new-owner/renamed-package" }), dispatch);
+  assert.deepEqual(
+    calls[1],
+    {
+      owner: "new-owner",
+      repo: "renamed-package",
+      workflow_id: "unity-benchmarks.yml",
+      ref: "main"
+    },
+    "The same repository ID after rename or transfer must dispatch to its current context"
+  );
+  assert.equal(calls.length, 2);
 
   const denied = [
     ["push", event({ event_name: "push" })],
     ["pull request", event({ event_name: "pull_request", ref: "refs/pull/42/merge" })],
     ["manual", event({ event_name: "workflow_dispatch" })],
-    ["other repository", event({ repository: "Ambiguous-Interactive/another-project" })],
-    ["outside fork", event({ repository: "outsider/unity-helpers" }, { fork: true })],
+    [
+      "other repository ID",
+      event({ repository: "Ambiguous-Interactive/another-project" }, { id: 123 })
+    ],
+    ["missing repository ID", event({}, { id: undefined })],
+    ["outside fork", event({ repository: "outsider/unity-helpers" }, { id: 456, fork: true })],
     ["fork flag", event({}, { fork: true })],
     ["changed default branch", event({}, { default_branch: "release" })],
     ["feature branch", event({ ref: "refs/heads/feature" })],
@@ -90,7 +114,7 @@ async function main() {
   for (const [name, input] of denied) {
     assert.equal(evaluate(input), false, `${name} must be denied`);
     await runScheduledDispatch(input, dispatch);
-    assert.equal(calls, 1, `${name} must never call the API`);
+    assert.equal(calls.length, 2, `${name} must never call the API`);
   }
 
   const deniedError = new Error("Dispatch access denied");
@@ -101,7 +125,9 @@ async function main() {
     (error) => error === deniedError,
     "A rejected dispatch must fail the scheduler"
   );
-  console.log("Scheduled benchmark workflow: canonical dispatch and 11 denied inputs passed.");
+  console.log(
+    `Scheduled benchmark workflow: canonical and renamed dispatches and ${denied.length} denied inputs passed.`
+  );
 }
 
 main().catch((error) => {

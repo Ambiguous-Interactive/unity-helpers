@@ -78,13 +78,29 @@ function validateComplete(decision, metrics, provenance) {
     !/^\d+$/.test(String(provenance.runAttempt)) ||
     Number(provenance.runAttempt) < 1 ||
     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(provenance.generatedAt) ||
-    !Number.isFinite(Date.parse(provenance.generatedAt))
+    !Number.isFinite(Date.parse(provenance.generatedAt)) ||
+    typeof provenance.ref !== "string" ||
+    provenance.ref.length === 0 ||
+    /[\x00-\x20\x7f]/.test(provenance.ref)
   ) {
-    throw new Error("Publication requires a run URL, attempt, and UTC publication timestamp.");
+    throw new Error(
+      "Publication requires a run URL, attempt, publication ref, and UTC publication timestamp."
+    );
   }
 }
 
+function encodeSourceSegment(value) {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (character) => "%" + character.charCodeAt(0).toString(16).toUpperCase()
+  );
+}
+
 function renderMeasurements(metrics, provenance, expectedFiles) {
+  const run = new URL(provenance.runUrl);
+  const repository = run.origin + run.pathname.split("/").slice(0, 3).join("/");
+  const publishedRoot =
+    repository + "/blob/" + encodeSourceSegment(provenance.ref) + "/perf-results/";
   return [
     "## Current benchmark measurements",
     "",
@@ -99,8 +115,14 @@ function renderMeasurements(metrics, provenance, expectedFiles) {
     "do not seed the acceptance baseline or establish calibrated optimization acceptance.",
     "",
     "Raw NUnit evidence: " +
-      expectedFiles.map((file) => `[${text(file)}](../../perf-results/${file})`).join(", ") +
+      expectedFiles
+        .map((file) => `[${text(file)}](${publishedRoot}${encodeSourceSegment(file)})`)
+        .join(", ") +
       ".",
+    "",
+    "These repository links resolve the committed rolling evidence on the publication ref,",
+    "after the measurement document and XML are committed together. The measured candidate SHA",
+    "identifies the code under test; the new evidence is published by a later documentation commit.",
     "",
     "<!-- cspell:disable -->",
     "",
@@ -177,9 +199,15 @@ function main(argv) {
   for (let index = 0; index < argv.length; index += 2) {
     const key = argv[index];
     if (
-      !["--decision", "--current", "--document", "--run-url", "--run-attempt", "--commit"].includes(
-        key
-      ) ||
+      ![
+        "--decision",
+        "--current",
+        "--document",
+        "--run-url",
+        "--run-attempt",
+        "--commit",
+        "--ref"
+      ].includes(key) ||
       !argv[index + 1]
     ) {
       throw new Error(`Unknown or incomplete argument: ${key}`);
@@ -196,6 +224,7 @@ function main(argv) {
       runUrl: options["--run-url"],
       runAttempt: options["--run-attempt"],
       commit: options["--commit"],
+      ref: options["--ref"],
       generatedAt: new Date().toISOString()
     }
   });

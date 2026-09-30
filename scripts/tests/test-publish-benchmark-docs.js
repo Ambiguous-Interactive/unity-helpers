@@ -23,6 +23,7 @@ const provenance = {
   commit: "a".repeat(40),
   runUrl: "https://github.com/wallstop/unity-helpers/actions/runs/123",
   runAttempt: "2",
+  ref: "main",
   generatedAt: "2026-09-30T12:00:00.000Z"
 };
 
@@ -68,7 +69,7 @@ test("complete measurements publish all values with provenance while baseline re
     "Single aggregate",
     "Historical results stay intact.",
     "Acceptance policy stays intact.",
-    "../../perf-results/" + file
+    "https://github.com/wallstop/unity-helpers/blob/main/perf-results/" + file
   ]) {
     assert.ok(result.includes(text), text);
   }
@@ -262,12 +263,84 @@ test("generated documentation with literal raw labels stays Prettier clean and l
   assert.ok(enable < content.indexOf(END));
 });
 
+for (const ref of ["main", "benchmark/manual-results"]) {
+  test(`raw evidence resolves the publication repository and ref ${ref}, not the measured candidate SHA`, (context) => {
+    const input = fixture(context);
+    input.provenance = {
+      ...provenance,
+      ref,
+      runUrl: "https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/123"
+    };
+    publish(input);
+    const content = fs.readFileSync(input.document, "utf8");
+    const link =
+      "https://github.com/Ambiguous-Interactive/unity-helpers/blob/" +
+      encodeURIComponent(ref) +
+      "/perf-results/" +
+      file;
+    assert.ok(content.includes(link));
+    assert.ok(!content.includes("/blob/" + provenance.commit));
+    assert.ok(!content.includes("](../../perf-results/"));
+  });
+}
+
+test("publication links encode Markdown delimiters in branch refs and raw evidence filenames", (context) => {
+  const input = fixture(context);
+  const evidence = "results-6000.6.0f1+build(1)-playmode.xml";
+  input.provenance = { ...provenance, ref: "benchmark/results(weekly)" };
+  input.decision.expectedFiles = [evidence];
+  input.decision.actualFiles = [evidence];
+  input.metrics = [{ ...metric, unityVersion: "6000.6.0f1+build(1)" }];
+  publish(input);
+  const content = fs.readFileSync(input.document, "utf8");
+  assert.ok(
+    content.includes(
+      // cspell:disable-next-line
+      "/blob/benchmark%2Fresults%28weekly%29/perf-results/results-6000.6.0f1%2Bbuild%281%29-playmode.xml"
+    )
+  );
+});
+
+test("publication requires a safe explicit ref and preserves documentation when it is absent", (context) => {
+  for (const ref of [undefined, "", "bad\nref"]) {
+    const input = fixture(context);
+    input.provenance = { ...provenance, ref };
+    assert.throws(() => publish(input), /publication ref/);
+    assert.equal(fs.readFileSync(input.document, "utf8"), input.original);
+  }
+});
+
+test("current guide and representative generated report have no repository asset links outside the MkDocs tree", (context) => {
+  const input = fixture(context);
+  const guide = path.join(__dirname, "../../docs/performance/baseline-tests-performance.md");
+  fs.copyFileSync(guide, input.document);
+  publish(input);
+  const content = fs.readFileSync(input.document, "utf8");
+  for (const link of content.matchAll(/\]\(([^)]+)\)/g)) {
+    const destination = link[1];
+    if (/^https?:\/\//.test(destination) || destination.startsWith("#")) {
+      continue;
+    }
+    const resolved = path.resolve(path.dirname(guide), destination.split("#")[0]);
+    const docsRoot = path.resolve(__dirname, "../../docs") + path.sep;
+    assert.ok(resolved.startsWith(docsRoot), destination);
+    assert.ok(fs.existsSync(resolved), destination);
+  }
+  assert.ok(
+    content.includes(
+      "https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/perf-results/baseline.json"
+    )
+  );
+});
+
 test("workflow publishes only complete datasets and commits the generated guide", () => {
   const workflow = fs.readFileSync(
     path.join(__dirname, "../../.github/workflows/unity-benchmarks.yml"),
     "utf8"
   );
   assert.match(workflow, /publish-benchmark-docs\.js/);
+  assert.match(workflow, /BENCHMARK_PUBLICATION_REF: \$\{\{ github\.ref_name \}\}/);
+  assert.ok(workflow.includes('--ref "${BENCHMARK_PUBLICATION_REF}"'));
   assert.match(
     workflow,
     /file_pattern:.*perf-results\/\*\*.*docs\/performance\/baseline-tests-performance\.md/

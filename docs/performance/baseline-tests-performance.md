@@ -33,9 +33,11 @@ are removed and the workflow reports the comparison contract failure after commi
 malformed, duplicate, or mismatched result sets preserve the last complete measurement report.
 
 Each publication records its workflow run and attempt, measured candidate commit, Unity version,
-test mode, and UTC publication time. Single Stopwatch aggregates are labeled recorded values;
+test mode, and UTC publication time. Raw XML links target the same repository and publication
+ref as the run; measurements and evidence are committed together. The candidate SHA identifies
+the measured code, not the later documentation commit. Single Stopwatch aggregates are labeled recorded values;
 reported distributions retain their median and sample count. These current measurements do not
-seed or promote the separate [canonical acceptance baseline](../../perf-results/baseline.json).
+seed or promote the separate [canonical acceptance baseline](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/perf-results/baseline.json).
 
 Benchmarks run weekly on Wednesday at 10:29 UTC through a separate hosted scheduler, which
 requests an eligible dispatch on protected `main`. The scheduler performs no licensed Unity

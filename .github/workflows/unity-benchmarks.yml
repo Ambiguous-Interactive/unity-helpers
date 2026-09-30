@@ -521,6 +521,7 @@ jobs:
           BENCHMARK_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           BENCHMARK_RUN_ATTEMPT: ${{ github.run_attempt }}
           BENCHMARK_COMMIT: ${{ github.sha }}
+          BENCHMARK_PUBLICATION_REF: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -544,7 +545,8 @@ jobs:
             --document docs/performance/baseline-tests-performance.md \
             --run-url "${BENCHMARK_RUN_URL}" \
             --run-attempt "${BENCHMARK_RUN_ATTEMPT}" \
-            --commit "${BENCHMARK_COMMIT}"
+            --commit "${BENCHMARK_COMMIT}" \
+            --ref "${BENCHMARK_PUBLICATION_REF}"
 
       - name: Compute perf deltas vs baseline
         id: perf_deltas

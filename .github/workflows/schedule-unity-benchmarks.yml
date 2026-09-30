@@ -13,9 +13,10 @@ concurrency:
 jobs:
   dispatch:
     name: Dispatch canonical benchmarks
+    # The stable repository ID preserves canonical ownership across renames and transfers.
     if: >-
       ${{ github.event_name == 'schedule' &&
-          github.repository == 'Ambiguous-Interactive/unity-helpers' &&
+          github.event.repository.id == 737391131 &&
           !github.event.repository.fork &&
           github.event.repository.default_branch == 'main' &&
           github.ref == 'refs/heads/main' && github.ref_protected }}
