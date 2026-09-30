@@ -27,6 +27,10 @@ The repository uses git hooks in `.githooks/` as fast last-resort guards. Run
 `npm run agent:preflight:fix` before committing for routine formatting,
 spelling, Markdown, and documentation repairs.
 
+Both preflight modes run the existing changelog semantic check when the root
+[CHANGELOG](../../CHANGELOG.md) changes. This check rejects invalid entries without
+rewriting prose or staging unrelated files.
+
 ### Installation
 
 ```bash

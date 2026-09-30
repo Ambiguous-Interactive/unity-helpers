@@ -85,6 +85,7 @@ function New-TestRepo {
     Copy-Item (Join-Path $repoRoot 'scripts/comment-stripping.ps1') (Join-Path $scriptsDir 'comment-stripping.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/check-eol.ps1') (Join-Path $scriptsDir 'check-eol.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/normalize-eol.ps1') (Join-Path $scriptsDir 'normalize-eol.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/lint-changelog.ps1') (Join-Path $scriptsDir 'lint-changelog.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-cspell-config.js') (Join-Path $scriptsDir 'lint-cspell-config.js') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/validate-lint-error-codes.ps1') (Join-Path $scriptsDir 'validate-lint-error-codes.ps1') -Force
     # configure-git-defaults.ps1 is preserved as a CLI entry point; it also
@@ -861,6 +862,67 @@ MonoImporter:
 }
 finally {
     Remove-Item -Path $repo7 -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "`nTest group: changed changelog semantic validation" -ForegroundColor Magenta
+$changelogPrefix = "# Changelog`n`n## [Unreleased]`n`n### Added`n`n"
+$validChangelog = $changelogPrefix + "- Add a useful feature.`n- Add another useful feature.`n"
+$changelogCases = @(
+    @{ Name = 'BlankBetweenEntries'; Body = $changelogPrefix + "- Add a useful feature.`n`n- Add another useful feature.`n"; ExitCode = 1; Diagnostic = 'Blank line between two entries' },
+    @{ Name = 'LongEntry'; Body = $changelogPrefix + '- Add ' + ('useful ' * 50) + "features.`n"; ExitCode = 1; Diagnostic = 'rendered characters, over the 300 limit' },
+    @{ Name = 'Valid'; Body = $validChangelog; ExitCode = 0; Diagnostic = 'CHANGELOG.md validation passed' },
+    @{ Name = 'UnrelatedMarkdown'; Body = $changelogPrefix + '- Add ' + ('useful ' * 50) + "features.`n"; ExitCode = 0; Diagnostic = $null }
+)
+foreach ($case in $changelogCases) {
+    foreach ($fixMode in @($false, $true)) {
+        $changelogRepo = New-TestRepo -ConfigurePushDefaults
+        try {
+            Add-FakePrettierPackage -RepoPath $changelogRepo
+            Add-FakeMarkdownlintPackage -RepoPath $changelogRepo
+            $changelogPath = Join-Path $changelogRepo 'CHANGELOG.md'
+            $readmePath = Join-Path $changelogRepo 'README.md'
+            $baseline = if ($case.Name -eq 'UnrelatedMarkdown') { $case.Body } else { $changelogPrefix + "- Add the original feature.`n" }
+            [System.IO.File]::WriteAllText($changelogPath, $baseline)
+            [System.IO.File]::WriteAllText($readmePath, "# Fixture`n")
+            Push-Location $changelogRepo
+            try {
+                git add .
+                git -c user.email=test@example.com -c user.name=test commit -q -m 'fixture baseline'
+                if ($case.Name -ne 'UnrelatedMarkdown') {
+                    [System.IO.File]::WriteAllText($changelogPath, $case.Body)
+                }
+                [System.IO.File]::WriteAllText($readmePath, "# Changed fixture`n")
+                git add -- CHANGELOG.md README.md
+                $indexBefore = @(git ls-files --stage)
+            }
+            finally {
+                Pop-Location
+            }
+            $changelogBefore = [System.IO.File]::ReadAllBytes($changelogPath)
+            $arguments = if ($fixMode) { @('-Fix') } else { @() }
+            $result = Invoke-Preflight -RepoPath $changelogRepo -Arguments $arguments
+            $testName = "Changelog$($case.Name)$(if ($fixMode) { 'Fix' } else { 'Check' })"
+            Write-TestResult "${testName}_ExitCode" ($result.ExitCode -eq $case.ExitCode) "Expected exit $($case.ExitCode), got $($result.ExitCode). Output: $($result.Output)"
+            if ($null -ne $case.Diagnostic) {
+                Write-TestResult "${testName}_Diagnostic" ($result.Output -match $case.Diagnostic) "Expected changelog diagnostic '$($case.Diagnostic)'. Output: $($result.Output)"
+            }
+            else {
+                Write-TestResult "${testName}_Skipped" ($result.Output -notmatch '\[changelog-lint\]') "Unchanged CHANGELOG.md must not be linted. Output: $($result.Output)"
+            }
+            Push-Location $changelogRepo
+            try {
+                $indexAfter = @(git ls-files --stage)
+            }
+            finally {
+                Pop-Location
+            }
+            Write-TestResult "${testName}_IndexPreserved" (($indexBefore -join "`n") -ceq ($indexAfter -join "`n")) 'Expected every staged path and blob to be preserved'
+            Write-TestResult "${testName}_ChangelogPreserved" (Test-ByteArrayEqual -Expected $changelogBefore -Actual ([System.IO.File]::ReadAllBytes($changelogPath))) 'Semantic validation must not rewrite changelog prose'
+        }
+        finally {
+            Remove-Item -Path $changelogRepo -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 # Test 8: Changed markdown files should pass when cspell lint succeeds

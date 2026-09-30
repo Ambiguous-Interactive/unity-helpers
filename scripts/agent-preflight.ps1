@@ -2026,6 +2026,15 @@ if ($markdownTargets.Count -gt 0) {
     }
 }
 
+if ($dedupedPaths.Contains('CHANGELOG.md')) {
+    Write-Host '[agent-preflight] Validating changed CHANGELOG.md semantics...' -ForegroundColor Blue
+    & (Join-Path $repoRoot 'scripts/lint-changelog.ps1') -ChangelogPath (Join-Path $repoRoot 'CHANGELOG.md') -VerboseOutput:$VerboseOutput
+    if ($LASTEXITCODE -ne 0) {
+        Write-ErrorMsg 'CHANGELOG.md semantic validation failed. Correct the reported entries and re-run preflight.'
+        $failureCount++
+    }
+}
+
 if ($spellingTargets.Count -gt 0) {
     Write-Host '[agent-preflight] Checking spelling on changed spell-checkable files...' -ForegroundColor Blue
     if (-not $availableNodeTools.ContainsKey('cspell') -or -not $availableNodeTools['cspell']) {
