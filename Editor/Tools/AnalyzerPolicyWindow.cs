@@ -535,13 +535,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private static bool TryGetRoot(XDocument document, out XElement root, out string message)
         {
-            root = document.Root;
+            XElement candidate = document.Root;
             bool valid =
-                root != null
-                && string.Equals(root.Name.LocalName, "RuleSet", StringComparison.Ordinal);
+                candidate != null
+                && string.Equals(candidate.Name.LocalName, "RuleSet", StringComparison.Ordinal);
             message = valid
                 ? null
                 : "The existing ruleset has no valid RuleSet root and was left unchanged.";
+            root = candidate;
             return valid;
         }
 
