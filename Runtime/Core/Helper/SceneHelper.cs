@@ -28,10 +28,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     public static class SceneHelper
     {
         /// <summary>
-        /// Returns true if a scene with the given name or path is currently loaded.
+        /// Returns true if a scene with the given nonblank name or path is currently loaded.
         /// </summary>
         public static bool IsSceneLoaded(string sceneNameOrPath)
         {
+            if (string.IsNullOrWhiteSpace(sceneNameOrPath))
+            {
+                return false;
+            }
+
             for (int i = 0; i < SceneManager.sceneCount; ++i)
             {
                 Scene scene = SceneManager.GetSceneAt(i);
@@ -210,7 +215,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrEmpty(projectRoot))
+            if (string.IsNullOrWhiteSpace(projectRoot))
             {
                 return false;
             }
@@ -234,12 +239,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             private bool _disposed;
 
             /// <summary>
-            /// Creates the scope and ensures the target scene is loaded. If the active scene already matches, no loading occurs.
+            /// Ensures the target scene is loaded; a blank path does nothing and an already active scene needs no loading.
             /// </summary>
             public SceneLoadScope(string scenePath, UnityAction<Scene, LoadSceneMode> onSceneLoaded)
             {
                 _onSceneLoaded = onSceneLoaded;
                 _eventAdded = false;
+                if (string.IsNullOrWhiteSpace(scenePath))
+                {
+                    return;
+                }
+
                 Scene activeScene = SceneManager.GetActiveScene();
                 if (
                     !activeScene.IsValid()

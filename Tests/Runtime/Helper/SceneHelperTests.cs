@@ -61,6 +61,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             return relativePath;
         }
 
+        [TestCase(null, TestName = "LoadedScene.Null.ReturnsFalse")]
+        [TestCase("", TestName = "LoadedScene.Empty.ReturnsFalse")]
+        [TestCase("   ", TestName = "LoadedScene.Spaces.ReturnsFalse")]
+        [TestCase("\t\r\n", TestName = "LoadedScene.ControlWhitespace.ReturnsFalse")]
+        [TestCase("\u2003", TestName = "LoadedScene.UnicodeWhitespace.ReturnsFalse")]
+        public void IsSceneLoadedRejectsBlankNamesAndPaths(string sceneNameOrPath)
+        {
+            Scene unsavedScene = CreateTempScene(
+                nameof(IsSceneLoadedRejectsBlankNamesAndPaths),
+                setActive: false
+            );
+            Assert.AreEqual(string.Empty, unsavedScene.path);
+            Assert.IsTrue(SceneHelper.IsSceneLoaded(unsavedScene.name));
+            Assert.IsFalse(SceneHelper.IsSceneLoaded(sceneNameOrPath));
+        }
+
+        [TestCase(null, TestName = "SceneScope.Null.DoesNothing")]
+        [TestCase("", TestName = "SceneScope.Empty.DoesNothing")]
+        [TestCase("   ", TestName = "SceneScope.Spaces.DoesNothing")]
+        [TestCase("\t\r\n", TestName = "SceneScope.ControlWhitespace.DoesNothing")]
+        [TestCase("\u2003", TestName = "SceneScope.UnicodeWhitespace.DoesNothing")]
+        public void SceneLoadScopeWithBlankPathDoesNothing(string scenePath)
+        {
+            int initialSceneCount = SceneManager.sceneCount;
+            bool callbackInvoked = false;
+            SceneHelper.SceneLoadScope scope = new(
+                scenePath,
+                (scene, mode) => callbackInvoked = true
+            );
+            TrackAsyncDisposal(scope.DisposeAsync);
+            Assert.IsFalse(callbackInvoked);
+            Assert.AreEqual(initialSceneCount, SceneManager.sceneCount);
+            ValueTask disposal = scope.DisposeAsync();
+            Assert.IsTrue(disposal.IsCompletedSuccessfully);
+            Assert.AreEqual(initialSceneCount, SceneManager.sceneCount);
+        }
+
         [Test]
         public void GetScenesInBuild()
         {

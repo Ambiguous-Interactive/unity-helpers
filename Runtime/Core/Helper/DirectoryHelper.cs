@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             // Create the disk folder first to prevent Unity from showing a modal move-failure dialog.
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string absoluteDirectory = null;
-            if (!string.IsNullOrEmpty(projectRoot))
+            if (!string.IsNullOrWhiteSpace(projectRoot))
             {
                 absoluteDirectory = Path.Combine(projectRoot, relativeDirectoryPath);
                 try
@@ -79,7 +79,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             // Import an existing disk folder instead of creating a duplicate asset folder.
             bool directoryExistsOnDisk =
-                !string.IsNullOrEmpty(absoluteDirectory) && Directory.Exists(absoluteDirectory);
+                !string.IsNullOrWhiteSpace(absoluteDirectory)
+                && Directory.Exists(absoluteDirectory);
             if (directoryExistsOnDisk)
             {
                 string parentForRefresh = Path.GetDirectoryName(relativeDirectoryPath)
@@ -263,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             absolutePath = absolutePath.SanitizePath();
 
             string relativePath = AbsoluteToUnityRelativePath(absolutePath);
-            if (!string.IsNullOrEmpty(relativePath))
+            if (!string.IsNullOrWhiteSpace(relativePath))
             {
                 return relativePath;
             }
@@ -309,7 +310,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="relativePath">The path relative to the package root (e.g., "Editor/Styles/MyStyle.uss").</param>
         /// <param name="sourceFilePath">Leave as default to use the calling script's path. This parameter is automatically filled by the compiler.</param>
-        /// <returns>A Unity-loadable path that can be used with <c>AssetDatabase.LoadAssetAtPath</c>.</returns>
+        /// <returns>A Unity-loadable path, or empty when the path cannot be resolved or an external package has a blank ID.</returns>
         public static string ResolvePackageAssetPath(
             string relativePath,
             [CallerFilePath] string sourceFilePath = ""
@@ -324,13 +325,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ? string.Empty
                 : Path.GetDirectoryName(sourceFilePath);
 
-            if (string.IsNullOrEmpty(scriptDirectory))
+            if (string.IsNullOrWhiteSpace(scriptDirectory))
             {
                 return string.Empty;
             }
 
             string packageRootAbsolute = FindPackageRootPath(scriptDirectory);
-            if (string.IsNullOrEmpty(packageRootAbsolute))
+            if (string.IsNullOrWhiteSpace(packageRootAbsolute))
             {
                 return string.Empty;
             }
@@ -353,7 +354,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return projectPath;
             }
 
-            if (string.IsNullOrEmpty(packageId))
+            if (string.IsNullOrWhiteSpace(packageId))
             {
                 return string.Empty;
             }

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add informational `WPROTO048` migration guidance for protobuf-net runtime model registrations, which do not configure generated formatters ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Add `WUH013` coverage for custom collections with public struct enumerators and immediately cached full-sequence bounds, while retaining indexed traversal for mutation and dictionary keys ([#900](https://github.com/Ambiguous-Interactive/unity-helpers/issues/900)).
 - Add a compact UI Toolkit analyzer policy list with search, syntax-highlighted code examples, per-analyzer severity controls, automatic ruleset synchronization, and a Project Settings shortcut ([#883](https://github.com/Ambiguous-Interactive/unity-helpers/issues/883)).
 - Add protobuf support for `Vector4`, `Matrix4x4`, `Keyframe` and `BoneWeight` as roots and members on both serialization routes, including IL2CPP ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix blank scene queries and temporary scene loads, and reject blank external package identifiers when resolving asset paths ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix dropdown providers so blank method names return no options before method discovery ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank animation configuration folders and sprite profile asset paths so they stop before file access or profile matching ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank multi-file selector paths and saved directories, reject blank sprite extension filters, and prevent test run summaries from claiming blank paths ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).

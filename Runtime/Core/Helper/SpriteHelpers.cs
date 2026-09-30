@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
 #if UNITY_EDITOR
             string assetPath = AssetDatabase.GetAssetPath(texture);
-            if (string.IsNullOrEmpty(assetPath))
+            if (string.IsNullOrWhiteSpace(assetPath))
             {
                 texture.LogError($"Failed to get asset path.");
                 return;
