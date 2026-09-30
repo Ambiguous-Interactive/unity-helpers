@@ -48,6 +48,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             ).SetName("ConfigPath.Edge.TrailingBackslash");
             yield return new TestCaseData("", "").SetName("ConfigPath.Edge.EmptyPath");
             yield return new TestCaseData(null, "").SetName("ConfigPath.Edge.NullPath");
+            yield return new TestCaseData(" ", "").SetName("ConfigPath.Edge.SpacePath");
+            yield return new TestCaseData("\t\r\n", "").SetName(
+                "ConfigPath.Edge.ControlWhitespacePath"
+            );
+            yield return new TestCaseData("\u2003\u00a0", "").SetName(
+                "ConfigPath.Edge.UnicodeWhitespacePath"
+            );
+            yield return new TestCaseData(
+                "Assets/My Sprites",
+                "Assets/My Sprites/.animation-creator.json"
+            ).SetName("ConfigPath.Normal.InternalSpaces");
         }
 
         [SetUp]

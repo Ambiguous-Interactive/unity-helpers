@@ -100,10 +100,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// Gets the config file path for a given folder path.
         /// </summary>
         /// <param name="folderPath">The path to the source folder.</param>
-        /// <returns>The config file path within the folder.</returns>
+        /// <returns>The config file path within the folder, or empty for a blank folder path.</returns>
         public static string GetConfigPath(string folderPath)
         {
-            if (string.IsNullOrEmpty(folderPath))
+            if (string.IsNullOrWhiteSpace(folderPath))
             {
                 return string.Empty;
             }

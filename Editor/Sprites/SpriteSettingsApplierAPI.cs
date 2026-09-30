@@ -255,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <summary>
         /// Finds the highest-priority profile matching the asset path.
         /// </summary>
-        /// <param name="assetPath">The asset path to match. Returns null if null/empty.</param>
+        /// <param name="assetPath">The asset path to match. Returns null if null, empty, or whitespace-only.</param>
         /// <param name="prepared">Prepared profiles to search. Returns null if null/empty.</param>
         /// <returns>The matching settings, or null if no match or invalid input.</returns>
         public static SpriteSettings FindMatchingSettings(
@@ -264,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         )
         {
             assetPath = SanitizePath(assetPath);
-            if (string.IsNullOrEmpty(assetPath))
+            if (string.IsNullOrWhiteSpace(assetPath))
             {
                 return null;
             }

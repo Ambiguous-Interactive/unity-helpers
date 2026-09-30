@@ -540,7 +540,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 "asset",
                 "Choose location to save the profiles asset"
             );
-            if (string.IsNullOrEmpty(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return;
             }
@@ -562,7 +562,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 "Assets",
                 "asset"
             );
-            if (string.IsNullOrEmpty(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return;
             }
