@@ -43,6 +43,40 @@ function Write-TestResult {
   }
 }
 
+function Invoke-Gate {
+  param([string]$ScriptPath, [string]$Root, [switch]$Cli)
+
+  if ($Cli) {
+    Push-Location $Root
+    try {
+      $output = & pwsh -NoProfile -File $ScriptPath *>&1
+      return @{ ExitCode = $LASTEXITCODE; Output = ($output | Out-String) }
+    }
+    finally { Pop-Location }
+  }
+
+  $runner = [System.Management.Automation.PowerShell]::Create()
+  try {
+    $null = $runner.AddCommand('Set-Location').AddParameter('LiteralPath', $Root)
+    $null = $runner.AddStatement().AddCommand($ScriptPath)
+    $result = $runner.Invoke()
+    $output = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $result) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+    foreach ($item in $runner.Streams.Warning) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+    if ($runner.Streams.Error.Count -gt 0) {
+      throw "Gate emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+    }
+    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    if ($null -eq $exitCode) {
+      throw "Gate returned without an exit status. $($output -join [Environment]::NewLine)"
+    }
+    return @{ ExitCode = [int]$exitCode; Output = ($output -join [Environment]::NewLine) }
+  }
+  finally { $runner.Dispose() }
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path
 $tempBase = if ($env:TMPDIR) { $env:TMPDIR } elseif ($env:TEMP) { $env:TEMP } else { '/tmp' }
 $scratchRoot = Join-Path $tempBase "test-empty-corpus-gates-$([System.Guid]::NewGuid().ToString('N'))"
@@ -75,17 +109,11 @@ try {
       continue
     }
 
-    $previousLocation = Get-Location
-    try {
-      Set-Location -LiteralPath $scratchRoot
-      $output = & pwsh -NoProfile -File $scriptPath *>&1
-      $exitCode = $LASTEXITCODE
-    }
-    finally {
-      Set-Location -LiteralPath $previousLocation
-    }
-
-    Write-TestResult "$($gate.Name) fails when its corpus is absent" ($exitCode -ne 0) "Expected a non-zero exit with no Runtime/Editor/Tests present. Exit: $exitCode. Output: $($output | Out-String)"
+    $result = Invoke-Gate -ScriptPath $scriptPath -Root $scratchRoot
+    $message = if ($gate.Name -eq 'lint-duplicate-usings') { 'scan found no C# files' } else { 'root not found' }
+    Write-TestResult "$($gate.Name) fails when its corpus is absent" `
+      ($result.ExitCode -eq 1 -and $result.Output.Contains($message)) `
+      "Expected exit 1 and '$message' with no Runtime/Editor/Tests present. Exit: $($result.ExitCode). Output: $($result.Output)"
   }
 
   # audit-license-years.sh derives its corpus from `git ls-files`, so it gets its own shape:
@@ -100,21 +128,50 @@ try {
   finally {
     Set-Location -LiteralPath $previousLocation
   }
-  Write-TestResult 'audit-license-years fails when no .cs files are audited' ($exitCode -ne 0) "Expected a non-zero exit with an empty corpus. Exit: $exitCode. Output: $($output | Out-String)"
+  Write-TestResult 'audit-license-years fails when no .cs files are audited' ($exitCode -eq 1 -and ($output | Out-String).Contains('no .cs files were audited')) "Expected exit 1 with an empty corpus. Exit: $exitCode. Output: $($output | Out-String)"
 
   # dependabot's config is a single file rather than a tree, so it gets its own shape: deleting the
   # config used to skip the schema check and report success.
   $dependabotScript = Join-Path $scratchRoot 'scripts/lint-dependabot.ps1'
-  $previousLocation = Get-Location
-  try {
-    Set-Location -LiteralPath $scratchRoot
-    $output = & pwsh -NoProfile -File $dependabotScript *>&1
-    $exitCode = $LASTEXITCODE
+  $result = Invoke-Gate -ScriptPath $dependabotScript -Root $scratchRoot
+  Write-TestResult 'lint-dependabot fails when the config is absent' `
+    ($result.ExitCode -eq 1 -and $result.Output.Contains('dependabot.yml not found')) `
+    "Expected exit 1 for the absent config. Exit: $($result.ExitCode). Output: $($result.Output)"
+
+  $cliResult = Invoke-Gate -ScriptPath $dependabotScript -Root $scratchRoot -Cli
+  Write-TestResult 'real CLI preserves the missing-config diagnostic and exit' `
+    ($cliResult.ExitCode -eq 1 -and $cliResult.Output.Contains('dependabot.yml not found'))
+
+  $control = Join-Path $scratchRoot 'control.ps1'
+  foreach ($status in @(0, 1, 7)) {
+    Set-Content -LiteralPath $control -Value "Write-Host 'control-$status'; exit $status"
+    $result = Invoke-Gate -ScriptPath $control -Root $scratchRoot
+    Write-TestResult "runspace preserves exit $status and output" `
+      ($result.ExitCode -eq $status -and $result.Output.Contains("control-$status"))
   }
-  finally {
-    Set-Location -LiteralPath $previousLocation
+  $failures = @(
+    @{ Name = 'missing exit status'; Content = "Write-Host 'no-status'"; Message = 'without an exit status' },
+    @{ Name = 'PowerShell error'; Content = "Write-Error 'control-error'; exit 1"; Message = 'PowerShell error' },
+    @{ Name = 'terminating error'; Content = "throw 'control-throw'"; Message = 'control-throw' }
+  )
+  foreach ($failure in $failures) {
+    Set-Content -LiteralPath $control -Value $failure.Content
+    $rejected = $false
+    try { $null = Invoke-Gate -ScriptPath $control -Root $scratchRoot }
+    catch { $rejected = $_.Exception.Message.Contains($failure.Message) }
+    Write-TestResult "runspace rejects $($failure.Name)" $rejected
   }
-  Write-TestResult 'lint-dependabot fails when the config is absent' ($exitCode -ne 0) "Expected a non-zero exit with no .github/dependabot.yml. Exit: $exitCode. Output: $($output | Out-String)"
+  Set-Content -LiteralPath $control -Value "`$global:GateControl = 1; exit 0"
+  $null = Invoke-Gate -ScriptPath $control -Root $scratchRoot
+  Set-Content -LiteralPath $control -Value "if (Get-Variable GateControl -Scope Global -ErrorAction SilentlyContinue) { exit 1 }; exit 0"
+  $result = Invoke-Gate -ScriptPath $control -Root $scratchRoot
+  Write-TestResult 'runspace isolates global state' ($result.ExitCode -eq 0)
+  Set-Content -LiteralPath $control -Value "& git --version | Out-Null"
+  $result = Invoke-Gate -ScriptPath $control -Root $scratchRoot
+  $cliResult = Invoke-Gate -ScriptPath $control -Root $scratchRoot -Cli
+  Write-TestResult 'native implicit success matches the CLI exit status' `
+    ($result.ExitCode -eq 0 -and $cliResult.ExitCode -eq 0)
+
 
   # There is deliberately no green half here. Every one of these gates already runs against the
   # real repository in lint:repo, on every push; repeating those six full-tree scans inside a
