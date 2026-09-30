@@ -403,6 +403,10 @@ Generator~/**/obj/**
 !scripts/random-quality/testu01~/
 !scripts/random-quality/testu01~/**
 
+# Keep reproducible benchmark sources outside Unity's script import.
+!scripts/benchmarks~/
+!scripts/benchmarks~/**
+
 artifacts*/
 artifacts/**
 artifacts.meta

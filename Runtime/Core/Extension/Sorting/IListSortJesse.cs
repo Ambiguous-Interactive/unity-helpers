@@ -8,7 +8,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System;
     using System.Collections.Generic;
-    using System.Runtime.CompilerServices;
     using Utils;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -25,7 +24,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// Adapts Jesse Lew's allocating pipeline at upstream commit
         /// 1bf1f3d5b719c869880d98443050a836a65f47c1. Direct regions use this
-        /// package's IpnSort backend; pile searches use binary search.
+        /// package's IpnSort backend; pile searches use binary search. Values remain
+        /// direct because the upstream compact-index route regressed measured managed workloads.
         /// </remarks>
         public static void JesseSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
@@ -89,21 +89,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            if (32 <= Unsafe.SizeOf<T>() && IsDenseJesseDirectionSwitching(array, count, comparer))
-            {
-                using PooledArray<int> indexLease = SystemArrayPool<int>.Get(
-                    count,
-                    out int[] order
-                );
-                for (int index = 0; index < count; ++index)
-                {
-                    order[index] = index;
-                }
-                JesseIndirectComparer<T, TComparer> indirect = new(array, comparer);
-                JesseSortCore(order, count, indirect);
-                RealizeJessePermutation(array, order, count);
-                return;
-            }
             using PooledResource<List<JesseRun>> runLease = Buffers<JesseRun>.List.Get(
                 out List<JesseRun> runs
             );
@@ -1148,59 +1133,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 && comparer.Compare(leftMinimum, rightMaximum) < 0;
         }
 
-        private static bool IsDenseJesseDirectionSwitching<T, TComparer>(
-            T[] array,
-            int count,
-            TComparer comparer
-        )
-            where TComparer : IComparer<T>
-        {
-            if (count <= 16)
-            {
-                return false;
-            }
-            for (int window = 0; window < 8; ++window)
-            {
-                int begin = (int)(((long)(count - 17) * window) / 7);
-                bool previousDescending = comparer.Compare(array[begin + 1], array[begin]) < 0;
-                int switches = 0;
-                for (int edge = 1; edge < 16; ++edge)
-                {
-                    bool descending =
-                        comparer.Compare(array[begin + edge + 1], array[begin + edge]) < 0;
-                    switches += descending != previousDescending ? 1 : 0;
-                    previousDescending = descending;
-                }
-                if (8 <= switches)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private static void RealizeJessePermutation<T>(T[] array, int[] order, int count)
-        {
-            for (int index = 0; index < count; ++index)
-            {
-                if (order[index] == index)
-                {
-                    continue;
-                }
-                T saved = array[index];
-                int current = index;
-                while (order[current] != index)
-                {
-                    int source = order[current];
-                    array[current] = array[source];
-                    order[current] = current;
-                    current = source;
-                }
-                array[current] = saved;
-                order[current] = current;
-            }
-        }
-
         private static void PrecompactJesseRuns<T, TComparer>(
             T[] array,
             List<JesseRun> runs,
@@ -1299,24 +1231,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             public int Start;
             public int End;
             public bool Descending;
-        }
-
-        private readonly struct JesseIndirectComparer<T, TComparer> : IComparer<int>
-            where TComparer : IComparer<T>
-        {
-            private readonly T[] array;
-            private readonly TComparer comparer;
-
-            public JesseIndirectComparer(T[] array, TComparer comparer)
-            {
-                this.array = array;
-                this.comparer = comparer;
-            }
-
-            public int Compare(int left, int right)
-            {
-                return comparer.Compare(array[left], array[right]);
-            }
         }
     }
 }
