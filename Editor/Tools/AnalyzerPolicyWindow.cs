@@ -563,9 +563,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             if (_codeFont != null)
             {
                 code.style.unityFont = _codeFont;
-#if UNITY_2022_1_OR_NEWER
                 code.style.unityFontDefinition = FontDefinition.FromFont(_codeFont);
-#endif
             }
             scroll.Add(code);
             panel.Add(scroll);
