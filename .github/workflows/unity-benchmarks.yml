@@ -3,10 +3,10 @@ name: Unity Benchmarks
 # cspell:ignore lfs WSL
 
 on:
-  # Enrollment contract: scheduled runs are never an eligible trusted trigger
-  # for licensed Unity work, so the weekly cron was removed. Benchmarks now run
-  # on controlled manual dispatch; refreshed results land via the
-  # protected-branch push of the perf-results commit.
+  # Enrollment contract: direct scheduled runs are not eligible for licensed
+  # Unity work. The separate hosted weekly scheduler requests this controlled
+  # dispatch on protected main; manual dispatch is also available. Complete
+  # measurements and raw evidence are committed after successful execution.
   workflow_dispatch:
 
 # Top-level permissions are least-privilege and mirror unity-tests.yml. The
@@ -286,14 +286,8 @@ jobs:
           label: Benchmarks 6000.6.0f1 playmode
           expected-empty: false
 
-      # Stage the raw NUnit results for this leg into a deterministic path so
-      # the downstream commit job can collect every leg's results via
-      # download-artifact and commit them under perf-results/. We commit
-      # the raw results.xml (the source of truth) rather than a hand-formatted
-      # doc; unity-helpers has no NUnit->markdown perf-doc generator yet (the
-      # human-authored docs under docs/performance/*.md stay hand-maintained).
-      # TODO(unity-helpers): if a perf-doc generator is added, render the
-      # polished table here instead of copying raw XML.
+      # Retain raw NUnit evidence for the downstream publication job. Complete
+      # successful runs also refresh the current measurements in the performance guide.
       - name: Stage perf results for commit
         if: ${{ !cancelled() && steps.run_tests.outcome == 'success' }}
         shell: pwsh
@@ -464,10 +458,10 @@ jobs:
           # meta-file-lint (every tracked docs file/dir requires a .meta) on the
           # next push; perf-results/ sidesteps that entirely.
           dest="perf-results"
-          candidate="$(mktemp -d)"
+          candidate="$(mktemp -d "${RUNNER_TEMP}/perf-candidate.XXXXXX")"
           mkdir -p "${dest}"
           find perf-download -type f -name 'results-*.xml' -exec cp -f {} "${candidate}/" \; 2>/dev/null || true
-          decision="${candidate}/decision.json"
+          decision="${RUNNER_TEMP}/perf-refresh-decision.json"
           node scripts/unity/lib/evaluate-perf-refresh.js \
             --benchmark-result "${BENCHMARKS_RESULT}" \
             --allow-baseline-refresh "${ALLOW_BASELINE_REFRESH}" \
@@ -517,12 +511,16 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      # Dispatch aggregates remain advisory. Baseline promotion requires calibrated
-      # player evidence and an accepted candidate confirmed after merge (#636).
-      - name: Compute perf deltas vs baseline
-        id: perf_deltas
+      # Current measurements are committed; comparisons do not promote the acceptance
+      # baseline. Promotion requires calibrated player evidence and post-merge confirmation.
+      - name: Publish current benchmark measurements
+        id: publish_measurements
         if: ${{ steps.assemble.outputs.complete-matrix == 'true' }}
         shell: bash
+        env:
+          BENCHMARK_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BENCHMARK_RUN_ATTEMPT: ${{ github.run_attempt }}
+          BENCHMARK_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -540,6 +538,24 @@ jobs:
             echo "::error::Benchmark results contained no extractable performance metrics."
             exit 1
           fi
+          node scripts/unity/lib/publish-benchmark-docs.js \
+            --decision "${RUNNER_TEMP}/perf-refresh-decision.json" \
+            --current perf-results/perf-current.json \
+            --document docs/performance/baseline-tests-performance.md \
+            --run-url "${BENCHMARK_RUN_URL}" \
+            --run-attempt "${BENCHMARK_RUN_ATTEMPT}" \
+            --commit "${BENCHMARK_COMMIT}"
+
+      - name: Compute perf deltas vs baseline
+        id: perf_deltas
+        if: ${{ steps.assemble.outputs.complete-matrix == 'true' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f perf-results/perf-current.json' EXIT
+          # A failed comparison cannot leave an older comparison labeled current.
+          rm -f perf-results/perf-deltas.md perf-results/perf-deltas.json
           # render-perf-deltas.js always exits 0 in report-only mode and prints
           # changed=/regressed= on stdout; capture regressed for the annotation.
           render_args=(
@@ -557,8 +573,6 @@ jobs:
           if [ "${regressed}" = "true" ]; then
             echo "::warning::Perf delta computed a significant regression; see perf-results/perf-deltas.md."
           fi
-          # perf-current.json is a transient intermediate; do not commit it.
-          rm -f perf-results/perf-current.json
 
       # git-auto-commit-action is a no-op when there is no diff, so a run that
       # produced no new results does not create an empty commit.
@@ -583,10 +597,19 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d
         with:
           commit_message: "chore(perf): refresh CI perf results [skip ci]"
-          # Commit generated reports and XML; the canonical baseline stays read-only.
+          # Commit current measurement documentation, generated reports, and raw XML.
+          # The canonical acceptance baseline stays read-only.
           # perf-results/** is in .prettierignore and cspell's ignorePaths, so
           # these generated files never trip the prettier/cspell CI checks.
-          file_pattern: perf-results/**
+          file_pattern: perf-results/** docs/performance/baseline-tests-performance.md
           commit_user_name: "github-actions[bot]"
           commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
           commit_author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+
+      - name: Require valid benchmark comparison
+        if: ${{ steps.perf_deltas.outcome == 'failure' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::error::Current measurements were published, but the baseline comparison contract failed."
+          exit 1
