@@ -14,7 +14,8 @@ The compact UI Toolkit list supports searching by diagnostic ID, title, or descr
 focus a policy to see its explanation and syntax-highlighted examples of reported and preferred
 code. Click the policy or press Enter to pin the example card, use **Copy fix** for the preferred
 snippet, and press Escape to dismiss it. Pinned examples stay visible while you search, change
-severities, or use the toolbar; select another policy to replace the pinned example.
+severities, or use the toolbar; select another policy to replace the pinned example. **Unpin** lets
+hovering or focusing another rule change the example again.
 
 The window refreshes `Assets/Default.ruleset` while open and when it gains focus. A severity edit
 re-reads the file before updating only the selected rule, preserving other diagnostics, unknown

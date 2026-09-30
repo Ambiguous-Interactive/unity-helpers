@@ -654,7 +654,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             cardHeight = Mathf.Min(cardHeight, maximumHeight);
             float top;
-            if (_detailsPinned && _detailsAnchor.resolvedStyle.display == DisplayStyle.None)
+            if (_detailsAnchor.resolvedStyle.display == DisplayStyle.None)
             {
                 top = _details.resolvedStyle.top;
             }

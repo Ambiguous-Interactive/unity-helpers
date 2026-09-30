@@ -993,6 +993,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.None));
         }
 
+        [UnityTest]
+        public IEnumerator UnpinnedExamplesRetainPositionWhenTheirAnchorIsFilteredOut()
+        {
+            AnalyzerPolicyWindow window = CreatePolicyWindow();
+            window.position = new Rect(100f, 100f, 750f, 640f);
+            yield return null;
+            yield return null;
+            Button title = window.GetPolicyRow("WUH001").Q<Button>();
+            title.Focus();
+            yield return null;
+            using (
+                KeyDownEvent enter = KeyDownEvent.GetPooled(
+                    new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
+                )
+            )
+            {
+                title.SendEvent(enter);
+            }
+            yield return null;
+            Button pin = window.DetailsCard.Q<Button>();
+            Assert.That(pin.text, Is.EqualTo("Unpin"));
+            ToolbarSearchField search = window.rootVisualElement.Q<ToolbarSearchField>();
+            search.value = "WUH002";
+            yield return null;
+            Assert.That(
+                window.GetPolicyRow("WUH001").style.display.value,
+                Is.EqualTo(DisplayStyle.None)
+            );
+            float cardTop = window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y;
+            pin.Focus();
+            yield return null;
+            Assert.That(
+                window.rootVisualElement.panel.focusController.focusedElement,
+                Is.SameAs(pin)
+            );
+            using (NavigationSubmitEvent unpin = NavigationSubmitEvent.GetPooled())
+            {
+                pin.SendEvent(unpin);
+            }
+            yield return null;
+            Assert.That(pin.text, Is.EqualTo("Pin"));
+            Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(
+                window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y,
+                Is.EqualTo(cardTop).Within(0.5f)
+            );
+            window.position = new Rect(100f, 100f, 760f, 640f);
+            yield return null;
+            yield return null;
+            Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(
+                window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y,
+                Is.EqualTo(cardTop).Within(0.5f)
+            );
+            AssertCardInsideWindow(window);
+        }
+
         [Test]
         public void HeadlessWindowLogHandlingExpectsOnlyKnownErrorsDuringShow()
         {
