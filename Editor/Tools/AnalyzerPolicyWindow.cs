@@ -287,7 +287,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         {
             VisualElement target = eventData.target as VisualElement;
             if (
-                _details != null
+                !_detailsPinned
+                && _details != null
                 && target != null
                 && !_details.Contains(target)
                 && !ReferenceEquals(target, _details)
@@ -652,10 +653,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 cardHeight = maximumHeight;
             }
             cardHeight = Mathf.Min(cardHeight, maximumHeight);
-            float top = _detailsAnchor.worldBound.yMax - rootBounds.y + 3f;
-            if (availableHeight < top + cardHeight + 8f)
+            float top;
+            if (_detailsPinned && _detailsAnchor.resolvedStyle.display == DisplayStyle.None)
             {
-                top = _detailsAnchor.worldBound.y - rootBounds.y - cardHeight - 3f;
+                top = _details.resolvedStyle.top;
+            }
+            else
+            {
+                top = _detailsAnchor.worldBound.yMax - rootBounds.y + 3f;
+                if (availableHeight < top + cardHeight + 8f)
+                {
+                    top = _detailsAnchor.worldBound.y - rootBounds.y - cardHeight - 3f;
+                }
             }
             _details.style.top = Mathf.Clamp(
                 top,
@@ -728,7 +737,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
             }
             _emptyResult.style.display = visible == 0 ? DisplayStyle.Flex : DisplayStyle.None;
-            HideDetails();
+            if (!_detailsPinned)
+            {
+                HideDetails();
+            }
         }
 
         private void RefreshControls()

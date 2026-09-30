@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using UnityEditor;
     using UnityEditor.UIElements;
     using UnityEngine;
+    using UnityEngine.Rendering;
     using UnityEngine.TestTools;
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Editor.Tools;
@@ -19,7 +20,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     [TestFixture]
     public sealed class AnalyzerPolicyWindowTests : CommonTestBase
     {
+        private const string NoGraphicsInitializeMessage =
+            "No graphic device is available to initialize the view.";
+        private const string NoGraphicsShowMessage =
+            "No graphic device is available to show the window.";
         private string _temporaryDirectory;
+
+        private static void ShowWindowWithExpectedGraphicsErrors(Action showWindow, bool headless)
+        {
+            if (headless)
+            {
+                Application.logMessageReceived += ExpectKnownGraphicsError;
+            }
+            try
+            {
+                showWindow();
+            }
+            finally
+            {
+                if (headless)
+                {
+                    Application.logMessageReceived -= ExpectKnownGraphicsError;
+                }
+            }
+        }
+
+        private static void ExpectKnownGraphicsError(
+            string message,
+            string stackTrace,
+            LogType type
+        )
+        {
+            if (
+                type == LogType.Error
+                && (
+                    string.Equals(message, NoGraphicsInitializeMessage, StringComparison.Ordinal)
+                    || string.Equals(message, NoGraphicsShowMessage, StringComparison.Ordinal)
+                )
+            )
+            {
+                LogAssert.Expect(type, message);
+            }
+        }
 
         private static Rect ToolbarContentBounds(ToolbarButton button)
         {
@@ -796,6 +838,187 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             AssertCardInsideWindow(window);
         }
 
+        [UnityTest]
+        public IEnumerator PinnedExamplesSurviveOtherControlsSearchAndResizeUntilExplicitlyDismissed()
+        {
+            AnalyzerPolicyWindow window = CreatePolicyWindow();
+            window.position = new Rect(100f, 100f, 750f, 640f);
+            yield return null;
+            yield return null;
+            Button title = window.GetPolicyRow("WUH001").Q<Button>();
+            title.Focus();
+            yield return null;
+            using (
+                KeyDownEvent enter = KeyDownEvent.GetPooled(
+                    new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
+                )
+            )
+            {
+                title.SendEvent(enter);
+            }
+            yield return null;
+            Assert.That(window.DetailsCard.Q<Button>().text, Is.EqualTo("Unpin"));
+            Toolbar toolbar = window.rootVisualElement.Q<Toolbar>();
+            ToolbarSearchField search = toolbar.Q<ToolbarSearchField>();
+            DropdownField severity = window.GetSeverityField("WUH002");
+            ToolbarButton refresh = toolbar[2] as ToolbarButton;
+            Assert.IsTrue(refresh != null);
+            (VisualElement Target, string Label)[] controls =
+            {
+                (search, "search"),
+                (severity, "severity"),
+                (refresh, "refresh"),
+            };
+            foreach ((VisualElement target, string label) in controls)
+            {
+                using (
+                    PointerDownEvent pointer = PointerDownEvent.GetPooled(
+                        new Event
+                        {
+                            type = EventType.MouseDown,
+                            button = 0,
+                            mousePosition = target.worldBound.center,
+                        }
+                    )
+                )
+                {
+                    target.SendEvent(pointer);
+                }
+                yield return null;
+                Assert.That(
+                    window.DetailsCard.style.display.value,
+                    Is.EqualTo(DisplayStyle.Flex),
+                    "Clicking " + label + " dismissed the pinned card."
+                );
+                Assert.That(window.DetailsCard.Q<Label>().text, Does.Contain("WUH001"));
+                using (
+                    PointerUpEvent pointer = PointerUpEvent.GetPooled(
+                        new Event
+                        {
+                            type = EventType.MouseUp,
+                            button = 0,
+                            mousePosition = target.worldBound.center,
+                        }
+                    )
+                )
+                {
+                    target.SendEvent(pointer);
+                }
+                yield return null;
+            }
+            severity.value = "Error";
+            yield return null;
+            Assert.That(window.GetAction("WUH002"), Is.EqualTo("Error"));
+            refresh.Focus();
+            yield return null;
+            using (NavigationSubmitEvent submit = NavigationSubmitEvent.GetPooled())
+            {
+                refresh.SendEvent(submit);
+            }
+            yield return null;
+            Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Button otherTitle = window.GetPolicyRow("WUH002").Q<Button>();
+            otherTitle.Focus();
+            yield return null;
+            Assert.That(window.DetailsCard.Q<Label>().text, Does.Contain("WUH001"));
+            float pinnedTop =
+                window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y;
+            search.value = "WUH002";
+            yield return null;
+            Assert.That(
+                window.GetPolicyRow("WUH001").style.display.value,
+                Is.EqualTo(DisplayStyle.None)
+            );
+            Assert.That(
+                window.DetailsCard.style.display.value,
+                Is.EqualTo(DisplayStyle.Flex),
+                "Filtering the anchor should keep the pinned reference visible."
+            );
+            window.position = new Rect(100f, 100f, 760f, 640f);
+            yield return null;
+            yield return null;
+            Assert.That(
+                window.DetailsCard.worldBound.y - window.rootVisualElement.worldBound.y,
+                Is.EqualTo(pinnedTop).Within(0.5f),
+                "Resizing after filtering should retain the pinned card position."
+            );
+            AssertCardInsideWindow(window);
+            otherTitle.Focus();
+            yield return null;
+            using (
+                KeyDownEvent replace = KeyDownEvent.GetPooled(
+                    new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
+                )
+            )
+            {
+                otherTitle.SendEvent(replace);
+            }
+            yield return null;
+            Assert.That(window.DetailsCard.Q<Label>().text, Does.Contain("WUH002"));
+            using (
+                KeyDownEvent escape = KeyDownEvent.GetPooled(
+                    new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape }
+                )
+            )
+            {
+                window.rootVisualElement.SendEvent(escape);
+            }
+            yield return null;
+            Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.None));
+            otherTitle.Focus();
+            yield return null;
+            using (
+                KeyDownEvent enter = KeyDownEvent.GetPooled(
+                    new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
+                )
+            )
+            {
+                otherTitle.SendEvent(enter);
+            }
+            yield return null;
+            Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Button close = window.DetailsCard.Query<Button>().ToList()[2];
+            Assert.That(close.text, Is.EqualTo("×"));
+            close.Focus();
+            yield return null;
+            Assert.That(
+                window.rootVisualElement.panel.focusController.focusedElement,
+                Is.SameAs(close)
+            );
+            using (NavigationSubmitEvent dismiss = NavigationSubmitEvent.GetPooled())
+            {
+                close.SendEvent(dismiss);
+            }
+            yield return null;
+            Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [Test]
+        public void HeadlessWindowLogHandlingExpectsOnlyKnownErrorsDuringShow()
+        {
+            const string unrelatedMessage = "Analyzer policy unexpected graphics control error.";
+            bool previousIgnoreFailingMessages = LogAssert.ignoreFailingMessages;
+            ShowWindowWithExpectedGraphicsErrors(
+                () =>
+                {
+                    Debug.LogError(NoGraphicsInitializeMessage);
+                    Debug.LogError(NoGraphicsShowMessage);
+                    Debug.LogError(NoGraphicsInitializeMessage);
+                    LogAssert.NoUnexpectedReceived();
+                    Debug.LogError(unrelatedMessage);
+                    Assert.Catch<Exception>(() => LogAssert.NoUnexpectedReceived());
+                    LogAssert.Expect(LogType.Error, unrelatedMessage);
+                    LogAssert.NoUnexpectedReceived();
+                },
+                headless: true
+            );
+            Assert.That(LogAssert.ignoreFailingMessages, Is.EqualTo(previousIgnoreFailingMessages));
+            Debug.LogError(NoGraphicsInitializeMessage);
+            Assert.Catch<Exception>(() => LogAssert.NoUnexpectedReceived());
+            LogAssert.Expect(LogType.Error, NoGraphicsInitializeMessage);
+            LogAssert.NoUnexpectedReceived();
+        }
+
         private AnalyzerPolicyWindow CreatePolicyWindow()
         {
             AnalyzerPolicyWindow window = Track(
@@ -804,7 +1027,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window.RulesetPathOverride = GetRulesetPath();
             window.RefreshState();
             window.BuildUserInterface();
-            window.Show();
+            ShowWindowWithExpectedGraphicsErrors(
+                window.Show,
+                SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null
+            );
             return window;
         }
 
