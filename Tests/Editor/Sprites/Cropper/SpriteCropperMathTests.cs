@@ -58,6 +58,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.AreEqual(expected, SpriteCropper.ShouldScanPixelsInParallel(width, height));
         }
 
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u2003")]
+        public void BlankExtensionsCannotMatchFilenameSuffixes(string extension)
+        {
+            Assert.That(
+                SpriteFileExtensions.HasAny("Assets/Sprite" + extension, new[] { extension }),
+                Is.False
+            );
+            Assert.That(SpriteFileExtensions.HasAny(extension, new[] { extension }), Is.False);
+            Assert.That(
+                SpriteFileExtensions.HasAny(
+                    "Assets/Sprite with space.PNG",
+                    new[] { extension, ".png" }
+                ),
+                Is.True
+            );
+        }
+
         [Test]
         public void ExtensionMatchingHandlesCaseAndInvalidInputs()
         {

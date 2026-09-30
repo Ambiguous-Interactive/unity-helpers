@@ -10,7 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     {
         internal static bool HasAny(string path, string[] extensions)
         {
-            if (string.IsNullOrEmpty(path) || extensions == null)
+            if (string.IsNullOrWhiteSpace(path) || extensions == null)
             {
                 return false;
             }
@@ -18,7 +18,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             foreach (string extension in extensions)
             {
                 if (
-                    !string.IsNullOrEmpty(extension)
+                    !string.IsNullOrWhiteSpace(extension)
                     && path.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
                 )
                 {

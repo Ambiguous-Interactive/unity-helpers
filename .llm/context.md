@@ -178,6 +178,11 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 
 ## Agent Workflow and CI
 
+Keep the working plan to open actions, dependencies, and acceptance signals; follow
+[maintain-plan](./skills/maintain-plan.md). Route completed work to ignored `progress/` session files
+and reusable guidance to context, skills, or references. Link context instead of copying it into
+the plan; preserve open work when shortening it.
+
 Read [build commands](./references/context-build-commands.md) before running local checks.
 Read [agent operations](./references/context-agent-operations.md) before GitHub, git, or review work.
 Read [CI and test guidance](./references/context-ci-and-testing.md) before validation or pushing.

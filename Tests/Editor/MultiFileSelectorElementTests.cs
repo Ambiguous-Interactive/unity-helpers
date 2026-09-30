@@ -96,6 +96,48 @@ namespace WallstopStudios.UnityHelpers.Tests
             }
         }
 
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u2003")]
+        public void BlankNavigationFallsBackToAssets(string path)
+        {
+            MultiFileSelectorElement selector = new(_baseRel, null);
+
+            Assert.DoesNotThrow(() => selector.ResetAndShow(path));
+            CollectionAssert.Contains(
+                selector.DebugGetVisibleEntryNames(),
+                Path.GetFileName(_baseAbs)
+            );
+            Assert.That(selector.DebugGetSelectedFilePaths(), Is.Empty);
+        }
+
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u2003")]
+        public void BlankPersistedDirectoryKeepsValidInitialDirectory(string path)
+        {
+            EditorPrefs.SetString("WallstopStudios.MultiFileSelector.lastDirectory.DirKey", path);
+
+            MultiFileSelectorElement selector = new(_baseRel + "/DirA", null, "DirKey");
+
+            CollectionAssert.Contains(selector.DebugGetVisibleEntryNames(), "nested.txt");
+        }
+
+        [Test]
+        public void WhitespaceSearchRemainsALiteralFilenameFilter()
+        {
+            File.WriteAllText(Path.Combine(_baseAbs, "with space.txt"), "space");
+            EditorPrefs.SetString("WallstopStudios.MultiFileSelector.lastSearch.TestScope1", " ");
+
+            MultiFileSelectorElement selector = new(_baseRel, null, "TestScope1");
+            IReadOnlyList<string> names = selector.DebugGetVisibleEntryNames();
+
+            CollectionAssert.Contains(names, "with space.txt");
+            CollectionAssert.DoesNotContain(names, "foo.txt");
+        }
+
         [Test]
         public void FolderFirstAndSorting()
         {

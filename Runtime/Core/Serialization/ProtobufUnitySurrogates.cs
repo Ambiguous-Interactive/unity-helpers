@@ -717,6 +717,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #if UNITY_5_3_OR_NEWER
             Register<Vector2, Vector2Surrogate>(model);
             Register<Vector3, Vector3Surrogate>(model);
+            Register<Vector4, Vector4Surrogate>(model);
+            Register<Matrix4x4, Matrix4x4Surrogate>(model);
+            Register<Keyframe, KeyframeSurrogate>(model);
+            Register<BoneWeight, BoneWeightSurrogate>(model);
             Register<Quaternion, QuaternionSurrogate>(model);
             Register<Color, ColorSurrogate>(model);
             Register<Color32, Color32Surrogate>(model);

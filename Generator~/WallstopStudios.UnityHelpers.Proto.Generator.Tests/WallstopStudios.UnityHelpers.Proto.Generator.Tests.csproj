@@ -75,6 +75,10 @@
          retired, and an automatic pass that rewrites an unchanged file forever. -->
     <Compile Include="$(RepoRoot)/Editor/Tools/WProtoSubtypeTagManifestFile.cs" />
     <Compile Include="$(RepoRoot)/Runtime/Core/Helper/PathHelper.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/Vector4Surrogate.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/Matrix4x4Surrogate.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/KeyframeSurrogate.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/BoneWeightSurrogate.cs" />
     <Compile Include="*.cs" />
     <Compile
       Include="$(RepoRoot)/Tests/Core/DictionaryAssertions.cs"

@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         /// <summary>
         /// Creates a new multi-file selector.
         /// </summary>
-        /// <param name="initialPath">Project-relative path (e.g., "Assets/..."). If null or invalid, defaults to Assets.</param>
+        /// <param name="initialPath">Project-relative path (e.g., "Assets/..."). If null, blank, or invalid, defaults to Assets.</param>
         /// <param name="filterExtensions">Allowed file extensions (with or without leading dot). Empty/null means all files.</param>
         /// <param name="persistenceKey">Optional key to persist last directory and search across sessions for this selector. If null or empty, no persistence occurs.</param>
         public MultiFileSelectorElement(
@@ -289,16 +289,16 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             string validInitialPath = initialPath;
 
             string persistedStart = LoadString(ScopedKey(PrefKey_LastDir), null);
-            if (!string.IsNullOrEmpty(persistedStart))
+            if (!string.IsNullOrWhiteSpace(persistedStart))
             {
                 validInitialPath = persistedStart;
             }
-            else if (string.IsNullOrEmpty(validInitialPath))
+            else if (string.IsNullOrWhiteSpace(validInitialPath))
             {
                 validInitialPath = DefaultRootPath;
             }
             if (
-                string.IsNullOrEmpty(validInitialPath)
+                string.IsNullOrWhiteSpace(validInitialPath)
                 || !Directory.Exists(Path.Combine(Application.dataPath, "..", validInitialPath))
             )
             {
@@ -308,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         }
 
         /// <summary>
-        /// Clears selection and navigates to a new starting directory.
+        /// Clears selection and navigates to a new starting directory; blank paths select Assets.
         /// </summary>
         /// <param name="newInitialPath">Project-relative path (e.g., "Assets/...").</param>
         public void ResetAndShow(string newInitialPath)
@@ -343,6 +343,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
         internal void NavigateTo(string path)
         {
+            path = string.IsNullOrWhiteSpace(path) ? DefaultRootPath : path;
             string fullPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", path));
 
             if (!fullPath.StartsWith(_projectRootPath, StringComparison.OrdinalIgnoreCase))
@@ -401,7 +402,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 ? _currentDirectory.Substring(_projectRootPath.Length + 1)
                 : _currentDirectory;
             string dirKey = ScopedKey(PrefKey_LastDir);
-            if (!string.IsNullOrEmpty(rel) && !string.IsNullOrEmpty(dirKey))
+            if (!string.IsNullOrWhiteSpace(rel) && !string.IsNullOrEmpty(dirKey))
             {
                 PersistString(dirKey, rel.SanitizePath());
                 UpdateLastUsedNow();
@@ -456,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
         private void NavigateUp()
         {
-            if (string.IsNullOrEmpty(_currentDirectory))
+            if (string.IsNullOrWhiteSpace(_currentDirectory))
             {
                 return;
             }
@@ -649,7 +650,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 return;
             }
             string path = evt.currentTarget is VisualElement ve ? ve.userData as string : null;
-            if (string.IsNullOrEmpty(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return;
             }
@@ -665,7 +666,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         private void OnToggleChanged(ChangeEvent<bool> evt)
         {
             string filePath = (evt.target as Toggle)?.userData as string;
-            if (string.IsNullOrEmpty(filePath))
+            if (string.IsNullOrWhiteSpace(filePath))
             {
                 return;
             }
@@ -701,7 +702,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
             AddCrumb("Assets", "Assets");
 
-            if (!string.IsNullOrEmpty(rel))
+            if (!string.IsNullOrWhiteSpace(rel))
             {
                 display = rel.SanitizePath();
                 if (display.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))

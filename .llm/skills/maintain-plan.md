@@ -17,7 +17,7 @@ completion will be recognized.
 ## Size Contract
 
 - Hard limit: 150 lines.
-- Target: 100 lines or fewer.
+- Target: 100 lines or fewer; a passing line count alone does not prove the plan is lean.
 - Every addition must remove or replace stale material when needed to stay within the limit.
 - The working plan is gitignored, so run the local check below before handoff; CI cannot enforce it.
 
@@ -60,6 +60,25 @@ Do not duplicate those sources in the working plan; link them.
 
 ---
 
+## Cleanup Without Losing Work
+
+1. Save the original plan and baseline counts in an ignored local `progress/` session file.
+2. Inventory open actions, blockers, dependencies, acceptance conditions, and issue references.
+3. Route completed-work narratives and measurements to the session file. Promote only reusable
+   rules or procedures to context, skills, or references; keep issue-specific facts with the issue.
+4. Rewrite each initiative around its remaining actions. Preserve release, compatibility, owner,
+   and measurement conditions that still constrain those actions. Do not reopen shipped work.
+5. Compare the rewrite with the inventory. Account for every removed issue reference; duplicate
+   or historical references belong in the session record, not the open-work list.
+6. Verify both the size contract and the semantic audit below after formatting. Record the result
+   in the session file; keep audit reports and snapshots out of the working plan.
+
+Use a failing characterization before cleanup and repeat it afterward: count lines and initiatives,
+check for historical narratives, and compare open actions and references. For a prose-only cleanup,
+these checks and documentation linters supply the evidence; a new test framework is unnecessary.
+
+---
+
 ## Task Lifecycle
 
 1. Before work, state a falsifiable baseline or failing characterization in an ignored local note.
@@ -81,6 +100,8 @@ the working plan is a routing failure. Move it; do not summarize it in place.
 ## Audit Questions
 
 - Can someone act on every line now or in a named future phase?
+- Does it describe remaining work, rather than what shipped, what a session found, or benchmark results?
+- Are statuses and priorities preserved without implying unverified issue closures?
 - Is status represented by the presence of open work rather than a history of closed work?
 - Does each task have one observable completion signal?
 - Is detailed context linked instead of copied?

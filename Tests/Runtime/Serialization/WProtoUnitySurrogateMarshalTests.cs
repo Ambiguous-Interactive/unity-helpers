@@ -78,6 +78,104 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     expected.x == actual.x && expected.y == actual.y && expected.z == actual.z
             );
             yield return Case(
+                nameof(Vector4),
+                new Vector4
+                {
+                    x = 1f,
+                    y = 2f,
+                    z = 3f,
+                    w = 4f,
+                },
+                (Vector4 expected, Vector4 actual) =>
+                    expected.x == actual.x
+                    && expected.y == actual.y
+                    && expected.z == actual.z
+                    && expected.w == actual.w
+            );
+            yield return Case(
+                nameof(Matrix4x4),
+                new Matrix4x4
+                {
+                    m00 = 1f,
+                    m10 = 2f,
+                    m20 = 3f,
+                    m30 = 4f,
+                    m01 = 5f,
+                    m11 = 6f,
+                    m21 = 7f,
+                    m31 = 8f,
+                    m02 = 9f,
+                    m12 = 10f,
+                    m22 = 11f,
+                    m32 = 12f,
+                    m03 = 13f,
+                    m13 = 14f,
+                    m23 = 15f,
+                    m33 = 16f,
+                },
+                (Matrix4x4 expected, Matrix4x4 actual) =>
+                    expected.m00 == actual.m00
+                    && expected.m10 == actual.m10
+                    && expected.m20 == actual.m20
+                    && expected.m30 == actual.m30
+                    && expected.m01 == actual.m01
+                    && expected.m11 == actual.m11
+                    && expected.m21 == actual.m21
+                    && expected.m31 == actual.m31
+                    && expected.m02 == actual.m02
+                    && expected.m12 == actual.m12
+                    && expected.m22 == actual.m22
+                    && expected.m32 == actual.m32
+                    && expected.m03 == actual.m03
+                    && expected.m13 == actual.m13
+                    && expected.m23 == actual.m23
+                    && expected.m33 == actual.m33
+            );
+            yield return Case(
+                nameof(Keyframe),
+                new Keyframe
+                {
+                    time = 1f,
+                    value = 2f,
+                    inTangent = 3f,
+                    outTangent = 4f,
+                    inWeight = 5f,
+                    outWeight = 6f,
+                    weightedMode = WeightedMode.Both,
+                },
+                (Keyframe expected, Keyframe actual) =>
+                    expected.time == actual.time
+                    && expected.value == actual.value
+                    && expected.inTangent == actual.inTangent
+                    && expected.outTangent == actual.outTangent
+                    && expected.inWeight == actual.inWeight
+                    && expected.outWeight == actual.outWeight
+                    && expected.weightedMode == actual.weightedMode
+            );
+            yield return Case(
+                nameof(BoneWeight),
+                new BoneWeight
+                {
+                    weight0 = 1f,
+                    weight1 = 2f,
+                    weight2 = 3f,
+                    weight3 = 4f,
+                    boneIndex0 = 5,
+                    boneIndex1 = 6,
+                    boneIndex2 = 7,
+                    boneIndex3 = 8,
+                },
+                (BoneWeight expected, BoneWeight actual) =>
+                    expected.weight0 == actual.weight0
+                    && expected.weight1 == actual.weight1
+                    && expected.weight2 == actual.weight2
+                    && expected.weight3 == actual.weight3
+                    && expected.boneIndex0 == actual.boneIndex0
+                    && expected.boneIndex1 == actual.boneIndex1
+                    && expected.boneIndex2 == actual.boneIndex2
+                    && expected.boneIndex3 == actual.boneIndex3
+            );
+            yield return Case(
                 nameof(Quaternion),
                 new Quaternion(0.125f, 0.25f, 0.5f, 0.75f),
                 (Quaternion expected, Quaternion actual) =>
@@ -213,6 +311,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 name
                     + " serialized to an empty payload, so every member was dropped before a byte "
                     + "was written."
+            );
+
+            Assert.IsTrue(WProtoFacade.TrySerialize(value, out byte[] directBytes));
+            Assert.IsTrue(WProtoFacade.TryDeserialize(directBytes, out T directRestored));
+            Assert.IsTrue(
+                matches(value, directRestored),
+                name + " lost fields through WallstopProto."
             );
 
             T restored = Serializer.ProtoDeserialize<T>(bytes);

@@ -402,12 +402,12 @@ PlayerInfo sliced = Serializer.Deserialize<PlayerInfo>(buffer.AsSpan(0, len).ToA
 ```csharp
 // This package registers protobuf-net surrogates at startup so Unity structs just work in protobuf models.
 // The following Unity types are protobuf-compatible out of the box:
-// - Vector2, Vector3, Vector2Int, Vector3Int
+// - Vector2, Vector3, Vector4, Vector2Int, Vector3Int
 // - Quaternion
 // - Color, Color32
 // - Rect, RectInt
 // - Bounds, BoundsInt
-// - Resolution
+// - Resolution, Matrix4x4, Keyframe, BoneWeight
 // Example: use Vector3 directly in a protobuf-annotated model
 using ProtoBuf;              // protobuf-net
 using UnityEngine;           // Unity types
@@ -438,6 +438,17 @@ constructor. This preserves default payloads and older curves whose coefficients
 zero. New public construction requires representable nonzero coefficients; loading an older payload
 does not make its curve valid for evaluation. Wire encoding still follows protobuf's default-value
 rules, including omission of zero fields.
+
+### Unity surrogate layouts
+
+`Vector4`, `Matrix4x4`, `Keyframe` and `BoneWeight` work as roots and contract members
+on both protobuf routes. Matrix elements use tags 1–16 in column order (`m00`, `m10`,
+`m20`, `m30`, then the next column). Keyframes carry time, value, both tangents, both
+weights and `weightedMode` at tags 1–7; obsolete editor tangent modes are outside this
+wire shape. Bone weights carry weights 0–3 at tags 1–4 and bone indices 0–3 at tags 5–8.
+These layouts match both protobuf-net majors. As with the existing float surrogates,
+protobuf omits zero components, so a negative zero reads as positive zero. Nonzero
+float bit patterns, including NaN payloads and infinities, retain their bits.
 
 ### Checking the surrogates took effect
 

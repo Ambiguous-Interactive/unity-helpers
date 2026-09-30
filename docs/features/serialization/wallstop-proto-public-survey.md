@@ -1,5 +1,11 @@
 # WallstopProto vs. Public Unity protobuf-net Projects
 
+> The figures below preserve the original survey snapshot. The package now ships
+> `Vector4`, `Matrix4x4`, `Keyframe` and `BoneWeight` surrogates on both protobuf routes,
+> closing three surveyed member gaps. Coverage becomes **2,154 / 2,166 (99.45%)**;
+> 12 members still require the changes recorded below. See the
+> [Unity surrogate layouts](./serialization.md#unity-surrogate-layouts).
+
 ## TL;DR
 
 - **2,166 serialized member declarations** were catalogued across four public Unity codebases that
@@ -362,10 +368,10 @@ tracking separately, because neither is a shape question:
    counts only when its namespace also declares `ProtoMemberAttribute`.
 2. **Decide explicitly whether `ImplicitFields` is in scope**, or document that it is not and that a
    port must number the members by hand in declaration order.
-3. **Consider shipping the missing Unity struct surrogates.** `Matrix4x4`, `Keyframe` and
-   `BoneWeight` each cost a member in RTSL, and `Vector4` has a JSON converter but no protobuf
-   surrogate on **either** path — so this is existing protobuf-net parity rather than a WallstopProto
-   regression, and four more surrogate structs would close it.
+3. **Ship the missing Unity struct surrogates — done.** `Vector4`, `Matrix4x4`,
+   `Keyframe` and `BoneWeight` now have shared protobuf-net / WallstopProto shapes and
+   AOT-safe root formatters. Both protobuf-net majors pass byte and cross-read checks;
+   Unity fixtures cover each field conversion and root registration.
 
 ## See Also
 

@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -39,13 +40,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     public sealed class PackageContractShapeTests
     {
         /// <summary>
-        /// Maps each annotated package contract to the stand-in that pins its bytes.
+        /// Maps package contracts to oracle-tested shapes, including directly compiled Unity surrogate shapes.
         /// </summary>
         internal static readonly IReadOnlyDictionary<string, Type> Mirrors = new Dictionary<
             string,
             Type
         >(StringComparer.Ordinal)
         {
+            [nameof(Vector4Surrogate)] = typeof(Vector4Surrogate),
+            [nameof(Matrix4x4Surrogate)] = typeof(Matrix4x4Surrogate),
+            [nameof(KeyframeSurrogate)] = typeof(KeyframeSurrogate),
+            [nameof(BoneWeightSurrogate)] = typeof(BoneWeightSurrogate),
             ["None"] = typeof(NoneShape),
             ["Line2D"] = typeof(LineShape),
             ["Line3D"] = typeof(LineShape),

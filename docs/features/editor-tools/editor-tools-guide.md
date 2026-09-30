@@ -1313,12 +1313,16 @@ public sealed class Turret : MonoBehaviour
 
 Use this window to make the package's compiler guidance explicit for scripts under `Assets`:
 
-- **Enable All** writes every `WUH001` through `WUH018` rule as `Warning`.
+- Each `WUH001` through `WUH019` diagnostic has a **Default**, **Off**, **Info**, **Warning**,
+  **Error**, or **Hidden** selector. Default retains the shipped severity and opt-in behavior.
+- **Enable All** writes every rule as `Warning`.
 - **Disable All** writes every rule as `None`, including diagnostics that are on by default.
-- **Refresh** re-reads `Assets/Default.ruleset` and reports missing, duplicate, mixed, malformed, or
-  unknown Unity Helpers policy entries.
+- The window refreshes external file changes while open and on focus. **Refresh** reads the file
+  immediately; malformed XML or duplicate overrides are reported before editing.
+- `Project Settings > Wallstop Studios > Unity Helpers` also links to the severity window.
 
-The tool preserves rule groups owned by other analyzers. It refuses malformed XML instead of
+Individual severity edits re-read the file and preserve other overrides, unknown rules, includes,
+and rule groups owned by other analyzers. Avoid simultaneous edits from other tools. It refuses malformed XML instead of
 overwriting it. Ruleset writes are staged before replacement, and failures are reported without
 leaving a partly written ruleset. The ruleset is a project file change outside Unity's undo system,
 so commit it when the policy should be shared with the team. The window lists every diagnostic
@@ -1329,7 +1333,9 @@ Editor scripts and batch mode can call `AnalyzerPolicyAPI.TrySetEnabled(true, ou
 to enable all Unity Helpers policies in `Assets/Default.ruleset`, or pass `false` to disable them.
 The overload accepting an asset path manages another `.ruleset` under `Assets`. Both calls import
 the written ruleset immediately and return `false` with a message when the path, ruleset, write, or
-import fails. Ruleset file changes cannot be reversed through Unity Undo.
+import fails. `AnalyzerPolicyAPI.TrySetSeverity("WUH001", "Error", out string message)` updates
+one diagnostic; its asset-path overload supports assembly-specific rulesets managed by Unity.
+The window edits `Assets/Default.ruleset`. Ruleset file changes cannot be reversed through Unity Undo.
 
 ### Unity Method Analyzer
 
@@ -2172,6 +2178,30 @@ Persistence is opt-in per element, via a `persistenceKey`. Stored scopes are man
 `Tools > Wallstop Studios > Unity Helpers > Multi-File Selector Persistence`, which can
 **Run Cleanup Now** or drop scopes unused for more than **Max age (days)** (default `30`) on editor
 startup.
+
+Blank initial or reset paths select `Assets`. A blank saved directory is ignored so a valid supplied
+starting directory still wins. Paths containing spaces remain valid; the guard only treats an
+entirely whitespace value as absent. Search text is a literal filename substring: searching for a
+space still finds filenames containing a space.
+
+The whitespace audit distinguishes input contracts rather than replacing every empty check:
+
+| Input                                                        | Whitespace policy                                                                                    |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Selector initial, saved, reset, and clicked paths            | Blank paths are absent; embedded spaces are preserved.                                               |
+| Sprite file extension filters                                | Blank extension entries are ignored; ordinary matching stays case-insensitive.                       |
+| Test run summary and competing summary paths                 | Blank paths never open or claim a file.                                                              |
+| Selector search text                                         | Whitespace is literal filename data.                                                                 |
+| Selector persistence keys and ownership tokens               | Exact identifiers retain their existing null/empty contract.                                         |
+| `StringExtensions` input, separators, and truncation markers | Whitespace is string content or formatting, so null/empty checks remain.                             |
+| Effect tags in `TagHandler` and `AttributeEffect`            | Tags are exact ordinal keys, including whitespace.                                                   |
+| `DurableFile` text contents                                  | Whitespace is written; only null/empty append contents are a no-op.                                  |
+| `WShowIfComparison.IsNullOrEmpty`                            | The named comparison tests null/empty, including empty collections; whitespace strings are nonempty. |
+
+These classifications cover the reviewed contracts above. The wider Runtime/Editor audit in
+[#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867) remains open for other
+paths, labels, member identifiers, and serialized values. A blanket lint rule would erase these
+valid differences; future enforcement needs contract-specific scope and positive controls.
 
 There is a runnable example in the `UI Toolkit - MultiFile Selector (Editor)` sample, importable from
 the Package Manager.

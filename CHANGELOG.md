@@ -11,11 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add per-analyzer severity controls with automatic ruleset synchronization and a Project Settings shortcut ([#883](https://github.com/Ambiguous-Interactive/unity-helpers/issues/883)).
+- Add protobuf support for `Vector4`, `Matrix4x4`, `Keyframe` and `BoneWeight` as roots and members on both serialization routes, including IL2CPP ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Add opt-in `WUH019` to suggest caching stable loop bounds while keeping live bounds for changing collections ([#894](https://github.com/Ambiguous-Interactive/unity-helpers/issues/894)).
 - Add cached read-only enum values and an ordinal enum-name comparer for allocation-free iteration and warmed name ordering ([#889](https://github.com/Ambiguous-Interactive/unity-helpers/issues/889)).
 
 ### Fixed
 
+- Fix blank multi-file selector paths and saved directories, reject blank sprite extension filters, and prevent test run summaries from claiming blank paths ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix the Pool Purging settings foldout so hysteresis and spike threshold stay with the other global options ([#883](https://github.com/Ambiguous-Interactive/unity-helpers/issues/883)).
 - Fix disposal lease slot growth when a lease is acquired on one thread and disposed on another ([#888](https://github.com/Ambiguous-Interactive/unity-helpers/issues/888)).
 - Fix sprite pixel helpers for readable compressed textures and avoid reading a full atlas when extracting one sprite ([#886](https://github.com/Ambiguous-Interactive/unity-helpers/issues/886)).

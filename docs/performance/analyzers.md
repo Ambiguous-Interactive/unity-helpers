@@ -4,11 +4,22 @@ Unity Helpers ships a Roslyn analyzer that reports footguns in code that already
 the most part, already works. It runs on your code as well as the package's, because the shapes it
 finds are not specific to either.
 
-Open `Tools > Wallstop Studios > Unity Helpers > Analyzer Policies` to inspect the complete policy
-set and enable or disable it for user code. The window manages only the Unity Helpers block in
-`Assets/Default.ruleset`, preserves unrelated analyzer configuration, and reports configuration
-drift before repairing it. Editor scripts can call `AnalyzerPolicyAPI.TrySetEnabled` with an
-explicit enabled state and optional `.ruleset` asset path for the same prompt-free operation.
+Open `Tools > Wallstop Studios > Unity Helpers > Analyzer Policies`, or select **Configure Analyzer
+Severities** in `Project Settings > Wallstop Studios > Unity Helpers`. Each diagnostic has a severity
+selector: **Default**, **Off**, **Info**, **Warning**, **Error**, or **Hidden**. Default keeps the
+analyzer's shipped behavior, including the four opt-in policies. Enable All and Disable All still
+apply Warning or Off across the catalog.
+
+The window refreshes `Assets/Default.ruleset` while open and when it gains focus. A severity edit
+re-reads the file before updating only the selected rule, preserving other diagnostics, unknown
+rules, includes, and unrelated analyzer groups. Malformed XML and duplicate overrides for the
+selected diagnostic are refused without changing the file. These project file writes are outside
+Unity Undo; use version control to revert them. Avoid simultaneous writes from other tools.
+
+Editor scripts can call `AnalyzerPolicyAPI.TrySetEnabled`, or `AnalyzerPolicyAPI.TrySetSeverity`
+with a diagnostic ID and ruleset action (`Default`, `None`, `Info`, `Warning`, `Error`, or `Hidden`).
+Both support an explicit `.ruleset` asset path for assembly-specific rulesets managed by Unity;
+the window edits the project-wide default ruleset. Writes import the asset immediately.
 
 | Id                                                                       | Reports                                                               |
 | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
@@ -38,14 +49,20 @@ different policy on purpose:
 |                     | `WPROTO###`                                                  | `WUH###`                                              |
 | ------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
 | Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code              |
-| Severity            | Error: the alternative is an exception from a shipped player | **Warning, always**                                   |
-| Can fail your build | Yes, and it should                                           | **No**                                                |
+| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported       |
+| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                |
 | Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, and `WUH019` |
 
-**A `WUH###` diagnostic will never fail your build.** Taking a package upgrade cannot turn a green
-build red over one of these. If your project treats warnings as errors, see
+**A `WUH###` diagnostic defaults to a warning.** Taking a package upgrade does not promote it to
+a build error; an explicit Error override does. If your project treats warnings as errors, see
 [Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, and `WUH019` go further and are off until you ask for them, because
 their shapes are correct code far more often than they are defects.
+
+The policy list now offers a severity selector beside each diagnostic:
+
+| Previous policy list                                                                  | Individual severity controls                                                              |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| ![Previous analyzer policy list](../images/editor-tools/analyzer-policies-before.png) | ![Analyzer policy severity selectors](../images/editor-tools/analyzer-policies-after.png) |
 
 ## `WUH001`: a lookup factory passed as a method group
 

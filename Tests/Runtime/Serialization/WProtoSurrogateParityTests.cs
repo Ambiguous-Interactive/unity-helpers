@@ -52,6 +52,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             typeof(Vector2),
             typeof(Vector3),
+            typeof(Vector4),
+            typeof(Matrix4x4),
+            typeof(Keyframe),
+            typeof(BoneWeight),
             typeof(Quaternion),
             typeof(Color),
             typeof(Color32),
@@ -98,6 +102,124 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 new Vector3(1f, -2f, 3.5f),
                 default,
                 new Vector3(float.NegativeInfinity, 0f, float.Epsilon)
+            );
+            AssertParity(
+                mismatches,
+                mode,
+                (Vector4 value) => (Vector4Surrogate)value,
+                new Vector4
+                {
+                    x = 1f,
+                    y = 2f,
+                    z = 3f,
+                    w = 4f,
+                },
+                default,
+                new Vector4
+                {
+                    x = float.NaN,
+                    y = float.PositiveInfinity,
+                    z = float.NegativeInfinity,
+                    w = float.Epsilon,
+                }
+            );
+            AssertParity(
+                mismatches,
+                mode,
+                (Matrix4x4 value) => (Matrix4x4Surrogate)value,
+                new Matrix4x4
+                {
+                    m00 = 1f,
+                    m10 = 2f,
+                    m20 = 3f,
+                    m30 = 4f,
+                    m01 = 5f,
+                    m11 = 6f,
+                    m21 = 7f,
+                    m31 = 8f,
+                    m02 = 9f,
+                    m12 = 10f,
+                    m22 = 11f,
+                    m32 = 12f,
+                    m03 = 13f,
+                    m13 = 14f,
+                    m23 = 15f,
+                    m33 = 16f,
+                },
+                default,
+                new Matrix4x4
+                {
+                    m00 = float.NaN,
+                    m10 = float.PositiveInfinity,
+                    m20 = float.NegativeInfinity,
+                    m30 = float.Epsilon,
+                    m01 = float.MaxValue,
+                    m11 = float.MinValue,
+                    m21 = BitConverter.Int32BitsToSingle(int.MinValue),
+                    m31 = float.NaN,
+                    m02 = float.PositiveInfinity,
+                    m12 = float.NegativeInfinity,
+                    m22 = float.Epsilon,
+                    m32 = float.MaxValue,
+                    m03 = float.MinValue,
+                    m13 = BitConverter.Int32BitsToSingle(int.MinValue),
+                    m23 = float.NaN,
+                    m33 = float.PositiveInfinity,
+                }
+            );
+            AssertParity(
+                mismatches,
+                mode,
+                (Keyframe value) => (KeyframeSurrogate)value,
+                new Keyframe
+                {
+                    time = 1f,
+                    value = 2f,
+                    inTangent = 3f,
+                    outTangent = 4f,
+                    inWeight = 5f,
+                    outWeight = 6f,
+                    weightedMode = WeightedMode.Both,
+                },
+                default,
+                new Keyframe
+                {
+                    time = float.NaN,
+                    value = float.PositiveInfinity,
+                    inTangent = float.NegativeInfinity,
+                    outTangent = float.Epsilon,
+                    inWeight = float.MaxValue,
+                    outWeight = float.MinValue,
+                    weightedMode = WeightedMode.In,
+                }
+            );
+            AssertParity(
+                mismatches,
+                mode,
+                (BoneWeight value) => (BoneWeightSurrogate)value,
+                new BoneWeight
+                {
+                    weight0 = 1f,
+                    weight1 = 2f,
+                    weight2 = 3f,
+                    weight3 = 4f,
+                    boneIndex0 = 5,
+                    boneIndex1 = 6,
+                    boneIndex2 = 7,
+                    boneIndex3 = 8,
+                },
+                default,
+                new BoneWeight
+                {
+                    weight0 = float.NaN,
+                    weight1 = float.PositiveInfinity,
+                    weight2 = float.NegativeInfinity,
+                    weight3 = float.Epsilon,
+                    boneIndex0 = int.MaxValue,
+                    boneIndex1 = int.MinValue,
+                    boneIndex2 = int.MaxValue,
+                    boneIndex3 = int.MinValue,
+                }
             );
             AssertParity(
                 mismatches,

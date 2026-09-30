@@ -2458,6 +2458,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     );
                     serializedSettings.UpdateIfRequiredOrScript();
 
+                    EditorGUILayout.LabelField("Analyzer Policies", EditorStyles.boldLabel);
+                    if (GUILayout.Button("Configure Analyzer Severities"))
+                    {
+                        WallstopStudios.UnityHelpers.Editor.Tools.AnalyzerPolicyWindow.ShowWindow();
+                    }
+                    EditorGUILayout.Space();
+
                     bool dataChanged = false;
                     bool palettePropertyChanged = false;
 
@@ -3747,6 +3754,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 },
                 keywords = new[]
                 {
+                    "Analyzer",
+                    "Severity",
+                    "Ruleset",
                     "StringInList",
                     "Pagination",
                     "SerializableSet",

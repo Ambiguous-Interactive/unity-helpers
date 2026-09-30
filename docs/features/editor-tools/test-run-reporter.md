@@ -35,6 +35,9 @@ enabled first.
 
 ## Where the summary files live
 
+Summary file operations reject null, empty, and entirely whitespace paths before claiming or
+opening a file. Paths containing spaces remain valid.
+
 | Mode     | Path                                                 |
 | -------- | ---------------------------------------------------- |
 | EditMode | `<project>/Temp/unity-helpers-test-run-editmode.txt` |

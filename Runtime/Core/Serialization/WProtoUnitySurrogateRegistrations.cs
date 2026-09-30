@@ -11,6 +11,10 @@ using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 #if UNITY_5_3_OR_NEWER
 [assembly: WProtoSurrogate(typeof(UnityEngine.Vector2), typeof(Vector2Surrogate))]
 [assembly: WProtoSurrogate(typeof(UnityEngine.Vector3), typeof(Vector3Surrogate))]
+[assembly: WProtoSurrogate(typeof(UnityEngine.Vector4), typeof(Vector4Surrogate))]
+[assembly: WProtoSurrogate(typeof(UnityEngine.Matrix4x4), typeof(Matrix4x4Surrogate))]
+[assembly: WProtoSurrogate(typeof(UnityEngine.Keyframe), typeof(KeyframeSurrogate))]
+[assembly: WProtoSurrogate(typeof(UnityEngine.BoneWeight), typeof(BoneWeightSurrogate))]
 [assembly: WProtoSurrogate(typeof(UnityEngine.Quaternion), typeof(QuaternionSurrogate))]
 [assembly: WProtoSurrogate(typeof(UnityEngine.Color), typeof(ColorSurrogate))]
 [assembly: WProtoSurrogate(typeof(UnityEngine.Color32), typeof(Color32Surrogate))]
@@ -36,6 +40,10 @@ using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 #if UNITY_5_3_OR_NEWER
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Vector2), typeof(Vector2MarshalFormatter))]
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Vector3), typeof(Vector3MarshalFormatter))]
+[assembly: WProtoRootMarshal(typeof(UnityEngine.Vector4), typeof(Vector4MarshalFormatter))]
+[assembly: WProtoRootMarshal(typeof(UnityEngine.Matrix4x4), typeof(Matrix4x4MarshalFormatter))]
+[assembly: WProtoRootMarshal(typeof(UnityEngine.Keyframe), typeof(KeyframeMarshalFormatter))]
+[assembly: WProtoRootMarshal(typeof(UnityEngine.BoneWeight), typeof(BoneWeightMarshalFormatter))]
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Quaternion), typeof(QuaternionMarshalFormatter))]
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Color), typeof(ColorMarshalFormatter))]
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Color32), typeof(Color32MarshalFormatter))]

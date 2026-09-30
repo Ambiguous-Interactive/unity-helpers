@@ -49,6 +49,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             base.TearDown();
         }
 
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u2003")]
+        public void BlankSummaryPathsAreRefusedBeforeClaimingAFile(string path)
+        {
+            bool claimed = false;
+            TestRunSummaryFile.AfterBeginClaimForTests = () => claimed = true;
+
+            Assert.That(
+                TestRunSummaryFile.TryBeginRun(
+                    path,
+                    TestMode.EditMode,
+                    StartedUtc,
+                    out string owner
+                ),
+                Is.False
+            );
+            Assert.That(owner, Is.Empty);
+            Assert.That(claimed, Is.False);
+            Assert.That(TestRunSummaryFile.IsMarkedRunning(path), Is.False);
+            Assert.That(TestRunSummaryFile.TryReadOwner(path, out string readOwner), Is.False);
+            Assert.That(readOwner, Is.Empty);
+            Assert.That(
+                TestRunSummaryFile.TryReadStartedUtc(path, out DateTime startedUtc),
+                Is.False
+            );
+            Assert.That(startedUtc, Is.EqualTo(default(DateTime)));
+            Assert.That(
+                TestRunSummaryFile.TryFinishRun(
+                    path,
+                    nameof(owner),
+                    TestMode.EditMode,
+                    FinishedUtc,
+                    null
+                ),
+                Is.False
+            );
+            Assert.That(TestRunSummaryFile.TryDiscardRun(path, nameof(owner)), Is.False);
+        }
+
         [Test]
         public void EditModeAndPlayModeResolveToDifferentPathsUnderTemp()
         {

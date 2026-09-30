@@ -122,6 +122,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <summary>Enables or disables every Unity Helpers analyzer in an asset ruleset.</summary>
         public static bool TrySetEnabled(string rulesetAssetPath, bool enabled, out string message)
         {
+            return TrySetPolicy(rulesetAssetPath, enabled, null, null, out message);
+        }
+
+        /// <summary>Sets one analyzer's ruleset action to Default, None, Info, Warning, Error, or Hidden.</summary>
+        public static bool TrySetSeverity(string diagnosticId, string action, out string message)
+        {
+            return TrySetSeverity(DefaultRulesetAssetPath, diagnosticId, action, out message);
+        }
+
+        /// <summary>Sets one analyzer's severity in an asset ruleset, preserving other rules.</summary>
+        public static bool TrySetSeverity(
+            string rulesetAssetPath,
+            string diagnosticId,
+            string action,
+            out string message
+        )
+        {
+            if (string.IsNullOrWhiteSpace(diagnosticId))
+            {
+                message = "A Unity Helpers analyzer diagnostic ID is required.";
+                return false;
+            }
+            return TrySetPolicy(rulesetAssetPath, false, diagnosticId, action, out message);
+        }
+
+        private static bool TrySetPolicy(
+            string rulesetAssetPath,
+            bool enabled,
+            string diagnosticId,
+            string action,
+            out string message
+        )
+        {
             string normalizedPath = rulesetAssetPath?.Replace('\\', '/');
             if (
                 string.IsNullOrWhiteSpace(normalizedPath)
@@ -198,7 +231,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 : AnalyzerPolicyState.Disabled;
             try
             {
-                if (!AnalyzerPolicyRuleset.TryWrite(fullPath, state, Policies, out message))
+                bool written =
+                    diagnosticId == null
+                        ? AnalyzerPolicyRuleset.TryWrite(fullPath, state, Policies, out message)
+                        : AnalyzerPolicyRuleset.TryWriteSeverity(
+                            fullPath,
+                            diagnosticId,
+                            action,
+                            Policies,
+                            out message
+                        );
+                if (!written)
                 {
                     return false;
                 }

@@ -79,11 +79,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <summary>
         ///     Reports whether the file at the given path is currently claimed by a run in flight.
         /// </summary>
-        /// <param name="summaryPath">The summary path to inspect.</param>
+        /// <param name="summaryPath">The nonblank summary path to inspect.</param>
         /// <returns><c>true</c> when the file exists and its first line carries the running marker.</returns>
         internal static bool IsMarkedRunning(string summaryPath)
         {
-            if (string.IsNullOrEmpty(summaryPath))
+            if (string.IsNullOrWhiteSpace(summaryPath))
             {
                 return false;
             }
@@ -107,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         ///     Claims the summary file for a new run by writing the running marker, refusing when a
         ///     run already holds it.
         /// </summary>
-        /// <param name="summaryPath">The summary path to claim.</param>
+        /// <param name="summaryPath">The nonblank summary path to claim.</param>
         /// <param name="mode">The test mode the run covers.</param>
         /// <param name="startedUtc">When the run is starting.</param>
         /// <param name="owner">The unique token required to finish or discard this run.</param>
@@ -120,7 +120,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             string competingSummaryPath = null
         )
         {
-            if (string.IsNullOrEmpty(summaryPath))
+            if (string.IsNullOrWhiteSpace(summaryPath))
             {
                 owner = string.Empty;
                 return false;
@@ -129,7 +129,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             try
             {
                 string directory = Path.GetDirectoryName(summaryPath);
-                if (!string.IsNullOrEmpty(directory))
+                if (!string.IsNullOrWhiteSpace(directory))
                 {
                     Directory.CreateDirectory(directory);
                 }
@@ -139,7 +139,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 if (
                     IsMarkedRunning(summaryPath)
                     || (
-                        !string.IsNullOrEmpty(competingSummaryPath)
+                        !string.IsNullOrWhiteSpace(competingSummaryPath)
                         && IsMarkedRunning(competingSummaryPath)
                     )
                 )
@@ -173,7 +173,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <summary>
         ///     Replaces the running marker with the completed summary for a result tree.
         /// </summary>
-        /// <param name="summaryPath">The summary path to finish.</param>
+        /// <param name="summaryPath">The nonblank summary path to finish.</param>
         /// <param name="owner">The ownership token returned when this run began.</param>
         /// <param name="mode">The test mode the run covered.</param>
         /// <param name="finishedUtc">When the run finished.</param>
@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             TestRunResultNode root
         )
         {
-            if (string.IsNullOrEmpty(summaryPath) || string.IsNullOrEmpty(owner))
+            if (string.IsNullOrWhiteSpace(summaryPath) || string.IsNullOrEmpty(owner))
             {
                 return false;
             }
@@ -195,7 +195,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             try
             {
                 string directory = Path.GetDirectoryName(summaryPath);
-                if (!string.IsNullOrEmpty(directory))
+                if (!string.IsNullOrWhiteSpace(directory))
                 {
                     Directory.CreateDirectory(directory);
                 }
@@ -231,12 +231,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <summary>
         ///     Reads back when the run holding the summary file started.
         /// </summary>
-        /// <param name="summaryPath">The summary path to inspect.</param>
+        /// <param name="summaryPath">The nonblank summary path to inspect.</param>
         /// <param name="startedUtc">The parsed timestamp, in UTC.</param>
         /// <returns><c>true</c> when the file's first line carried a parseable timestamp.</returns>
         internal static bool TryReadStartedUtc(string summaryPath, out DateTime startedUtc)
         {
-            if (string.IsNullOrEmpty(summaryPath))
+            if (string.IsNullOrWhiteSpace(summaryPath))
             {
                 startedUtc = default;
                 return false;
@@ -262,12 +262,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <summary>
         ///     Reads the owner of an in-flight summary marker.
         /// </summary>
-        /// <param name="summaryPath">The summary path to inspect.</param>
+        /// <param name="summaryPath">The nonblank summary path to inspect.</param>
         /// <param name="owner">The ownership token, empty when no running marker owns the file.</param>
         /// <returns><c>true</c> when the first line is a running marker with an owner.</returns>
         internal static bool TryReadOwner(string summaryPath, out string owner)
         {
-            if (string.IsNullOrEmpty(summaryPath))
+            if (string.IsNullOrWhiteSpace(summaryPath))
             {
                 owner = string.Empty;
                 return false;
@@ -293,12 +293,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <summary>
         ///     Releases the summary file without writing a summary, for a run that never started.
         /// </summary>
-        /// <param name="summaryPath">The summary path to release.</param>
+        /// <param name="summaryPath">The nonblank summary path to release.</param>
         /// <param name="owner">The ownership token returned when this run began.</param>
         /// <returns><c>true</c> when the file is gone afterwards.</returns>
         internal static bool TryDiscardRun(string summaryPath, string owner)
         {
-            if (string.IsNullOrEmpty(summaryPath) || string.IsNullOrEmpty(owner))
+            if (string.IsNullOrWhiteSpace(summaryPath) || string.IsNullOrEmpty(owner))
             {
                 return false;
             }
@@ -336,7 +336,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private static FileStream OpenBeginClaim(string summaryPath, string competingSummaryPath)
         {
-            if (string.IsNullOrEmpty(competingSummaryPath))
+            if (string.IsNullOrWhiteSpace(competingSummaryPath))
             {
                 return OpenClaim(summaryPath);
             }

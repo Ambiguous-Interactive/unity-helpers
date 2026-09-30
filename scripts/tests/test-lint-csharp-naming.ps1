@@ -102,16 +102,39 @@ function Add-FixtureFile {
 }
 
 function Invoke-LintInFixture {
-    param([string]$FixtureRoot)
+    param([string]$FixtureRoot, [switch]$Cli)
     $lintCopy = Join-Path $FixtureRoot 'scripts/lint-csharp-naming.ps1'
-    Push-Location $FixtureRoot
-    try {
-        $output = & pwsh -NoProfile -File $lintCopy *>&1
-        $exitCode = $LASTEXITCODE
-    } finally {
-        Pop-Location
+    if ($Cli) {
+        Push-Location $FixtureRoot
+        try {
+            $output = & pwsh -NoProfile -File $lintCopy *>&1
+            return @{ ExitCode = $LASTEXITCODE; Output = ($output | Out-String) }
+        } finally {
+            Pop-Location
+        }
     }
-    return @{ ExitCode = $exitCode; Output = ($output | Out-String) }
+
+    $runner = [System.Management.Automation.PowerShell]::Create()
+    try {
+        $null = $runner.AddCommand('Set-Location').AddParameter('LiteralPath', $FixtureRoot)
+        $null = $runner.AddStatement().AddCommand($lintCopy)
+        $result = $runner.Invoke()
+        $output = [System.Collections.Generic.List[string]]::new()
+        foreach ($item in $result) { $output.Add($item.ToString()) }
+        foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+        foreach ($item in $runner.Streams.Warning) { $output.Add($item.ToString()) }
+        foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+        if ($runner.Streams.Error.Count -gt 0) {
+            throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+        }
+        $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+        if ($null -eq $exitCode) {
+            throw "Linter returned without an exit status. $($output -join [Environment]::NewLine)"
+        }
+        return @{ ExitCode = [int]$exitCode; Output = ($output -join [Environment]::NewLine) }
+    } finally {
+        $runner.Dispose()
+    }
 }
 
 function Invoke-TestCase {
@@ -130,12 +153,8 @@ function Invoke-TestCase {
         $reasons = @()
 
         if ($Case.PSObject.Properties['ExpectedExit']) {
-            $expected = $Case.ExpectedExit
-            if ($expected -is [string] -and $expected -eq 'nonzero') {
-                if ($result.ExitCode -eq 0) { $reasons += "expected nonzero exit, got 0" }
-            } else {
-                if ($result.ExitCode -ne [int]$expected) { $reasons += "expected exit $expected, got $($result.ExitCode)" }
-            }
+            $expected = [int]$Case.ExpectedExit
+            if ($result.ExitCode -ne $expected) { $reasons += "expected exit $expected, got $($result.ExitCode)" }
         }
 
         if ($Case.PSObject.Properties['ExpectedOutputContains']) {
@@ -167,6 +186,32 @@ function Invoke-TestCase {
 
 try {
     New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+
+    $harnessRoot = New-FixtureRoot
+    $harnessScript = Join-Path $harnessRoot 'scripts/lint-csharp-naming.ps1'
+    foreach ($exitCode in @(0, 1, 7)) {
+        Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-result'; exit $exitCode"
+        $result = Invoke-LintInFixture $harnessRoot
+        Write-TestResult "Harness_Exit$exitCode" ($result.ExitCode -eq $exitCode -and $result.Output -match 'harness-result')
+    }
+    Set-Content -LiteralPath $harnessScript -Value "& git --version; Write-Host 'harness-implicit-success'"
+    $result = Invoke-LintInFixture $harnessRoot
+    Write-TestResult 'Harness_NativeSuccessSuppliesExitStatus' ($result.ExitCode -eq 0 -and $result.Output -match 'harness-implicit-success')
+    foreach ($case in @(
+        @{ Name = 'NoExitStatus'; Script = "Write-Host 'harness-no-exit'"; Message = 'without an exit status' },
+        @{ Name = 'PowerShellError'; Script = "Write-Error 'harness-error'; exit 0"; Message = 'PowerShell error' },
+        @{ Name = 'Throw'; Script = "throw 'harness-throw'"; Message = 'harness-throw' }
+    )) {
+        Set-Content -LiteralPath $harnessScript -Value $case.Script
+        $failed = $false
+        try { $null = Invoke-LintInFixture $harnessRoot }
+        catch { $failed = $_.Exception.Message -match $case.Message }
+        Write-TestResult "Harness_$($case.Name)Fails" $failed
+    }
+    $root = New-FixtureRoot
+    Add-FixtureFile -Root $root -RelativePath 'Runtime/Bar.cs' -Content 'public class Bar { }'
+    $result = Invoke-LintInFixture $root -Cli
+    Write-TestResult 'Cli_CleanFixture' ($result.ExitCode -eq 0)
 
     Write-Host "Testing lint-csharp-naming.ps1..." -ForegroundColor White
     Write-Host "`n  Section A: XML doc comment + method line-number reporting" -ForegroundColor White
@@ -211,7 +256,7 @@ namespace Foo {
 '@
                 }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('Bad_Name', 'line=9', 'Runtime/Bar.cs')
             # The line number must be 9 (method decl), NOT an earlier line in
             # the doc-comment block (lines 6, 7, 8) or the class line (5).
