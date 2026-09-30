@@ -1324,11 +1324,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 - Dependabot PRs: Formatting fixes (CSharpier + Prettier + markdownlint) are applied automatically by CI.
 - Contributor PRs: Opt-in formatting is available.
-  - Comment on the PR with `/format` (aliases: `/autofix`, `/lint-fix`).
+  - Comment on an open PR with only `/format` (aliases: `/autofix`, `/lint-fix`). Commands mentioned in prose do not run formatting.
     - If the PR branch is in this repo, the bot pushes a commit with fixes.
     - If the PR is from a fork, the bot opens a formatting PR targeting the base branch.
     - The commenter must be the PR author or a maintainer/collaborator.
-  - Or run the Actions workflow manually: Actions → "Opt-in Formatting" → Run workflow → enter the PR number.
+  - Or run the Actions workflow manually: Actions → "Opt-in Formatting" → Run workflow → enter the PR number. Closed or merged PRs are skipped.
 - Not everything is auto-fixable: link checks and YAML linting may still require manual changes.
 
 See more details in [CONTRIBUTING](./docs/project/contributing.md).

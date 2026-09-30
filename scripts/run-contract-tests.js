@@ -255,6 +255,11 @@ const CHECKS = [
 
   // Workflow and CI contracts.
   {
+    id: "format-on-demand-workflow",
+    name: "Opt-in formatting command and PR-state guards",
+    run: "npm run test:format-on-demand-workflow"
+  },
+  {
     id: "sync-script-contracts",
     name: "Script and workflow sync contracts",
     run: "npm run test:sync-script-contracts"

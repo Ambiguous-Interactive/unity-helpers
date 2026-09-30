@@ -20,7 +20,8 @@ jobs:
       ${{ github.event_name == 'issue_comment' &&
           github.event.action == 'created' &&
           github.event.issue.pull_request &&
-          (contains(github.event.comment.body, '/format') || contains(github.event.comment.body, '/autofix') || contains(github.event.comment.body, '/lint-fix')) }}
+          github.event.issue.state == 'open' &&
+          (github.event.comment.body == '/format' || github.event.comment.body == '/autofix' || github.event.comment.body == '/lint-fix') }}
     runs-on: ubuntu-latest
     steps:
       - name: Resolve PR metadata and authorize request
@@ -28,8 +29,15 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
+            core.setOutput('ready', 'false');
+            core.setOutput('open', 'false');
             const prNumber = context.payload.issue.number;
             const pr = (await github.rest.pulls.get({ ...context.repo, pull_number: prNumber })).data;
+            if (pr.state !== 'open') {
+              core.info('Skipping formatting because the PR is closed.');
+              return;
+            }
+            core.setOutput('open', 'true');
             const commenter = context.payload.comment.user.login;
             const prAuthor = pr.user.login;
             const assoc = context.payload.comment.author_association; // OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, etc.
@@ -39,6 +47,8 @@ jobs:
             const allowed = isMaintainer || isAuthor;
 
             core.setOutput('allowed', String(allowed));
+            if (!allowed) return;
+            core.setOutput('ready', 'true');
             core.setOutput('pr', String(prNumber));
             core.setOutput('base_ref', pr.base.ref);
             core.setOutput('head_repo', pr.head.repo.full_name);
@@ -46,20 +56,20 @@ jobs:
             core.setOutput('same_repo', String(pr.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`));
 
       - name: Exit if not authorized
-        if: ${{ steps.meta.outputs.allowed != 'true' }}
+        if: ${{ steps.meta.outputs.open == 'true' && steps.meta.outputs.allowed != 'true' }}
         run: |
           echo "Commenter is not authorized to trigger formatting." 1>&2
           exit 1
 
       - name: Checkout PR branch (same-repo)
-        if: ${{ steps.meta.outputs.same_repo == 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.meta.outputs.same_repo == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ steps.meta.outputs.head_ref }}
           fetch-depth: 0
 
       - name: Checkout PR fork head
-        if: ${{ steps.meta.outputs.same_repo != 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.meta.outputs.same_repo != 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ${{ steps.meta.outputs.head_repo }}
@@ -68,19 +78,23 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22"
 
       - name: Setup .NET
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
           dotnet-version: "8.0.x"
 
       - name: Restore .NET tools
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         run: dotnet tool restore
 
       - name: Apply Prettier fixes
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         run: |
           npx --yes prettier@3.7.4 --write -- "**/*.{md,markdown}"
           npx --yes prettier@3.7.4 --write -- "**/*.{json,jsonc,asmdef,asmref}"
@@ -88,13 +102,16 @@ jobs:
           npx --yes prettier@3.7.4 --write -- "**/*.{yml,yaml}"
 
       - name: Apply markdownlint fixes
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         run: |
           npx --yes markdownlint-cli@0.46.0 --config .markdownlint.json --ignore-path .markdownlintignore --fix -- "**/*.md" "**/*.markdown"
 
       - name: Apply CSharpier formatting
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         run: dotnet tool run csharpier format
 
       - name: Detect changes
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         id: changes
         shell: bash
         run: |
@@ -105,7 +122,7 @@ jobs:
           fi
 
       - name: Commit changes to PR branch (same-repo)
-        if: ${{ steps.meta.outputs.same_repo == 'true' && steps.changes.outputs.has_changes == 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.meta.outputs.same_repo == 'true' && steps.changes.outputs.has_changes == 'true' }}
         uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d
         with:
           commit_message: "chore(format): apply requested formatting"
@@ -121,7 +138,7 @@ jobs:
             **/*.asmref
 
       - name: Create bot branch and PR (fork)
-        if: ${{ steps.meta.outputs.same_repo != 'true' && steps.changes.outputs.has_changes == 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.meta.outputs.same_repo != 'true' && steps.changes.outputs.has_changes == 'true' }}
         shell: bash
         env:
           GH_REPO: ${{ github.repository }}
@@ -140,7 +157,7 @@ jobs:
           git push upstream "$BRANCH" --force
 
       - name: Open/Update formatting PR (fork)
-        if: ${{ steps.meta.outputs.same_repo != 'true' && steps.changes.outputs.has_changes == 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.meta.outputs.same_repo != 'true' && steps.changes.outputs.has_changes == 'true' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
@@ -161,7 +178,7 @@ jobs:
             }
 
       - name: Comment result on PR
-        if: ${{ steps.changes.outputs.has_changes == 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.changes.outputs.has_changes == 'true' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
@@ -173,7 +190,7 @@ jobs:
             await github.rest.issues.createComment({ ...context.repo, issue_number: prNumber, body });
 
       - name: No-op comment (nothing to change)
-        if: ${{ steps.changes.outputs.has_changes != 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.changes.outputs.has_changes != 'true' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
@@ -191,9 +208,18 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
-            const prNumber = Number('${{ inputs.pr_number }}');
-            if (!prNumber) core.setFailed('pr_number is required');
+            core.setOutput('ready', 'false');
+            const prNumber = Number(context.payload.inputs.pr_number);
+            if (!Number.isSafeInteger(prNumber) || prNumber <= 0) {
+              core.setFailed('pr_number must be a positive integer');
+              return;
+            }
             const pr = (await github.rest.pulls.get({ ...context.repo, pull_number: prNumber })).data;
+            if (pr.state !== 'open') {
+              core.info('Skipping formatting because the PR is closed.');
+              return;
+            }
+            core.setOutput('ready', 'true');
             core.setOutput('pr', String(prNumber));
             core.setOutput('base_ref', pr.base.ref);
             core.setOutput('head_repo', pr.head.repo.full_name);
@@ -201,14 +227,14 @@ jobs:
             core.setOutput('same_repo', String(pr.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`));
 
       - name: Checkout PR branch (same-repo)
-        if: ${{ steps.meta.outputs.same_repo == 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.meta.outputs.same_repo == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ steps.meta.outputs.head_ref }}
           fetch-depth: 0
 
       - name: Checkout PR fork head
-        if: ${{ steps.meta.outputs.same_repo != 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.meta.outputs.same_repo != 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ${{ steps.meta.outputs.head_repo }}
@@ -217,19 +243,23 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22"
 
       - name: Setup .NET
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
           dotnet-version: "8.0.x"
 
       - name: Restore .NET tools
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         run: dotnet tool restore
 
       - name: Apply Prettier fixes
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         run: |
           npx --yes prettier@3.7.4 --write -- "**/*.{md,markdown}"
           npx --yes prettier@3.7.4 --write -- "**/*.{json,jsonc,asmdef,asmref}"
@@ -237,13 +267,16 @@ jobs:
           npx --yes prettier@3.7.4 --write -- "**/*.{yml,yaml}"
 
       - name: Apply markdownlint fixes
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         run: |
           npx --yes markdownlint-cli@0.46.0 --config .markdownlint.json --ignore-path .markdownlintignore --fix -- "**/*.md" "**/*.markdown"
 
       - name: Apply CSharpier formatting
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         run: dotnet tool run csharpier format
 
       - name: Detect changes
+        if: ${{ steps.meta.outputs.ready == 'true' }}
         id: changes
         shell: bash
         run: |
@@ -254,7 +287,7 @@ jobs:
           fi
 
       - name: Commit changes to PR branch (same-repo)
-        if: ${{ steps.meta.outputs.same_repo == 'true' && steps.changes.outputs.has_changes == 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.meta.outputs.same_repo == 'true' && steps.changes.outputs.has_changes == 'true' }}
         uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d
         with:
           commit_message: "chore(format): apply requested formatting"
@@ -270,7 +303,7 @@ jobs:
             **/*.asmref
 
       - name: Create bot branch and PR (fork)
-        if: ${{ steps.meta.outputs.same_repo != 'true' && steps.changes.outputs.has_changes == 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.meta.outputs.same_repo != 'true' && steps.changes.outputs.has_changes == 'true' }}
         shell: bash
         env:
           GH_REPO: ${{ github.repository }}
@@ -289,7 +322,7 @@ jobs:
           git push upstream "$BRANCH" --force
 
       - name: Open/Update formatting PR (fork)
-        if: ${{ steps.meta.outputs.same_repo != 'true' && steps.changes.outputs.has_changes == 'true' }}
+        if: ${{ steps.meta.outputs.ready == 'true' && steps.meta.outputs.same_repo != 'true' && steps.changes.outputs.has_changes == 'true' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |

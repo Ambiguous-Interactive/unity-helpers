@@ -239,6 +239,7 @@
     "test:create-unitypackage": "node scripts/tests/test-create-unitypackage.js",
     "test:unity-acceptance-runner": "pwsh -NoProfile -File scripts/tests/test-unity-acceptance.ps1",
     "test:unity-acceptance-evidence": "node scripts/tests/test-unity-acceptance.js",
+    "test:format-on-demand-workflow": "node scripts/tests/test-format-on-demand-workflow.js",
     "test:unity-acceptance-workflow": "node scripts/tests/test-unity-acceptance-workflow.js",
     "test:unity-grouped-modes": "node scripts/tests/test-unity-grouped-modes.js",
     "test:perf-tools": "node scripts/unity/lib/extract-perf-metrics.js --self-test && node scripts/unity/lib/evaluate-perf-refresh.js --self-test && node scripts/unity/lib/render-perf-deltas.js --self-test",
