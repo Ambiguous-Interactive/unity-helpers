@@ -133,7 +133,44 @@ try {
             $checks++
         }
     }
+    function Get-UnityDiagnosticLogFiles { param([string]$ResultsDir) Join-Path $ResultsDir 'unity.log' }
+    function ConvertTo-UnitySafeLogText { param([string]$Text) $Text }
+    function Write-CiError { param([string]$Message) Write-Host "::error::$Message" }
+    $diagnosticChecks = 0
+    foreach ($diagnosticSource in @($source, $verifier)) {
+        $isRunner = $diagnosticSource -eq $source
+        $functionName = 'Write-UnityExecutionSymptomDiagnostics'
+        $start = $diagnosticSource.IndexOf("function $functionName {")
+        if ($start -lt 0) { throw "Missing production diagnostic function $functionName." }
+        $diagnosticAst = [System.Management.Automation.Language.Parser]::ParseInput(
+            $diagnosticSource.Substring($start), [ref]$tokens, [ref]$parseErrors)
+        $diagnosticFunction = $diagnosticAst.Find({
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $node.Name -eq $functionName
+            }, $true)
+        if ($null -eq $diagnosticFunction) { throw "Cannot parse production diagnostic function $functionName." }
+        Invoke-Expression $diagnosticFunction.Extent.Text
+        foreach ($fixture in @(
+                @{ Line = '0.2 kb 0.0% Packages/com.unity.test-framework/UnexpectedLogMessageException.cs'; Rejected = $false },
+                @{ Line = 'UnexpectedLogMessageException: unexpected Error log'; Rejected = $true },
+                @{ Line = 'Unhandled log message: unexpected Error log'; Rejected = $true }
+            )) {
+            $logPath = Join-Path $temporary 'unity.log'
+            Set-Content -LiteralPath $logPath -Value $fixture.Line
+            $output = if ($isRunner) {
+                Write-UnityExecutionSymptomDiagnostics -LogPath $logPath -Label 'control' 6>&1 | Out-String
+            } else {
+                Write-UnityExecutionSymptomDiagnostics -ResultsDir $temporary -Label 'control' 6>&1 | Out-String
+            }
+            $rejected = $output.Contains('::error::Unity Test Framework rejected an unexpected log')
+            if ($rejected -ne $fixture.Rejected) {
+                throw "$functionName misclassified execution symptom: $($fixture.Line)"
+            }
+            $diagnosticChecks++
+        }
+    }
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force
 }
-Write-Host "[test-unity-test-filter] All six argument propagation controls and $checks result controls passed."
+Write-Host "[test-unity-test-filter] All six argument propagation controls, $checks result controls, and $diagnosticChecks diagnostic controls passed."
