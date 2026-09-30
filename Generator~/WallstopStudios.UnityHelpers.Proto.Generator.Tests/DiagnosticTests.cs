@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// Pins the diagnostics a consumer sees when a contract cannot be serialized or migrated.
@@ -444,6 +445,89 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             return assembly.GetType(typeof(ProtoBuf.ProtoContractAttribute).FullName, false) != null
                 || assembly.GetType(typeof(ProtoBuf.ProtoMemberAttribute).FullName, false) != null;
+        }
+
+        private static IEnumerable<TestCaseData> RuntimeModelMigrationCases()
+        {
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.RuntimeTypeModel model) { model.Add(typeof(Plain), false); }",
+                "RuntimeTypeModel.Add",
+                "WProtoContract",
+                "model.Add(typeof(Plain), false)",
+                "for 'Consumer.Plain'"
+            ).SetName("RuntimeModelMigration.Add.TypeLiteral");
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.RuntimeTypeModel model, global::System.Type target) { model.Add(target, false); }",
+                "RuntimeTypeModel.Add",
+                "WProtoContract",
+                "model.Add(target, false)",
+                "for a runtime-selected target"
+            ).SetName("RuntimeModelMigration.Add.DynamicTarget");
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.MetaType contract) { contract.Add(1, nameof(Plain.Value)); }",
+                "MetaType.Add",
+                "WProtoMember",
+                "contract.Add(1, nameof(Plain.Value))",
+                "through a member registration on a runtime-selected target"
+            ).SetName("RuntimeModelMigration.Member.Variable");
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.MetaType contract) { contract.AddSubType(100, typeof(Child)); }",
+                "MetaType.AddSubType",
+                "WProtoInclude",
+                "contract.AddSubType(100, typeof(Child))",
+                "with subtype 'Consumer.Child'"
+            ).SetName("RuntimeModelMigration.Subtype.TypeLiteral");
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.MetaType contract) { contract.SetSurrogate(typeof(Proxy)); }",
+                "MetaType.SetSurrogate",
+                "WProtoSurrogate",
+                "contract.SetSurrogate(typeof(Proxy))",
+                "with surrogate 'Consumer.Proxy'"
+            ).SetName("RuntimeModelMigration.Surrogate.TypeLiteral");
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.RuntimeTypeModel model) { model.Add(typeof(Plain), false).SetSurrogate(typeof(Proxy)); }",
+                "MetaType.SetSurrogate",
+                "WProtoSurrogate",
+                "model.Add(typeof(Plain), false).SetSurrogate(typeof(Proxy))",
+                "with surrogate 'Consumer.Proxy'"
+            ).SetName("RuntimeModelMigration.Surrogate.Chained");
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.MetaType contract) { contract.Add(1, nameof(Plain.Value), typeof(Child), typeof(Plain)); }",
+                "MetaType.Add",
+                "WProtoMember",
+                "contract.Add(1, nameof(Plain.Value), typeof(Child), typeof(Plain))",
+                "through a member registration referencing 'Consumer.Child', 'Consumer.Plain'"
+            ).SetName("RuntimeModelMigration.Member.TypeArguments");
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.MetaType contract, global::System.Type subtype) { contract.AddSubType(100, subtype); }",
+                "MetaType.AddSubType",
+                "WProtoInclude",
+                "contract.AddSubType(100, subtype)",
+                "with a runtime-selected subtype"
+            ).SetName("RuntimeModelMigration.Subtype.DynamicTarget");
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.MetaType contract, global::System.Type surrogate) { contract.SetSurrogate(surrogate); }",
+                "MetaType.SetSurrogate",
+                "WProtoSurrogate",
+                "contract.SetSurrogate(surrogate)",
+                "with a runtime-selected surrogate"
+            ).SetName("RuntimeModelMigration.Surrogate.DynamicTarget");
+#if !PROTOBUF_NET_ORACLE_V2
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.RuntimeTypeModel model) { model.Add<Plain>(false, global::ProtoBuf.CompatibilityLevel.Level200); }",
+                "RuntimeTypeModel.Add",
+                "WProtoContract",
+                "model.Add<Plain>(false, global::ProtoBuf.CompatibilityLevel.Level200)",
+                "for 'Consumer.Plain'"
+            ).SetName("RuntimeModelMigration.Add.GenericTarget");
+#endif
+            yield return new TestCaseData(
+                "public static void Configure(global::ProtoBuf.Meta.RuntimeTypeModel model) { model?.Add(typeof(Plain), false); }",
+                "RuntimeTypeModel.Add",
+                "WProtoContract",
+                ".Add(typeof(Plain), false)",
+                "for 'Consumer.Plain'"
+            ).SetName("RuntimeModelMigration.Add.Conditional");
         }
 
         private static ImmutableArray<Diagnostic> Run(string body)
@@ -2068,6 +2152,169 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         string.Equals(diagnostic.Id, "WPROTO036", System.StringComparison.Ordinal)
                     )
                     .Severity
+            );
+        }
+
+        /// <summary>
+        /// Aliases resolve to the same runtime registration APIs without source-name matching.
+        /// </summary>
+        [Test]
+        public void RuntimeModelMigrationRecognizesAnAliasedModel()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"using Model = global::ProtoBuf.Meta.RuntimeTypeModel;
+                  public static class Configuration {
+                  public static void Configure(Model model) { model.Add(typeof(int), false); } }",
+                out Compilation generated
+            );
+            Assert.IsEmpty(
+                generated.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)
+            );
+            Assert.AreEqual(
+                1,
+                diagnostics.Count(d => string.Equals(d.Id, "WPROTO048", StringComparison.Ordinal))
+            );
+        }
+
+        /// <summary>
+        /// Compile-time declarations preserve the old runtime-only model's bytes and both read directions.
+        /// </summary>
+        [TestCase(0, null, TestName = "RuntimeModelMigration.Compatibility.Default")]
+        [TestCase(7, "", TestName = "RuntimeModelMigration.Compatibility.EmptyName")]
+        [TestCase(-1, "old save", TestName = "RuntimeModelMigration.Compatibility.Negative")]
+        [TestCase(int.MaxValue, "café", TestName = "RuntimeModelMigration.Compatibility.Maximum")]
+        [TestCase(int.MinValue, "player", TestName = "RuntimeModelMigration.Compatibility.Minimum")]
+        public void RuntimeModelMigrationPreservesARepresentativeConsumerModel(
+            int identifier,
+            string name
+        )
+        {
+            RuntimeModelMigrationContract value = new RuntimeModelMigrationContract
+            {
+                Identifier = identifier,
+                Name = name,
+            };
+            ProtoBuf.Meta.RuntimeTypeModel model = ProtoBuf.Meta.RuntimeTypeModel.Create();
+            // The oracle recreates the old model; the contract's WProtoMember declarations carry its new shape.
+#pragma warning disable WPROTO048
+            model
+                .Add(typeof(RuntimeModelMigrationContract), false)
+                .Add(5, nameof(RuntimeModelMigrationContract.Identifier))
+                .Add(11, nameof(RuntimeModelMigrationContract.Name));
+#pragma warning restore WPROTO048
+            Assert.IsTrue(WProtoFacade.TrySerialize(value, out byte[] generated));
+            using (MemoryStream stream = new MemoryStream())
+            {
+                model.Serialize(stream, value);
+                byte[] original = stream.ToArray();
+                CollectionAssert.AreEqual(original, generated);
+                Assert.IsTrue(
+                    WProtoFacade.TryDeserialize(
+                        original,
+                        out RuntimeModelMigrationContract migrated
+                    )
+                );
+                Assert.AreEqual(identifier, migrated.Identifier);
+                Assert.AreEqual(name, migrated.Name);
+            }
+            using (MemoryStream stream = new MemoryStream(generated))
+            {
+                RuntimeModelMigrationContract restored = (RuntimeModelMigrationContract)
+                    model.Deserialize(stream, null, typeof(RuntimeModelMigrationContract));
+                Assert.AreEqual(identifier, restored.Identifier);
+                Assert.AreEqual(name, restored.Name);
+            }
+        }
+
+        /// <summary>
+        /// Runtime-only registrations expose migration work even when no contract attribute exists.
+        /// </summary>
+        [TestCaseSource(nameof(RuntimeModelMigrationCases))]
+        public void RuntimeModelMigrationNamesTheApiAndCompileTimeReplacement(
+            string configuration,
+            string api,
+            string replacement,
+            string location,
+            string target
+        )
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                "public class Plain { public int Value; } public class Child : Plain { } public struct Proxy { public int Value; } "
+                    + "public static class Configuration { "
+                    + configuration
+                    + " }",
+                out Compilation generated
+            );
+            Assert.IsEmpty(
+                generated.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)
+            );
+            Diagnostic match = diagnostics.Single(d =>
+                string.Equals(d.Id, "WPROTO048", StringComparison.Ordinal)
+                && d.GetMessage().Contains(api)
+            );
+            Assert.AreEqual(DiagnosticSeverity.Info, match.Severity);
+            Assert.IsTrue(match.GetMessage().Contains(replacement), match.GetMessage());
+            StringAssert.StartsWith(
+                "'ProtoBuf.Meta." + api + "' configures protobuf-net " + target + ";",
+                match.GetMessage()
+            );
+            Assert.IsTrue(match.GetMessage().Contains("does not configure"), match.GetMessage());
+            Assert.AreEqual(
+                location,
+                match.Location.SourceTree.GetText().ToString(match.Location.SourceSpan)
+            );
+        }
+
+        /// <summary>
+        /// Migration guidance is suppressible for intentional hybrid-oracle registration.
+        /// </summary>
+        [Test]
+        public void RuntimeModelMigrationCanBeSuppressed()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"public static class Configuration {
+                  public static void Configure(global::ProtoBuf.Meta.RuntimeTypeModel model) {
+                  #pragma warning disable WPROTO048
+                  model.Add(typeof(int), false);
+                  #pragma warning restore WPROTO048
+                  } }"
+            );
+            Diagnostic match = diagnostics.Single(d =>
+                string.Equals(d.Id, "WPROTO048", StringComparison.Ordinal)
+            );
+            Assert.IsTrue(match.IsSuppressed);
+        }
+
+        /// <summary>
+        /// API names in unrelated symbols, text, and unresolved calls do not invent migration work.
+        /// </summary>
+        [TestCase(
+            "public static void Configure() { new global::System.Collections.Generic.List<int>().Add(1); }",
+            TestName = "RuntimeModelMigration.UnrelatedAdd.Quiet"
+        )]
+        [TestCase(
+            "public void AddSubType(int tag, global::System.Type type) { } public void Configure() { AddSubType(1, typeof(int)); }",
+            TestName = "RuntimeModelMigration.UnrelatedSubtype.Quiet"
+        )]
+        [TestCase(
+            "public void SetSurrogate(global::System.Type type) { } public void Configure() { SetSurrogate(typeof(int)); }",
+            TestName = "RuntimeModelMigration.UnrelatedSurrogate.Quiet"
+        )]
+        [TestCase(
+            "public const string Text = \"model.Add(typeof(int), false)\"; // model.SetSurrogate(typeof(int));",
+            TestName = "RuntimeModelMigration.Text.Quiet"
+        )]
+        [TestCase(
+            "public void Configure() { missing.Add(typeof(int), false); }",
+            TestName = "RuntimeModelMigration.Unresolved.Quiet"
+        )]
+        public void RuntimeModelMigrationRequiresAResolvedProtobufApi(string body)
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                "public class Configuration { " + body + "\n }"
+            );
+            Assert.IsFalse(
+                diagnostics.Any(d => string.Equals(d.Id, "WPROTO048", StringComparison.Ordinal))
             );
         }
 

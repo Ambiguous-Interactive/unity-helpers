@@ -776,9 +776,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             try
             {
+                // WallstopProto declares these shapes separately in WProtoUnitySurrogateRegistrations.
+#pragma warning disable WPROTO048
                 model
                     .Add(typeof(TReal), applyDefaultBehaviour: false)
                     .SetSurrogate(typeof(TSurrogate));
+#pragma warning restore WPROTO048
             }
             catch (Exception error)
             {
