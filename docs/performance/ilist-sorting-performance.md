@@ -33,20 +33,136 @@ Unity Helpers ships several custom sorting algorithms for `IList<T>` that cover 
 
 ## JesseSort
 
-`JesseSort` adapts [Jesse Lew's dual-patience design](https://github.com/lewj85/jessesort).
-It handles sorted, reverse-sorted, and equal input in linear time. Pile assignments are recorded,
-reconstructed into contiguous ascending piles, then merged bottom-up, one adjacent pair at a time:
-an ordered-boundary shortcut emits a single copy when two neighboring piles already read as one
-sorted run, and a reverse-disjoint shortcut block-swaps the pair when every element of the right
-pile precedes every element of the left one. Upstream alignment is still
-in progress. For lists of at least 4,096 items, a full direction-change scan and eight distributed
-16-item dual-patience probes identify sustained disorder. When at least six probes favor direct
-sorting, `JesseSort` routes the input to the package's `IpnSort` implementation. This whole-array
-route is a conservative C# adaptation; it is not upstream's phase-local pipeline. The adaptation's
-[current measurements](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)
-are available in the tracking issue. The historical Jesse columns below measure the previous C#
-port, and the tracking issue also holds the superseded numbers for the intermediate k-way merge
-adaptation.
+`JesseSort` adapts [Jesse Lew's allocating live-phase pipeline](https://github.com/lewj85/jessesort/tree/1bf1f3d5b719c869880d98443050a836a65f47c1),
+including its E750 run precompaction policy. Sorted, reverse-sorted, and equal input retain a linear
+early exit. Other inputs are divided into monotone, direct, and dual-patience regions. Region probes
+grow from 1,024 to 8,192 values; a route change must persist through two confirmation probes.
+Direct regions use the package's `IpnSort` backend. Patience regions record compact pile assignments,
+reuse equivalent-value assignments and previous pile hints, and switch a pressured game's remaining
+suffix to direct sorting. Descending piles are reconstructed before ascending piles.
+
+The pipeline also recognizes sparse disorder from 10,000 values and bounded natural-run layouts
+from 50,000 values. Prepared runs merge in adjacent pairs, with ordered-boundary and
+reverse-disjoint shortcuts, route-specific galloping, and selective outer-run precompaction.
+
+This remains a C# adaptation: direct sorting uses `IpnSort`, pile searches use binary search, and
+pooled cursors replace upstream's reconstruction storage choices. Large values remain directly
+sorted. The upstream compact-index route took roughly twice as long as the same pipeline without
+that route on the measured 40-byte records, with both interface and struct comparers. These
+measurements cover Editor Mono; they do not establish a crossover for larger records or players.
+These implementation differences
+preclude a claim of identical C++ timings. The algorithm remains unstable; comparer-equivalent
+items may change relative order. Tests hold ordering and preservation of every original payload
+across array, list, and indexer-only backings, including large records and route thresholds.
+
+### Native Unity comparison
+
+The [final dataset](./jessesort-native-comparison.json) retains all 26 cells and 2,080 raw timing
+slots: 20 integer array shapes, four integer list shapes, and two 40-byte record shapes, each with
+100,000 elements. These measurements were taken on Unity 6000.4.6f1, Editor Mono, Windows 11,
+and an Intel Core Ultra 9 285K. The debugger and profiler were disabled. The previous implementation
+is pinned to `99f0520c`; the final source and helper hashes are recorded in the dataset. The list
+cells compare source clones that share an indexer-loop writeback adapter. Production list writeback
+uses `Clear` and `AddRange`, so these cells do not measure the exact production list backend. Array
+timings are unaffected.
+
+Each arm warms for at least 100 ms. Eight batches use the sequence `ABBABAABCD`, producing 32
+samples for each JesseSort implementation and eight each for the framework sort and `IpnSort`
+controls. One timer surrounds a whole batch of prepared replicas; cloning and validation occur
+outside timing. All arms use a common replication count within a cell. The shortest observed slot
+was 38.96 ms. The table reports median milliseconds per sort and the ratio of final to previous
+medians; a ratio below one means the final implementation took less time. The 95% intervals use
+2,000 bootstrap resamples of eight complete paired batches, preserving A/B pairing.
+
+| Input                                  | Backing | Previous median (ms) | Final median (ms) | Final / previous | 95% ratio interval |
+| -------------------------------------- | ------- | -------------------: | ----------------: | ---------------: | ------------------ |
+| Random                                 | Array   |               11.162 |            10.590 |            0.949 | 0.943–0.951        |
+| Sorted                                 | Array   |                0.377 |             0.330 |            0.874 | 0.869–0.895        |
+| Equal                                  | Array   |                0.227 |             0.208 |            0.917 | 0.906–0.923        |
+| OrganPipe                              | Array   |                2.785 |             0.781 |            0.280 | 0.278–0.283        |
+| Sawtooth                               | Array   |                8.672 |             3.764 |            0.434 | 0.429–0.435        |
+| Noise1                                 | Array   |                6.512 |             5.943 |            0.913 | 0.900–0.920        |
+| Runs38                                 | Array   |                3.927 |             0.316 |            0.081 | 0.080–0.081        |
+| OverlapRuns38                          | Array   |                3.652 |             1.481 |            0.405 | 0.400–0.409        |
+| Random                                 | List    |               11.467 |            10.933 |            0.953 | 0.945–0.959        |
+| Noise1                                 | List    |                6.641 |             6.139 |            0.924 | 0.921–0.930        |
+| Random (40-byte record)                | Array   |               15.826 |            14.893 |            0.941 | 0.916–0.953        |
+| AlternatingDuplicates (40-byte record) | Array   |                6.396 |             5.787 |            0.905 | 0.895–0.921        |
+
+The [faithful upstream-policy reference](./jessesort-upstream-reference.json), pinned to
+`4ec12c5d`, is also retained. In that earlier session, `Noise1` regressed: array ratio 1.047
+(95% interval 1.033–1.063) and list ratio 1.038 (1.024–1.048). The final session's lower ratios
+above do not erase those observations; session variation limits conclusions about this small
+tradeoff. On the 40-byte inputs, the faithful compact-index route also regressed against the
+previous implementation. The [isolated index-routing comparison](./jessesort-index-routing.json)
+then compared the same pipeline with only that route disabled. Direct values took 0.445–0.526
+of the compact-index time across the two shapes and both interface and concrete struct comparer
+forms. The final C# adaptation therefore omits that route.
+
+These are same-host editor measurements, not native C++ timings or target-player results. They
+include managed comparer and runtime costs, and do not establish IL2CPP behavior, a larger-record
+crossover, or a universal speedup. The allocating positive control returned zero from
+`GC.GetAllocatedBytesForCurrentThread`, so no allocation count is claimed. Each final integer
+replica equals the framework sort output; each final wide replica preserves its complete tuple
+at its original 64-bit identity and has ordered keys. Historical wide timing validation was weaker,
+as stated in those datasets; separate NUnit regressions verify full payload preservation.
+
+### Reproduce the comparison
+
+From a checkout containing the recorded baseline commit, use Python 3.10 or later and the
+probe generator at `scripts/benchmarks~/generate-jesse-parity.py`. It writes renamed copies
+of both implementations and identical helper bodies into an ignored hidden probe, leaving
+production sources untouched. Its shared indexer-loop writeback adapter reproduces the measured
+list clones, rather than the production bulk writeback:
+
+```bash
+python3 scripts/benchmarks~/generate-jesse-parity.py --baseline 99f0520c
+```
+
+In the Unity project containing this package, call the Unity MCP `run_script` tool with these
+parameters. `args` is a JSON-encoded array of five arguments: shape, element count, list backing,
+first batch, and batch count.
+
+```json
+{
+  "file": "Packages/com.wallstop-studios.unity-helpers/progress/.jesse-benchmark/JessePairedNative.cs",
+  "entry": "WallstopStudios.UnityHelpers.Core.Extension.JesseParityHarness.Main",
+  "args": "[\"Random\",100000,false,0,8]",
+  "timeout_ms": 50000
+}
+```
+
+Repeat for the shapes and backings in the final dataset; pass `true` for list cells. To generate
+the two wide cells, run:
+
+```bash
+python3 scripts/benchmarks~/generate-jesse-parity.py --baseline 99f0520c --wide
+```
+
+Use the same `file` and five-argument format, change `entry` to
+`WallstopStudios.UnityHelpers.Core.Extension.JesseWideParityHarness.Main`, and select `Random`
+or `AlternatingDuplicates` with `false` for list backing. `--struct-comparer` selects the concrete
+struct comparer for additional wide comparisons. To replay the faithful reference instead of the
+working-tree candidate, add `--candidate-ref 4ec12c5d` to either generator command. Preserve every
+returned slot and emitted source hash. Compare source hashes with the dataset before interpreting
+a replay; normalized LF hashes are also recorded to distinguish line-ending changes. Packaged replay templates add license headers,
+formatting, and a separate comparer file, so their template hashes differ from the original
+measured templates as explained in each dataset.
+
+To compare the faithful index route against the final direct-value implementation, use the faithful
+commit as the baseline:
+
+```bash
+python3 scripts/benchmarks~/generate-jesse-parity.py --baseline 4ec12c5d --wide
+```
+
+Run both wide shapes as above, then add `--struct-comparer` and repeat for the concrete comparer.
+The historical isolated dataset disabled only the index predicate; this replay compares the
+anchored faithful source with the final source that removes that route.
+
+The [tracking issue](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747) records the
+upstream comparison. The historical Jesse columns below measure earlier C# implementations,
+rather than this live-phase revision.
 
 ## Where the Time Actually Goes
 

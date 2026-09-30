@@ -2245,6 +2245,8 @@ The whitespace audit distinguishes input contracts rather than replacing every e
 | `StringExtensions` input, separators, and truncation markers | Whitespace is string content or formatting, so null/empty checks remain.                             |
 | Effect tags in `TagHandler` and `AttributeEffect`            | Tags are exact ordinal keys, including whitespace.                                                   |
 | `DurableFile` text contents                                  | Whitespace is written; only null/empty append contents are a no-op.                                  |
+| Dropdown provider method names                               | Blank names return no options before discovery; nonblank names are exact identifiers.                |
+| Dropdown string options                                      | Whitespace remains a selectable literal value.                                                       |
 | `WShowIfComparison.IsNullOrEmpty`                            | The named comparison tests null/empty, including empty collections; whitespace strings are nonempty. |
 
 These classifications cover the reviewed contracts above. The wider Runtime/Editor audit in

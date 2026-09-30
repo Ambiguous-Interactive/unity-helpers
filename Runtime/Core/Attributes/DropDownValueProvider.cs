@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return EmptyFactory;
             }
 
-            if (string.IsNullOrEmpty(methodName))
+            if (string.IsNullOrWhiteSpace(methodName))
             {
                 Debug.LogWarning($"{attributeName}: Method name cannot be null or empty.");
                 return EmptyFactory;
@@ -217,7 +217,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return logErrorIfNotFound ? EmptyFactory : null;
             }
 
-            if (string.IsNullOrEmpty(methodName))
+            if (string.IsNullOrWhiteSpace(methodName))
             {
                 Debug.LogWarning($"{attributeName}: Method name cannot be null or empty.");
                 return logErrorIfNotFound ? EmptyFactory : null;
@@ -291,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return logErrorIfNotFound ? EmptyFactory : null;
             }
 
-            if (string.IsNullOrEmpty(methodName))
+            if (string.IsNullOrWhiteSpace(methodName))
             {
                 Debug.LogWarning($"{attributeName}: Method name cannot be null or empty.");
                 resolvedValueType = typeof(object);
