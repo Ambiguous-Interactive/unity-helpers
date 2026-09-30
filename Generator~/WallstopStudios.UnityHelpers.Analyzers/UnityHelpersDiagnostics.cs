@@ -325,8 +325,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             );
 
         /// <summary>
-        /// A counting <c>for</c> over an array or <c>List&lt;T&gt;</c> whose body never uses the
-        /// index, where <c>foreach</c> allocates nothing and says what the loop means.
+        /// A forward counting loop whose index only reads elements of an allocation-free sequence.
         /// </summary>
         /// <remarks>
         /// <c>foreach</c> over an array or a <c>List&lt;T&gt;</c> is allocation-free: the array form
@@ -347,7 +346,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             new DiagnosticDescriptor(
                 "WUH013",
                 "This loop can be a foreach",
-                "'{0}' is a '{1}', which 'foreach' walks without allocating, and this loop never uses '{2}' for anything but indexing it. Write it as 'foreach' so the loop says what it does. A counting loop is the right shape over an interface like 'IReadOnlyList<T>', whose enumerator boxes, and wherever the body needs the index itself. Off by default: turn it on with '<Rule Id=\"WUH013\" Action=\"Warning\" />' in 'Assets/Default.ruleset'.",
+                "'{0}' is a '{1}', which 'foreach' walks without boxing an enumerator, and this loop never uses '{2}' for anything but indexing it. Write it as 'foreach' so the loop says what it does. A counting loop is the right shape over an interface like 'IReadOnlyList<T>', whose enumerator boxes, and wherever the body needs the index itself. Off by default: turn it on with '<Rule Id=\"WUH013\" Action=\"Warning\" />' in 'Assets/Default.ruleset'.",
                 "Style",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false

@@ -6,6 +6,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using Microsoft.CodeAnalysis;
+    using Microsoft.CodeAnalysis.CSharp;
+    using Microsoft.CodeAnalysis.CSharp.Syntax;
     using Microsoft.CodeAnalysis.Diagnostics;
     using Microsoft.CodeAnalysis.Operations;
 
@@ -56,15 +58,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     index,
                     out ISymbol sequence,
                     out ISymbol receiver,
-                    out ITypeSymbol sequenceType
+                    out ITypeSymbol sequenceType,
+                    out IPropertyReferenceOperation bound
                 )
-                || !WalksWithoutAllocating(sequenceType, list)
+                || !WalksWithoutAllocating(sequenceType, list, loop, bound, sequence, receiver)
             )
             {
                 return;
             }
 
-            if (!OnlyIndexesThatSequence(loop.Body, index, sequence, receiver))
+            if (!OnlyIndexesThatSequence(loop.Body, index, sequence, receiver, list))
             {
                 return;
             }
@@ -99,13 +102,15 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     foreach (IVariableDeclaratorOperation declarator in declaration.Declarators)
                     {
                         if (
-                            declarator.Symbol != null
-                            && declarator.Symbol.Type.SpecialType == SpecialType.System_Int32
-                            && IsZero(declarator.Initializer?.Value)
+                            declarator.Symbol == null
+                            || declarator.Symbol.Type.SpecialType != SpecialType.System_Int32
+                            || !IsZero(declarator.Initializer?.Value)
                         )
                         {
-                            declared.Add(declarator.Symbol);
+                            index = null;
+                            return false;
                         }
+                        declared.Add(declarator.Symbol);
                     }
                 }
             }
@@ -134,23 +139,21 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             ILocalSymbol index,
             out ISymbol sequence,
             out ISymbol receiver,
-            out ITypeSymbol sequenceType
+            out ITypeSymbol sequenceType,
+            out IPropertyReferenceOperation bound
         )
         {
             sequence = null;
             receiver = null;
             sequenceType = null;
+            bound = null;
 
             if (
                 !(loop.Condition is IBinaryOperation condition)
                 || condition.OperatorKind != BinaryOperatorKind.LessThan
                 || !IsLocal(condition.LeftOperand, index)
-                || !TryGetCountedSequence(
-                    condition.RightOperand,
-                    out sequence,
-                    out receiver,
-                    out sequenceType
-                )
+                || !TryGetBound(loop, condition.RightOperand, out bound)
+                || !TryGetCountedSequence(bound, out sequence, out receiver, out sequenceType)
             )
             {
                 return false;
@@ -170,6 +173,60 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return step is IIncrementOrDecrementOperation increment
                 && increment.Kind == OperationKind.Increment
                 && IsLocal(increment.Target, index);
+        }
+
+        private static bool TryGetBound(
+            IForLoopOperation loop,
+            IOperation operand,
+            out IPropertyReferenceOperation bound
+        )
+        {
+            if (operand is IPropertyReferenceOperation direct)
+            {
+                bound = direct;
+                return true;
+            }
+
+            if (operand is ILocalReferenceOperation cached && loop.Parent is IBlockOperation block)
+            {
+                IOperation previous = null;
+                foreach (IOperation statement in block.Operations)
+                {
+                    if (statement == loop)
+                    {
+                        break;
+                    }
+                    previous = statement;
+                }
+
+                if (
+                    previous is IVariableDeclarationGroupOperation group
+                    && group.Declarations.Length == 1
+                    && group.Declarations[0].Declarators.Length == 1
+                )
+                {
+                    IVariableDeclaratorOperation declarator = group.Declarations[0].Declarators[0];
+                    if (
+                        SymbolEqualityComparer.Default.Equals(declarator.Symbol, cached.Local)
+                        && declarator.Initializer?.Value is IPropertyReferenceOperation snapshot
+                    )
+                    {
+                        foreach (IOperation operation in Descendants(loop.Body))
+                        {
+                            if (IsLocal(operation, cached.Local) && IsWrittenThrough(operation))
+                            {
+                                bound = null;
+                                return false;
+                            }
+                        }
+                        bound = snapshot;
+                        return true;
+                    }
+                }
+            }
+
+            bound = null;
+            return false;
         }
 
         /// <summary>The sequence behind a <c>.Length</c> or <c>.Count</c> read.</summary>
@@ -243,18 +300,79 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// <summary>Whether <c>foreach</c> over this type allocates no enumerator.</summary>
         /// <param name="sequenceType">The sequence's type.</param>
         /// <param name="list">The resolved <c>List&lt;T&gt;</c> symbol.</param>
-        /// <returns><c>true</c> for an array or a concrete <c>List&lt;T&gt;</c> only.</returns>
-        private static bool WalksWithoutAllocating(ITypeSymbol sequenceType, INamedTypeSymbol list)
+        /// <returns><c>true</c> for an array or a public value-type enumeration pattern.</returns>
+        private static bool WalksWithoutAllocating(
+            ITypeSymbol sequenceType,
+            INamedTypeSymbol list,
+            IForLoopOperation loop,
+            IPropertyReferenceOperation bound,
+            ISymbol sequence,
+            ISymbol receiver
+        )
         {
-            if (sequenceType is IArrayTypeSymbol)
+            if (sequenceType is IArrayTypeSymbol arrayType)
+            {
+                return arrayType.Rank == 1;
+            }
+
+            if (
+                list != null
+                && sequenceType is INamedTypeSymbol named
+                && named.IsGenericType
+                && SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, list)
+            )
             {
                 return true;
             }
 
-            return list != null
-                && sequenceType is INamedTypeSymbol named
-                && named.IsGenericType
-                && SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, list);
+            if (
+                sequenceType == null
+                || sequenceType.TypeKind == TypeKind.Interface
+                || !(bound.Instance?.Syntax is ExpressionSyntax expression)
+            )
+            {
+                return false;
+            }
+
+            ForEachStatementSyntax candidate = SyntaxFactory.ForEachStatement(
+                SyntaxFactory.IdentifierName("var"),
+                SyntaxFactory.Identifier("element"),
+                expression,
+                SyntaxFactory.EmptyStatement()
+            );
+            SemanticModel model = loop.SemanticModel;
+            if (
+                model == null
+                || !model.TryGetSpeculativeSemanticModel(
+                    loop.Syntax.SpanStart,
+                    candidate,
+                    out SemanticModel speculativeModel
+                )
+            )
+            {
+                return false;
+            }
+
+            ForEachStatementInfo enumeration = speculativeModel.GetForEachStatementInfo(candidate);
+            foreach (IOperation operation in Descendants(loop.Body))
+            {
+                if (
+                    IsIndexInto(operation, sequence, receiver)
+                    && !SymbolEqualityComparer.Default.Equals(
+                        operation.Type,
+                        enumeration.ElementType
+                    )
+                )
+                {
+                    return false;
+                }
+            }
+            return enumeration.GetEnumeratorMethod != null
+                && enumeration.GetEnumeratorMethod.DeclaredAccessibility == Accessibility.Public
+                && !enumeration.GetEnumeratorMethod.IsStatic
+                && enumeration.GetEnumeratorMethod.ReturnType.IsValueType
+                && enumeration.MoveNextMethod != null
+                && enumeration.CurrentProperty != null;
         }
 
         /// <summary>
@@ -274,7 +392,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             IOperation body,
             ILocalSymbol index,
             ISymbol sequence,
-            ISymbol receiver
+            ISymbol receiver,
+            INamedTypeSymbol list
         )
         {
             foreach (IOperation operation in Descendants(body))
@@ -282,12 +401,12 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 if (
                     (
                         NamesSequence(operation, sequence, receiver)
-                        && IsPassedToUnknownCode(operation)
+                        && MayExposeSequenceAlias(operation)
                     )
                     || (
                         receiver != null
                         && NamesSymbol(operation, receiver)
-                        && IsWrittenThrough(operation)
+                        && (IsWrittenThrough(operation) || MayExposeSequenceAlias(operation))
                     )
                 )
                 {
@@ -304,7 +423,12 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     || (
                         operation is IInvocationOperation invocation
                         && NamesSequence(invocation.Instance, sequence, receiver)
-                        && MutatesList(invocation.TargetMethod)
+                        && (
+                            !SymbolEqualityComparer.Default.Equals(
+                                invocation.TargetMethod.ContainingType?.OriginalDefinition,
+                                list
+                            ) || MutatesList(invocation.TargetMethod)
+                        )
                     )
                 )
                 {
@@ -331,7 +455,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return true;
         }
 
-        private static bool IsPassedToUnknownCode(IOperation operation)
+        private static bool MayExposeSequenceAlias(IOperation operation)
         {
             IOperation current = operation;
             while (current.Parent is IConversionOperation conversion)
@@ -339,7 +463,17 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 current = conversion;
             }
 
-            return current.Parent is IArgumentOperation;
+            switch (current.Parent)
+            {
+                case IMemberReferenceOperation member:
+                    return member.Instance != current;
+                case IArrayElementReferenceOperation array:
+                    return array.ArrayReference != current;
+                case IInvocationOperation invocation:
+                    return invocation.Instance != current;
+                default:
+                    return true;
+            }
         }
 
         private static bool NamesSymbol(IOperation operation, ISymbol symbol)

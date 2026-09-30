@@ -165,10 +165,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     if (texture.format == TextureFormat.RGBA32 && rawBytes.Length == expectedBytes)
                     {
                         NativeArray<Color32> raw = texture.GetRawTextureData<Color32>();
-                        int n = raw.Length;
-                        for (int i = 0; i < n; ++i)
+                        foreach (Color32 c in raw)
                         {
-                            Color32 c = raw[i];
                             if (c.a <= alphaThreshold)
                             {
                                 continue;
@@ -231,10 +229,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     if (texture.format == TextureFormat.RGBA32 && rawBytes.Length == expectedBytes)
                     {
                         NativeArray<Color32> raw = texture.GetRawTextureData<Color32>();
-                        int n = raw.Length;
-                        for (int i = 0; i < n; ++i)
+                        foreach (Color32 c in raw)
                         {
-                            Color32 c = raw[i];
                             if (c.a <= alphaThreshold)
                             {
                                 continue;
@@ -316,10 +312,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     if (texture.format == TextureFormat.RGBA32 && rawBytes.Length == expectedBytes)
                     {
                         NativeArray<Color32> raw = texture.GetRawTextureData<Color32>();
-                        int n = raw.Length;
-                        for (int i = 0; i < n; ++i)
+                        foreach (Color32 c in raw)
                         {
-                            Color32 c = raw[i];
                             if (c.a <= alphaThreshold)
                             {
                                 continue;
@@ -397,10 +391,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     if (texture.format == TextureFormat.RGBA32 && rawBytes.Length == expectedBytes)
                     {
                         NativeArray<Color32> raw = texture.GetRawTextureData<Color32>();
-                        int n = raw.Length;
-                        for (int i = 0; i < n; ++i)
+                        foreach (Color32 c in raw)
                         {
-                            Color32 c = raw[i];
                             if (c.a <= alphaThreshold)
                             {
                                 continue;
