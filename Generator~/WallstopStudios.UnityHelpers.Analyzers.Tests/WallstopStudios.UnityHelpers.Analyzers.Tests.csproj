@@ -11,6 +11,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
+    <DefineConstants>$(DefineConstants);UNITY_EDITOR</DefineConstants>
     <!--
       Warnings are NOT errors here, unlike everywhere else under Generator~. Two reasons, both
       about what this project compiles: its fixtures deliberately trigger the generator's own
@@ -30,6 +31,13 @@
     <ProjectReference Include="../WallstopStudios.UnityHelpers.Analyzers/WallstopStudios.UnityHelpers.Analyzers.csproj">
       <Properties>CopyAnalyzerPayload=false</Properties>
     </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="../../Editor/Tools/AnalyzerPolicyExamples.cs"
+      Link="AnalyzerPolicyExamples.cs"
+    />
   </ItemGroup>
 
   <ItemGroup>

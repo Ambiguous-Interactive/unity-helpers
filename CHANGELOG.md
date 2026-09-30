@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add per-analyzer severity controls with automatic ruleset synchronization and a Project Settings shortcut ([#883](https://github.com/Ambiguous-Interactive/unity-helpers/issues/883)).
+- Add a compact UI Toolkit analyzer policy list with search, syntax-highlighted code examples, per-analyzer severity controls, automatic ruleset synchronization, and a Project Settings shortcut ([#883](https://github.com/Ambiguous-Interactive/unity-helpers/issues/883)).
 - Add protobuf support for `Vector4`, `Matrix4x4`, `Keyframe` and `BoneWeight` as roots and members on both serialization routes, including IL2CPP ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Add opt-in `WUH019` to suggest caching stable loop bounds while keeping live bounds for changing collections ([#894](https://github.com/Ambiguous-Interactive/unity-helpers/issues/894)).
 - Add cached read-only enum values and an ordinal enum-name comparer for allocation-free iteration and warmed name ordering ([#889](https://github.com/Ambiguous-Interactive/unity-helpers/issues/889)).

@@ -161,6 +161,7 @@
         "TMP_InputField",
         "TMP_Text",
         "TextMeshPro",
+        "noparse",
         "TextMeshProUGUI",
         "UGUI",
         "EditorWindow",

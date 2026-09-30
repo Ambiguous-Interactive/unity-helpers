@@ -10,6 +10,11 @@ selector: **Default**, **Off**, **Info**, **Warning**, **Error**, or **Hidden**.
 analyzer's shipped behavior, including the four opt-in policies. Enable All and Disable All still
 apply Warning or Off across the catalog.
 
+The compact UI Toolkit list supports searching by diagnostic ID, title, or description. Hover or
+focus a policy to see its explanation and syntax-highlighted examples of reported and preferred
+code. Click the policy or press Enter to pin the example card, use **Copy fix** for the preferred
+snippet, and press Escape to dismiss it.
+
 The window refreshes `Assets/Default.ruleset` while open and when it gains focus. A severity edit
 re-reads the file before updating only the selected rule, preserving other diagnostics, unknown
 rules, includes, and unrelated analyzer groups. Malformed XML and duplicate overrides for the
@@ -58,11 +63,15 @@ a build error; an explicit Error override does. If your project treats warnings 
 [Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, and `WUH019` go further and are off until you ask for them, because
 their shapes are correct code far more often than they are defects.
 
-The policy list now offers a severity selector beside each diagnostic:
+The compact policy list offers a severity selector beside each diagnostic:
 
 | Previous policy list                                                                  | Individual severity controls                                                              |
 | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | ![Previous analyzer policy list](../images/editor-tools/analyzer-policies-before.png) | ![Analyzer policy severity selectors](../images/editor-tools/analyzer-policies-after.png) |
+
+The example card shows the diagnostic and its preferred code together:
+
+![Analyzer policy code examples](../images/editor-tools/analyzer-policies-examples.png)
 
 ## `WUH001`: a lookup factory passed as a method group
 

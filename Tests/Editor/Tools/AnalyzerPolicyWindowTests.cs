@@ -4,11 +4,15 @@
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
+    using UnityEditor.UIElements;
     using UnityEngine;
+    using UnityEngine.TestTools;
+    using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Editor.Tools;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -16,6 +20,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     public sealed class AnalyzerPolicyWindowTests : CommonTestBase
     {
         private string _temporaryDirectory;
+
+        private static Rect ToolbarContentBounds(ToolbarButton button)
+        {
+            Rect bounds = button.worldBound;
+            IResolvedStyle style = button.resolvedStyle;
+            float left = style.paddingLeft + style.borderLeftWidth;
+            float right = style.paddingRight + style.borderRightWidth;
+            return new Rect(
+                bounds.xMin + left,
+                bounds.yMin,
+                bounds.width - left - right,
+                bounds.height
+            );
+        }
+
+        private static void AssertCardInsideWindow(AnalyzerPolicyWindow window)
+        {
+            Rect rootBounds = window.rootVisualElement.worldBound;
+            Rect cardBounds = window.DetailsCard.worldBound;
+            Assert.LessOrEqual(rootBounds.xMin - 0.5f, cardBounds.xMin);
+            Assert.LessOrEqual(rootBounds.yMin - 0.5f, cardBounds.yMin);
+            Assert.LessOrEqual(cardBounds.xMax, rootBounds.xMax + 0.5f);
+            Assert.LessOrEqual(cardBounds.yMax, rootBounds.yMax + 0.5f);
+        }
 
         [SetUp]
         public void SetUp()
@@ -504,6 +532,280 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 Assert.That(entry.Value, Is.EqualTo(action));
             }
+        }
+
+        [UnityTest]
+        public IEnumerator SeverityDropdownSavesAndRefreshChangesControlWithoutWriting()
+        {
+            AnalyzerPolicyWindow window = CreatePolicyWindow();
+            yield return null;
+            Assert.That(window.rootVisualElement.panel != null, Is.True);
+            string path = GetRulesetPath();
+            DropdownField dropdown = window.GetSeverityField("WUH001");
+            Assert.That(dropdown.value, Is.EqualTo("Default"));
+            Assert.That(File.Exists(path), Is.False);
+            window.RefreshState();
+            Assert.That(File.Exists(path), Is.False);
+            dropdown.value = "Error";
+            yield return null;
+            Assert.That(File.ReadAllText(path), Does.Contain("Id=\"WUH001\" Action=\"Error\""));
+            string external = File.ReadAllText(path).Replace("Action=\"Error\"", "Action=\"Info\"");
+            File.WriteAllText(path, external);
+            window.RefreshState();
+            Assert.That(dropdown.value, Is.EqualTo("Info"));
+            Assert.That(ReferenceEquals(dropdown, window.GetSeverityField("WUH001")), Is.True);
+            Assert.That(File.ReadAllText(path), Is.EqualTo(external));
+            Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [UnityTest]
+        public IEnumerator SearchControlFiltersIdsTitlesAndDescriptionsWithoutChangingRuleset()
+        {
+            AnalyzerPolicyWindow window = CreatePolicyWindow();
+            yield return null;
+            Assert.That(window.rootVisualElement.panel != null, Is.True);
+            ToolbarSearchField search = window.rootVisualElement.Q<ToolbarSearchField>();
+            (string Query, string ExpectedId)[] cases =
+            {
+                ("wuh018", "WUH018"),
+                ("lookup factory", "WUH001"),
+                ("infinite effect", "WUH006"),
+                ("   wuh019   ", "WUH019"),
+            };
+            foreach ((string query, string expectedId) in cases)
+            {
+                search.value = query;
+                yield return null;
+                foreach (AnalyzerPolicy policy in AnalyzerPolicyWindow.GetPolicies())
+                {
+                    DisplayStyle expected = string.Equals(
+                        policy.Id,
+                        expectedId,
+                        StringComparison.Ordinal
+                    )
+                        ? DisplayStyle.Flex
+                        : DisplayStyle.None;
+                    Assert.That(
+                        window.GetPolicyRow(policy.Id).style.display.value,
+                        Is.EqualTo(expected),
+                        query + " matched " + policy.Id + " incorrectly."
+                    );
+                }
+                Assert.That(File.Exists(GetRulesetPath()), Is.False);
+            }
+            search.value = string.Empty;
+            yield return null;
+            foreach (AnalyzerPolicy policy in AnalyzerPolicyWindow.GetPolicies())
+            {
+                Assert.That(
+                    window.GetPolicyRow(policy.Id).style.display.value,
+                    Is.EqualTo(DisplayStyle.Flex)
+                );
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator KeyboardFocusOpensExamplesEnterPinsAndEscapeCloses()
+        {
+            string previousClipboard = GUIUtility.systemCopyBuffer;
+            try
+            {
+                AnalyzerPolicyWindow window = CreatePolicyWindow();
+                yield return null;
+                Assert.That(window.rootVisualElement.panel != null, Is.True);
+                Button title = window.GetPolicyRow("WUH001").Q<Button>();
+                title.Focus();
+                yield return null;
+                Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+                Assert.That(window.DetailsCard.Q<Label>().text, Does.Contain("WUH001"));
+                using (
+                    KeyDownEvent enter = KeyDownEvent.GetPooled(
+                        new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
+                    )
+                )
+                {
+                    title.SendEvent(enter);
+                }
+                yield return null;
+                window.CopyFixButton.Focus();
+                yield return null;
+                using (NavigationSubmitEvent copy = NavigationSubmitEvent.GetPooled())
+                {
+                    window.CopyFixButton.SendEvent(copy);
+                }
+                yield return null;
+                Assert.That(
+                    AnalyzerPolicyExamples.TryGet("WUH001", out _, out string goodCode),
+                    Is.True
+                );
+                Assert.That(GUIUtility.systemCopyBuffer, Is.EqualTo(goodCode));
+                Button otherTitle = window.GetPolicyRow("WUH002").Q<Button>();
+                otherTitle.Focus();
+                yield return null;
+                Assert.That(window.DetailsCard.Q<Label>().text, Does.Contain("WUH001"));
+                using (
+                    KeyDownEvent escape = KeyDownEvent.GetPooled(
+                        new Event { type = EventType.KeyDown, keyCode = KeyCode.Escape }
+                    )
+                )
+                {
+                    window.rootVisualElement.SendEvent(escape);
+                }
+                yield return null;
+                Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.None));
+                Assert.That(File.Exists(GetRulesetPath()), Is.False);
+            }
+            finally
+            {
+                GUIUtility.systemCopyBuffer = previousClipboard;
+            }
+        }
+
+        [Test]
+        public void MalformedExternalRulesetDisablesDropdownAndRecoveryRestoresIt()
+        {
+            AnalyzerPolicyWindow window = CreatePolicyWindow();
+            string path = GetRulesetPath();
+            const string malformed = "<RuleSet><Rules>";
+            File.WriteAllText(path, malformed);
+            window.RefreshState();
+            Assert.That(window.GetSeverityField("WUH001").enabledSelf, Is.False);
+            Assert.That(File.ReadAllText(path), Is.EqualTo(malformed));
+            File.Delete(path);
+            window.RefreshState();
+            Assert.That(window.GetSeverityField("WUH001").enabledSelf, Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator BulkToolbarUsesWindowRulesetAndUpdatesExistingDropdowns()
+        {
+            AnalyzerPolicyWindow window = CreatePolicyWindow();
+            yield return null;
+            Assert.That(window.rootVisualElement.panel != null, Is.True);
+            DropdownField dropdown = window.GetSeverityField("WUH001");
+            ToolbarButton enable = window.rootVisualElement.Q<ToolbarButton>();
+            enable.Focus();
+            yield return null;
+            using (NavigationSubmitEvent submit = NavigationSubmitEvent.GetPooled())
+            {
+                enable.SendEvent(submit);
+            }
+            yield return null;
+            Assert.That(File.Exists(GetRulesetPath()), Is.True);
+            Assert.That(dropdown.value, Is.EqualTo("Warning"));
+            Assert.That(ReferenceEquals(dropdown, window.GetSeverityField("WUH001")), Is.True);
+            foreach (AnalyzerPolicy policy in AnalyzerPolicyWindow.GetPolicies())
+            {
+                Assert.That(window.GetSeverityField(policy.Id).value, Is.EqualTo("Warning"));
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator NarrowWindowStacksExamplesAndKeepsPinnedCardAndToolbarInsideBounds()
+        {
+            AnalyzerPolicyWindow window = CreatePolicyWindow();
+            window.position = new Rect(100f, 100f, 420f, 400f);
+            yield return null;
+            yield return null;
+            Button title = window.GetPolicyRow("WUH016").Q<Button>();
+            title.Focus();
+            yield return null;
+            using (
+                KeyDownEvent enter = KeyDownEvent.GetPooled(
+                    new Event { type = EventType.KeyDown, keyCode = KeyCode.Return }
+                )
+            )
+            {
+                title.SendEvent(enter);
+            }
+            yield return null;
+            yield return null;
+            Assert.That(
+                window.ExamplesContainer.style.flexDirection.value,
+                Is.EqualTo(FlexDirection.Column)
+            );
+            AssertCardInsideWindow(window);
+            Vector2 narrowGlyphs = window.BadCodeLabel.MeasureTextSize(
+                "iiii",
+                0f,
+                VisualElement.MeasureMode.Undefined,
+                0f,
+                VisualElement.MeasureMode.Undefined
+            );
+            Vector2 wideGlyphs = window.BadCodeLabel.MeasureTextSize(
+                "WWWW",
+                0f,
+                VisualElement.MeasureMode.Undefined,
+                0f,
+                VisualElement.MeasureMode.Undefined
+            );
+            Assert.Less(0f, narrowGlyphs.x, "The attached code label must measure visible glyphs.");
+            Assert.That(
+                narrowGlyphs.x,
+                Is.EqualTo(wideGlyphs.x).Within(0.01f),
+                "Code rendering must use a monospace font."
+            );
+            Toolbar toolbar = window.rootVisualElement.Q<Toolbar>();
+            ToolbarButton previous = null;
+            Rect previousContent = default;
+            foreach (VisualElement control in toolbar.Children())
+            {
+                if (control is ToolbarButton button)
+                {
+                    Rect content = ToolbarContentBounds(button);
+                    Vector2 textSize = button.MeasureTextSize(
+                        button.text,
+                        0f,
+                        VisualElement.MeasureMode.Undefined,
+                        0f,
+                        VisualElement.MeasureMode.Undefined
+                    );
+                    Assert.LessOrEqual(
+                        textSize.x,
+                        content.width,
+                        button.text + " does not fit its padded content area."
+                    );
+                    if (previous != null)
+                    {
+                        Assert.LessOrEqual(
+                            previousContent.xMax,
+                            content.xMin,
+                            "Toolbar label areas overlap."
+                        );
+                    }
+                    previous = button;
+                    previousContent = content;
+                }
+            }
+            ToolbarSearchField search = toolbar.Q<ToolbarSearchField>();
+            Assert.IsTrue(previous != null);
+            Assert.LessOrEqual(previousContent.xMax, search.worldBound.xMin);
+            Assert.LessOrEqual(
+                search.worldBound.xMax,
+                window.rootVisualElement.worldBound.xMax + 0.5f
+            );
+            window.position = new Rect(100f, 100f, 750f, 640f);
+            yield return null;
+            yield return null;
+            Assert.That(
+                window.ExamplesContainer.style.flexDirection.value,
+                Is.EqualTo(FlexDirection.Row)
+            );
+            Assert.That(window.DetailsCard.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(window.DetailsCard.Q<Label>().text, Does.Contain("WUH016"));
+            AssertCardInsideWindow(window);
+        }
+
+        private AnalyzerPolicyWindow CreatePolicyWindow()
+        {
+            AnalyzerPolicyWindow window = Track(
+                ScriptableObject.CreateInstance<AnalyzerPolicyWindow>()
+            );
+            window.RulesetPathOverride = GetRulesetPath();
+            window.RefreshState();
+            window.BuildUserInterface();
+            window.Show();
+            return window;
         }
 
         private string GetRulesetPath()
