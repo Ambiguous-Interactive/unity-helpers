@@ -849,6 +849,7 @@ Unity prefers forward slashes. Use this for cross-platform paths.
 `DirectoryHelper.ResolvePackageAssetPath` returns an AssetDatabase path for package-relative
 content, including local packages referenced from an external checkout. Assets installations
 retain their `Assets/` path; embedded, cached and external packages use `Packages/<package-id>/`.
+An external checkout with a missing or whitespace-only package identifier returns an empty path.
 `FindAbsolutePathToDirectory` uses the same resolver for directories in this package.
 
 **Create directories safely:**
@@ -1040,6 +1041,9 @@ safe to ignore or delete.
 
 ### Scene Queries
 
+`SceneHelper.IsSceneLoaded` returns `false` for null, empty, or whitespace-only names and paths,
+including when an unsaved scene has an empty path. Valid names and paths are matched exactly.
+
 **Check if scene is loaded:**
 
 <!-- doc-sample: compiles -->
@@ -1068,6 +1072,9 @@ string[] buildScenes = SceneHelper.GetScenesInBuild();
 ---
 
 ### Temporary Scene Loading
+
+Constructing `SceneHelper.SceneLoadScope` with a null, empty, or whitespace-only path does nothing:
+it loads no scene, invokes no callback, and completes disposal immediately.
 
 **Load scene, extract data, auto-unload:**
 

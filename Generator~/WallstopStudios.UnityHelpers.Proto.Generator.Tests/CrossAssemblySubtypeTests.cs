@@ -55,7 +55,10 @@ namespace Consumer {
             Assert.IsTrue(WProtoFacade.TryDeserialize<Upstream.Inventory>(actual, out Upstream.Inventory read));
             Check(read);
             ProtoBuf.Meta.RuntimeTypeModel model = ProtoBuf.Meta.RuntimeTypeModel.Create();
+            // The oracle model mirrors the WProtoContract and WProtoSubtype declarations above.
+#pragma warning disable WPROTO048
             model.Add(typeof(Upstream.Weapon), true).AddSubType(200, typeof(Plasma));
+#pragma warning restore WPROTO048
             using (MemoryStream stream = new MemoryStream()) {
                 model.Serialize(stream, value);
                 byte[] expected = stream.ToArray();
@@ -119,6 +122,18 @@ namespace Consumer {
             return generated;
         }
 
+        private static void AssertOnlySuppressedRuntimeModelDiagnostics(
+            ImmutableArray<Diagnostic> diagnostics
+        )
+        {
+            Assert.AreEqual(2, diagnostics.Length);
+            foreach (Diagnostic diagnostic in diagnostics)
+            {
+                Assert.AreEqual("WPROTO048", diagnostic.Id);
+                Assert.IsTrue(diagnostic.IsSuppressed, diagnostic.GetMessage());
+            }
+        }
+
         private static byte[] Emit(Compilation compilation)
         {
             using (MemoryStream stream = new MemoryStream())
@@ -146,7 +161,7 @@ namespace Consumer {
                 out ImmutableArray<Diagnostic> diagnostics,
                 MetadataReference.CreateFromImage(upstream)
             );
-            Assert.IsEmpty(diagnostics);
+            AssertOnlySuppressedRuntimeModelDiagnostics(diagnostics);
             string generated = string.Join(
                 "\n",
                 consumer.SyntaxTrees.Skip(1).Select(tree => tree.ToString())
@@ -216,7 +231,10 @@ namespace Consumer {
             Assert.IsTrue(WProtoFacade.TryDeserialize(payload, out Upstream.Inventory read));
             Assert.AreEqual(17, read.Selected.Damage, ""Installing a replacement must retain the private seed member omitted by the payload."");
             ProtoBuf.Meta.RuntimeTypeModel model = ProtoBuf.Meta.RuntimeTypeModel.Create();
+            // The oracle model mirrors the WProtoContract and WProtoSubtype declarations above.
+#pragma warning disable WPROTO048
             model.Add(typeof(Upstream.Weapon), true).AddSubType(200, typeof(Plasma));
+#pragma warning restore WPROTO048
             using (MemoryStream stream = new MemoryStream(payload)) {
                 Upstream.Inventory expected = (Upstream.Inventory)model.Deserialize(stream, null, typeof(Upstream.Inventory));
                 Assert.AreEqual(expected.Selected.GetType(), read.Selected.GetType());
@@ -235,7 +253,7 @@ namespace Consumer {
                 out ImmutableArray<Diagnostic> diagnostics,
                 MetadataReference.CreateFromImage(upstream)
             );
-            Assert.IsEmpty(diagnostics);
+            AssertOnlySuppressedRuntimeModelDiagnostics(diagnostics);
             using (MemoryStream upstreamStream = new MemoryStream(upstream))
             {
                 AssemblyLoadContext.Default.LoadFromStream(upstreamStream);
@@ -286,7 +304,7 @@ namespace Consumer {
                 out ImmutableArray<Diagnostic> diagnostics,
                 MetadataReference.CreateFromImage(upstream)
             );
-            Assert.IsEmpty(diagnostics);
+            AssertOnlySuppressedRuntimeModelDiagnostics(diagnostics);
             using (MemoryStream upstreamStream = new MemoryStream(upstream))
             {
                 AssemblyLoadContext.Default.LoadFromStream(upstreamStream);
@@ -439,7 +457,7 @@ namespace Consumer {
                     reference
                 )
             );
-            Assert.IsEmpty(firstDiagnostics);
+            AssertOnlySuppressedRuntimeModelDiagnostics(firstDiagnostics);
             Generate(
                 "SecondExtender",
                 "[WProtoContract, WProtoSubtype(typeof(Upstream.Weapon), 201)] public sealed partial class Other : Upstream.Weapon {}",
@@ -524,7 +542,7 @@ namespace Consumer {
                 out ImmutableArray<Diagnostic> diagnostics,
                 MetadataReference.CreateFromImage(upstream)
             );
-            Assert.IsEmpty(diagnostics);
+            AssertOnlySuppressedRuntimeModelDiagnostics(diagnostics);
             using (MemoryStream upstreamStream = new MemoryStream(upstream))
             {
                 AssemblyLoadContext.Default.LoadFromStream(upstreamStream);

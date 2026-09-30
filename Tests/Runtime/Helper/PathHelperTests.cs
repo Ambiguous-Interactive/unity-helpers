@@ -25,6 +25,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(string.Empty, result);
         }
 
+        [TestCase("", TestName = "PathSanitization.Empty.PreservesInput")]
+        [TestCase("   ", TestName = "PathSanitization.Spaces.PreservesInput")]
+        [TestCase("\t\r\n", TestName = "PathSanitization.ControlWhitespace.PreservesInput")]
+        [TestCase("\u2003", TestName = "PathSanitization.UnicodeWhitespace.PreservesInput")]
+        public void SanitizePreservesBlankText(string path)
+        {
+            Assert.AreSame(path, PathHelper.Sanitize(path));
+        }
+
         [Test]
         public void SanitizePathWithForwardSlashesReturnsUnchanged()
         {

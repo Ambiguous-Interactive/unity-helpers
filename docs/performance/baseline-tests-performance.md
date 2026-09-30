@@ -13,9 +13,42 @@ Baselines are set generously (2-3x expected typical performance) to account for 
 - **Pooling**: Collection pool rent/return overhead for List, HashSet, Dictionary, StringBuilder, SystemArrayPool
 - **Serialization**: JSON and Protobuf serialization/deserialization throughput
 
+<!-- CURRENT_BENCHMARK_RESULTS_START -->
+
+## Current benchmark measurements
+
+No successful complete Unity Benchmarks run is available for publication yet. The committed
+measurements below are historical and are not results from the current candidate.
+
+<!-- CURRENT_BENCHMARK_RESULTS_END -->
+
+## Publishing current measurements
+
+Every complete successful Unity Benchmarks execution updates the current measurements section
+above and commits the guide alongside its raw NUnit XML and comparison report. A detected
+comparison regression still publishes the measured values and is labeled in the comparison
+report. An unseeded acceptance baseline does not prevent publication. If a seeded baseline
+cannot be compared completely, the current measurements still publish; stale comparison files
+are removed and the workflow reports the comparison contract failure after committing the data. Partial, failed, empty,
+malformed, duplicate, or mismatched result sets preserve the last complete measurement report.
+
+Each publication records its workflow run and attempt, measured candidate commit, Unity version,
+test mode, and UTC publication time. Raw XML links target the same repository and publication
+ref as the run; measurements and evidence are committed together. The candidate SHA identifies
+the measured code, not the later documentation commit. Single Stopwatch aggregates are labeled recorded values;
+reported distributions retain their median and sample count. These current measurements do not
+seed or promote the separate [canonical acceptance baseline](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/perf-results/baseline.json).
+
+Benchmarks run weekly on Wednesday at 10:29 UTC through a separate hosted scheduler, which
+requests an eligible dispatch on protected `main`. The scheduler performs no licensed Unity
+work and holds no Unity credentials. Direct scheduled execution remains excluded from the
+licensed workflow by the enrollment contract; that workflow accepts controlled dispatches.
+Manual dispatch remains available. Every complete successful execution uses the same committed
+measurement publication path.
+
 <!-- BASELINE_PERFORMANCE_START -->
 
-## Performance Baseline Report
+## Historical performance baseline report
 
 Generated: 2026-01-12 01:36:55 UTC
 
@@ -121,12 +154,13 @@ Generated: 2026-01-12 01:36:55 UTC
 
 ## Running the Tests
 
-These tests run automatically during CI to catch regressions. To generate fresh benchmark results:
+Dispatch **Unity Benchmarks** to execute the current benchmark profile and publish its complete
+measurements to this guide. To inspect the historical baseline test report locally:
 
 1. Open Unity Test Runner
 2. Navigate to `PerformanceBaselineTests`
 3. Run `GeneratePerformanceBaselineReport` explicitly (it is marked `[Explicit]`)
-4. Results will be output to the console and can be copied to this document
+4. Results are output to the console; they do not replace the committed current measurements
 
 ## Interpreting Results
 
@@ -143,7 +177,8 @@ Run `PerformanceBaselineTests.GeneratePerformanceBaselineReport` from Unity's Te
 
 The generous baseline budgets above detect large regressions. They do not establish that an
 optimization meets the acceptance criteria in [issue #636](https://github.com/Ambiguous-Interactive/unity-helpers/issues/636).
-Scheduled aggregate reports are advisory. Their renderer never writes the canonical baseline,
+Unity Benchmarks publishes current measured aggregates in this guide. Comparative aggregate
+reports are not calibrated acceptance evidence. Their renderer never writes the canonical baseline,
 including after a regression, and refuses empty, malformed, duplicate, or incomplete metric sets.
 A positive cost against a zero baseline is a regression. The previous automatic baseline update
 option is rejected.
@@ -192,5 +227,5 @@ fast/slow player canaries, workload-specific retention probes and build-size mea
 full acceptance policy including declared tradeoffs, and explicit post-merge promotion after
 20 clean floor/latest Mono/IL2CPP player calibration repetitions. There is currently no automatic
 promotion command. Analyzer findings, changed-branch coverage, mutation, replay/minimization, and
-touched-group CI tiers also remain separate requirements. No new measured performance numbers or
-nonempty baseline are claimed by this infrastructure change.
+touched-group CI tiers also remain separate requirements. Current measured numbers are published only after a complete successful benchmark run; this
+infrastructure change does not claim new measurements or a nonempty acceptance baseline.

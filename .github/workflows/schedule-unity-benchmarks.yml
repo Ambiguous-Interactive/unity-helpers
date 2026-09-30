@@ -1,0 +1,36 @@
+name: Schedule Unity Benchmarks
+
+on:
+  schedule:
+    - cron: "29 10 * * 3"
+
+permissions: {}
+
+concurrency:
+  group: schedule-unity-benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    name: Dispatch canonical benchmarks
+    # The stable repository ID preserves canonical ownership across renames and transfers.
+    # Schedules run only on the default branch; the stable ID also excludes forks.
+    if: >-
+      ${{ github.event_name == 'schedule' &&
+          github.repository_id == '737391131' &&
+          github.ref == 'refs/heads/main' && github.ref_protected }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch Unity Benchmarks on main
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "unity-benchmarks.yml",
+              ref: "main"
+            });

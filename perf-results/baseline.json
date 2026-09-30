@@ -1,4 +1,4 @@
 {
-  "_comment": "Rolling perf baseline for unity-helpers benchmarks. Seeded empty; the first Unity Benchmarks run (.github/workflows/unity-benchmarks.yml) extracts metrics from the NUnit results and rewrites this file via scripts/unity/lib/render-perf-deltas.js. Subsequent runs diff current metrics against this file and write perf-results/perf-deltas.md. Do not hand-edit.",
+  "_comment": "Unseeded canonical performance baseline. Unity Benchmarks is manually dispatched and produces advisory reports; render-perf-deltas.js never writes or seeds this file. Promotion requires an accepted candidate, a green post-merge confirmation, and 20 clean floor/latest Mono/IL2CPP player calibration repetitions under issue #636. No promotion command exists yet. Empty metrics are not evidence of performance acceptance.",
   "metrics": []
 }

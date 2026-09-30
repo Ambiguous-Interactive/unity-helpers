@@ -607,5 +607,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
         );
+        internal static readonly DiagnosticDescriptor RuntimeModelMigration =
+            new DiagnosticDescriptor(
+                "WPROTO048",
+                "protobuf-net runtime model needs compile-time migration",
+                "'{0}' configures protobuf-net {1}; it does not configure generated WallstopProto formatters. Migrate this registration to {2}. Runtime-discovered targets must each receive a compile-time declaration and compatible formatter before the protobuf-net fallback can be removed. Suppress WPROTO048 at this call only when the registration deliberately serves protobuf-net and the WallstopProto shape is declared separately.",
+                "WallstopProto",
+                DiagnosticSeverity.Info,
+                isEnabledByDefault: true
+            );
     }
 }

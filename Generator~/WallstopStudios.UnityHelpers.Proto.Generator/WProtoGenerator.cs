@@ -3980,6 +3980,142 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return false;
         }
 
+        private static bool IsRuntimeModelRegistrationName(string name)
+        {
+            return string.Equals(name, "Add", StringComparison.Ordinal)
+                || string.Equals(name, "AddSubType", StringComparison.Ordinal)
+                || string.Equals(name, "SetSurrogate", StringComparison.Ordinal);
+        }
+
+        private static void ReportRuntimeModelMigration(
+            GeneratorExecutionContext context,
+            List<InvocationExpressionSyntax> registrations,
+            Dictionary<SyntaxTree, SemanticModel> models
+        )
+        {
+            INamedTypeSymbol runtimeModel = context.Compilation.GetTypeByMetadataName(
+                "ProtoBuf.Meta.RuntimeTypeModel"
+            );
+            INamedTypeSymbol metaType = context.Compilation.GetTypeByMetadataName(
+                "ProtoBuf.Meta.MetaType"
+            );
+            if (runtimeModel == null && metaType == null)
+            {
+                return;
+            }
+
+            foreach (InvocationExpressionSyntax invocation in registrations)
+            {
+                SemanticModel model = ModelFor(context.Compilation, models, invocation.SyntaxTree);
+                if (!(model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method))
+                {
+                    continue;
+                }
+
+                string replacement;
+                if (
+                    SymbolEqualityComparer.Default.Equals(method.ContainingType, runtimeModel)
+                    && string.Equals(method.Name, "Add", StringComparison.Ordinal)
+                )
+                {
+                    replacement =
+                        "[WProtoContract] and [WProtoMember] with the existing field numbers";
+                }
+                else if (SymbolEqualityComparer.Default.Equals(method.ContainingType, metaType))
+                {
+                    switch (method.Name)
+                    {
+                        case "Add":
+                            replacement =
+                                "[WProtoMember] with the existing field numbers and member names";
+                            break;
+                        case "AddSubType":
+                            replacement =
+                                "[WProtoInclude] or [WProtoSubtype] with the existing subtype field number";
+                            break;
+                        case "SetSurrogate":
+                            replacement =
+                                "[assembly: WProtoSurrogate] with the same real and surrogate types";
+                            break;
+                        default:
+                            continue;
+                    }
+                }
+                else
+                {
+                    continue;
+                }
+
+                List<string> typeReferences = new List<string>();
+                bool configuresRoot = SymbolEqualityComparer.Default.Equals(
+                    method.ContainingType,
+                    runtimeModel
+                );
+                if (configuresRoot)
+                {
+                    foreach (ITypeSymbol type in method.TypeArguments)
+                    {
+                        if (type.TypeKind != TypeKind.Error)
+                        {
+                            typeReferences.Add("'" + type.ToDisplayString() + "'");
+                        }
+                    }
+                }
+                foreach (ArgumentSyntax argument in invocation.ArgumentList.Arguments)
+                {
+                    if (
+                        argument.Expression is TypeOfExpressionSyntax typeOf
+                        && model.GetTypeInfo(typeOf.Type).Type is ITypeSymbol type
+                        && type.TypeKind != TypeKind.Error
+                    )
+                    {
+                        typeReferences.Add("'" + type.ToDisplayString() + "'");
+                    }
+                }
+
+                string target;
+                if (configuresRoot)
+                {
+                    target =
+                        typeReferences.Count == 0
+                            ? "for a runtime-selected target"
+                            : "for " + typeReferences[0];
+                }
+                else if (string.Equals(method.Name, "AddSubType", StringComparison.Ordinal))
+                {
+                    target =
+                        typeReferences.Count == 0
+                            ? "with a runtime-selected subtype"
+                            : "with subtype " + typeReferences[0];
+                }
+                else if (string.Equals(method.Name, "SetSurrogate", StringComparison.Ordinal))
+                {
+                    target =
+                        typeReferences.Count == 0
+                            ? "with a runtime-selected surrogate"
+                            : "with surrogate " + typeReferences[0];
+                }
+                else
+                {
+                    target =
+                        typeReferences.Count == 0
+                            ? "through a member registration on a runtime-selected target"
+                            : "through a member registration referencing "
+                                + string.Join(", ", typeReferences);
+                }
+
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        WProtoDiagnostics.RuntimeModelMigration,
+                        invocation.GetLocation(),
+                        method.ContainingType.ToDisplayString() + "." + method.Name,
+                        target,
+                        replacement
+                    )
+                );
+            }
+        }
+
         /// <inheritdoc />
         public void Initialize(GeneratorInitializationContext context)
         {
@@ -4015,6 +4151,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // Reuse one semantic model per tree because ordinary subclasses also enter this scan.
             Dictionary<SyntaxTree, SemanticModel> models =
                 new Dictionary<SyntaxTree, SemanticModel>();
+
+            ReportRuntimeModelMigration(context, receiver.RuntimeModelRegistrations, models);
 
             foreach (TypeDeclarationSyntax declaration in receiver.Types)
             {
@@ -4402,6 +4540,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             /// </remarks>
             internal List<EnumDeclarationSyntax> Enums { get; } = new List<EnumDeclarationSyntax>();
 
+            internal List<InvocationExpressionSyntax> RuntimeModelRegistrations { get; } =
+                new List<InvocationExpressionSyntax>();
+
             private static bool HasAttributedMethod(TypeDeclarationSyntax declaration)
             {
                 foreach (MemberDeclarationSyntax member in declaration.Members)
@@ -4417,6 +4558,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             public void OnVisitSyntaxNode(SyntaxNode node)
             {
+                if (node is InvocationExpressionSyntax invocation)
+                {
+                    SimpleNameSyntax name = invocation.Expression as SimpleNameSyntax;
+                    if (invocation.Expression is MemberAccessExpressionSyntax access)
+                    {
+                        name = access.Name;
+                    }
+                    else if (invocation.Expression is MemberBindingExpressionSyntax binding)
+                    {
+                        name = binding.Name;
+                    }
+
+                    if (name != null && IsRuntimeModelRegistrationName(name.Identifier.ValueText))
+                    {
+                        RuntimeModelRegistrations.Add(invocation);
+                    }
+                    return;
+                }
+
                 if (node is EnumDeclarationSyntax enumeration)
                 {
                     if (0 < enumeration.AttributeLists.Count)

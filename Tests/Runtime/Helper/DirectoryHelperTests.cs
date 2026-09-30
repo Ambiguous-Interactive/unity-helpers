@@ -721,6 +721,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        [TestCase("", TestName = "PackageIdentity.Empty.ReturnsEmpty")]
+        [TestCase("   ", TestName = "PackageIdentity.Spaces.ReturnsEmpty")]
+        [TestCase("\u2003", TestName = "PackageIdentity.UnicodeWhitespace.ReturnsEmpty")]
+        public void ResolvePackageAssetPathFromExternalCheckoutRejectsBlankPackageIdentity(
+            string packageIdentity
+        )
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                File.WriteAllText(
+                    Path.Combine(directory, "package.json"),
+                    "{\"name\":\"" + packageIdentity + "\"}"
+                );
+                Assert.AreEqual(
+                    string.Empty,
+                    DirectoryHelper.ResolvePackageAssetPath(
+                        "Editor/Styles/EditorTheme.uss",
+                        Path.Combine(directory, "Source.cs")
+                    )
+                );
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
         [Test]
         public void ResolvePackageAssetPathWithEmptyReturnsEmpty()
         {

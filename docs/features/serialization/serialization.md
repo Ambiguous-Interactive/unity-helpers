@@ -1234,7 +1234,7 @@ makes assembly load order choose the adapter and wire shape. Remove one declarat
 `Serializer.RegisterProtobufRoot` claim fixes protobuf-net's root choice but cannot repair which
 WallstopProto adapter an unordered registrar replaced.
 
-There is also one **informational migration diagnostic**. `WPROTO030` marks a protobuf-net contract
+There are also two **informational migration diagnostics**. `WPROTO030` marks a protobuf-net contract
 that has no `[WProtoContract]`, because that type has no generated formatter and, unless served
 another way, follows the reflective fallback path that does not work under IL2CPP. It is
 informational so upgrading the package does not break an existing consumer or a warnings-as-errors
@@ -1267,6 +1267,7 @@ In Unity, promote it to a warning in `Assets/Default.ruleset` when you want a mi
   <Rules AnalyzerId="WallstopStudios.UnityHelpers.Proto.Generator"
     RuleNamespace="WallstopStudios.UnityHelpers.Proto.Generator">
     <Rule Id="WPROTO030" Action="Warning" />
+    <Rule Id="WPROTO048" Action="Warning" />
   </Rules>
 </RuleSet>
 ```
@@ -1277,6 +1278,43 @@ and matching `[WProtoMember]` field numbers to port the type. If a contract is d
 through a surrogate, root marshal, or hand-written formatter, suppress `WPROTO030` around its
 declaration -- the `[ProtoContract]`, the vendored equivalent, or the `[DataContract]`, whichever the
 message named.
+
+#### Migrating runtime model registrations
+
+`WPROTO048` identifies calls to protobuf-net's `RuntimeTypeModel.Add`, `MetaType.Add`,
+`MetaType.AddSubType` and `MetaType.SetSurrogate`. Runtime model changes configure protobuf-net;
+they do not configure generated WallstopProto formatters. A contract registered only through such
+calls has no attribute for `WPROTO030` to find, so this diagnostic reports the registration call
+instead. It names the resolved API and available static type references by role: registered type,
+subtype, surrogate, or types referenced by a member registration. It recognizes direct `typeof`
+arguments and generic `RuntimeTypeModel.Add<T>` type arguments. Aliases, chained calls, conditional
+access and model variables are recognized through their resolved symbols;
+unrelated methods with the same names remain silent.
+
+| Runtime registration    | Compile-time declaration                                                |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `RuntimeTypeModel.Add`  | `[WProtoContract]` and numbered `[WProtoMember]` declarations           |
+| `MetaType.Add`          | `[WProtoMember]` with the existing field number on the named member     |
+| `MetaType.AddSubType`   | `[WProtoInclude]` or `[WProtoSubtype]` with the existing subtype number |
+| `MetaType.SetSurrogate` | `[assembly: WProtoSurrogate]` with the same real and surrogate types    |
+
+Carry every existing field number and encoding option across, then verify old payloads and bytes
+against the protobuf-net model, including default-value omission. For example, a model built with
+`Add(type, false).Add(5, memberName)` can write an `int` at zero because its member has no configured
+default to omit. A plain `[WProtoMember(5)]` omits that zero; `[WProtoMember(5, IsRequired = true)]`
+preserves the original write behavior. Matching field numbers alone does not prove byte compatibility.
+
+A call that discovers its target at runtime is still reported,
+but the diagnostic cannot list types supplied by reflection, configuration or another assembly.
+Inventory those targets separately and declare each supported shape at compilation. This check
+covers the four APIs above in source compiled with the generator; it does not inspect precompiled
+registration code or other protobuf-net configuration APIs.
+
+Like `WPROTO030`, `WPROTO048` is informational during the hybrid rollout, so upgrading does not
+break a consumer build. Promote it using the ruleset above or
+`dotnet_diagnostic.WPROTO048.severity = warning` in `.editorconfig`. Suppress it at an intentional
+protobuf-net registration only after the matching WallstopProto shape has been declared separately.
+A suppression records that decision; it does not prove that the registered types migrated.
 
 #### Contracts that hold other contracts
 
