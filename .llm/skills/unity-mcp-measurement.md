@@ -73,13 +73,22 @@ System.Func<ulong> draw = (System.Func<ulong>)System.Delegate.CreateDelegate(
     typeof(System.Func<ulong>), instance, method);   // then loop on draw()
 ```
 
-Two things that follow, both learned by getting them wrong first. The sandbox has **no `Stopwatch`**
-and `DateTime.UtcNow` has a ~0.5 ms floor, so the inner loop needs enough iterations (20M for a
-single-digit-nanosecond call) that elapsed time swamps it — otherwise the run fabricates a speedup.
-And the delegate's own call overhead sits in **every** cell, so a ratio between two cells is
+The timing API depends on the backend. The legacy command sandbox had no `Stopwatch`, and
+`DateTime.UtcNow` had a ~0.5 ms floor. Pipeline `0.8.0-exp.1` on editor `6000.4.6f1` supports
+`Stopwatch`: a 20 ms sleep control measured 30.9959 ms, with a 10,000,000 Hz high-resolution clock.
+Check the timer and batch each workload above its measured floor; a nominal frequency alone does
+not prove a usable measurement. This backend's `GC.GetAllocatedBytesForCurrentThread` still read
+zero for a retained 65,536-byte allocation, so it cannot support an allocation claim.
+
+The delegate's own call overhead sits in **every** cell, so a ratio between two cells is
 compressed toward 1: report such a ratio as a **lower bound**, not an estimate. Session 213 measured
 `NextUlong` against `NextUint` this way across eight generators and the control landed exactly where
 the algorithm predicted, which is what makes the shape trustworthy.
+
+For temporary SDK clients, call `StreamableHTTPClientTransport.terminateSession()` before
+`client.close()` in `finally`. Closing the connection alone leaves the bridge session alive until
+its idle timeout. Repeated probes exhausted the eight-session limit during session 340. Preserve
+errors and check editor status before retrying a tool whose completion is uncertain.
 
 ### What session 224 got wrong first
 

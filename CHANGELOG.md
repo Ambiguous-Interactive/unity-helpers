@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Improve `JesseSort` for mixed regions, sparse disorder, and natural runs using the upstream live-phase design ([#747](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)).
 - Improve parent and child collection transfers with bulk copying for `Component` fields while retaining typed enumeration for derived components ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 
 ## [3.6.2] - 2026-09-28

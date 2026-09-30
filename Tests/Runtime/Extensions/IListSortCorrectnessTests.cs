@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using JesseLargeValue = System.ValueTuple<int, int, long, long, long, long>;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -198,6 +199,133 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             return builder.Append(']').ToString();
         }
 
+        private static IEnumerable<TestCaseData> JesseRegionRegressionCases()
+        {
+            (int Shape, int Count, string Name)[] cases =
+            {
+                (0, 35, "ShortSuffix"),
+                (0, 1055, "PrefixAnd1023Suffix"),
+                (0, 1056, "PrefixAnd1024Suffix"),
+                (0, 1057, "PrefixAnd1025Suffix"),
+                (0, 8223, "PrefixAnd8191Suffix"),
+                (0, 8224, "PrefixAnd8192Suffix"),
+                (0, 8225, "PrefixAnd8193Suffix"),
+                (1, 8191, "Mixed8191"),
+                (1, 8192, "Mixed8192"),
+                (1, 8193, "Mixed8193"),
+                (2, 9999, "Sparse9999"),
+                (2, 10000, "Sparse10000"),
+                (2, 10001, "Sparse10001"),
+                (3, 49999, "Runs49999"),
+                (3, 50000, "Runs50000"),
+                (3, 50001, "Runs50001"),
+                (4, 50000, "NaturalRuns64"),
+                (5, 50000, "NaturalRuns65"),
+            };
+            foreach ((int shape, int count, string name) in cases)
+            {
+                for (int backing = 0; backing < 3; ++backing)
+                {
+                    foreach (bool descending in new[] { false, true })
+                    {
+                        yield return new TestCaseData(shape, count, backing, descending).SetName(
+                            $"Jesse.Regions.{name}.{backing}.{(descending ? "Descending" : "Ascending")}"
+                        );
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<TestCaseData> JesseLargeValueRegressionCases()
+        {
+            foreach (int count in new[] { 31, 32, 33, 1023, 1024, 1025, 8191, 8192, 8193, 100000 })
+            {
+                for (int backing = 0; backing < 3; ++backing)
+                {
+                    foreach (bool descending in new[] { false, true })
+                    {
+                        yield return new TestCaseData(count, backing, descending).SetName(
+                            $"Jesse.LargeValues.{count}.{backing}.{(descending ? "Descending" : "Ascending")}"
+                        );
+                    }
+                }
+            }
+        }
+
+        private static int[] CreateJesseRegressionKeys(int shape, int count)
+        {
+            int naturalRunCount = shape == 4 ? 64 : 65;
+            int[] keys = new int[count];
+            for (int index = 0; index < count; ++index)
+            {
+                keys[index] = shape switch
+                {
+                    0 => index < 32 ? index : (int)(((long)index * 48271) % count) - count,
+                    1 => ((index / 1024) % 3) switch
+                    {
+                        0 => index % 1024,
+                        1 => 1024 - index % 1024,
+                        _ => (index % 2 == 0 ? index % 17 : 17 + index % 17),
+                    },
+                    2 => (index % 16) switch
+                    {
+                        8 when index + 1 < count => index + 1,
+                        9 => index - 1,
+                        _ => index,
+                    },
+                    3 => ((index / 2048 * 7) % ((count + 2047) / 2048)) * 2048 + index % 2048,
+                    _ => (naturalRunCount - index * naturalRunCount / count) * count + index,
+                };
+            }
+            return keys;
+        }
+
+        private static IList<T> CreateJesseBacking<T>(int backing, T[] input)
+        {
+            if (backing == 0)
+            {
+                return (T[])input.Clone();
+            }
+            if (backing == 1)
+            {
+                return new List<T>(input);
+            }
+            IndexerOnlyList<T> indexed = new();
+            indexed.AddRange(input);
+            return indexed;
+        }
+
+        private static void VerifyJessePermutation<T>(
+            IList<T> subject,
+            T[] original,
+            IComparer<T> comparer,
+            Func<T, int> originOf
+        )
+        {
+            Assert.That(subject.Count, Is.EqualTo(original.Length));
+            bool[] seen = new bool[original.Length];
+            for (int index = 0; index < original.Length; ++index)
+            {
+                T item = subject[index];
+                int origin = originOf(item);
+                if (origin < 0 || original.Length <= origin || seen[origin])
+                {
+                    Assert.Fail(
+                        $"Output {index} has missing, duplicate, or invalid identity {origin}."
+                    );
+                }
+                seen[origin] = true;
+                if (!EqualityComparer<T>.Default.Equals(item, original[origin]))
+                {
+                    Assert.Fail($"Output {index} changed the payload for identity {origin}.");
+                }
+                if (0 < index && 0 < comparer.Compare(subject[index - 1], item))
+                {
+                    Assert.Fail($"Output {index} violates the supplied comparer ordering.");
+                }
+            }
+        }
+
         private static IEnumerable<SortAlgorithm> EveryAlgorithm()
         {
             foreach (SortAlgorithm algorithm in Enum.GetValues(typeof(SortAlgorithm)))
@@ -357,6 +485,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             CollectionAssert.AreEqual(direct, subject);
             Assert.That(comparer.Comparisons, Is.LessThan(directComparer.Comparisons + count * 2));
+        }
+
+        [TestCaseSource(nameof(JesseRegionRegressionCases))]
+        public void JesseSortPreservesEveryIdentityAcrossMixedRegions(
+            int shape,
+            int count,
+            int backing,
+            bool descending
+        )
+        {
+            int[] keys = CreateJesseRegressionKeys(shape, count);
+            SortProbe[] input = new SortProbe[count];
+            for (int index = 0; index < count; ++index)
+            {
+                input[index] = new SortProbe(keys[index], index);
+            }
+            IComparer<SortProbe> comparer = descending
+                ? Comparer<SortProbe>.Create(static (left, right) => right.Key.CompareTo(left.Key))
+                : new SortProbeKeyComparer();
+            IList<SortProbe> subject = CreateJesseBacking(backing, input);
+            subject.JesseSort(comparer);
+            VerifyJessePermutation(subject, input, comparer, static item => item.Origin);
+        }
+
+        [TestCaseSource(nameof(JesseLargeValueRegressionCases))]
+        public void JesseSortPreservesLargeComparerEquivalentPayloads(
+            int count,
+            int backing,
+            bool descending
+        )
+        {
+            JesseLargeValue[] input = new JesseLargeValue[count];
+            for (int index = 0; index < count; ++index)
+            {
+                int key = index % 2 == 0 ? index % 17 : 17 + index % 17;
+                input[index] = (key, index, index * 3L, ~((long)index), index * 7L, index * 11L);
+            }
+            IComparer<JesseLargeValue> comparer = descending
+                ? Comparer<JesseLargeValue>.Create(
+                    static (left, right) => right.Item1.CompareTo(left.Item1)
+                )
+                : Comparer<JesseLargeValue>.Create(
+                    static (left, right) => left.Item1.CompareTo(right.Item1)
+                );
+            IList<JesseLargeValue> subject = CreateJesseBacking(backing, input);
+            subject.JesseSort(comparer);
+            VerifyJessePermutation(subject, input, comparer, static item => item.Item2);
         }
 
         [Test]

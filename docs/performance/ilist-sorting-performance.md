@@ -33,20 +33,29 @@ Unity Helpers ships several custom sorting algorithms for `IList<T>` that cover 
 
 ## JesseSort
 
-`JesseSort` adapts [Jesse Lew's dual-patience design](https://github.com/lewj85/jessesort).
-It handles sorted, reverse-sorted, and equal input in linear time. Pile assignments are recorded,
-reconstructed into contiguous ascending piles, then merged bottom-up, one adjacent pair at a time:
-an ordered-boundary shortcut emits a single copy when two neighboring piles already read as one
-sorted run, and a reverse-disjoint shortcut block-swaps the pair when every element of the right
-pile precedes every element of the left one. Upstream alignment is still
-in progress. For lists of at least 4,096 items, a full direction-change scan and eight distributed
-16-item dual-patience probes identify sustained disorder. When at least six probes favor direct
-sorting, `JesseSort` routes the input to the package's `IpnSort` implementation. This whole-array
-route is a conservative C# adaptation; it is not upstream's phase-local pipeline. The adaptation's
-[current measurements](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)
-are available in the tracking issue. The historical Jesse columns below measure the previous C#
-port, and the tracking issue also holds the superseded numbers for the intermediate k-way merge
-adaptation.
+`JesseSort` adapts [Jesse Lew's allocating live-phase pipeline](https://github.com/lewj85/jessesort/tree/1bf1f3d5b719c869880d98443050a836a65f47c1),
+including its E750 run precompaction policy. Sorted, reverse-sorted, and equal input retain a linear
+early exit. Other inputs are divided into monotone, direct, and dual-patience regions. Region probes
+grow from 1,024 to 8,192 values; a route change must persist through two confirmation probes.
+Direct regions use the package's `IpnSort` backend. Patience regions record compact pile assignments,
+reuse equivalent-value assignments and previous pile hints, and switch a pressured game's remaining
+suffix to direct sorting. Descending piles are reconstructed before ascending piles.
+
+The pipeline also recognizes sparse disorder from 10,000 values and bounded natural-run layouts
+from 50,000 values. Dense direction changes in values of at least 32 bytes use sorted source indices
+and an in-place permutation to reduce large-value movement. Reference types retain their pointer
+size for this decision. Prepared runs merge in adjacent pairs, with ordered-boundary and
+reverse-disjoint shortcuts, route-specific galloping, and selective outer-run precompaction.
+
+This remains a C# adaptation: direct sorting uses `IpnSort`, pile searches use binary search, and
+pooled cursors replace upstream's reconstruction storage choices. These implementation differences
+preclude a claim of identical C++ timings. The algorithm remains unstable; comparer-equivalent
+items may change relative order. Tests hold ordering and preservation of every original payload
+across array, list, and indexer-only backings, including large records and route thresholds.
+
+The [tracking issue](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747) holds the
+comparison and native Unity evidence. The historical Jesse columns below measure earlier C#
+implementations, rather than this live-phase revision.
 
 ## Where the Time Actually Goes
 
