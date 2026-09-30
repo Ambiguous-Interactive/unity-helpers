@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
 
     [TestFixture]
     [Category("Fast")]
@@ -172,6 +173,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void WarmValuesAndComparerDoNotAllocate()
         {
+            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
             EnumNameComparer<DayOfWeek> comparer = EnumNameComparer<DayOfWeek>.Instance;
             int total = comparer.Compare(DayOfWeek.Monday, DayOfWeek.Friday);
             total += EnumValues<DayOfWeek>.Values.Length;
