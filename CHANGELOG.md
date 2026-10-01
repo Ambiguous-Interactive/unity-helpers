@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add explicit scalar default omission for WallstopProto consumer migrations, with conversion diagnostics and runtime-model compatibility guidance ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Add prompt-free Sentinel workspace APIs for authored rules, preferences, profiles, build gates, and frame budgets, with isolated inputs, diagnostics, and persisted undo/redo ([#901](https://github.com/Ambiguous-Interactive/unity-helpers/issues/901)).
 - Add informational `WPROTO048` migration guidance for protobuf-net runtime model registrations, which do not configure generated formatters ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Add `WUH013` coverage for custom collections with public struct enumerators and immediately cached full-sequence bounds, while retaining indexed traversal for mutation and dictionary keys ([#900](https://github.com/Ambiguous-Interactive/unity-helpers/issues/900)).

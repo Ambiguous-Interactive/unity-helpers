@@ -68,7 +68,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         private readonly Shape _shape;
-        private readonly string _presence;
+        private string _presence;
+        private string _defaultStringExpression;
         private readonly string _value;
         private readonly string _assign;
         private readonly string _declared;
@@ -185,6 +186,46 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 nullable
             );
+        }
+
+        /// <summary>Applies the explicit scalar omission default resolved at compilation.</summary>
+        internal void ConfigureDefault(string expression)
+        {
+            if (string.Equals(expression, "null", System.StringComparison.Ordinal))
+            {
+                return;
+            }
+            if (_shape.IsReference)
+            {
+                _defaultStringExpression = expression;
+                expression = "defaultValue" + Tag;
+            }
+            string comparison = _value + " != " + expression;
+            if (_shape.IsMessage)
+            {
+                comparison = "!" + _value + ".Equals(" + expression + ")";
+            }
+            _presence =
+                _nullable ? "value." + Name + ".HasValue && (" + comparison + ")"
+                : _shape.IsReference ? "value." + Name + " != null && (" + comparison + ")"
+                : comparison;
+        }
+
+        /// <summary>Initializes string defaults once without allocations on the write path.</summary>
+        internal void EmitDefaultField(Writer writer)
+        {
+            if (_defaultStringExpression != null)
+            {
+                writer.Line(
+                    "private static readonly "
+                        + _declared
+                        + " defaultValue"
+                        + Tag
+                        + " = "
+                        + _defaultStringExpression
+                        + ";"
+                );
+            }
         }
 
         /// <inheritdoc />

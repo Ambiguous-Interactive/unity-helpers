@@ -1349,6 +1349,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             writer.Blank();
 
+            foreach (Member member in members)
+            {
+                if (member is ScalarMember scalar)
+                {
+                    scalar.EmitDefaultField(writer);
+                }
+            }
+            writer.Blank();
             EmitCanServe(writer, encodedTypeParameters);
             EmitCanWrite(
                 writer,
@@ -3373,6 +3381,38 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     );
                     failed = true;
                     continue;
+                }
+
+                AttributeData explicitDefault = FindAttribute(
+                    symbol,
+                    "System.ComponentModel.DefaultValueAttribute"
+                );
+                if (explicitDefault != null && !NamedFlag(attribute, "IsRequired"))
+                {
+                    if (
+                        !(member is ScalarMember scalar)
+                        || !DefaultValueExpression.TryCreate(
+                            explicitDefault,
+                            type,
+                            out string expression
+                        )
+                    )
+                    {
+                        Report(
+                            context,
+                            WProtoDiagnostics.UnsupportedDefaultValue,
+                            symbol,
+                            contract.Name,
+                            symbol.Name,
+                            TypeNaming.Display(type)
+                        );
+                        failed = true;
+                        continue;
+                    }
+                    if (!NamedFlag(attribute, "IsRequired"))
+                    {
+                        scalar.ConfigureDefault(expression);
+                    }
                 }
 
                 member.DeclaredType = type.ToDisplayString(
