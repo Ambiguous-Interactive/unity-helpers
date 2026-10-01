@@ -87,7 +87,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         private readonly Action<T> _onDestroy;
         private readonly int _maxIdleCount;
         private readonly List<T> _idle = new();
-        private readonly List<T> _inFlight = new();
+        private readonly List<InFlightItem> _inFlight = new();
+
+        private long _nextOwnershipId;
 
         private bool _disposed;
 
@@ -128,6 +130,25 @@ namespace WallstopStudios.UnityHelpers.Utils
             return candidate == null;
         }
 
+        private static bool TryInvoke(Action<T> callback, T item)
+        {
+            if (callback == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                callback(item);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                return false;
+            }
+        }
+
         /// <summary>
         /// Checks out an item, creating one when none is pooled.
         /// </summary>
@@ -135,7 +156,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <returns><c>true</c> when an item was checked out.</returns>
         /// <remarks>
         /// An item that was destroyed while pooled is discarded rather than handed out. That happens
-        /// whenever a scene unload takes the objects but not the pool holding them.
+        /// whenever a scene unload takes the objects but not the pool holding them. If the producer
+        /// or take callback disposes the pool, or the take callback destroys or releases the item, no item is handed out.
+        /// Callback exceptions are logged; a failed take retires an item it still owns through the destruction callback.
         /// </remarks>
         public bool TryTake(out T taken)
         {
@@ -169,7 +192,16 @@ namespace WallstopStudios.UnityHelpers.Utils
                     return false;
                 }
 
-                candidate = _producer();
+                try
+                {
+                    candidate = _producer();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                    taken = null;
+                    return false;
+                }
 
                 // Neither null nor an already-destroyed produced object may enter tracking.
                 if (IsGone(candidate))
@@ -177,10 +209,38 @@ namespace WallstopStudios.UnityHelpers.Utils
                     taken = null;
                     return false;
                 }
+
+                if (_disposed)
+                {
+                    TryInvoke(_onDestroy, candidate);
+                    taken = null;
+                    return false;
+                }
             }
 
-            _inFlight.Add(candidate);
-            _onTake?.Invoke(candidate);
+            long ownershipId = ++_nextOwnershipId;
+            int index = _inFlight.Count;
+            _inFlight.Add(new InFlightItem(candidate, ownershipId));
+            bool callbackSucceeded = TryInvoke(_onTake, candidate);
+            if (_inFlight.Count <= index || !ReferenceEquals(_inFlight[index].Value, candidate))
+            {
+                index = IndexOfInFlight(candidate);
+            }
+            if (index < 0 || _inFlight[index].OwnershipId != ownershipId)
+            {
+                taken = null;
+                return false;
+            }
+            if (!callbackSucceeded || IsGone(candidate))
+            {
+                _inFlight.RemoveAtSwapBack(index);
+                if (!IsGone(candidate))
+                {
+                    TryInvoke(_onDestroy, candidate);
+                }
+                taken = null;
+                return false;
+            }
             taken = candidate;
             return true;
         }
@@ -194,7 +254,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <remarks>
         /// Releasing something this pool did not hand out, or releasing twice, answers <c>false</c>
         /// rather than throwing — the caller is usually a tween's completion callback, where a throw
-        /// surfaces a level away from its cause and often nowhere at all.
+        /// surfaces a level away from its cause and often nowhere at all. If the release callback
+        /// disposes the pool or throws, the returned item is retired through the destruction callback instead of pooled.
+        /// Callback exceptions are logged; the return still succeeds because the item left tracking.
         /// </remarks>
         public bool Release(T taken)
         {
@@ -218,11 +280,21 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return true;
             }
 
-            _onRelease?.Invoke(taken);
+            bool callbackSucceeded = TryInvoke(_onRelease, taken);
+            if (IsGone(taken))
+            {
+                return true;
+            }
+
+            if (_disposed || !callbackSucceeded)
+            {
+                TryInvoke(_onDestroy, taken);
+                return true;
+            }
 
             if (0 < _maxIdleCount && _maxIdleCount <= _idle.Count)
             {
-                _onDestroy?.Invoke(taken);
+                TryInvoke(_onDestroy, taken);
                 return true;
             }
 
@@ -236,7 +308,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <remarks>
         /// The in-flight list is drained into scratch storage <b>before</b> anything is destroyed, so
         /// that a <see cref="Release"/> arriving from a destroyed item's own ending finds nothing to
-        /// hand back and answers <c>false</c> instead of being counted twice.
+        /// hand back and answers <c>false</c> instead of being counted twice. Destruction callback
+        /// exceptions are logged and do not prevent the remaining items from being processed.
         /// </remarks>
         public void Dispose()
         {
@@ -249,7 +322,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             using (Buffers<T>.List.Get(out List<T> pending))
             {
-                pending.AddRange(_inFlight);
+                foreach (InFlightItem item in _inFlight)
+                {
+                    pending.Add(item.Value);
+                }
                 _inFlight.Clear();
                 pending.AddRange(_idle);
                 _idle.Clear();
@@ -261,7 +337,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         continue;
                     }
 
-                    _onDestroy?.Invoke(current);
+                    TryInvoke(_onDestroy, current);
                 }
             }
         }
@@ -272,13 +348,26 @@ namespace WallstopStudios.UnityHelpers.Utils
             for (int i = 0; i < inFlightCount; ++i)
             {
                 // Reference equality distinguishes different destroyed objects that Unity equality treats as null.
-                if (ReferenceEquals(_inFlight[i], taken))
+                if (ReferenceEquals(_inFlight[i].Value, taken))
                 {
                     return i;
                 }
             }
 
             return -1;
+        }
+
+        private readonly struct InFlightItem
+        {
+            public T Value { get; }
+
+            public long OwnershipId { get; }
+
+            public InFlightItem(T value, long ownershipId)
+            {
+                Value = value;
+                OwnershipId = ownershipId;
+            }
         }
     }
 }

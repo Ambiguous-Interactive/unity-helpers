@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `TrackedObjectPool` callback cleanup so disposed pools retain no returned items, nested takes keep distinct ownership, and callback failures do not interrupt cleanup ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
+- Fix `FileHelper.InitializePath` accepting whitespace-only paths on some platforms. See [File Operations](./docs/features/utilities/helper-utilities.md#file-operations) ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix percentile interpolation across extreme finite values and preserve infinite endpoints without boxing primitive elements ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Fix command-line helpers so blank option names return no values before reading process arguments; padded names and literal values retain exact matching ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank scene queries and temporary scene loads, and reject blank external package identifiers when resolving asset paths ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
