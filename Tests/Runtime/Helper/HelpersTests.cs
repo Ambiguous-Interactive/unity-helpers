@@ -104,6 +104,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsEmpty(Helpers.GetCommandLineArguments(null, "-scene"));
         }
 
+        [TestCase(null, TestName = "CommandLine.BlankName.Null")]
+        [TestCase("", TestName = "CommandLine.BlankName.Empty")]
+        [TestCase(" ", TestName = "CommandLine.BlankName.Space")]
+        [TestCase("\t", TestName = "CommandLine.BlankName.Tab")]
+        [TestCase("\r\n", TestName = "CommandLine.BlankName.LineBreak")]
+        public void CommandLineArgumentsRejectBlankNamesBeforeReadingProcessArguments(string name)
+        {
+            string[] arguments = { name, "unexpected" };
+            Assert.IsTrue(Helpers.GetCommandLineArgument(arguments, name) == null);
+            Assert.IsEmpty(Helpers.GetCommandLineArguments(arguments, name));
+
+            int providerCalls = 0;
+            try
+            {
+                Helpers.CommandLineArgumentProvider = () =>
+                {
+                    providerCalls++;
+                    return arguments;
+                };
+                Assert.IsTrue(Helpers.GetCommandLineArgument(name) == null);
+                Assert.AreEqual(0, providerCalls);
+            }
+            finally
+            {
+                Helpers.ResetCommandLineArgumentProvider();
+            }
+        }
+
+        [TestCase(" -scene ", " ", TestName = "CommandLine.Literal.PaddedName")]
+        [TestCase("-scene", "\t", TestName = "CommandLine.Literal.TabValue")]
+        [TestCase("-scene", "", TestName = "CommandLine.Literal.EmptyValue")]
+        public void CommandLineArgumentsPreserveExactPaddedNamesAndLiteralValues(
+            string name,
+            string value
+        )
+        {
+            string[] arguments = { name, value, name, "second" };
+            Assert.AreEqual(value, Helpers.GetCommandLineArgument(arguments, name));
+            CollectionAssert.AreEqual(
+                new[] { value, "second" },
+                Helpers.GetCommandLineArguments(arguments, name)
+            );
+            if (!string.Equals(name, name.Trim(), StringComparison.Ordinal))
+            {
+                Assert.IsTrue(Helpers.GetCommandLineArgument(arguments, name.Trim()) == null);
+            }
+        }
+
         [Test]
         public void CurrentCommandLineArgumentLookupFailsSoftWhenNameIsAbsent()
         {

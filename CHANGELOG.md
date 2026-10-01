@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix command-line helpers so blank option names return no values before reading process arguments; padded names and literal values retain exact matching ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank scene queries and temporary scene loads, and reject blank external package identifiers when resolving asset paths ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix dropdown providers so blank method names return no options before method discovery ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank animation configuration folders and sprite profile asset paths so they stop before file access or profile matching ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).

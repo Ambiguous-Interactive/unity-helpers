@@ -1663,8 +1663,9 @@ List<string> scenes = Helpers.GetCommandLineArguments(
 ```
 
 `GetCommandLineArguments` preserves repeated values in order. Both helpers fail soft for null input
-or an empty name, and the current-process overload returns `null` instead of throwing when process
-arguments are unavailable.
+or a blank name, and the current-process overload returns `null` instead of throwing when process
+arguments are unavailable. Blank names are rejected before reading process arguments. Names with
+surrounding spaces match exactly, and values retain literal whitespace.
 
 **Supported CI systems (checked via environment variables):**
 
