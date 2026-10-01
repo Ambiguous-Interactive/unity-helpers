@@ -1348,7 +1348,8 @@ IL2CPP player.
 The full High-stripping test player also runs deliberate legacy reflection fixtures. Its runner
 stages their narrowly scoped test linker declarations under `Assets`, because Unity ignores
 package-contained `link.xml` files. Those declarations preserve named legacy fixture contracts and
-the protobuf attribute getters their models inspect. The ordinary `ConsumerMigration` assembly
+the reflected constructor and protobuf attribute getters their legacy models need. The ordinary
+`ConsumerMigration` assembly
 and its generated contracts have no linker preservation entries. Test fixture preservation does
 not establish that an arbitrary consumer can use the legacy runtime engine under IL2CPP.
 

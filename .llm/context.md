@@ -106,7 +106,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 
 Run formatters/linters **immediately after each file change**, not batched at task end:
 
-- **C#**: `dotnet tool run csharpier format .` (or `npm run format:csharp`). `npm run agent:preflight:fix` formats changed C# files and `npm run agent:preflight` / `validate:local` fail on unformatted C#, so a later edit that undoes the formatting is caught locally rather than by CI
+- **C#, MSBuild, and XML**: `dotnet tool run csharpier format <file>` (or `npm run format:csharp` for the whole repository). `npm run agent:preflight:fix` formats changed supported files and `npm run agent:preflight` / `validate:local` fail on formatting drift, including linker XML, so a later edit is caught locally rather than by CI
 - **Non-C#** (`.md`, `.json`, `.yaml`, `.yml`): `node scripts/run-prettier.js --write -- <file>` (repo-local launcher; run `npm install` first on the host that runs hooks)
 - **Markdown**: `npm run lint:docs` + `npm run lint:markdown`
 - **YAML**: `pwsh -NoProfile -File scripts/lint-yaml.ps1 -Paths <changed files>` (then `actionlint <changed workflows>`)

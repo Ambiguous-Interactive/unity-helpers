@@ -18,7 +18,7 @@
 
 | File Type                | Formatter | Command                                          |
 | ------------------------ | --------- | ------------------------------------------------ |
-| C# (`.cs`)               | CSharpier | `dotnet tool run csharpier format .`             |
+| C#, MSBuild, XML         | CSharpier | `dotnet tool run csharpier format <file>`        |
 | Markdown (`.md`)         | Prettier  | `node scripts/run-prettier.js --write -- <file>` |
 | JSON (`.json`,`.asmdef`) | Prettier  | `node scripts/run-prettier.js --write -- <file>` |
 | YAML (`.yml`,`.yaml`)    | Prettier  | `node scripts/run-prettier.js --write -- <file>` |
@@ -34,9 +34,9 @@
 
 Run **IMMEDIATELY** after:
 
-- Creating a new `.cs` file
-- Modifying an existing `.cs` file (even a single line)
-- ANY edit to ANY `.cs` file - no exceptions
+- Creating a C#, MSBuild, or XML file
+- Modifying a C#, MSBuild, or XML file (even a single line)
+- Any edit to a supported file, including `link.xml`
 
 **NEVER:**
 
@@ -61,7 +61,7 @@ npm run format:csharp:check   # whole repo; also runs inside npm run validate:lo
 npm run format:csharp         # whole repo, formatting in place
 ```
 
-`npm run agent:preflight` checks only the **changed** C# files, and `npm run agent:preflight:fix`
+`npm run agent:preflight` checks only the **changed** C#, MSBuild, and XML files, and `npm run agent:preflight:fix`
 formats them and re-stages the staged ones. Formatting a file and then editing it again is the
 common way to push unformatted C#, so the check runs after the fix rather than instead of it.
 
