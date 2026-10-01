@@ -102,7 +102,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     if (
                         value is string directName
                         && attribute.ConstructorArguments.Length == 1
-                        && directName.IndexOf(',') >= 0
+                        && 0 <= directName.IndexOf(',')
                     )
                     {
                         foreach (string token in directName.Split(','))
@@ -404,7 +404,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                                 !EnumBitsFit(enumeration.EnumUnderlyingType.SpecialType, unsigned)
                                 || enumeration.EnumUnderlyingType.SpecialType
                                     != SpecialType.System_UInt64
-                                    && unsigned > long.MaxValue
+                                    && long.MaxValue < unsigned
                             )
                             {
                                 value = null;
@@ -546,17 +546,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 case SpecialType.System_SByte:
                     return bits <= (ulong)sbyte.MaxValue
-                        || unchecked((long)bits) >= sbyte.MinValue && unchecked((long)bits) < 0;
+                        || sbyte.MinValue <= unchecked((long)bits) && unchecked((long)bits) < 0;
                 case SpecialType.System_Byte:
                     return bits <= byte.MaxValue;
                 case SpecialType.System_Int16:
                     return bits <= (ulong)short.MaxValue
-                        || unchecked((long)bits) >= short.MinValue && unchecked((long)bits) < 0;
+                        || short.MinValue <= unchecked((long)bits) && unchecked((long)bits) < 0;
                 case SpecialType.System_UInt16:
                     return bits <= ushort.MaxValue;
                 case SpecialType.System_Int32:
                     return bits <= int.MaxValue
-                        || unchecked((long)bits) >= int.MinValue && unchecked((long)bits) < 0;
+                        || int.MinValue <= unchecked((long)bits) && unchecked((long)bits) < 0;
                 case SpecialType.System_UInt32:
                     return bits <= uint.MaxValue;
                 case SpecialType.System_Int64:
