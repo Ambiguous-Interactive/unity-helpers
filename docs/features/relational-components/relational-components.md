@@ -469,6 +469,8 @@ public class Enemy : MonoBehaviour
 - **Safe fallback** - Gracefully degrades to standard behavior if DI binding is missing
 - **Risk-free adoption** - Use incrementally, mix DI and non-DI components freely
 
+The shared assigner and the Zenject and VContainer scene entry points preserve their injected constructors for IL2CPP players, including builds with High managed stripping. The built-in registrations need no additional linker roots for these constructors ([#916](https://github.com/wallstop/unity-helpers/issues/916)).
+
 ### Supported Packages (Auto-detected)
 
 Unity Helpers automatically detects these packages via UPM:

@@ -1286,9 +1286,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 count = 0;
             }
-            else if (source.Count < count)
+            else
             {
-                count = source.Count;
+                int sourceCount = source.Count;
+                if (sourceCount < count)
+                {
+                    count = sourceCount;
+                }
             }
 
             Func<List<TSource>, int, Array> builder = GetTypedArrayBuilderCached<TSource>(

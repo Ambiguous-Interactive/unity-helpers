@@ -677,8 +677,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int hullCount = hull.Count;
                 for (int i = 0; 2 < hullCount && i < hullCount; ++i)
                 {
-                    int prevIndex = (i - 1 + hull.Count) % hull.Count;
-                    int nextIndex = (i + 1) % hull.Count;
+                    int prevIndex = (i - 1 + hullCount) % hullCount;
+                    int nextIndex = (i + 1) % hullCount;
                     Vector3Int prevPoint = hull[prevIndex];
                     Vector3Int currentPoint = hull[i];
                     Vector3Int nextPoint = hull[nextIndex];
@@ -713,8 +713,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int hullCount = hull.Count;
                 for (int i = 0; 2 < hullCount && i < hullCount; ++i)
                 {
-                    int prevIndex = (i - 1 + hull.Count) % hull.Count;
-                    int nextIndex = (i + 1) % hull.Count;
+                    int prevIndex = (i - 1 + hullCount) % hullCount;
+                    int nextIndex = (i + 1) % hullCount;
                     FastVector3Int prevPoint = hull[prevIndex];
                     FastVector3Int currentPoint = hull[i];
                     FastVector3Int nextPoint = hull[nextIndex];

@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
     using global::VContainer.Unity;
     using UnityEngine;
     using UnityEngine.SceneManagement;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tags;
@@ -46,6 +47,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
         private readonly AttributeMetadataCache _metadataCache;
         private readonly RelationalSceneAssignmentOptions _options;
 
+        // The container constructs this entry point through reflection in IL2CPP players.
+        [Preserve]
         public RelationalComponentEntryPoint(
             IRelationalComponentAssigner assigner,
             AttributeMetadataCache metadataCache,

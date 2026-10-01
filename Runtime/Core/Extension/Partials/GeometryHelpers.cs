@@ -393,9 +393,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            if (writeIndex < points.Count)
+            int finalPointCount = points.Count;
+            if (writeIndex < finalPointCount)
             {
-                points.RemoveRange(writeIndex, points.Count - writeIndex);
+                points.RemoveRange(writeIndex, finalPointCount - writeIndex);
             }
         }
 
@@ -422,9 +423,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            if (writeIndex < points.Count)
+            int finalPointCount = points.Count;
+            if (writeIndex < finalPointCount)
             {
-                points.RemoveRange(writeIndex, points.Count - writeIndex);
+                points.RemoveRange(writeIndex, finalPointCount - writeIndex);
             }
         }
 
@@ -451,9 +453,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            if (writeIndex < points.Count)
+            int finalPointCount = points.Count;
+            if (writeIndex < finalPointCount)
             {
-                points.RemoveRange(writeIndex, points.Count - writeIndex);
+                points.RemoveRange(writeIndex, finalPointCount - writeIndex);
             }
         }
 
@@ -1131,9 +1134,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (source is ICollection<FastVector3Int> collection)
             {
-                if (vectorPoints.Capacity < collection.Count)
+                int collectionCount = collection.Count;
+                if (vectorPoints.Capacity < collectionCount)
                 {
-                    vectorPoints.Capacity = collection.Count;
+                    vectorPoints.Capacity = collectionCount;
                 }
             }
 

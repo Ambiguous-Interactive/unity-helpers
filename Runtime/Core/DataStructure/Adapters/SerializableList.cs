@@ -281,12 +281,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public void CopyTo(T[] array, int arrayIndex)
         {
             List<T> items = _items;
-            if (items == null || items.Count == 0)
+            if (items == null)
             {
                 return;
             }
 
-            if (array == null || arrayIndex < 0 || array.Length - arrayIndex < items.Count)
+            int itemCount = items.Count;
+            if (itemCount == 0)
+            {
+                return;
+            }
+
+            if (array == null || arrayIndex < 0 || array.Length - arrayIndex < itemCount)
             {
                 return;
             }

@@ -500,16 +500,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             foreach (List<int> indexSet in _disjointSet.TryGetAllSets(indexSets))
             {
+                int indexCount = indexSet.Count;
                 if (!stack.TryPop(out List<T> elementSet))
                 {
-                    elementSet = new List<T>(indexSet.Count);
+                    elementSet = new List<T>(indexCount);
                 }
                 else
                 {
                     elementSet.Clear();
-                    if (elementSet.Capacity < indexSet.Count)
+                    if (elementSet.Capacity < indexCount)
                     {
-                        elementSet.Capacity = indexSet.Count;
+                        elementSet.Capacity = indexCount;
                     }
                 }
 

@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
     using global::Zenject;
     using UnityEngine;
     using UnityEngine.SceneManagement;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tags;
@@ -23,6 +24,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
         private readonly AttributeMetadataCache _metadataCache;
         private readonly RelationalSceneAssignmentOptions _options;
 
+        // The container constructs this entry point through reflection in IL2CPP players.
+        [Preserve]
         public RelationalSceneLoadListener(
             IRelationalComponentAssigner assigner,
             AttributeMetadataCache metadataCache,

@@ -89,18 +89,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
             builder.RegisterInstance(cache).AsSelf();
             RecordingAssigner assigner = new();
             builder.RegisterInstance(assigner).As<IRelationalComponentAssigner>();
+            builder.RegisterInstance(RelationalSceneAssignmentOptions.Default);
+            builder.Register<RelationalComponentEntryPoint>(Lifetime.Singleton);
             IObjectResolver resolver = builder.Build();
+            TrackDisposable(resolver);
 
             VContainerRelationalTester tester = CreateHierarchy();
             GameObject rootObj = tester.transform.root.gameObject;
             SceneManager.MoveGameObjectToScene(rootObj, scene);
             yield return null;
 
-            RelationalComponentEntryPoint entryPoint = new(
-                resolver.Resolve<IRelationalComponentAssigner>(),
-                cache,
-                RelationalSceneAssignmentOptions.Default
-            );
+            RelationalComponentEntryPoint entryPoint =
+                resolver.Resolve<RelationalComponentEntryPoint>();
             entryPoint.Initialize();
             yield return null;
 
@@ -123,7 +123,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
                 includeInactive: true,
                 useSinglePassScan: true
             );
-            RelationalSceneLoadListener listener = new(assigner, cache, options);
+            ContainerBuilder builder = new();
+            builder.RegisterInstance(cache);
+            builder.RegisterInstance(assigner).As<IRelationalComponentAssigner>();
+            builder.RegisterInstance(options);
+            builder.Register<RelationalSceneLoadListener>(Lifetime.Singleton);
+            IObjectResolver resolver = builder.Build();
+            TrackDisposable(resolver);
+            RelationalSceneLoadListener listener = resolver.Resolve<RelationalSceneLoadListener>();
             listener.Initialize();
             TrackDisposable(listener);
 
@@ -160,7 +167,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
                 includeInactive: true,
                 useSinglePassScan: false
             );
-            RelationalSceneLoadListener listener = new(assigner, cache, options);
+            ContainerBuilder builder = new();
+            builder.RegisterInstance(cache);
+            builder.RegisterInstance(assigner).As<IRelationalComponentAssigner>();
+            builder.RegisterInstance(options);
+            builder.Register<RelationalSceneLoadListener>(Lifetime.Singleton);
+            IObjectResolver resolver = builder.Build();
+            TrackDisposable(resolver);
+            RelationalSceneLoadListener listener = resolver.Resolve<RelationalSceneLoadListener>();
             listener.Initialize();
             TrackDisposable(listener);
 

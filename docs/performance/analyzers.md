@@ -50,20 +50,21 @@ the window edits the project-wide default ruleset. Writes import the asset immed
 | [`WUH018`](#wuh018-implicit-string-equality-opt-in)                      | String equality without an explicit policy (**off by default**)       |
 | [`WUH019`](#wuh019-repeated-stable-loop-bound-opt-in)                    | A counting loop repeatedly reading a stable size (**off by default**) |
 | [`WUH020`](#wuh020-hard-stack-and-queue-reads)                           | A throwing stack or queue read with an available Try method           |
+| [`WUH021`](#wuh021-repeated-collection-count-opt-in)                     | Repeated collection Count observations (**off by default**)           |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
 
-|                     | `WPROTO###`                                                  | `WUH###`                                              |
-| ------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
-| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code              |
-| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported       |
-| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                |
-| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, and `WUH019` |
+|                     | `WPROTO###`                                                  | `WUH###`                                                        |
+| ------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
+| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                        |
+| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                 |
+| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                          |
+| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, and `WUH021` |
 
 **A `WUH###` diagnostic defaults to a warning.** Taking a package upgrade does not promote it to
 a build error; an explicit Error override does. If your project treats warnings as errors, see
-[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, and `WUH019` go further and are off until you ask for them, because
+[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, and `WUH021` go further and are off until you ask for them, because
 their shapes are correct code far more often than they are defects.
 
 The compact policy list offers a severity selector beside each diagnostic:
@@ -866,8 +867,9 @@ The policy is off by default. Production TypeCheck, EditorCheck, and Integration
 through `Generator~/ProductionCheckProjects.ruleset`, which imports the shared policies. Test and
 tooling projects keep the shared ruleset. WUH019 promotion is limited to those production projects: explicitly listing a diagnostic in
 `WarningsAsErrors` enables it even when a shared ruleset says `None`.
-The excluded-production-source loop audit runs both WUH013 and WUH019 and requires a reporting
-control for each, so old host reference gaps cannot silently bypass either rule.
+The excluded-production-source audit runs WUH013, WUH019, and WUH021 and requires a reporting
+control for each beside an unresolved API in the same compilation. Known host reference gaps
+cannot silently bypass these collection-size rules in the nine audited production sources.
 
 ## `WUH020`: hard stack and queue reads
 
@@ -901,6 +903,52 @@ even when a caller knows the collection is populated. A guard can also become st
 caller changes the collection. The diagnostic is on by default, suppressible, and a warning.
 There is no automatic fix because choosing what happens when the collection is empty requires
 caller policy. Checking the boolean result also avoids [`WUH008`](#wuh008-a-tryxxx-out-value-read-without-testing-the-call).
+
+## `WUH021`: repeated collection Count (opt-in)
+
+Read `Count` once when a guard and later work require one snapshot:
+
+```csharp
+// WUH021: two observations for one capacity decision.
+if (values.Count > 0)
+{
+    Reserve(values.Count);
+}
+
+int count = values.Count;
+if (count > 0)
+{
+    Reserve(count);
+}
+```
+
+The rule recognizes the .NET `ICollection<T>`, `IReadOnlyCollection<T>`, and non-generic
+`ICollection` contracts, including inherited interfaces and constrained generic receivers.
+It follows the same local, parameter, or field receiver along uninterrupted evaluation paths,
+including guards, conditional expressions, and call arguments. Reference casts retain receiver
+identity when the invoked member remains the same. Interface dispatch on an unsealed receiver
+can select a different implementation, so it does not merge a class Count with an interface Count.
+A sealed receiver can establish that mapping. Distinct explicit Count implementations remain
+separate observations.
+Custom properties named Count outside these contracts are exempt.
+
+Calls, mutations, unknown getters, user operators, and constructors interrupt observations.
+Unfamiliar operation shapes are opaque boundaries, including implicit coalesce conversions and
+record clones. Static field access can run a type initializer and also interrupts earlier reads.
+Constructors run before their initializers; nested functions start with independent state.
+Loop and exception boundaries do not carry earlier observations into later paths.
+This conservative analysis does not prove Count pure or thread-safe. Interface getters can
+execute custom code, and concurrent observations can differ even without a visible mutation.
+A snapshot does not synchronize a collection. Suppress intentional repeated observations when
+one snapshot would change the intended behavior. There is no automatic code fix.
+
+This suppressible warning is off by default for consumers. Enable it with
+`<Rule Id="WUH021" Action="Warning" />` in a project ruleset. Production TypeCheck,
+EditorCheck, and IntegrationCheck enable and promote WUH021 alongside WUH019 through
+`Generator~/ProductionCheckProjects.ruleset`; tests and tooling retain the shared opt-in policy.
+Compiler controls require both production diagnostics and their absence in shared projects.
+The existing excluded-source audit also enforces WUH021 in its nine production subjects and
+requires a separate reporting control alongside known unresolved host APIs.
 
 ## Turning one off
 

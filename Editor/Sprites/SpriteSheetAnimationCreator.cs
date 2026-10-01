@@ -795,8 +795,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (
                 startSpriteIndex < 0
                 || endSpriteIndex < 0
-                || _availableSprites.Count <= startSpriteIndex
-                || _availableSprites.Count <= endSpriteIndex
+                || _availableSprites.Count <= Math.Max(startSpriteIndex, endSpriteIndex)
             )
             {
                 this.LogWarn(
@@ -1061,14 +1060,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             definition.startIndexField.SetValueWithoutNotify(definition.StartSpriteIndex);
             EventCallback<ChangeEvent<int>> startChangeCallback = evt =>
             {
+                int availableSpriteCount = _availableSprites.Count;
                 definition.StartSpriteIndex = Mathf.Clamp(
                     evt.newValue,
                     0,
-                    0 < _availableSprites.Count ? _availableSprites.Count - 1 : 0
+                    0 < availableSpriteCount ? availableSpriteCount - 1 : 0
                 );
                 if (
                     definition.EndSpriteIndex < definition.StartSpriteIndex
-                    && 0 < _availableSprites.Count
+                    && 0 < availableSpriteCount
                 )
                 {
                     definition.EndSpriteIndex = definition.StartSpriteIndex;
@@ -1087,14 +1087,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             definition.endIndexField.SetValueWithoutNotify(definition.EndSpriteIndex);
             EventCallback<ChangeEvent<int>> endChangeCallback = evt =>
             {
+                int availableSpriteCount = _availableSprites.Count;
                 definition.EndSpriteIndex = Mathf.Clamp(
                     evt.newValue,
                     0,
-                    0 < _availableSprites.Count ? _availableSprites.Count - 1 : 0
+                    0 < availableSpriteCount ? availableSpriteCount - 1 : 0
                 );
                 if (
                     definition.EndSpriteIndex < definition.StartSpriteIndex
-                    && 0 < _availableSprites.Count
+                    && 0 < availableSpriteCount
                 )
                 {
                     definition.StartSpriteIndex = definition.EndSpriteIndex;
@@ -1178,11 +1179,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private void UpdateSpritesForDefinition(AnimationDefinition def)
         {
             def.SpritesToAnimate.Clear();
+            int availableSpriteCount = _availableSprites.Count;
             if (
-                0 < _availableSprites.Count
+                0 < availableSpriteCount
                 && def.StartSpriteIndex <= def.EndSpriteIndex
-                && def.StartSpriteIndex < _availableSprites.Count
-                && def.EndSpriteIndex < _availableSprites.Count
+                && def.StartSpriteIndex < availableSpriteCount
+                && def.EndSpriteIndex < availableSpriteCount
                 && 0 <= def.StartSpriteIndex
                 && 0 <= def.EndSpriteIndex
             )

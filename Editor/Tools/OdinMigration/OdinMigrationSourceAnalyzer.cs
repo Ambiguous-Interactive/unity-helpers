@@ -1336,11 +1336,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 int index = 0;
                 while (index < source.Length)
                 {
-                    bool atCompilationUnit = braceKinds.Count == 0;
+                    int braceCount = braceKinds.Count;
+                    bool atCompilationUnit = braceCount == 0;
                     bool atDirectTypeBody =
-                        0 < braceKinds.Count
-                        && braceKinds[braceKinds.Count - 1]
-                        && parenthesisDepth == 0;
+                        0 < braceCount && braceKinds[braceCount - 1] && parenthesisDepth == 0;
                     compilationUnit[index] = atCompilationUnit;
                     directTypeBody[index] = atDirectTypeBody;
 
@@ -1406,9 +1405,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             headerHasParentheses = false;
                             break;
                         case '}':
-                            if (0 < braceKinds.Count)
+                            if (0 < braceCount)
                             {
-                                braceKinds.RemoveAt(braceKinds.Count - 1);
+                                braceKinds.RemoveAt(braceCount - 1);
                             }
                             headerDeclaresType = false;
                             headerHasParentheses = false;
@@ -1420,11 +1419,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     }
                     index++;
                 }
-                compilationUnit[source.Length] = braceKinds.Count == 0;
+                int finalBraceCount = braceKinds.Count;
+                compilationUnit[source.Length] = finalBraceCount == 0;
                 directTypeBody[source.Length] =
-                    0 < braceKinds.Count
-                    && braceKinds[braceKinds.Count - 1]
-                    && parenthesisDepth == 0;
+                    0 < finalBraceCount && braceKinds[finalBraceCount - 1] && parenthesisDepth == 0;
             }
 
             private static bool IdentifierEquals(string source, int start, int end, string expected)

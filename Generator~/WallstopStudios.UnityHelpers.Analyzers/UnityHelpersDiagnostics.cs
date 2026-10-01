@@ -515,5 +515,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true
         );
+
+        /// <summary>A repeated collection Count observation without an intervening execution boundary.</summary>
+        internal static readonly DiagnosticDescriptor RepeatedCollectionCount =
+            new DiagnosticDescriptor(
+                "WUH021",
+                "Collection Count is read repeatedly",
+                "'{0}' reads Count again on this evaluation path. Read Count once when one snapshot is intended. Interface getters may execute custom code, and concurrent observations may differ; retain intentional live reads with a suppression. WUH021 is opt-in.",
+                "Performance",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: false
+            );
     }
 }

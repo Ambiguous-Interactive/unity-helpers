@@ -821,8 +821,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static double Median(this IReadOnlyList<int> values)
         {
             using PooledResource<List<int>> lease = CopySorted(values, out List<int> sorted);
-            int middle = sorted.Count / 2;
-            if (sorted.Count % 2 == 1)
+            int sortedCount = sorted.Count;
+            int middle = sortedCount / 2;
+            if (sortedCount % 2 == 1)
             {
                 return sorted[middle];
             }
@@ -844,8 +845,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static double Median(this IReadOnlyList<long> values)
         {
             using PooledResource<List<long>> lease = CopySorted(values, out List<long> sorted);
-            int middle = sorted.Count / 2;
-            if (sorted.Count % 2 == 1)
+            int sortedCount = sorted.Count;
+            int middle = sortedCount / 2;
+            if (sortedCount % 2 == 1)
             {
                 return sorted[middle];
             }

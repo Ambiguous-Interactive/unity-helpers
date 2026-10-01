@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add opt-in `WUH021` to flag repeated collection counts, including interface reads, when one snapshot is intended.
 - Add `WUH020` to suggest non-throwing queue and stack reads when compatible `Try` methods are available ([#912](https://github.com/Ambiguous-Interactive/unity-helpers/issues/912)).
 - Add explicit scalar default omission for WallstopProto consumer migrations, with ordinary consumer migration coverage and runtime-model compatibility guidance ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Add prompt-free Sentinel workspace APIs for authored rules, preferences, profiles, build gates, and frame budgets, with isolated inputs, blank-path rejection, diagnostics, and persisted undo/redo ([#901](https://github.com/Ambiguous-Interactive/unity-helpers/issues/901)).
@@ -24,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix relational component assigner and injection constructors being stripped from High-stripping IL2CPP players using Zenject, VContainer, or Reflex ([#916](https://github.com/Ambiguous-Interactive/unity-helpers/issues/916)).
 - Fix WButton coroutines retaining resources when cancelled, completed, or faulted. Nested callback updates also leave each routine intact ([#911](https://github.com/Ambiguous-Interactive/unity-helpers/issues/911)).
 - Fix persistent runtime singletons losing their authored world placement when detached from transformed parents ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix `PartitionPooled` retaining outstanding lists when the source throws during disposal. Cleanup no longer replaces an exception from batch processing ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).

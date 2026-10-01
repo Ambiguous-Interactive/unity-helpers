@@ -116,6 +116,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Throwing collection retrieval",
                 "Reports stack and queue retrievals that can use a compatible Try method."
             ),
+            new(
+                "WUH021",
+                "Repeated collection Count",
+                "Reports repeated Count observations when one snapshot is intended. This policy is opt-in by default."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

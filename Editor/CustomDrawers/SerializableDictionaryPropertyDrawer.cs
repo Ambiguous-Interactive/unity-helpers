@@ -10051,10 +10051,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                     if (!_groupingDictionary.TryGetValue(lookupKey, out List<int> indices))
                     {
-                        if (0 < _listPool.Count)
+                        int poolCount = _listPool.Count;
+                        if (0 < poolCount)
                         {
-                            indices = _listPool[_listPool.Count - 1];
-                            _listPool.RemoveAt(_listPool.Count - 1);
+                            int lastIndex = poolCount - 1;
+                            indices = _listPool[lastIndex];
+                            _listPool.RemoveAt(lastIndex);
                         }
                         else
                         {

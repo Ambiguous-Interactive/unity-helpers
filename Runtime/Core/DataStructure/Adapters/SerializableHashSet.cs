@@ -1180,12 +1180,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return (T[])_items.Clone();
             }
 
-            if (_set.Count == 0)
+            int itemCount = _set.Count;
+            if (itemCount == 0)
             {
                 return Array.Empty<T>();
             }
 
-            T[] snapshot = new T[_set.Count];
+            T[] snapshot = new T[itemCount];
             _set.CopyTo(snapshot, 0);
             return snapshot;
         }

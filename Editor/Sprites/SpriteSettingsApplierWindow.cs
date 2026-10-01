@@ -203,9 +203,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             _assetsThatWillChange.Clear();
-            if (_assetsThatWillChange.Capacity < targetFiles.Count)
+            int targetFileCount = targetFiles.Count;
+            if (_assetsThatWillChange.Capacity < targetFileCount)
             {
-                _assetsThatWillChange.Capacity = targetFiles.Count;
+                _assetsThatWillChange.Capacity = targetFileCount;
             }
 
             List<SpriteSettingsApplierAPI.PreparedProfile> prepared =

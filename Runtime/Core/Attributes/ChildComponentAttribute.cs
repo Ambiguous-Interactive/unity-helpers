@@ -590,9 +590,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             {
                 count = 0;
             }
-            else if (components.Count < count)
+            else
             {
-                count = components.Count;
+                int componentCount = components.Count;
+                if (componentCount < count)
+                {
+                    count = componentCount;
+                }
             }
 
             switch (metadata.kind)

@@ -1499,9 +1499,10 @@ namespace WallstopStudios.UnityHelpers.Utils
             _usageTracker.RecordRent(currentTime);
 
             T rented;
-            if (0 < _pool.Count)
+            int poolCount = _pool.Count;
+            if (0 < poolCount)
             {
-                int lastIndex = _pool.Count - 1;
+                int lastIndex = poolCount - 1;
                 rented = _pool[lastIndex].Value;
                 _pool.RemoveAt(lastIndex);
             }
@@ -2465,9 +2466,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (_lock)
             {
-                if (0 < _pool.Count)
+                int poolCount = _pool.Count;
+                if (0 < poolCount)
                 {
-                    int lastIndex = _pool.Count - 1;
+                    int lastIndex = poolCount - 1;
                     T pooled = _pool[lastIndex].Value;
                     _pool.RemoveAt(lastIndex);
                     _onGet?.Invoke(pooled);

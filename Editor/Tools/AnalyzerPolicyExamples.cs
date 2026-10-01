@@ -172,6 +172,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Test retrieval success directly. A Count check can become stale before the next operation.";
                     break;
+                case "WUH021":
+                    selectedBadCode = "if (values.Count > 0)\n{\n    Reserve(values.Count);\n}";
+                    selectedGoodCode =
+                        "int count = values.Count;\nif (count > 0)\n{\n    Reserve(count);\n}";
+                    selectedExplanation =
+                        "Read Count once when one snapshot is intended. Suppress intentional live observations; interface getters may execute custom code and concurrent observations may differ.";
+                    break;
                 default:
                     badCode = string.Empty;
                     goodCode = string.Empty;

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using Helper;
     using Tags;
     using UnityEngine;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Utils;
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
@@ -44,12 +45,16 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// <summary>
         /// Creates a new assigner using the active <c>AttributeMetadataCache.Instance</c>.
         /// </summary>
+        // Built-in DI registrations construct the assigner through reflection.
+        [Preserve]
         public RelationalComponentAssigner()
             : this(AttributeMetadataCache.Instance) { }
 
         /// <summary>
         /// Creates a new assigner using the supplied metadata cache.
         /// </summary>
+        // Built-in DI registrations construct the assigner through reflection.
+        [Preserve]
         public RelationalComponentAssigner(AttributeMetadataCache metadataCache)
         {
             _metadataCache = metadataCache;

@@ -1685,11 +1685,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int notificationCount = 0;
             try
             {
-                if (_pendingEvictions != null && 0 < _pendingEvictions.Count)
+                int pendingCount = _pendingEvictions == null ? 0 : _pendingEvictions.Count;
+                if (0 < pendingCount)
                 {
-                    notifications = ArrayPool<EvictionNotification>.Shared.Rent(
-                        _pendingEvictions.Count
-                    );
+                    notifications = ArrayPool<EvictionNotification>.Shared.Rent(pendingCount);
                     while (_pendingEvictions.TryDequeue(out EvictionNotification notification))
                     {
                         notifications[notificationCount++] = notification;

@@ -95,9 +95,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                     folders.Add("Assets");
                 }
 
-                if (0 < folders.Count)
+                int folderCount = folders.Count;
+                if (0 < folderCount)
                 {
-                    string[] folderPaths = new string[folders.Count];
+                    string[] folderPaths = new string[folderCount];
                     folders.CopyTo(folderPaths);
                     string[] found = AssetDatabase.FindAssets(
                         onlySprites ? "t:sprite" : "t:texture2D",
@@ -109,9 +110,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
                 }
 
-                if (destination.Capacity < guids.Count)
+                int guidCount = guids.Count;
+                if (destination.Capacity < guidCount)
                 {
-                    destination.Capacity = guids.Count;
+                    destination.Capacity = guidCount;
                 }
                 foreach (string guid in guids)
                 {

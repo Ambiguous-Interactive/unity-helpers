@@ -997,9 +997,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _serializedObject.ApplyModifiedProperties();
                 Refresh();
 
-                if (0 < _indices.Count)
+                int indexCount = _indices.Count;
+                if (0 < indexCount)
                 {
-                    _listView.selectedIndex = Mathf.Clamp(selectedIndex, 0, _indices.Count - 1);
+                    _listView.selectedIndex = Mathf.Clamp(selectedIndex, 0, indexCount - 1);
                 }
             }
 

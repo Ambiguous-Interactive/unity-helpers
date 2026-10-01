@@ -1245,7 +1245,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             bool alreadySorted = false
         )
         {
-            if (labels == null || labels.Count == 0)
+            int labelCount = labels == null ? 0 : labels.Count;
+            if (labelCount == 0)
             {
                 AllSpriteLabels = Array.Empty<string>();
 #if UNITY_EDITOR
@@ -1255,7 +1256,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             string[] cache =
-                AllSpriteLabels.Length == labels.Count ? AllSpriteLabels : new string[labels.Count];
+                AllSpriteLabels.Length == labelCount ? AllSpriteLabels : new string[labelCount];
 
             if (labels is IReadOnlyList<string> list)
             {

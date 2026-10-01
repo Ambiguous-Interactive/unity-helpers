@@ -119,13 +119,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
-            bool hasActivePartialCycle = 0 < _remaining.Count && _remaining.Count < _entries.Count;
+            int remainingCount = _remaining.Count;
+            bool hasActivePartialCycle = 0 < remainingCount && remainingCount < _entries.Count;
             if (hasActivePartialCycle)
             {
                 return false;
             }
 
-            bool resetAfterAdd = 0 < _entries.Count && _remaining.Count == 0;
+            bool resetAfterAdd = 0 < _entries.Count && remainingCount == 0;
             for (int i = 0; i < tickets; ++i)
             {
                 _entries.Add(item);

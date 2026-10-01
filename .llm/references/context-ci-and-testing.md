@@ -43,8 +43,8 @@ redacted, uploaded, and required by the aggregate gate (#813).
     the newest ever published** -- so a 2021.2/2021.3 member reads as absent: #553 one notch worse.
     Exclude such a file rather than "fixing" the source; the seven exclusions and their
     compile shims are enumerated in the csproj. **These exclusions still lack complete local API binding checks**. The editor build runs a
-    separate WUH013 audit over nine excluded runtime/editor subjects, including the dictionary and set
-    drawers, with an in-compilation reporting control; this certifies only counting-loop diagnostics.
+    separate WUH013/WUH019/WUH021 audit over nine excluded runtime/editor subjects, including the dictionary and set
+    drawers, with in-compilation reporting controls; this certifies only these collection diagnostics.
     Other changes still require real Unity verification. Copy the check
     project, drop those two `<Compile Remove>` lines and build that: the only `CS####` it should
     report are six `CS0154` on `managedReferenceValue`, the 2021.1.14 gap the exclusions exist
