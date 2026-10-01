@@ -81,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static IEnumerable<TestCaseData> Cases()
         {
-            for (int number = 1; number <= 19; number++)
+            for (int number = 1; number <= 20; number++)
             {
                 string id = $"WUH{number:000}";
                 yield return new TestCaseData(id).SetName(id + "ExamplesMatchTheActualDiagnostic");
@@ -128,6 +128,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new StringEqualityAnalyzer();
                 case "WUH019":
                     return new LoopBoundAnalyzer();
+                case "WUH020":
+                    return new HardCollectionReadAnalyzer();
                 default:
                     Assert.Fail("Unmapped diagnostic " + id);
                     return null;
@@ -210,6 +212,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     break;
                 case "WUH018":
                     fields = "private string mode; private void Read() { }";
+                    break;
+                case "WUH020":
+                    fields = "private Queue<int> queue = new(); private void Process(int item) { }";
                     break;
                 case "WUH019":
                     fields = "private int[] rows = new int[4]; private int[] output = new int[4];";

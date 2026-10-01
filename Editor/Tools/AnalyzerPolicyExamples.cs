@@ -165,6 +165,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Cache a stable size for indexed traversal. Keep live bounds when callbacks can change the collection.";
                     break;
+                case "WUH020":
+                    selectedBadCode = "if (queue.Count != 0)\n{\n    Process(queue.Dequeue());\n}";
+                    selectedGoodCode =
+                        "if (queue.TryDequeue(out int value))\n{\n    Process(value);\n}";
+                    selectedExplanation =
+                        "Test retrieval success directly. A Count check can become stale before the next operation.";
+                    break;
                 default:
                     badCode = string.Empty;
                     goodCode = string.Empty;

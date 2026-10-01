@@ -30,6 +30,7 @@ $fixturePaths = @(
     'Tests/Editor/Capture/SentinelSurfaceCaptureTests.cs',
     'Tests/Editor/Tools/WProtoSubtypeTagAssignerClassificationTests.cs',
     'Tests/Runtime/Serialization/WProtoCrossAssemblyTests.cs',
+    'Tests/Runtime/Serialization/WProtoConsumerMigrationTests.cs',
     'Tests/Runtime/Performance/IntMapPerformanceTests.cs'
 )
 try {
@@ -66,16 +67,24 @@ if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Tools') {
 if ($ManagedStrippingLevel -eq 'High') {
     $root = Join-Path $ProjectPath 'Assets/SerializationAcceptance'
     $assemblies = @(Get-ChildItem -LiteralPath $root -Filter '*.asmdef' -Recurse)
-    if ($assemblies.Count -ne 2) { throw 'High stripping needs two ordinary model assemblies.' }
+    if ($assemblies.Count -ne 3) { throw 'High stripping needs three ordinary model assemblies.' }
     foreach ($assembly in $assemblies) {
         $definition = Get-Content -LiteralPath $assembly.FullName -Raw | ConvertFrom-Json
         if ($definition.references -isnot [array]) { throw 'Assembly references must be a JSON array, including one reference.' }
+        if (-not $definition.overrideReferences -or $definition.precompiledReferences.Count -ne 0) {
+            throw 'Ordinary acceptance assemblies must not reference protobuf-net or NUnit.'
+        }
         if (-not $definition.autoReferenced -or ($definition.references -join ',') -match 'Tests|TestRunner') {
             throw 'Stripping subjects must not depend on test assemblies.'
         }
     }
     $consumer = Get-Content -LiteralPath (Join-Path $root 'Consumer/Contracts.cs') -Raw
     if ($consumer -match 'NUnit|\[Test|\[Category|Tests\.Core') { throw 'Ordinary consumer retained test framework roots.' }
+    $migrationDefinition = Get-Content -LiteralPath (Join-Path $root 'MigrationContracts/MigrationContracts.asmdef') -Raw | ConvertFrom-Json
+    if (-not $migrationDefinition.overrideReferences -or $migrationDefinition.precompiledReferences.Count -ne 0 -or
+        $migrationDefinition.defineConstraints.Count -ne 0) { throw 'Migration declarations must compile without fallback or test framework references.' }
+    $migrationCases = Get-Content -LiteralPath (Join-Path $root 'Consumer/MigrationCases.cs') -Raw
+    if ($migrationCases -match 'NUnit|\[Test|\[Category|Tests\.Serialization|#if !ENABLE_IL2CPP') { throw 'Migration acceptance retained test-only declarations.' }
     $driver = Get-Content -LiteralPath (Join-Path $root 'Consumer/SerializationAcceptance.cs') -Raw
     if ($driver -notmatch 'UH_SERIALIZATION_ACCEPTANCE commit=[0-9a-f]{40}') { throw 'Native driver is not bound to source.' }
 }
@@ -186,27 +195,30 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         if ($calls.Count -ne $expected) { throw "Wrong selected invocation count for $selection." }
         foreach ($call in $calls) {
             $fixtures = @($fixturePaths | Where-Object {
-                [IO.Path]::GetFileNameWithoutExtension($_) -in ($call.TestFilter -split '\.')
+                [IO.Path]::GetFileNameWithoutExtension($_) -in ($call.TestFilter -split '[.;]')
             })
-            if ($fixtures.Count -ne 1) { throw 'Acceptance must select one known source fixture.' }
-            $fixture = Get-Item -LiteralPath (Join-Path $PSScriptRoot "../../$($fixtures[0])")
-            $directory = $fixture.Directory
-            $definitions = @()
-            while ($null -ne $directory -and $definitions.Count -eq 0) {
-                $definitions = @(Get-ChildItem -LiteralPath $directory.FullName -Filter '*.asmdef' -File)
-                $directory = $directory.Parent
+            $expectedFixtures = if ($call.TestFilter -match 'WProtoConsumerMigrationTests') { 2 } else { 1 }
+            if ($fixtures.Count -ne $expectedFixtures) { throw 'Acceptance must select every known source fixture.' }
+            foreach ($fixturePath in $fixtures) {
+                $fixture = Get-Item -LiteralPath (Join-Path $PSScriptRoot "../../$fixturePath")
+                $directory = $fixture.Directory
+                $definitions = @()
+                while ($null -ne $directory -and $definitions.Count -eq 0) {
+                    $definitions = @(Get-ChildItem -LiteralPath $directory.FullName -Filter '*.asmdef' -File)
+                    $directory = $directory.Parent
+                }
+                if ($definitions.Count -ne 1) { throw 'Acceptance fixture needs one nearest owning asmdef.' }
+                $owner = Get-Content -LiteralPath $definitions[0].FullName -Raw | ConvertFrom-Json
+                if ($call.AssemblyNames -ne $owner.name) {
+                    throw "Acceptance fixture $($fixture.Name) belongs to $($owner.name), not $($call.AssemblyNames)."
+                }
+                $checks++
             }
-            if ($definitions.Count -ne 1) { throw 'Acceptance fixture needs one nearest owning asmdef.' }
-            $owner = Get-Content -LiteralPath $definitions[0].FullName -Raw | ConvertFrom-Json
-            if ($call.AssemblyNames -ne $owner.name) {
-                throw "Acceptance fixture $($fixture.Name) belongs to $($owner.name), not $($call.AssemblyNames)."
-            }
-            $checks++
             if (-not $call.ReleaseCodeOptimization -or -not $call.ReleasePlayerBuild -or
                 $call.Il2CppCompilerConfiguration -ne 'Release' -or $call.TestFilter -notmatch '^WallstopStudios\.') {
                 throw 'Acceptance lost Release configuration or exact test selection.'
             }
-            if ($call.TestFilter -eq 'WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests' -and
+            if ($call.TestFilter -match 'WProtoCrossAssemblyTests' -and
                 $call.ManagedStrippingLevel -ne 'High') { throw 'Serialization acceptance lost High stripping.' }
             if (Test-Path -LiteralPath $call.ProjectPath) { throw 'An owned acceptance project was left behind.' }
             if ($call.TestFilter -match 'ValidationWorkspaceInteractionTests' -and $call.AssemblyNames -ne 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
@@ -339,16 +351,32 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         'SeededBasePromotionKeepsInheritedMembersAndConsumerFields',
         'AConcreteSubtypeEntryPointUsesTheReplacementRootChain'
     ) | ForEach-Object { "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests.$_" }
+    $serializationNames += @(
+        'ClosedTargets.Int.Zero',
+        'ClosedTargets.Int.One',
+        'ClosedTargets.Int.NegativeOne',
+        'ClosedTargets.Int.Minimum',
+        'ClosedTargets.Int.Maximum',
+        'ClosedTargets.String.Zero',
+        'ClosedTargets.String.NegativeOne',
+        'ClosedTargets.String.Minimum',
+        'ClosedTargets.String.Maximum',
+        'CombinedMigrationReadsRetainedGoldenBytes',
+        'RuntimeDefaultsHaveGoldenBytesAndAChangedDefaultIsDetectable',
+        'NullAndEmptyReferenceValuesKeepTheirWireDistinction'
+    ) | ForEach-Object { "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.$_" }
     foreach ($shape in @('pass', 'alias api', 'skipped', 'missing', 'duplicate', 'wrong name', 'fixture failure',
-        'no config', 'duplicate config', 'disabled stripping', 'debug compiler', 'missing build', 'disabled build', 'debug build', 'missing owner', 'skipped owner', 'missing conflicts', 'one owner order', 'missing player', 'duplicate player', 'wrong commit', 'wrong version', 'editor')) {
+        'no config', 'duplicate config', 'disabled stripping', 'debug compiler', 'missing build', 'disabled build', 'debug build', 'missing owner', 'skipped owner', 'missing conflicts', 'one owner order', 'missing migrations', 'incomplete migrations', 'missing player', 'duplicate player', 'wrong commit', 'wrong version', 'editor')) {
         $body = ($serializationNames | ForEach-Object { "<test-case fullname='$_' result='Passed' />" }) -join ''
         $configure = 'UH perf config: backend=IL2CPP, api=NET_Standard, codeOpt=Release, il2cppConfig=Release, stripping=High, defines=[]'
         $build = 'UH player build config: backend=IL2CPP, stripping=High, development=False'
-        $player = 'UH_SERIALIZATION_ACCEPTANCE commit=' + ('a' * 40) + ' unity=2021.3.45f1 backend=IL2CPP development=False cases=4 conflicts=2'
+        $player = 'UH_SERIALIZATION_ACCEPTANCE commit=' + ('a' * 40) + ' unity=2021.3.45f1 backend=IL2CPP development=False cases=4 conflicts=2 migrations=12'
         $ownerBody = "<test-run><test-case fullname='$ownerName' result='Passed' /></test-run>"
         switch ($shape) {
             'missing owner' { $ownerBody = '<test-run />' }
             'skipped owner' { $ownerBody = $ownerBody.Replace('Passed', 'Skipped') }
+            'missing migrations' { $player = $player.Replace(' migrations=12', '') }
+            'incomplete migrations' { $player = $player.Replace('migrations=12', 'migrations=11') }
             'missing conflicts' { $player = $player.Replace(' conflicts=2', '') }
             'one owner order' { $player = $player.Replace('conflicts=2', 'conflicts=1') }
             'skipped' { $body = $body.Replace('Passed', 'Skipped') }
@@ -387,7 +415,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
     Set-Content -LiteralPath (Join-Path $serializationResults 'results.xml') -Value "<test-run>$body</test-run>"
     Set-Content -LiteralPath (Join-Path $serializationResults 'configure.log') -Value 'UH perf config: backend=IL2CPP, api=NET_Standard, codeOpt=Release, il2cppConfig=Release, stripping=High, defines=[]'
     Set-Content -LiteralPath (Join-Path $serializationResults 'unity.log') -Value 'UH player build config: backend=IL2CPP, stripping=High, development=False'
-    Set-Content -LiteralPath (Join-Path $serializationResults 'player.log') -Value ('UH_SERIALIZATION_ACCEPTANCE commit=' + ('a' * 40) + ' unity=2021.3.45f1 backend=IL2CPP development=False cases=4 conflicts=2')
+    Set-Content -LiteralPath (Join-Path $serializationResults 'player.log') -Value ('UH_SERIALIZATION_ACCEPTANCE commit=' + ('a' * 40) + ' unity=2021.3.45f1 backend=IL2CPP development=False cases=4 conflicts=2 migrations=12')
     $intmapResults = Join-Path $temporary 'intmap'
     New-Item -ItemType Directory -Path $intmapResults | Out-Null
     $intmapName = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.IntMapPerformanceTests.IntMapLookupsComparedAgainstDictionary'

@@ -1687,14 +1687,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 if (_pendingEvictions != null && 0 < _pendingEvictions.Count)
                 {
-                    notificationCount = _pendingEvictions.Count;
-                    notifications = ArrayPool<EvictionNotification>.Shared.Rent(notificationCount);
-#pragma warning disable WUH013 // A rented array may be larger; only its initialized prefix is valid.
-                    for (int i = 0; i < notificationCount; i++)
+                    notifications = ArrayPool<EvictionNotification>.Shared.Rent(
+                        _pendingEvictions.Count
+                    );
+                    while (_pendingEvictions.TryDequeue(out EvictionNotification notification))
                     {
-                        notifications[i] = _pendingEvictions.Dequeue();
+                        notifications[notificationCount++] = notification;
                     }
-#pragma warning restore WUH013
                 }
             }
             finally

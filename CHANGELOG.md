@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add explicit scalar default omission for WallstopProto consumer migrations, with conversion diagnostics and runtime-model compatibility guidance ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
-- Add prompt-free Sentinel workspace APIs for authored rules, preferences, profiles, build gates, and frame budgets, with isolated inputs, diagnostics, and persisted undo/redo ([#901](https://github.com/Ambiguous-Interactive/unity-helpers/issues/901)).
+- Add `WUH020` to suggest non-throwing queue and stack reads when compatible `Try` methods are available ([#912](https://github.com/Ambiguous-Interactive/unity-helpers/issues/912)).
+- Add explicit scalar default omission for WallstopProto consumer migrations, with ordinary consumer migration coverage and runtime-model compatibility guidance ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
+- Add prompt-free Sentinel workspace APIs for authored rules, preferences, profiles, build gates, and frame budgets, with isolated inputs, blank-path rejection, diagnostics, and persisted undo/redo ([#901](https://github.com/Ambiguous-Interactive/unity-helpers/issues/901)).
 - Add Mantel-Haenszel pooled odds ratios and chi-square upper-tail probabilities, including zero-cell boundaries and extreme-tail evaluation ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add informational `WPROTO048` migration guidance for protobuf-net runtime model registrations, which do not configure generated formatters ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Add `WUH013` coverage for custom collections with public struct enumerators and immediately cached full-sequence bounds, while retaining indexed traversal for mutation and dictionary keys ([#900](https://github.com/Ambiguous-Interactive/unity-helpers/issues/900)).
@@ -23,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix WButton coroutines retaining resources when cancelled, completed, or faulted. Iterator cleanup runs from child to parent and continues after disposal errors ([#911](https://github.com/Ambiguous-Interactive/unity-helpers/issues/911)).
+- Fix WButton coroutines retaining resources when cancelled, completed, or faulted. Nested callback updates also leave each routine intact ([#911](https://github.com/Ambiguous-Interactive/unity-helpers/issues/911)).
 - Fix persistent runtime singletons losing their authored world placement when detached from transformed parents ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix `PartitionPooled` retaining outstanding lists when the source throws during disposal. Cleanup no longer replaces an exception from batch processing ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix `TrackedObjectPool` callback cleanup so disposed pools retain no returned items, nested takes keep distinct ownership, and callback failures do not interrupt cleanup ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).

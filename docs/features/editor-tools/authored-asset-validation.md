@@ -8,6 +8,8 @@ flickers" or "no decal appeared", which nobody files as a bug.
 These checks read committed `.unity`, `.prefab` and `.asset` files as text and report what is
 wrong, with the line to open.
 
+Blank filesystem paths and scope prefixes are ignored. Spaces inside asset names remain valid; the checks do not trim authored names.
+
 ## Commands
 
 Every command lives under **Tools > Wallstop Studios > Unity Helpers > Authored Assets**.

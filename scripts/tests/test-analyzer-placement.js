@@ -239,7 +239,7 @@ const promotedPolicyIds = [...generatorBuildPolicy.matchAll(/(?:^|;)(WUH\d{3})(?
 );
 check(
   "shared WUH policies are promoted globally and WUH019 only in production",
-  JSON.stringify(promotedPolicyIds) === JSON.stringify(descriptorIds),
+  JSON.stringify([...promotedPolicyIds].sort()) === JSON.stringify([...descriptorIds].sort()),
   `descriptors=${descriptorIds.join(",")} promoted=${promotedPolicyIds.join(",")}`
 );
 

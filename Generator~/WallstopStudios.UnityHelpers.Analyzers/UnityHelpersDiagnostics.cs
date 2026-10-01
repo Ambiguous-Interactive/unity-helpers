@@ -503,5 +503,17 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
             );
+
+        /// <summary>
+        /// A throwing stack or queue read with an available non-throwing alternative.
+        /// </summary>
+        internal static readonly DiagnosticDescriptor HardCollectionRead = new DiagnosticDescriptor(
+            "WUH020",
+            "Use an available Try method for stack and queue reads",
+            "'{0}.{1}' fails when the collection is empty. Use '{2}(out value)' and handle its boolean result, including after a Count guard; a separate guard can become stale before the read.",
+            "Correctness",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
     }
 }

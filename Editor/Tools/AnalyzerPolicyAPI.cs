@@ -111,6 +111,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Repeated stable loop bound",
                 "Reports counting loops that repeatedly read a stable size. This policy is opt-in by default."
             ),
+            new(
+                "WUH020",
+                "Throwing collection retrieval",
+                "Reports stack and queue retrievals that can use a compatible Try method."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

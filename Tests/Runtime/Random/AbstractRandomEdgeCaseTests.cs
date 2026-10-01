@@ -409,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             public override uint NextUint()
             {
-                if (_values.Count == 0)
+                if (!_values.TryDequeue(out uint value))
                 {
                     throw new InvalidOperationException(
                         "No values enqueued for DeterministicRandom."
@@ -417,7 +417,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 }
 
                 ++UintCalls;
-                return _values.Dequeue();
+                return value;
             }
 
             public override IRandom Copy()

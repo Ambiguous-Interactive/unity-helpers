@@ -126,6 +126,11 @@ function analyzerControl(anchor) {
             return target?.name;
         }
 
+        internal static int Retrieve(System.Collections.Generic.Queue<int> values)
+        {
+            return values.Dequeue();
+        }
+
         internal static int Sum(int[] values)
         {
             int total = 0;
@@ -193,7 +198,7 @@ const CONTROLS = Object.freeze([
     id: "analyzers",
     fileName: "WallstopCheckControlAnalyzers.cs",
     render: analyzerControl,
-    expected: ["WPROTO001", "WUH003", "WUH013"],
+    expected: ["WPROTO001", "WUH003", "WUH013", "WUH020"],
     productionExpected: ["WUH019"],
     meaning:
       "the shipped generators and analyzers report, including the package counting-loop opt-in"

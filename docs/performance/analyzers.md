@@ -49,6 +49,7 @@ the window edits the project-wide default ruleset. Writes import the asset immed
 | [`WUH017`](#wuh017-a-getcomponent-compared-against-null)                 | A `GetComponent` compared against null                                |
 | [`WUH018`](#wuh018-implicit-string-equality-opt-in)                      | String equality without an explicit policy (**off by default**)       |
 | [`WUH019`](#wuh019-repeated-stable-loop-bound-opt-in)                    | A counting loop repeatedly reading a stable size (**off by default**) |
+| [`WUH020`](#wuh020-hard-stack-and-queue-reads)                           | A throwing stack or queue read with an available Try method           |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -867,6 +868,39 @@ tooling projects keep the shared ruleset. WUH019 promotion is limited to those p
 `WarningsAsErrors` enables it even when a shared ruleset says `None`.
 The excluded-production-source loop audit runs both WUH013 and WUH019 and requires a reporting
 control for each, so old host reference gaps cannot silently bypass either rule.
+
+## `WUH020`: hard stack and queue reads
+
+Use `Stack<T>.TryPop`, `Queue<T>.TryDequeue`, and their `TryPeek` methods when the target
+framework exposes them. These methods make the empty case explicit without throwing.
+Shared `Stack<T>` and `Queue<T>` still require synchronization between threads.
+
+```csharp
+// WUH020: an empty queue throws.
+int item = queue.Dequeue();
+Process(item);
+
+// Handle the empty case through the boolean result.
+if (queue.TryDequeue(out int item))
+{
+    Process(item);
+}
+```
+
+The analyzer resolves the invoked method to the generic .NET stack or queue types. A custom
+`Pop`, `Peek`, or `Dequeue` method, even on a class named `Stack`, stays outside the rule. A
+method hidden by a derived custom type also stays outside it; an inherited .NET method remains
+covered, including through a constrained generic type parameter. An alternative must be accessible,
+return `bool`, and accept exactly one `out` parameter
+matching the hard method's return type. Older target frameworks without these APIs are exempt.
+Non-generic collections without Try methods are exempt as well. Concurrent stacks and queues
+already expose Try methods for these operations, which produce no diagnostic.
+
+A separate `Count` guard does not exempt a hard read: the rule requires the available Try API
+even when a caller knows the collection is populated. A guard can also become stale if another
+caller changes the collection. The diagnostic is on by default, suppressible, and a warning.
+There is no automatic fix because choosing what happens when the collection is empty requires
+caller policy. Checking the boolean result also avoids [`WUH008`](#wuh008-a-tryxxx-out-value-read-without-testing-the-call).
 
 ## Turning one off
 

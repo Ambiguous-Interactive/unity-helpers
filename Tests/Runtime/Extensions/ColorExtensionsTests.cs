@@ -634,14 +634,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             public override float NextFloat()
             {
-                if (_floatValues.Count == 0)
+                if (!_floatValues.TryDequeue(out float value))
                 {
                     throw new InvalidOperationException(
                         "No float samples enqueued for StubRandom."
                     );
                 }
 
-                return _floatValues.Dequeue();
+                return value;
             }
 
             public override uint NextUint()

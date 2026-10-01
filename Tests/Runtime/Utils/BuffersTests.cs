@@ -1152,9 +1152,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     List<PooledArray<int>> verificationArrays = new();
                     foreach (KeyValuePair<int, Stack<int[]>> pair in expectedOrder)
                     {
-                        while (0 < pair.Value.Count)
+                        while (pair.Value.TryPop(out int[] expected))
                         {
-                            int[] expected = pair.Value.Pop();
                             PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
                                 pair.Key,
                                 out int[] array
@@ -1670,7 +1669,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             queue.Enqueue(1);
             queue.Enqueue(2);
             Assert.AreEqual(2, queue.Count);
-            Assert.AreEqual(1, queue.Dequeue());
+            Assert.IsTrue(queue.TryDequeue(out int value));
+            Assert.AreEqual(1, value);
         }
 
         [Test]
@@ -1682,7 +1682,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             stack.Push(1);
             stack.Push(2);
             Assert.AreEqual(2, stack.Count);
-            Assert.AreEqual(2, stack.Pop());
+            Assert.IsTrue(stack.TryPop(out int value));
+            Assert.AreEqual(2, value);
         }
 
         [Test]

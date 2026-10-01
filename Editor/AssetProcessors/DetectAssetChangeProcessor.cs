@@ -323,9 +323,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             int processedBatches = 0;
             try
             {
-                while (0 < PendingAssetChanges.Count)
+                while (PendingAssetChanges.TryDequeue(out PendingAssetChangeSet changeSet))
                 {
-                    PendingAssetChangeSet changeSet = PendingAssetChanges.Dequeue();
                     bool handled = HandleAssetChanges(
                         changeSet.Imported,
                         changeSet.Deleted,

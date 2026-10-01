@@ -527,12 +527,13 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
   assert.deepStrictEqual(
     [...governedAsmdefs(testCheck, asmdefs, repoRoot).keys()].sort(),
     [
+      "WallstopStudios.UnityHelpers.ConsumerMigration",
       "WallstopStudios.UnityHelpers.Tests.Core",
       "WallstopStudios.UnityHelpers.Tests.Runtime",
       "WallstopStudios.UnityHelpers.Tests.Runtime.Performance",
       "WallstopStudios.UnityHelpers.Tests.Runtime.Random"
     ],
-    "the four PlayMode test asmdefs TestCheck compiles"
+    "the four PlayMode test asmdefs and ordinary consumer asmdef TestCheck compiles"
   );
 
   // The #616 half. TestCheck's list above stops at `Tests/Runtime`, which is exactly the hole

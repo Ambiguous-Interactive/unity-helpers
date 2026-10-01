@@ -33,7 +33,7 @@ function Initialize-SerializationAcceptanceProject {
         New-Item -ItemType Directory -Force -Path $directory | Out-Null
         $references = @('WallstopStudios.UnityHelpers')
         if ($assembly -eq 'Consumer') { $references += $upstreamNamespace }
-        @{ name = "WallstopStudios.UnityHelpers.Acceptance.$assembly"; references = $references; autoReferenced = $true } |
+        @{ name = "WallstopStudios.UnityHelpers.Acceptance.$assembly"; references = $references; autoReferenced = $true; overrideReferences = $true; precompiledReferences = @() } |
             ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $directory "$assembly.asmdef")
         $source = if ($assembly -eq 'Upstream') { $upstream } else { $consumer }
         if ($assembly -eq 'Upstream') {
@@ -62,6 +62,28 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Upstream
         }
         [IO.File]::WriteAllText((Join-Path $directory 'Contracts.cs'), $source)
     }
+    $migrationNamespace = 'WallstopStudios.UnityHelpers.Acceptance.MigrationContracts'
+    $migrationDirectory = Join-Path $Project 'Assets/SerializationAcceptance/MigrationContracts'
+    New-Item -ItemType Directory -Force -Path $migrationDirectory | Out-Null
+    $migrationDefinition = Get-Content -LiteralPath (Join-Path $Repository 'Tests/Runtime/Serialization/ConsumerMigration/WallstopStudios.UnityHelpers.ConsumerMigration.asmdef') -Raw | ConvertFrom-Json
+    $migrationDefinition.name = $migrationNamespace
+    $migrationDefinition.rootNamespace = $migrationNamespace
+    $migrationDefinition.autoReferenced = $true
+    $migrationDefinition | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $migrationDirectory 'MigrationContracts.asmdef')
+    foreach ($contract in Get-ChildItem -LiteralPath (Join-Path $Repository 'Tests/Runtime/Serialization/ConsumerMigration') -Filter '*.cs' -File) {
+        $source = [IO.File]::ReadAllText($contract.FullName).Replace('WallstopStudios.UnityHelpers.Tests.Serialization.ConsumerMigration', $migrationNamespace)
+        [IO.File]::WriteAllText((Join-Path $migrationDirectory $contract.Name), $source)
+    }
+    $migration = [IO.File]::ReadAllText((Join-Path $Repository 'Tests/Runtime/Serialization/WProtoConsumerMigrationTests.cs')).Replace(
+        'WallstopStudios.UnityHelpers.Tests.Serialization.ConsumerMigration', $migrationNamespace).Replace(
+        'WallstopStudios.UnityHelpers.Tests.Serialization', $consumerNamespace)
+    $migration = $migration.Replace('#if !ENABLE_IL2CPP', '#if false')
+    $migration = $migration -replace '(?m)^\s*(?:using NUnit\.Framework;|\[(?:TestFixture|Test|Category|TestCase)[^\r\n]*\])\s*\r?\n', ''
+    [IO.File]::WriteAllText((Join-Path $Project 'Assets/SerializationAcceptance/Consumer/MigrationCases.cs'), $migration)
+    $consumerDefinitionPath = Join-Path $Project 'Assets/SerializationAcceptance/Consumer/Consumer.asmdef'
+    $consumerDefinition = Get-Content -LiteralPath $consumerDefinitionPath -Raw | ConvertFrom-Json
+    $consumerDefinition.references += $migrationNamespace
+    $consumerDefinition | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $consumerDefinitionPath
     $driver = @'
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
@@ -96,6 +118,28 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Consumer
                 scenario();
                 ++completed;
             }
+            WProtoConsumerMigrationTests migration = new WProtoConsumerMigrationTests();
+            Action[] migrations =
+            {
+                () => migration.ClosedTargetsPreserveModelBytesAndBothReadDirections(0, false),
+                () => migration.ClosedTargetsPreserveModelBytesAndBothReadDirections(1, false),
+                () => migration.ClosedTargetsPreserveModelBytesAndBothReadDirections(-1, false),
+                () => migration.ClosedTargetsPreserveModelBytesAndBothReadDirections(int.MinValue, false),
+                () => migration.ClosedTargetsPreserveModelBytesAndBothReadDirections(int.MaxValue, false),
+                () => migration.ClosedTargetsPreserveModelBytesAndBothReadDirections(0, true),
+                () => migration.ClosedTargetsPreserveModelBytesAndBothReadDirections(-1, true),
+                () => migration.ClosedTargetsPreserveModelBytesAndBothReadDirections(int.MinValue, true),
+                () => migration.ClosedTargetsPreserveModelBytesAndBothReadDirections(int.MaxValue, true),
+                migration.CombinedMigrationReadsRetainedGoldenBytes,
+                migration.RuntimeDefaultsHaveGoldenBytesAndAChangedDefaultIsDetectable,
+                migration.NullAndEmptyReferenceValuesKeepTheirWireDistinction,
+            };
+            int migrated = 0;
+            foreach (Action scenario in migrations)
+            {
+                scenario();
+                ++migrated;
+            }
             Action[] ownerOrders =
             {
                 () => VerifyConflict<ForwardOwnerOrder>(new UpstreamReplacement<ForwardOwnerOrder>(), new ConsumerReplacement<ForwardOwnerOrder>()),
@@ -108,7 +152,7 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Consumer
                 ++conflicts;
             }
             Debug.Log("UH_SERIALIZATION_ACCEPTANCE commit=__COMMIT__ unity=" + Application.unityVersion
-                + " backend=IL2CPP development=False cases=" + completed + " conflicts=" + conflicts);
+                + " backend=IL2CPP development=False cases=" + completed + " conflicts=" + conflicts + " migrations=" + migrated);
 #endif
         }
 
@@ -136,6 +180,28 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Consumer
 
     internal sealed class ConsumerReplacement<T> : UpstreamReplacement<T> { }
 
+    internal static class CollectionAssert
+    {
+        public static void AreEqual(byte[] expected, byte[] actual, string message = null)
+        {
+            Assert.AreEqual(expected.Length, actual.Length);
+            for (int index = 0; index < expected.Length; index++)
+            {
+                Assert.AreEqual(expected[index], actual[index]);
+            }
+        }
+
+        public static void AreNotEqual(byte[] expected, byte[] actual, string message = null)
+        {
+            if (expected.Length != actual.Length) { return; }
+            for (int index = 0; index < expected.Length; index++)
+            {
+                if (expected[index] != actual[index]) { return; }
+            }
+            throw new InvalidOperationException("Migration golden bytes lost their distinction.");
+        }
+    }
+
     internal static class Assert
     {
         public static void IsTrue(bool value)
@@ -143,12 +209,12 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Consumer
             if (!value) { throw new InvalidOperationException("Serialization acceptance assertion failed."); }
         }
 
-        public static void AreEqual<T>(T expected, T actual)
+        public static void AreEqual<T>(T expected, T actual, string message = null)
         {
             IsTrue(EqualityComparer<T>.Default.Equals(expected, actual));
         }
 
-        public static void AreNotEqual<T>(T expected, T actual)
+        public static void AreNotEqual<T>(T expected, T actual, string message = null)
         {
             IsTrue(!EqualityComparer<T>.Default.Equals(expected, actual));
         }
@@ -165,7 +231,7 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Consumer
     if ($ConflictingSibling) {
         $sibling = Join-Path $Project 'Assets/SerializationAcceptance/Sibling'
         New-Item -ItemType Directory -Path $sibling | Out-Null
-        @{ name = 'WallstopStudios.UnityHelpers.Acceptance.Sibling'; references = @('WallstopStudios.UnityHelpers', $upstreamNamespace); autoReferenced = $true } |
+        @{ name = 'WallstopStudios.UnityHelpers.Acceptance.Sibling'; references = @('WallstopStudios.UnityHelpers', $upstreamNamespace); autoReferenced = $true; overrideReferences = $true; precompiledReferences = @() } |
             ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $sibling 'Sibling.asmdef')
         @'
 namespace WallstopStudios.UnityHelpers.Acceptance.Sibling
@@ -269,7 +335,7 @@ foreach ($kind in $selected) {
             if ($kind -eq 'serialization') {
                 $parameters.ManagedStrippingLevel = 'High'
                 $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime'
-                $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests'
+                $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests;WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests'
                 Initialize-SerializationAcceptanceProject -Project $ownedProject -Repository $Repository
             } else {
                 $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance'

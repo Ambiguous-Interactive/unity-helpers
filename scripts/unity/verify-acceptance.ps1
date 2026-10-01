@@ -27,6 +27,20 @@ $names = @{
         'AConcreteSubtypeEntryPointUsesTheReplacementRootChain'
     ) | ForEach-Object { "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests.$_" }
 }
+$names.serialization += @(
+    'ClosedTargets.Int.Zero',
+    'ClosedTargets.Int.One',
+    'ClosedTargets.Int.NegativeOne',
+    'ClosedTargets.Int.Minimum',
+    'ClosedTargets.Int.Maximum',
+    'ClosedTargets.String.Zero',
+    'ClosedTargets.String.NegativeOne',
+    'ClosedTargets.String.Minimum',
+    'ClosedTargets.String.Maximum',
+    'CombinedMigrationReadsRetainedGoldenBytes',
+    'RuntimeDefaultsHaveGoldenBytesAndAChangedDefaultIsDetectable',
+    'NullAndEmptyReferenceValuesKeepTheirWireDistinction'
+) | ForEach-Object { "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.$_" }
 $failures = [System.Collections.Generic.List[string]]::new()
 $passed = @{}
 foreach ($kind in $selected) {
@@ -53,7 +67,7 @@ foreach ($kind in $selected) {
                 throw 'Serialization acceptance did not prove High stripping at the player build.'
             }
             $player = Get-Content -LiteralPath (Join-Path $ArtifactsPath 'serialization/player.log') -Raw
-            $pattern = '(?m)^UH_SERIALIZATION_ACCEPTANCE commit=([0-9a-f]{40}) unity=([^\s]+) backend=IL2CPP development=False cases=4 conflicts=2\r?$'
+            $pattern = '(?m)^UH_SERIALIZATION_ACCEPTANCE commit=([0-9a-f]{40}) unity=([^\s]+) backend=IL2CPP development=False cases=4 conflicts=2 migrations=12\r?$'
             $records = [regex]::Matches($player, $pattern)
             if ($records.Count -ne 1 -or $records[0].Groups[1].Value -ne $Commit -or
                 $records[0].Groups[2].Value -ne $UnityVersion) {

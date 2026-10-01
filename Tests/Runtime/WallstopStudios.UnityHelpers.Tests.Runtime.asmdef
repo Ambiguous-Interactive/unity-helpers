@@ -6,7 +6,8 @@
     "UnityEngine.TestRunner",
     "WallstopStudios.UnityHelpers",
     "WallstopStudios.UnityHelpers.Tests.Runtime.Random",
-    "WallstopStudios.UnityHelpers.Tests.Core"
+    "WallstopStudios.UnityHelpers.Tests.Core",
+    "WallstopStudios.UnityHelpers.ConsumerMigration"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

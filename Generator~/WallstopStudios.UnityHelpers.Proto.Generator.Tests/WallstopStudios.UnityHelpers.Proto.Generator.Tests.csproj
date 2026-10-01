@@ -81,6 +81,8 @@
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/BoneWeightSurrogate.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoExplicitDefaultContract.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoExplicitDefaultTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/ConsumerMigration/*.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConsumerMigrationTests.cs" />
     <Compile Include="*.cs" />
     <Compile
       Include="$(RepoRoot)/Tests/Core/DictionaryAssertions.cs"

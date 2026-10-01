@@ -1475,7 +1475,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         public override double NextDouble()
         {
-            return 0 < _doubles.Count ? _doubles.Dequeue() : 0d;
+            return _doubles.TryDequeue(out double value) ? value : 0d;
         }
 
         public override void NextBytes(byte[] buffer)

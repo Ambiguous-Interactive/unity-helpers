@@ -70,6 +70,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        [TestCase(" ", " ", false)]
+        [TestCase("\t", "\t", false)]
+        [TestCase("\r\n", "\r", false)]
+        [TestCase("Assets/My Folder/Hero.prefab", "Assets/My Folder/", true)]
+        [TestCase("Assets/ Hero.prefab", "Assets/ ", true)]
+        [TestCase("Assets/Hero.prefab", " ", false)]
+        public void BlankPathsAndPrefixesDoNotSelectAuthoredAssets(
+            string path,
+            string prefix,
+            bool expected
+        )
+        {
+            Assert.AreEqual(expected, AuthoredAssetYaml.IsUnderAnyPrefix(path, new[] { prefix }));
+        }
+
         [Test]
         public void APathWithNoPrefixesAtAllIsOutOfScope()
         {

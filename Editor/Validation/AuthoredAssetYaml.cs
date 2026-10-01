@@ -58,7 +58,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         )
         {
             List<string> matches = new();
-            if (string.IsNullOrEmpty(rootDirectory))
+            if (string.IsNullOrWhiteSpace(rootDirectory))
             {
                 return matches;
             }
@@ -124,7 +124,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out IReadOnlyList<AuthoredAssetDocument> documents
         )
         {
-            if (string.IsNullOrEmpty(filePath))
+            if (string.IsNullOrWhiteSpace(filePath))
             {
                 lines = Array.Empty<string>();
                 documents = Array.Empty<AuthoredAssetDocument>();
@@ -388,14 +388,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <summary>Whether <paramref name="path"/> sits under one of <paramref name="prefixes"/>.</summary>
         /// <param name="path">The asset path to test.</param>
         /// <param name="prefixes">The prefixes to accept.</param>
-        /// <returns><c>true</c> when the path is in scope.</returns>
+        /// <returns><c>true</c> when a non-blank path matches a non-blank prefix.</returns>
         /// <remarks>
         /// Shared so two checks cannot drift into two contracts. They had: one returned false for a
         /// null path and the other threw, which is what exposing them for test found.
         /// </remarks>
         internal static bool IsUnderAnyPrefix(string path, IReadOnlyList<string> prefixes)
         {
-            if (string.IsNullOrEmpty(path) || prefixes == null)
+            if (string.IsNullOrWhiteSpace(path) || prefixes == null)
             {
                 return false;
             }
@@ -405,7 +405,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 string prefix = prefixes[index];
                 if (
-                    !string.IsNullOrEmpty(prefix)
+                    !string.IsNullOrWhiteSpace(prefix)
                     && normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
                 )
                 {
