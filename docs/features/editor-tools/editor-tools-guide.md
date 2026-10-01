@@ -15,33 +15,34 @@ This inventory covers the 21 `EditorWindow` and `ScriptableWizard` types in the 
 API availability, not proof that every operation has passed its side-effect tests. Window layout,
 selection, previews, prompts, and persisted UI state remain window concerns.
 
-| Window or wizard                     | Callable operation or remaining work                                                                                                                                              |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AnimationEventEditor`               | `AnimationEventSaveAPI.TrySave` saves events.                                                                                                                                     |
-| `FitTextureSizeWindow`               | `FitTextureSizeAPI` discovers textures and previews or applies size changes.                                                                                                      |
-| `MultiFileSelectorPersistenceWindow` | `MultiFileSelectorPersistenceManager` configures and runs cleanup.                                                                                                                |
-| `TextureSettingsApplierWindow`       | `TextureSettingsApplierAPI` previews and applies importer settings.                                                                                                               |
-| `PrefabChecker`                      | `ScanFolders` scans; `TryRemoveMissingScripts` previews or repairs prefabs.                                                                                                       |
-| `TextureResizerWizard`               | `TextureResizerAPI.TryResizeTextures` previews or writes resized textures.                                                                                                        |
-| `SpriteCropper`                      | `SpriteCropperAPI` discovers, crops, and replaces references.                                                                                                                     |
-| `AnimationViewerWindow`              | `AnimationClipFrameSaveAPI.TrySaveFrames` writes frame edits.                                                                                                                     |
-| `AnimationCreatorWindow`             | `AnimationCreatorAPI.TryCreateClip` and `TryCreateAsset` create clips.                                                                                                            |
-| `SpriteSheetExtractor`               | `SpriteSheetExtractionAPI` extracts; `SpriteSheetReferenceReplacementAPI` replaces references.                                                                                    |
-| `AnimationCopierWindow`              | `AnimationCopierAPI` analyzes and applies selected copy/delete operations.                                                                                                        |
-| `ScriptableSpriteAtlasEditor`        | `ScriptableSpriteAtlasGenerator` creates configs, scans, synchronizes, generates, checks drift, packs, and changes source import settings.                                        |
-| `SpriteSheetAnimationCreator`        | `SpriteSheetAnimationAPI` discovers frames and creates clips.                                                                                                                     |
-| `SpritePivotAdjuster`                | `SpritePivotAdjusterAPI` discovers textures and previews or applies pivots.                                                                                                       |
-| `SpriteSettingsApplierWindow`        | `SpriteSettingsApplierAPI` previews and applies settings and loads/saves profiles.                                                                                                |
-| `ValidationWindow`                   | `ValidationScheduler` runs checks; `ValidationReportExportAPI` writes reports. Project rule creation, profile changes, and rule preferences remain internal workspace operations. |
-| `WDropDownPopupWindow`               | UI selection callback; callers can assign the serialized property directly with Unity's undo and apply APIs.                                                                      |
-| `ImageBlurTool`                      | `ImageBlurAPI` creates blurred textures and asset output.                                                                                                                         |
-| `AnalyzerPolicyWindow`               | `AnalyzerPolicyAPI` changes analyzer enablement and severity.                                                                                                                     |
-| `UnityMethodAnalyzerWindow`          | Analysis APIs find issues; `UnityMethodAnalyzerReportExportAPI` writes reports.                                                                                                   |
-| `ProtoSchemaExporterWindow`          | `ProtoSchemaExporter` discovers contracts and writes schemas.                                                                                                                     |
+| Window or wizard                     | Callable operation or remaining work                                                                                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AnimationEventEditor`               | `AnimationEventSaveAPI.TrySave` saves events.                                                                                                                                               |
+| `FitTextureSizeWindow`               | `FitTextureSizeAPI` discovers textures and previews or applies size changes.                                                                                                                |
+| `MultiFileSelectorPersistenceWindow` | `MultiFileSelectorPersistenceManager` configures and runs cleanup.                                                                                                                          |
+| `TextureSettingsApplierWindow`       | `TextureSettingsApplierAPI` previews and applies importer settings.                                                                                                                         |
+| `PrefabChecker`                      | `ScanFolders` scans; `TryRemoveMissingScripts` previews or repairs prefabs.                                                                                                                 |
+| `TextureResizerWizard`               | `TextureResizerAPI.TryResizeTextures` previews or writes resized textures.                                                                                                                  |
+| `SpriteCropper`                      | `SpriteCropperAPI` discovers, crops, and replaces references.                                                                                                                               |
+| `AnimationViewerWindow`              | `AnimationClipFrameSaveAPI.TrySaveFrames` writes frame edits.                                                                                                                               |
+| `AnimationCreatorWindow`             | `AnimationCreatorAPI.TryCreateClip` and `TryCreateAsset` create clips.                                                                                                                      |
+| `SpriteSheetExtractor`               | `SpriteSheetExtractionAPI` extracts; `SpriteSheetReferenceReplacementAPI` replaces references.                                                                                              |
+| `AnimationCopierWindow`              | `AnimationCopierAPI` analyzes and applies selected copy/delete operations.                                                                                                                  |
+| `ScriptableSpriteAtlasEditor`        | `ScriptableSpriteAtlasGenerator` creates configs, scans, synchronizes, generates, checks drift, packs, and changes source import settings.                                                  |
+| `SpriteSheetAnimationCreator`        | `SpriteSheetAnimationAPI` discovers frames and creates clips.                                                                                                                               |
+| `SpritePivotAdjuster`                | `SpritePivotAdjusterAPI` discovers textures and previews or applies pivots.                                                                                                                 |
+| `SpriteSettingsApplierWindow`        | `SpriteSettingsApplierAPI` previews and applies settings and loads/saves profiles.                                                                                                          |
+| `ValidationWindow`                   | `ValidationScheduler` runs checks; `ValidationReportExportAPI` writes reports. `ValidationWorkspaceSettings` changes authored rules, preferences, profiles, build gates, and frame budgets. |
+| `WDropDownPopupWindow`               | UI selection callback; callers can assign the serialized property directly with Unity's undo and apply APIs.                                                                                |
+| `ImageBlurTool`                      | `ImageBlurAPI` creates blurred textures and asset output.                                                                                                                                   |
+| `AnalyzerPolicyWindow`               | `AnalyzerPolicyAPI` changes analyzer enablement and severity.                                                                                                                               |
+| `UnityMethodAnalyzerWindow`          | Analysis APIs find issues; `UnityMethodAnalyzerReportExportAPI` writes reports.                                                                                                             |
+| `ProtoSchemaExporterWindow`          | `ProtoSchemaExporter` discovers contracts and writes schemas.                                                                                                                               |
 
-The sweep remains open for [Sentinel workspace mutation APIs](https://github.com/Ambiguous-Interactive/unity-helpers/issues/901)
-and direct side-effect evidence for the remaining actions. The dropdown is a UI control rather than an asset processing tool; this
-classification does not change its public popup entry points.
+The sweep remains open for direct side-effect evidence for the remaining actions.
+[Sentinel workspace APIs](./asset-validation.md#configuring-the-workspace-from-scripts) expose its
+authored rules, preferences, profiles, build gates, and frame budget without the window. The dropdown
+is a UI control; this classification does not change its public popup entry points.
 
 ---
 

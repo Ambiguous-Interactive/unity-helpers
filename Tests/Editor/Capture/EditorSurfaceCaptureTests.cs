@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Reflection;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.Rendering;
@@ -139,6 +140,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             }
 
             base.TearDown();
+        }
+
+        [Test]
+        public void PanelRenderingEntryPointsMatchTheInstalledEditor()
+        {
+            Type panelType = typeof(VisualElement).Assembly.GetType(
+                "UnityEngine.UIElements.Panel",
+                true
+            );
+            MethodInfo repaint = EditorSurfaceCapture.ResolvePanelRepaintMethod(panelType);
+            ParameterInfo[] parameters = repaint.GetParameters();
+            Assert.IsTrue(parameters.Length == 0 || parameters.Length == 1);
+            if (parameters.Length == 1)
+            {
+                Assert.AreEqual(typeof(Event), parameters[0].ParameterType);
+            }
+            Assert.AreEqual(typeof(void), repaint.ReturnType);
+
+            MethodInfo render = panelType.GetMethod(
+                "Render",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: Type.EmptyTypes,
+                modifiers: null
+            );
+#if UNITY_6000_0_OR_NEWER
+            Assert.IsTrue(
+                render != null,
+                "Unity 6 must expose its separate panel draw entry point."
+            );
+#else
+            Assert.IsTrue(render == null, "Earlier editors draw during Repaint(Event).");
+#endif
+        }
+
+        [Test]
+        public void PanelRepaintResolutionReportsAnUnsupportedUnityType()
+        {
+            InvalidOperationException failure = Assert.Throws<InvalidOperationException>(() =>
+                EditorSurfaceCapture.ResolvePanelRepaintMethod(typeof(Event))
+            );
+            StringAssert.Contains(typeof(Event).FullName, failure.Message);
+            StringAssert.Contains("Repaint(Event)", failure.Message);
+            StringAssert.Contains("Repaint()", failure.Message);
         }
 
         [Test]

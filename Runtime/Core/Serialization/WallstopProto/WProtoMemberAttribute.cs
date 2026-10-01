@@ -12,6 +12,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// Assigns a wire field number, and optionally an explicit schema name, to a member.
     /// </summary>
     /// <remarks>
+    /// <para>A <see cref="System.ComponentModel.DefaultValueAttribute"/> on the same member sets
+    /// scalar write omission; absent-field reads retain construction state.</para>
     /// Field numbers are the contract; names are not on the wire at all. <see cref="Name"/> exists
     /// because the number alone is unreadable in a schema, a diagnostic, or a hand-inspected
     /// payload dump, and because a member renamed in C# must not silently rename itself everywhere

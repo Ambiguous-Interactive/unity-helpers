@@ -79,6 +79,91 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
+        private static IEnumerable<TestCaseData> PercentileExtremeCases()
+        {
+            double[] oppositeExtremes = { -double.MaxValue, double.MaxValue };
+            yield return new TestCaseData(oppositeExtremes, 0.0, -double.MaxValue).SetName(
+                "Percentile.ExtremeDouble.Minimum"
+            );
+            yield return new TestCaseData(oppositeExtremes, 0.25, -double.MaxValue / 2.0).SetName(
+                "Percentile.ExtremeDouble.LowerQuarter"
+            );
+            yield return new TestCaseData(oppositeExtremes, 0.5, 0.0).SetName(
+                "Percentile.ExtremeDouble.Midpoint"
+            );
+            yield return new TestCaseData(oppositeExtremes, 0.75, double.MaxValue / 2.0).SetName(
+                "Percentile.ExtremeDouble.UpperQuarter"
+            );
+            yield return new TestCaseData(oppositeExtremes, 1.0, double.MaxValue).SetName(
+                "Percentile.ExtremeDouble.Maximum"
+            );
+            yield return new TestCaseData(
+                new double[] { double.MaxValue / 2.0, -double.MaxValue },
+                0.5,
+                -double.MaxValue / 4.0
+            ).SetName("Percentile.ExtremeDouble.UnequalOppositeMagnitudes");
+            yield return new TestCaseData(
+                new double[] { double.MaxValue, double.MaxValue / 2.0 },
+                0.5,
+                double.MaxValue * 0.75
+            ).SetName("Percentile.ExtremeDouble.PositivePair");
+            yield return new TestCaseData(
+                new double[] { -double.MaxValue, -double.MaxValue / 2.0 },
+                0.5,
+                -double.MaxValue * 0.75
+            ).SetName("Percentile.ExtremeDouble.NegativePair");
+            yield return new TestCaseData(
+                new double[] { double.Epsilon, double.Epsilon },
+                0.5,
+                double.Epsilon
+            ).SetName("Percentile.SubnormalDouble.RepeatedValue");
+            yield return new TestCaseData(
+                new double[] { -2.0 * double.Epsilon, 2.0 * double.Epsilon },
+                0.25,
+                -double.Epsilon
+            ).SetName("Percentile.SubnormalDouble.OppositeSigns");
+            yield return new TestCaseData(
+                new double[] { double.Epsilon, 3.0 * double.Epsilon },
+                0.5,
+                2.0 * double.Epsilon
+            ).SetName("Percentile.SubnormalDouble.PositivePair");
+            yield return new TestCaseData(
+                new double[] { double.PositiveInfinity, double.PositiveInfinity },
+                0.5,
+                double.PositiveInfinity
+            ).SetName("Percentile.InfinityDouble.RepeatedPositive");
+            yield return new TestCaseData(
+                new double[] { double.NegativeInfinity, double.NegativeInfinity },
+                0.5,
+                double.NegativeInfinity
+            ).SetName("Percentile.InfinityDouble.RepeatedNegative");
+            yield return new TestCaseData(
+                new double[] { double.NegativeInfinity, -1.0 },
+                0.5,
+                double.NegativeInfinity
+            ).SetName("Percentile.InfinityDouble.NegativeWithFinite");
+            yield return new TestCaseData(
+                new double[] { 1.0, double.PositiveInfinity },
+                0.5,
+                double.PositiveInfinity
+            ).SetName("Percentile.InfinityDouble.PositiveWithFinite");
+            yield return new TestCaseData(
+                new double[] { double.NegativeInfinity, double.PositiveInfinity },
+                0.5,
+                double.NaN
+            ).SetName("Percentile.InfinityDouble.OppositeSignsUndefined");
+            yield return new TestCaseData(
+                new double[] { double.NegativeInfinity, double.PositiveInfinity },
+                0.0,
+                double.NegativeInfinity
+            ).SetName("Percentile.InfinityDouble.ExactMinimum");
+            yield return new TestCaseData(
+                new double[] { double.NegativeInfinity, double.PositiveInfinity },
+                1.0,
+                double.PositiveInfinity
+            ).SetName("Percentile.InfinityDouble.ExactMaximum");
+        }
+
         private static IEnumerable<TestCaseData> MeanCases()
         {
             yield return new TestCaseData(new float[] { 2f, 3f }, 2.5f).SetName(
@@ -193,6 +278,281 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
 
             return Math.Min(1.0, result);
+        }
+
+        private static IEnumerable<TestCaseData> ChiSquareReferenceCases()
+        {
+            yield return new TestCaseData(1.0, 1, 0.31731050786291115).SetName(
+                "ChiSquare.OneDegree.NormalSquare"
+            );
+            yield return new TestCaseData(3.841458820694124, 1, 0.05).SetName(
+                "ChiSquare.OneDegree.CriticalValue"
+            );
+            yield return new TestCaseData(100.0, 1, 1.5239706048320995e-23).SetName(
+                "ChiSquare.OneDegree.SmallTail"
+            );
+            yield return new TestCaseData(1000.0, 1, 1.7958327848007363e-219).SetName(
+                "ChiSquare.OneDegree.ExtremeRepresentableTail"
+            );
+            yield return new TestCaseData(1000.0, 2, 7.124576406741474e-218).SetName(
+                "ChiSquare.TwoDegrees.ExponentialTail"
+            );
+            yield return new TestCaseData(10.0, 3, 0.01856613546304325).SetName(
+                "ChiSquare.ThreeDegrees"
+            );
+            yield return new TestCaseData(10.0, 5, 0.07523524614651217).SetName(
+                "ChiSquare.FiveDegrees"
+            );
+            yield return new TestCaseData(32.0, 32, 0.4667448913877211).SetName(
+                "ChiSquare.StirlingBoundary.Center"
+            );
+            yield return new TestCaseData(33.9, 32, 0.375997951578569).SetName(
+                "ChiSquare.SeriesBoundary.Below"
+            );
+            yield return new TestCaseData(34.0, 32, 0.3714536560753673).SetName(
+                "ChiSquare.SeriesBoundary.At"
+            );
+            yield return new TestCaseData(10000.0, 10000, 0.49811936596618267).SetName(
+                "ChiSquare.TenThousandDegrees.Center"
+            );
+            yield return new TestCaseData(1000000.0, 1000000, 0.4998119368033945).SetName(
+                "ChiSquare.MillionDegrees.Center"
+            );
+            yield return new TestCaseData(1004000.0, 1000000, 0.002363028238683893).SetName(
+                "ChiSquare.MillionDegrees.UpperTail"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> MantelHaenszelReferenceCases()
+        {
+            yield return new TestCaseData(
+                new (int, int, int, int)[] { (1, 9, 11, 3) },
+                1.0 / 33.0
+            ).SetName("MantelHaenszel.SingleStratum");
+            yield return new TestCaseData(
+                new (int, int, int, int)[] { (1, 9, 11, 3), (8, 2, 4, 6) },
+                101.0 / 181.0
+            ).SetName("MantelHaenszel.StratifiedEstimate");
+            yield return new TestCaseData(
+                new (int, int, int, int)[] { (10, 5, 8, 20), (3, 15, 12, 4), (1, 1, 1, 1) },
+                15363.0 / 18931.0
+            ).SetName("MantelHaenszel.ThreeUnequalStrata");
+            yield return new TestCaseData(
+                new (int, int, int, int)[] { (0, 0, 0, 0), (1, 9, 11, 3) },
+                1.0 / 33.0
+            ).SetName("MantelHaenszel.EmptyStratumIgnored");
+            yield return new TestCaseData(
+                new (int, int, int, int)[] { (1, 0, 0, 1), (0, 1, 1, 0) },
+                1.0
+            ).SetName("MantelHaenszel.ComplementaryZeroCells");
+            yield return new TestCaseData(new (int, int, int, int)[] { (0, 1, 1, 1) }, 0.0).SetName(
+                "MantelHaenszel.ZeroEstimate"
+            );
+            yield return new TestCaseData(
+                new (int, int, int, int)[] { (1, 0, 1, 1) },
+                double.PositiveInfinity
+            ).SetName("MantelHaenszel.InfiniteEstimate");
+            yield return new TestCaseData(
+                new (int, int, int, int)[]
+                {
+                    (int.MaxValue, int.MaxValue, int.MaxValue, int.MaxValue),
+                },
+                1.0
+            ).SetName("MantelHaenszel.MaximumCells.TotalDoesNotOverflow");
+            yield return new TestCaseData(
+                new (int, int, int, int)[] { (int.MaxValue, 1, 1, int.MaxValue) },
+                4611686014132420609.0
+            ).SetName("MantelHaenszel.MaximumCrossProduct.DoesNotOverflow");
+        }
+
+        private static IEnumerable<TestCaseData> InvalidMantelHaenszelCases()
+        {
+            yield return new TestCaseData((object)null).SetName("MantelHaenszel.Null.Fails");
+            yield return new TestCaseData(Array.Empty<(int, int, int, int)>()).SetName(
+                "MantelHaenszel.Empty.Fails"
+            );
+            yield return new TestCaseData(new (int, int, int, int)[] { (0, 0, 0, 0) }).SetName(
+                "MantelHaenszel.AllEmpty.Fails"
+            );
+            yield return new TestCaseData(new (int, int, int, int)[] { (1, 1, 0, 0) }).SetName(
+                "MantelHaenszel.UndefinedRatio.Fails"
+            );
+            yield return new TestCaseData(
+                new (int, int, int, int)[] { (1, 1, 1, 1), (-1, 1, 1, 1) }
+            ).SetName("MantelHaenszel.NegativeUpperLeft.Fails");
+            yield return new TestCaseData(new (int, int, int, int)[] { (1, -1, 1, 1) }).SetName(
+                "MantelHaenszel.NegativeUpperRight.Fails"
+            );
+            yield return new TestCaseData(new (int, int, int, int)[] { (1, 1, -1, 1) }).SetName(
+                "MantelHaenszel.NegativeLowerLeft.Fails"
+            );
+            yield return new TestCaseData(new (int, int, int, int)[] { (1, 1, 1, -1) }).SetName(
+                "MantelHaenszel.NegativeLowerRight.Fails"
+            );
+        }
+
+        [TestCaseSource(nameof(ChiSquareReferenceCases))]
+        public void ChiSquareSurvivalMatchesIndependentReference(
+            double statistic,
+            int degreesOfFreedom,
+            double expected
+        )
+        {
+            Assert.IsTrue(
+                WallMath.TryChiSquareSurvival(statistic, degreesOfFreedom, out double probability)
+            );
+            Assert.AreEqual(expected, probability, expected * 2e-12);
+        }
+
+        [TestCase(
+            2147155967.0000763,
+            0.99999971371120872473,
+            TestName = "ChiSquare.MaximumDegrees.LowerTailQuadrature"
+        )]
+        [TestCase(
+            2147483647.0,
+            0.49999594174926252866,
+            TestName = "ChiSquare.MaximumDegrees.CenterQuadrature"
+        )]
+        [TestCase(
+            2147811326.9999237,
+            0.00000028701472863699552631,
+            TestName = "ChiSquare.MaximumDegrees.UpperTailQuadrature"
+        )]
+        public void ChiSquareMaximumDegreesMatchesHighPrecisionDensityQuadrature(
+            double statistic,
+            double expected
+        )
+        {
+            Assert.IsTrue(
+                WallMath.TryChiSquareSurvival(statistic, int.MaxValue, out double probability)
+            );
+            Assert.AreEqual(expected, probability, expected * 2e-12);
+        }
+
+        [TestCase(-1.0, 1, TestName = "ChiSquare.NegativeStatistic.Fails")]
+        [TestCase(double.NegativeInfinity, 1, TestName = "ChiSquare.NegativeInfinity.Fails")]
+        [TestCase(double.NaN, 1, TestName = "ChiSquare.NaN.Fails")]
+        [TestCase(1.0, 0, TestName = "ChiSquare.ZeroDegrees.Fails")]
+        [TestCase(1.0, -1, TestName = "ChiSquare.NegativeDegrees.Fails")]
+        public void ChiSquareInvalidInputClearsOutput(double statistic, int degreesOfFreedom)
+        {
+            Assert.IsFalse(
+                WallMath.TryChiSquareSurvival(statistic, degreesOfFreedom, out double probability)
+            );
+            Assert.AreEqual(0.0, probability);
+        }
+
+        [TestCase(0.0, 1, 1.0, TestName = "ChiSquare.ZeroStatistic.One")]
+        [TestCase(double.Epsilon, 1, 1.0, TestName = "ChiSquare.SubnormalStatistic.One")]
+        [TestCase(0.0, int.MaxValue, 1.0, TestName = "ChiSquare.ZeroStatistic.MaximumDegrees")]
+        [TestCase(double.PositiveInfinity, 1, 0.0, TestName = "ChiSquare.PositiveInfinity.Zero")]
+        [TestCase(
+            double.MaxValue,
+            int.MaxValue,
+            0.0,
+            TestName = "ChiSquare.MaximumFiniteStatistic.Underflows"
+        )]
+        [TestCase(2000.0, 2, 0.0, TestName = "ChiSquare.UnrepresentableTail.Underflows")]
+        public void ChiSquareBoundaryValuesReturnExpectedProbability(
+            double statistic,
+            int degreesOfFreedom,
+            double expected
+        )
+        {
+            Assert.IsTrue(
+                WallMath.TryChiSquareSurvival(statistic, degreesOfFreedom, out double probability)
+            );
+            Assert.AreEqual(expected, probability);
+        }
+
+        [Test]
+        public void ChiSquareEvenDegreesMatchesFiniteExponentialSum()
+        {
+            double[] statistics = { 0.0, 0.1, 1.0, 10.0, 30.0, 100.0, 500.0 };
+            for (int degreesOfFreedom = 2; degreesOfFreedom <= 40; degreesOfFreedom += 2)
+            {
+                foreach (double statistic in statistics)
+                {
+                    double term = 1.0;
+                    double sum = term;
+                    for (int order = 1; order < degreesOfFreedom / 2; ++order)
+                    {
+                        term *= statistic / (2.0 * order);
+                        sum += term;
+                    }
+
+                    double expected = Math.Exp(-statistic / 2.0) * sum;
+                    Assert.IsTrue(
+                        WallMath.TryChiSquareSurvival(
+                            statistic,
+                            degreesOfFreedom,
+                            out double probability
+                        )
+                    );
+                    Assert.AreEqual(
+                        expected,
+                        probability,
+                        expected * 2e-12,
+                        $"Statistic {statistic}, degrees {degreesOfFreedom}."
+                    );
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(MantelHaenszelReferenceCases))]
+        public void MantelHaenszelMatchesRationalReference(
+            (int, int, int, int)[] strata,
+            double expected
+        )
+        {
+            (int, int, int, int)[] original = ((int, int, int, int)[])strata.Clone();
+            Assert.IsTrue(WallMath.TryMantelHaenszelOddsRatio(strata, out double oddsRatio));
+            if (double.IsPositiveInfinity(expected))
+            {
+                Assert.AreEqual(expected, oddsRatio);
+            }
+            else
+            {
+                Assert.AreEqual(expected, oddsRatio, Math.Max(1e-15, expected * 1e-14));
+            }
+
+            CollectionAssert.AreEqual(original, strata);
+        }
+
+        [TestCaseSource(nameof(InvalidMantelHaenszelCases))]
+        public void MantelHaenszelInvalidInputClearsOutput((int, int, int, int)[] strata)
+        {
+            Assert.IsFalse(WallMath.TryMantelHaenszelOddsRatio(strata, out double oddsRatio));
+            Assert.AreEqual(0.0, oddsRatio);
+        }
+
+        [Test]
+        public void MantelHaenszelIsInvariantToStratumOrderAndReciprocalUnderColumnSwap()
+        {
+            (int, int, int, int)[] strata = { (10, 5, 8, 20), (3, 15, 12, 4), (1, 1, 1, 1) };
+            (int, int, int, int)[] swapped = { (5, 10, 20, 8), (15, 3, 4, 12), (1, 1, 1, 1) };
+            Assert.IsTrue(WallMath.TryMantelHaenszelOddsRatio(strata, out double oddsRatio));
+            Assert.IsTrue(WallMath.TryMantelHaenszelOddsRatio(swapped, out double reciprocal));
+            Assert.AreEqual(1.0, oddsRatio * reciprocal, 1e-14);
+            Array.Reverse(strata);
+            Assert.IsTrue(WallMath.TryMantelHaenszelOddsRatio(strata, out double reversed));
+            Assert.AreEqual(oddsRatio, reversed, 1e-14);
+        }
+
+        [Test]
+        public void MantelHaenszelHandlesTenThousandStrataInReusableList()
+        {
+            List<(int, int, int, int)> strata = new List<(int, int, int, int)>(10000);
+            for (int index = 0; index < 5000; ++index)
+            {
+                strata.Add((1, 9, 11, 3));
+                strata.Add((8, 2, 4, 6));
+            }
+
+            Assert.IsTrue(WallMath.TryMantelHaenszelOddsRatio(strata, out double oddsRatio));
+            Assert.AreEqual(101.0 / 181.0, oddsRatio, 1e-14);
+            Assert.AreEqual(10000, strata.Count);
         }
 
         [Test]
@@ -640,6 +1000,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 Assert.AreEqual(expected, ((long[])values).Median(), 1e-9);
             }
+        }
+
+        [TestCaseSource(nameof(PercentileExtremeCases))]
+        public void PercentileHandlesExtremeMagnitudesAndInfiniteBounds(
+            double[] values,
+            double percentile,
+            double expected
+        )
+        {
+            double[] original = (double[])values.Clone();
+            double result = values.Percentile(percentile);
+            if (double.IsNaN(expected))
+            {
+                Assert.IsTrue(double.IsNaN(result));
+            }
+            else if (double.IsInfinity(expected) || Math.Abs(expected) < 1e-300)
+            {
+                Assert.AreEqual(expected, result);
+            }
+            else
+            {
+                Assert.AreEqual(expected, result, Math.Abs(expected) * 1e-14);
+            }
+
+            CollectionAssert.AreEqual(original, values);
         }
 
         [Test]

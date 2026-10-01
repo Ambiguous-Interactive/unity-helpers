@@ -282,6 +282,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Field<IntegerField>(settingsView, "Frame budget (ms)").value = 0;
                 Assert.AreEqual(1, settings.frameBudget);
                 Field<IntegerField>(settingsView, "Frame budget (ms)").value = 17;
+                byte[] savedBeforeFailure = File.ReadAllBytes(settingsPath);
+                File.Delete(settingsPath);
+                Directory.CreateDirectory(settingsPath);
+                try
+                {
+                    Field<IntegerField>(settingsView, "Frame budget (ms)").value = 25;
+                    Assert.AreEqual(17, settings.frameBudget);
+                    Assert.AreEqual(
+                        17,
+                        Field<IntegerField>(settingsView, "Frame budget (ms)").value
+                    );
+                    Label diagnostic = root.Q(className: "sentinel-toast").Q<Label>();
+                    Assert.IsTrue(diagnostic != null);
+                    Assert.IsFalse(string.IsNullOrWhiteSpace(diagnostic.text));
+                    Assert.AreEqual(0, Directory.GetFileSystemEntries(settingsPath).Length);
+                }
+                finally
+                {
+                    Directory.Delete(settingsPath);
+                    File.WriteAllBytes(settingsPath, savedBeforeFailure);
+                }
                 Button trigger = settingsView
                     .Query<Button>()
                     .ToList()

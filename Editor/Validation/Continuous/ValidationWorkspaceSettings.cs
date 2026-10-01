@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         "ProjectSettings/UnityHelpersValidation.asset",
         FilePathAttribute.Location.ProjectFolder
     )]
-    public sealed class ValidationWorkspaceSettings
+    public sealed partial class ValidationWorkspaceSettings
         : ScriptableSingleton<ValidationWorkspaceSettings>
     {
         internal const string RenameToPatternFix = "Rename to pattern";
@@ -241,41 +241,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             ValidationSeverity severity
         )
         {
-            Change(
-                "Configure validation rule",
-                () =>
-                {
-                    RulePreference preference = PreferenceFor(ruleId);
-                    if (preference == null)
-                    {
-                        preference = new RulePreference { ruleId = ruleId };
-                        rulePreferences.Add(preference);
-                    }
-                    preference.enabled = enabled;
-                    preference.overrideSeverity = overrideSeverity;
-                    preference.severity = severity;
-                }
-            );
-        }
-
-        internal void Change(string operation, Action mutation)
-        {
-            if (mutation == null)
-            {
-                return;
-            }
-            Undo.RecordObject(this, operation);
-            mutation();
-            Normalize();
-            Save(true);
-            Changed?.Invoke();
+            TrySetRulePreference(ruleId, enabled, overrideSeverity, severity, out _);
         }
 
         internal void SaveAfterUndo()
         {
             Normalize();
-            Save(true);
-            Changed?.Invoke();
+            if (TryPersist(out _))
+            {
+                NotifyChanged();
+            }
         }
 
         private void OnEnable()
@@ -294,35 +269,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         private void UpdateUndoSubscription()
         {
             Undo.undoRedoPerformed -= SaveAfterUndo;
-            if (ValidationPreferences.Enabled)
+            if (ValidationPreferences.Enabled || _persistUndoWhileDisabled)
                 Undo.undoRedoPerformed += SaveAfterUndo;
         }
 
+        /// <summary>A detached validation profile configuration.</summary>
         [Serializable]
-        internal sealed class Profile
+        public sealed class Profile
         {
+            /// <summary>The display name.</summary>
             public string name = "Default";
+
+            /// <summary>Category triggers in category order: change (0), save (1), or manual (2).</summary>
             public int[] triggers = new int[8];
+
+            /// <summary>Whether validation gates builds.</summary>
             public bool gateBuild;
+
+            /// <summary>The minimum build failure severity.</summary>
             public ValidationSeverity failOn = ValidationSeverity.Error;
         }
 
+        /// <summary>A detached rule enablement and severity preference.</summary>
         [Serializable]
-        internal sealed class RulePreference
+        public sealed class RulePreference
         {
+            /// <summary>The stable rule identifier.</summary>
             public string ruleId;
+
+            /// <summary>Whether the rule runs.</summary>
             public bool enabled = true;
+
+            /// <summary>Whether severity replaces the rule default.</summary>
             public bool overrideSeverity;
+
+            /// <summary>The reported finding severity.</summary>
             public ValidationSeverity severity = ValidationSeverity.Warning;
         }
 
+        /// <summary>An authored validation rule definition.</summary>
         [Serializable]
-        internal sealed class RuleDefinition
+        public sealed class RuleDefinition
         {
+            /// <summary>The stable identifier assigned on creation.</summary>
             public string id;
+
+            /// <summary>The display name.</summary>
             public string name = "Mono audio for 3D sources";
+
+            /// <summary>The supported target category.</summary>
             public string target = "Prefabs";
+
+            /// <summary>An optional project-relative folder filter.</summary>
             public string pathFilter = "Assets/Prefabs";
+
+            /// <summary>The conditions which must all match.</summary>
             public List<RuleCondition> checks = new List<RuleCondition>
             {
                 new RuleCondition
@@ -338,18 +339,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     value = "1",
                 },
             };
+
+            /// <summary>The reported finding severity.</summary>
             public ValidationSeverity severity = ValidationSeverity.Warning;
+
+            /// <summary>The finding message.</summary>
             public string message = "3D AudioSource plays a stereo clip";
+
+            /// <summary>The supported fix choice.</summary>
             public string fix = "Force mono on import";
+
+            /// <summary>The fix argument.</summary>
             public string fixValue = "1024";
         }
 
+        /// <summary>A condition in an authored validation rule.</summary>
         [Serializable]
-        internal sealed class RuleCondition
+        public sealed class RuleCondition
         {
+            /// <summary>The condition position in the graph.</summary>
             public Vector2 graphPosition;
+
+            /// <summary>The supported property path.</summary>
             public string property = "Rigidbody.mass";
+
+            /// <summary>The supported comparison.</summary>
             public string comparison = ">";
+
+            /// <summary>The comparison argument.</summary>
             public string value = "100";
         }
     }

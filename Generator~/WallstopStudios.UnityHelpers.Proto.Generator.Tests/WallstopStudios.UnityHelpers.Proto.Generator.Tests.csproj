@@ -79,6 +79,8 @@
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/Matrix4x4Surrogate.cs" />
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/KeyframeSurrogate.cs" />
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/BoneWeightSurrogate.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoExplicitDefaultContract.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoExplicitDefaultTests.cs" />
     <Compile Include="*.cs" />
     <Compile
       Include="$(RepoRoot)/Tests/Core/DictionaryAssertions.cs"

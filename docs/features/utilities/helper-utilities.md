@@ -1509,8 +1509,11 @@ Conventions, chosen once so callers do not have to guess:
 
 - `Median` of an even count averages the two middle elements; the halving is done in `double`, so
   extreme magnitudes cannot overflow.
-- `Percentile` interpolates linearly between closest ranks (`0` is the minimum, `1` the maximum);
-  a NaN or out-of-range percentile throws.
+- `Percentile` interpolates linearly between closest ranks (`0` is the minimum, `1` the maximum).
+  Finite opposite extremes stay finite, and primitive conversions do not box the elements. Exact
+  ranks retain their stored value. Interior interpolation preserves equal infinities, returns the
+  infinite endpoint when only one endpoint is infinite, and returns NaN between opposite infinities.
+  Results are undefined for data containing NaN; a NaN or out-of-range percentile throws.
 - `Mean` accumulates in `double`, so a float sum cannot lose magnitude and an int sum cannot
   overflow. Integral data returns `double`, matching `Enumerable.Average`.
 - `StandardDeviation` is the population standard deviation by default; pass `sample: true` for
@@ -1579,6 +1582,62 @@ Negative counts, an empty table, totals beyond `int.MaxValue`, or more than one 
 fixed-margin tables return `false` and clear the output. The table-count limit bounds work for data
 that needs a large-sample method instead.
 
+For stratified binary outcomes, estimate the common odds ratio with Mantel-Haenszel pooling:
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+(int upperLeft, int upperRight, int lowerLeft, int lowerRight)[] strata =
+{
+    (1, 9, 11, 3),
+    (8, 2, 4, 6)
+};
+bool estimated = WallMath.TryMantelHaenszelOddsRatio(strata, out double oddsRatio);
+// oddsRatio = 101 / 181, about 0.558
+```
+
+Rows and columns must have consistent meanings across strata. With cells `(a, b, c, d)` and total
+`n`, pooling computes `sum(a*d/n) / sum(b*c/n)`, as in
+[statsmodels' pooled odds ratio](https://www.statsmodels.org/stable/_modules/statsmodels/stats/contingency_tables.html#StratifiedTable.oddsratio_pooled).
+Empty strata contribute nothing. Null or empty input, any negative cell, and an undefined
+zero-over-zero ratio return `false` and clear the output. A zero numerator produces zero; a positive
+numerator with a zero denominator produces positive infinity. All non-negative `int` cell counts
+are supported, including tables whose total exceeds `int.MaxValue`. The method reads the existing
+buffer without allocating or changing it. No continuity correction is added. This is a common-effect
+estimate, with independent observations within and between strata; it does not supply a confidence
+interval, an exact significance test, or a test of homogeneity.
+
+For an already computed chi-square statistic, get its upper-tail probability directly:
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+bool evaluated = WallMath.TryChiSquareSurvival(
+    statistic: 3.841458820694124,
+    degreesOfFreedom: 1,
+    out double upperTailProbability
+); // about 0.05
+```
+
+The probability is `Q(degreesOfFreedom / 2, statistic / 2)`, the regularized upper incomplete gamma
+function. Its evaluation uses the [gamma series](https://dlmf.nist.gov/8.11.E4) and
+[continued fraction](https://dlmf.nist.gov/8.9), with a stable logarithmic prefactor for large degrees
+of freedom. This evaluates the chi-square distribution; whether that distribution is appropriate
+for a particular test remains the caller's statistical assumption. It does not turn a small-sample
+chi-square test into an exact test.
+
+Degrees of freedom must be a positive `int`. A zero statistic returns one, positive infinity returns
+zero, and negative or NaN statistics return `false`. Both numerical paths have a one-million-iteration
+convergence limit and fail with `false` and zero output if convergence cannot be established.
+Extremely small probabilities can underflow to zero; ordinary small tails are evaluated directly
+rather than by subtracting a cumulative probability from one. The method allocates no scratch
+buffer. Reference tests cover finite exponential sums for even degrees, independently evaluated
+small tails, and high-precision density quadrature at `int.MaxValue` degrees of freedom.
+
 <!-- doc-sample: compiles -->
 
 ```csharp
@@ -1591,7 +1650,7 @@ double medianWave = waveSizes.Median(); // 10.5
 double p90Wave = waveSizes.Percentile(0.9); // 14.3
 ```
 
-Every method throws on an empty list and a null receiver: a statistic of nothing is undefined, and
+The descriptive list methods throw on an empty list and a null receiver: a statistic of nothing is undefined, and
 the package fails closed rather than inventing a zero.
 
 ---
@@ -1663,8 +1722,9 @@ List<string> scenes = Helpers.GetCommandLineArguments(
 ```
 
 `GetCommandLineArguments` preserves repeated values in order. Both helpers fail soft for null input
-or an empty name, and the current-process overload returns `null` instead of throwing when process
-arguments are unavailable.
+or a blank name, and the current-process overload returns `null` instead of throwing when process
+arguments are unavailable. Blank names are rejected before reading process arguments. Names with
+surrounding spaces match exactly, and values retain literal whitespace.
 
 **Supported CI systems (checked via environment variables):**
 

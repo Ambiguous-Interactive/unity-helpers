@@ -616,5 +616,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 DiagnosticSeverity.Info,
                 isEnabledByDefault: true
             );
+        internal static readonly DiagnosticDescriptor UnsupportedDefaultValue =
+            new DiagnosticDescriptor(
+                "WPROTO049",
+                "Explicit default cannot be generated",
+                "'{0}.{1}' declares a DefaultValue that cannot be represented for '{2}'. Use a compatible scalar constant or a hand-written formatter; never discard an existing default omission policy during migration.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
     }
 }

@@ -2226,6 +2226,119 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
+        [TestCase("int", "typeof(int), \"invalid\"")]
+        [TestCase("System.Collections.Generic.List<int>", "5")]
+        [TestCase("byte[]", "5")]
+        [TestCase("int", "typeof(int)")]
+        [TestCase("int", "new int[] { 1 }")]
+        [TestCase("System.DayOfWeek", "1.5D")]
+        [TestCase("System.IO.FileAttributes", "\"1, 2\"")]
+        [TestCase("float", "float.NaN")]
+        [TestCase("double", "typeof(double), \"NaN\"")]
+        [TestCase("System.DayOfWeek", "typeof(System.DayOfWeek), \"-1, 2147483648\"")]
+        [TestCase("System.DayOfWeek", "typeof(System.DayOfWeek), \"4294967301\"")]
+        public void ExplicitDefaultsRefuseUnsupportedOmissionPolicies(
+            string memberType,
+            string attributeArguments
+        )
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                "[WProtoContract] public partial class CustomDefault { [WProtoMember(1)] "
+                    + "[System.ComponentModel.DefaultValue("
+                    + attributeArguments
+                    + ")] public "
+                    + memberType
+                    + " Value; } [WProtoContract] public partial class ValidDefault { [WProtoMember(1)] public int Value; }",
+                out Compilation generated
+            );
+            Assert.AreEqual(
+                1,
+                diagnostics.Count(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO049", StringComparison.Ordinal)
+                )
+            );
+            Assert.IsFalse(
+                diagnostics.Any(diagnostic =>
+                    string.Equals(diagnostic.Id, "CS8785", StringComparison.Ordinal)
+                )
+            );
+            Assert.IsTrue(
+                generated.SyntaxTrees.Any(tree => tree.ToString().Contains("class WProtoFormatter"))
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DefaultDiagnosticSuppressionCannotPublishAnInvalidFormatter(bool suppress)
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                (suppress ? "\n#pragma warning disable WPROTO049\n" : "")
+                    + "[WProtoContract] public partial class CustomDefault { [WProtoMember(1)] "
+                    + "[System.ComponentModel.DefaultValue(typeof(int))] public int Value; }\n"
+                    + "[WProtoContract] public partial class ValidDefault { [WProtoMember(1)] public int Value; }\n",
+                out Compilation generated
+            );
+            Assert.IsFalse(
+                diagnostics.Any(diagnostic =>
+                    string.Equals(diagnostic.Id, "CS8785", StringComparison.Ordinal)
+                )
+            );
+            Assert.IsFalse(
+                generated.SyntaxTrees.Any(tree =>
+                    tree.ToString().Contains("IWProtoFormatter<global::Consumer.CustomDefault>")
+                )
+            );
+            Assert.IsTrue(
+                generated.SyntaxTrees.Any(tree =>
+                    tree.ToString().Contains("IWProtoFormatter<global::Consumer.ValidDefault>")
+                )
+            );
+        }
+
+        [TestCase("public enum Alias { First = 1, Second = 1 }", "string", "Alias.First")]
+        [TestCase(
+            "public enum Alias { Alpha = 1, ALPHA = 2 }",
+            "Alias",
+            "typeof(Alias), \"Alpha\""
+        )]
+        [TestCase("public enum Alias : ulong { First = 1 }", "Alias", "typeof(Alias), \"-1\"")]
+        [TestCase(
+            "[System.ComponentModel.TypeConverter(typeof(System.ComponentModel.BooleanConverter))] public enum Alias { First = 1 }",
+            "Alias",
+            "typeof(Alias), \"true\""
+        )]
+        public void AmbiguousEnumDefaultsRequireAnExplicitFormatter(
+            string declaration,
+            string memberType,
+            string defaultArguments
+        )
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                declaration
+                    + " [WProtoContract] public partial class CustomDefault { [WProtoMember(1)] "
+                    + "[System.ComponentModel.DefaultValue("
+                    + defaultArguments
+                    + ")] public "
+                    + memberType
+                    + " Value; }",
+                out Compilation generated
+            );
+            Assert.AreEqual(
+                1,
+                diagnostics.Count(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO049", StringComparison.Ordinal)
+                )
+            );
+            Assert.IsFalse(
+                diagnostics.Any(diagnostic =>
+                    string.Equals(diagnostic.Id, "CS8785", StringComparison.Ordinal)
+                )
+            );
+            Assert.IsFalse(
+                generated.SyntaxTrees.Any(tree => tree.ToString().Contains("class WProtoFormatter"))
+            );
+        }
+
         /// <summary>
         /// Runtime-only registrations expose migration work even when no contract attribute exists.
         /// </summary>

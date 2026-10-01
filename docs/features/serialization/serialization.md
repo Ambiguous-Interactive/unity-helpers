@@ -1316,6 +1316,60 @@ break a consumer build. Promote it using the ruleset above or
 protobuf-net registration only after the matching WallstopProto shape has been declared separately.
 A suppression records that decision; it does not prove that the registered types migrated.
 
+#### Consumer migration acceptance
+
+Runtime-configured targets can migrate when the build knows their complete shapes. The
+`RuntimeModelConsumerMigrationTests` fixture reconstructs a model without protobuf-net contract
+attributes and compares it with generated declarations on both 2.4.9 and 3.2.56. It covers closed
+`Save<int>` and `Save<string>` targets, a member with an explicitly configured zero default, a member
+with no configured default, nullable zero, repeated polymorphic entries, subtype-side declarations,
+and a foreign struct surrogate. It checks exact bytes and both cross-read directions. Golden bytes
+pin the distinction between an absent string and an empty string; a changed runtime default is a
+negative control that must disagree with the declared shape.
+
+This establishes that these migration mechanisms work together. It does not establish that every
+consumer's configured model has migrated. Before retiring that consumer's fallback, record each
+runtime target, its closed type arguments, field numbers, configured defaults, encoding options,
+subtype tags, surrogate pairs, and construction or callback behavior. Run each recorded shape
+against its original model and retained save payloads, on both oracles. Run the migrated build in
+an IL2CPP player with generated formatters serving those targets. A diagnostic suppression or a
+successful round trip through only the new formatter is insufficient evidence.
+
+| Model surface                                                                                                 | Migration status                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fixed registrations, closed generic targets, numbered members, subtype tags, static surrogate pairs           | Supported through compile-time declarations; the combined fixture checks exact bytes and cross-reads.                                                                                                                                                                     |
+| A finite list of settings-selected identifier types                                                           | Feasible: declare and reference every supported closure in the consumer build. Test each closure; testing `int` does not establish another identifier's encoding.                                                                                                         |
+| Unset scalar defaults and explicit zero defaults                                                              | Preserve the original distinction with `IsRequired` and ordinary omission, respectively. Required nullable/reference members still cannot invent a null value.                                                                                                            |
+| Custom scalar `ValueMember.DefaultValue` omission policies                                                    | Carry them as `[System.ComponentModel.DefaultValue]` on the matching numbered member. Numeric, boolean, character, string, enum, nullable scalar, decimal, DateTime, TimeSpan, and Guid defaults are supported; conversion and omission are checked against both oracles. |
+| Runtime configuration in a referenced precompiled assembly                                                    | Feasible if its complete model is inventoried and equivalent static declarations or formatters are supplied. `WPROTO048` cannot inspect that assembly's registration code.                                                                                                |
+| Unbounded types discovered only after the player is built, or field/subtype layouts mutated after compilation | Incompatible with static AOT generation unless the application restricts them to a declared build-time set. Keeping reflection-based model discovery does not supply IL2CPP with the missing generated code.                                                              |
+
+`[DefaultValue]` configures write omission. A value equal to that explicit default is absent;
+a different value, including zero, is written. Absent fields retain constructor state, so a field
+with `[DefaultValue(5)]` and no initializer reads an absent value as zero, just as protobuf-net does.
+`IsRequired` overrides omission; null references and nullable values remain absent.
+
+The `(Type, string)` constructor first converts through the declared scalar type at compilation,
+then applies protobuf-net's conversion to the member type. This matters for rounding and hexadecimal
+integer defaults. Generated writers use resolved constants and value constructors, without runtime
+parsing or reflection. Zoned timestamp defaults keep their UTC instant and convert it to the player's
+local time zone; fractional ticks and the original conversion policy remain intact. Zoned dates converted
+to string defaults initialize once in the player, so serialization does not allocate a formatted string
+on each call. A local timestamp outside the representable UTC range reports `WPROTO049`. Enum names, numeric values, and flags combinations are supported. Enum
+names used as string defaults require unique enum values; ambiguous aliases, names that differ only in case, and custom enum type
+converters report `WPROTO049`. Collections, arbitrary object defaults, invalid conversions, and
+unresolved generic omission defaults also report that error instead of silently changing saved bytes.
+
+An explicit NaN omission default reports `WPROTO049` unless `IsRequired` disables omission. The v2
+oracle's interpreted model omits NaN while its compiled model writes it; one encoding cannot match
+both. Ordinary NaN payload values remain supported, as do infinity defaults. Keep the consumer's
+original route or a formatter with the established policy for that incompatible model, rather than
+choosing an oracle backend silently.
+
+The remaining feasible surfaces stay part of the consumer migration work. They are not grounds for
+claiming that runtime models as a whole are technically infeasible, or for removing the fallback.
+The hybrid release observation and major-release acceptance gates still apply.
+
 #### Contracts that hold other contracts
 
 A `[WProtoMember]` whose type is another contract is written as a nested message, and a contract may
