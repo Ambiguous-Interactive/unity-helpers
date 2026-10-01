@@ -291,8 +291,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return false;
         }
 
-        // Only these shapes have transparent evaluation between their children. Unknown shapes
-        // may hide callbacks (patterns, coalesce conversions, disposal, or newer language features).
+        /* Unknown operation shapes may hide callbacks between their children. */
         private static bool HasKnownEvaluationOrder(IOperation operation)
         {
             return operation is IBlockOperation
