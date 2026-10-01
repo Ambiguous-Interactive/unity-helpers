@@ -553,6 +553,7 @@ jobs:
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
+            -ManagedStrippingLevel 'High' `
             -Il2CppCompilerConfiguration 'Release'
 
       - name: Run additional native acceptance
@@ -1136,6 +1137,7 @@ jobs:
             -AdditionalScriptingDefines SINGLE_THREADED,WALLSTOP_CONCAVE_HULL_STATS `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
+            -ManagedStrippingLevel 'High' `
             -Il2CppCompilerConfiguration 'Release'
 
       - name: Return Unity license

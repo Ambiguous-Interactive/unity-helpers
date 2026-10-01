@@ -49,20 +49,22 @@ the window edits the project-wide default ruleset. Writes import the asset immed
 | [`WUH017`](#wuh017-a-getcomponent-compared-against-null)                 | A `GetComponent` compared against null                                |
 | [`WUH018`](#wuh018-implicit-string-equality-opt-in)                      | String equality without an explicit policy (**off by default**)       |
 | [`WUH019`](#wuh019-repeated-stable-loop-bound-opt-in)                    | A counting loop repeatedly reading a stable size (**off by default**) |
+| [`WUH020`](#wuh020-hard-stack-and-queue-reads)                           | A throwing stack or queue read with an available Try method           |
+| [`WUH021`](#wuh021-repeated-collection-count-opt-in)                     | Repeated size observations (**off by default**)                       |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
 
-|                     | `WPROTO###`                                                  | `WUH###`                                              |
-| ------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
-| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code              |
-| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported       |
-| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                |
-| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, and `WUH019` |
+|                     | `WPROTO###`                                                  | `WUH###`                                                        |
+| ------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
+| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                        |
+| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                 |
+| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                          |
+| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, and `WUH021` |
 
 **A `WUH###` diagnostic defaults to a warning.** Taking a package upgrade does not promote it to
 a build error; an explicit Error override does. If your project treats warnings as errors, see
-[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, and `WUH019` go further and are off until you ask for them, because
+[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, and `WUH021` go further and are off until you ask for them, because
 their shapes are correct code far more often than they are defects.
 
 The compact policy list offers a severity selector beside each diagnostic:
@@ -865,8 +867,122 @@ The policy is off by default. Production TypeCheck, EditorCheck, and Integration
 through `Generator~/ProductionCheckProjects.ruleset`, which imports the shared policies. Test and
 tooling projects keep the shared ruleset. WUH019 promotion is limited to those production projects: explicitly listing a diagnostic in
 `WarningsAsErrors` enables it even when a shared ruleset says `None`.
-The excluded-production-source loop audit runs both WUH013 and WUH019 and requires a reporting
-control for each, so old host reference gaps cannot silently bypass either rule.
+The excluded-production-source audit runs WUH013, WUH019, and WUH021 and requires a reporting
+control for each beside an unresolved API in the same compilation. Known host reference gaps
+cannot silently bypass these collection-size rules in the nine audited production sources.
+
+## `WUH020`: hard stack and queue reads
+
+Use `Stack<T>.TryPop`, `Queue<T>.TryDequeue`, and their `TryPeek` methods when the target
+framework exposes them. These methods make the empty case explicit without throwing.
+Shared `Stack<T>` and `Queue<T>` still require synchronization between threads.
+
+```csharp
+// WUH020: an empty queue throws.
+int item = queue.Dequeue();
+Process(item);
+
+// Handle the empty case through the boolean result.
+if (queue.TryDequeue(out int item))
+{
+    Process(item);
+}
+```
+
+The analyzer resolves the invoked method to the generic .NET stack or queue types. A custom
+`Pop`, `Peek`, or `Dequeue` method, even on a class named `Stack`, stays outside the rule. A
+method hidden by a derived custom type also stays outside it; an inherited .NET method remains
+covered, including through a constrained generic type parameter. An alternative must be accessible,
+return `bool`, and accept exactly one `out` parameter
+matching the hard method's return type. Older target frameworks without these APIs are exempt.
+Non-generic collections without Try methods are exempt as well. Concurrent stacks and queues
+already expose Try methods for these operations, which produce no diagnostic.
+
+A separate `Count` guard does not exempt a hard read: the rule requires the available Try API
+even when a caller knows the collection is populated. A guard can also become stale if another
+caller changes the collection. The diagnostic is on by default, suppressible, and a warning.
+There is no automatic fix because choosing what happens when the collection is empty requires
+caller policy. Checking the boolean result also avoids [`WUH008`](#wuh008-a-tryxxx-out-value-read-without-testing-the-call).
+
+## `WUH021`: repeated collection Count (opt-in)
+
+This policy covers repeated size observations: collection counts, known lengths, and LINQ counts.
+
+Read `Count` once when a guard and later work require one snapshot:
+
+```csharp
+// WUH021: two observations for one capacity decision.
+if (values.Count > 0)
+{
+    Reserve(values.Count);
+}
+
+int count = values.Count;
+if (count > 0)
+{
+    Reserve(count);
+}
+```
+
+The rule recognizes these semantic contracts when the target framework exposes them:
+
+| Size member                 | Known types                                                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Count` property            | .NET `ICollection<T>`, `IReadOnlyCollection<T>`, and non-generic `ICollection` implementations, including `List<T>` and `ArraySegment<T>` |
+| `Length` and `LongLength`   | Arrays, including multidimensional arrays and receivers typed as `System.Array`                                                           |
+| `Length`                    | `string`, `Span<T>`, `ReadOnlySpan<T>`, `Memory<T>`, `ReadOnlyMemory<T>`, `StringBuilder`, `ImmutableArray<T>`, and `ReadOnlySequence<T>` |
+| `Count()` and `LongCount()` | Non-predicate `System.Linq.Enumerable` overloads on one source                                                                            |
+
+Collection contracts include inherited interfaces and constrained generic receivers. Standard
+`List<T>` exposes `Count`, rather than `Length`. Custom members with these names outside the
+known contracts are exempt. Missing optional framework types require no new reference.
+
+```csharp
+// WUH021: enumeration may execute twice.
+if (items.Count() > 0)
+{
+    Reserve(items.Count());
+}
+
+int itemCount = items.Count();
+if (itemCount > 0)
+{
+    Reserve(itemCount);
+}
+```
+
+Both extension-call and static `Enumerable.Count(items)` forms identify the same constructed
+method and source. Count and LongCount are distinct contracts: their result widths and overflow
+behavior differ. A property Count and Enumerable.Count are also kept separate. Predicate counts,
+`Queryable`, parallel LINQ, custom Count methods, different generic element contracts, and
+factory/property receivers whose identity is unknown are exempt. The rule does not track aliases.
+Enumeration can invoke callbacks, so a count call discards observations of other receivers;
+a repeated count of the same source is still reported when one snapshot is intended.
+It follows the same local, parameter, or field receiver along uninterrupted evaluation paths,
+including guards, conditional expressions, and call arguments. Reference casts retain receiver
+identity when the invoked member remains the same. Interface dispatch on an unsealed receiver
+can select a different implementation, so it does not merge a class Count with an interface Count.
+A sealed receiver can establish that mapping. Distinct explicit Count implementations remain
+separate observations.
+
+Calls, mutations, unknown getters, user operators, and constructors interrupt observations.
+Unfamiliar operation shapes are opaque boundaries, including implicit coalesce conversions and
+record clones. Static field access can run a type initializer and also interrupts earlier reads.
+Constructors run before their initializers; nested functions start with independent state.
+Loop and exception boundaries do not carry earlier observations into later paths.
+This conservative analysis does not prove size observations pure or thread-safe. Interface getters
+and enumeration can execute custom code; enumeration can be expensive, stateful, or one-shot.
+Concurrent observations can differ even without a visible mutation.
+A snapshot does not synchronize a collection. Suppress intentional repeated observations or
+repeated enumerations when one snapshot would change the intended behavior. There is no automatic code fix.
+
+This suppressible warning is off by default for consumers. Enable it with
+`<Rule Id="WUH021" Action="Warning" />` in a project ruleset. Production TypeCheck,
+EditorCheck, and IntegrationCheck enable and promote WUH021 alongside WUH019 through
+`Generator~/ProductionCheckProjects.ruleset`; tests and tooling retain the shared opt-in policy.
+Compiler controls require both production diagnostics and their absence in shared projects.
+The existing excluded-source audit also enforces WUH021 in its nine production subjects and
+requires a separate reporting control alongside known unresolved host APIs.
 
 ## Turning one off
 

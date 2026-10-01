@@ -1327,6 +1327,32 @@ and a foreign struct surrogate. It checks exact bytes and both cross-read direct
 pin the distinction between an absent string and an empty string; a changed runtime default is a
 negative control that must disagree with the declared shape.
 
+The same combined shapes also live in the ordinary Unity assembly
+`WallstopStudios.UnityHelpers.ConsumerMigration`, whose asmdef has no NUnit or protobuf-net
+reference and no test-only define constraint. `WProtoConsumerMigrationTests` references that
+assembly and exercises both closed targets, polymorphic entries, nullable zero, configured
+omission, and the surrogate through generated dispatch. Its retained combined golden payload
+covers all those mechanisms together, and is read and rewritten without an oracle in IL2CPP.
+The host dual-oracle harness compiles these same source files to validate the golden bytes and
+cross-read directions; that flattened host compilation alone does not prove Unity assembly
+registration. Unity runs additionally assert that the declarations and fixture belong to different
+assemblies. The required player acceptance is Release IL2CPP with High managed stripping;
+an ordinary Mono test pass does not establish that acceptance. The focused
+`scripts/unity/run-acceptance.ps1 -Acceptance serialization` gate copies these declarations into
+an ordinary assembly and runs all 12 player-compatible migration scenarios from an ordinary
+consumer driver. Its verifier requires those 12 completed scenarios, the existing four
+cross-assembly scenarios and both replacement-owner orders, exact passing test names, and
+matching source/version markers with effective High stripping and a non-development Release
+IL2CPP player.
+
+The full High-stripping test player also runs deliberate legacy reflection fixtures. Its runner
+stages their narrowly scoped test linker declarations under `Assets`, because Unity ignores
+package-contained `link.xml` files. Those declarations preserve named legacy fixture contracts and
+the reflected constructor and protobuf attribute getters their legacy models need. The ordinary
+`ConsumerMigration` assembly
+and its generated contracts have no linker preservation entries. Test fixture preservation does
+not establish that an arbitrary consumer can use the legacy runtime engine under IL2CPP.
+
 This establishes that these migration mechanisms work together. It does not establish that every
 consumer's configured model has migrated. Before retiring that consumer's fallback, record each
 runtime target, its closed type arguments, field numbers, configured defaults, encoding options,

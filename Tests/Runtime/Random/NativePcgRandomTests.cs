@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     using System;
     using System.Collections.Generic;
     using NUnit.Framework;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Core.Random;
 
     /// <summary>
@@ -19,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     {
         private const int DistributionSamples = 200_000;
 
+        [Preserve]
         private static IEnumerable<int> Seeds()
         {
             yield return int.MinValue;

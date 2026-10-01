@@ -517,9 +517,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             {
                 count = 0;
             }
-            else if (parents.Count < count)
+            else
             {
-                count = parents.Count;
+                int parentCount = parents.Count;
+                if (parentCount < count)
+                {
+                    count = parentCount;
+                }
             }
 
             switch (metadata.kind)

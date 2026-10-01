@@ -256,9 +256,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             {
                 _sizePlanArena = new int[16];
             }
-            else if (_sizePlanArenaCount == _sizePlanArena.Length)
+            else
             {
-                Array.Resize(ref _sizePlanArena, checked(_sizePlanArena.Length * 2));
+                int arenaLength = _sizePlanArena.Length;
+                if (_sizePlanArenaCount == arenaLength)
+                {
+                    Array.Resize(ref _sizePlanArena, checked(arenaLength * 2));
+                }
             }
 
             int index = _sizePlanArenaCount++;

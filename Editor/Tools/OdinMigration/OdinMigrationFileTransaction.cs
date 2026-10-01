@@ -107,11 +107,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         private static bool StartsWith(byte[] bytes, byte[] prefix)
         {
-            if (prefix.Length == 0 || bytes.Length < prefix.Length)
+            int prefixLength = prefix.Length;
+            if (prefixLength == 0 || bytes.Length < prefixLength)
             {
                 return false;
             }
-            int prefixLength = prefix.Length;
             for (int index = 0; index < prefixLength; index++)
             {
                 if (bytes[index] != prefix[index])

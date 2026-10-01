@@ -623,7 +623,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
             Assert.IsTrue(watcher == null);
             Assert.AreEqual(1, nullEntrySnapshot.PendingAssetChanges.Count);
-            Assert.IsTrue(nullEntrySnapshot.PendingAssetChanges.Peek() == null);
+            Assert.IsTrue(
+                nullEntrySnapshot.PendingAssetChanges.TryPeek(
+                    out DetectAssetChangeProcessor.PendingAssetChangeSet pendingChange
+                )
+            );
+            Assert.IsTrue(pendingChange == null);
         }
 
         [Test]

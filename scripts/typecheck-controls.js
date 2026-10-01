@@ -126,6 +126,20 @@ function analyzerControl(anchor) {
             return target?.name;
         }
 
+        internal static int Retrieve(System.Collections.Generic.Queue<int> values)
+        {
+            return values.Dequeue();
+        }
+
+        internal static int Snapshot(System.Collections.Generic.ICollection<int> values)
+        {
+            if (values.Count > 0)
+            {
+                return values.Count;
+            }
+            return 0;
+        }
+
         internal static int Sum(int[] values)
         {
             int total = 0;
@@ -146,6 +160,15 @@ function excludedLoopControl(anchor) {
     internal static class ControlExcludedCountingLoop
     {
         internal static readonly System.Type Anchor = typeof(${anchor});
+        internal static int Snapshot(System.Collections.Generic.ICollection<int> values)
+        {
+            if (values.Count > 0)
+            {
+                return values.Count;
+            }
+            return 0;
+        }
+
         internal static int Sum(int[] values)
         {
             int total = 0;
@@ -193,10 +216,10 @@ const CONTROLS = Object.freeze([
     id: "analyzers",
     fileName: "WallstopCheckControlAnalyzers.cs",
     render: analyzerControl,
-    expected: ["WPROTO001", "WUH003", "WUH013"],
-    productionExpected: ["WUH019"],
+    expected: ["WPROTO001", "WUH003", "WUH013", "WUH020"],
+    productionExpected: ["WUH019", "WUH021"],
     meaning:
-      "the shipped generators and analyzers report, including the package counting-loop opt-in"
+      "the shipped generators and analyzers report, including the production collection-size opt-ins"
   },
   {
     id: "compiler",
@@ -209,10 +232,11 @@ const CONTROLS = Object.freeze([
     id: "excluded-loops",
     fileName: "WallstopCheckControlExcludedLoops.cs",
     render: excludedLoopControl,
-    expected: ["WUH013", "WUH019"],
+    expected: ["WUH013", "WUH019", "WUH021"],
     projectIds: ["editor"],
     property: "WallstopCountingLoopAuditControl",
-    meaning: "the persistent audit rejects counting loops in sources outside normal compilation"
+    meaning:
+      "the persistent audit rejects collection-size reads in sources outside normal compilation"
   }
 ]);
 

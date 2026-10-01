@@ -71,6 +71,10 @@ const PROBE_PROPERTY = "WallstopRuntimeOnlyReferences";
  */
 const UNDECLARED_BY_DESIGN = new Map([
   [
+    "WallstopStudios.UnityHelpers.TestCheck::System.Text.Json",
+    "Runtime/** and four of the five governed asmdefs declare it; ConsumerMigration contains only generated protobuf contracts and uses no JSON types"
+  ],
+  [
     "WallstopStudios.UnityHelpers.TestCheck::System.Text.Encodings.Web",
     "Runtime/**: the JsonConverters call JsonEncodedText.Encode, whose optional parameter is a JavaScriptEncoder"
   ],
@@ -84,15 +88,15 @@ const UNDECLARED_BY_DESIGN = new Map([
   ],
   [
     "WallstopStudios.UnityHelpers.TestCheck::protobuf-net",
-    "Runtime/**, and the three Tests/Runtime asmdefs declare it; only Tests/Core does not, and no fixture there names ProtoBuf"
+    "Runtime/** and the three runtime test asmdefs declare it; Tests/Core and the ordinary ConsumerMigration contracts name no ProtoBuf types"
   ],
   [
     "WallstopStudios.UnityHelpers.TestCheck::protobuf-net.Core",
-    "Runtime/**, and the three Tests/Runtime asmdefs declare it; only Tests/Core does not, and no fixture there names ProtoBuf"
+    "Runtime/** and the three runtime test asmdefs declare it; Tests/Core and the ordinary ConsumerMigration contracts name no ProtoBuf types"
   ],
   [
     "WallstopStudios.UnityHelpers.TestCheck::System.Collections.Immutable",
-    "Runtime/**, and the three Tests/Runtime asmdefs declare it; only Tests/Core does not, and no fixture there names ImmutableArray"
+    "Runtime/** and the three runtime test asmdefs declare it; Tests/Core and the ordinary ConsumerMigration contracts name no ImmutableArray types"
   ],
   [
     "WallstopStudios.UnityHelpers.EditorTestCheck::System.Text.Json",

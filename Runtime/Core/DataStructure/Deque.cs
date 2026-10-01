@@ -214,9 +214,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public void PushFront(T item)
         {
-            if (_count == _items.Length)
+            int capacity = _items.Length;
+            if (_count == capacity)
             {
-                Resize(ComputeGrowth(_items.Length));
+                Resize(ComputeGrowth(capacity));
             }
 
             _head = _head.WrappedAdd(-1, _items.Length);
@@ -229,9 +230,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public void PushBack(T item)
         {
-            if (_count == _items.Length)
+            int capacity = _items.Length;
+            if (_count == capacity)
             {
-                Resize(ComputeGrowth(_items.Length));
+                Resize(ComputeGrowth(capacity));
             }
 
             _items[_tail] = item;
@@ -305,7 +307,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 result = default;
                 return false;
             }
-            int backIndex = (_tail - 1 + _items.Length) % _items.Length;
+            int capacity = _items.Length;
+            int backIndex = (_tail - 1 + capacity) % capacity;
             result = _items[backIndex];
             return true;
         }

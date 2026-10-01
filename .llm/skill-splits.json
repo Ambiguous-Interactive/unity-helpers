@@ -137,7 +137,7 @@
     },
     {
       "name": "formatting",
-      "sha256": "9898a424d5fbe9c64c1bab9bd7ae7cfde20ac99a79edb9c4b7153fd3aac2f772",
+      "sha256": "acc5526732a97487982d82328109f3ee54df93b160b99cf1198985eb86d7985e",
       "parts": ["formatting-part-1.md", "formatting-part-2.md"],
       "routerSha256": "b0630668a19f5417e169caac274bea181fd12a9f1e42a0a162cc32bf70ce72ce"
     },

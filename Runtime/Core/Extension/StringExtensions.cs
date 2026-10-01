@@ -108,12 +108,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </example>
         public static string Center(this string input, int length)
         {
-            if (input == null || length <= input.Length)
+            int inputLength = input == null ? 0 : input.Length;
+            if (input == null || length <= inputLength)
             {
                 return input;
             }
 
-            return input.PadLeft((length - input.Length) / 2 + input.Length).PadRight(length);
+            return input.PadLeft((length - inputLength) / 2 + inputLength).PadRight(length);
         }
 
         /// <summary>
@@ -680,13 +681,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return input;
             }
 
+            int inputLength = input.Length;
             int estimated = 0;
-            if (1 < count && 0 < input.Length)
+            if (1 < count && 0 < inputLength)
             {
-                int maxMultiplier = int.MaxValue / input.Length;
+                int maxMultiplier = int.MaxValue / inputLength;
                 if (count <= maxMultiplier)
                 {
-                    estimated = input.Length * count;
+                    estimated = inputLength * count;
                 }
             }
             using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(

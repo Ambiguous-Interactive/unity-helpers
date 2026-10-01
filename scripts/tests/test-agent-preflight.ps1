@@ -1046,6 +1046,76 @@ finally {
     Remove-Item -Path $repo8bb -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# XML-only edits must receive the same formatter check and safe auto-fix as CI.
+Write-Host "`nTest group: XML-only CSharpier formatting and partial staging" -ForegroundColor Magenta
+$repoXml = New-TestRepo -ConfigurePushDefaults
+try {
+    $configurationDirectory = Join-Path $repoXml '.config'
+    $null = New-Item -ItemType Directory -Path $configurationDirectory -Force
+    $repositoryRoot = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
+    Copy-Item (Join-Path $repositoryRoot '.config/dotnet-tools.json') (Join-Path $configurationDirectory 'dotnet-tools.json')
+    Copy-Item (Join-Path $repositoryRoot '.editorconfig') (Join-Path $repoXml '.editorconfig')
+    $xmlPath = Join-Path $configurationDirectory 'link.xml'
+    [IO.File]::WriteAllText($xmlPath, '<linker><assembly fullname="Test.Reflection" preserve="all" /></linker>')
+    [IO.File]::WriteAllText((Join-Path $repoXml 'scripts/lint-duplicate-usings.ps1'), "throw 'XML formatting must not run C# using checks.'")
+    Push-Location $repoXml
+    try {
+        git add .config/link.xml
+    }
+    finally {
+        Pop-Location
+    }
+
+    $xmlCheck = Invoke-Preflight -UseCli -RepoPath $repoXml -Arguments @('-Paths', '.config/link.xml')
+    Write-TestResult 'XmlFormatting_UnformattedCheckFails' ($xmlCheck.ExitCode -eq 1 -and $xmlCheck.Output -match 'Was not formatted') "Expected real CSharpier to reject unformatted XML. Output: $($xmlCheck.Output)"
+    $xmlFix = Invoke-Preflight -UseCli -RepoPath $repoXml -Arguments @('-Fix', '-Paths', '.config/link.xml')
+    Write-TestResult 'XmlFormatting_FixPasses' ($xmlFix.ExitCode -eq 0) "Expected XML-only fix to succeed without C# checks. Output: $($xmlFix.Output)"
+    $xmlFormatted = [IO.File]::ReadAllText($xmlPath)
+    Write-TestResult 'XmlFormatting_ChangesFile' ($xmlFormatted -match "\r?\n$" -and $xmlFormatted.Contains('Test.Reflection')) 'Expected real CSharpier to format the XML while retaining its declaration'
+    Push-Location $repoXml
+    try {
+        $xmlStagedBefore = git show ':.config/link.xml' | Out-String
+        $xmlUnstagedPaths = @(git diff --name-only -- .config/link.xml)
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'XmlFormatting_FixStagesResult' ($xmlUnstagedPaths.Count -eq 0 -and $xmlStagedBefore.Contains('Test.Reflection')) 'Expected formatted XML to replace its staged copy'
+    $xmlRecheck = Invoke-Preflight -UseCli -RepoPath $repoXml -Arguments @('-Paths', '.config/link.xml')
+    Write-TestResult 'XmlFormatting_FormattedCheckPasses' ($xmlRecheck.ExitCode -eq 0) "Expected formatted XML to pass. Output: $($xmlRecheck.Output)"
+
+    $additionalXmlPaths = @('config', 'csproj', 'props', 'targets', 'slnx', 'xaml', 'axaml') | ForEach-Object { ".config/link.$_" }
+    foreach ($additionalXmlPath in $additionalXmlPaths) {
+        [IO.File]::WriteAllText((Join-Path $repoXml $additionalXmlPath), '<root><value>one</value></root>')
+    }
+    $additionalXmlCheck = Invoke-Preflight -UseCli -RepoPath $repoXml -Arguments (@('-Paths') + $additionalXmlPaths)
+    $additionalXmlFilesReported = @($additionalXmlPaths | Where-Object { $additionalXmlCheck.Output -notmatch ([regex]::Escape($_) + ' - Was not formatted') }).Count -eq 0
+    Write-TestResult 'XmlFormatting_SupportedExtensionsChecked' ($additionalXmlCheck.ExitCode -eq 1 -and $additionalXmlFilesReported) "Expected every supported XML extension to reach CSharpier. Output: $($additionalXmlCheck.Output)"
+    $additionalXmlFix = Invoke-Preflight -UseCli -RepoPath $repoXml -Arguments (@('-Fix', '-Paths') + $additionalXmlPaths)
+    Write-TestResult 'XmlFormatting_SupportedExtensionsFixed' ($additionalXmlFix.ExitCode -eq 0) "Expected supported XML extensions to format without C# checks. Output: $($additionalXmlFix.Output)"
+
+    [IO.File]::WriteAllText((Join-Path $configurationDirectory 'unsupported.resx'), 'Not XML and not a supported formatter extension.')
+    $unsupportedXmlCheck = Invoke-Preflight -UseCli -RepoPath $repoXml -Arguments @('-Paths', '.config/unsupported.resx')
+    Write-TestResult 'XmlFormatting_UnsupportedExtensionExcluded' ($unsupportedXmlCheck.ExitCode -eq 0 -and $unsupportedXmlCheck.Output -notmatch 'Checking CSharpier') "Expected unsupported XML-like files to stay outside the formatter. Output: $($unsupportedXmlCheck.Output)"
+
+    [IO.File]::WriteAllText($xmlPath, '<linker><assembly fullname="Test.Unstaged" preserve="all" /></linker>')
+    $xmlWorktreeBefore = [IO.File]::ReadAllBytes($xmlPath)
+    $xmlPartialFix = Invoke-Preflight -UseCli -RepoPath $repoXml -Arguments @('-Fix', '-Paths', '.config/link.xml')
+    Write-TestResult 'XmlFormatting_PartialStageRefused' ($xmlPartialFix.ExitCode -eq 1 -and $xmlPartialFix.Output -match 'Refusing to auto-stage whole file') "Expected formatter to refuse partially staged XML. Output: $($xmlPartialFix.Output)"
+    Write-TestResult 'XmlFormatting_PartialStageWorktreeUnchanged' (Test-ByteArrayEqual -Expected $xmlWorktreeBefore -Actual ([IO.File]::ReadAllBytes($xmlPath))) 'Expected partial-staging refusal before mutation'
+    Push-Location $repoXml
+    try {
+        $xmlStagedAfter = git show ':.config/link.xml' | Out-String
+    }
+    finally {
+        Pop-Location
+    }
+    Write-TestResult 'XmlFormatting_PartialStageIndexUnchanged' ($xmlStagedAfter -ceq $xmlStagedBefore) 'Expected formatter to retain staged XML while refusing unstaged edits'
+}
+finally {
+    Remove-Item -Path $repoXml -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # Test 9: Changed markdown typos should fail preflight with actionable output
 Write-Host "`nTest group: spelling failure diagnostics" -ForegroundColor Magenta
 $repo9 = New-TestRepo -ConfigurePushDefaults

@@ -32,6 +32,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         }
 
         [Test]
+        public void ContainerConstructsAssignerSingleton()
+        {
+            AttributeMetadataCache cache = CreateCacheFor(typeof(ZenjectRelationalTester));
+            Container.BindInstance(cache);
+            Container
+                .Bind<IRelationalComponentAssigner>()
+                .To<RelationalComponentAssigner>()
+                .AsSingle();
+
+            IRelationalComponentAssigner first = Container.Resolve<IRelationalComponentAssigner>();
+            IRelationalComponentAssigner second = Container.Resolve<IRelationalComponentAssigner>();
+            Assert.That(first, Is.TypeOf<RelationalComponentAssigner>());
+            Assert.That(second, Is.SameAs(first));
+
+            ZenjectRelationalTester tester = CreateHierarchy();
+            first.Assign(tester);
+            Assert.That(tester.parentBody, Is.Not.Null);
+            Assert.That(tester.childCollider, Is.Not.Null);
+        }
+
+        [Test]
         public void ContainerExtensionsUseBoundAssigner()
         {
             RecordingAssigner assigner = new();
@@ -213,7 +234,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
                 includeInactive: true,
                 useSinglePassScan: true
             );
-            RelationalSceneLoadListener listener = new(assigner, cache, options);
+            Container.BindInstance(cache);
+            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            Container.BindInstance(options);
+            Container.BindInterfacesAndSelfTo<RelationalSceneLoadListener>().AsSingle();
+            RelationalSceneLoadListener listener = Container.Resolve<RelationalSceneLoadListener>();
             listener.Initialize();
             TrackDisposable(listener);
 
@@ -247,7 +272,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
                 includeInactive: true,
                 useSinglePassScan: false
             );
-            RelationalSceneLoadListener listener = new(assigner, cache, options);
+            Container.BindInstance(cache);
+            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            Container.BindInstance(options);
+            Container.BindInterfacesAndSelfTo<RelationalSceneLoadListener>().AsSingle();
+            RelationalSceneLoadListener listener = Container.Resolve<RelationalSceneLoadListener>();
             listener.Initialize();
             TrackDisposable(listener);
 

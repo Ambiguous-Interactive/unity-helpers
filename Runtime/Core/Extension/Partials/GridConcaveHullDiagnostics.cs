@@ -447,12 +447,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             frontier.Enqueue(start);
             parents[start] = start;
 
-            while (0 < frontier.Count)
+            while (frontier.TryDequeue(out FastVector3Int current))
             {
 #if ENABLE_CONCAVE_HULL_STATS
-                stats?.MaybeRecordFrontierSize(frontier.Count);
+                stats?.MaybeRecordFrontierSize(frontier.Count + 1);
 #endif
-                FastVector3Int current = frontier.Dequeue();
                 if (current == end)
                 {
                     break;

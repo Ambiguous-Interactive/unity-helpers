@@ -57,12 +57,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Random
             public int Next()
             {
                 NextCallCount++;
-                if (_values.Count == 0)
+                if (!_values.TryDequeue(out int value))
                 {
                     throw new InvalidOperationException("No more values configured");
                 }
 
-                return _values.Dequeue();
+                return value;
             }
 
             public int Next(int max) => NotSupported<int>();

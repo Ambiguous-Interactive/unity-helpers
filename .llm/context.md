@@ -70,13 +70,13 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     inside a shipped player. `WUH###`
     (`Generator~/WallstopStudios.UnityHelpers.Analyzers`) reports an allocation or footgun in code
     that already works, so it is **capped at `DiagnosticSeverity.Warning` and suppressible**:
-    taking a package upgrade must never fail a consumer's build. On by default, with four exceptions --
+    taking a package upgrade must never fail a consumer's build. On by default, with five exceptions --
     `WUH010` (a dictionary read by indexer), `WUH013` (a counting loop that can use `foreach`),
-    `WUH018` (string equality whose comparison policy is implicit), and `WUH019` (repeated stable loop bounds) remain opt-in for consumers
+    `WUH018` (string equality whose comparison policy is implicit), `WUH019` (repeated stable loop bounds), and `WUH021` (repeated size observations) remain opt-in for consumers
     because their correct shapes are ubiquitous. **The package opts into WUH010, WUH013, and WUH018
-    in its shared check-project ruleset; WUH019 is enabled by the production-only ruleset for
-    Runtime, Editor, and integration checks. The excluded-source loop audit covers both WUH013
-    and WUH019 with reporting controls.** Every owned `Generator~` project self-hosts both shipped analyzer assemblies and promotes shared `WUH###` policies; WUH019 promotion is limited to production checks; the five Unity source gates cover Runtime, Editor, integrations, and both test trees without changing consumer defaults.
+    in its shared check-project ruleset; WUH019 and WUH021 are enabled by the production-only ruleset for
+    Runtime, Editor, and integration checks. The excluded-source loop audit covers WUH013,
+    WUH019, and WUH021 with reporting controls.** Every owned `Generator~` project self-hosts both shipped analyzer assemblies and promotes shared `WUH###` policies; WUH019 and WUH021 promotion is limited to production checks; the five Unity source gates cover Runtime, Editor, integrations, and both test trees without changing consumer defaults.
     Retain indexed loops when the index is needed or enumeration changes behavior.
     Both DLLs are committed under `Runtime/Analyzers`, byte-compared in CI, and **an edit to
     either is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)
@@ -106,7 +106,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 
 Run formatters/linters **immediately after each file change**, not batched at task end:
 
-- **C#**: `dotnet tool run csharpier format .` (or `npm run format:csharp`). `npm run agent:preflight:fix` formats changed C# files and `npm run agent:preflight` / `validate:local` fail on unformatted C#, so a later edit that undoes the formatting is caught locally rather than by CI
+- **C#, MSBuild, and XML**: `dotnet tool run csharpier format <file>` (or `npm run format:csharp` for the whole repository). `npm run agent:preflight:fix` formats changed supported files and `npm run agent:preflight` / `validate:local` fail on formatting drift, including linker XML, so a later edit is caught locally rather than by CI
 - **Non-C#** (`.md`, `.json`, `.yaml`, `.yml`): `node scripts/run-prettier.js --write -- <file>` (repo-local launcher; run `npm install` first on the host that runs hooks)
 - **Markdown**: `npm run lint:docs` + `npm run lint:markdown`
 - **YAML**: `pwsh -NoProfile -File scripts/lint-yaml.ps1 -Paths <changed files>` (then `actionlint <changed workflows>`)

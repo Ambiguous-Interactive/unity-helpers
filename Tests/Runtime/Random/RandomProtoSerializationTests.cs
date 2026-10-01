@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
@@ -80,6 +81,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         /// <summary>
         /// Every generator, built the ordinary way, so one case cannot quietly drop out.
         /// </summary>
+        [Preserve]
         private static IEnumerable<TestCaseData> EveryGenerator()
         {
             Guid seed = Guid.Parse("12345678-1234-1234-1234-123456789012");
@@ -125,6 +127,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         /// Seed zero is the most ordinary seed there is, so this is not a corner reachable only
         /// by a crafted payload -- <c>new SquirrelRandom(0)</c> is a line a game writes.
         /// </remarks>
+        [Preserve]
         private static IEnumerable<TestCaseData> EveryAllDefaultGenerator()
         {
             yield return Named(
@@ -169,11 +172,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             return ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
         }
 
+        [Preserve]
         private static IEnumerable<TestCaseData> EveryMixedContinuation()
         {
             return MixedContinuationCases(nameof(MixedContinuationSurvivesEveryRestorePath));
         }
 
+        [Preserve]
         private static IEnumerable<TestCaseData> EveryMixedJsonContinuation()
         {
             return MixedContinuationCases(nameof(MixedContinuationSurvivesJsonRestore));
@@ -280,6 +285,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
+        [Preserve]
         private static IEnumerable<TestCaseData> EveryGeneratorRepairedAfterDeserialization()
         {
             yield return EmptySubtype("DotNetRandom", 100, true);

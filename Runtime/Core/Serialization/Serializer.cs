@@ -4186,7 +4186,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 throw new ArgumentNullException(nameof(buffer));
             }
 
-            if (buffer.Length < (uint)offset || buffer.Length - offset < (uint)count)
+            int bufferLength = buffer.Length;
+            if (bufferLength < (uint)offset || bufferLength - offset < (uint)count)
             {
                 throw new ArgumentOutOfRangeException();
             }

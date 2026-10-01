@@ -306,9 +306,9 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
                 throw new InvalidOperationException("Exceeded configured float call budget.");
             }
 
-            if (_floatSequence != null && 0 < _floatSequence.Count)
+            if (_floatSequence != null && _floatSequence.TryDequeue(out float value))
             {
-                return _floatSequence.Dequeue();
+                return value;
             }
 
             return _floatFallback;
@@ -321,9 +321,9 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
                 throw new InvalidOperationException("Exceeded configured double call budget.");
             }
 
-            if (_doubleSequence != null && 0 < _doubleSequence.Count)
+            if (_doubleSequence != null && _doubleSequence.TryDequeue(out double value))
             {
-                return _doubleSequence.Dequeue();
+                return value;
             }
 
             return _doubleFallback;

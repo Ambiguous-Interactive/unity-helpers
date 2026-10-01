@@ -872,15 +872,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     return cached.labels;
                 }
 
+                int optionsLength = options.Length;
                 if (
                     cached.sourceOptions != null
-                    && cached.sourceOptions.Length == options.Length
+                    && cached.sourceOptions.Length == optionsLength
                     && cached.labels != null
-                    && cached.labels.Length == options.Length
+                    && cached.labels.Length == optionsLength
                 )
                 {
                     bool match = true;
-                    int optionsLength = options.Length;
                     for (int i = 0; i < optionsLength && match; i++)
                     {
                         if (!Equals(cached.sourceOptions[i], options[i]))
@@ -905,8 +905,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static string[] BuildDisplayLabelsUncached(object[] options)
         {
-            string[] labels = new string[options.Length];
             int optionsLength = options.Length;
+            string[] labels = new string[optionsLength];
             for (int index = 0; index < optionsLength; index += 1)
             {
                 labels[index] = FormatOptionCached(options[index]);

@@ -503,5 +503,28 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
             );
+
+        /// <summary>
+        /// A throwing stack or queue read with an available non-throwing alternative.
+        /// </summary>
+        internal static readonly DiagnosticDescriptor HardCollectionRead = new DiagnosticDescriptor(
+            "WUH020",
+            "Use an available Try method for stack and queue reads",
+            "'{0}.{1}' fails when the collection is empty. Use '{2}(out value)' and handle its boolean result, including after a Count guard; a separate guard can become stale before the read.",
+            "Correctness",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
+
+        /// <summary>A repeated collection Count observation without an intervening execution boundary.</summary>
+        internal static readonly DiagnosticDescriptor RepeatedCollectionCount =
+            new DiagnosticDescriptor(
+                "WUH021",
+                "Collection size is read repeatedly",
+                "'{0}' reads a size again on this evaluation path. Read the size once when one snapshot is intended. Getters and enumeration may execute custom code, and concurrent observations may differ; retain intentional live reads with a suppression. WUH021 is opt-in.",
+                "Performance",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: false
+            );
     }
 }

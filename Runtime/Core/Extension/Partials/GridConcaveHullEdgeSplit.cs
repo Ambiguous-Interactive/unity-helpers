@@ -69,9 +69,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             using PooledResource<List<HullEdge>> concaveHullEdgesResource =
                 Buffers<HullEdge>.List.Get(out List<HullEdge> concaveHullEdges);
-            if (concaveHullEdges.Capacity < convexHull.Count)
+            int convexHullCount = convexHull.Count;
+            if (concaveHullEdges.Capacity < convexHullCount)
             {
-                concaveHullEdges.Capacity = convexHull.Count;
+                concaveHullEdges.Capacity = convexHullCount;
             }
 
             using PooledResource<SortedSet<HullEdge>> sortedSetBuffer = SetBuffers<HullEdge>
@@ -385,9 +386,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             using PooledResource<List<HullEdgeV2>> edgeListRes = Buffers<HullEdgeV2>.List.Get(
                 out List<HullEdgeV2> concaveHullEdges
             );
-            if (concaveHullEdges.Capacity < convexHull.Count)
+            int convexHullCount = convexHull.Count;
+            if (concaveHullEdges.Capacity < convexHullCount)
             {
-                concaveHullEdges.Capacity = convexHull.Count;
+                concaveHullEdges.Capacity = convexHullCount;
             }
             using PooledResource<SortedSet<HullEdgeV2>> sortedSetRes = SetBuffers<HullEdgeV2>
                 .GetSortedSetPool(ConcaveHullComparerV2.Instance)

@@ -513,7 +513,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            if (matching.Length < source.Length || notMatching.Length < source.Length)
+            int sourceLength = source.Length;
+            if (matching.Length < sourceLength || notMatching.Length < sourceLength)
             {
                 matchedCount = 0;
                 unmatchedCount = 0;

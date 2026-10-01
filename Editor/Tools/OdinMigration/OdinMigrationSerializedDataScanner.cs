@@ -124,8 +124,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         private static bool StartsWith(string source, int start, string value)
         {
-            return start + value.Length <= source.Length
-                && string.CompareOrdinal(source, start, value, 0, value.Length) == 0;
+            int valueLength = value.Length;
+            return start + valueLength <= source.Length
+                && string.CompareOrdinal(source, start, value, 0, valueLength) == 0;
         }
 
         private static bool TargetsSerializationData(string source, int start, int end)

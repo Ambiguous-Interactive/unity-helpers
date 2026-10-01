@@ -62,9 +62,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return;
             }
 
-            _items = new T[seed.Length];
-            Array.Copy(seed, _items, seed.Length);
-            _count = seed.Length;
+            int seedLength = seed.Length;
+            _items = new T[seedLength];
+            Array.Copy(seed, _items, seedLength);
+            _count = seedLength;
         }
 
         /// <summary>
@@ -121,9 +122,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return;
             }
 
-            Reserve(items.Length);
-            Array.Copy(items, 0, _items, _count, items.Length);
-            _count += items.Length;
+            int itemsLength = items.Length;
+            Reserve(itemsLength);
+            Array.Copy(items, 0, _items, _count, itemsLength);
+            _count += itemsLength;
         }
 
         /// <summary>

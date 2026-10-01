@@ -82,12 +82,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 out List<string> targets
             );
             GetTargetTexturePaths(targets);
-            _totalTexturesToProcess = targets.Count;
+            int targetCount = targets.Count;
+            _totalTexturesToProcess = targetCount;
             _texturesThatWillChange = 0;
             _assetsThatWillChange.Clear();
-            if (_assetsThatWillChange.Capacity < targets.Count)
+            if (_assetsThatWillChange.Capacity < targetCount)
             {
-                _assetsThatWillChange.Capacity = targets.Count;
+                _assetsThatWillChange.Capacity = targetCount;
             }
 
             TextureSettingsApplierAPI.Config config = BuildConfig();

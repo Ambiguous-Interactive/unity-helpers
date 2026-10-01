@@ -737,9 +737,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                     --_prefixRemaining;
                     return _prefix;
                 }
-                if (0 < _values.Count)
+                if (_values.TryDequeue(out uint value))
                 {
-                    return _values.Dequeue();
+                    return value;
                 }
 
                 if (_hasConstant)

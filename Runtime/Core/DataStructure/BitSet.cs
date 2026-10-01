@@ -581,8 +581,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public ImmutableBitSet ToImmutable()
         {
-            ulong[] bitsCopy = new ulong[_bits.Length];
-            Array.Copy(_bits, bitsCopy, _bits.Length);
+            int bitsLength = _bits.Length;
+            ulong[] bitsCopy = new ulong[bitsLength];
+            Array.Copy(_bits, bitsCopy, bitsLength);
             return new ImmutableBitSet(bitsCopy, _capacity);
         }
 

@@ -51,9 +51,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             List<SpriteRenderer> expected = new();
             Queue<Transform> pending = new();
             pending.Enqueue(root.transform);
-            while (0 < pending.Count)
+            while (pending.TryDequeue(out Transform current))
             {
-                Transform current = pending.Dequeue();
                 if (current != root.transform)
                 {
                     expected.AddRange(current.GetComponents<SpriteRenderer>());

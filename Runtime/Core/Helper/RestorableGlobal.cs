@@ -411,9 +411,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             int created = _slotsCreated;
             _slotsCreated++;
-            if (_entries.Length <= created)
+            int previousCapacity = _entries.Length;
+            if (previousCapacity <= created)
             {
-                int previousCapacity = _entries.Length;
                 int capacity = previousCapacity * 2;
                 Array.Resize(ref _entries, capacity);
                 for (int index = previousCapacity; index < capacity; index++)

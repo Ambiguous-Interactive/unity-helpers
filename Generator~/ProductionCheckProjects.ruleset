@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RuleSet Name="Unity Helpers production loop bounds" Description="Production-only loop-bound caching policy; test and tooling loops retain the shared policies." ToolsVersion="15.0">
+<RuleSet Name="Unity Helpers production collection sizes" Description="Production-only loop-bound and repeated Count policies; tests and tooling retain the shared policies." ToolsVersion="15.0">
   <Include Path="CheckProjects.ruleset" Action="Default" />
   <Rules AnalyzerId="WallstopStudios.UnityHelpers.Analyzers" RuleNamespace="WallstopStudios.UnityHelpers.Analyzers">
     <Rule Id="WUH019" Action="Warning" />
+    <Rule Id="WUH021" Action="Warning" />
   </Rules>
 </RuleSet>

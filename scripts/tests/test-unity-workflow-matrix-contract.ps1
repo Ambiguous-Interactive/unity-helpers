@@ -1830,6 +1830,20 @@ function Test-UnityJobUsesCentralEditorGate {
 
 $unityTestsMatrixJob = if ($jobTexts.ContainsKey('unity-tests')) { $jobTexts['unity-tests'] } else { '' }
 $unityTestsSingleThreadedJob = if ($jobTexts.ContainsKey('unity-tests-single-threaded')) { $jobTexts['unity-tests-single-threaded'] } else { '' }
+foreach ($playerGate in @(
+        @{ Job = $unityTestsMatrixJob; Step = 'Run Standalone tests' },
+        @{ Job = $unityTestsSingleThreadedJob; Step = 'Run Standalone tests (SINGLE_THREADED)' }
+    )) {
+    $playerStep = Get-UnityWorkflowStepText -JobText $playerGate.Job -StepName $playerGate.Step
+    if (-not ($playerStep.Contains("-ManagedStrippingLevel 'High'") -and
+            $playerStep.Contains('-ReleaseCodeOptimization') -and
+            $playerStep.Contains('-ReleasePlayerBuild') -and
+            $playerStep.Contains("-Il2CppCompilerConfiguration 'Release'"))) {
+        Write-Host "::error file=.github/workflows/unity-tests.yml::Every Standalone gate must retain Release IL2CPP with High stripping for consumer migration acceptance."
+        $failed = $true
+    }
+}
+
 $benchmarksMatrixJob = if ($benchmarksJobTexts.ContainsKey('benchmarks')) { $benchmarksJobTexts['benchmarks'] } else { '' }
 
 $defaultModeContracts = @(

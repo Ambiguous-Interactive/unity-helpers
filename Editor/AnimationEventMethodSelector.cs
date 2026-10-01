@@ -405,9 +405,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                 filtered.Insert(0, item.selectedType);
             }
 
-            if (limit < filtered.Count)
+            int filteredCount = filtered.Count;
+            if (limit < filteredCount)
             {
-                filtered.RemoveRange(limit, filtered.Count - limit);
+                filtered.RemoveRange(limit, filteredCount - limit);
                 truncated = true;
                 return;
             }

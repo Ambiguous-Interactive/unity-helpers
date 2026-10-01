@@ -584,6 +584,10 @@ resources acquired before a yield. A custom `IDisposable` enumerator is disposed
 before its first step. A cleanup failure reports an error while remaining parents still receive
 cleanup; if execution already failed, that original error remains the invocation result.
 
+Each editor update advances a scheduled coroutine once. Updates triggered inside an enumerator or
+completion callback wait for the next editor update, so callbacks cannot recursively advance or
+remove an active coroutine.
+
 ---
 
 ### 4. Async Methods (Task / ValueTask)

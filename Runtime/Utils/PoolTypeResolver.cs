@@ -370,8 +370,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             if (hasNestedGenerics)
             {
-                Type[] openedArgs = new Type[genericArgs.Length];
                 int genericArgsLength = genericArgs.Length;
+                Type[] openedArgs = new Type[genericArgsLength];
                 for (int i = 0; i < genericArgsLength; i++)
                 {
                     Type arg = genericArgs[i];

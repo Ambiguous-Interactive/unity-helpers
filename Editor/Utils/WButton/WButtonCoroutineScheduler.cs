@@ -46,6 +46,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
     {
         private static readonly List<CoroutineInstance> Instances = new();
         private static bool _isSubscribed;
+        private static bool _isUpdating;
 
         /// <summary>Owns a coroutine and releases its enumerators on completion, cancellation, or failure.</summary>
         internal static WButtonCoroutineTicket Schedule(
@@ -90,8 +91,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
         }
 
+        /// <summary>Advances each scheduled coroutine once, ignoring updates nested inside callbacks.</summary>
         internal static void Update()
         {
+            if (_isUpdating)
+            {
+                return;
+            }
             if (Instances.Count == 0)
             {
                 if (_isSubscribed)
@@ -102,14 +108,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return;
             }
 
-            for (int index = Instances.Count - 1; 0 <= index; index--)
+            _isUpdating = true;
+            try
             {
-                CoroutineInstance instance = Instances[index];
-                instance.Tick();
-                if (instance.IsCompleted)
+                for (int index = Instances.Count - 1; 0 <= index; index--)
                 {
-                    Instances.RemoveAt(index);
+                    CoroutineInstance instance = Instances[index];
+                    instance.Tick();
+                    if (instance.IsCompleted)
+                    {
+                        Instances.RemoveAt(index);
+                    }
                 }
+            }
+            finally
+            {
+                _isUpdating = false;
             }
         }
 
@@ -184,23 +198,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     Finish(null, cancelled: true);
                     return;
                 }
-                if (_stack.Count == 0)
+                if (!_stack.TryPeek(out System.Collections.IEnumerator current))
                 {
                     Finish(null, cancelled: false);
                     return;
                 }
 
-                System.Collections.IEnumerator current = _stack.Peek();
                 try
                 {
                     if (!current.MoveNext())
                     {
-                        _stack.Pop();
-                        if (current is IDisposable disposable)
+                        if (
+                            _stack.TryPop(out System.Collections.IEnumerator completed)
+                            && completed is IDisposable disposable
+                        )
                         {
                             disposable.Dispose();
                         }
-                        if (_stack.Count == 0)
+                        if (!_stack.TryPeek(out _))
                         {
                             Finish(null, cancelled: false);
                         }
@@ -224,9 +239,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     return;
                 }
                 IsCompleted = true;
-                while (0 < _stack.Count)
+                while (_stack.TryPop(out System.Collections.IEnumerator enumerator))
                 {
-                    System.Collections.IEnumerator enumerator = _stack.Pop();
                     try
                     {
                         if (enumerator is IDisposable disposable)

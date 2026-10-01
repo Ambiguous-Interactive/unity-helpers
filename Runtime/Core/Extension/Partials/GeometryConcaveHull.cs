@@ -388,8 +388,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int hullCount = hull.Count;
                 for (int i = 0; 2 < hullCount && i < hullCount; ++i)
                 {
-                    int prev = (i - 1 + hull.Count) % hull.Count;
-                    int next = (i + 1) % hull.Count;
+                    int prev = (i - 1 + hullCount) % hullCount;
+                    int next = (i + 1) % hullCount;
                     if (AreApproximatelyColinear(hull[prev], hull[i], hull[next]))
                     {
                         hull.RemoveAt(i);

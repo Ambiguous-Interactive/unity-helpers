@@ -493,18 +493,19 @@ namespace WallstopStudios.UnityHelpers.Tags
                 target.Clear();
             }
 
-            if (_tagCount.Count == 0)
+            int tagCount = _tagCount.Count;
+            if (tagCount == 0)
             {
                 return target ?? new List<string>(0);
             }
 
             if (target == null)
             {
-                target = new List<string>(_tagCount.Count);
+                target = new List<string>(tagCount);
             }
-            else if (target.Capacity < _tagCount.Count)
+            else if (target.Capacity < tagCount)
             {
-                target.Capacity = _tagCount.Count;
+                target.Capacity = tagCount;
             }
 
             foreach (KeyValuePair<string, uint> entry in _tagCount)
@@ -620,9 +621,10 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             Exception firstFailure = null;
-            if (0 < _effectHandles.Count)
+            int handleCount = _effectHandles.Count;
+            if (0 < handleCount)
             {
-                int estimatedCapacity = Math.Min(_effectHandles.Count, 8);
+                int estimatedCapacity = Math.Min(handleCount, 8);
                 foreach (EffectHandle handle in _effectHandles.Values)
                 {
                     if (
@@ -930,7 +932,8 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             Exception firstFailure = null;
-            int removable = applied < effectTags.Count ? applied : effectTags.Count;
+            int effectTagCount = effectTags.Count;
+            int removable = applied < effectTagCount ? applied : effectTagCount;
             for (int index = 0; index < removable; ++index)
             {
                 try

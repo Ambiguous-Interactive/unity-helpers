@@ -283,6 +283,115 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             CollectionAssert.AreEqual(new[] { "throwing", "other" }, disposed);
         }
 
+        [TestCase(0, TestName = "ReentrantUpdate.MoveNext.AdvancesOncePerTick")]
+        [TestCase(1, TestName = "ReentrantUpdate.Current.AdvancesOncePerTick")]
+        [TestCase(2, TestName = "ReentrantUpdate.Dispose.AdvancesOncePerTick")]
+        [TestCase(3, TestName = "ReentrantUpdate.Completion.AdvancesOncePerTick")]
+        public void ReentrantUpdateAdvancesEachRoutineOnlyOncePerTick(int callbackPhase)
+        {
+            List<string> disposed = new();
+            WButtonDisposableEnumerator other = new("other", disposed);
+            WButtonDisposableEnumerator root = new("root", disposed);
+            int completed = 0;
+            Exception failure = null;
+            bool reentered = false;
+            Action reenter = () =>
+            {
+                if (reentered)
+                {
+                    return;
+                }
+                reentered = true;
+                WButtonCoroutineScheduler.Update();
+            };
+            if (callbackPhase == 0)
+            {
+                root.OnMoveNext = reenter;
+            }
+            else if (callbackPhase == 1)
+            {
+                root.OnCurrent = reenter;
+            }
+            else if (callbackPhase == 2)
+            {
+                root.OnDispose = reenter;
+            }
+            Schedule(other, () => ++completed, exception => failure = exception, () => { });
+            Schedule(
+                root,
+                () =>
+                {
+                    ++completed;
+                    if (callbackPhase == 3)
+                    {
+                        reenter();
+                    }
+                },
+                exception => failure = exception,
+                () => { }
+            );
+            Assert.DoesNotThrow(WButtonCoroutineScheduler.Update);
+            Assert.AreEqual(1, root.MoveNextCount);
+            Assert.AreEqual(1, other.MoveNextCount);
+            Assert.DoesNotThrow(WButtonCoroutineScheduler.Update);
+            Assert.AreEqual(2, root.MoveNextCount);
+            Assert.AreEqual(2, other.MoveNextCount);
+            Assert.IsTrue(reentered);
+            Assert.IsTrue(failure == null, failure?.ToString());
+            Assert.AreEqual(2, completed);
+            Assert.AreEqual(1, root.DisposeCount);
+            Assert.AreEqual(1, other.DisposeCount);
+        }
+
+        [TestCase(false, TestName = "ReentrantUpdate.Cancellation.CompletesEachRoutineOnce")]
+        [TestCase(true, TestName = "ReentrantUpdate.Fault.CompletesEachRoutineOnce")]
+        public void ReentrantTerminalCallbackCompletesEachRoutineOnce(bool fault)
+        {
+            List<string> disposed = new();
+            WButtonDisposableEnumerator other = new("other", disposed, yieldCount: 0);
+            WButtonDisposableEnumerator root = new("root", disposed) { FailMoveNext = fault };
+            int completed = 0;
+            int terminalCallbacks = 0;
+            Action reenter = () =>
+            {
+                ++terminalCallbacks;
+                WButtonCoroutineScheduler.Update();
+            };
+            Schedule(
+                other,
+                () => ++completed,
+                exception => Assert.Fail(exception.ToString()),
+                () => Assert.Fail("Unexpected cancellation.")
+            );
+            WButtonCoroutineTicket ticket = Schedule(
+                root,
+                () => Assert.Fail("Unexpected completion."),
+                exception =>
+                {
+                    Assert.IsTrue(fault);
+                    Assert.AreEqual("MoveNext failed.", exception.Message);
+                    reenter();
+                },
+                () =>
+                {
+                    Assert.IsFalse(fault);
+                    reenter();
+                }
+            );
+            if (!fault)
+            {
+                WButtonCoroutineScheduler.Cancel(ticket);
+            }
+            Assert.DoesNotThrow(WButtonCoroutineScheduler.Update);
+            Assert.DoesNotThrow(WButtonCoroutineScheduler.Update);
+            Assert.AreEqual(1, terminalCallbacks);
+            Assert.AreEqual(1, completed);
+            Assert.AreEqual(fault ? 1 : 0, root.MoveNextCount);
+            Assert.AreEqual(1, other.MoveNextCount);
+            Assert.AreEqual(1, root.DisposeCount);
+            Assert.AreEqual(1, other.DisposeCount);
+        }
+
         private WButtonCoroutineTicket Schedule(
             IEnumerator routine,
             Action onCompleted,

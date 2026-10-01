@@ -27,8 +27,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                 return _cachedChoices;
             }
 
-            string[] arr = new string[known.Length + 1];
             int knownLength = known.Length;
+            string[] arr = new string[knownLength + 1];
             for (int i = 0; i < knownLength; i++)
             {
                 arr[i] = known[i];

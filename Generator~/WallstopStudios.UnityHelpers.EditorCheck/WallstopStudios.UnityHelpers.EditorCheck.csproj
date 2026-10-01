@@ -316,9 +316,9 @@
   <ItemGroup Condition="'$(WallstopCheckControl)' != ''">
     <Compile Include="$(WallstopCheckControl)" />
   </ItemGroup>
-  <!-- WUH013 and WUH019 also cover production sources excluded only for old host reference gaps.
+  <!-- WUH013, WUH019, and WUH021 also cover production sources excluded only for old host reference gaps.
        This audit does not certify their API binding; its in-compilation reporting control proves
-       those known compiler errors cannot silently disable the counting-loop diagnostic. -->
+       those known compiler errors cannot silently disable the collection-size diagnostics. -->
   <Target Name="AuditExcludedCountingLoops" AfterTargets="Build">
     <ItemGroup>
       <CountingLoopSubject Include="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs;$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs;$(RepoRoot)/Editor/AnimationEventEditor.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs;$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs" />

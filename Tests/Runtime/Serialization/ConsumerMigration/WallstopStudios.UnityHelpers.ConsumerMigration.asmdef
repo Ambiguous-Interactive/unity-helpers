@@ -1,0 +1,14 @@
+{
+  "name": "WallstopStudios.UnityHelpers.ConsumerMigration",
+  "rootNamespace": "WallstopStudios.UnityHelpers.Tests.Serialization.ConsumerMigration",
+  "references": ["WallstopStudios.UnityHelpers"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

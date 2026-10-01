@@ -502,8 +502,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     return cachedBoxedValues;
                 }
 
-                object[] boxedValues = new object[typedValues.Length];
                 int typedValuesLength = typedValues.Length;
+                object[] boxedValues = new object[typedValuesLength];
                 for (int index = 0; index < typedValuesLength; index += 1)
                 {
                     boxedValues[index] = typedValues[index];
@@ -686,8 +686,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (result is Array array)
             {
-                object[] boxed = new object[array.Length];
                 int arrayLength = array.Length;
+                object[] boxed = new object[arrayLength];
                 for (int i = 0; i < arrayLength; i++)
                 {
                     boxed[i] = array.GetValue(i);

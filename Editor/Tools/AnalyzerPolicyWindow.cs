@@ -1207,10 +1207,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             List<XElement> groups = FindManagedGroups(root);
-            if (groups.Count != 1)
+            int groupCount = groups.Count;
+            if (groupCount != 1)
             {
                 message =
-                    groups.Count == 0
+                    groupCount == 0
                         ? "The Unity Helpers analyzer policy block is missing."
                         : "The Unity Helpers analyzer policy block is duplicated.";
                 state = AnalyzerPolicyState.Drifted;

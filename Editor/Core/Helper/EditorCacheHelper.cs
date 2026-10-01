@@ -278,9 +278,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
 
             Array values = Enum.GetValues(enumType);
 
-            string[] names = new string[values.Length];
-
             int valuesLength = values.Length;
+            string[] names = new string[valuesLength];
+
             for (int i = 0; i < valuesLength; i++)
             {
                 object enumValue = values.GetValue(i);

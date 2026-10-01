@@ -1801,12 +1801,10 @@ $spellingTargets = @(
     }
 )
 $csharpTargets = @($relativePaths | Where-Object { $_ -like '*.cs' })
-# CSharpier formats MSBuild project files as well as C# sources, and CI runs it over the WHOLE
-# repository -- so a changed .csproj that this script never looked at still fails the build. That
-# happened: a new .csproj passed preflight and reddened the format leg. Kept separate from
-# $csharpTargets because the license-header and duplicate-using checks beside it are .cs-only.
+# CSharpier also formats XML and MSBuild files; CI checks the whole repository.
+# Keep formatter targets separate because C# source checks must not receive XML paths.
 $csharpierTargets = @($relativePaths | Where-Object {
-        $_ -like '*.cs' -or $_ -like '*.csproj' -or $_ -like '*.props' -or $_ -like '*.targets'
+        $_ -match '\.(cs|xml|config|csproj|props|targets|slnx|xaml|axaml)$'
     })
 $testFiles = @($csharpTargets | Where-Object { $_ -like 'Tests/*.cs' })
 $metaRelevantPaths = @($relativePaths | Where-Object { Test-MetaRequiredPath -RelativePath $_ })
@@ -2315,7 +2313,7 @@ if ($testFiles.Count -gt 0) {
 
 if ($csharpierTargets.Count -gt 0) {
     if ($Fix) {
-        Write-Host '[agent-preflight] Formatting changed C# files with CSharpier...' -ForegroundColor Blue
+        Write-Host '[agent-preflight] Formatting changed C#/MSBuild/XML files with CSharpier...' -ForegroundColor Blue
         if (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
                     -RepoRoot $repoRoot `
                     -Paths $csharpierTargets `
@@ -2349,22 +2347,24 @@ if ($csharpierTargets.Count -gt 0) {
         }
     }
 
-    Write-Host '[agent-preflight] Checking CSharpier formatting on changed C# files...' -ForegroundColor Blue
+    Write-Host '[agent-preflight] Checking CSharpier formatting on changed C#/MSBuild/XML files...' -ForegroundColor Blue
     & (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') -SkipWhenUnavailable -Paths $csharpierTargets -VerboseOutput:$VerboseOutput
     if ($LASTEXITCODE -ne 0) {
         $failureCount++
     }
 
-    Write-Host '[agent-preflight] Checking duplicate using directives on changed C# files...' -ForegroundColor Blue
-    Push-Location $repoRoot
-    try {
-        & (Join-Path $repoRoot 'scripts/lint-duplicate-usings.ps1') -Paths $csharpTargets
-        if ($LASTEXITCODE -ne 0) {
-            $failureCount++
+    if ($csharpTargets.Count -gt 0) {
+        Write-Host '[agent-preflight] Checking duplicate using directives on changed C# files...' -ForegroundColor Blue
+        Push-Location $repoRoot
+        try {
+            & (Join-Path $repoRoot 'scripts/lint-duplicate-usings.ps1') -Paths $csharpTargets
+            if ($LASTEXITCODE -ne 0) {
+                $failureCount++
+            }
         }
-    }
-    finally {
-        Pop-Location
+        finally {
+            Pop-Location
+        }
     }
 
     # The two analyzer DLLs are committed and CI compares them byte-for-byte against a Release build

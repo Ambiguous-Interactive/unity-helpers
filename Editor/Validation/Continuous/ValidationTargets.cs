@@ -44,14 +44,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             string[] guids;
             try
             {
-                if (searchInFolders == null || searchInFolders.Length == 0)
+                int searchFolderCount = searchInFolders == null ? 0 : searchInFolders.Length;
+                if (searchFolderCount == 0)
                 {
                     guids = AssetDatabase.FindAssets(EveryAsset);
                 }
                 else
                 {
                     // Skip missing folders before Unity logs an avoidable warning for each one.
-                    List<string> existing = new List<string>(searchInFolders.Length);
+                    List<string> existing = new List<string>(searchFolderCount);
                     foreach (string folder in searchInFolders)
                     {
                         string normalizedFolder = NormalizeFolder(folder);

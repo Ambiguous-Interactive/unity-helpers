@@ -590,9 +590,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
             }
 
-            if (writeIndex < components.Count)
+            int finalComponentCount = components.Count;
+            if (writeIndex < finalComponentCount)
             {
-                components.RemoveRange(writeIndex, components.Count - writeIndex);
+                components.RemoveRange(writeIndex, finalComponentCount - writeIndex);
             }
 
             return writeIndex;
@@ -686,9 +687,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         buffer[writeIndex++] = candidate;
                     }
                 }
-                if (writeIndex < buffer.Count)
+                int bufferCount = buffer.Count;
+                if (writeIndex < bufferCount)
                 {
-                    buffer.RemoveRange(writeIndex, buffer.Count - writeIndex);
+                    buffer.RemoveRange(writeIndex, bufferCount - writeIndex);
                 }
             }
             return buffer;

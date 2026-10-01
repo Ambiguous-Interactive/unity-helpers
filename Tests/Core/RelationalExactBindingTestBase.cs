@@ -34,9 +34,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 pending.Enqueue(directChild);
             }
-            while (0 < pending.Count)
+            while (pending.TryDequeue(out Transform current))
             {
-                Transform current = pending.Dequeue();
                 child.AddRange(ExactComponentsOn(current));
                 foreach (Transform descendant in current)
                 {

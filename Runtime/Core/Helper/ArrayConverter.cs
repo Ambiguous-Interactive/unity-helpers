@@ -60,7 +60,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 throw new ArgumentNullException(nameof(bytes), "Byte array cannot be null.");
             }
 
-            if (bytes.Length % sizeof(int) != 0)
+            int bytesLength = bytes.Length;
+            if (bytesLength % sizeof(int) != 0)
             {
                 throw new ArgumentException(
                     $"Byte array length must be a multiple of {sizeof(int)}.",
@@ -68,8 +69,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
 
-            int[] ints = new int[bytes.Length / sizeof(int)];
-            Buffer.BlockCopy(bytes, 0, ints, 0, bytes.Length);
+            int[] ints = new int[bytesLength / sizeof(int)];
+            Buffer.BlockCopy(bytes, 0, ints, 0, bytesLength);
             return ints;
         }
     }

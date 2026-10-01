@@ -193,23 +193,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         {
             output.Append("<noparse>");
             int end = start + length;
+            int noParseCloseLength = NoParseClose.Length;
             for (int index = start; index < end; index++)
             {
                 if (
                     code[index] == '<'
-                    && index + NoParseClose.Length <= end
+                    && index + noParseCloseLength <= end
                     && string.Compare(
                         code,
                         index,
                         NoParseClose,
                         0,
-                        NoParseClose.Length,
+                        noParseCloseLength,
                         StringComparison.OrdinalIgnoreCase
                     ) == 0
                 )
                 {
                     output.Append("</no\u200Bparse>");
-                    index += NoParseClose.Length - 1;
+                    index += noParseCloseLength - 1;
                     continue;
                 }
                 output.Append(

@@ -79,9 +79,17 @@ user code; cache it only when concrete caller ownership proves the source remain
 
 `WUH019` is opt-in for consumers and enabled in production TypeCheck, EditorCheck, and
 IntegrationCheck through `Generator~/ProductionCheckProjects.ruleset`. The excluded-production
-loop audit holds WUH013 and WUH019 with reporting controls. Shared test and tooling projects
+loop audit holds WUH013, WUH019, and WUH021 with reporting controls. Shared test and tooling projects
 retain the shared ruleset. Explicit WUH019 warning promotion is production-only because naming
 a diagnostic in `WarningsAsErrors` overrides ruleset suppression.
+
+`WUH021` flags repeated size observations along one uninterrupted evaluation path, including
+collection interface `Count`, known `Length`/`LongLength` properties, and non-predicate LINQ
+`Count()`/`LongCount()` calls. Use one named snapshot when the reads are intended to agree. A borrowed
+interface getter or enumeration can execute user code, and a concurrent collection can change between
+observations; this warning does not prove purity or synchronization. Keep live reads when they are
+intentional and suppress the warning with the reason. Calls, writes, and control-flow boundaries limit
+the analysis. The rule is opt-in for consumers and enabled by the package production ruleset.
 
 `WUH013` remains **off by default for consumers**; all five package check projects opt in through
 `Generator~/CheckProjects.ruleset` ([#671](https://github.com/Ambiguous-Interactive/unity-helpers/issues/671)).

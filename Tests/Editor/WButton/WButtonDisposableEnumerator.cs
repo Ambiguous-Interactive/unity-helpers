@@ -18,11 +18,15 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 {
                     throw new InvalidOperationException("Current failed.");
                 }
+                OnCurrent?.Invoke();
                 return Yielded;
             }
         }
 
         internal object Yielded { get; set; }
+        internal Action OnMoveNext { get; set; }
+        internal Action OnCurrent { get; set; }
+        internal Action OnDispose { get; set; }
         internal bool FailMoveNext { get; set; }
         internal bool FailCurrent { get; set; }
         internal bool FailDispose { get; set; }
@@ -44,6 +48,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         {
             ++DisposeCount;
             _disposed.Add(_name);
+            OnDispose?.Invoke();
             if (FailDispose)
             {
                 throw new InvalidOperationException("Dispose failed.");
@@ -53,6 +58,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         public bool MoveNext()
         {
             ++MoveNextCount;
+            OnMoveNext?.Invoke();
             if (FailMoveNext)
             {
                 throw new InvalidOperationException("MoveNext failed.");

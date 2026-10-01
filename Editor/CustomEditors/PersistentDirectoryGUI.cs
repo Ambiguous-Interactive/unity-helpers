@@ -104,7 +104,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     false,
                     0
                 );
-                if (topN < allPaths.Length)
+                int allPathsLength = allPaths.Length;
+                if (topN < allPathsLength)
                 {
                     Rect expansionFoldoutRect = new(
                         startX + 15f,
@@ -115,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     expanded = EditorGUI.Foldout(
                         expansionFoldoutRect,
                         expanded,
-                        "Show All History (" + allPaths.Length + ")",
+                        "Show All History (" + allPathsLength + ")",
                         true,
                         EditorStyles.foldout
                     );
@@ -124,10 +125,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 
                     if (expanded)
                     {
-                        int remaining = allPaths.Length - topN;
+                        int remaining = allPathsLength - topN;
                         if (0 < remaining)
                         {
-                            int allPathsLength = allPaths.Length;
                             for (int idx = topN; idx < allPathsLength; idx++)
                             {
                                 DirectoryUsageData dirData = allPaths[idx];
@@ -771,14 +771,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         false,
                         0
                     );
-                    if (allPaths.Length <= topN)
+                    int allPathsLength = allPaths.Length;
+                    if (allPathsLength <= topN)
                     {
                         return;
                     }
 
                     expanded = EditorGUILayout.Foldout(
                         expanded,
-                        "Show All History (" + allPaths.Length + ")",
+                        "Show All History (" + allPathsLength + ")",
                         true,
                         EditorStyles.foldout
                     );
@@ -788,10 +789,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         return;
                     }
 
-                    int remaining = allPaths.Length - topN;
+                    int remaining = allPathsLength - topN;
                     if (0 < remaining)
                     {
-                        int allPathsLength = allPaths.Length;
                         for (int idx = topN; idx < allPathsLength; idx++)
                         {
                             DirectoryUsageData dirData = allPaths[idx];

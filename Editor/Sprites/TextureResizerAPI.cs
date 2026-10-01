@@ -159,9 +159,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            if (0 < sourcePaths.Count)
+            int sourcePathCount = sourcePaths.Count;
+            if (0 < sourcePathCount)
             {
-                string[] sourceFolders = new string[sourcePaths.Count];
+                string[] sourceFolders = new string[sourcePathCount];
                 sourcePaths.CopyTo(sourceFolders);
                 foreach (string guid in AssetDatabase.FindAssets("t:texture2D", sourceFolders))
                 {
