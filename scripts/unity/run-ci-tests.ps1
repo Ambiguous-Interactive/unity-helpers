@@ -2040,6 +2040,20 @@ function Initialize-EphemeralProject {
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'ProjectSettings') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'Assets\Editor') | Out-Null
 
+    $testLinkerSource = Join-Path $Root 'Tests/Runtime/Serialization/link.xml'
+    $testLinkerTarget = Join-Path $project 'Assets/UhCiTestLinker/link.xml'
+    if (Test-Path -LiteralPath $testLinkerSource -PathType Leaf) {
+        $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $testLinkerTarget)
+        Set-EphemeralProjectContent -Path $testLinkerTarget -Content ([IO.File]::ReadAllText($testLinkerSource))
+    }
+    else {
+        foreach ($staleTestLinkerPath in @($testLinkerTarget, "$testLinkerTarget.meta")) {
+            if (Test-Path -LiteralPath $staleTestLinkerPath -PathType Leaf) {
+                Remove-Item -LiteralPath $staleTestLinkerPath
+            }
+        }
+    }
+
     Set-EphemeralProjectContent `
         -Path (Join-Path $project 'Packages\manifest.json') `
         -Content (New-ManifestJson -Root $Root -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -RepoRoot $RepoRoot)

@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     using System;
     using System.Collections.Generic;
     using NUnit.Framework;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Core.Random;
 
     /// <summary>
@@ -55,6 +56,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             nameof(XorShiftRandom),
         };
 
+        [Preserve]
         private static IEnumerable<TestCaseData> EveryGenerator()
         {
             foreach (KeyValuePair<string, Func<IRandom>> entry in Factories())

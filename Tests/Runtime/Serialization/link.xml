@@ -1,0 +1,34 @@
+<!-- These nonpartial fixtures deliberately exercise legacy reflection rather than generated dispatch. -->
+<linker>
+  <assembly fullname="WallstopStudios.UnityHelpers.Tests.Runtime">
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Extensions.ProtoEqualityPolymorphismTests/AnimalBase" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Extensions.ProtoEqualityPolymorphismTests/Cat" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Extensions.ProtoEqualityPolymorphismTests/Dog" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoInterfaceResolutionEdgeTests/AbstractBase" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoInterfaceResolutionEdgeTests/DerivedA" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoInterfaceResolutionEdgeTests/DerivedB" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoInterfaceResolutionEdgeTests/RegisteredAbstractBase" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoInterfaceResolutionEdgeTests/RegisteredDerived" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoInterfaceResolutionEdgeTests/Widget" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoRootRegistrationTests/Cat" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoRootRegistrationTests/Dog" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoRootRegistrationTests/ExplicitBird" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoRootRegistrationTests/ExplicitPlainAnimal" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoRootRegistrationTests/InferredAnimalBase" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoRootRegistrationTests/InferredDog" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoRootRegistrationTests/PlainAbstractAnimalBase" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoSerializeBehaviorTests/BaseMsg" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.ProtoSerializeBehaviorTests/DerivedMsg" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.SerializationMutationTests/MutationSample" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.SerializerExceptionContractTests/Sample" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.SerializerExceptionContractTests/Unregistered" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.SerializerTryApiTests/Sample" preserve="all" />
+    <type fullname="WallstopStudios.UnityHelpers.Tests.Serialization.SerializerTryApiTests/Unregistered" preserve="all" />
+  </assembly>
+  <!-- The legacy model also reads attribute property getters through reflection. -->
+  <assembly fullname="protobuf-net.Core">
+    <type fullname="ProtoBuf.ProtoContractAttribute" preserve="all" />
+    <type fullname="ProtoBuf.ProtoIncludeAttribute" preserve="all" />
+    <type fullname="ProtoBuf.ProtoMemberAttribute" preserve="all" />
+  </assembly>
+</linker>

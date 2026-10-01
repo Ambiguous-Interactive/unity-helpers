@@ -141,6 +141,52 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         }
         $checks++
     }
+    $testLinkerSource = Join-Path $temporary 'Tests/Runtime/Serialization/link.xml'
+    $testLinkerDirectory = Split-Path -Parent $testLinkerSource
+    $null = New-Item -ItemType Directory -Force -Path $testLinkerDirectory
+    $testLinkerContent = '<linker><assembly fullname="Test.Reflection"><type fullname="Test.Contract" preserve="all" /></assembly></linker>'
+    [IO.File]::WriteAllText($testLinkerSource, $testLinkerContent)
+    [IO.File]::WriteAllText((Join-Path $temporary 'link.xml'), '<linker><assembly fullname="Broad.Root" preserve="all" /></linker>')
+    $testLinkerProject = Join-Path $temporary 'test-linker-project'
+    $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $testLinkerProject
+    $testLinkerTarget = Join-Path $testLinkerProject 'Assets/UhCiTestLinker/link.xml'
+    if (-not (Test-Path -LiteralPath $testLinkerTarget -PathType Leaf) -or
+        [IO.File]::ReadAllText($testLinkerTarget).TrimEnd() -cne $testLinkerContent) {
+        throw 'Ephemeral test project must stage the specific test linker declaration in Assets.'
+    }
+    $checks++
+    $toolingRoot = Join-Path $temporary 'different-tooling-root'
+    $toolingLinkerDirectory = Join-Path $toolingRoot 'Tests/Runtime/Serialization'
+    $null = New-Item -ItemType Directory -Force -Path $toolingLinkerDirectory
+    [IO.File]::WriteAllText((Join-Path $toolingLinkerDirectory 'link.xml'), '<linker><assembly fullname="Wrong.Tooling" preserve="all" /></linker>')
+    $splitRootProject = Join-Path $temporary 'split-root-project'
+    $null = Initialize-EphemeralProject -Root $temporary -RepoRoot $toolingRoot -Version '2021.3.45f1' -Mode editmode -Path $splitRootProject
+    if ([IO.File]::ReadAllText((Join-Path $splitRootProject 'Assets/UhCiTestLinker/link.xml')).TrimEnd() -cne $testLinkerContent) {
+        throw 'Test linker declarations must follow the tested package root, not the tooling checkout.'
+    }
+    $checks++
+    $testLinkerWriteTime = [DateTime]::SpecifyKind([DateTime]'2001-01-01T00:00:00', [DateTimeKind]::Utc)
+    [IO.File]::SetLastWriteTimeUtc($testLinkerTarget, $testLinkerWriteTime)
+    $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $testLinkerProject
+    if ([IO.File]::GetLastWriteTimeUtc($testLinkerTarget) -ne $testLinkerWriteTime) {
+        throw 'Unchanged test linker declarations must not trigger an import.'
+    }
+    $checks++
+    $updatedTestLinkerContent = $testLinkerContent.Replace('Test.Contract', 'Test.Replacement')
+    [IO.File]::WriteAllText($testLinkerSource, $updatedTestLinkerContent)
+    $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $testLinkerProject
+    if ([IO.File]::ReadAllText($testLinkerTarget).TrimEnd() -cne $updatedTestLinkerContent -or
+        [IO.File]::GetLastWriteTimeUtc($testLinkerTarget) -eq $testLinkerWriteTime) {
+        throw 'Changed test linker declarations must replace cached preservation.'
+    }
+    $checks++
+    [IO.File]::WriteAllText("$testLinkerTarget.meta", 'stale generated metadata')
+    Remove-Item -LiteralPath $testLinkerSource
+    $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $testLinkerProject
+    if ((Test-Path -LiteralPath $testLinkerTarget) -or (Test-Path -LiteralPath "$testLinkerTarget.meta")) {
+        throw 'Removed test linker declarations must not survive in the cached project.'
+    }
+    $checks++
     $idempotentProject = Join-Path $temporary 'idempotent-project'
     $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $idempotentProject
     $seedPaths = @(

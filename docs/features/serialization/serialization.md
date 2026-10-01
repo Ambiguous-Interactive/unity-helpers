@@ -1345,6 +1345,13 @@ cross-assembly scenarios and both replacement-owner orders, exact passing test n
 matching source/version markers with effective High stripping and a non-development Release
 IL2CPP player.
 
+The full High-stripping test player also runs deliberate legacy reflection fixtures. Its runner
+stages their narrowly scoped test linker declarations under `Assets`, because Unity ignores
+package-contained `link.xml` files. Those declarations preserve named legacy fixture contracts and
+the protobuf attribute getters their models inspect. The ordinary `ConsumerMigration` assembly
+and its generated contracts have no linker preservation entries. Test fixture preservation does
+not establish that an arbitrary consumer can use the legacy runtime engine under IL2CPP.
+
 This establishes that these migration mechanisms work together. It does not establish that every
 consumer's configured model has migrated. Before retiring that consumer's fallback, record each
 runtime target, its closed type arguments, field numbers, configured defaults, encoding options,
