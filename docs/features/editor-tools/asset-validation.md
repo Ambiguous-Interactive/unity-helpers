@@ -351,6 +351,49 @@ The eight navigation categories are Prefabs, Scenes, ScriptableObjects, Material
 Addressables, Settings and Build Profiles. Materials includes texture imports. Category membership
 selects assets; a rule still needs a supported property on an asset before it can produce a finding.
 
+### Configuring the workspace from scripts
+
+`ValidationWorkspaceSettings.instance` exposes prompt-free `TryCreateAuthoredRule`,
+`TryDeleteAuthoredRule`, `TrySetRulePreference`, `TrySelectProfile`, `TryConfigureProfile`,
+`TrySetProfileTrigger`, `TrySetProfileBuildGate`, and `TrySetFrameBudget` operations. Each returns
+`false` and a diagnostic for invalid input without modifying memory or the settings file. Rule
+creation assigns a fresh `project.` identifier and leaves the caller's definition unchanged.
+Deleting a rule disables its stored findings in the same undo step.
+
+`GetAuthoredRules`, `GetProfiles`, and `GetRulePreference` return detached snapshots. Editing a
+snapshot does not change the workspace; pass the profile snapshot to `TryConfigureProfile` to
+persist it. `GetCategories` returns the category order for the profile's eight triggers. Trigger
+values are On change (`0`), On save (`1`), and Manual (`2`). Build failure thresholds accept
+Warning or Error; rule severity preferences also accept Info. The frame budget accepts 1–100 ms.
+Profiles must already exist, and names match exactly.
+
+<!-- doc-sample: compiles-editor -->
+
+```csharp
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
+
+ValidationWorkspaceSettings workspace = ValidationWorkspaceSettings.instance;
+if (!workspace.TrySetFrameBudget(12, out string error))
+{
+    Debug.LogWarning(error);
+}
+
+ValidationWorkspaceSettings.Profile release = workspace.GetProfiles()[1];
+release.gateBuild = true;
+release.failOn = ValidationSeverity.Warning;
+if (!workspace.TryConfigureProfile(release, out error))
+{
+    Debug.LogWarning(error);
+}
+```
+
+Call these operations on the editor thread. Successful changes persist the existing Unity
+settings format and enter Unity's Undo history; undo and redo persist their restored values even
+when Sentinel is disabled. Writes stage Unity's serialized data before publishing it. Failed
+writes restore the previous in-memory values. File replacement has the platform durability limits
+of `DurableFile`; unrelated external edits to the settings file are outside Unity Undo's guarantees.
+
 ### Authoring and fixing rules
 
 Conditions support audio spatial blend and clip channels, rigidbody mass, renderer material,

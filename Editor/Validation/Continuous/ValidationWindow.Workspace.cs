@@ -224,11 +224,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     ValidationWorkspaceSettings.RulePreference old = settings.PreferenceFor(
                         rule.RuleId
                     );
-                    settings.SetRulePreference(
-                        rule.RuleId,
-                        changed.newValue,
-                        old != null && old.overrideSeverity,
-                        old == null ? ValidationSeverity.Warning : old.severity
+                    CompleteWorkspaceChange(
+                        settings.TrySetRulePreference(
+                            rule.RuleId,
+                            changed.newValue,
+                            old != null && old.overrideSeverity,
+                            old == null ? ValidationSeverity.Warning : old.severity,
+                            out string error
+                        ),
+                        error
                     );
                     Refresh();
                 });
@@ -253,11 +257,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         bool overridden =
                             !string.Equals(value, "Default", System.StringComparison.Ordinal)
                             && Enum.TryParse(value, out severity);
-                        settings.SetRulePreference(
-                            rule.RuleId,
-                            settings.IsEnabled(rule.RuleId),
-                            overridden,
-                            severity
+                        CompleteWorkspaceChange(
+                            settings.TrySetRulePreference(
+                                rule.RuleId,
+                                settings.IsEnabled(rule.RuleId),
+                                overridden,
+                                severity,
+                                out string error
+                            ),
+                            error
                         );
                         Refresh();
                     }
@@ -272,22 +280,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     row.Add(
                         new Button(() =>
                         {
-                            settings.Change(
-                                "Delete validation rule",
-                                () =>
-                                    settings.projectRules.RemoveAll(definition =>
-                                        string.Equals(
-                                            definition.id,
-                                            rule.RuleId,
-                                            System.StringComparison.Ordinal
-                                        )
-                                    )
-                            );
-                            settings.SetRulePreference(
-                                rule.RuleId,
-                                false,
-                                false,
-                                ValidationSeverity.Warning
+                            CompleteWorkspaceChange(
+                                settings.TryDeleteAuthoredRule(rule.RuleId, out string error),
+                                error
                             );
                             RefreshRules();
                             Refresh();
@@ -510,17 +505,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
         }
 
+        private void CompleteWorkspaceChange(bool success, string error)
+        {
+            if (success)
+            {
+                return;
+            }
+            Say(error);
+            Refresh();
+            RefreshRules();
+            RefreshSettings();
+        }
+
         private void SaveRule()
         {
             if (!ValidateDraft())
                 return;
-            ValidationWorkspaceSettings.RuleDefinition definition =
-                JsonUtility.FromJson<ValidationWorkspaceSettings.RuleDefinition>(
-                    JsonUtility.ToJson(_draft)
-                );
-            definition.id = "project." + Guid.NewGuid().ToString("N");
-            ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
-            settings.Change("Create validation rule", () => settings.projectRules.Add(definition));
+            if (
+                !ValidationWorkspaceSettings.instance.TryCreateAuthoredRule(
+                    _draft,
+                    out _,
+                    out string error
+                )
+            )
+            {
+                _drySummary.text = error;
+                return;
+            }
             _ruleCategory = "Project Rules";
             ShowView("Rules");
             if (!ValidationScheduler.IsRunning)
@@ -541,9 +552,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 Button button = new Button(() =>
                 {
                     ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
-                    settings.Change(
-                        "Select validation profile",
-                        () => settings.selectedProfile = profile.name
+                    CompleteWorkspaceChange(
+                        settings.TrySelectProfile(profile.name, out string error),
+                        error
                     );
                     RefreshSettings();
                 })
@@ -600,9 +611,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 {
                     int choice = mode;
                     Button toggle = new Button(() =>
-                        settings.Change(
-                            "Set validation trigger",
-                            () => profile.triggers[categoryIndex] = choice
+                        CompleteWorkspaceChange(
+                            settings.TrySetProfileTrigger(
+                                profile.name,
+                                ValidationWorkspaceSettings.Categories[categoryIndex],
+                                choice,
+                                out string error
+                            ),
+                            error
                         )
                     )
                     {
@@ -624,9 +640,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 isDelayed = true,
             };
             budget.RegisterValueChangedCallback(changed =>
-                settings.Change(
-                    "Set validation frame budget",
-                    () => settings.frameBudget = changed.newValue
+                CompleteWorkspaceChange(
+                    settings.TrySetFrameBudget(
+                        Math.Max(1, Math.Min(100, changed.newValue)),
+                        out string error
+                    ),
+                    error
                 )
             );
             _settingsContent.Add(budget);
@@ -638,9 +657,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             AddLabel(_settingsContent, "CONTINUOUS INTEGRATION", "sentinel-section-title");
             Toggle gate = new Toggle("Gate builds on validation") { value = profile.gateBuild };
             gate.RegisterValueChangedCallback(changed =>
-                settings.Change(
-                    "Set validation build gate",
-                    () => profile.gateBuild = changed.newValue
+                CompleteWorkspaceChange(
+                    settings.TrySetProfileBuildGate(
+                        profile.name,
+                        changed.newValue,
+                        profile.failOn,
+                        out string error
+                    ),
+                    error
                 )
             );
             _settingsContent.Add(gate);
@@ -650,14 +674,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 new[] { "Error", "Warning" },
                 profile.failOn.ToString(),
                 value =>
-                    settings.Change(
-                        "Set validation failure threshold",
-                        () =>
-                        {
-                            if (Enum.TryParse(value, out ValidationSeverity severity))
-                                profile.failOn = severity;
-                        }
-                    )
+                {
+                    if (Enum.TryParse(value, out ValidationSeverity severity))
+                    {
+                        CompleteWorkspaceChange(
+                            settings.TrySetProfileBuildGate(
+                                profile.name,
+                                profile.gateBuild,
+                                severity,
+                                out string error
+                            ),
+                            error
+                        );
+                    }
+                }
             );
             VisualElement exports = Element(_settingsContent, "dx-row");
             exports.Add(new Button(() => ExportReport(false)) { text = "Export JSON" });
