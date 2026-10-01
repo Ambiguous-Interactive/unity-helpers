@@ -124,6 +124,18 @@ asks whether anything was handed in, `item == null` asks whether it is gone, and
 on the second question leaks one dead reference per use. The pool never calls `Object.Destroy` on its
 own initiative: `onDestroy` is where destruction lives, and a `null` one means something else owns it.
 
+Callbacks can dispose the pool or destroy an item. `TryTake` returns `false` with a null output when
+its callback disposes the pool, destroys the item, or releases it. A nested take after that release
+keeps its own ownership. A release callback that disposes the pool retires the returned item through
+`onDestroy` instead of retaining it.
+
+Callback exceptions are logged. A failed producer returns no item; it remains responsible for
+resources it never returns. A failed take retires its live item through `onDestroy` while that take
+still owns it. A failed release callback retires its live item. `Release` still returns `true` because
+it removed an item owned by this pool.
+If `onDestroy` throws, cleanup continues with the remaining items and clears all tracking.
+The caller must clean up any native object its destruction callback failed to destroy.
+
 ---
 
 ## Gameplay Helpers
@@ -927,12 +939,13 @@ FileHelper.InitializePath(
 ```
 
 `InitializePath` creates the file only when its path is free. It returns `false` for an existing
-file, an invalid path, or an I/O failure; it does not replace existing contents.
+file, a null, empty, or whitespace-only path, or an I/O failure; it does not replace existing contents.
+Paths that contain spaces alongside other characters are kept as supplied.
 
 **Async file copy:**
 
-The destination keeps its previous contents if reading or staging fails, or if the copy is
-cancelled. A successful copy replaces it after the full source has been staged. On platforms that
+A zero or negative copy buffer returns `false` before opening files. The destination keeps its
+previous contents if reading or staging fails, or if the copy is cancelled. A successful copy replaces it after the full source has been staged. On platforms that
 do not support file replacement, the final swap deletes the old destination before moving the
 staged file; a failed move can leave the destination absent. A temporary sibling file may remain
 after an interrupted process.

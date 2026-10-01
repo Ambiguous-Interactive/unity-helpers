@@ -398,6 +398,12 @@ public void FlagsEnumShowsWhenAllFlagsSetAndExpectedIsSubset()
 }
 ```
 
+## Capacity claims without large test buffers
+
+Keep hostile serialized capacity and index claims, including `int.MaxValue`, in correctness regressions. Configure a small `SerializationCapacityLimits.MaximumRestoredCapacity` before decoding a capacity hint, assert the restored capacity exactly, and restore the setting in teardown. The same payload must clamp at a low limit and retain its claimed capacity after the test raises that limit. Default-limit values can be checked directly through `Clamp` and `TryAccept` without allocating their corresponding buffers.
+
+This exercises rejection, clamping, growth, and limit configuration while keeping routine tests small. Reserve large real buffers for separately categorized stress or performance tests. These bounded fixtures reduce test memory pressure; passing them alone does not establish the cause of an editor termination.
+
 ## Overflow Conditions
 
 Test behavior at the boundaries of numeric types to catch overflow, underflow, and precision issues.

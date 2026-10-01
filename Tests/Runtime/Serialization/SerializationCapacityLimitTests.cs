@@ -101,13 +101,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ADequeCapacityClaimIsClampedRatherThanAllocated()
         {
+            SerializationCapacityLimits.MaximumRestoredCapacity = 8;
             Deque<int> restored = Serializer.ProtoDeserialize<Deque<int>>(HostileCapacityClaim);
 
             Assert.IsTrue(restored != null);
             Assert.AreEqual(0, restored.Count);
-            Assert.LessOrEqual(
+            Assert.AreEqual(
+                SerializationCapacityLimits.MaximumRestoredCapacity,
                 restored.Capacity,
-                SerializationCapacityLimits.DefaultMaximumRestoredCapacity,
                 "A payload that delivered no elements must not size a buffer beyond the limit."
             );
 
@@ -355,13 +356,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void RaisingTheLimitHonorsALargerClaim()
         {
-            // The game sets restoration limits independently of untrusted payload claims.
-            SerializationCapacityLimits.MaximumRestoredCapacity = 4_000_000;
+            byte[] payload = Serializer.ProtoSerialize(new Deque<int>(32));
+            SerializationCapacityLimits.MaximumRestoredCapacity = 8;
+            Deque<int> clamped = Serializer.ProtoDeserialize<Deque<int>>(payload);
+            Assert.AreEqual(8, clamped.Capacity);
 
-            Deque<int> restored = Serializer.ProtoDeserialize<Deque<int>>(
-                Serializer.ProtoSerialize(new Deque<int>(2_000_000))
-            );
-            Assert.AreEqual(2_000_000, restored.Capacity);
+            SerializationCapacityLimits.MaximumRestoredCapacity = 64;
+            Deque<int> restored = Serializer.ProtoDeserialize<Deque<int>>(payload);
+            Assert.AreEqual(32, restored.Capacity);
         }
 
         [Test]

@@ -77,9 +77,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         [TestCase(null, TestName = "InitializePath.Invalid.Null.ReturnsFalse")]
         [TestCase("", TestName = "InitializePath.Invalid.Empty.ReturnsFalse")]
+        [TestCase(" ", TestName = "InitializePath.Invalid.Space.ReturnsFalse")]
+        [TestCase("\t", TestName = "InitializePath.Invalid.Tab.ReturnsFalse")]
+        [TestCase("\r\n", TestName = "InitializePath.Invalid.Newlines.ReturnsFalse")]
+        [TestCase("\u2003", TestName = "InitializePath.Invalid.UnicodeSpace.ReturnsFalse")]
         public void InitializePathReturnsFalseForInvalidPath(string path)
         {
-            Assert.IsFalse(FileHelper.InitializePath(path));
+            bool existed = File.Exists(path);
+            try
+            {
+                Assert.IsFalse(FileHelper.InitializePath(path));
+            }
+            finally
+            {
+                if (!existed && File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
         }
 
         [Test]
@@ -471,26 +486,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(content, copiedContent);
         }
 
-        [UnityTest]
-        public IEnumerator CopyFileAsyncWithZeroBufferSizeUsesDefault()
+        [TestCase(0, TestName = "CopyFile.InvalidBuffer.Zero.PreservesDestination")]
+        [TestCase(-1, TestName = "CopyFile.InvalidBuffer.Negative.PreservesDestination")]
+        [TestCase(int.MinValue, TestName = "CopyFile.InvalidBuffer.Minimum.PreservesDestination")]
+        public void CopyFileAsyncRejectsInvalidBufferWithoutChangingDestination(int bufferSize)
         {
-            string sourceFile = Path.Combine(_testDirectory, "zero_buffer_source.txt");
-            string destinationFile = Path.Combine(_testDirectory, "zero_buffer_destination.txt");
-            string content = "Content";
-            File.WriteAllText(sourceFile, content);
+            string sourceFile = Path.Combine(_testDirectory, "invalid_buffer_source.txt");
+            string destinationFile = Path.Combine(_testDirectory, "invalid_buffer_destination.txt");
+            File.WriteAllText(sourceFile, "new contents");
+            File.WriteAllText(destinationFile, "previous contents");
 
             ValueTask<bool> copyTask = FileHelper.CopyFileAsync(
                 sourceFile,
                 destinationFile,
-                bufferSize: 0
+                bufferSize: bufferSize
             );
-            while (!copyTask.IsCompleted)
-            {
-                yield return null;
-            }
-            bool result = copyTask.Result;
 
-            Assert.That(result, Is.True.Or.False);
+            Assert.IsTrue(copyTask.IsCompleted);
+            Assert.IsFalse(copyTask.Result);
+            Assert.AreEqual("previous contents", File.ReadAllText(destinationFile));
+            Assert.IsFalse(File.Exists(destinationFile + DurableFile.TemporarySuffix));
         }
 
         [UnityTest]

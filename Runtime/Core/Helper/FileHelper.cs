@@ -19,11 +19,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>
         /// Creates a file at the specified path if it does not exist, optionally writing initial contents.
         /// </summary>
-        /// <param name="path">Absolute or relative file path.</param>
+        /// <param name="path">Absolute or relative file path; blank paths are refused.</param>
         /// <param name="contents">Optional initial contents (defaults to empty).</param>
         /// <returns>True if the file was created; false if it already existed or creation failed.</returns>
         public static bool InitializePath(string path, byte[] contents = null)
         {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
             try
             {
                 string directory = Path.GetDirectoryName(path);
