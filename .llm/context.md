@@ -72,7 +72,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     that already works, so it is **capped at `DiagnosticSeverity.Warning` and suppressible**:
     taking a package upgrade must never fail a consumer's build. On by default, with five exceptions --
     `WUH010` (a dictionary read by indexer), `WUH013` (a counting loop that can use `foreach`),
-    `WUH018` (string equality whose comparison policy is implicit), `WUH019` (repeated stable loop bounds), and `WUH021` (repeated collection count observations) remain opt-in for consumers
+    `WUH018` (string equality whose comparison policy is implicit), `WUH019` (repeated stable loop bounds), and `WUH021` (repeated size observations) remain opt-in for consumers
     because their correct shapes are ubiquitous. **The package opts into WUH010, WUH013, and WUH018
     in its shared check-project ruleset; WUH019 and WUH021 are enabled by the production-only ruleset for
     Runtime, Editor, and integration checks. The excluded-source loop audit covers WUH013,

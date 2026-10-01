@@ -520,8 +520,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         internal static readonly DiagnosticDescriptor RepeatedCollectionCount =
             new DiagnosticDescriptor(
                 "WUH021",
-                "Collection Count is read repeatedly",
-                "'{0}' reads Count again on this evaluation path. Read Count once when one snapshot is intended. Interface getters may execute custom code, and concurrent observations may differ; retain intentional live reads with a suppression. WUH021 is opt-in.",
+                "Collection size is read repeatedly",
+                "'{0}' reads a size again on this evaluation path. Read the size once when one snapshot is intended. Getters and enumeration may execute custom code, and concurrent observations may differ; retain intentional live reads with a suppression. WUH021 is opt-in.",
                 "Performance",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false

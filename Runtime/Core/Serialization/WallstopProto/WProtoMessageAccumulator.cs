@@ -88,11 +88,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _payload.CopyTo(_buffer);
                 _length = _payload.Length;
             }
-            else if (_buffer.Length < required)
+            else
             {
-                byte[] grown = new byte[Capacity(_buffer.Length, (int)required)];
-                Array.Copy(_buffer, grown, _length);
-                _buffer = grown;
+                int bufferLength = _buffer.Length;
+                if (bufferLength < required)
+                {
+                    byte[] grown = new byte[Capacity(bufferLength, (int)required)];
+                    Array.Copy(_buffer, grown, _length);
+                    _buffer = grown;
+                }
             }
 
             occurrence.CopyTo(new Span<byte>(_buffer, _length, occurrence.Length));

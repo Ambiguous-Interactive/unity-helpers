@@ -50,7 +50,7 @@ the window edits the project-wide default ruleset. Writes import the asset immed
 | [`WUH018`](#wuh018-implicit-string-equality-opt-in)                      | String equality without an explicit policy (**off by default**)       |
 | [`WUH019`](#wuh019-repeated-stable-loop-bound-opt-in)                    | A counting loop repeatedly reading a stable size (**off by default**) |
 | [`WUH020`](#wuh020-hard-stack-and-queue-reads)                           | A throwing stack or queue read with an available Try method           |
-| [`WUH021`](#wuh021-repeated-collection-count-opt-in)                     | Repeated collection Count observations (**off by default**)           |
+| [`WUH021`](#wuh021-repeated-collection-count-opt-in)                     | Repeated size observations (**off by default**)                       |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -906,6 +906,8 @@ caller policy. Checking the boolean result also avoids [`WUH008`](#wuh008-a-tryx
 
 ## `WUH021`: repeated collection Count (opt-in)
 
+This policy covers repeated size observations: collection counts, known lengths, and LINQ counts.
+
 Read `Count` once when a guard and later work require one snapshot:
 
 ```csharp
@@ -922,25 +924,57 @@ if (count > 0)
 }
 ```
 
-The rule recognizes the .NET `ICollection<T>`, `IReadOnlyCollection<T>`, and non-generic
-`ICollection` contracts, including inherited interfaces and constrained generic receivers.
+The rule recognizes these semantic contracts when the target framework exposes them:
+
+| Size member                 | Known types                                                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Count` property            | .NET `ICollection<T>`, `IReadOnlyCollection<T>`, and non-generic `ICollection` implementations, including `List<T>` and `ArraySegment<T>` |
+| `Length` and `LongLength`   | Arrays, including multidimensional arrays and receivers typed as `System.Array`                                                           |
+| `Length`                    | `string`, `Span<T>`, `ReadOnlySpan<T>`, `Memory<T>`, `ReadOnlyMemory<T>`, `StringBuilder`, `ImmutableArray<T>`, and `ReadOnlySequence<T>` |
+| `Count()` and `LongCount()` | Non-predicate `System.Linq.Enumerable` overloads on one source                                                                            |
+
+Collection contracts include inherited interfaces and constrained generic receivers. Standard
+`List<T>` exposes `Count`, rather than `Length`. Custom members with these names outside the
+known contracts are exempt. Missing optional framework types require no new reference.
+
+```csharp
+// WUH021: enumeration may execute twice.
+if (items.Count() > 0)
+{
+    Reserve(items.Count());
+}
+
+int itemCount = items.Count();
+if (itemCount > 0)
+{
+    Reserve(itemCount);
+}
+```
+
+Both extension-call and static `Enumerable.Count(items)` forms identify the same constructed
+method and source. Count and LongCount are distinct contracts: their result widths and overflow
+behavior differ. A property Count and Enumerable.Count are also kept separate. Predicate counts,
+`Queryable`, parallel LINQ, custom Count methods, different generic element contracts, and
+factory/property receivers whose identity is unknown are exempt. The rule does not track aliases.
+Enumeration can invoke callbacks, so a count call discards observations of other receivers;
+a repeated count of the same source is still reported when one snapshot is intended.
 It follows the same local, parameter, or field receiver along uninterrupted evaluation paths,
 including guards, conditional expressions, and call arguments. Reference casts retain receiver
 identity when the invoked member remains the same. Interface dispatch on an unsealed receiver
 can select a different implementation, so it does not merge a class Count with an interface Count.
 A sealed receiver can establish that mapping. Distinct explicit Count implementations remain
 separate observations.
-Custom properties named Count outside these contracts are exempt.
 
 Calls, mutations, unknown getters, user operators, and constructors interrupt observations.
 Unfamiliar operation shapes are opaque boundaries, including implicit coalesce conversions and
 record clones. Static field access can run a type initializer and also interrupts earlier reads.
 Constructors run before their initializers; nested functions start with independent state.
 Loop and exception boundaries do not carry earlier observations into later paths.
-This conservative analysis does not prove Count pure or thread-safe. Interface getters can
-execute custom code, and concurrent observations can differ even without a visible mutation.
-A snapshot does not synchronize a collection. Suppress intentional repeated observations when
-one snapshot would change the intended behavior. There is no automatic code fix.
+This conservative analysis does not prove size observations pure or thread-safe. Interface getters
+and enumeration can execute custom code; enumeration can be expensive, stateful, or one-shot.
+Concurrent observations can differ even without a visible mutation.
+A snapshot does not synchronize a collection. Suppress intentional repeated observations or
+repeated enumerations when one snapshot would change the intended behavior. There is no automatic code fix.
 
 This suppressible warning is off by default for consumers. Enable it with
 `<Rule Id="WUH021" Action="Warning" />` in a project ruleset. Production TypeCheck,

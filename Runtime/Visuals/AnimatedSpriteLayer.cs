@@ -71,8 +71,9 @@ namespace WallstopStudios.UnityHelpers.Visuals
                         return Array.Empty<Sprite>();
                     }
 
-                    Sprite[] copy = new Sprite[spriteArray.Length];
-                    Array.Copy(spriteArray, copy, spriteArray.Length);
+                    int spriteCount = spriteArray.Length;
+                    Sprite[] copy = new Sprite[spriteCount];
+                    Array.Copy(spriteArray, copy, spriteCount);
                     return copy;
                 }
                 case ICollection<Sprite> collection:

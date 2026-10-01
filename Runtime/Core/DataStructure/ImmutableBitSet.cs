@@ -333,8 +333,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 return Array.Empty<ulong>();
             }
-            ulong[] copy = new ulong[_bits.Length];
-            Array.Copy(_bits, copy, _bits.Length);
+            int bitsLength = _bits.Length;
+            ulong[] copy = new ulong[bitsLength];
+            Array.Copy(_bits, copy, bitsLength);
             return copy;
         }
 

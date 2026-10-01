@@ -103,8 +103,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return false;
             }
 
-            string[] names = new string[arguments.Length];
             int argumentsLength = arguments.Length;
+            string[] names = new string[argumentsLength];
             for (int index = 0; index < argumentsLength; index++)
             {
                 names[index] = Readable(arguments[index]);

@@ -968,8 +968,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (intDropDownAttribute != null)
             {
                 int[] values = intDropDownAttribute.Options ?? Array.Empty<int>();
-                ToggleOption[] options = new ToggleOption[values.Length];
                 int valuesLength = values.Length;
+                ToggleOption[] options = new ToggleOption[valuesLength];
                 for (int index = 0; index < valuesLength; index += 1)
                 {
                     int value = values[index];
@@ -989,8 +989,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 UnityEngine.Object context = property.serializedObject?.targetObject;
                 string[] values =
                     stringInListAttribute.GetOptions(context) ?? Array.Empty<string>();
-                ToggleOption[] options = new ToggleOption[values.Length];
                 int valuesLength3 = values.Length;
+                ToggleOption[] options = new ToggleOption[valuesLength3];
                 for (int index = 0; index < valuesLength3; index += 1)
                 {
                     string value = values[index] ?? string.Empty;
@@ -1011,8 +1011,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return Array.Empty<ToggleOption>();
             }
 
-            ToggleOption[] options = new ToggleOption[values.Length];
             int valuesLength = values.Length;
+            ToggleOption[] options = new ToggleOption[valuesLength];
             for (int index = 0; index < valuesLength; index += 1)
             {
                 object value = values[index];

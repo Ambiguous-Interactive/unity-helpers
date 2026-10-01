@@ -443,7 +443,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             string trimmed = value.Trim();
-            if (trimmed.Length < 2 || trimmed[0] != '{' || trimmed[trimmed.Length - 1] != '}')
+            int trimmedLength = trimmed.Length;
+            if (trimmedLength < 2 || trimmed[0] != '{' || trimmed[trimmedLength - 1] != '}')
             {
                 fileId = 0;
                 guid = null;

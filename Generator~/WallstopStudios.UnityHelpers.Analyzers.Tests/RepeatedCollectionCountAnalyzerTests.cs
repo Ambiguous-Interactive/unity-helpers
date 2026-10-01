@@ -24,11 +24,20 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             bool allowCompilationErrors = false
         )
         {
-            System.Reflection.Assembly binderAssembly =
-                typeof(Microsoft.CSharp.RuntimeBinder.Binder).Assembly;
-            Assert.IsTrue(binderAssembly != null);
+            System.Reflection.Assembly[] fixtureAssemblies =
+            {
+                typeof(Microsoft.CSharp.RuntimeBinder.Binder).Assembly,
+                typeof(System.Runtime.CompilerServices.DynamicAttribute).Assembly,
+                typeof(System.Linq.Queryable).Assembly,
+                typeof(System.Linq.ParallelEnumerable).Assembly,
+                typeof(System.Buffers.ReadOnlySequence<int>).Assembly,
+            };
+            foreach (System.Reflection.Assembly assembly in fixtureAssemblies)
+            {
+                Assert.IsTrue(assembly != null);
+            }
             string source =
-                "using System; using System.Collections.Generic; using System.Collections.Concurrent; "
+                "using System; using System.Collections.Generic; using System.Collections.Concurrent; using System.Linq; "
                 + "namespace Consumer { public static class Subject { "
                 + body
                 + " } } "
@@ -94,6 +103,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         [TestCase("IList<int>")]
         [TestCase("IReadOnlyList<int>")]
         [TestCase("System.Collections.ICollection")]
+        [TestCase("System.ArraySegment<int>")]
         public void AGuardAndBranchReadReportTheSecondObservation(string type)
         {
             ImmutableArray<Diagnostic> diagnostics = Analyze(
@@ -495,6 +505,211 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 Analyze(
                     "public static int Read<T>(ICollection<int> values) where T : IHolder, new() { int first = values.Count; T holder = new T { Size = values.Count }; return 0; }",
                     "public interface IHolder { int Size { get; set; } }"
+                )
+            );
+        }
+
+        [TestCase("int[]", "Length")]
+        [TestCase("int[,]", "Length")]
+        [TestCase("int[]", "LongLength")]
+        [TestCase("System.Array", "Length")]
+        [TestCase("System.Array", "LongLength")]
+        [TestCase("string", "Length")]
+        [TestCase("System.Span<int>", "Length")]
+        [TestCase("System.ReadOnlySpan<int>", "Length")]
+        [TestCase("System.Memory<int>", "Length")]
+        [TestCase("System.ReadOnlyMemory<int>", "Length")]
+        [TestCase("System.Text.StringBuilder", "Length")]
+        [TestCase("System.Collections.Immutable.ImmutableArray<int>", "Length")]
+        [TestCase("System.Buffers.ReadOnlySequence<int>", "Length")]
+        public void FrameworkLengthPropertiesReportRepeatedObservations(
+            string type,
+            string property
+        )
+        {
+            Assert.That(
+                Analyze(
+                    "public static long Read("
+                        + type
+                        + " values) { if (values."
+                        + property
+                        + " > 0) { return values."
+                        + property
+                        + "; } return 0; }"
+                ).Length,
+                Is.EqualTo(1)
+            );
+        }
+
+        [TestCase("return values.Count() + values.Count();")]
+        [TestCase("return Enumerable.Count(values) + Enumerable.Count(values);")]
+        [TestCase("return values.Count() + Enumerable.Count(values);")]
+        [TestCase("return Enumerable.Count(values) + values.Count();")]
+        [TestCase("if (values != null && values.Count() > 0) { return values.Count(); } return 0;")]
+        [TestCase("return Consume(values.Count(), values.Count());")]
+        [TestCase("return values.LongCount() + values.LongCount();")]
+        [TestCase("return Enumerable.LongCount(values) + values.LongCount();")]
+        [TestCase("return values.LongCount() + Enumerable.LongCount(values);")]
+        public void StandardEnumerableCountsReportRepeatedSourceObservations(string statements)
+        {
+            Assert.That(
+                Analyze(
+                    "private static int Consume(int first, int second) => first + second; public static long Read(IEnumerable<int> values) { "
+                        + statements
+                        + " }"
+                ).Length,
+                Is.EqualTo(1)
+            );
+        }
+
+        [TestCase("return values.Length + values.LongLength;")]
+        [TestCase("return values.Length + values.Count();")]
+        [TestCase("return values.Count() + values.LongCount();")]
+        [TestCase("return values.Count() + other.Count();")]
+        [TestCase(
+            "int first = values.Count(); IEnumerable<int> alias = values; return alias.Count();"
+        )]
+        [TestCase("return values.Count(v => v > 0) + values.Count(v => v > 0);")]
+        [TestCase("return values.LongCount(v => v > 0) + values.LongCount(v => v > 0);")]
+        [TestCase("return values.AsQueryable().Count() + values.AsQueryable().Count();")]
+        public void DistinctSizeContractsAndPredicateCountsAreNotMerged(string statements)
+        {
+            Assert.IsEmpty(
+                Analyze("public static long Read(int[] values, int[] other) { " + statements + " }")
+            );
+        }
+
+        [TestCase("int first = values.Count(); Unknown(); return values.Count();")]
+        [TestCase("int first = list.Count; int ignored = values.Count(); return list.Count;")]
+        [TestCase("int first = list.Count(); list.Clear(); return list.Count();")]
+        [TestCase("long first = values.LongCount(); Unknown(); return values.LongCount();")]
+        [TestCase(
+            "int first = values.Count(); int ignored = callback.Count; return values.Count();"
+        )]
+        public void EnumerationCallbacksAndMutationsInterruptPriorObservations(string statements)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "private static void Unknown() { } public static long Read(IEnumerable<int> values, List<int> list, ICollection<int> callback) { "
+                        + statements
+                        + " }"
+                )
+            );
+        }
+
+        [TestCase("int first = values.Length; Unknown(); return values.Length;")]
+        [TestCase("int first = values.Length; values = new int[1]; return values.Length;")]
+        [TestCase("int first = values.Length; int ignored = callback.Count; return values.Length;")]
+        public void ArrayLengthHonorsCallbackAndReceiverReplacementBoundaries(string statements)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "private static void Unknown() { } public static int Read(int[] values, ICollection<int> callback) { "
+                        + statements
+                        + " }"
+                )
+            );
+        }
+
+        [Test]
+        public void AnArbitraryLengthPropertyIsOutsideTheFrameworkContract()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static int Read(Custom values) { return values.Length + values.Length; }",
+                    "public sealed class Custom { public int Length => 1; }"
+                )
+            );
+        }
+
+        [Test]
+        public void AnInstanceCountMethodIsNotEnumerableCount()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static int Read(Custom values) { return values.Count() + values.Count(); }",
+                    "public sealed class Custom { public int Count() => 1; }"
+                )
+            );
+        }
+
+        [TestCase("IQueryable<int>")]
+        [TestCase("ParallelQuery<int>")]
+        public void QueryAndParallelProvidersAreOutsideTheEnumerableContract(string type)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static int Read("
+                        + type
+                        + " values) { return values.Count() + values.Count(); }"
+                )
+            );
+        }
+
+        [Test]
+        public void DifferentEnumerableElementContractsAreSeparateObservations()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static int Read(IEnumerable<string> values) { return Enumerable.Count<string>(values) + Enumerable.Count<object>(values); }"
+                )
+            );
+        }
+
+        [TestCase("Span")]
+        [TestCase("Memory")]
+        public void ASourceLengthTypeCannotClaimFrameworkSemantics(string name)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static int Read(System."
+                        + name
+                        + "<int> values) { return values.Length + values.Length; }",
+                    "namespace System { public sealed class "
+                        + name
+                        + "<T> { public int Length => 1; } }"
+                )
+            );
+        }
+
+        [Test]
+        public void ASourceEnumerableCannotClaimFrameworkCountSemantics()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static int Read(IEnumerable<int> values) { return Enumerable.Count(values) + Enumerable.Count(values); }",
+                    "namespace System.Linq { public static class Enumerable { public static int Count<T>(this System.Collections.Generic.IEnumerable<T> values) => 1; } }"
+                )
+            );
+        }
+
+        [Test]
+        public void APropertyReceiverDoesNotProveOneStableSequence()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static int Read(Holder values) { return values.Memory.Length + values.Memory.Length; }",
+                    "public sealed class Holder { public System.Memory<int> Memory => default; }"
+                )
+            );
+        }
+
+        [Test]
+        public void ARefCallCanReplaceAnArrayBeforeTheNextLengthRead()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "private static void Change(ref int[] values) { } public static int Read(int[] values) { int first = values.Length; Change(ref values); return values.Length; }"
+                )
+            );
+        }
+
+        [Test]
+        public void ACollectionGetterAndEnumerableCountAreDifferentContracts()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static int Read(List<int> values) { return values.Count + values.Count(); }"
                 )
             );
         }

@@ -139,8 +139,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return "No dispatchers found.";
             }
 
-            string[] descriptions = new string[dispatchers.Length];
             int dispatchersLength = dispatchers.Length;
+            string[] descriptions = new string[dispatchersLength];
             for (int i = 0; i < dispatchersLength; i++)
             {
                 UnityMainThreadDispatcher dispatcher = dispatchers[i];

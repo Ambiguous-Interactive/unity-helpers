@@ -651,9 +651,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     )
             )
             {
-                if (filtered.Capacity < source.Length)
+                int sourceLength = source.Length;
+                if (filtered.Capacity < sourceLength)
                 {
-                    filtered.Capacity = source.Length;
+                    filtered.Capacity = sourceLength;
                 }
 
                 foreach (SerializableTypeDescriptor descriptor in source)
@@ -1150,10 +1151,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     }
                 }
 
-                _assemblyQualifiedNames = new string[_descriptors.Length];
-                _displayNames = new string[_descriptors.Length];
-                _tooltips = new string[_descriptors.Length];
                 int descriptorsLength = _descriptors.Length;
+                _assemblyQualifiedNames = new string[descriptorsLength];
+                _displayNames = new string[descriptorsLength];
+                _tooltips = new string[descriptorsLength];
                 for (int index = 0; index < descriptorsLength; index++)
                 {
                     _assemblyQualifiedNames[index] = _descriptors[index].AssemblyQualifiedName;

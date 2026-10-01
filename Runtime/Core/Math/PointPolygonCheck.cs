@@ -55,15 +55,14 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// </remarks>
         public static bool IsPointInsidePolygon(Vector2 point, ReadOnlySpan<Vector2> polygon)
         {
-            if (polygon.Length < 3)
+            int polygonLength = polygon.Length;
+            if (polygonLength < 3)
             {
                 return false;
             }
 
             bool inside = false;
-            int j = polygon.Length - 1;
-
-            int polygonLength = polygon.Length;
+            int j = polygonLength - 1;
             for (int i = 0; i < polygonLength; i++)
             {
                 Vector2 vi = polygon[i];

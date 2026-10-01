@@ -55,8 +55,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
-            string[] normalized = new string[groupNames.Length];
             int groupNamesLength = groupNames.Length;
+            string[] normalized = new string[groupNamesLength];
             for (int index = 0; index < groupNamesLength; index++)
             {
                 string name = groupNames[index];

@@ -118,8 +118,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             ),
             new(
                 "WUH021",
-                "Repeated collection Count",
-                "Reports repeated Count observations when one snapshot is intended. This policy is opt-in by default."
+                "Repeated size observations",
+                "Reports repeated Count or Length observations when one snapshot is intended. This policy is opt-in by default."
             ),
         };
 

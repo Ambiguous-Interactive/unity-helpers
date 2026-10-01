@@ -272,16 +272,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TryWriteBytes(ReadOnlySpan<byte> value)
         {
-            int prefixSize = WProtoSizes.Varint32Size((uint)value.Length);
+            int valueLength = value.Length;
+            int prefixSize = WProtoSizes.Varint32Size((uint)valueLength);
 
             // Subtract lengths to avoid overflow admitting an orphaned prefix.
-            if (_faulted || Remaining - prefixSize < value.Length)
+            if (_faulted || Remaining - prefixSize < valueLength)
             {
                 _faulted = true;
                 return false;
             }
 
-            if (!TryWriteVarint32((uint)value.Length))
+            if (!TryWriteVarint32((uint)valueLength))
             {
                 return false;
             }

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add opt-in `WUH021` to flag repeated collection counts, including interface reads, when one snapshot is intended.
+- Add opt-in `WUH021` to flag repeated size observations, including interface `Count`, known `Length`/`LongLength` properties, and non-predicate LINQ `Count()`/`LongCount()`, when one snapshot is intended.
 - Add `WUH020` to suggest non-throwing queue and stack reads when compatible `Try` methods are available ([#912](https://github.com/Ambiguous-Interactive/unity-helpers/issues/912)).
 - Add explicit scalar default omission for WallstopProto consumer migrations, with ordinary consumer migration coverage and runtime-model compatibility guidance ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Add prompt-free Sentinel workspace APIs for authored rules, preferences, profiles, build gates, and frame budgets, with isolated inputs, blank-path rejection, diagnostics, and persisted undo/redo ([#901](https://github.com/Ambiguous-Interactive/unity-helpers/issues/901)).

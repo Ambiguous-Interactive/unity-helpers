@@ -147,9 +147,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     _items = new T[DefaultCapacity];
                     foreach (T item in items)
                     {
-                        if (_count == _items.Length)
+                        int capacity = _items.Length;
+                        if (_count == capacity)
                         {
-                            int newCapacity = ComputeGrowth(_items.Length);
+                            int newCapacity = ComputeGrowth(capacity);
                             Resize(newCapacity);
                         }
                         _items[_count++] = item;
@@ -245,9 +246,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public void Add(T item)
         {
-            if (_count == _items.Length)
+            int capacity = _items.Length;
+            if (_count == capacity)
             {
-                int newCapacity = ComputeGrowth(_items.Length);
+                int newCapacity = ComputeGrowth(capacity);
                 Resize(newCapacity);
             }
 

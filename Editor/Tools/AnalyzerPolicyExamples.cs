@@ -177,7 +177,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedGoodCode =
                         "int count = values.Count;\nif (count > 0)\n{\n    Reserve(count);\n}";
                     selectedExplanation =
-                        "Read Count once when one snapshot is intended. Suppress intentional live observations; interface getters may execute custom code and concurrent observations may differ.";
+                        "Read the size once when one snapshot is intended. Count, known Length properties, and Enumerable counts are covered. Suppress intentional live observations; getters and enumeration may execute custom code and concurrent observations may differ.";
                     break;
                 default:
                     badCode = string.Empty;

@@ -895,17 +895,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             internal static RTreeNode CreateInternal(RTreeNode[] children)
             {
-                if (children.Length == 0)
+                int childrenLength = children.Length;
+                if (childrenLength == 0)
                 {
                     return CreateEmpty();
                 }
 
                 int startIndex = children[0]._startIndex;
-                int lastChildIndex = children.Length - 1;
+                int lastChildIndex = childrenLength - 1;
                 RTreeNode lastChild = children[lastChildIndex];
                 int endIndex = lastChild._startIndex + lastChild._count;
                 Bounds nodeBounds = children[0].boundary;
-                int childrenLength = children.Length;
                 for (int i = 1; i < childrenLength; ++i)
                 {
                     nodeBounds = SpatialQueryMath.Union(nodeBounds, children[i].boundary);

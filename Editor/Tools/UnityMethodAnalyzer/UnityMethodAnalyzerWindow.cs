@@ -682,9 +682,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         && displayPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
                     )
                     {
+                        int projectRootLength = projectRoot.Length;
                         displayPath =
-                            projectRoot.Length < displayPath.Length
-                                ? "." + displayPath.Substring(projectRoot.Length)
+                            projectRootLength < displayPath.Length
+                                ? "." + displayPath.Substring(projectRootLength)
                                 : ".";
                     }
 

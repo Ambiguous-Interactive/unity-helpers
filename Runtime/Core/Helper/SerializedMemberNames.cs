@@ -101,9 +101,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            int prefixLength = BackingFieldPrefix.Length;
             propertyName = fieldName.Substring(
-                BackingFieldPrefix.Length,
-                fieldName.Length - BackingFieldPrefix.Length - BackingFieldSuffix.Length
+                prefixLength,
+                fieldName.Length - prefixLength - BackingFieldSuffix.Length
             );
             return true;
         }

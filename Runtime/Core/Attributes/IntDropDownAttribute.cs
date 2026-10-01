@@ -134,8 +134,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return _cachedIntOptions;
             }
 
-            int[] result = new int[options.Length];
             int optionsLength = options.Length;
+            int[] result = new int[optionsLength];
             for (int i = 0; i < optionsLength; i++)
             {
                 if (options[i] is int intValue)

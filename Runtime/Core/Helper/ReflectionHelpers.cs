@@ -2239,8 +2239,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 return Type.EmptyTypes;
             }
-            Type[] types = new Type[parameters.Length];
             int parametersLength = parameters.Length;
+            Type[] types = new Type[parametersLength];
             for (int i = 0; i < parametersLength; i++)
             {
                 types[i] = parameters[i]?.GetType();
@@ -4283,9 +4283,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     : Expression.Convert(instanceParam, method.DeclaringType);
 
                 ParameterInfo[] parameters = method.GetParameters();
-                Expression[] paramExpressions = new Expression[parameters.Length];
-
                 int parametersLength = parameters.Length;
+                Expression[] paramExpressions = new Expression[parametersLength];
+
                 for (int i = 0; i < parametersLength; i++)
                 {
                     Expression argExpression = Expression.ArrayIndex(
@@ -4338,9 +4338,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ParameterExpression argsParam = Expression.Parameter(typeof(object[]), "args");
 
                 ParameterInfo[] parameters = method.GetParameters();
-                Expression[] paramExpressions = new Expression[parameters.Length];
-
                 int parametersLength = parameters.Length;
+                Expression[] paramExpressions = new Expression[parametersLength];
+
                 for (int i = 0; i < parametersLength; i++)
                 {
                     Expression argExpression = Expression.ArrayIndex(
@@ -4384,9 +4384,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ParameterExpression argsParam = Expression.Parameter(typeof(object[]), "args");
 
                 ParameterInfo[] parameters = constructor.GetParameters();
-                Expression[] paramExpressions = new Expression[parameters.Length];
-
                 int parametersLength = parameters.Length;
+                Expression[] paramExpressions = new Expression[parametersLength];
+
                 for (int i = 0; i < parametersLength; i++)
                 {
                     Expression argExpression = Expression.ArrayIndex(
@@ -4502,8 +4502,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     : Expression.Convert(instanceParam, property.DeclaringType);
 
                 ParameterInfo[] indices = property.GetIndexParameters();
-                Expression[] indexExpressions = new Expression[indices.Length];
                 int indicesLength = indices.Length;
+                Expression[] indexExpressions = new Expression[indicesLength];
                 for (int i = 0; i < indicesLength; i++)
                 {
                     Expression element = Expression.ArrayIndex(argsParam, Expression.Constant(i));
@@ -4560,8 +4560,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     : Expression.Convert(instanceParam, property.DeclaringType);
 
                 ParameterInfo[] indices = property.GetIndexParameters();
-                Expression[] indexExpressions = new Expression[indices.Length];
                 int indicesLength = indices.Length;
+                Expression[] indexExpressions = new Expression[indicesLength];
                 for (int i = 0; i < indicesLength; i++)
                 {
                     Expression element = Expression.ArrayIndex(argsParam, Expression.Constant(i));
@@ -4575,8 +4575,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     ? Expression.Unbox(valueParam, property.PropertyType)
                     : Expression.Convert(valueParam, property.PropertyType);
 
-                Expression[] arguments = new Expression[indexExpressions.Length + 1];
                 int indexExpressionsLength = indexExpressions.Length;
+                Expression[] arguments = new Expression[indexExpressionsLength + 1];
                 for (int i = 0; i < indexExpressionsLength; i++)
                 {
                     arguments[i] = indexExpressions[i];

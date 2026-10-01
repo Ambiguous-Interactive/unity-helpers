@@ -166,12 +166,13 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
 #endif
             PoolBucket<T>[] snapshot = _buckets;
-            if (snapshot.Length <= size)
+            int snapshotLength = snapshot.Length;
+            if (snapshotLength <= size)
             {
-                long doubled = Math.Max(snapshot.Length * 2L, MinimumCapacity);
+                long doubled = Math.Max(snapshotLength * 2L, MinimumCapacity);
                 long wanted = Math.Max(doubled, size + 1L);
                 PoolBucket<T>[] grown = new PoolBucket<T>[(int)Math.Min(wanted, MaximumCapacity)];
-                Array.Copy(snapshot, grown, snapshot.Length);
+                Array.Copy(snapshot, grown, snapshotLength);
                 snapshot = grown;
                 Volatile.Write(ref _buckets, grown);
             }

@@ -756,9 +756,9 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return sortedDirectories;
             }
 
-            int n =
-                topN < 0 ? 0 : (sortedDirectories.Length < topN ? sortedDirectories.Length : topN);
-            if (n == sortedDirectories.Length)
+            int directoryCount = sortedDirectories.Length;
+            int n = topN < 0 ? 0 : (directoryCount < topN ? directoryCount : topN);
+            if (n == directoryCount)
             {
                 return sortedDirectories;
             }

@@ -74,8 +74,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                         Type[] paramTypes;
                         if (parameters is { Length: > 0 })
                         {
-                            paramTypes = new Type[parameters.Length];
                             int parametersLength = parameters.Length;
+                            paramTypes = new Type[parametersLength];
                             for (int pi = 0; pi < parametersLength; pi++)
                             {
                                 paramTypes[pi] = parameters[pi].ParameterType;
@@ -202,11 +202,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
 
                     ParameterInfo[] ps = m.GetParameters();
                     bool ok;
-                    if (ps == null || ps.Length == 0)
+                    int parameterCount = ps == null ? 0 : ps.Length;
+                    if (parameterCount == 0)
                     {
                         ok = true;
                     }
-                    else if (ps.Length == 1)
+                    else if (parameterCount == 1)
                     {
                         Type pt = ps[0].ParameterType;
                         ok =

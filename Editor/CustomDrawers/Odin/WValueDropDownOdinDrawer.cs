@@ -43,8 +43,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         internal static string[] GetDisplayOptions(object[] options)
         {
-            string[] displayOptions = new string[options.Length];
             int optionsLength = options.Length;
+            string[] displayOptions = new string[optionsLength];
             for (int i = 0; i < optionsLength; i++)
             {
                 displayOptions[i] = DropDownShared.FormatOption(options[i]);

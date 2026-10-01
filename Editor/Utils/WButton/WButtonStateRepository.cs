@@ -86,16 +86,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         {
             Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
             WButtonParameterMetadata[] parameterMetadata = metadata.Parameters;
-            if (parameterMetadata == null || parameterMetadata.Length == 0)
+            int parameterMetadataLength = parameterMetadata == null ? 0 : parameterMetadata.Length;
+            if (parameterMetadataLength == 0)
             {
                 Parameters = Array.Empty<WButtonParameterState>();
             }
             else
             {
-                WButtonParameterState[] states = new WButtonParameterState[
-                    parameterMetadata.Length
-                ];
-                int parameterMetadataLength = parameterMetadata.Length;
+                WButtonParameterState[] states = new WButtonParameterState[parameterMetadataLength];
                 for (int index = 0; index < parameterMetadataLength; index++)
                 {
                     states[index] = new WButtonParameterState(parameterMetadata[index]);

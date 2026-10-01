@@ -9,7 +9,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     using Microsoft.CodeAnalysis.Diagnostics;
     using Microsoft.CodeAnalysis.Operations;
 
-    /// <summary>Reports repeated collection Count observations on uninterrupted evaluation paths.</summary>
+    /// <summary>Reports repeated collection size observations on uninterrupted evaluation paths.</summary>
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class RepeatedCollectionCountAnalyzer : DiagnosticAnalyzer
     {
@@ -17,28 +17,26 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.RepeatedCollectionCount);
 
-        private static Dictionary<ISymbol, IPropertySymbol> NewState()
+        private static Dictionary<ISymbol, ISymbol> NewState()
         {
-            return new Dictionary<ISymbol, IPropertySymbol>(SymbolEqualityComparer.Default);
+            return new Dictionary<ISymbol, ISymbol>(SymbolEqualityComparer.Default);
         }
 
-        private static Dictionary<ISymbol, IPropertySymbol> CopyState(
-            Dictionary<ISymbol, IPropertySymbol> state
-        )
+        private static Dictionary<ISymbol, ISymbol> CopyState(Dictionary<ISymbol, ISymbol> state)
         {
-            return new Dictionary<ISymbol, IPropertySymbol>(state, SymbolEqualityComparer.Default);
+            return new Dictionary<ISymbol, ISymbol>(state, SymbolEqualityComparer.Default);
         }
 
-        private static Dictionary<ISymbol, IPropertySymbol> Intersect(
-            Dictionary<ISymbol, IPropertySymbol> first,
-            Dictionary<ISymbol, IPropertySymbol> second
+        private static Dictionary<ISymbol, ISymbol> Intersect(
+            Dictionary<ISymbol, ISymbol> first,
+            Dictionary<ISymbol, ISymbol> second
         )
         {
-            Dictionary<ISymbol, IPropertySymbol> common = NewState();
-            foreach (KeyValuePair<ISymbol, IPropertySymbol> entry in first)
+            Dictionary<ISymbol, ISymbol> common = NewState();
+            foreach (KeyValuePair<ISymbol, ISymbol> entry in first)
             {
                 if (
-                    second.TryGetValue(entry.Key, out IPropertySymbol other)
+                    second.TryGetValue(entry.Key, out ISymbol other)
                     && SymbolEqualityComparer.Default.Equals(entry.Value, other)
                 )
                 {
@@ -148,6 +146,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private static ISymbol ReceiverSymbol(IOperation operation)
         {
+            if (operation == null)
+            {
+                return null;
+            }
             while (
                 operation is IConversionOperation conversion
                 && conversion.OperatorMethod == null
@@ -203,19 +205,152 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return property.Property;
         }
 
+        private static bool IsFrameworkType(
+            INamedTypeSymbol owner,
+            string metadataName,
+            Compilation compilation
+        )
+        {
+            return !SymbolEqualityComparer.Default.Equals(
+                    owner.ContainingAssembly,
+                    compilation.Assembly
+                )
+                && SymbolEqualityComparer.Default.Equals(
+                    owner.OriginalDefinition,
+                    compilation.GetTypeByMetadataName(metadataName)
+                );
+        }
+
+        private static bool IsKnownLength(
+            IPropertyReferenceOperation property,
+            Compilation compilation
+        )
+        {
+            if (property.Instance == null || property.Arguments.Length != 0)
+            {
+                return false;
+            }
+            bool length = string.Equals(property.Property.Name, "Length", StringComparison.Ordinal);
+            bool longLength = string.Equals(
+                property.Property.Name,
+                "LongLength",
+                StringComparison.Ordinal
+            );
+            if (!length && !longLength)
+            {
+                return false;
+            }
+            INamedTypeSymbol owner = property.Property.ContainingType;
+            if (IsFrameworkType(owner, "System.Array", compilation))
+            {
+                return property.Type.SpecialType
+                    == (longLength ? SpecialType.System_Int64 : SpecialType.System_Int32);
+            }
+            if (!length)
+            {
+                return false;
+            }
+            if (IsFrameworkType(owner, "System.Buffers.ReadOnlySequence`1", compilation))
+            {
+                return property.Type.SpecialType == SpecialType.System_Int64;
+            }
+            if (property.Type.SpecialType != SpecialType.System_Int32)
+            {
+                return false;
+            }
+            return IsFrameworkType(owner, "System.String", compilation)
+                || IsFrameworkType(owner, "System.Span`1", compilation)
+                || IsFrameworkType(owner, "System.ReadOnlySpan`1", compilation)
+                || IsFrameworkType(owner, "System.Memory`1", compilation)
+                || IsFrameworkType(owner, "System.ReadOnlyMemory`1", compilation)
+                || IsFrameworkType(owner, "System.Text.StringBuilder", compilation)
+                || IsFrameworkType(
+                    owner,
+                    "System.Collections.Immutable.ImmutableArray`1",
+                    compilation
+                );
+        }
+
+        private static IMethodSymbol EnumerableSizeMethod(
+            IInvocationOperation invocation,
+            Compilation compilation
+        )
+        {
+            IMethodSymbol method = invocation.TargetMethod;
+            IMethodSymbol fullMethod = method.ReducedFrom ?? method;
+            if (
+                !fullMethod.IsStatic
+                || !fullMethod.IsExtensionMethod
+                || fullMethod.Arity != 1
+                || fullMethod.Parameters.Length != 1
+                || !IsFrameworkType(
+                    fullMethod.ContainingType,
+                    "System.Linq.Enumerable",
+                    compilation
+                )
+            )
+            {
+                return null;
+            }
+            bool count = string.Equals(fullMethod.Name, "Count", StringComparison.Ordinal);
+            bool longCount = string.Equals(fullMethod.Name, "LongCount", StringComparison.Ordinal);
+            if (
+                (!count && !longCount)
+                || fullMethod.ReturnType.SpecialType
+                    != (longCount ? SpecialType.System_Int64 : SpecialType.System_Int32)
+                || !(fullMethod.Parameters[0].Type is INamedTypeSymbol sourceType)
+                || !IsFrameworkType(
+                    sourceType,
+                    "System.Collections.Generic.IEnumerable`1",
+                    compilation
+                )
+            )
+            {
+                return null;
+            }
+            ITypeSymbol[] arguments = new ITypeSymbol[method.TypeArguments.Length];
+            for (int index = 0; index < arguments.Length; index++)
+            {
+                arguments[index] = method.TypeArguments[index];
+            }
+            return fullMethod.OriginalDefinition.Construct(arguments);
+        }
+
+        private static void RecordObservation(
+            IOperation operation,
+            ISymbol receiver,
+            ISymbol observed,
+            bool mayInvokeCallbacks,
+            Dictionary<ISymbol, ISymbol> state,
+            OperationBlockAnalysisContext context
+        )
+        {
+            if (
+                state.TryGetValue(receiver, out ISymbol earlier)
+                && SymbolEqualityComparer.Default.Equals(earlier, observed)
+            )
+            {
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        UnityHelpersDiagnostics.RepeatedCollectionCount,
+                        operation.Syntax.GetLocation(),
+                        operation.Syntax.ToString()
+                    )
+                );
+            }
+            if (mayInvokeCallbacks)
+            {
+                state.Clear();
+            }
+            state[receiver] = observed;
+        }
+
         private static bool IsKnownPureGetter(
             IPropertyReferenceOperation property,
             Compilation compilation
         )
         {
-            if (
-                string.Equals(property.Property.Name, "Length", StringComparison.Ordinal)
-                && property.Instance != null
-                && (
-                    property.Instance.Type is IArrayTypeSymbol
-                    || property.Instance.Type.SpecialType == SpecialType.System_String
-                )
-            )
+            if (IsKnownLength(property, compilation))
             {
                 return true;
             }
@@ -330,10 +465,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private static void VisitCondition(
             IOperation condition,
-            Dictionary<ISymbol, IPropertySymbol> state,
+            Dictionary<ISymbol, ISymbol> state,
             OperationBlockAnalysisContext context,
-            out Dictionary<ISymbol, IPropertySymbol> whenTrue,
-            out Dictionary<ISymbol, IPropertySymbol> whenFalse
+            out Dictionary<ISymbol, ISymbol> whenTrue,
+            out Dictionary<ISymbol, ISymbol> whenFalse
         )
         {
             if (
@@ -349,16 +484,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     binary.LeftOperand,
                     state,
                     context,
-                    out Dictionary<ISymbol, IPropertySymbol> leftTrue,
-                    out Dictionary<ISymbol, IPropertySymbol> leftFalse
+                    out Dictionary<ISymbol, ISymbol> leftTrue,
+                    out Dictionary<ISymbol, ISymbol> leftFalse
                 );
                 bool conjunction = binary.OperatorKind == BinaryOperatorKind.ConditionalAnd;
                 VisitCondition(
                     binary.RightOperand,
                     conjunction ? leftTrue : leftFalse,
                     context,
-                    out Dictionary<ISymbol, IPropertySymbol> rightTrue,
-                    out Dictionary<ISymbol, IPropertySymbol> rightFalse
+                    out Dictionary<ISymbol, ISymbol> rightTrue,
+                    out Dictionary<ISymbol, ISymbol> rightFalse
                 );
                 whenTrue = conjunction ? rightTrue : Intersect(leftTrue, rightTrue);
                 whenFalse = conjunction ? Intersect(leftFalse, rightFalse) : rightFalse;
@@ -380,7 +515,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private static void VisitAssignmentTarget(
             IOperation target,
-            Dictionary<ISymbol, IPropertySymbol> state,
+            Dictionary<ISymbol, ISymbol> state,
             OperationBlockAnalysisContext context
         )
         {
@@ -400,7 +535,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private static void Visit(
             IOperation operation,
-            Dictionary<ISymbol, IPropertySymbol> state,
+            Dictionary<ISymbol, ISymbol> state,
             OperationBlockAnalysisContext context
         )
         {
@@ -477,8 +612,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     conditional.Condition,
                     state,
                     context,
-                    out Dictionary<ISymbol, IPropertySymbol> whenTrue,
-                    out Dictionary<ISymbol, IPropertySymbol> whenFalse
+                    out Dictionary<ISymbol, ISymbol> whenTrue,
+                    out Dictionary<ISymbol, ISymbol> whenFalse
                 );
                 Visit(conditional.WhenTrue, whenTrue, context);
                 Visit(conditional.WhenFalse, whenFalse, context);
@@ -498,12 +633,12 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     operation,
                     state,
                     context,
-                    out Dictionary<ISymbol, IPropertySymbol> whenTrue,
-                    out Dictionary<ISymbol, IPropertySymbol> whenFalse
+                    out Dictionary<ISymbol, ISymbol> whenTrue,
+                    out Dictionary<ISymbol, ISymbol> whenFalse
                 );
-                Dictionary<ISymbol, IPropertySymbol> common = Intersect(whenTrue, whenFalse);
+                Dictionary<ISymbol, ISymbol> common = Intersect(whenTrue, whenFalse);
                 state.Clear();
-                foreach (KeyValuePair<ISymbol, IPropertySymbol> entry in common)
+                foreach (KeyValuePair<ISymbol, ISymbol> entry in common)
                 {
                     state.Add(entry.Key, entry.Value);
                 }
@@ -541,30 +676,22 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     Visit(argument, state, context);
                 }
                 bool pureGetter = IsKnownPureGetter(propertyReference, context.Compilation);
-                if (IsCollectionCount(propertyReference, context.Compilation))
+                if (
+                    IsCollectionCount(propertyReference, context.Compilation)
+                    || IsKnownLength(propertyReference, context.Compilation)
+                )
                 {
                     ISymbol receiver = ReceiverSymbol(propertyReference.Instance);
                     if (receiver != null)
                     {
-                        IPropertySymbol observed = ObservedProperty(propertyReference);
-                        if (
-                            state.TryGetValue(receiver, out IPropertySymbol earlier)
-                            && SymbolEqualityComparer.Default.Equals(earlier, observed)
-                        )
-                        {
-                            context.ReportDiagnostic(
-                                Diagnostic.Create(
-                                    UnityHelpersDiagnostics.RepeatedCollectionCount,
-                                    propertyReference.Syntax.GetLocation(),
-                                    propertyReference.Syntax.ToString()
-                                )
-                            );
-                        }
-                        if (!pureGetter)
-                        {
-                            state.Clear();
-                        }
-                        state[receiver] = observed;
+                        RecordObservation(
+                            propertyReference,
+                            receiver,
+                            ObservedProperty(propertyReference),
+                            !pureGetter,
+                            state,
+                            context
+                        );
                         return;
                     }
                 }
@@ -573,6 +700,32 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     state.Clear();
                 }
                 return;
+            }
+            if (operation is IInvocationOperation invocation)
+            {
+                IMethodSymbol observed = EnumerableSizeMethod(invocation, context.Compilation);
+                if (observed != null)
+                {
+                    Visit(invocation.Instance, state, context);
+                    foreach (IArgumentOperation argument in invocation.Arguments)
+                    {
+                        Visit(argument, state, context);
+                    }
+                    IOperation source =
+                        invocation.TargetMethod.ReducedFrom != null ? invocation.Instance
+                        : invocation.Arguments.Length == 1 ? invocation.Arguments[0].Value
+                        : null;
+                    ISymbol receiver = ReceiverSymbol(source);
+                    if (receiver != null)
+                    {
+                        RecordObservation(invocation, receiver, observed, true, state, context);
+                    }
+                    else
+                    {
+                        state.Clear();
+                    }
+                    return;
+                }
             }
             if (!HasKnownEvaluationOrder(operation))
             {
