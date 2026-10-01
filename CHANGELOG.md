@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix persistent runtime singletons losing their authored world placement when detached from transformed parents ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix `PartitionPooled` retaining outstanding lists when the source throws during disposal. Cleanup no longer replaces an exception from batch processing ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix `TrackedObjectPool` callback cleanup so disposed pools retain no returned items, nested takes keep distinct ownership, and callback failures do not interrupt cleanup ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 - Fix `FileHelper.InitializePath` accepting whitespace-only paths on some platforms. See [File Operations](./docs/features/utilities/helper-utilities.md#file-operations) ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix percentile interpolation across extreme finite values and preserve infinite endpoints without boxing primitive elements ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).

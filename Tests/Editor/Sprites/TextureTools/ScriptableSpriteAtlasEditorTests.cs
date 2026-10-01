@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
+    using UnityEditor.U2D;
     using UnityEngine;
     using UnityEngine.TestTools;
     using UnityEngine.U2D;
@@ -23,6 +24,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     public sealed class ScriptableSpriteAtlasEditorTests : CommonTestBase
     {
         private const string Root = "Assets/Temp/ScriptableSpriteAtlasEditorTests";
+
+        private static void AssertPersistedSpriteSelection(string configPath, Sprite expected)
+        {
+            AssetDatabase.SaveAssets();
+            AssetDatabase.ImportAsset(configPath, ImportAssetOptions.ForceSynchronousImport);
+            ScriptableSpriteAtlas reloaded = AssetDatabase.LoadAssetAtPath<ScriptableSpriteAtlas>(
+                configPath
+            );
+            Assert.IsTrue(reloaded != null);
+            CollectionAssert.AreEqual(new[] { expected }, reloaded.spritesToPack);
+        }
 
         private static string RelToFull(string rel)
         {
@@ -324,6 +336,154 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsTrue(ScriptableSpriteAtlasGenerator.Generate(config));
             Assert.IsTrue(ScriptableSpriteAtlasGenerator.TryFindDrift(config, differences));
             Assert.IsEmpty(differences);
+        }
+
+        [Test]
+        public void SynchronizePersistsSelectionAndSupportsUndoRedo()
+        {
+            string firstPath = Root + "/sync-first.png";
+            string secondPath = Root + "/sync-second.png";
+            Sprite first = CreateImportedSprite(firstPath);
+            Sprite second = CreateImportedSprite(secondPath);
+            string configPath = Root + "/SyncConfig.asset";
+            Assert.IsTrue(
+                ScriptableSpriteAtlasGenerator.TryCreateConfig(
+                    configPath,
+                    out ScriptableSpriteAtlas config,
+                    out string error
+                ),
+                error
+            );
+            TrackAssetPath(configPath);
+            config.spritesToPack.Add(first);
+            EditorUtility.SetDirty(config);
+            AssetDatabase.SaveAssets();
+            string originalGuid = AssetDatabase.AssetPathToGUID(configPath);
+            byte[] firstBytes = File.ReadAllBytes(RelToFull(firstPath));
+            byte[] firstMeta = File.ReadAllBytes(RelToFull(firstPath) + ".meta");
+            byte[] secondBytes = File.ReadAllBytes(RelToFull(secondPath));
+            byte[] secondMeta = File.ReadAllBytes(RelToFull(secondPath) + ".meta");
+            Undo.ClearAll();
+            try
+            {
+                Assert.IsTrue(
+                    ScriptableSpriteAtlasGenerator.Synchronize(
+                        config,
+                        new[] { second, second },
+                        new[] { first },
+                        removeUnmatchedSprites: true
+                    )
+                );
+                Undo.FlushUndoRecordObjects();
+                AssertPersistedSpriteSelection(configPath, second);
+
+                Undo.PerformUndo();
+                AssertPersistedSpriteSelection(configPath, first);
+
+                Undo.PerformRedo();
+                AssertPersistedSpriteSelection(configPath, second);
+                Assert.AreEqual(originalGuid, AssetDatabase.AssetPathToGUID(configPath));
+                CollectionAssert.AreEqual(firstBytes, File.ReadAllBytes(RelToFull(firstPath)));
+                CollectionAssert.AreEqual(
+                    firstMeta,
+                    File.ReadAllBytes(RelToFull(firstPath) + ".meta")
+                );
+                CollectionAssert.AreEqual(secondBytes, File.ReadAllBytes(RelToFull(secondPath)));
+                CollectionAssert.AreEqual(
+                    secondMeta,
+                    File.ReadAllBytes(RelToFull(secondPath) + ".meta")
+                );
+            }
+            finally
+            {
+                Undo.ClearAll();
+                AssetDatabase.DeleteAsset(configPath);
+                AssetDatabase.DeleteAsset(firstPath);
+                AssetDatabase.DeleteAsset(secondPath);
+            }
+        }
+
+        [Test]
+        public void DriftInspectionAndRepeatedGenerationPreserveFilesAndAtlasGuid()
+        {
+            string spritePath = Root + "/drift-source.png";
+            Sprite sprite = CreateImportedSprite(spritePath);
+            string configPath = Root + "/DriftConfig.asset";
+            string atlasPath = Root + "/DriftGenerated.spriteatlas";
+            Assert.IsTrue(
+                ScriptableSpriteAtlasGenerator.TryCreateConfig(
+                    configPath,
+                    out ScriptableSpriteAtlas config,
+                    out string error
+                ),
+                error
+            );
+            TrackAssetPath(configPath);
+            TrackAssetPath(atlasPath);
+            config.outputSpriteAtlasDirectory = Root;
+            config.outputSpriteAtlasName = "DriftGenerated";
+            config.spritesToPack.Add(sprite);
+            EditorUtility.SetDirty(config);
+            Assert.IsTrue(ScriptableSpriteAtlasGenerator.Generate(config));
+            string originalGuid = AssetDatabase.AssetPathToGUID(atlasPath);
+            string[] paths =
+            {
+                RelToFull(spritePath),
+                RelToFull(spritePath) + ".meta",
+                RelToFull(configPath),
+                RelToFull(configPath) + ".meta",
+                RelToFull(atlasPath),
+                RelToFull(atlasPath) + ".meta",
+            };
+            Dictionary<string, byte[]> originalFiles = new();
+            foreach (string path in paths)
+            {
+                originalFiles.Add(path, File.ReadAllBytes(path));
+            }
+            try
+            {
+                List<string> differences = new() { "Stale difference" };
+                Assert.IsTrue(ScriptableSpriteAtlasGenerator.TryFindDrift(config, differences));
+                Assert.IsEmpty(differences);
+                Assert.IsFalse(EditorUtility.IsDirty(config));
+                Assert.IsFalse(ScriptableSpriteAtlasGenerator.Generate(config));
+                config.padding = 16;
+                Assert.IsTrue(ScriptableSpriteAtlasGenerator.TryFindDrift(config, differences));
+                CollectionAssert.AreEqual(new[] { "Packing settings differ." }, differences);
+                Assert.IsFalse(EditorUtility.IsDirty(config));
+                foreach (KeyValuePair<string, byte[]> originalFile in originalFiles)
+                {
+                    CollectionAssert.AreEqual(
+                        originalFile.Value,
+                        File.ReadAllBytes(originalFile.Key),
+                        originalFile.Key
+                    );
+                }
+
+                EditorUtility.SetDirty(config);
+                Assert.IsTrue(ScriptableSpriteAtlasGenerator.Generate(config));
+                AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceSynchronousImport);
+                SpriteAtlas reloadedAtlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
+                Assert.IsTrue(reloadedAtlas != null);
+                Assert.AreEqual(16, reloadedAtlas.GetPackingSettings().padding);
+                CollectionAssert.AreEqual(new Object[] { sprite }, reloadedAtlas.GetPackables());
+                Assert.AreEqual(originalGuid, AssetDatabase.AssetPathToGUID(atlasPath));
+                Assert.IsTrue(ScriptableSpriteAtlasGenerator.TryFindDrift(config, differences));
+                Assert.IsEmpty(differences);
+                foreach (
+                    string path in new[] { RelToFull(spritePath), RelToFull(spritePath) + ".meta" }
+                )
+                {
+                    Assert.IsTrue(originalFiles.TryGetValue(path, out byte[] originalBytes), path);
+                    CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(path), path);
+                }
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(atlasPath);
+                AssetDatabase.DeleteAsset(configPath);
+                AssetDatabase.DeleteAsset(spritePath);
+            }
         }
 
         [Test]
@@ -643,6 +803,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             CollectionAssert.AreEqual(new[] { alpha, secondSame, firstSame }, configs);
             Assert.DoesNotThrow(() => ScriptableSpriteAtlasEditor.SortAtlasConfigs(null));
+        }
+
+        private Sprite CreateImportedSprite(string path)
+        {
+            CreatePng(path, 8, 8, Color.red);
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.SaveAndReimport();
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            Assert.IsTrue(sprite != null);
+            return sprite;
         }
 
         private void CreatePng(

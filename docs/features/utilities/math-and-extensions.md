@@ -929,15 +929,20 @@ foreach (var batch in items.Partition(10))
     ProcessBatch(batch); // batch is a List<int> of size 10
 }
 
-// Zero-allocation version for hot paths
-using (var batchBuffer = items.PartitionPooled(10))
+// Return each pooled list when its batch is finished.
+foreach (PooledResource<List<int>> batch in items.PartitionPooled(10))
 {
-    foreach (var batch in batchBuffer)
+    using (batch)
     {
-        // batch is reused from pool, no allocations
+        ProcessBatch(batch.resource);
     }
-} // Automatically returns buffer to pool
+}
 ```
+
+`PartitionPooled` reuses lists; its enumerator still allocates. Dispose each batch before
+advancing unless you need to retain it. Disposing the enumerator returns all outstanding lists,
+even when the source throws during cleanup. Source cleanup exceptions are suppressed so they
+cannot replace an exception from your batch processing.
 
 **Shuffled (non-destructive):**
 

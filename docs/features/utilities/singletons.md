@@ -179,7 +179,7 @@ Common pitfalls:
 
 - If an inactive instance exists in the scene, `Instance` won’t find it (search excludes inactive objects) and will create a new one.
 - If two active instances exist, the newer one logs an error and destroys itself.
-- If `Preserve` is `true`, the instance is detached and marked `DontDestroyOnLoad`.
+- If `Preserve` is `true`, the instance is detached with Unity’s `worldPositionStays` behavior and marked `DontDestroyOnLoad`, retaining its world position and rotation. Unity cannot preserve shear from a rotated child under a nonuniformly scaled parent when detaching.
 
 Lifecycle diagram:
 
