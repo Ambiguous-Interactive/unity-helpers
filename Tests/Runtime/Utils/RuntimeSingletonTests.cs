@@ -256,6 +256,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(instance.transform.parent == null);
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void PreservableSingletonKeepsAuthoredWorldTransformWhenDetaching(
+            int parentTransform
+        )
+        {
+            GameObject parent = Track(new GameObject("Authored singleton parent"));
+            parent.SetActive(false);
+            parent.transform.position = new Vector3(12f, -7f, 4f);
+            if (1 <= parentTransform)
+            {
+                parent.transform.rotation = Quaternion.Euler(20f, 35f, -15f);
+            }
+            if (parentTransform == 2)
+            {
+                parent.transform.localScale = new Vector3(2f, 3f, 4f);
+            }
+            GameObject authored = Track(new GameObject("Authored persistent singleton"));
+            authored.transform.SetParent(parent.transform, worldPositionStays: false);
+            authored.transform.localPosition = new Vector3(3f, -2f, 5f);
+            authored.transform.localScale = new Vector3(0.5f, 1.5f, 2f);
+            PreservableSingleton singleton = authored.AddComponent<PreservableSingleton>();
+            Vector3 expectedPosition = authored.transform.position;
+            Quaternion expectedRotation = authored.transform.rotation;
+            Vector3 expectedScale = authored.transform.lossyScale;
+
+            parent.SetActive(true);
+
+            Assert.IsTrue(singleton.awakeWasCalled);
+            Assert.IsTrue(authored.transform.parent == null);
+            Assert.That(
+                Vector3.Distance(expectedPosition, authored.transform.position),
+                Is.LessThan(0.0001f)
+            );
+            Assert.That(
+                Quaternion.Angle(expectedRotation, authored.transform.rotation),
+                Is.LessThan(0.01f)
+            );
+            Assert.That(
+                Vector3.Distance(expectedScale, authored.transform.lossyScale),
+                Is.LessThan(0.0001f)
+            );
+            Assert.AreEqual("DontDestroyOnLoad", authored.scene.name);
+            Assert.AreSame(singleton, PreservableSingleton.Instance);
+        }
+
         [UnityTest]
         public IEnumerator NonPreservableSingletonIsNotDontDestroyOnLoad()
         {

@@ -319,6 +319,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <param name="items">Sequence to partition.</param>
         /// <param name="size">Maximum elements per partition.</param>
         /// <returns>Sequence of pooled list resources; dispose each to return to pool.</returns>
+        /// <remarks>
+        /// Disposing the enumerator returns outstanding lists and suppresses source cleanup exceptions.
+        /// Exceptions while reading the source still propagate.
+        /// </remarks>
         public static IEnumerable<PooledResource<List<T>>> PartitionPooled<T>(
             this IEnumerable<T> items,
             int size
@@ -446,7 +450,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 _disposed = true;
                 Current = default;
-                _source.Dispose();
+                try
+                {
+                    _source.Dispose();
+                }
+                catch (Exception)
+                {
+                    // Foreign cleanup must not strand rented lists or replace the caller's exception.
+                }
 
                 foreach (PooledResource<List<T>> lease in _outstanding)
                 {

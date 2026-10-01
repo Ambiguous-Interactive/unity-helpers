@@ -47,6 +47,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static readonly List<CoroutineInstance> Instances = new();
         private static bool _isSubscribed;
 
+        /// <summary>Owns a coroutine and releases its enumerators on completion, cancellation, or failure.</summary>
         internal static WButtonCoroutineTicket Schedule(
             System.Collections.IEnumerator routine,
             CancellationTokenSource cancellationSource,
@@ -60,9 +61,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 throw new ArgumentNullException(nameof(routine));
             }
 
-            IEnumerator<object> wrapped = WrapLegacyEnumerator(routine);
             CoroutineInstance instance = new(
-                wrapped,
+                routine,
                 cancellationSource,
                 onCompleted,
                 onFaulted,
@@ -90,18 +90,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
         }
 
-        private static void EnsureSubscribed()
-        {
-            if (_isSubscribed)
-            {
-                return;
-            }
-
-            EditorApplication.update += Update;
-            _isSubscribed = true;
-        }
-
-        private static void Update()
+        internal static void Update()
         {
             if (Instances.Count == 0)
             {
@@ -124,26 +113,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
         }
 
-        private static IEnumerator<object> WrapLegacyEnumerator(
-            System.Collections.IEnumerator enumerator
-        )
+        private static void EnsureSubscribed()
         {
-            while (enumerator.MoveNext())
+            if (_isSubscribed)
             {
-                object yielded = enumerator.Current;
-                if (yielded is IEnumerator<object> typed)
-                {
-                    yield return typed;
-                }
-                else if (yielded is System.Collections.IEnumerator legacy)
-                {
-                    yield return WrapLegacyEnumerator(legacy);
-                }
-                else
-                {
-                    yield return null;
-                }
+                return;
             }
+
+            EditorApplication.update += Update;
+            _isSubscribed = true;
         }
 
         private sealed class CoroutineInstance
@@ -152,14 +130,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
             internal bool IsCompleted { get; private set; }
 
-            private readonly Stack<IEnumerator<object>> _stack = new();
+            private readonly Stack<System.Collections.IEnumerator> _stack = new();
             private readonly CancellationTokenSource _cancellationSource;
             private readonly Action _onCompleted;
             private readonly Action<Exception> _onFaulted;
             private readonly Action _onCancelled;
+            private bool _cancelRequested;
 
             internal CoroutineInstance(
-                IEnumerator<object> root,
+                System.Collections.IEnumerator root,
                 CancellationTokenSource cancellationSource,
                 Action onCompleted,
                 Action<Exception> onFaulted,
@@ -176,9 +155,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
             internal void RequestCancel()
             {
-                if (_cancellationSource is { IsCancellationRequested: false })
+                if (IsCompleted)
                 {
-                    _cancellationSource.Cancel();
+                    return;
+                }
+                _cancelRequested = true;
+                try
+                {
+                    if (_cancellationSource is { IsCancellationRequested: false })
+                    {
+                        _cancellationSource.Cancel();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
                 }
             }
 
@@ -188,66 +179,92 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 {
                     return;
                 }
-
-                if (_cancellationSource is { IsCancellationRequested: true })
+                if (_cancelRequested || _cancellationSource is { IsCancellationRequested: true })
                 {
-                    IsCompleted = true;
-                    _onCancelled?.Invoke();
+                    Finish(null, cancelled: true);
                     return;
                 }
-
                 if (_stack.Count == 0)
                 {
-                    Complete();
+                    Finish(null, cancelled: false);
                     return;
                 }
 
-                IEnumerator<object> current = _stack.Peek();
+                System.Collections.IEnumerator current = _stack.Peek();
                 try
                 {
                     if (!current.MoveNext())
                     {
                         _stack.Pop();
+                        if (current is IDisposable disposable)
+                        {
+                            disposable.Dispose();
+                        }
                         if (_stack.Count == 0)
                         {
-                            Complete();
+                            Finish(null, cancelled: false);
                         }
                         return;
                     }
+                    if (current.Current is System.Collections.IEnumerator nested)
+                    {
+                        _stack.Push(nested);
+                    }
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
-                    IsCompleted = true;
-                    _onFaulted?.Invoke(ex);
-                    return;
+                    Finish(exception, cancelled: false);
                 }
-
-                object yielded = current.Current;
-                if (yielded == null)
-                {
-                    return;
-                }
-
-                if (yielded is IEnumerator<object> nested)
-                {
-                    _stack.Push(nested);
-                }
-                else if (yielded is System.Collections.IEnumerator legacyEnumerator)
-                {
-                    _stack.Push(WrapLegacyEnumerator(legacyEnumerator));
-                }
-                else if (yielded is YieldInstruction) { }
             }
 
-            private void Complete()
+            private void Finish(Exception failure, bool cancelled)
             {
                 if (IsCompleted)
                 {
                     return;
                 }
-
                 IsCompleted = true;
-                _onCompleted?.Invoke();
+                while (0 < _stack.Count)
+                {
+                    System.Collections.IEnumerator enumerator = _stack.Pop();
+                    try
+                    {
+                        if (enumerator is IDisposable disposable)
+                        {
+                            disposable.Dispose();
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        if (failure == null)
+                        {
+                            failure = exception;
+                        }
+                        else
+                        {
+                            Debug.LogException(exception);
+                        }
+                    }
+                }
+                try
+                {
+                    if (failure != null)
+                    {
+                        _onFaulted?.Invoke(failure);
+                    }
+                    else if (cancelled)
+                    {
+                        _onCancelled?.Invoke();
+                    }
+                    else
+                    {
+                        _onCompleted?.Invoke();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
             }
         }
     }

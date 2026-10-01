@@ -28,6 +28,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             throw new InvalidOperationException("the source stopped part way through a partition");
         }
 
+        private static IEnumerable<int> ThrowsOnDisposal(Action onDispose)
+        {
+            try
+            {
+                for (int index = 0; index < 12; ++index)
+                {
+                    yield return index;
+                }
+            }
+            finally
+            {
+                onDispose();
+                throw new InvalidOperationException("Source cleanup failed.");
+            }
+        }
+
         private static void EnumerateWithoutDisposing(List<int> values)
         {
             using IEnumerator<PooledResource<List<int>>> enumerator = values
@@ -463,6 +479,84 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 buffer.Count,
                 "Enumerator disposal should release outstanding pooled lists."
             );
+        }
+
+        [TestCase(1, false, TestName = "PartitionPooled.DisposeFailure.OneChunk.ReturnsRent")]
+        [TestCase(3, false, TestName = "PartitionPooled.DisposeFailure.ManyChunks.ReturnsRents")]
+        [TestCase(
+            3,
+            true,
+            TestName = "PartitionPooled.DisposeFailure.ReturnedChunk.ReturnsRemainingRents"
+        )]
+        public void PartitionPooledReturnsOutstandingChunksWhenSourceDisposalThrows(
+            int chunkCount,
+            bool returnFirst
+        )
+        {
+            int disposalCount = 0;
+            IEnumerator<PooledResource<List<int>>> enumerator = ThrowsOnDisposal(() =>
+                    ++disposalCount
+                )
+                .PartitionPooled(2)
+                .GetEnumerator();
+            List<PooledResource<List<int>>> chunks = new();
+            try
+            {
+                for (int index = 0; index < chunkCount; ++index)
+                {
+                    Assert.IsTrue(enumerator.MoveNext());
+                    PooledResource<List<int>> chunk = enumerator.Current;
+                    CollectionAssert.AreEqual(new[] { index * 2, index * 2 + 1 }, chunk.resource);
+                    chunks.Add(chunk);
+                }
+                if (returnFirst)
+                {
+                    chunks[0].Dispose();
+                }
+
+                Assert.DoesNotThrow(() => enumerator.Dispose());
+                Assert.AreEqual(1, disposalCount);
+                foreach (PooledResource<List<int>> chunk in chunks)
+                {
+                    Assert.IsFalse(chunk.IsHeld);
+                    CollectionAssert.IsEmpty(chunk.resource);
+                }
+                Assert.IsFalse(enumerator.Current.IsHeld);
+                Assert.IsFalse(enumerator.MoveNext());
+                Assert.DoesNotThrow(() => enumerator.Dispose());
+                Assert.AreEqual(1, disposalCount);
+            }
+            finally
+            {
+                foreach (PooledResource<List<int>> chunk in chunks)
+                {
+                    chunk.Dispose();
+                }
+                enumerator.Dispose();
+            }
+        }
+
+        [Test]
+        public void PartitionPooledSourceCleanupDoesNotReplaceBatchFailure()
+        {
+            int disposalCount = 0;
+            PooledResource<List<int>> captured = default;
+            ApplicationException failure = new("Batch processing failed.");
+            ApplicationException observed = Assert.Throws<ApplicationException>(() =>
+            {
+                foreach (
+                    PooledResource<List<int>> batch in ThrowsOnDisposal(() => ++disposalCount)
+                        .PartitionPooled(2)
+                )
+                {
+                    captured = batch;
+                    throw failure;
+                }
+            });
+            Assert.AreSame(failure, observed);
+            Assert.AreEqual(1, disposalCount);
+            Assert.IsFalse(captured.IsHeld);
+            CollectionAssert.IsEmpty(captured.resource);
         }
 
         [UnityTest]
