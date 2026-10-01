@@ -1347,6 +1347,186 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return succeeded;
         }
 
+        /// <summary>Estimates a common odds ratio across stratified two-by-two tables.</summary>
+        /// <param name="strata">Tables with consistent row and column meanings across strata.</param>
+        /// <param name="oddsRatio">The pooled estimate, including zero or positive infinity, or zero on failure.</param>
+        /// <returns>False for null, empty, negative-count, or undefined zero-over-zero data.</returns>
+        /// <remarks>
+        /// Computes sum(a*d/n) / sum(b*c/n), without adding a continuity correction.
+        /// Empty strata contribute nothing. This estimates a common effect; it is not an exact test
+        /// or a test of whether the stratum effects are homogeneous.
+        /// </remarks>
+        public static bool TryMantelHaenszelOddsRatio(
+            IReadOnlyList<(int upperLeft, int upperRight, int lowerLeft, int lowerRight)> strata,
+            out double oddsRatio
+        )
+        {
+            if (strata == null)
+            {
+                oddsRatio = 0.0;
+                return false;
+            }
+
+            double numerator = 0.0;
+            double numeratorCompensation = 0.0;
+            double denominator = 0.0;
+            double denominatorCompensation = 0.0;
+            int count = strata.Count;
+            for (int index = 0; index < count; ++index)
+            {
+                (int upperLeft, int upperRight, int lowerLeft, int lowerRight) table = strata[
+                    index
+                ];
+                if (
+                    table.upperLeft < 0
+                    || table.upperRight < 0
+                    || table.lowerLeft < 0
+                    || table.lowerRight < 0
+                )
+                {
+                    oddsRatio = 0.0;
+                    return false;
+                }
+
+                double total =
+                    (double)table.upperLeft + table.upperRight + table.lowerLeft + table.lowerRight;
+                if (total == 0.0)
+                {
+                    continue;
+                }
+
+                AddCompensated(
+                    (double)table.upperLeft * table.lowerRight / total,
+                    ref numerator,
+                    ref numeratorCompensation
+                );
+                AddCompensated(
+                    (double)table.upperRight * table.lowerLeft / total,
+                    ref denominator,
+                    ref denominatorCompensation
+                );
+            }
+
+            if (numerator == 0.0 && denominator == 0.0)
+            {
+                oddsRatio = 0.0;
+                return false;
+            }
+
+            oddsRatio = denominator == 0.0 ? double.PositiveInfinity : numerator / denominator;
+            return true;
+        }
+
+        /// <summary>Computes the upper-tail probability of a chi-square distribution.</summary>
+        /// <param name="statistic">A non-negative statistic, including positive infinity.</param>
+        /// <param name="degreesOfFreedom">A positive number of degrees of freedom.</param>
+        /// <param name="probability">The inclusive upper-tail probability, or zero on failure.</param>
+        /// <returns>False for invalid inputs or numerical non-convergence.</returns>
+        /// <remarks>
+        /// Evaluates the regularized upper incomplete gamma function without a normal approximation.
+        /// Each series or continued fraction is limited to one million iterations.
+        /// Probabilities below the double-precision range may underflow to zero.
+        /// </remarks>
+        public static bool TryChiSquareSurvival(
+            double statistic,
+            int degreesOfFreedom,
+            out double probability
+        )
+        {
+            if (statistic < 0.0 || double.IsNaN(statistic) || degreesOfFreedom <= 0)
+            {
+                probability = 0.0;
+                return false;
+            }
+
+            double value = statistic / 2.0;
+            if (value == 0.0)
+            {
+                probability = 1.0;
+                return true;
+            }
+
+            if (double.IsPositiveInfinity(value))
+            {
+                probability = 0.0;
+                return true;
+            }
+
+            const int maximumIterations = 1_000_000;
+            double shape = degreesOfFreedom / 2.0;
+            double logarithmicFront = GammaLogarithmicFront(shape, value);
+            if (value < shape + 1.0)
+            {
+                double term = 1.0;
+                double sum = 1.0;
+                double compensation = 0.0;
+                for (int iteration = 1; iteration <= maximumIterations; ++iteration)
+                {
+                    term *= value / (shape + iteration);
+                    AddCompensated(term, ref sum, ref compensation);
+                    double nextRatio = value / (shape + iteration + 1.0);
+                    if (nextRatio < 1.0 && term * nextRatio / (1.0 - nextRatio) <= 2e-15 * sum)
+                    {
+                        double lowerProbability = Math.Exp(
+                            logarithmicFront + Math.Log(sum / shape)
+                        );
+                        if (double.IsNaN(lowerProbability) || double.IsInfinity(lowerProbability))
+                        {
+                            probability = 0.0;
+                            return false;
+                        }
+
+                        probability = Math.Max(0.0, Math.Min(1.0, 1.0 - lowerProbability));
+                        return true;
+                    }
+                }
+
+                probability = 0.0;
+                return false;
+            }
+
+            const double minimumDenominator = 1e-300;
+            double offset = value + 1.0 - shape;
+            double numerator = 1.0 / minimumDenominator;
+            double denominator = 1.0 / offset;
+            double fraction = denominator;
+            for (int iteration = 1; iteration <= maximumIterations; ++iteration)
+            {
+                double coefficient = -(double)iteration * (iteration - shape);
+                offset += 2.0;
+                denominator = coefficient * denominator + offset;
+                if (Math.Abs(denominator) < minimumDenominator)
+                {
+                    denominator = minimumDenominator;
+                }
+
+                numerator = offset + coefficient / numerator;
+                if (Math.Abs(numerator) < minimumDenominator)
+                {
+                    numerator = minimumDenominator;
+                }
+
+                denominator = 1.0 / denominator;
+                double delta = denominator * numerator;
+                fraction *= delta;
+                if (Math.Abs(delta - 1.0) <= 2e-15)
+                {
+                    double result = Math.Exp(logarithmicFront + Math.Log(fraction));
+                    if (double.IsNaN(result) || double.IsInfinity(result))
+                    {
+                        probability = 0.0;
+                        return false;
+                    }
+
+                    probability = Math.Max(0.0, Math.Min(1.0, result));
+                    return true;
+                }
+            }
+
+            probability = 0.0;
+            return false;
+        }
+
         /// <summary>
         /// Reports whether two values differ by no more than <paramref name="tolerance"/>, with no
         /// relative cushion of any kind. Unlike <see cref="Approximately(float, float, float)"/>,
@@ -1893,6 +2073,52 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             probability = Math.Max(0.0, Math.Min(1.0, result));
             return true;
+        }
+
+        private static double GammaLogarithmicFront(double shape, double value)
+        {
+            if (shape < 16.0)
+            {
+                return shape * Math.Log(value) - value - LogGamma(shape);
+            }
+
+            double displacement = (value - shape) / shape;
+            double logarithmicDifference;
+            if (Math.Abs(displacement) < 0.125)
+            {
+                double power = -displacement * displacement;
+                logarithmicDifference = power / 2.0;
+                for (int order = 3; order <= 24; ++order)
+                {
+                    power *= -displacement;
+                    logarithmicDifference += power / order;
+                }
+            }
+            else
+            {
+                logarithmicDifference = Math.Log(value / shape) - displacement;
+            }
+
+            double inverseShape = 1.0 / shape;
+            double inverseSquared = inverseShape * inverseShape;
+            double correction =
+                inverseShape
+                * (
+                    1.0 / 12.0
+                    + inverseSquared
+                        * (
+                            -1.0 / 360.0
+                            + inverseSquared
+                                * (
+                                    1.0 / 1260.0
+                                    + inverseSquared * (-1.0 / 1680.0 + inverseSquared / 1188.0)
+                                )
+                        )
+                );
+            return shape * logarithmicDifference
+                + 0.5 * Math.Log(shape)
+                - 0.91893853320467274
+                - correction;
         }
 
         private static double LogGamma(double value)
