@@ -79,6 +79,91 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
+        private static IEnumerable<TestCaseData> PercentileExtremeCases()
+        {
+            double[] oppositeExtremes = { -double.MaxValue, double.MaxValue };
+            yield return new TestCaseData(oppositeExtremes, 0.0, -double.MaxValue).SetName(
+                "Percentile.ExtremeDouble.Minimum"
+            );
+            yield return new TestCaseData(oppositeExtremes, 0.25, -double.MaxValue / 2.0).SetName(
+                "Percentile.ExtremeDouble.LowerQuarter"
+            );
+            yield return new TestCaseData(oppositeExtremes, 0.5, 0.0).SetName(
+                "Percentile.ExtremeDouble.Midpoint"
+            );
+            yield return new TestCaseData(oppositeExtremes, 0.75, double.MaxValue / 2.0).SetName(
+                "Percentile.ExtremeDouble.UpperQuarter"
+            );
+            yield return new TestCaseData(oppositeExtremes, 1.0, double.MaxValue).SetName(
+                "Percentile.ExtremeDouble.Maximum"
+            );
+            yield return new TestCaseData(
+                new double[] { double.MaxValue / 2.0, -double.MaxValue },
+                0.5,
+                -double.MaxValue / 4.0
+            ).SetName("Percentile.ExtremeDouble.UnequalOppositeMagnitudes");
+            yield return new TestCaseData(
+                new double[] { double.MaxValue, double.MaxValue / 2.0 },
+                0.5,
+                double.MaxValue * 0.75
+            ).SetName("Percentile.ExtremeDouble.PositivePair");
+            yield return new TestCaseData(
+                new double[] { -double.MaxValue, -double.MaxValue / 2.0 },
+                0.5,
+                -double.MaxValue * 0.75
+            ).SetName("Percentile.ExtremeDouble.NegativePair");
+            yield return new TestCaseData(
+                new double[] { double.Epsilon, double.Epsilon },
+                0.5,
+                double.Epsilon
+            ).SetName("Percentile.SubnormalDouble.RepeatedValue");
+            yield return new TestCaseData(
+                new double[] { -2.0 * double.Epsilon, 2.0 * double.Epsilon },
+                0.25,
+                -double.Epsilon
+            ).SetName("Percentile.SubnormalDouble.OppositeSigns");
+            yield return new TestCaseData(
+                new double[] { double.Epsilon, 3.0 * double.Epsilon },
+                0.5,
+                2.0 * double.Epsilon
+            ).SetName("Percentile.SubnormalDouble.PositivePair");
+            yield return new TestCaseData(
+                new double[] { double.PositiveInfinity, double.PositiveInfinity },
+                0.5,
+                double.PositiveInfinity
+            ).SetName("Percentile.InfinityDouble.RepeatedPositive");
+            yield return new TestCaseData(
+                new double[] { double.NegativeInfinity, double.NegativeInfinity },
+                0.5,
+                double.NegativeInfinity
+            ).SetName("Percentile.InfinityDouble.RepeatedNegative");
+            yield return new TestCaseData(
+                new double[] { double.NegativeInfinity, -1.0 },
+                0.5,
+                double.NegativeInfinity
+            ).SetName("Percentile.InfinityDouble.NegativeWithFinite");
+            yield return new TestCaseData(
+                new double[] { 1.0, double.PositiveInfinity },
+                0.5,
+                double.PositiveInfinity
+            ).SetName("Percentile.InfinityDouble.PositiveWithFinite");
+            yield return new TestCaseData(
+                new double[] { double.NegativeInfinity, double.PositiveInfinity },
+                0.5,
+                double.NaN
+            ).SetName("Percentile.InfinityDouble.OppositeSignsUndefined");
+            yield return new TestCaseData(
+                new double[] { double.NegativeInfinity, double.PositiveInfinity },
+                0.0,
+                double.NegativeInfinity
+            ).SetName("Percentile.InfinityDouble.ExactMinimum");
+            yield return new TestCaseData(
+                new double[] { double.NegativeInfinity, double.PositiveInfinity },
+                1.0,
+                double.PositiveInfinity
+            ).SetName("Percentile.InfinityDouble.ExactMaximum");
+        }
+
         private static IEnumerable<TestCaseData> MeanCases()
         {
             yield return new TestCaseData(new float[] { 2f, 3f }, 2.5f).SetName(
@@ -915,6 +1000,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 Assert.AreEqual(expected, ((long[])values).Median(), 1e-9);
             }
+        }
+
+        [TestCaseSource(nameof(PercentileExtremeCases))]
+        public void PercentileHandlesExtremeMagnitudesAndInfiniteBounds(
+            double[] values,
+            double percentile,
+            double expected
+        )
+        {
+            double[] original = (double[])values.Clone();
+            double result = values.Percentile(percentile);
+            if (double.IsNaN(expected))
+            {
+                Assert.IsTrue(double.IsNaN(result));
+            }
+            else if (double.IsInfinity(expected) || Math.Abs(expected) < 1e-300)
+            {
+                Assert.AreEqual(expected, result);
+            }
+            else
+            {
+                Assert.AreEqual(expected, result, Math.Abs(expected) * 1e-14);
+            }
+
+            CollectionAssert.AreEqual(original, values);
         }
 
         [Test]

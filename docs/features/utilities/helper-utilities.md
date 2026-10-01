@@ -1509,8 +1509,11 @@ Conventions, chosen once so callers do not have to guess:
 
 - `Median` of an even count averages the two middle elements; the halving is done in `double`, so
   extreme magnitudes cannot overflow.
-- `Percentile` interpolates linearly between closest ranks (`0` is the minimum, `1` the maximum);
-  a NaN or out-of-range percentile throws.
+- `Percentile` interpolates linearly between closest ranks (`0` is the minimum, `1` the maximum).
+  Finite opposite extremes stay finite, and primitive conversions do not box the elements. Exact
+  ranks retain their stored value. Interior interpolation preserves equal infinities, returns the
+  infinite endpoint when only one endpoint is infinite, and returns NaN between opposite infinities.
+  Results are undefined for data containing NaN; a NaN or out-of-range percentile throws.
 - `Mean` accumulates in `double`, so a float sum cannot lose magnitude and an int sum cannot
   overflow. Integral data returns `double`, matching `Enumerable.Average`.
 - `StandardDeviation` is the population standard deviation by default; pass `sample: true` for

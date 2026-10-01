@@ -864,7 +864,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>The interpolated percentile of <paramref name="values"/>.</returns>
         /// <remarks>
         /// Sorting is performed on a pooled copy, so <paramref name="values"/> is never reordered.
-        /// Results are undefined if the data contains NaN.
+        /// Finite endpoint interpolation avoids overflow. Equal infinities remain
+        /// unchanged; one infinite endpoint determines an interior result, and opposite infinities
+        /// produce NaN. Results are undefined if the data contains NaN.
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
@@ -889,7 +891,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>The interpolated percentile of <paramref name="values"/>.</returns>
         /// <remarks>
         /// Sorting is performed on a pooled copy, so <paramref name="values"/> is never reordered.
-        /// Results are undefined if the data contains NaN.
+        /// Finite endpoint interpolation avoids overflow. Equal infinities remain
+        /// unchanged; one infinite endpoint determines an interior result, and opposite infinities
+        /// produce NaN. Results are undefined if the data contains NaN.
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
@@ -1612,7 +1616,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         private static double InterpolatePercentile<T>(List<T> sorted, double percentile)
-            where T : IComparable<T>
+            where T : struct, IComparable<T>, IConvertible
         {
             int count = sorted.Count;
             double rank = percentile * (count - 1);
@@ -1621,12 +1625,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             double fraction = rank - lower;
             if (fraction == 0)
             {
-                return Convert.ToDouble(sorted[lower]);
+                return sorted[lower].ToDouble(null);
             }
 
-            double lhs = Convert.ToDouble(sorted[lower]);
-            double rhs = Convert.ToDouble(sorted[upper]);
-            return lhs + (rhs - lhs) * fraction;
+            double lhs = sorted[lower].ToDouble(null);
+            double rhs = sorted[upper].ToDouble(null);
+            if (lhs == rhs)
+            {
+                return lhs;
+            }
+
+            double difference = rhs - lhs;
+            return double.IsInfinity(difference)
+                ? lhs * (1.0 - fraction) + rhs * fraction
+                : lhs + difference * fraction;
         }
 
         private static void ValidatePercentile(double percentile)
