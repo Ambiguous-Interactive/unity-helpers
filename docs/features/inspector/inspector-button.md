@@ -578,6 +578,12 @@ private IEnumerator FadeOut()
 - Spinner animation during execution
 - "Complete" message when finished
 
+The editor disposes each completed coroutine enumerator. Cancellation and faults dispose every
+pending enumerator from the innermost child to its parent, so iterator `finally` blocks release
+resources acquired before a yield. A custom `IDisposable` enumerator is disposed even if cancelled
+before its first step. A cleanup failure reports an error while remaining parents still receive
+cleanup; if execution already failed, that original error remains the invocation result.
+
 ---
 
 ### 4. Async Methods (Task / ValueTask)
