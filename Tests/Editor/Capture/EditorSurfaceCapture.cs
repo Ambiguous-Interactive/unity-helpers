@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
     /// implementation this is adapted from (DxMessaging pull request 473), then re-confirmed in a
     /// Direct3D11 editor here:
     ///
-    /// - The panel's <c>ValidateLayout</c>, <c>Repaint</c> and <c>Render</c> are inherited, so
+    /// - The panel's <c>ValidateLayout</c>, <c>Repaint</c> and, from Unity 6, <c>Render</c> are inherited, so
     ///   they must be reflected with instance, public and non-public binding flags and WITHOUT
     ///   <see cref="BindingFlags.DeclaredOnly"/>. Reflecting on Unity's internal panel API is the
     ///   one place this repository allows reflection: nothing here reflects on package types.
@@ -190,12 +190,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 {
                     for (int repaintPass = 0; repaintPass < RepaintPasses; repaintPass++)
                     {
-                        InvokeInheritedPanelMethod(
-                            panel,
-                            RepaintMethodName,
-                            new object[] { new Event { type = EventType.Repaint } }
-                        );
-                        InvokeInheritedPanelMethod(panel, RenderMethodName, Array.Empty<object>());
+                        RepaintPanel(panel);
                     }
 
                     renderErrorCount = recorder.Errors.Count;
@@ -343,6 +338,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             }
 
             method.Invoke(panel, arguments);
+        }
+
+        /// <summary>Resolves Unity's event-taking or parameterless panel repaint entry point.</summary>
+        internal static MethodInfo ResolvePanelRepaintMethod(Type panelType)
+        {
+            MethodInfo repaint = panelType.GetMethod(
+                RepaintMethodName,
+                InheritedInstanceMembers,
+                binder: null,
+                types: new[] { typeof(Event) },
+                modifiers: null
+            );
+            if (repaint == null)
+            {
+                repaint = panelType.GetMethod(
+                    RepaintMethodName,
+                    InheritedInstanceMembers,
+                    binder: null,
+                    types: Type.EmptyTypes,
+                    modifiers: null
+                );
+            }
+            if (repaint == null)
+            {
+                throw new InvalidOperationException(
+                    $"Panel type {panelType.FullName} exposes neither Repaint(Event) nor Repaint(). "
+                        + "Unity's internal panel API changed; update the capture harness."
+                );
+            }
+            return repaint;
+        }
+
+        private static void RepaintPanel(IPanel panel)
+        {
+            MethodInfo repaint = ResolvePanelRepaintMethod(panel.GetType());
+            object[] arguments =
+                repaint.GetParameters().Length == 0
+                    ? Array.Empty<object>()
+                    : new object[] { new Event { type = EventType.Repaint } };
+            repaint.Invoke(panel, arguments);
+#if UNITY_6000_0_OR_NEWER
+            // Earlier editors render inside Repaint; Unity 6 separates the draw from the update.
+            InvokeInheritedPanelMethod(panel, RenderMethodName, Array.Empty<object>());
+#endif
         }
 
         /// <summary>
