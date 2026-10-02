@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix IntMap lookups for keys sharing low bits and keep small live windows at their starting capacity during add/remove churn ([#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926)).
+- Fix main-thread guard diagnostics to omit blank context labels and use the source filename for blank member names; nonblank labels retain their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank serialized member names creating synthetic backing fields, and reject backing-field names with blank property names ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix newly constructed serialization failure diagnostics with blank reasons so they show `operation failed`; nonblank reasons and literal input descriptors keep their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix async durable writes and copies publishing after cancellation during staging; the previous file stays intact when cancellation is observed before publication ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).

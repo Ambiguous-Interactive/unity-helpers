@@ -28,7 +28,7 @@ All paths in this table are under `scripts/tests/`. Counts are executable source
 
 | File                                                                                                   | Sites | Classification and reason                                                                                                                                                                                                                                                               |
 | ------------------------------------------------------------------------------------------------------ | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1)                     |     1 | CLI: native implicit-success observation, exercised by the three migrated suites; the strict runspace harness rejects the same script without an explicit terminal exit.                                                                                                                |
+| [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1)                     |     1 | CLI: native implicit-success observation, exercised by the four migrated suites; the strict runspace harness rejects the same script without an explicit terminal exit.                                                                                                                 |
 | [test-agent-preflight.ps1](../../scripts/tests/test-agent-preflight.ps1)                               |     4 | CLI: helper's explicit CLI branch; loaded-function isolation probe; repository and non-repository push configuration entrypoints. Content cases already use runspaces.                                                                                                                  |
 | [test-check-eol.ps1](../../scripts/tests/test-check-eol.ps1)                                           |     1 | CLI: explicit CLI branch preserves verbose and multiple-path binding. Content cases already use runspaces.                                                                                                                                                                              |
 | [test-empty-corpus-gates.ps1](../../scripts/tests/test-empty-corpus-gates.ps1)                         |     1 | CLI: retained smoke and native implicit-status parity controls. Content cases already use runspaces.                                                                                                                                                                                    |
@@ -49,7 +49,7 @@ All paths in this table are under `scripts/tests/`. Counts are executable source
 | [test-validate-git-push-config.ps1](../../scripts/tests/test-validate-git-push-config.ps1)             |     1 | CLI: retained copied-repository smoke compares exit and complete output with the runspace result. Content checks use fresh runspaces at the requested location and require exact 0/1 statuses.                                                                                          |
 | [test-validate-hook-sync-calls.ps1](../../scripts/tests/test-validate-hook-sync-calls.ps1)             |     1 | CLI: explicit branch preserves real `-RepoRoot` binding. Content cases already use runspaces.                                                                                                                                                                                           |
 | [test-validate-mcp-config.ps1](../../scripts/tests/test-validate-mcp-config.ps1)                       |     1 | CLI: retained real `-RepoRoot` binding. Content cases already use runspaces.                                                                                                                                                                                                            |
-| [test-verify-release-tag.ps1](../../scripts/tests/test-verify-release-tag.ps1)                         |     1 | Candidate: repeated package/version content checks. Preserve GitHub output-file environment and exact diagnostics; keep one real tag/source/path binding check.                                                                                                                         |
+| [test-verify-release-tag.ps1](../../scripts/tests/test-verify-release-tag.ps1)                         |     1 | CLI: retained real tag/source/path binding, empty tag/source ref, and unexpected argument controls. Repeated package/version content checks use fresh runspaces with exact exit codes and preserve GitHub output-file environment and diagnostics.                                      |
 
 The additional `ProcessStartInfo` launcher in
 [test-validate-lint-error-codes.ps1](../../scripts/tests/test-validate-lint-error-codes.ps1)
@@ -145,8 +145,8 @@ contract for the three selected scripts, not a universal PowerShell control-flow
 `LASTEXITCODE` supplies the exact observed status only after this structural check succeeds.
 The native-only control exits 0 under real CLI execution and fails the runspace harness,
 so native success cannot substitute for the required explicit terminal exit.
-The tag verifier and skills generator end successfully without an explicit exit, so they
-still require an honest implicit-success contract before migration.
+The skills generator ends successfully without an explicit exit, so it still requires an honest
+implicit-success contract before migration. The tag verifier now ends with explicit exit 0.
 
 A sequential comparison on the same devcontainer host measured all original assertions
 before and after, then the initial complete revised suites before the stricter exit-contract controls:
@@ -179,6 +179,28 @@ Final full suites with all 23 harness controls passed **48/48 template in 1.641 
 Independent adversarial review reproduced all four function/block break/continue cases and
 confirmed rejection, then ran the shared harness at 23/23. These local results supersede the
 preceding pre-follow-up assertion totals without changing the original fixture assertions.
+
+## Release tag verifier migration evidence
+
+All 24 original assertions remain. The repeated package/version checks now use the shared
+strict runspace harness, including its 23 rejection, status, stream, and isolation controls.
+Four added real CLI assertions preserve successful tag/source/path binding and identical
+GitHub output-file content, empty tag and empty source ref diagnostics, and exact exit 64
+for an unexpected argument. Every original negative case still requires exact exit 1 and
+its original diagnostic assertion.
+
+The production verifier now ends with explicit `exit 0`. Its CLI success already returned 0;
+this makes success satisfy the same terminal-exit contract as the migrated scripts without
+inferring success from an absent status. The existing failure function still exits 1, and
+unexpected arguments still exit 64. The fixture continues to restore `GITHUB_OUTPUT` in a
+`finally` block and removes its temporary output files.
+
+A sequential comparison on the same devcontainer host passed the original **24/24 in
+3.888 seconds**, then the revised **51/51 in 1.918 seconds**. The revised run includes all
+original content assertions, 23 harness controls, and four CLI controls. These are local
+single-sample observations, not hosted performance acceptance. The retained CLI helper
+is still one executable launch site, so the direct-command inventory remains 37 sites in
+22 PowerShell test files; the site's execution count is lower.
 
 ## Remaining acceptance work
 

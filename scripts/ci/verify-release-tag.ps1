@@ -106,3 +106,4 @@ if (-not [string]::IsNullOrEmpty($env:GITHUB_OUTPUT)) {
 }
 
 Write-Host "Release tag $Tag matches ${packageName}@${packageVersion}."
+exit 0
