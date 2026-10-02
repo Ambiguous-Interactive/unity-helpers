@@ -187,8 +187,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         }
 
         /// <summary>
-        /// Returns a cached formatted string representation of an option value.
-        /// Handles Unity objects, enums, and general objects appropriately.
+        /// Returns a cached option label, using the type name for Unity objects with blank names.
         /// </summary>
         /// <param name="option">The option value to format.</param>
         /// <returns>The cached formatted string.</returns>
@@ -218,7 +217,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 else
                 {
                     string objectName = unityObject.name;
-                    formatted = string.IsNullOrEmpty(objectName)
+                    formatted = string.IsNullOrWhiteSpace(objectName)
                         ? unityObject.GetType().Name
                         : objectName;
                 }

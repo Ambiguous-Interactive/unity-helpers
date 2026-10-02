@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base;
+    using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
     using WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
@@ -635,6 +636,136 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 new object[] { 10, 20, 30 }
             );
             Assert.That(index, Is.EqualTo(1));
+        }
+
+        [TestCase("", nameof(GameObject), true, TestName = "ObjectLabel.Empty.Shared.UsesType")]
+        [TestCase("", nameof(GameObject), false, TestName = "ObjectLabel.Empty.Drawer.UsesType")]
+        [TestCase(" ", nameof(GameObject), true, TestName = "ObjectLabel.Space.Shared.UsesType")]
+        [TestCase(" ", nameof(GameObject), false, TestName = "ObjectLabel.Space.Drawer.UsesType")]
+        [TestCase(
+            "\t\r\n",
+            nameof(GameObject),
+            true,
+            TestName = "ObjectLabel.ControlWhitespace.Shared.UsesType"
+        )]
+        [TestCase(
+            "\t\r\n",
+            nameof(GameObject),
+            false,
+            TestName = "ObjectLabel.ControlWhitespace.Drawer.UsesType"
+        )]
+        [TestCase(
+            "\u2003\u00a0",
+            nameof(GameObject),
+            true,
+            TestName = "ObjectLabel.UnicodeWhitespace.Shared.UsesType"
+        )]
+        [TestCase(
+            "\u2003\u00a0",
+            nameof(GameObject),
+            false,
+            TestName = "ObjectLabel.UnicodeWhitespace.Drawer.UsesType"
+        )]
+        [TestCase(
+            " Padded Name ",
+            " Padded Name ",
+            true,
+            TestName = "ObjectLabel.Padded.Shared.RemainsExact"
+        )]
+        [TestCase(
+            " Padded Name ",
+            " Padded Name ",
+            false,
+            TestName = "ObjectLabel.Padded.Drawer.RemainsExact"
+        )]
+        public void UnityObjectDropdownLabelsPreserveSelection(
+            string objectName,
+            string expectedLabel,
+            bool useSharedFormatter
+        )
+        {
+            GameObject first = Track(new GameObject(objectName));
+            GameObject selected = Track(new GameObject(objectName));
+            WValueDropDownGenericObjectAsset asset =
+                CreateScriptableObject<WValueDropDownGenericObjectAsset>();
+            object[] options = new object[] { first, selected };
+            using SerializedObject serializedObject = new(asset);
+            serializedObject.Update();
+            SerializedProperty property = serializedObject.FindProperty(
+                nameof(WValueDropDownGenericObjectAsset.selectedObject)
+            );
+            Assert.IsTrue(property != null);
+            WValueDropDownDrawer.ApplyOption(property, selected);
+            serializedObject.ApplyModifiedProperties();
+            serializedObject.Update();
+
+            string label = useSharedFormatter
+                ? DropDownShared.FormatOption(selected)
+                : WValueDropDownDrawer.TestHooks.FormatOptionCached(selected);
+            Assert.IsTrue(asset.selectedObject == selected);
+            Assert.IsTrue(property.objectReferenceValue == selected);
+            Assert.AreEqual(
+                1,
+                WValueDropDownDrawer.TestHooks.ResolveSelectedIndex(
+                    property,
+                    typeof(UnityEngine.Object),
+                    options
+                )
+            );
+            Assert.AreEqual(objectName, selected.name);
+            Assert.AreEqual(objectName, first.name);
+            Assert.AreEqual(expectedLabel, label);
+        }
+
+        [TestCase(" ", true, TestName = "StringLabel.Space.Shared.RemainsLiteral")]
+        [TestCase(" ", false, TestName = "StringLabel.Space.Drawer.RemainsLiteral")]
+        [TestCase("\t\r\n", true, TestName = "StringLabel.ControlWhitespace.Shared.RemainsLiteral")]
+        [TestCase(
+            "\t\r\n",
+            false,
+            TestName = "StringLabel.ControlWhitespace.Drawer.RemainsLiteral"
+        )]
+        [TestCase(
+            "\u2003\u00a0",
+            true,
+            TestName = "StringLabel.UnicodeWhitespace.Shared.RemainsLiteral"
+        )]
+        [TestCase(
+            "\u2003\u00a0",
+            false,
+            TestName = "StringLabel.UnicodeWhitespace.Drawer.RemainsLiteral"
+        )]
+        public void LiteralWhitespaceDropdownLabelsPreserveStringSelection(
+            string option,
+            bool useSharedFormatter
+        )
+        {
+            WValueDropDownStringOptionsAsset asset =
+                CreateScriptableObject<WValueDropDownStringOptionsAsset>();
+            using SerializedObject serializedObject = new(asset);
+            serializedObject.Update();
+            SerializedProperty property = serializedObject.FindProperty(
+                nameof(WValueDropDownStringOptionsAsset.selection)
+            );
+            Assert.IsTrue(property != null);
+            WValueDropDownDrawer.ApplyOption(property, option);
+            serializedObject.ApplyModifiedProperties();
+            serializedObject.Update();
+
+            string label = useSharedFormatter
+                ? DropDownShared.FormatOption(option)
+                : WValueDropDownDrawer.TestHooks.FormatOptionCached(option);
+            Assert.AreEqual(option, label);
+            Assert.AreEqual(option, property.stringValue);
+            Assert.AreEqual(option, asset.selection);
+            Assert.AreEqual(
+                1,
+                WValueDropDownDrawer.TestHooks.ResolveSelectedIndex(
+                    property,
+                    typeof(string),
+                    new object[] { "Different", option }
+                )
+            );
         }
 
         [Test]

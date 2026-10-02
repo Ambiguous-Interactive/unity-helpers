@@ -945,7 +945,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 else
                 {
                     string objectName = unityObject.name;
-                    formatted = string.IsNullOrEmpty(objectName)
+                    formatted = string.IsNullOrWhiteSpace(objectName)
                         ? unityObject.GetType().Name
                         : objectName;
                 }
