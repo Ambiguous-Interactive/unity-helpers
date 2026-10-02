@@ -144,6 +144,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual("Speed", recovered);
         }
 
+        [TestCase(" ", TestName = "BlankPropertySpace")]
+        [TestCase("\t\r\n", TestName = "BlankPropertyControlWhitespace")]
+        [TestCase("\u00a0\u2003", TestName = "BlankPropertyUnicodeWhitespace")]
+        public void BlankPropertyNamesAreReturnedUnchanged(string name)
+        {
+            Assert.AreSame(name, SerializedMemberNames.BackingFieldFor(name));
+            Assert.IsFalse(SerializedMemberNames.IsBackingField(name));
+            Assert.IsFalse(SerializedMemberNames.TryGetPropertyName(name, out string recovered));
+            Assert.AreSame(name, recovered);
+        }
+
+        [TestCase("< >k__BackingField", TestName = "BlankBackingPropertySpace")]
+        [TestCase("<\t\r\n>k__BackingField", TestName = "BlankBackingPropertyControlWhitespace")]
+        [TestCase(
+            "<\u00a0\u2003>k__BackingField",
+            TestName = "BlankBackingPropertyUnicodeWhitespace"
+        )]
+        public void BackingFieldsWithBlankPropertyNamesAreRejected(string name)
+        {
+            Assert.IsFalse(SerializedMemberNames.IsBackingField(name));
+            Assert.IsFalse(SerializedMemberNames.TryGetPropertyName(name, out string recovered));
+            Assert.AreSame(name, recovered);
+        }
+
+        [TestCase(" Speed ", TestName = "PaddedPropertyNameIsPreserved")]
+        [TestCase("\tSpeed\u2003", TestName = "UnicodePaddedPropertyNameIsPreserved")]
+        [TestCase("\u901f\u5ea6", TestName = "UnicodePropertyNameIsPreserved")]
+        public void NonblankPropertyNamesRoundTripWithoutTrimming(string name)
+        {
+            string backingField = SerializedMemberNames.BackingFieldFor(name);
+
+            Assert.AreEqual("<" + name + ">k__BackingField", backingField);
+            Assert.IsTrue(SerializedMemberNames.IsBackingField(backingField));
+            Assert.AreSame(backingField, SerializedMemberNames.BackingFieldFor(backingField));
+            Assert.IsTrue(
+                SerializedMemberNames.TryGetPropertyName(backingField, out string recovered)
+            );
+            Assert.AreEqual(name, recovered);
+        }
+
         [Test]
         public void AnAbsentNameIsReturnedUnchanged()
         {

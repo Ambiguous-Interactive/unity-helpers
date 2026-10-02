@@ -270,7 +270,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>Enumerates the elements.</summary>
         public IEnumerator<T> GetEnumerator()
         {
+            /* This contract fixture deliberately exercises an interface-typed enumeration boundary. */
+#pragma warning disable WUH022
             return _items.GetEnumerator();
+#pragma warning restore WUH022
         }
 
         /// <summary>Reports the position of an element.</summary>

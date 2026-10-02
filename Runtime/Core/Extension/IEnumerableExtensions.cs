@@ -378,7 +378,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             public PooledResource<List<T>> Current { get; private set; }
 
+            /* The nongeneric enumerator protocol requires an object; typed consumers avoid this box. */
+#pragma warning disable WUH022
             object IEnumerator.Current => Current;
+#pragma warning restore WUH022
 
             private readonly IEnumerator<T> _source;
             private readonly int _size;

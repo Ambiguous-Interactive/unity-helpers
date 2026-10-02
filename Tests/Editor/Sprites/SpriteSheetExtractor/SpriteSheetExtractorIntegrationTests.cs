@@ -69,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         /// <summary>
         /// Tracks whether fixture-level batching has been started.
         /// </summary>
-        private IDisposable _fixtureBatchScope;
+        private AssetDatabaseBatchScope? _fixtureBatchScope;
 
         /// <summary>
         /// Sanitizes a test name for use as a directory name.
@@ -228,7 +228,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             if (_fixtureBatchScope != null)
             {
-                _fixtureBatchScope.Dispose();
+                _fixtureBatchScope.Value.Dispose();
                 _fixtureBatchScope = null;
             }
 

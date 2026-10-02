@@ -113,6 +113,18 @@ string second = (string)readAt(names, new object[] { 1 }); // "z"
 
 ---
 
+## Serialized member names
+
+`SerializedMemberNames.BackingFieldFor` translates an auto-property name into the backing-field
+name Unity serializes for `[field: SerializeField]`. Null, empty, and whitespace-only input is
+returned unchanged instead of creating a synthetic field name. Already translated names remain
+unchanged.
+
+`IsBackingField` and `TryGetPropertyName` reject backing-field shapes whose property name is
+empty or whitespace-only, including Unicode whitespace. A rejected recovery returns its original
+input. Nonblank names retain their exact spelling, including surrounding whitespace; these helpers
+translate names rather than trim or validate every character of a C# identifier.
+
 ## Methods
 
 `GetMethodInvoker` and `GetStaticMethodInvoker` take an `object[]` of arguments and work with any

@@ -34,6 +34,8 @@ function Write-TestResult {
     }
 }
 
+. (Join-Path $PSScriptRoot 'isolated-fixture-runspace.ps1')
+
 function New-TestRepo {
     param(
         [switch]$ConfigurePushDefaults,
@@ -96,10 +98,14 @@ function Invoke-Validator {
     param(
         [Parameter(Mandatory = $true)]
         [string]$RepoPath,
-        [string]$WorkingDirectory = $RepoPath
+        [string]$WorkingDirectory = $RepoPath,
+        [switch]$Cli
     )
 
     $validatorPath = Join-Path $RepoPath 'scripts/validate-git-push-config.ps1'
+    if (-not $Cli) {
+        return Invoke-IsolatedFixture -ScriptPath $validatorPath -WorkingDirectory $WorkingDirectory
+    }
     Push-Location $WorkingDirectory
     try {
         $output = & pwsh -NoProfile -File $validatorPath 2>&1
@@ -113,12 +119,16 @@ function Invoke-Validator {
     }
 }
 
+Test-IsolatedFixtureHarness
+
 Write-Host 'Testing validate-git-push-config.ps1...' -ForegroundColor White
 
 Write-Host "`nTest group: clean repository passes" -ForegroundColor Magenta
 $repo1 = New-TestRepo -ConfigurePushDefaults
 try {
     $result1 = Invoke-Validator -RepoPath $repo1
+    $cliResult = Invoke-Validator -RepoPath $repo1 -Cli
+    Write-TestResult 'CLI.CleanRepoMatchesRunspace' ($cliResult.ExitCode -eq $result1.ExitCode -and $cliResult.Output.Trim() -ceq $result1.Output.Trim())
     Write-TestResult 'Pass_CleanRepoExitCodeZero' ($result1.ExitCode -eq 0) "Expected exit code 0, got $($result1.ExitCode). Output: $($result1.Output)"
     Write-TestResult 'Pass_CleanRepoReportsSuccess' ($result1.Output -match 'checks passed') "Expected success message. Output: $($result1.Output)"
 }
@@ -133,7 +143,7 @@ try {
     Set-Content -Path $artifactPath -Value 'redirected hook output' -Encoding UTF8
 
     $result2 = Invoke-Validator -RepoPath $repo2
-    Write-TestResult 'Fail_GithooksTxtArtifactExitCodeNonZero' ($result2.ExitCode -ne 0) "Expected non-zero exit code, got $($result2.ExitCode). Output: $($result2.Output)"
+    Write-TestResult 'Fail_GithooksTxtArtifactExitCodeNonZero' ($result2.ExitCode -eq 1) "Expected non-zero exit code, got $($result2.ExitCode). Output: $($result2.Output)"
     Write-TestResult 'Fail_GithooksTxtArtifactIsReported' ($result2.Output -match 'pre-commit\.txt') "Expected output to mention .githooks/pre-commit.txt. Output: $($result2.Output)"
     Write-TestResult 'Fail_GithooksTxtArtifactClassifiedAsGitignored' ($result2.Output -match 'gitignored') "Expected output to classify the artifact as gitignored. Output: $($result2.Output)"
 }
@@ -183,7 +193,7 @@ else {
         }
 
         $result4 = Invoke-Validator -RepoPath $repo4
-        Write-TestResult 'Fail_UnnormalizedCredentialHelperExitCodeNonZero' ($result4.ExitCode -ne 0) "Expected non-zero exit code, got $($result4.ExitCode). Output: $($result4.Output)"
+        Write-TestResult 'Fail_UnnormalizedCredentialHelperExitCodeNonZero' ($result4.ExitCode -eq 1) "Expected non-zero exit code, got $($result4.ExitCode). Output: $($result4.Output)"
         Write-TestResult 'Fail_UnnormalizedCredentialHelperIsReported' ($result4.Output -match 'cached-token credential helper') "Expected the credential postcondition to be reported. Output: $($result4.Output)"
         Write-TestResult 'Fail_UnnormalizedCredentialHelperNamesTheFix' ($result4.Output -match 'normalize-container-git-config\.sh') "Expected the fix command in the output. Output: $($result4.Output)"
 
@@ -227,12 +237,12 @@ else {
         New-Item -ItemType Directory -Path $elsewhere -Force | Out-Null
         try {
             $result7 = Invoke-Validator -RepoPath $repo4 -WorkingDirectory $elsewhere
-            Write-TestResult 'Fail_LocalHelperIsReportedFromAnotherWorkingDirectory' (($result7.ExitCode -ne 0) -and ($result7.Output -match 'cached-token credential helper')) "Expected the repo-local helper to be found from a different working directory. Output: $($result7.Output)"
+            Write-TestResult 'Fail_LocalHelperIsReportedFromAnotherWorkingDirectory' (($result7.ExitCode -eq 1) -and ($result7.Output -match 'cached-token credential helper')) "Expected the repo-local helper to be found from a different working directory. Output: $($result7.Output)"
 
             # Control: the same repository, judged from inside itself, reaches the same verdict --
             # so the assertion above is measuring the working directory and nothing else.
             $result8 = Invoke-Validator -RepoPath $repo4
-            Write-TestResult 'Fail_LocalHelperIsReportedFromTheRepoItself' (($result8.ExitCode -ne 0) -and ($result8.Output -match 'cached-token credential helper')) "Expected the repo-local helper to be reported from the repo itself. Output: $($result8.Output)"
+            Write-TestResult 'Fail_LocalHelperIsReportedFromTheRepoItself' (($result8.ExitCode -eq 1) -and ($result8.Output -match 'cached-token credential helper')) "Expected the repo-local helper to be reported from the repo itself. Output: $($result8.Output)"
         }
         finally {
             Remove-Item -Path $elsewhere -Recurse -Force -ErrorAction SilentlyContinue

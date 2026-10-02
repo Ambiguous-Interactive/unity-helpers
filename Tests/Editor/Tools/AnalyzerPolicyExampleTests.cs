@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
         [TestCase(null)]
         [TestCase("")]
-        [TestCase("WUH022")]
+        [TestCase("WUH999")]
         [TestCase("WPROTO001")]
         public void UnknownPoliciesReturnEmptyExamples(string id)
         {

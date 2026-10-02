@@ -3710,12 +3710,12 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Creates a new PooledResource wrapping the specified resource with a disposal action.
         /// </summary>
         /// <param name="resource">The resource to wrap.</param>
-        /// <param name="onDispose">The action to invoke when disposing, typically returning the resource to a pool.</param>
+        /// <param name="onDispose">The return action, or null for an inert wrapper that reserves no disposal state.</param>
         public PooledResource(T resource, Action<T> onDispose)
         {
             this.resource = resource;
             _onDispose = onDispose;
-            _lease = DisposalLeases.Acquire();
+            _lease = onDispose == null ? default : DisposalLeases.Acquire();
         }
 
         /// <summary>

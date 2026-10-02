@@ -783,10 +783,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         protected T TrackDisposable<T>(T disposable)
             where T : IDisposable
         {
+            /* Heterogeneous test cleanup deliberately retains disposable values through an interface. */
+#pragma warning disable WUH022
             if (disposable != null)
             {
                 _trackedDisposables.Add(disposable);
             }
+#pragma warning restore WUH022
             return disposable;
         }
 
@@ -2120,7 +2123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             // Reuse an active batch to avoid redundant refreshes.
             bool shouldBatch = !AssetDatabaseBatchHelper.IsCurrentlyBatching;
-            IDisposable batchScope = shouldBatch
+            AssetDatabaseBatchScope? batchScope = shouldBatch
                 ? AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true)
                 : null;
 

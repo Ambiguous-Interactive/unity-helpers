@@ -63,6 +63,10 @@ namespace UnityEngine {
 }
 namespace WallstopStudios.UnityHelpers.Tags { public struct EffectHandle { } }
 namespace WallstopStudios.UnityHelpers.Utils {
+    public readonly struct DisposableScope : IDisposable {
+        public static DisposableScope Create(Action cleanup) { return default; }
+        public void Dispose() { }
+    }
     public sealed class SerializedStringComparer : IEqualityComparer<string> {
         public enum StringCompareMode { Ordinal, OrdinalIgnoreCase }
         public StringCompareMode compareMode;
@@ -81,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static IEnumerable<TestCaseData> Cases()
         {
-            for (int number = 1; number <= 21; ++number)
+            for (int number = 1; number <= 22; ++number)
             {
                 string id = $"WUH{number:000}";
                 yield return new TestCaseData(id).SetName(id + "ExamplesMatchTheActualDiagnostic");
@@ -132,6 +136,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new HardCollectionReadAnalyzer();
                 case "WUH021":
                     return new RepeatedCollectionCountAnalyzer();
+                case "WUH022":
+                    return new DisposableStructBoxingAnalyzer();
                 default:
                     Assert.Fail("Unmapped diagnostic " + id);
                     return null;
@@ -221,6 +227,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                 case "WUH021":
                     fields =
                         "private ICollection<int> values = new List<int>(); private void Reserve(int count) { }";
+                    break;
+                case "WUH022":
+                    fields = "private static void Cleanup() { }";
                     break;
                 case "WUH019":
                     fields = "private int[] rows = new int[4]; private int[] output = new int[4];";

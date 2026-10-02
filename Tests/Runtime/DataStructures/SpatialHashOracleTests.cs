@@ -658,7 +658,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         private T Track<T>(T disposable)
             where T : IDisposable
         {
+            /* Heterogeneous test cleanup deliberately retains disposable values through an interface. */
+#pragma warning disable WUH022
             _trackedResources.Add(disposable);
+#pragma warning restore WUH022
             return disposable;
         }
 

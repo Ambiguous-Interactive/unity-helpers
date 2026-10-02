@@ -1744,7 +1744,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             public IEnumerator<T> GetEnumerator()
             {
+                /* This fixture deliberately exposes an interface enumerator to exercise the collection contract. */
+#pragma warning disable WUH022
                 return _inner.GetEnumerator();
+#pragma warning restore WUH022
             }
 
             public int IndexOf(T item)

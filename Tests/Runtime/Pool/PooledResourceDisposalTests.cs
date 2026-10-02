@@ -181,6 +181,70 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.That(calls, Is.EqualTo(1));
         }
 
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("value")]
+        public void NullCallbackResourcesDoNotReserveDisposalSlots(string value)
+        {
+            int before = DisposalLeases.SlotsCreated;
+            for (int i = 0; i < 2048; ++i)
+            {
+                PooledResource<string> lease = new(value, null);
+                PooledResource<string> copy = lease;
+                Assert.That(lease.resource, Is.EqualTo(value));
+                Assert.That(lease.IsHeld, Is.False);
+                lease.Dispose();
+                copy.Dispose();
+                Assert.That(copy.IsHeld, Is.False);
+            }
+
+            Assert.That(DisposalLeases.SlotsCreated, Is.EqualTo(before));
+        }
+
+        [Test]
+        public void UndisposedNullCallbackResourcesDoNotGrowDisposalState()
+        {
+            int before = DisposalLeases.SlotsCreated;
+            for (int i = 0; i < 2048; ++i)
+            {
+                PooledResource<int> lease = new(i, null);
+                Assert.That(lease.resource, Is.EqualTo(i));
+            }
+
+            Assert.That(DisposalLeases.SlotsCreated, Is.EqualTo(before));
+        }
+
+        [Test]
+        public void NullCallbackResourceConstructionAndDisposalAllocateNothing()
+        {
+            GCAssert.DoesNotAllocate(() =>
+            {
+                using PooledResource<string> lease = new("value", null);
+            });
+        }
+
+        [Test]
+        public void NullResourceWithCallbackStillReleasesExactlyOnce()
+        {
+            int calls = 0;
+            PooledResource<string> lease = new(
+                null,
+                value =>
+                {
+                    Assert.That(value, Is.Null);
+                    ++calls;
+                }
+            );
+            PooledResource<string> copy = lease;
+            Assert.That(lease.IsHeld, Is.True);
+
+            lease.Dispose();
+            copy.Dispose();
+
+            Assert.That(calls, Is.EqualTo(1));
+            Assert.That(copy.IsHeld, Is.False);
+        }
+
         [Test]
         public void ValueTypedPoolsStillRoundTrip()
         {
