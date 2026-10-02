@@ -24,6 +24,82 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             GCAssert.DoesNotAllocate(() => deque.CopyTo(destination, 0));
         }
 
+        private static Exception CaptureCopyException(Action copy)
+        {
+            try
+            {
+                copy();
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+        }
+
+        private static Deque<object> CreateCovariantCopySource(
+            bool wrapped,
+            out object[] items,
+            out int head
+        )
+        {
+            Deque<object> deque = new(128);
+            if (wrapped)
+            {
+                deque.PushFront("first");
+            }
+            else
+            {
+                deque.PushBack("first");
+            }
+            deque.PushBack(null);
+            deque.PushBack(new object());
+            for (int index = 0; index < 70; ++index)
+            {
+                deque.PushBack("after");
+            }
+            items = new object[128];
+            head = wrapped ? items.Length - 1 : 0;
+            int count = deque.Count;
+            for (int index = 0; index < count; ++index)
+            {
+                items[(head + index) % items.Length] = deque[index];
+            }
+            return deque;
+        }
+
+        private static void CopyToElementwise<T>(
+            T[] items,
+            int head,
+            int count,
+            T[] array,
+            int arrayIndex
+        )
+        {
+            for (int index = 0; index < count; ++index)
+            {
+                int actualIndex = (head + index) % items.Length;
+                array[arrayIndex + index] = items[actualIndex];
+            }
+        }
+
+        private static void CopyToWithoutCovarianceGuard<T>(
+            T[] items,
+            int head,
+            int count,
+            T[] array,
+            int arrayIndex
+        )
+        {
+            int firstCount = Math.Min(count, items.Length - head);
+            Array.Copy(items, head, array, arrayIndex, firstCount);
+            int remainingCount = count - firstCount;
+            if (0 < remainingCount)
+            {
+                Array.Copy(items, 0, array, arrayIndex + firstCount, remainingCount);
+            }
+        }
+
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(5)]
@@ -135,33 +211,103 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
         [TestCase(false)]
         [TestCase(true)]
-        public void CopyToCovariantDestinationRetainsPartialWriteOnIncompatibleElement(bool wrapped)
+        public void CopyToCovariantDestinationPreservesBackendElementwiseBehavior(bool wrapped)
         {
-            Deque<object> deque = new(128);
-            if (wrapped)
+            Deque<object> deque = CreateCovariantCopySource(
+                wrapped,
+                out object[] items,
+                out int head
+            );
+            int count = deque.Count;
+            object[] baselineDestination = new string[count + 2];
+            object[] candidateDestination = new string[count + 2];
+            Array.Fill(baselineDestination, "sentinel");
+            Array.Fill(candidateDestination, "sentinel");
+
+            Exception baseline = CaptureCopyException(() =>
+                CopyToElementwise(items, head, count, baselineDestination, 1)
+            );
+            Exception candidate = CaptureCopyException(() => deque.CopyTo(candidateDestination, 1));
+
+            TestContext.WriteLine(
+                $"Elementwise baseline: {baseline?.GetType().FullName ?? "none"}; deque: {candidate?.GetType().FullName ?? "none"}; wrapped: {wrapped}"
+            );
+            Assert.That(candidate?.GetType(), Is.EqualTo(baseline?.GetType()));
+            int destinationLength = baselineDestination.Length;
+            for (int index = 0; index < destinationLength; ++index)
             {
-                deque.PushFront("first");
+                Assert.That(
+                    ReferenceEquals(candidateDestination[index], baselineDestination[index]),
+                    Is.True,
+                    $"Destination index {index}"
+                );
+            }
+            Assert.That(ReferenceEquals(candidateDestination[0], "sentinel"), Is.True);
+            Assert.That(
+                ReferenceEquals(candidateDestination[destinationLength - 1], "sentinel"),
+                Is.True
+            );
+            Assert.That(ReferenceEquals(candidateDestination[1], deque[0]), Is.True);
+            Assert.That(candidateDestination[2] == null, Is.True);
+            if (baseline != null)
+            {
+                Assert.That(baseline.GetType(), Is.EqualTo(typeof(ArrayTypeMismatchException)));
+                Assert.That(ReferenceEquals(candidateDestination[3], "sentinel"), Is.True);
             }
             else
             {
-                deque.PushBack("first");
+                for (int index = 0; index < count; ++index)
+                {
+                    Assert.That(
+                        ReferenceEquals(candidateDestination[index + 1], deque[index]),
+                        Is.True,
+                        $"Copied source index {index}"
+                    );
+                }
             }
-            deque.PushBack(null);
-            deque.PushBack(new object());
-            for (int index = 0; index < 70; ++index)
-            {
-                deque.PushBack("after");
-            }
+            Assert.That(deque.Count, Is.EqualTo(count));
+            Assert.That(count, Is.EqualTo(73));
+        }
 
-            string[] destination = new string[deque.Count + 2];
-            Array.Fill(destination, "sentinel");
-            Assert.Throws<ArrayTypeMismatchException>(() => deque.CopyTo(destination, 1));
-            Assert.AreEqual("sentinel", destination[0]);
-            Assert.AreEqual("first", destination[1]);
-            Assert.IsTrue(destination[2] == null);
-            Assert.AreEqual("sentinel", destination[3]);
-            Assert.AreEqual("sentinel", destination[destination.Length - 1]);
-            Assert.AreEqual(73, deque.Count);
+        [TestCase(false)]
+        [TestCase(true)]
+        public void CovarianceControlDetectsAnUnguardedBulkCopy(bool wrapped)
+        {
+            Deque<object> deque = CreateCovariantCopySource(
+                wrapped,
+                out object[] items,
+                out int head
+            );
+            int count = deque.Count;
+            object[] baselineDestination = new string[count + 2];
+            object[] bulkDestination = new string[count + 2];
+            Array.Fill(baselineDestination, "sentinel");
+            Array.Fill(bulkDestination, "sentinel");
+
+            Exception baseline = CaptureCopyException(() =>
+                CopyToElementwise(items, head, count, baselineDestination, 1)
+            );
+            Exception bulk = CaptureCopyException(() =>
+                CopyToWithoutCovarianceGuard(items, head, count, bulkDestination, 1)
+            );
+
+            bool detectsBulkCopy = baseline?.GetType() != bulk?.GetType();
+            int destinationLength = baselineDestination.Length;
+            for (int index = 0; index < destinationLength; ++index)
+            {
+                detectsBulkCopy |= !ReferenceEquals(
+                    baselineDestination[index],
+                    bulkDestination[index]
+                );
+            }
+            TestContext.WriteLine(
+                $"Elementwise baseline: {baseline?.GetType().FullName ?? "none"}; unguarded bulk: {bulk?.GetType().FullName ?? "none"}; wrapped: {wrapped}"
+            );
+            Assert.That(
+                detectsBulkCopy,
+                Is.True,
+                "The control must distinguish an unguarded bulk copy from the original elementwise stores."
+            );
         }
 
         [Test]
