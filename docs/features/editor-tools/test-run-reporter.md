@@ -195,6 +195,16 @@ invocation, of either mode, sees that marker and refuses with a warning in the c
 file that is held. Finishing or discarding a run requires the same owner token, so a late callback
 from an older run cannot replace or delete a newer marker.
 
+Ownership tokens are identifiers: null, empty, and entirely whitespace tokens cannot finish or
+discard a run, even when a malformed marker contains the same value. Reading such a marker returns
+no owner. Nonblank tokens are compared exactly, including any surrounding spaces; the reporter does
+not trim a token or a summary path.
+
+The guards distinguish identifiers from serialized report data. Escaping, unescaping, and field
+value parsing preserve whitespace-only values because test messages and names are literal data.
+Their null/empty checks intentionally remain unchanged. A malformed marker still carries `running`,
+so starting another run refuses it until the reader performs the documented recovery action below.
+
 The menu items are deliberately **not** greyed out while a run is in flight. A validate function
 that disables them would make a bridge's `ExecuteMenuItem` do nothing silently; a clickable item that
 logs why it refused tells the driver something.

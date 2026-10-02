@@ -294,10 +294,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// </summary>
         /// <param name="line">A single line, without its terminator.</param>
         /// <param name="owner">The ownership token, empty when none was present.</param>
-        /// <returns><c>true</c> when the line carried a non-empty ownership token.</returns>
+        /// <returns><c>true</c> when the line carried a nonblank ownership token.</returns>
         internal static bool TryParseOwner(string line, out string owner)
         {
-            return TryGetField(line, OwnerKey, out owner) && !string.IsNullOrEmpty(owner);
+            if (TryGetField(line, OwnerKey, out owner) && !string.IsNullOrWhiteSpace(owner))
+            {
+                return true;
+            }
+
+            owner = string.Empty;
+            return false;
         }
 
         /// <summary>

@@ -174,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         ///     Replaces the running marker with the completed summary for a result tree.
         /// </summary>
         /// <param name="summaryPath">The nonblank summary path to finish.</param>
-        /// <param name="owner">The ownership token returned when this run began.</param>
+        /// <param name="owner">The nonblank ownership token returned when this run began.</param>
         /// <param name="mode">The test mode the run covered.</param>
         /// <param name="finishedUtc">When the run finished.</param>
         /// <param name="root">The root of the result tree, whose children are the assemblies.</param>
@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             TestRunResultNode root
         )
         {
-            if (string.IsNullOrWhiteSpace(summaryPath) || string.IsNullOrEmpty(owner))
+            if (string.IsNullOrWhiteSpace(summaryPath) || string.IsNullOrWhiteSpace(owner))
             {
                 return false;
             }
@@ -294,11 +294,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         ///     Releases the summary file without writing a summary, for a run that never started.
         /// </summary>
         /// <param name="summaryPath">The nonblank summary path to release.</param>
-        /// <param name="owner">The ownership token returned when this run began.</param>
+        /// <param name="owner">The nonblank ownership token returned when this run began.</param>
         /// <returns><c>true</c> when the file is gone afterwards.</returns>
         internal static bool TryDiscardRun(string summaryPath, string owner)
         {
-            if (string.IsNullOrWhiteSpace(summaryPath) || string.IsNullOrEmpty(owner))
+            if (string.IsNullOrWhiteSpace(summaryPath) || string.IsNullOrWhiteSpace(owner))
             {
                 return false;
             }

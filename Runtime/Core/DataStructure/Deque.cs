@@ -36,6 +36,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     {
         public const int DefaultCapacity = 16;
 
+        private const int MinimumBulkCopyCount = 64;
         private const int MinimumGrowth = 4;
 
         /// <summary>
@@ -353,7 +354,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
-        /// Copies the deque elements to an array.
+        /// Copies the deque elements in logical order to an array without allocating.
         /// </summary>
         public void CopyTo(T[] array, int arrayIndex)
         {
@@ -368,6 +369,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             if (array.Length - arrayIndex < _count)
             {
                 throw new ArgumentException("Destination array is not large enough.");
+            }
+
+            if (MinimumBulkCopyCount <= _count && array.GetType() == typeof(T[]))
+            {
+                int firstCount = Math.Min(_count, _items.Length - _head);
+                Array.Copy(_items, _head, array, arrayIndex, firstCount);
+                int remainingCount = _count - firstCount;
+                if (0 < remainingCount)
+                {
+                    Array.Copy(_items, 0, array, arrayIndex + firstCount, remainingCount);
+                }
+                return;
             }
 
             for (int i = 0; i < _count; ++i)
