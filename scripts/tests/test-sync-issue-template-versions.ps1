@@ -50,6 +50,8 @@ function Write-TestResult {
   }
 }
 
+. (Join-Path $PSScriptRoot 'isolated-fixture-runspace.ps1')
+
 function Get-RepoRoot {
   return (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 }
@@ -119,8 +121,8 @@ function Run-ReleaseVersionAdditionTest {
 
     Push-Location $tempRoot
     try {
-      & pwsh -NoProfile -File (Join-Path $tempScriptDir 'sync-issue-template-versions.ps1') -AddPackageVersion *> $null
-      $addPassed = $LASTEXITCODE -eq 0
+      $addResult = Invoke-IsolatedFixture -ScriptPath (Join-Path $tempScriptDir 'sync-issue-template-versions.ps1') -Parameters @{ AddPackageVersion = $true } -WorkingDirectory $tempRoot
+      $addPassed = $addResult.ExitCode -eq 0
       $manifestPath = Join-Path $tempRoot '.github/issue-template-versions.json'
       $addedManifest = Get-Content $manifestPath -Raw
       $addedVersion = (ConvertFrom-Json $addedManifest).versions[0] -ceq '9.9.9'
@@ -136,8 +138,8 @@ function Run-ReleaseVersionAdditionTest {
         }
       }
 
-      & pwsh -NoProfile -File (Join-Path $tempScriptDir 'sync-issue-template-versions.ps1') *> $null
-      $secondPassed = $LASTEXITCODE -eq 0
+      $secondResult = Invoke-IsolatedFixture -ScriptPath (Join-Path $tempScriptDir 'sync-issue-template-versions.ps1') -WorkingDirectory $tempRoot
+      $secondPassed = $secondResult.ExitCode -eq 0
       $unchanged = (Get-Content $manifestPath -Raw) -ceq $addedManifest
       foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
         $index = if ($templateName -eq 'bug_report.yml') { 0 } else { 1 }
@@ -145,6 +147,8 @@ function Run-ReleaseVersionAdditionTest {
           $unchanged = $false
         }
       }
+      & pwsh -NoProfile -File (Join-Path $tempScriptDir 'sync-issue-template-versions.ps1') -AddPackageVersion *> $null
+      Write-TestResult 'CLI.AddPackageVersionMatchesRunspace' ($LASTEXITCODE -eq $addResult.ExitCode)
     } finally {
       Pop-Location
     }
@@ -510,6 +514,7 @@ Write-Host "========================================" -ForegroundColor White
 Write-Host "Sync Issue Template Versions Tests" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor White
 
+Test-IsolatedFixtureHarness
 Run-VersionToStringTests
 Run-VersionManifestTests
 Run-ReleaseVersionAdditionTest

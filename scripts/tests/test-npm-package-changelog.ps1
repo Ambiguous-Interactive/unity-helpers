@@ -58,6 +58,10 @@ function Write-TestResult {
   }
 }
 
+. (Join-Path $PSScriptRoot 'isolated-fixture-runspace.ps1')
+
+Test-IsolatedFixtureHarness
+
 Write-Host "Testing the UPM changelog surface contract..." -ForegroundColor White
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -270,8 +274,9 @@ function Invoke-ValidatorExpectingUntrackedPayloadFailure {
     Set-Content -LiteralPath $canaryPath -Value "# Package Validator Canary`n" -NoNewline
     Push-Location $repoRoot
     try {
-      $validatorOutput = & pwsh -NoProfile -File $validatorPath *>&1
-      $validatorExitCode = $LASTEXITCODE
+      $validatorResult = Invoke-IsolatedFixture -ScriptPath $validatorPath -WorkingDirectory $repoRoot
+      $validatorOutput = $validatorResult.Output
+      $validatorExitCode = $validatorResult.ExitCode
     }
     finally {
       Pop-Location
@@ -285,7 +290,7 @@ function Invoke-ValidatorExpectingUntrackedPayloadFailure {
   $expectedMessage = "File in npm package but not tracked in git repo: $RelativePath"
   Write-TestResult `
     -TestName $TestName `
-    -Passed ($validatorExitCode -ne 0 -and $validatorOutputText.Contains($expectedMessage)) `
+    -Passed ($validatorExitCode -eq 1 -and $validatorOutputText.Contains($expectedMessage)) `
     -Message "Expected validator to fail with '$expectedMessage'. Exit: $validatorExitCode. Output: $validatorOutputText"
 }
 
@@ -316,8 +321,9 @@ function Invoke-ValidatorExpectingForbiddenRootArtifactFailure {
     Set-Content -LiteralPath $canaryPath -Value "# Package Validator Forbidden Artifact Canary`n" -NoNewline
     Push-Location $repoRoot
     try {
-      $validatorOutput = & pwsh -NoProfile -File $validatorPath *>&1
-      $validatorExitCode = $LASTEXITCODE
+      $validatorResult = Invoke-IsolatedFixture -ScriptPath $validatorPath -WorkingDirectory $repoRoot
+      $validatorOutput = $validatorResult.Output
+      $validatorExitCode = $validatorResult.ExitCode
     }
     finally {
       Pop-Location
@@ -337,7 +343,7 @@ function Invoke-ValidatorExpectingForbiddenRootArtifactFailure {
   $duplicateDiagnostics = @($duplicateMessages | Where-Object { $validatorOutputText.Contains($_) })
   Write-TestResult `
     -TestName $TestName `
-    -Passed ($validatorExitCode -ne 0 -and $validatorOutputText.Contains($forbiddenMessage) -and $duplicateDiagnostics.Count -eq 0) `
+    -Passed ($validatorExitCode -eq 1 -and $validatorOutputText.Contains($forbiddenMessage) -and $duplicateDiagnostics.Count -eq 0) `
     -Message "Expected validator to fail with '$forbiddenMessage' and without duplicate generic diagnostics. Duplicates: $($duplicateDiagnostics -join '; '). Exit: $validatorExitCode. Output: $validatorOutputText"
 }
 

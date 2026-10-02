@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             {
                 using PooledResource<List<int>> firstList = _intPool.Get();
                 using PooledResource<List<int>> secondList = _intPool.Get();
-                Assert.AreNotEqual(firstList, secondList);
+                Assert.AreNotSame(firstList.resource, secondList.resource);
                 firstList.resource.Add(1);
                 Assert.AreEqual(1, firstList.resource.Count);
                 Assert.AreEqual(0, secondList.resource.Count);

@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Tests.Core
 {
 #if UNITY_EDITOR
-    using System;
     using NUnit.Framework;
     using UnityEditor;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
@@ -31,7 +30,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     /// </remarks>
     public abstract class BatchedEditorTestBase : CommonTestBase
     {
-        private IDisposable _batchScope;
+        private AssetDatabaseBatchScope? _batchScope;
 
         /// <summary>
         /// Called once before any tests in the fixture run.
@@ -58,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 if (_batchScope != null)
                 {
-                    _batchScope.Dispose();
+                    _batchScope.Value.Dispose();
                     _batchScope = null;
                 }
 

@@ -82,6 +82,11 @@ callback disposes the pool, the returning item is sent to the disposal callback 
 never added back to the disposed pool. The same guarantee holds when a lease return races
 `WallstopGenericPool<T>.Dispose()` in the thread-safe build.
 
+A directly constructed `PooledResource<T>` with a null return callback is an inert wrapper. It
+keeps the supplied resource accessible and reserves no disposal slot, even if it is never disposed.
+Disposing or copying it has no effect on the resource. Wrappers with a return callback retain their
+copy-safe, at-most-once release guarantee.
+
 ### Disable Globally (One-Liner Opt-Out)
 
 <!-- doc-sample: compiles -->

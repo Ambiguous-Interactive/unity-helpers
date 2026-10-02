@@ -50,7 +50,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="propertyName">Property name as written in source.</param>
         /// <returns>
         /// <c>&lt;propertyName&gt;k__BackingField</c>, or <paramref name="propertyName"/> unchanged
-        /// when it is null, empty, or already a backing-field name.
+        /// when it is null, empty, whitespace-only, or already a backing-field name.
         /// </returns>
         /// <remarks>
         /// Cached, because the result is used on inspector paint paths and the set of names a
@@ -58,7 +58,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </remarks>
         public static string BackingFieldFor(string propertyName)
         {
-            if (string.IsNullOrEmpty(propertyName) || IsBackingField(propertyName))
+            if (string.IsNullOrWhiteSpace(propertyName) || IsBackingField(propertyName))
             {
                 return propertyName;
             }
@@ -70,13 +70,28 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// Whether <paramref name="fieldName"/> is a compiler-generated auto-property backing field.
         /// </summary>
         /// <param name="fieldName">Field name to test.</param>
-        /// <returns><c>true</c> when the name has the backing-field shape.</returns>
+        /// <returns><c>true</c> when the name has the backing-field shape and a nonblank property name.</returns>
         public static bool IsBackingField(string fieldName)
         {
-            return !string.IsNullOrEmpty(fieldName)
-                && fieldName.StartsWith(BackingFieldPrefix, StringComparison.Ordinal)
-                && fieldName.EndsWith(BackingFieldSuffix, StringComparison.Ordinal)
-                && BackingFieldPrefix.Length + BackingFieldSuffix.Length < fieldName.Length;
+            if (
+                string.IsNullOrWhiteSpace(fieldName)
+                || !fieldName.StartsWith(BackingFieldPrefix, StringComparison.Ordinal)
+                || !fieldName.EndsWith(BackingFieldSuffix, StringComparison.Ordinal)
+            )
+            {
+                return false;
+            }
+
+            int propertyNameEnd = fieldName.Length - BackingFieldSuffix.Length;
+            for (int index = BackingFieldPrefix.Length; index < propertyNameEnd; ++index)
+            {
+                if (!char.IsWhiteSpace(fieldName[index]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -86,12 +101,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="propertyName">The property name when one was recovered.</param>
         /// <returns><c>true</c> when <paramref name="fieldName"/> was a backing field.</returns>
         /// <remarks>
-        /// The <c>Substring</c> below cannot throw, and the guard above is what makes that true
-        /// rather than the shape of the input: <see cref="IsBackingField"/> has already established
-        /// that the name starts with the prefix, ends with the suffix, and is STRICTLY longer than
-        /// the two combined -- so the offset is in range and the length is at least one. The length
-        /// test is the load-bearing one; without it <c>"&lt;&gt;k__BackingField"</c> would ask for a
-        /// zero-length name and anything shorter for a negative one.
+        /// A backing-field name with an empty or whitespace-only property name is rejected.
+        /// Names that are rejected are returned unchanged.
         /// </remarks>
         public static bool TryGetPropertyName(string fieldName, out string propertyName)
         {

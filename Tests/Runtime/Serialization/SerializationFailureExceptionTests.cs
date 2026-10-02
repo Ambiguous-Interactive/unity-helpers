@@ -41,6 +41,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(ex.InnerException == null);
         }
 
+        [TestCase(null, TestName = "NullReasonUsesFallback")]
+        [TestCase("", TestName = "EmptyReasonUsesFallback")]
+        [TestCase(" ", TestName = "SpaceReasonUsesFallback")]
+        [TestCase("\t\r\n", TestName = "ControlWhitespaceReasonUsesFallback")]
+        [TestCase("\u00a0\u2003", TestName = "UnicodeWhitespaceReasonUsesFallback")]
+        public void BlankReasonsUseReadableFallback(string reason)
+        {
+            SerializationInputException exception = new(
+                SerializationFormat.Json,
+                SerializationOperation.Deserialize,
+                typeof(string),
+                "string(len=0)",
+                reason
+            );
+
+            Assert.AreEqual("operation failed", exception.Reason);
+            StringAssert.Contains("operation failed", exception.Message);
+        }
+
+        [TestCase("  codec rejected  ", TestName = "PaddedReasonIsPreserved")]
+        [TestCase("\tcodec\u2003rejected\r\n", TestName = "ReasonWhitespaceContentIsPreserved")]
+        public void NonblankReasonsKeepExactContent(string reason)
+        {
+            const string literalDescriptor = " \t\u2003";
+            SerializationInputException exception = new(
+                SerializationFormat.Json,
+                SerializationOperation.Deserialize,
+                typeof(string),
+                literalDescriptor,
+                reason
+            );
+
+            Assert.AreSame(reason, exception.Reason);
+            Assert.AreSame(literalDescriptor, exception.InputDescriptor);
+            StringAssert.Contains(reason, exception.Message);
+        }
+
         [Test]
         public void ExceptionTypeMetadataRecoversMovedGenericArgument()
         {

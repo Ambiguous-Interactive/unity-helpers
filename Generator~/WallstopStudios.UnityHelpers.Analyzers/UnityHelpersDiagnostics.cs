@@ -526,5 +526,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
             );
+
+        /// <summary>A boxing conversion of a disposable value type.</summary>
+        internal static readonly DiagnosticDescriptor DisposableStructBoxing =
+            new DiagnosticDescriptor(
+                "WUH022",
+                "Boxing a disposable value can allocate",
+                "Converting '{0}' to a reference type boxes a copy and can allocate. Keep the concrete disposable type in a using scope or use a generic parameter constrained to IDisposable. Suppress intentional interface boundaries; this allocation warning does not prove ownership or replace runtime copy safety.",
+                "Performance",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
     }
 }

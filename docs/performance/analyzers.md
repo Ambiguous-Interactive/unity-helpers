@@ -51,6 +51,7 @@ the window edits the project-wide default ruleset. Writes import the asset immed
 | [`WUH019`](#wuh019-repeated-stable-loop-bound-opt-in)                    | A counting loop repeatedly reading a stable size (**off by default**) |
 | [`WUH020`](#wuh020-hard-stack-and-queue-reads)                           | A throwing stack or queue read with an available Try method           |
 | [`WUH021`](#wuh021-repeated-collection-count-opt-in)                     | Repeated size observations (**off by default**)                       |
+| [`WUH022`](#wuh022-boxing-a-disposable-value-type)                       | A disposable value type converted to a reference type                 |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -1021,3 +1022,58 @@ An IDE or standalone .NET build can set `dotnet_diagnostic.WUH001.severity = non
 
 - [Serialization diagnostics](../features/serialization/serialization.md): the `WPROTO###` family
 - [Reflection performance](./reflection-performance.md): where these caches are used most
+
+## `WUH022`: boxing a disposable value type
+
+A conversion from a disposable struct to `IDisposable`, `object`, `ValueType`, or another
+implemented interface boxes a copy. Nullable disposable values box when present; a constrained
+generic conversion can box its value-type instantiations; reference-type instantiations and empty
+nullable inputs do not allocate a box. The warning reports the compiler's
+boxing conversion, including arguments, returns, casts, and collection elements.
+
+```csharp
+// WUH022: the interface variable adds a boxed scope allocation.
+using IDisposable scope = DisposableScope.Create(Cleanup);
+
+// Retain the concrete value type.
+using DisposableScope concreteScope = DisposableScope.Create(Cleanup);
+```
+
+A generic helper constrained to `IDisposable` can call `Dispose` without converting its parameter
+to an interface variable. Concrete copies, direct `using`, class-to-interface conversions,
+unboxing, and structs that do not implement `IDisposable` remain unreported. Intentional interface
+boundaries can use a narrow suppression; for example, a nongeneric `IEnumerator.Current` must
+return `object`. Explicit `IEnumerable.GetEnumerator` and `IDictionary.GetEnumerator` returns are excluded because
+the interface protocol requires boxing a value enumerator. Ordinary public methods returning an
+enumerator interface remain reportable. Generated code follows the analyzer family's exclusion policy.
+
+This policy is a warning about allocation, not a proof of exclusive ownership. The package retains
+its runtime copy-safe disposal guarantees when the analyzer is disabled or suppressed. C# defines
+value copies on assignment and boxing in its [struct specification](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/structs),
+and analyzers can be [suppressed by consumers](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/suppress-warnings).
+
+### Why disposal bookkeeping remains at runtime
+
+The [#924 investigation](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924) found
+that prohibiting source copies alone cannot preserve the current disposal contract. A single
+uncopied local can call `Dispose` twice, or call it manually before the compiler-generated disposal
+at the end of `using`. Already compiled callers do not run a new analyzer. Reflection, separately
+compiled methods, generated code, closures, generic wrappers, and aliases also prevent a local
+source warning from proving that every possible owner has surrendered its right to dispose.
+`ref struct` limits escaping and boxing, but remains a value type that can be copied; its
+[compiler restrictions](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/ref-struct)
+do not provide move-only ownership.
+
+The runtime sweep identified `DisposableScope`, `DisposableScope<TPrevious>`, `SemaphoreLease`,
+`PooledResource<T>`, and `PooledArray<T>` using shared `(slot, generation)` disposal leases.
+`RestorableGlobal<T>` and editor global scopes use owner-issued borrow identifiers, which also
+protect nested and out-of-order restoration. `PartitionPooled` deliberately keeps copies of the
+consumer's lease so enumeration cleanup returns outstanding partitions without returning a live
+renter's reused buffer. These are existing runtime behaviors that a blanket copy ban would forbid.
+
+Removing a generation check would require a separate ownership contract enforced across every
+caller, including repeated disposal and all escapes. A suppressible allocation analyzer cannot
+supply that contract. WUH022 instead removes an observable, avoidable allocation at the source
+boundary while retaining stale-generation rejection, exactly one concurrent disposal winner,
+warmed acquisition behavior, and safe copies. This investigation reports compiler conversion
+evidence and ownership behavior, without claiming measured player allocation or timing improvements.

@@ -77,7 +77,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// <returns>An enumerator over the elements.</returns>
         public IEnumerator<T> GetEnumerator()
         {
+            /* This fixture deliberately exposes an interface enumerator to exercise the collection contract. */
+#pragma warning disable WUH022
             return _chain.GetEnumerator();
+#pragma warning restore WUH022
         }
 
         /// <summary>Finds the index of an element.</summary>

@@ -131,6 +131,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public SerializationStage Stage { get; }
 
         /// <summary>A short, human-readable reason supplied by the throw site.</summary>
+        /// <remarks>New exceptions use "operation failed" when the supplied reason is blank.</remarks>
         public string Reason { get; }
 
         /// <inheritdoc />
@@ -162,7 +163,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             ResolvedType = resolvedType;
             InputDescriptor = inputDescriptor ?? "<unknown>";
             Stage = stage;
-            Reason = string.IsNullOrEmpty(reason) ? PlaceholderReason : reason;
+            Reason = string.IsNullOrWhiteSpace(reason) ? PlaceholderReason : reason;
         }
 
         /// <summary>

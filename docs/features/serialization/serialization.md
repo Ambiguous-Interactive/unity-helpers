@@ -229,6 +229,14 @@ if (!Serializer.TryWriteToJsonFile(data, "save.json"))
 - Handling corrupted save files gracefully
 - Writing to paths that may not be writable
 
+### Failure diagnostics
+
+New `SerializationFailureException` instances and their derived exceptions use `operation failed`
+when a supplied reason is null, empty, or whitespace-only, including Unicode whitespace. A nonblank
+reason keeps its exact text, including padding and line breaks. `InputDescriptor` remains literal
+metadata and is not trimmed or treated as human-facing reason text. Legacy binary restoration
+preserves a stored reason rather than rewriting historical diagnostic content.
+
 ### Reading Untrusted JSON
 
 A save file, a downloaded payload, and anything that crossed a network are all input nobody in

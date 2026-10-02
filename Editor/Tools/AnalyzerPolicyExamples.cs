@@ -179,6 +179,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Read the size once when one snapshot is intended. Count, known Length properties, and Enumerable counts are covered. Suppress intentional live observations; getters and enumeration may execute custom code and concurrent observations may differ.";
                     break;
+                case "WUH022":
+                    selectedBadCode = "using IDisposable scope = DisposableScope.Create(Cleanup);";
+                    selectedGoodCode =
+                        "using DisposableScope scope = DisposableScope.Create(Cleanup);";
+                    selectedExplanation =
+                        "Keep the concrete scope type to avoid boxing. Intentional interface boundaries can be suppressed; safe copying still depends on the runtime ownership contract.";
+                    break;
                 default:
                     badCode = string.Empty;
                     goodCode = string.Empty;

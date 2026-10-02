@@ -121,6 +121,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Repeated size observations",
                 "Reports repeated Count or Length observations when one snapshot is intended. This policy is opt-in by default."
             ),
+            new(
+                "WUH022",
+                "Disposable value boxing",
+                "Reports boxing conversions of disposable value types. Runtime copy safety remains required."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

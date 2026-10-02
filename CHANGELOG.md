@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WUH022` to report boxing disposable structs and suggest concrete or constrained generic disposal ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Add opt-in `WUH021` to flag repeated size observations, including interface `Count`, known `Length`/`LongLength` properties, and non-predicate LINQ `Count()`/`LongCount()`, when one snapshot is intended.
 - Add `WUH020` to suggest non-throwing queue and stack reads when compatible `Try` methods are available ([#912](https://github.com/Ambiguous-Interactive/unity-helpers/issues/912)).
 - Add explicit scalar default omission for WallstopProto consumer migrations, with ordinary consumer migration coverage and runtime-model compatibility guidance ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
@@ -25,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix blank serialized member names creating synthetic backing fields, and reject backing-field names with blank property names ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
+- Fix newly constructed serialization failure diagnostics with blank reasons so they show `operation failed`; nonblank reasons and literal input descriptors keep their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix async durable writes and copies publishing after cancellation during staging; the previous file stays intact when cancellation is observed before publication ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix Prefab Checker JSON exports to include scanned folders and findings, with empty collections and escaped text ([#870](https://github.com/Ambiguous-Interactive/unity-helpers/issues/870)).
 - Fix WShowIf condition names accepting whitespace-only identifiers; literal whitespace comparison values keep their meaning ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
@@ -52,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Improve directly constructed `PooledResource<T>` wrappers with no return callback by avoiding disposal tracking; callback-backed leases remain copy-safe ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Improve large `Deque<T>` array transfers with contiguous copies, preserving logical order, offsets, and covariant destination behavior ([#904](https://github.com/Ambiguous-Interactive/unity-helpers/issues/904)).
 - Improve `JesseSort` for mixed regions, sparse disorder, and natural runs using the upstream live-phase design ([#747](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)).
 - Improve parent and child collection transfers with bulk copying for `Component` fields while retaining typed enumeration for derived components ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
