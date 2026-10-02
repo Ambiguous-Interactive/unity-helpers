@@ -43,6 +43,11 @@ on:
           - intmap
           - serialization
           - all
+      intmap-diagnostics:
+        description: "Capture IntMap slot diagnostics; diagnostic records cannot pass acceptance."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -578,6 +583,7 @@ jobs:
           UH_PERF_COMMIT: ${{ github.sha }}
           UH_PERF_BASE_COMMIT: ${{ github.sha }}
           UH_PERF_OPTIMIZATION: "Release"
+          UH_PERF_DIAGNOSTICS: ${{ github.event_name == 'workflow_dispatch' && inputs.acceptance == 'intmap' && inputs.intmap-diagnostics && '1' || '' }}
           UH_ACCEPTANCE: ${{ inputs.acceptance }}
           UH_UNITY_VERSION: ${{ matrix.unity-version }}
         run: |

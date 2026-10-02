@@ -25,6 +25,328 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             return new CalibratedBenchmarkMeasurement(reference, subject, 1, 12345, 100, 100, 3, 3);
         }
 
+        [TestCase(null, false)]
+        [TestCase("", false)]
+        [TestCase("0", false)]
+        [TestCase("true", false)]
+        [TestCase(" 1", false)]
+        [TestCase("1 ", false)]
+        [TestCase("1", true)]
+        public void SlotDiagnosticsRequireTheExactOptInValue(string value, bool expected)
+        {
+            Assert.AreEqual(expected, BenchmarkProtocol.IsSlotDiagnosticsEnabled(value));
+        }
+
+        [Test]
+        public void DefaultMeasurementJsonOmitsSlotDiagnosticsEntirely()
+        {
+            double[] reference = new double[32];
+            double[] subject = new double[32];
+            for (int index = 0; index < reference.Length; ++index)
+            {
+                reference[index] = 100;
+                subject[index] = 50;
+            }
+            CalibratedBenchmarkMeasurement measurement = CreateSamples(reference, subject);
+            using JsonDocument document = JsonDocument.Parse(measurement.ToJson());
+            Assert.IsFalse(
+                document.RootElement.TryGetProperty(
+                    nameof(CalibratedBenchmarkMeasurement.SlotDiagnostics),
+                    out _
+                )
+            );
+            Assert.IsTrue(measurement.SlotDiagnostics == null);
+        }
+
+        [Test]
+        public void DiagnosticJsonRetainsEveryChronologicalSlotAndExactCounterValues()
+        {
+            double[] reference = new double[32];
+            double[] subject = new double[32];
+            for (int index = 0; index < reference.Length; ++index)
+            {
+                reference[index] = 100;
+                subject[index] = 50;
+            }
+            BenchmarkSlotObservation[] slots = new BenchmarkSlotObservation[64];
+            const long frequency = 1_000;
+            string order = BenchmarkProtocol.BatchOrder();
+            long cursor = 1000;
+            for (int index = 0; index < slots.Length; ++index)
+            {
+                bool isSubject = order[index % order.Length] == 'B';
+                long end = cursor + (isSubject ? 50 : 100);
+                BenchmarkThreadSnapshot before = BenchmarkThreadSnapshot.FromNativeResults(
+                    cursor - 2,
+                    cursor - 1,
+                    71,
+                    72,
+                    3,
+                    true,
+                    100,
+                    200,
+                    0,
+                    true,
+                    300,
+                    0
+                );
+                BenchmarkThreadSnapshot after = BenchmarkThreadSnapshot.FromNativeResults(
+                    end + 1,
+                    end + 2,
+                    71,
+                    72,
+                    4,
+                    true,
+                    110,
+                    220,
+                    0,
+                    true,
+                    330,
+                    0
+                );
+                slots[index] = new BenchmarkSlotObservation(
+                    index,
+                    isSubject,
+                    cursor,
+                    end,
+                    before,
+                    after
+                );
+                cursor = end + 10;
+            }
+            BenchmarkSlotDiagnostics diagnostics = new(slots, frequency, true);
+            CalibratedBenchmarkMeasurement measurement = new(
+                reference,
+                subject,
+                1,
+                12345,
+                100,
+                100,
+                3,
+                3,
+                diagnostics
+            );
+            slots[0] = default;
+            using JsonDocument document = JsonDocument.Parse(measurement.ToJson());
+            JsonElement serialized = document.RootElement.GetProperty(
+                nameof(CalibratedBenchmarkMeasurement.SlotDiagnostics)
+            );
+            Assert.IsTrue(
+                serialized
+                    .GetProperty(nameof(BenchmarkSlotDiagnostics.IsDiagnosticOnly))
+                    .GetBoolean()
+            );
+            Assert.AreEqual(
+                frequency,
+                serialized.GetProperty(nameof(BenchmarkSlotDiagnostics.CounterFrequency)).GetInt64()
+            );
+            JsonElement observations = serialized.GetProperty(
+                nameof(BenchmarkSlotDiagnostics.Slots)
+            );
+            Assert.AreEqual(64, observations.GetArrayLength());
+            int referenceIndex = 0;
+            int subjectIndex = 0;
+            int chronologicalIndex = 0;
+            foreach (JsonElement observation in observations.EnumerateArray())
+            {
+                Assert.AreEqual(
+                    chronologicalIndex,
+                    observation
+                        .GetProperty(nameof(BenchmarkSlotObservation.ChronologicalIndex))
+                        .GetInt32()
+                );
+                bool isSubject = observation
+                    .GetProperty(nameof(BenchmarkSlotObservation.IsSubject))
+                    .GetBoolean();
+                Assert.AreEqual(order[chronologicalIndex % order.Length] == 'B', isSubject);
+                long start = observation
+                    .GetProperty(nameof(BenchmarkSlotObservation.WorkStartTimestamp))
+                    .GetInt64();
+                long end = observation
+                    .GetProperty(nameof(BenchmarkSlotObservation.WorkEndTimestamp))
+                    .GetInt64();
+                double expected = isSubject ? subject[subjectIndex++] : reference[referenceIndex++];
+                Assert.AreEqual(expected, (end - start) * (1000.0 / frequency));
+                JsonElement before = observation.GetProperty(
+                    nameof(BenchmarkSlotObservation.Before)
+                );
+                JsonElement after = observation.GetProperty(nameof(BenchmarkSlotObservation.After));
+                Assert.AreEqual(
+                    72u,
+                    before.GetProperty(nameof(BenchmarkThreadSnapshot.NativeThreadId)).GetUInt32()
+                );
+                Assert.AreEqual(
+                    71u,
+                    after.GetProperty(nameof(BenchmarkThreadSnapshot.NativeProcessId)).GetUInt32()
+                );
+                Assert.AreEqual(
+                    3u,
+                    before.GetProperty(nameof(BenchmarkThreadSnapshot.ProcessorNumber)).GetUInt32()
+                );
+                Assert.AreEqual(
+                    4u,
+                    after.GetProperty(nameof(BenchmarkThreadSnapshot.ProcessorNumber)).GetUInt32()
+                );
+                ++chronologicalIndex;
+            }
+            Assert.AreEqual(32, referenceIndex);
+            Assert.AreEqual(32, subjectIndex);
+            Assert.AreEqual(1000, diagnostics.Slots[0].WorkStartTimestamp);
+            CalibratedBenchmarkMeasurement normal = CreateSamples(reference, subject);
+            Assert.AreEqual(normal.Comparison, measurement.Comparison);
+            Assert.AreEqual(normal.RatioLower95, measurement.RatioLower95);
+            Assert.AreEqual(normal.RatioUpper95, measurement.RatioUpper95);
+            Assert.IsTrue(normal.HasTimingImprovement);
+            Assert.IsTrue(normal.HasTimingNonInferiority);
+            Assert.IsFalse(measurement.HasTimingImprovement);
+            Assert.IsFalse(measurement.HasTimingNonInferiority);
+        }
+
+        [TestCase(true, true)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(false, false)]
+        public void FailedNativeMetricsSerializeAsNullAndPreserveExactApiErrors(
+            bool timesSucceeded,
+            bool cyclesSucceeded
+        )
+        {
+            BenchmarkThreadSnapshot snapshot = BenchmarkThreadSnapshot.FromNativeResults(
+                100,
+                110,
+                71,
+                72,
+                3,
+                timesSucceeded,
+                ulong.MaxValue,
+                200,
+                5,
+                cyclesSucceeded,
+                ulong.MaxValue,
+                87
+            );
+            BenchmarkSlotDiagnostics diagnostics = new(
+                new[] { new BenchmarkSlotObservation(0, false, 120, 130, snapshot, snapshot) },
+                1000,
+                true
+            );
+            double[] samples = new double[32];
+            for (int index = 0; index < samples.Length; ++index)
+            {
+                samples[index] = 100;
+            }
+            CalibratedBenchmarkMeasurement measurement = new(
+                samples,
+                samples,
+                1,
+                12345,
+                100,
+                100,
+                3,
+                3,
+                diagnostics
+            );
+            using JsonDocument document = JsonDocument.Parse(measurement.ToJson());
+            JsonElement before = document
+                .RootElement.GetProperty(nameof(CalibratedBenchmarkMeasurement.SlotDiagnostics))
+                .GetProperty(nameof(BenchmarkSlotDiagnostics.Slots))[0]
+                .GetProperty(nameof(BenchmarkSlotObservation.Before));
+            Assert.AreEqual(
+                timesSucceeded ? JsonValueKind.Number : JsonValueKind.Null,
+                before
+                    .GetProperty(nameof(BenchmarkThreadSnapshot.KernelTime100Nanoseconds))
+                    .ValueKind
+            );
+            Assert.AreEqual(
+                timesSucceeded ? JsonValueKind.Number : JsonValueKind.Null,
+                before.GetProperty(nameof(BenchmarkThreadSnapshot.UserTime100Nanoseconds)).ValueKind
+            );
+            Assert.AreEqual(
+                cyclesSucceeded ? JsonValueKind.Number : JsonValueKind.Null,
+                before.GetProperty(nameof(BenchmarkThreadSnapshot.ThreadCycleCount)).ValueKind
+            );
+            if (timesSucceeded)
+            {
+                Assert.AreEqual(
+                    ulong.MaxValue,
+                    before
+                        .GetProperty(nameof(BenchmarkThreadSnapshot.KernelTime100Nanoseconds))
+                        .GetUInt64()
+                );
+                Assert.AreEqual(
+                    JsonValueKind.Null,
+                    before.GetProperty(nameof(BenchmarkThreadSnapshot.ThreadTimesError)).ValueKind
+                );
+            }
+            else
+            {
+                Assert.AreEqual(
+                    5,
+                    before.GetProperty(nameof(BenchmarkThreadSnapshot.ThreadTimesError)).GetInt32()
+                );
+            }
+            if (cyclesSucceeded)
+            {
+                Assert.AreEqual(
+                    ulong.MaxValue,
+                    before.GetProperty(nameof(BenchmarkThreadSnapshot.ThreadCycleCount)).GetUInt64()
+                );
+                Assert.AreEqual(
+                    JsonValueKind.Null,
+                    before.GetProperty(nameof(BenchmarkThreadSnapshot.ThreadCyclesError)).ValueKind
+                );
+            }
+            else
+            {
+                Assert.AreEqual(
+                    87,
+                    before.GetProperty(nameof(BenchmarkThreadSnapshot.ThreadCyclesError)).GetInt32()
+                );
+            }
+            Assert.AreEqual(
+                timesSucceeded && cyclesSucceeded ? "Available" : "NativeApiFailed",
+                before.GetProperty(nameof(BenchmarkThreadSnapshot.Availability)).GetString()
+            );
+        }
+
+        [Test]
+        public void NativeSnapshotReportsAvailabilityWithoutInventingCounters()
+        {
+            BenchmarkThreadSnapshot snapshot = BenchmarkThreadSnapshot.Capture();
+            Assert.LessOrEqual(snapshot.CaptureStartTimestamp, snapshot.CaptureEndTimestamp);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(snapshot.Availability));
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            if (snapshot.NativeThreadId.HasValue)
+            {
+                Assert.Less(0u, snapshot.NativeThreadId.Value);
+                Assert.IsTrue(snapshot.NativeProcessId.HasValue);
+                Assert.Less(0u, snapshot.NativeProcessId.Value);
+                Assert.IsTrue(snapshot.ProcessorNumber.HasValue);
+                Assert.AreEqual(
+                    snapshot.KernelTime100Nanoseconds.HasValue,
+                    snapshot.UserTime100Nanoseconds.HasValue
+                );
+                Assert.AreEqual(
+                    !snapshot.ThreadTimesError.HasValue,
+                    snapshot.UserTime100Nanoseconds.HasValue
+                );
+                Assert.AreEqual(
+                    !snapshot.ThreadCyclesError.HasValue,
+                    snapshot.ThreadCycleCount.HasValue
+                );
+                return;
+            }
+#else
+            Assert.AreEqual("UnsupportedPlatform", snapshot.Availability);
+#endif
+            Assert.IsFalse(snapshot.NativeThreadId.HasValue);
+            Assert.IsFalse(snapshot.NativeProcessId.HasValue);
+            Assert.IsFalse(snapshot.ProcessorNumber.HasValue);
+            Assert.IsFalse(snapshot.KernelTime100Nanoseconds.HasValue);
+            Assert.IsFalse(snapshot.UserTime100Nanoseconds.HasValue);
+            Assert.IsFalse(snapshot.ThreadCycleCount.HasValue);
+        }
+
         [TestCase(0.90, true, true)]
         [TestCase(0.96, false, true)]
         [TestCase(1.04, false, true)]

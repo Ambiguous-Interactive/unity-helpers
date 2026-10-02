@@ -134,6 +134,9 @@ try {
       })
     ));
   for (const [name, mutation] of [
+    ["diagnostic observations", (sample) => (sample.SlotDiagnostics = { DiagnosticOnly: true })],
+    ["null diagnostics cannot bypass rejection", (sample) => (sample.SlotDiagnostics = null)],
+    ["malformed diagnostics cannot bypass rejection", (sample) => (sample.SlotDiagnostics = false)],
     ["wrong commit", (sample) => (sample.EnvironmentMetadata.commit = "b".repeat(40))],
     ["wrong version", (sample) => (sample.EnvironmentMetadata.unityVersion = "6000.5.2f1")],
     ["editor result", (sample) => (sample.EnvironmentMetadata.isEditor = "True")],

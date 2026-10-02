@@ -212,8 +212,25 @@ The verifier derives ratios, spreads and the bootstrap interval from the raw sam
 `inconclusive` for unstable arms, `meets-hit-margin` for stable results with at least 1.3× at both
 hit-only sizes and a favorable interval, or `below-hit-margin`. This is the timing decision for
 [#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578); it is not full #636
-acceptance or proof of unmeasured allocation and code-size properties. No IntMap player result
-has been claimed before this workflow actually runs.
+acceptance or proof of unmeasured allocation and code-size properties. The current corrected-map
+player campaign has rejected unstable workloads; those observations establish no speed claim.
+
+Set `UH_PERF_DIAGNOSTICS=1` only for a predeclared investigation run, or select
+`intmap-diagnostics=true` when manually dispatching `acceptance=intmap`. The workflow enables
+diagnostics only in that additional player step. Calibrated records then
+include `SlotDiagnostics` for every chronological slot, retaining the same clock boundaries,
+sample counts, calibration and stability limit. Windows diagnostics capture native thread identity,
+thread CPU accounting, raw thread cycle counts and the processor observed at each boundary.
+Unavailable APIs remain explicit. The player verifier rejects any record containing diagnostics
+as acceptance evidence, even when its timings appear stable.
+
+Thread CPU accounting brackets the timed work and includes diagnostic-call overhead and checksum
+publication; its resolution limits comparisons with elapsed time. Processor numbers are relative
+to the current processor group. Endpoints reveal some migrations but cannot exclude movement during
+a slot or between groups. Raw cycle counts are never converted to elapsed time or frequency, as
+[Microsoft's API contract](https://learn.microsoft.com/en-us/windows/win32/api/realtimeapiset/nf-realtimeapiset-querythreadcycletime)
+prohibits that inference. These diagnostics narrow scheduling hypotheses; they do not by themselves
+prove a cause or justify changing affinity, priority, samples or acceptance thresholds.
 
 The encoded timing improvement predicate requires at least 5% less runtime (throughput ratio
 at least `1 / 0.95`), an entirely favorable interval, and stable arms. The allocation-change timing

@@ -133,6 +133,9 @@ function verifyAcceptance(root, commit, unityVersion) {
     const key = `${match[1]}/${match[2]}`;
     if (workloads.has(key)) throw new Error(`Duplicate IntMap workload ${key}.`);
     const evidence = JSON.parse(match[3]);
+    if (Object.hasOwn(evidence, "SlotDiagnostics")) {
+      throw new Error(`IntMap ${key}: diagnostic observations cannot establish acceptance.`);
+    }
     const metadata = evidence.EnvironmentMetadata;
     if (
       !metadata ||

@@ -51,6 +51,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// </summary>
         public const double DefaultSpreadLimit = 0.03;
 
+        internal const string DiagnosticsEnvironmentVariable = "UH_PERF_DIAGNOSTICS";
+
         private static long _calibratedSink;
 
         // false = reference, true = subject. A B B A B A A B.
@@ -84,6 +86,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return null;
             }
 
+            bool captureDiagnostics = IsSlotDiagnosticsEnabled(
+                Environment.GetEnvironmentVariable(DiagnosticsEnvironmentVariable)
+            );
+            BenchmarkSlotObservation[] observations = captureDiagnostics
+                ? new BenchmarkSlotObservation[CalibratedBatches * CyclesPerBatch * 2]
+                : null;
             verifyCorrectness();
             double referenceWarmup = Warmup(reference, out int referenceWarmupExecutions);
             double subjectWarmup = Warmup(subject, out int subjectWarmupExecutions);
@@ -91,8 +99,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             const int maximumIterations = 1 << 20;
             while (true)
             {
-                double referenceMilliseconds = TimeWork(reference, iterations);
-                double subjectMilliseconds = TimeWork(subject, iterations);
+                double referenceMilliseconds = TimeWork(reference, iterations, out _, out _);
+                double subjectMilliseconds = TimeWork(subject, iterations, out _, out _);
                 if (
                     MinimumSampleMilliseconds * 2
                     <= Math.Min(referenceMilliseconds, subjectMilliseconds)
@@ -114,12 +122,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             double[] subjectSamples = new double[referenceSamples.Length];
             int referenceIndex = 0;
             int subjectIndex = 0;
+            int chronologicalIndex = 0;
             for (int batch = 0; batch < CalibratedBatches; ++batch)
             {
                 foreach (bool isSubject in BatchSlots)
                 {
                     Settle();
-                    double milliseconds = TimeWork(isSubject ? subject : reference, iterations);
+                    BenchmarkThreadSnapshot before = captureDiagnostics
+                        ? BenchmarkThreadSnapshot.Capture()
+                        : default;
+                    double milliseconds = TimeWork(
+                        isSubject ? subject : reference,
+                        iterations,
+                        out long startTimestamp,
+                        out long endTimestamp
+                    );
+                    if (captureDiagnostics)
+                    {
+                        BenchmarkThreadSnapshot after = BenchmarkThreadSnapshot.Capture();
+                        observations[chronologicalIndex] = new BenchmarkSlotObservation(
+                            chronologicalIndex,
+                            isSubject,
+                            startTimestamp,
+                            endTimestamp,
+                            before,
+                            after
+                        );
+                        ++chronologicalIndex;
+                    }
                     if (isSubject)
                     {
                         subjectSamples[subjectIndex++] = milliseconds;
@@ -140,7 +170,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 referenceWarmup,
                 subjectWarmup,
                 referenceWarmupExecutions,
-                subjectWarmupExecutions
+                subjectWarmupExecutions,
+                captureDiagnostics
+                    ? new BenchmarkSlotDiagnostics(
+                        observations,
+                        Stopwatch.Frequency,
+                        Stopwatch.IsHighResolution
+                    )
+                    : null
             );
         }
 
@@ -305,6 +342,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             return (highest - lowest) / lowest;
         }
 
+        internal static bool IsSlotDiagnosticsEnabled(string value)
+        {
+            return string.Equals(value, "1", StringComparison.Ordinal);
+        }
+
         private static double Warmup(Func<int, long> work, out int executions)
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
@@ -317,11 +359,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             return stopwatch.Elapsed.TotalMilliseconds;
         }
 
-        private static double TimeWork(Func<int, long> work, int iterations)
+        private static double TimeWork(
+            Func<int, long> work,
+            int iterations,
+            out long startTimestamp,
+            out long endTimestamp
+        )
         {
-            long start = Stopwatch.GetTimestamp();
+            startTimestamp = Stopwatch.GetTimestamp();
             long checksum = work(iterations);
-            long elapsed = Stopwatch.GetTimestamp() - start;
+            endTimestamp = Stopwatch.GetTimestamp();
+            long elapsed = endTimestamp - startTimestamp;
             Interlocked.Exchange(ref _calibratedSink, checksum);
             return elapsed * (1000.0 / Stopwatch.Frequency);
         }
