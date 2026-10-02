@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
             try
             {
                 if (
-                    arguments.Length > 1
+                    1 < arguments.Length
                     || (
                         arguments.Length == 1
                         && !string.Equals(arguments[0], "--fix", StringComparison.Ordinal)
@@ -65,13 +65,13 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
                         string source = File.ReadAllText(path);
                         Dictionary<TextSpan, string> methodEdits = FindEdits(source, true);
                         methods += methodEdits.Count;
-                        if (fix && methodEdits.Count > 0)
+                        if (fix && 0 < methodEdits.Count)
                         {
                             source = ApplyEdits(source, methodEdits);
                         }
                         Dictionary<TextSpan, string> incrementEdits = FindEdits(source, false);
                         increments += incrementEdits.Count;
-                        if (fix && incrementEdits.Count > 0)
+                        if (fix && 0 < incrementEdits.Count)
                         {
                             source = ApplyEdits(source, incrementEdits);
                         }
@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
         private static Dictionary<TextSpan, string> FindEdits(string source, bool methods)
         {
             List<string> symbols = FindSymbols(source);
-            if (symbols.Count > 12)
+            if (12 < symbols.Count)
             {
                 throw new InvalidOperationException(
                     "More than twelve conditional symbols require an explicit scan strategy."
