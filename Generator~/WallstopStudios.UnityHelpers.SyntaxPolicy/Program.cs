@@ -22,6 +22,8 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
             "Editor",
             "Tests",
             "Generator~",
+            "Samples~",
+            "Styles",
         };
 
         private static int Main(string[] arguments)

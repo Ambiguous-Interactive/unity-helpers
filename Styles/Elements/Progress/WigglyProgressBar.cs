@@ -797,7 +797,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 }
             }
 
-            for (int i = 0; i <= totalSegments; i++)
+            for (int i = 0; i <= totalSegments; ++i)
             {
                 float currentArcDist = startArcDistance + i * dArcDistance;
                 currentArcDist = Mathf.Clamp(currentArcDist, startArcDistance, endArcDistance);

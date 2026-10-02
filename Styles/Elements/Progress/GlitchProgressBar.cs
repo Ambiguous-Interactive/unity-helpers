@@ -430,7 +430,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 int numSegments = _random.Next(2, 5);
                 float segmentHeight = r.height / numSegments;
 
-                for (int i = 0; i < numSegments; i++)
+                for (int i = 0; i < numSegments; ++i)
                 {
                     float offsetX = (_random.NextFloat() - 0.5f) * 2f * r.width * glitchIntensity;
                     float offsetY =
