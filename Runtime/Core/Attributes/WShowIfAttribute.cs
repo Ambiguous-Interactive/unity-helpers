@@ -143,7 +143,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// <summary>
         /// Configures a conditional visibility rule for an inspector field.
         /// </summary>
-        /// <param name="conditionField">Name of the member used for evaluation.</param>
+        /// <param name="conditionField">Nonblank name of the member used for evaluation, preserved exactly.</param>
         /// <param name="expectedValues">Optional explicit values that should evaluate as visible.</param>
         public WShowIfAttribute(string conditionField, params object[] expectedValues)
             : this(conditionField, false, WShowIfComparison.Equal, expectedValues) { }
@@ -151,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// <summary>
         /// Configures a conditional visibility rule with explicit inversion for an inspector field.
         /// </summary>
-        /// <param name="conditionField">Name of the member used for evaluation.</param>
+        /// <param name="conditionField">Nonblank name of the member used for evaluation, preserved exactly.</param>
         /// <param name="inverse">Set to <c>true</c> to flip the visibility result.</param>
         /// <param name="expectedValues">Optional explicit values that should evaluate as visible.</param>
         public WShowIfAttribute(string conditionField, bool inverse, params object[] expectedValues)
@@ -160,7 +160,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// <summary>
         /// Configures a conditional visibility rule with a specific comparison mode.
         /// </summary>
-        /// <param name="conditionField">Name of the member used for evaluation.</param>
+        /// <param name="conditionField">Nonblank name of the member used for evaluation, preserved exactly.</param>
         /// <param name="comparison">Comparison strategy applied to the condition value.</param>
         /// <param name="expectedValues">Optional explicit values that should evaluate as visible.</param>
         public WShowIfAttribute(
@@ -173,7 +173,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// <summary>
         /// Configures a conditional visibility rule for an inspector field.
         /// </summary>
-        /// <param name="conditionField">Name of the member used for evaluation.</param>
+        /// <param name="conditionField">Nonblank name of the member used for evaluation, preserved exactly.</param>
         /// <param name="inverse">Set to <c>true</c> to flip the visibility result.</param>
         /// <param name="comparison">Comparison strategy applied to the condition value.</param>
         /// <param name="expectedValues">Optional explicit values that should evaluate as visible.</param>
@@ -184,10 +184,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             params object[] expectedValues
         )
         {
-            if (string.IsNullOrEmpty(conditionField))
+            if (string.IsNullOrWhiteSpace(conditionField))
             {
                 throw new ArgumentException(
-                    "Condition member name cannot be null or empty.",
+                    "Condition member name cannot be null, empty, or whitespace.",
                     nameof(conditionField)
                 );
             }

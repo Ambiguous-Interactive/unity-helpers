@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix async durable writes and copies publishing after cancellation during staging; the previous file stays intact when cancellation is observed before publication ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
+- Fix Prefab Checker JSON exports to include scanned folders and findings, with empty collections and escaped text ([#870](https://github.com/Ambiguous-Interactive/unity-helpers/issues/870)).
+- Fix WShowIf condition names accepting whitespace-only identifiers; literal whitespace comparison values keep their meaning ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix Unity Method Analyzer recovery from corrupt compiler snapshots while preserving saved report compatibility ([#870](https://github.com/Ambiguous-Interactive/unity-helpers/issues/870)).
 - Fix test run summary ownership so blank tokens cannot finish or discard running markers; valid tokens retain their literal spaces ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix subtype manifest ownership lookup accepting whitespace-only directories; valid folder names containing spaces remain unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).

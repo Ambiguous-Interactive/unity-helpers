@@ -202,7 +202,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="path">Destination file path. Missing directories are created.</param>
         /// <param name="contents">Text to write. Null is treated as empty.</param>
-        /// <param name="cancellationToken">Optional cancellation token.</param>
+        /// <param name="cancellationToken">Cancellation is checked immediately before publication; cancellation after that check may still publish.</param>
         /// <returns>Null on success, otherwise the failure.</returns>
         public static ValueTask<Exception> WriteAllTextAsync(
             string path,
@@ -222,7 +222,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </remarks>
         /// <param name="path">Destination file path. Missing directories are created.</param>
         /// <param name="contents">Bytes to write. Null is treated as empty.</param>
-        /// <param name="cancellationToken">Optional cancellation token.</param>
+        /// <param name="cancellationToken">Cancellation is checked immediately before publication; cancellation after that check may still publish.</param>
         /// <returns>Null on success, otherwise the failure.</returns>
         /// <example>
         /// <code>
@@ -457,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="sourcePath">File to copy from.</param>
         /// <param name="destinationPath">File to replace. Missing directories are created.</param>
-        /// <param name="cancellationToken">Optional cancellation token.</param>
+        /// <param name="cancellationToken">Cancellation is checked immediately before publication; cancellation after that check may still publish.</param>
         /// <returns>Null on success, otherwise the failure.</returns>
         public static ValueTask<Exception> CopyAsync(
             string sourcePath,
@@ -992,6 +992,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if UNITY_EDITOR
                         BeforeStagedSwapForTests?.Invoke(temporaryPath);
 #endif
+                        cancellationToken.ThrowIfCancellationRequested();
                         Swap(temporaryPath, destinationPath);
                     }
 
@@ -1092,6 +1093,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if UNITY_EDITOR
                     BeforeStagedSwapForTests?.Invoke(temporaryPath);
 #endif
+                    cancellationToken.ThrowIfCancellationRequested();
                     Swap(temporaryPath, path);
 
                     return null;

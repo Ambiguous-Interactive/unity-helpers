@@ -1021,6 +1021,13 @@ DurableFile.TryCopy(savePath, backupPath, out Exception copyError);
 `Serializer.WriteToJsonFile` and `WriteToJsonFileAsync` already write through this, so JSON saves get the
 guarantee without changing any code.
 
+Async whole-file writes and copies check cancellation again after staging and immediately before
+publication. Cancellation observed there returns a failure, preserves the previous destination (or its
+absence), attempts to remove the staged file, and releases ownership for a retry. Staged-file cleanup
+is best effort: a deletion failure can leave that temporary file behind. Cancellation arriving after
+that final check can still publish the complete new file. Appending records has a separate contract: a
+cancelled append may have written part of its new record.
+
 **What it promises:**
 
 - On platforms with `File.Replace`, a reader sees either complete old or complete new contents.
@@ -1040,7 +1047,9 @@ guarantee without changing any code.
 - An internal compare-then-replace operation checks a file before staging its replacement, but
   unrelated writers can edit the destination between that check and the swap. It does not provide
   atomic content compare-and-swap against external tools. See [#863](https://github.com/Ambiguous-Interactive/unity-helpers/issues/863)
-  for the stronger contract under investigation.
+  for the stronger contract under investigation. Tests reproduce a direct edit after comparison for both text
+  and byte replacement: the complete staged replacement wins, so the external edit is lost. Use a
+  shared writer protocol or a transactional store when that loss is unacceptable.
 
 A leftover `.tmp` sibling (`DurableFile.TemporarySuffix`) is what an interrupted write leaves behind; it is
 safe to ignore or delete.

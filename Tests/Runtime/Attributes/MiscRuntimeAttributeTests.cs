@@ -121,6 +121,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.AreEqual(string.Empty, attribute.resourcesPath);
         }
 
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u00a0\u2003")]
+        public void WShowIfAttributeRejectsBlankConditionMember(string conditionMember)
+        {
+            ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+                new WShowIfAttribute(conditionMember)
+            );
+            Assert.That(exception.ParamName, Is.EqualTo(nameof(WShowIfAttribute.conditionField)));
+            Assert.Throws<ArgumentException>(() => new WShowIfAttribute(conditionMember, true));
+            Assert.Throws<ArgumentException>(() =>
+                new WShowIfAttribute(conditionMember, WShowIfComparison.IsNull)
+            );
+            Assert.Throws<ArgumentException>(() =>
+                new WShowIfAttribute(conditionMember, true, WShowIfComparison.IsNull)
+            );
+        }
+
+        [TestCase(" condition ")]
+        [TestCase("nested.condition")]
+        public void WShowIfAttributePreservesNonblankConditionMember(string conditionMember)
+        {
+            WShowIfAttribute attribute = new(conditionMember);
+            Assert.That(attribute.conditionField, Is.EqualTo(conditionMember));
+        }
+
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u00a0\u2003")]
+        [TestCase(" value ")]
+        public void WShowIfAttributePreservesLiteralExpectedText(string expectedText)
+        {
+            WShowIfAttribute attribute = new(nameof(expectedText), expectedText);
+            Assert.That(attribute.expectedValues, Is.EqualTo(new object[] { expectedText }));
+        }
+
         [Test]
         public void WShowIfAttributeCopiesExpectedValues()
         {

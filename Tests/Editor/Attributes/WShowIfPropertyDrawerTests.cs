@@ -733,6 +733,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.True(InvokeShouldShow(drawer, dependentProperty));
         }
 
+        [TestCase(" ", WShowIfComparison.IsNullOrEmpty, false)]
+        [TestCase("\t\r\n", WShowIfComparison.IsNullOrEmpty, false)]
+        [TestCase("\u00a0\u2003", WShowIfComparison.IsNullOrEmpty, false)]
+        [TestCase(" ", WShowIfComparison.IsNotNullOrEmpty, true)]
+        [TestCase("\t\r\n", WShowIfComparison.IsNotNullOrEmpty, true)]
+        [TestCase("\u00a0\u2003", WShowIfComparison.IsNotNullOrEmpty, true)]
+        [TestCase(" ", WShowIfComparison.Equal, true)]
+        [TestCase("\t\r\n", WShowIfComparison.Equal, true)]
+        [TestCase("\u00a0\u2003", WShowIfComparison.Equal, true)]
+        [TestCase(" ", WShowIfComparison.NotEqual, false)]
+        [TestCase("\t\r\n", WShowIfComparison.NotEqual, false)]
+        [TestCase("\u00a0\u2003", WShowIfComparison.NotEqual, false)]
+        public void StringComparisonsPreserveWhitespaceContent(
+            string text,
+            WShowIfComparison comparison,
+            bool expectedVisible
+        )
+        {
+            TestContainer container = CreateScriptableObject<TestContainer>();
+            container.stringCondition = text;
+            using SerializedObjectTracker serializedObject = new();
+            SerializedProperty dependentProperty = RefreshProperty(
+                serializedObject,
+                container,
+                nameof(TestContainer.stringDependent)
+            );
+            WShowIfPropertyDrawer drawer = CreateDrawer(
+                new WShowIfAttribute(nameof(TestContainer.stringCondition), comparison, text)
+            );
+
+            Assert.That(InvokeShouldShow(drawer, dependentProperty), Is.EqualTo(expectedVisible));
+            Assert.That(container.stringCondition, Is.EqualTo(text));
+        }
+
         [Test]
         public void IsNullOrEmptyComparisonHandlesStringsAndCollections()
         {
