@@ -641,7 +641,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
 
             painter.BeginPath();
-            for (int i = 0; i < _pathPoints.Count - 1; i++)
+            for (int i = 0; i < _pathPoints.Count - 1; ++i)
             {
                 Vector2 p1 = _pathPoints[i];
                 Vector2 p2 = _pathPoints[i + 1];
@@ -768,7 +768,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             float startRad = startAngleDeg * Mathf.Deg2Rad;
             float endRad = (startAngleDeg + sweepAngleDeg) * Mathf.Deg2Rad;
             float angleStep = (endRad - startRad) / Mathf.Max(1, segments);
-            for (int i = 1; i <= segments; i++)
+            for (int i = 1; i <= segments; ++i)
             {
                 float currentRad = startRad + i * angleStep;
                 points.Add(

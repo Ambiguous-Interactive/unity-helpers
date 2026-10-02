@@ -1032,7 +1032,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             try
             {
                 Color[] pix = new Color[w * h];
-                for (int i = 0; i < pix.Length; i++)
+                for (int i = 0; i < pix.Length; ++i)
                 {
                     pix[i] = c;
                 }

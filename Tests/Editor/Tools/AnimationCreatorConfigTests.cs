@@ -284,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.AreEqual(original.preWrapMode, restored.preWrapMode);
             Assert.AreEqual(original.postWrapMode, restored.postWrapMode);
 
-            for (int i = 0; i < original.length; i++)
+            for (int i = 0; i < original.length; ++i)
             {
                 Assert.AreEqual(original[i].time, restored[i].time, 0.0001f);
                 Assert.AreEqual(original[i].value, restored[i].value, 0.0001f);
@@ -645,7 +645,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         public void LargeNumberOfKeyframesSerializesCorrectly()
         {
             AnimationCurve curve = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 float t = i / 99f;
                 curve.AddKey(new Keyframe(t, 6f + 18f * t));

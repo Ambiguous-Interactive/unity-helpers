@@ -298,7 +298,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 _status = string.Empty;
             }
 
-            for (int index = 0; index < run.Failures.Count; index++)
+            for (int index = 0; index < run.Failures.Count; ++index)
             {
                 Debug.LogError("[Asset Validation] " + run.Failures[index]);
             }
@@ -418,7 +418,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             if (selectedId != null)
             {
                 int visibleCount = _visible.Count;
-                for (int index = 0; index < visibleCount; index++)
+                for (int index = 0; index < visibleCount; ++index)
                 {
                     if (string.Equals(_visible[index].Id, selectedId, StringComparison.Ordinal))
                     {

@@ -199,7 +199,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return false;
                 }
                 int frameCount = frames.Count;
-                for (int index = 0; index < frameCount; index++)
+                for (int index = 0; index < frameCount; ++index)
                 {
                     if (frames[index] == null)
                     {
@@ -220,7 +220,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         curveDuration = lastTime;
                     }
                 }
-                for (int index = 0; index < frameCount; index++)
+                for (int index = 0; index < frameCount; ++index)
                 {
                     frameTimes[index] = currentTime;
                     if (index == frameCount - 1)
@@ -265,7 +265,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 try
                 {
                     ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[frameCount];
-                    for (int index = 0; index < frameCount; index++)
+                    for (int index = 0; index < frameCount; ++index)
                     {
                         keyframes[index] = new ObjectReferenceKeyframe
                         {
@@ -337,7 +337,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             char[] characters = name.ToCharArray();
             int charactersLength = characters.Length;
-            for (int index = 0; index < charactersLength; index++)
+            for (int index = 0; index < charactersLength; ++index)
             {
                 if (char.IsControl(characters[index]))
                 {

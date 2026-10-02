@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [WButton("Test Button")]
         private void TestMethod()
         {
-            invocationCount++;
+            ++invocationCount;
         }
     }
 }

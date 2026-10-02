@@ -152,7 +152,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             {
                 int[] normalized = new int[Categories.Length];
                 int normalizedLength = normalized.Length;
-                for (int index = 0; index < normalizedLength; index++)
+                for (int index = 0; index < normalizedLength; ++index)
                     normalized[index] =
                         profile.triggers != null && index < profile.triggers.Length
                             ? Math.Max(0, Math.Min(2, profile.triggers[index]))
@@ -211,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             if (findings == null)
                 return;
             findings.RemoveAll(finding => !IsEnabled(finding.RuleId));
-            for (int index = 0; index < findings.Count; index++)
+            for (int index = 0; index < findings.Count; ++index)
             {
                 ValidationFinding finding = findings[index];
                 ValidationSeverity severity = SeverityFor(finding.RuleId, finding.OriginalSeverity);

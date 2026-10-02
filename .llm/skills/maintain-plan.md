@@ -42,6 +42,22 @@ Each active or future initiative contains only:
 Keep only unchecked work. A decision belongs only when it directly changes the next action and has
 no canonical home to link instead.
 
+## Lean Entries
+
+- Group status once when several initiatives share it; keep priority and dependencies explicit.
+- Put a concrete acceptance signal beside its action. Do not repeat broad statements such as
+  "evidence recorded" or "all definitions of done met" under every initiative.
+- Use the owning issue's detailed definition of done; link designs, procedures, and technical
+  constraints instead of restating them. Keep a constraint inline when omitting it could cause
+  premature removal, incompatible migration, or an unsupported performance claim.
+- Detail near-term tasks enough to act; keep future work to its outcome, dependency, and first
+  characterization. Expand it when selected, using the canonical issue or design.
+- Do not make the plan shorter by hiding unfinished actions in session logs or creating a second
+  backlog in a context, skill, or reference file. Those files hold knowledge; the plan retains open
+  commitments. A session snapshot is an audit trail, not the only home of unfinished work.
+- Close each task against its concrete acceptance signal, or record an owned remainder in its
+  canonical issue. Do not infer closure from wording changes.
+
 ---
 
 ## Route Everything Else
@@ -74,8 +90,10 @@ Do not duplicate those sources in the working plan; link them.
    in the session file; keep audit reports and snapshots out of the working plan.
 
 Use a failing characterization before cleanup and repeat it afterward: count lines and initiatives,
-check for historical narratives, and compare open actions and references. For a prose-only cleanup,
-these checks and documentation linters supply the evidence; a new test framework is unnecessary.
+count words, check for historical narratives and repeated boilerplate, and compare open actions
+and references. Do not meet the line budget by packing more clauses onto each line. For a
+prose-only cleanup, these checks and documentation linters supply the evidence; a new test
+framework is unnecessary.
 
 ---
 
@@ -91,6 +109,10 @@ these checks and documentation linters supply the evidence; a new test framework
 
 Never stage or force-add `progress/` or `progress.meta`. These are disposable agent scratch files;
 the repository ignore rules and lint gate deliberately keep them out of history.
+
+A plan cleanup does not complete its owning goal. Audit each original goal requirement against
+current files, tests, issue acceptance and remote checks. Leave the goal active when any required
+evidence is missing; retain its next action in the plan instead of treating a partial slice as closure.
 
 A completed checkbox, shipped section, session narrative, evidence table, or retrospective in
 the working plan is a routing failure. Move it; do not summarize it in place.

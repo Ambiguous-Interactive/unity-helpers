@@ -8,7 +8,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
     internal static class ValidationManagedReferences
     {
-        internal static long GetId(SerializedProperty property) => property.managedReferenceId;
+        internal static long GetId(SerializedProperty property)
+        {
+            return property.managedReferenceId;
+        }
     }
 #endif
 }

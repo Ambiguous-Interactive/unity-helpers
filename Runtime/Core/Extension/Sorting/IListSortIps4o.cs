@@ -116,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             for (int i = left; i <= right; ++i)
             {
                 int bucket = Ips4oLocateBucket(array[i], pivots, pivotCount, comparer);
-                bucketCounts[bucket]++;
+                ++bucketCounts[bucket];
             }
 
             int running = 0;

@@ -232,7 +232,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Material cached = image.material;
             Assert.IsTrue(cached != null);
 
-            for (int i = 0; i < hdrColors.Length; i++)
+            for (int i = 0; i < hdrColors.Length; ++i)
             {
                 Color expected = hdrColors[i];
                 image.HdrColor = expected;
@@ -453,7 +453,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Material originalInstance = image.CachedMaterialInstanceForTests;
             Assert.IsTrue(originalInstance != null);
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 float intensity = 1.1f + (i * 0.1f);
                 image.HdrColor = new Color(intensity, 0.5f, 0.3f, 1f);
@@ -597,7 +597,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Material cached = image.material;
             Assert.IsTrue(cached != null);
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 Color hdr = new(2f + i, 1.5f, 1f, 1f);
                 image.HdrColor = hdr;
@@ -1160,7 +1160,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Assert.IsTrue(originalInstance != null);
 
             Shader shader = Shader.Find("UI/Default");
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 Material newBase = Track(new Material(shader));
                 image.material = newBase;

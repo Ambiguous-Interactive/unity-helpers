@@ -32,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             System.Text.StringBuilder builder = new System.Text.StringBuilder();
             builder.AppendLine($"Metadata ({metadata.Count} items):");
-            for (int i = 0; i < metadata.Count; i++)
+            for (int i = 0; i < metadata.Count; ++i)
             {
                 WButtonMethodMetadata m = metadata[i];
                 builder.AppendLine(
@@ -84,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonAlphabeticalTrapTarget)
             );
 
-            for (int i = 1; i < metadata.Count; i++)
+            for (int i = 1; i < metadata.Count; ++i)
             {
                 Assert.That(
                     metadata[i].DeclarationOrder,
@@ -417,7 +417,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Sixth",
             };
 
-            for (int i = 0; i < expectedOrder.Length; i++)
+            for (int i = 0; i < expectedOrder.Length; ++i)
             {
                 Assert.That(
                     metadata[i].DisplayName,
@@ -434,7 +434,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonLargeDeclarationOrderTarget)
             );
 
-            for (int i = 0; i < metadata.Count; i++)
+            for (int i = 0; i < metadata.Count; ++i)
             {
                 Assert.That(
                     metadata[i].DeclarationOrder,
@@ -578,7 +578,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"metadata2.Count ({metadata2.Count}) != metadata3.Count ({metadata3.Count})"
             );
 
-            for (int i = 0; i < metadata1.Count; i++)
+            for (int i = 0; i < metadata1.Count; ++i)
             {
                 Assert.That(
                     metadata1[i].Method.Name,
@@ -699,7 +699,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             HashSet<int> seenOrders = new HashSet<int>();
-            for (int i = 0; i < metadata.Count; i++)
+            for (int i = 0; i < metadata.Count; ++i)
             {
                 int order = metadata[i].DeclarationOrder;
 
@@ -782,7 +782,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             Assert.That(metadata1.Count, Is.EqualTo(metadata2.Count));
-            for (int i = 0; i < metadata1.Count; i++)
+            for (int i = 0; i < metadata1.Count; ++i)
             {
                 Assert.That(
                     ReferenceEquals(metadata1[i], metadata2[i]),
@@ -809,7 +809,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 );
 
                 int previousDrawOrder = int.MinValue;
-                for (int i = 0; i < metadata.Count; i++)
+                for (int i = 0; i < metadata.Count; ++i)
                 {
                     Assert.That(
                         metadata[i].DrawOrder,

@@ -102,7 +102,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             List<WEnumToggleButtonsPagination.PaginationState> churnedStates = new(churnedKeyCount);
-            for (int keyIndex = 1; keyIndex <= churnedKeyCount; keyIndex++)
+            for (int keyIndex = 1; keyIndex <= churnedKeyCount; ++keyIndex)
             {
                 churnedStates.Add(GetPaginationState(slots, keyIndex));
             }
@@ -156,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             List<WEnumToggleButtonsPagination.PaginationState> churnedStates = new(
                 PaginationEvictionChurnKeyCount
             );
-            for (int keyIndex = 1; keyIndex <= PaginationEvictionChurnKeyCount; keyIndex++)
+            for (int keyIndex = 1; keyIndex <= PaginationEvictionChurnKeyCount; ++keyIndex)
             {
                 churnedStates.Add(GetPaginationState(slots, keyIndex));
             }
@@ -239,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.AreEqual(PinnedLayoutHeight, storedHeight, HeightTolerance);
 
-            for (int keyIndex = 1; keyIndex <= churnedKeyCount; keyIndex++)
+            for (int keyIndex = 1; keyIndex <= churnedKeyCount; ++keyIndex)
             {
                 WEnumToggleButtonsLayoutCache.Store(
                     slots.GetArrayElementAtIndex(keyIndex),

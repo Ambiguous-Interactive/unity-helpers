@@ -45,7 +45,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private void OnValidate()
         {
-            OnValidateCount++;
+            ++OnValidateCount;
             if (EmitSendMessageDuringValidate)
             {
                 gameObject.SendMessage(

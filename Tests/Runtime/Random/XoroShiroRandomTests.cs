@@ -10,7 +10,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class XoroShiroRandomTests : RandomTestBase
     {
-        protected override IRandom NewRandom() =>
-            new XoroShiroRandom(DeterministicSeed64, DeterministicSeed64B);
+        protected override IRandom NewRandom()
+        {
+            return new XoroShiroRandom(DeterministicSeed64, DeterministicSeed64B);
+        }
     }
 }

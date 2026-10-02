@@ -98,7 +98,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             int pixelCount = width * height;
             Color[] pixels = new Color[pixelCount];
-            for (int i = 0; i < pixelCount; i++)
+            for (int i = 0; i < pixelCount; ++i)
             {
                 pixels[i] = fillColor;
             }
@@ -147,11 +147,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             Color[] pixels = new Color[width * height];
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < height; ++y)
             {
                 int cellY = y / cellSize;
                 int rowOffset = y * width;
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < width; ++x)
                 {
                     int cellX = x / cellSize;
                     bool isEvenCell = ((cellX + cellY) & 1) == 0;
@@ -199,10 +199,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             Color[] pixels = new Color[width * height];
             float widthMinusOne = 1 < width ? width - 1 : 1;
 
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < height; ++y)
             {
                 int rowOffset = y * width;
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < width; ++x)
                 {
                     float t = x / widthMinusOne;
                     pixels[rowOffset + x] = Color.Lerp(leftColor, rightColor, t);
@@ -249,12 +249,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             Color[] pixels = new Color[width * height];
             float heightMinusOne = 1 < height ? height - 1 : 1;
 
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < height; ++y)
             {
                 float t = y / heightMinusOne;
                 Color rowColor = Color.Lerp(bottomColor, topColor, t);
                 int rowOffset = y * width;
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < width; ++x)
                 {
                     pixels[rowOffset + x] = rowColor;
                 }
@@ -310,12 +310,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             Color[] pixels = new Color[width * height];
 
-            for (int row = 0; row < rows; row++)
+            for (int row = 0; row < rows; ++row)
             {
                 int cellStartY = row * cellHeight;
                 int cellEndY = (row == rows - 1) ? height : cellStartY + cellHeight;
 
-                for (int col = 0; col < columns; col++)
+                for (int col = 0; col < columns; ++col)
                 {
                     int cellIndex = row * columns + col;
                     float hue = (float)cellIndex / totalCells;
@@ -324,10 +324,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     int cellStartX = col * cellWidth;
                     int cellEndX = (col == columns - 1) ? width : cellStartX + cellWidth;
 
-                    for (int y = cellStartY; y < cellEndY; y++)
+                    for (int y = cellStartY; y < cellEndY; ++y)
                     {
                         int rowOffset = y * width;
-                        for (int x = cellStartX; x < cellEndX; x++)
+                        for (int x = cellStartX; x < cellEndX; ++x)
                         {
                             pixels[rowOffset + x] = cellColor;
                         }
@@ -394,12 +394,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             Color[] pixels = new Color[width * height];
 
-            for (int row = 0; row < rows; row++)
+            for (int row = 0; row < rows; ++row)
             {
                 int cellStartY = row * cellHeight;
                 int cellEndY = (row == rows - 1) ? height : cellStartY + cellHeight;
 
-                for (int col = 0; col < columns; col++)
+                for (int col = 0; col < columns; ++col)
                 {
                     int cellIndex = row * columns + col;
                     float hue = (float)cellIndex / totalCells;
@@ -408,14 +408,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     int cellStartX = col * cellWidth;
                     int cellEndX = (col == columns - 1) ? width : cellStartX + cellWidth;
 
-                    for (int y = cellStartY; y < cellEndY; y++)
+                    for (int y = cellStartY; y < cellEndY; ++y)
                     {
                         int rowOffset = y * width;
                         bool isVerticalBorder =
                             0 < borderWidth
                             && (y < cellStartY + borderWidth || cellEndY - borderWidth <= y);
 
-                        for (int x = cellStartX; x < cellEndX; x++)
+                        for (int x = cellStartX; x < cellEndX; ++x)
                         {
                             bool isHorizontalBorder =
                                 0 < borderWidth
@@ -477,10 +477,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             Color[] pixels = new Color[width * height];
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < height; ++y)
             {
                 int rowOffset = y * width;
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < width; ++x)
                 {
                     pixels[rowOffset + x] = pixelFactory(x, y);
                 }

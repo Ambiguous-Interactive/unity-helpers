@@ -1070,7 +1070,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
 
             public void WriteTarget(string path, byte[] bytes)
             {
-                TargetWrites++;
+                ++TargetWrites;
                 if (string.Equals(path, FailTargetPath, System.StringComparison.Ordinal))
                 {
                     throw new IOException("Simulated write failure.");

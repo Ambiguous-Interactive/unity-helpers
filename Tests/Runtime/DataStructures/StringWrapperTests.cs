@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void GetCachesMultipleStrings()
         {
-            for (int i = 0; i < NumTries; i++)
+            for (int i = 0; i < NumTries; ++i)
             {
                 string value = $"test_{i}";
                 StringWrapper wrapper1 = StringWrapper.Get(value);
@@ -397,7 +397,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ConcurrentGetReturnsSameInstance()
         {
             HashSet<StringWrapper> wrappers = new();
-            for (int i = 0; i < NumTries; i++)
+            for (int i = 0; i < NumTries; ++i)
             {
                 wrappers.Add(StringWrapper.Get("concurrent"));
             }

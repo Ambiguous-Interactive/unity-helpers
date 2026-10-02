@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         [WButton]
         public void IncrementCounter()
         {
-            counter++;
+            ++counter;
             lastAction = "Incremented";
         }
 

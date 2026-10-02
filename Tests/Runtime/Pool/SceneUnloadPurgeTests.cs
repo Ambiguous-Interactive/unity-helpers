@@ -528,7 +528,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 TimeProvider = TestTimeProvider,
             };
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 pools.Add(
                     new WallstopGenericPool<TestPoolItem>(
@@ -542,7 +542,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             const int purgeCount = 20;
             System.Threading.Tasks.Task[] tasks = new System.Threading.Tasks.Task[purgeCount];
 
-            for (int i = 0; i < purgeCount; i++)
+            for (int i = 0; i < purgeCount; ++i)
             {
                 tasks[i] = System.Threading.Tasks.Task.Run(() =>
                     PoolPurgeSettings.PurgeAllPools(
@@ -568,7 +568,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[0] = System.Threading.Tasks.Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     PoolPurgeSettings.PurgeOnSceneUnload = i % 2 == 0;
                     bool _ = PoolPurgeSettings.PurgeOnSceneUnload;
@@ -577,7 +577,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[1] = System.Threading.Tasks.Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     PoolPurgeSettings.PurgeOnSceneUnload = i % 2 != 0;
                     bool _ = PoolPurgeSettings.PurgeOnSceneUnload;
@@ -586,7 +586,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[2] = System.Threading.Tasks.Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     PoolPurgeSettings.ResetToDefaults();
                 }
@@ -594,7 +594,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[3] = System.Threading.Tasks.Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     bool _ = PoolPurgeSettings.PurgeOnSceneUnload;
                     Thread.SpinWait(10);
@@ -633,7 +633,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Held simultaneously: a sequential get/dispose would hand back the same item.
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -650,7 +650,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"After AppBackgrounded purge: pool count={pool.Count}, reasons collected so far={reasons.Count}"
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -676,13 +676,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 switch (reason)
                 {
                     case PurgeReason.SceneUnloaded:
-                        sceneUnloadedCount++;
+                        ++sceneUnloadedCount;
                         break;
                     case PurgeReason.AppBackgrounded:
-                        appBackgroundedCount++;
+                        ++appBackgroundedCount;
                         break;
                     case PurgeReason.Explicit:
-                        explicitCount++;
+                        ++explicitCount;
                         break;
                 }
             }

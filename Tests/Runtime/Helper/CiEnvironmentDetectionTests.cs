@@ -410,7 +410,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             ClearAllCiEnvironmentVariables();
             Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.Ci, "true");
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 bool result = Helpers.IsRunningInContinuousIntegration;
                 Assert.IsTrue(result);

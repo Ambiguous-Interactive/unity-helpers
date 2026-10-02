@@ -61,14 +61,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 the whole difference between counting elements and counting bytes.
             */
             int[] values = new int[count];
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 values[index] = index % 3 == 0 ? index : -index;
             }
 
             WProtoReader packed = PackedVarints(values);
             Assert.AreEqual(count, packed.CountPackedElements(WProtoWireType.Varint));
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 Assert.IsTrue(packed.TryReadInt32(out int decoded));
                 Assert.AreEqual(values[index], decoded);
@@ -84,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] scratch = new byte[ScratchSize];
             WProtoWriter writer = new(scratch);
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 Assert.IsTrue(writer.TryWriteFixed32((uint)index));
             }
@@ -93,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(count, thirtyTwo.CountPackedElements(WProtoWireType.Fixed32));
 
             writer = new WProtoWriter(scratch);
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 Assert.IsTrue(writer.TryWriteFixed64((ulong)index));
             }
@@ -187,14 +187,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void ABuilderWithNoReservationStillCollectsEverything()
         {
             WProtoArrayBuilder<int> builder = default;
-            for (int index = 0; index < 100; index++)
+            for (int index = 0; index < 100; ++index)
             {
                 builder.Add(index * 3);
             }
 
             int[] produced = builder.ToArray();
             Assert.AreEqual(100, produced.Length);
-            for (int index = 0; index < produced.Length; index++)
+            for (int index = 0; index < produced.Length; ++index)
             {
                 Assert.AreEqual(index * 3, produced[index]);
             }
@@ -267,7 +267,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 WProtoRepeated.Reserve(destination, 1);
                 if (lastCapacity != destination.Capacity)
                 {
-                    reallocations++;
+                    ++reallocations;
                     lastCapacity = destination.Capacity;
                 }
 

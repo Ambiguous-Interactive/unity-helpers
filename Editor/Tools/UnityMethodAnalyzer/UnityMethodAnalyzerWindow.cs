@@ -316,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             string[] pathParts = normalizedPath.Split('/');
             int pathPartsLength = pathParts.Length;
-            for (int i = 0; i < pathPartsLength; i++)
+            for (int i = 0; i < pathPartsLength; ++i)
             {
                 if (
                     pathParts[i].Equals("Packages", StringComparison.OrdinalIgnoreCase)
@@ -527,19 +527,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 switch (issue.Severity)
                 {
                     case IssueSeverity.Critical:
-                        criticalCount++;
+                        ++criticalCount;
                         break;
                     case IssueSeverity.High:
-                        highCount++;
+                        ++highCount;
                         break;
                     case IssueSeverity.Medium:
-                        mediumCount++;
+                        ++mediumCount;
                         break;
                     case IssueSeverity.Low:
-                        lowCount++;
+                        ++lowCount;
                         break;
                     case IssueSeverity.Info:
-                        infoCount++;
+                        ++infoCount;
                         break;
                 }
             }
@@ -671,7 +671,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 );
 
                 int removeIndex = -1;
-                for (int i = 0; i < _sourcePaths.Count; i++)
+                for (int i = 0; i < _sourcePaths.Count; ++i)
                 {
                     GUILayout.BeginHorizontal();
 

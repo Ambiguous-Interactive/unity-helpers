@@ -148,7 +148,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return;
             }
 
-            for (int iteration = 0; iteration < FlushIterationCap; iteration++)
+            for (int iteration = 0; iteration < FlushIterationCap; ++iteration)
             {
                 // Clear scheduling state before callbacks can reenter and enqueue another batch.
                 _scheduled = false;

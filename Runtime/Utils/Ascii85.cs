@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 for (int i = 0; i < 4 && index < dataLength; ++i)
                 {
                     chunk[i] = data[index++];
-                    chunkLength++;
+                    ++chunkLength;
                 }
 
                 uint val =
@@ -113,7 +113,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 for (int i = 0; i < 5 && index < encodedLength; ++i)
                 {
                     chunk[i] = encoded[index++];
-                    chunkLen++;
+                    ++chunkLen;
                 }
 
                 uint val = 0;

@@ -176,7 +176,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static byte[] Parse(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }
@@ -556,7 +556,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void PackableRepeatedMembersAreWrittenPackedAndAreSmallerForIt()
         {
             int[] many = new int[100];
-            for (int index = 0; index < many.Length; index++)
+            for (int index = 0; index < many.Length; ++index)
             {
                 many[index] = index;
             }
@@ -612,7 +612,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             // Only depth 64 discriminates; charging another level at depth 63 still succeeds.
             WProtoLengthToken[] open = new WProtoLengthToken[WProtoReader.MaxNestingDepth];
-            for (int level = 0; level < open.Length; level++)
+            for (int level = 0; level < open.Length; ++level)
             {
                 Assert.IsTrue(
                     writer.TryBeginLengthDelimited(1, true, out open[level]),

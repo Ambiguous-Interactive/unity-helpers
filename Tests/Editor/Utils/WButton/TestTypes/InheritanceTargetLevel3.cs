@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         [WButton]
         public void Level3Button()
         {
-            Level3CallCount++;
+            ++Level3CallCount;
         }
     }
 }

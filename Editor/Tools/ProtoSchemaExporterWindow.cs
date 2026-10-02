@@ -163,7 +163,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             window.RefreshFromUserInterface();
         }
 
-        internal static string ContractKeyForTest(Type contract) => ContractKey(contract);
+        internal static string ContractKeyForTest(Type contract)
+        {
+            return ContractKey(contract);
+        }
 
         internal static string UniqueFileNameForTest(string groupKey, HashSet<string> usedFileNames)
         {
@@ -232,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             while (!usedFileNames.Add(candidate))
             {
                 candidate = $"{baseName}-{suffix}.proto";
-                suffix++;
+                ++suffix;
             }
 
             return candidate;
@@ -749,7 +752,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             _diagnosticsContainer.Clear();
             int shown = Math.Min(_lastDiagnostics.Count, MaximumDisplayedDiagnostics);
-            for (int index = 0; index < shown; index++)
+            for (int index = 0; index < shown; ++index)
             {
                 _diagnosticsContainer.Add(
                     new HelpBox(_lastDiagnostics[index], HelpBoxMessageType.Warning)
@@ -1032,7 +1035,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
 
                 int segmentLength = segment.Length;
-                for (int index = 1; index < segmentLength; index++)
+                for (int index = 1; index < segmentLength; ++index)
                 {
                     char character = segment[index];
                     if (

@@ -363,7 +363,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         {
             lock (Lock)
             {
-                _referenceCount++;
+                ++_referenceCount;
 
                 if (_fixturesCreated)
                 {
@@ -695,9 +695,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 importer.textureCompression = TextureImporterCompression.Uncompressed;
 
                 SpriteMetaData[] spritesheet = new SpriteMetaData[columns * rows];
-                for (int row = 0; row < rows; row++)
+                for (int row = 0; row < rows; ++row)
                 {
-                    for (int col = 0; col < columns; col++)
+                    for (int col = 0; col < columns; ++col)
                     {
                         int index = row * columns + col;
                         spritesheet[index] = new SpriteMetaData
@@ -725,7 +725,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
                 UnityEditor.U2D.Sprites.SpriteRect[] spriteRects =
                     new UnityEditor.U2D.Sprites.SpriteRect[spritesheet.Length];
-                for (int i = 0; i < spritesheet.Length; i++)
+                for (int i = 0; i < spritesheet.Length; ++i)
                 {
                     SpriteMetaData meta = spritesheet[i];
                     spriteRects[i] = new UnityEditor.U2D.Sprites.SpriteRect

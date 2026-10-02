@@ -134,7 +134,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 TwoTargets(),
                 target =>
                 {
-                    loads++;
+                    ++loads;
                     return null;
                 }
             );
@@ -157,7 +157,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 TwoTargets(),
                 target =>
                 {
-                    loads++;
+                    ++loads;
                     return null;
                 }
             );
@@ -256,7 +256,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 OneTarget(),
                 target =>
                 {
-                    loads++;
+                    ++loads;
                     return null;
                 }
             );
@@ -520,7 +520,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             public bool AppliesTo(in ValidationTarget target)
             {
-                AppliesToCalls++;
+                ++AppliesToCalls;
                 return _claims;
             }
 
@@ -530,7 +530,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 List<ValidationFinding> findings
             )
             {
-                ValidateCalls++;
+                ++ValidateCalls;
             }
         }
 
@@ -565,9 +565,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 List<ValidationFinding> findings
             )
             {
-                ValidateCalls++;
+                ++ValidateCalls;
                 LastAsset = asset;
-                for (int index = 0; index < _perAsset; index++)
+                for (int index = 0; index < _perAsset; ++index)
                 {
                     findings.Add(
                         new ValidationFinding(
@@ -640,8 +640,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 List<ValidationFinding> findings
             )
             {
-                ValidateCalls++;
-                for (int index = 0; index < FindingsBeforeThrowing; index++)
+                ++ValidateCalls;
+                for (int index = 0; index < FindingsBeforeThrowing; ++index)
                 {
                     findings.Add(
                         new ValidationFinding(

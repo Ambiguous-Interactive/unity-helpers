@@ -594,7 +594,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     while (left < right)
                     {
                         (expected[left], expected[right]) = (expected[right], expected[left]);
-                        left++;
+                        ++left;
                         right--;
                     }
 
@@ -666,7 +666,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     while (left < right)
                     {
                         (expected[left], expected[right]) = (expected[right], expected[left]);
-                        left++;
+                        ++left;
                         right--;
                     }
 
@@ -862,7 +862,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int forwardCalls = 0;
             int firstIndex = forward.IndexOf(value =>
             {
-                forwardCalls++;
+                ++forwardCalls;
                 return value == 0;
             });
             Assert.That(firstIndex, Is.EqualTo(0), $"IndexOf over a {shapeName}");
@@ -876,7 +876,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int backwardCalls = 0;
             int lastIndex = backward.LastIndexOf(value =>
             {
-                backwardCalls++;
+                ++backwardCalls;
                 return value == source.Length - 1;
             });
             Assert.That(
@@ -1722,31 +1722,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             private readonly List<T> _inner = new();
 
-            public void Add(T item) => _inner.Add(item);
+            public void Add(T item)
+            {
+                _inner.Add(item);
+            }
 
-            public void Clear() => _inner.Clear();
+            public void Clear()
+            {
+                _inner.Clear();
+            }
 
-            public bool Contains(T item) => _inner.Contains(item);
+            public bool Contains(T item)
+            {
+                return _inner.Contains(item);
+            }
 
-            public void CopyTo(T[] array, int arrayIndex) => _inner.CopyTo(array, arrayIndex);
+            public void CopyTo(T[] array, int arrayIndex)
+            {
+                _inner.CopyTo(array, arrayIndex);
+            }
 
-            public IEnumerator<T> GetEnumerator() => _inner.GetEnumerator();
+            public IEnumerator<T> GetEnumerator()
+            {
+                return _inner.GetEnumerator();
+            }
 
-            public int IndexOf(T item) => _inner.IndexOf(item);
+            public int IndexOf(T item)
+            {
+                return _inner.IndexOf(item);
+            }
 
-            public void Insert(int index, T item) => _inner.Insert(index, item);
+            public void Insert(int index, T item)
+            {
+                _inner.Insert(index, item);
+            }
 
-            public bool Remove(T item) => _inner.Remove(item);
+            public bool Remove(T item)
+            {
+                return _inner.Remove(item);
+            }
 
-            public void RemoveAt(int index) => _inner.RemoveAt(index);
+            public void RemoveAt(int index)
+            {
+                _inner.RemoveAt(index);
+            }
 
-            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() =>
-                _inner.GetEnumerator();
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+            {
+                return _inner.GetEnumerator();
+            }
         }
 
         private readonly struct IntComparer : IComparer<int>
         {
-            public int Compare(int x, int y) => x.CompareTo(y);
+            public int Compare(int x, int y)
+            {
+                return x.CompareTo(y);
+            }
         }
 
         private sealed class CountingComparer : IComparer<int>
@@ -1755,7 +1787,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             public int Compare(int x, int y)
             {
-                ComparisonCount++;
+                ++ComparisonCount;
                 return x.CompareTo(y);
             }
         }
@@ -1770,9 +1802,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private readonly struct IntEqualityComparer : IEqualityComparer<int>
         {
-            public bool Equals(int x, int y) => x == y;
+            public bool Equals(int x, int y)
+            {
+                return x == y;
+            }
 
-            public int GetHashCode(int obj) => obj.GetHashCode();
+            public int GetHashCode(int obj)
+            {
+                return obj.GetHashCode();
+            }
         }
 
         private readonly struct SortDataset

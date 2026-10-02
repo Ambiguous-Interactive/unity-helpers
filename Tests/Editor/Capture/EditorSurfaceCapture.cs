@@ -188,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 string renderErrorSummary;
                 using (CaptureRenderLogRecorder recorder = new())
                 {
-                    for (int repaintPass = 0; repaintPass < RepaintPasses; repaintPass++)
+                    for (int repaintPass = 0; repaintPass < RepaintPasses; ++repaintPass)
                     {
                         RepaintPanel(panel);
                     }
@@ -285,7 +285,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             }
 
             string previous = null;
-            for (int pass = 0; pass < MaxLayoutPasses; pass++)
+            for (int pass = 0; pass < MaxLayoutPasses; ++pass)
             {
                 InvokeInheritedPanelMethod(panel, ValidateLayoutMethodName, Array.Empty<object>());
 
@@ -316,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
 
             Type panelType = panel.GetType();
             Type[] argumentTypes = new Type[arguments.Length];
-            for (int index = 0; index < arguments.Length; index++)
+            for (int index = 0; index < arguments.Length; ++index)
             {
                 argumentTypes[index] = arguments[index].GetType();
             }

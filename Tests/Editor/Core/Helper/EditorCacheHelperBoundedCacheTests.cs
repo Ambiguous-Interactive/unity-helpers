@@ -260,7 +260,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         )
         {
             Dictionary<string, int> cache = new();
-            for (int i = 0; i < initialCount; i++)
+            for (int i = 0; i < initialCount; ++i)
             {
                 cache[$"existing{i}"] = i;
             }
@@ -336,7 +336,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         )
         {
             Dictionary<string, int> cache = new();
-            for (int i = 0; i < initialCount; i++)
+            for (int i = 0; i < initialCount; ++i)
             {
                 EditorCacheHelper.AddToBoundedCache(cache, $"key{i}", i, maxSize);
             }
@@ -442,7 +442,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         {
             Dictionary<int, int> cache = new();
 
-            for (int i = 0; i < entriesToAdd; i++)
+            for (int i = 0; i < entriesToAdd; ++i)
             {
                 EditorCacheHelper.AddToBoundedCache(cache, i, i * 2, maxSize);
             }
@@ -455,11 +455,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
 
             if (maxSize < entriesToAdd)
             {
-                for (int i = entriesToAdd - maxSize; i < entriesToAdd; i++)
+                for (int i = entriesToAdd - maxSize; i < entriesToAdd; ++i)
                 {
                     Assert.That(cache.ContainsKey(i), Is.True, $"Expected key {i} to be present");
                 }
-                for (int i = 0; i < entriesToAdd - maxSize; i++)
+                for (int i = 0; i < entriesToAdd - maxSize; ++i)
                 {
                     Assert.That(cache.ContainsKey(i), Is.False, $"Expected key {i} to be evicted");
                 }
@@ -686,17 +686,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             Dictionary<int, string> cache = new();
             int maxSize = 5;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 EditorCacheHelper.AddToBoundedCache(cache, i, $"value{i}", maxSize);
             }
 
             Assert.That(cache.Count, Is.EqualTo(5), "Cache should be at capacity of 5");
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 Assert.That(cache.ContainsKey(i), Is.False, $"Key {i} should have been evicted");
             }
-            for (int i = 5; i < 10; i++)
+            for (int i = 5; i < 10; ++i)
             {
                 Assert.That(cache.ContainsKey(i), Is.True, $"Key {i} should still be present");
                 Assert.That(
@@ -714,7 +714,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             int maxSize = 10;
             int totalEntries = 1000;
 
-            for (int i = 0; i < totalEntries; i++)
+            for (int i = 0; i < totalEntries; ++i)
             {
                 EditorCacheHelper.AddToBoundedCache(cache, i, i, maxSize);
             }
@@ -725,7 +725,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 $"Cache should be at capacity of {maxSize}"
             );
 
-            for (int i = totalEntries - maxSize; i < totalEntries; i++)
+            for (int i = totalEntries - maxSize; i < totalEntries; ++i)
             {
                 Assert.That(cache.ContainsKey(i), Is.True, $"Key {i} should be present");
                 Assert.That(cache[i], Is.EqualTo(i), $"Value for key {i} should be {i}");
@@ -799,7 +799,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 "\u0000\u0001\u0002",
             };
 
-            for (int i = 0; i < specialKeys.Length; i++)
+            for (int i = 0; i < specialKeys.Length; ++i)
             {
                 EditorCacheHelper.AddToBoundedCache(cache, specialKeys[i], i, 100);
             }
@@ -809,7 +809,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 Is.EqualTo(specialKeys.Length),
                 $"Cache should contain all {specialKeys.Length} special keys"
             );
-            for (int i = 0; i < specialKeys.Length; i++)
+            for (int i = 0; i < specialKeys.Length; ++i)
             {
                 Assert.That(
                     cache[specialKeys[i]],
@@ -868,9 +868,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             Dictionary<string, int> cache = new();
             int maxSize = 5;
 
-            for (int cycle = 0; cycle < 100; cycle++)
+            for (int cycle = 0; cycle < 100; ++cycle)
             {
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < 10; ++i)
                 {
                     EditorCacheHelper.AddToBoundedCache(cache, $"key{i}", cycle * 10 + i, maxSize);
                 }
@@ -882,7 +882,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 "Cache should be at capacity after cycles"
             );
 
-            for (int i = 5; i < 10; i++)
+            for (int i = 5; i < 10; ++i)
             {
                 Assert.That(
                     cache.ContainsKey($"key{i}"),
@@ -966,7 +966,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             Dictionary<string, int> cache = new();
             int maxSize = 1;
 
-            for (int i = 0; i < operationCount; i++)
+            for (int i = 0; i < operationCount; ++i)
             {
                 EditorCacheHelper.AddToBoundedCache(cache, $"key{i}", i, maxSize);
             }
@@ -1136,7 +1136,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         {
             LRUOrderTracker<int> tracker = new();
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 tracker.MarkAccessed(i);
             }

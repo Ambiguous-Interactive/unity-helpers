@@ -25,7 +25,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         }
 
         /// <inheritdoc />
-        public bool AppliesTo(in ValidationTarget target) => _rule.AppliesTo(in target);
+        public bool AppliesTo(in ValidationTarget target)
+        {
+            return _rule.AppliesTo(in target);
+        }
 
         /// <inheritdoc />
         public void Validate(
@@ -38,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _rule.Validate(in target, asset, findings);
             if (!_severity.HasValue)
                 return;
-            for (int index = first; index < findings.Count; index++)
+            for (int index = first; index < findings.Count; ++index)
             {
                 ValidationFinding finding = findings[index];
                 Object subject = finding.TryGetTarget(out Object live) ? live : null;

@@ -15,8 +15,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         public bool visible => ValidationPreferences.Enabled;
 
         /// <inheritdoc />
-        public override VisualElement CreatePanelContent() =>
-            ValidationStatusSurfaces.CreatePanel();
+        public override VisualElement CreatePanelContent()
+        {
+            return ValidationStatusSurfaces.CreatePanel();
+        }
     }
 #endif
 }

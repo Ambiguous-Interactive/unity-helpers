@@ -154,7 +154,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         {
             lock (Lock)
             {
-                _referenceCount++;
+                ++_referenceCount;
                 if (!_fixturesCreated)
                 {
                     CreateFixtures();

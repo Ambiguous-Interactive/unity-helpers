@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int invocation = 0;
             Helpers.LayerNameProvider = () =>
             {
-                invocation++;
+                ++invocation;
                 return new[] { "LayerA", "LayerB" };
             };
 
@@ -35,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Helpers.LayerNameProvider = () =>
             {
-                invocation++;
+                ++invocation;
                 return new[] { "LayerChanged" };
             };
 
@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int invocation = 0;
             Helpers.LayerNameProvider = () =>
             {
-                invocation++;
+                ++invocation;
                 return invocation == 1 ? new[] { "LayerZero" } : new[] { "LayerOne", "LayerTwo" };
             };
 

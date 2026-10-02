@@ -63,7 +63,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     error = "A finite, positive frame rate with finite key times is required.";
                     return false;
                 }
-                for (int index = 0; index < frameCount; index++)
+                for (int index = 0; index < frameCount; ++index)
                 {
                     if (frames[index] == null)
                     {
@@ -127,7 +127,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 ObjectReferenceKeyframe[] replacement = new ObjectReferenceKeyframe[frameCount];
-                for (int index = 0; index < frameCount; index++)
+                for (int index = 0; index < frameCount; ++index)
                 {
                     Sprite frame = frames[index];
                     if (frame == null)

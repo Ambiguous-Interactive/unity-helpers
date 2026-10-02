@@ -2561,7 +2561,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int width = 64;
             int height = 64;
             Color32[] pixels = new Color32[width * height];
-            for (int i = 0; i < pixels.Length; i++)
+            for (int i = 0; i < pixels.Length; ++i)
             {
                 pixels[i] = new Color32(0, 0, 0, 0);
             }
@@ -2612,7 +2612,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int width = 32;
             int height = 32;
             Color32[] pixels = new Color32[width * height];
-            for (int i = 0; i < pixels.Length; i++)
+            for (int i = 0; i < pixels.Length; ++i)
             {
                 pixels[i] = new Color32(255, 255, 255, 255);
             }
@@ -3667,9 +3667,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int cellHeight = 32;
 
             List<Rect> rects = new();
-            for (int row = 0; row < 2; row++)
+            for (int row = 0; row < 2; ++row)
             {
-                for (int col = 0; col < 2; col++)
+                for (int col = 0; col < 2; ++col)
                 {
                     rects.Add(new Rect(col * cellWidth, row * cellHeight, cellWidth, cellHeight));
                 }

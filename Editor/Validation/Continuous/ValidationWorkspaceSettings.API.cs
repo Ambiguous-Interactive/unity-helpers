@@ -135,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             RuleDefinition[] copies = new RuleDefinition[projectRules.Count];
             int count = copies.Length;
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 copies[index] = Clone(projectRules[index]);
             }
@@ -147,7 +147,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             Profile[] copies = new Profile[profiles.Count];
             int count = copies.Length;
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 copies[index] = Clone(profiles[index]);
             }

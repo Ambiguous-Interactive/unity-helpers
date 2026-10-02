@@ -744,7 +744,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
 
             int spriteThumbnailsContainerChildCount = _spriteThumbnailsContainer.childCount;
-            for (int i = 0; i < spriteThumbnailsContainerChildCount; i++)
+            for (int i = 0; i < spriteThumbnailsContainerChildCount; ++i)
             {
                 VisualElement thumb = _spriteThumbnailsContainer.ElementAt(i);
                 if (thumb.userData is int thumbIndex)
@@ -776,7 +776,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private void ClearSpriteSelectionHighlight()
         {
             int spriteThumbnailsContainerChildCount = _spriteThumbnailsContainer.childCount;
-            for (int i = 0; i < spriteThumbnailsContainerChildCount; i++)
+            for (int i = 0; i < spriteThumbnailsContainerChildCount; ++i)
             {
                 VisualElement thumb = _spriteThumbnailsContainer.ElementAt(i);
                 thumb.style.backgroundColor = _defaultThumbnailBackgroundColor;
@@ -1441,7 +1441,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     )
                 )
                 {
-                    createdCount++;
+                    ++createdCount;
                 }
                 else
                 {

@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Buffers.ComparerPoolMaxDistinctEntries = 4;
 
             List<IEqualityComparer<HashSetProbe>> comparers = new();
-            for (int index = 0; index < 16; index++)
+            for (int index = 0; index < 16; ++index)
             {
                 ProbeEqualityComparer comparer = new();
                 comparers.Add(comparer);
@@ -75,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             {
                 if (SetBuffers<HashSetProbe>.HasHashSetPool(comparer))
                 {
-                    retained++;
+                    ++retained;
                 }
             }
 
@@ -109,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             Buffers.ComparerPoolMaxDistinctEntries = 2;
 
-            for (int index = 0; index < 8; index++)
+            for (int index = 0; index < 8; ++index)
             {
                 _ = SetBuffers<SortedSetProbe>.GetSortedSetPool(new ProbeComparer());
             }
@@ -122,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             Buffers.ComparerPoolMaxDistinctEntries = 2;
 
-            for (int index = 0; index < 8; index++)
+            for (int index = 0; index < 8; ++index)
             {
                 _ = DictionaryBuffer<DictionaryProbe, int>.GetDictionaryPool(
                     new ProbeDictionaryEqualityComparer()
@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             Buffers.ComparerPoolMaxDistinctEntries = 0;
 
-            for (int index = 0; index < 8; index++)
+            for (int index = 0; index < 8; ++index)
             {
                 _ = SetBuffers<UnboundedProbe>.GetHashSetPool(new ProbeUnboundedComparer());
             }
@@ -153,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void LoweringPoolCacheBoundEvictsExistingPoolsImmediately()
         {
             Buffers.ComparerPoolMaxDistinctEntries = 0;
-            for (int index = 0; index < 8; index++)
+            for (int index = 0; index < 8; ++index)
             {
                 _ = SetBuffers<UnboundedProbe>.GetHashSetPool(new ProbeUnboundedComparer());
             }
@@ -183,41 +183,77 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 IEqualityComparer<LruProbe>,
                 IEqualityComparer<StableProbe>
         {
-            public bool Equals(HashSetProbe x, HashSetProbe y) => true;
+            public bool Equals(HashSetProbe x, HashSetProbe y)
+            {
+                return true;
+            }
 
-            public int GetHashCode(HashSetProbe obj) => 0;
+            public int GetHashCode(HashSetProbe obj)
+            {
+                return 0;
+            }
 
-            public bool Equals(LruProbe x, LruProbe y) => true;
+            public bool Equals(LruProbe x, LruProbe y)
+            {
+                return true;
+            }
 
-            public int GetHashCode(LruProbe obj) => 0;
+            public int GetHashCode(LruProbe obj)
+            {
+                return 0;
+            }
 
-            public bool Equals(StableProbe x, StableProbe y) => true;
+            public bool Equals(StableProbe x, StableProbe y)
+            {
+                return true;
+            }
 
-            public int GetHashCode(StableProbe obj) => 0;
+            public int GetHashCode(StableProbe obj)
+            {
+                return 0;
+            }
         }
 
         private sealed class ProbeComparer : IComparer<SortedSetProbe>
         {
-            public int Compare(SortedSetProbe x, SortedSetProbe y) => 0;
+            public int Compare(SortedSetProbe x, SortedSetProbe y)
+            {
+                return 0;
+            }
         }
 
         private sealed class ProbeDictionaryEqualityComparer : IEqualityComparer<DictionaryProbe>
         {
-            public bool Equals(DictionaryProbe x, DictionaryProbe y) => true;
+            public bool Equals(DictionaryProbe x, DictionaryProbe y)
+            {
+                return true;
+            }
 
-            public int GetHashCode(DictionaryProbe obj) => 0;
+            public int GetHashCode(DictionaryProbe obj)
+            {
+                return 0;
+            }
         }
 
         private sealed class ProbeDictionaryComparer : IComparer<DictionaryProbe>
         {
-            public int Compare(DictionaryProbe x, DictionaryProbe y) => 0;
+            public int Compare(DictionaryProbe x, DictionaryProbe y)
+            {
+                return 0;
+            }
         }
 
         private sealed class ProbeUnboundedComparer : IEqualityComparer<UnboundedProbe>
         {
-            public bool Equals(UnboundedProbe x, UnboundedProbe y) => true;
+            public bool Equals(UnboundedProbe x, UnboundedProbe y)
+            {
+                return true;
+            }
 
-            public int GetHashCode(UnboundedProbe obj) => 0;
+            public int GetHashCode(UnboundedProbe obj)
+            {
+                return 0;
+            }
         }
 
         // Distinct element types isolate the closed-generic caches whose counts each test asserts.

@@ -32,9 +32,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             Assert.AreEqual(expected.GetLength(0), actual.GetLength(0), what + " rows");
             Assert.AreEqual(expected.GetLength(1), actual.GetLength(1), what + " columns");
-            for (int row = 0; row < expected.GetLength(0); row++)
+            for (int row = 0; row < expected.GetLength(0); ++row)
             {
-                for (int column = 0; column < expected.GetLength(1); column++)
+                for (int column = 0; column < expected.GetLength(1); ++column)
                 {
                     Assert.AreEqual(
                         expected[row, column],
@@ -47,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static void AssertSameShape<T>(T[,,] expected, T[,,] actual, string what)
         {
-            for (int axis = 0; axis < 3; axis++)
+            for (int axis = 0; axis < 3; ++axis)
             {
                 Assert.AreEqual(
                     expected.GetLength(axis),
@@ -56,11 +56,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 );
             }
 
-            for (int x = 0; x < expected.GetLength(0); x++)
+            for (int x = 0; x < expected.GetLength(0); ++x)
             {
-                for (int y = 0; y < expected.GetLength(1); y++)
+                for (int y = 0; y < expected.GetLength(1); ++y)
                 {
-                    for (int z = 0; z < expected.GetLength(2); z++)
+                    for (int z = 0; z < expected.GetLength(2); ++z)
                     {
                         Assert.AreEqual(expected[x, y, z], actual[x, y, z], what);
                     }
@@ -108,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static byte[] Bytes(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }

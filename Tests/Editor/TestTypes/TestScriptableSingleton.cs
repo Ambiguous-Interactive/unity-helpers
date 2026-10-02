@@ -22,7 +22,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         /// </summary>
         internal void TrackSave()
         {
-            saveCallCount++;
+            ++saveCallCount;
         }
 
         /// <summary>

@@ -1881,6 +1881,9 @@ The numbers handed out are the smallest free ones, so a tag stays inside protobu
 range. Measured against this package's own `AbstractRandom`, whose five members hold 1-5 and whose 21
 generators hold 100-120, a new numberless subtype is assigned **6**.
 
+Manifest ownership lookup refuses null, empty, and whitespace-only directory inputs. It preserves
+literal spaces in nonblank folder names and ignores blank assembly-definition paths.
+
 Each assembly gets its own manifest, beside its `.asmdef`. Unity's four predefined assemblies have no
 `.asmdef` to sit beside and are compiled from four disjoint directory sets, so each gets the one path
 that compiles into it -- `Assembly-CSharp` to `Assets/`, `Assembly-CSharp-Editor` to `Assets/Editor/`,

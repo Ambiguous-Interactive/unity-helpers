@@ -22,14 +22,26 @@ namespace WallstopStudios.UnityHelpers.Core.OneOf
         public static readonly None Default = default;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(None other) => true;
+        public bool Equals(None other)
+        {
+            return true;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override bool Equals(object obj) => obj is None;
+        public override bool Equals(object obj)
+        {
+            return obj is None;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override int GetHashCode() => 0;
+        public override int GetHashCode()
+        {
+            return 0;
+        }
 
-        public override string ToString() => "None";
+        public override string ToString()
+        {
+            return "None";
+        }
     }
 }

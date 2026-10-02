@@ -122,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         continue;
                     }
 
-                    for (int mi = 0; mi < methods.Count; mi++)
+                    for (int mi = 0; mi < methods.Count; ++mi)
                     {
                         MethodInfo method = methods[mi];
                         if (
@@ -227,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     ApplyTypeSearch(allTypes, item, filtered, out bool truncated);
 
                     string[] displayNames = new string[filtered.Count];
-                    for (int i = 0; i < filtered.Count; i++)
+                    for (int i = 0; i < filtered.Count; ++i)
                     {
                         displayNames[i] = filtered[i]?.FullName ?? string.Empty;
                     }
@@ -279,7 +279,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 out List<MethodInfo> buffer
             );
             {
-                for (int i = 0; i < methods.Count; i++)
+                for (int i = 0; i < methods.Count; ++i)
                 {
                     buffer.Add(methods[i]);
                 }
@@ -309,7 +309,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                 string[] methodNames = new string[buffer.Count];
                 int currentIndex = -1;
-                for (int i = 0; i < buffer.Count; i++)
+                for (int i = 0; i < buffer.Count; ++i)
                 {
                     methodNames[i] = buffer[i]?.Name ?? string.Empty;
                     if (buffer[i] == item.selectedMethod)
@@ -356,7 +356,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         private static bool ContainsAllTokens(string haystack, IReadOnlyList<string> tokens)
         {
-            for (int i = 0; i < tokens.Count; i++)
+            for (int i = 0; i < tokens.Count; ++i)
             {
                 if (haystack.IndexOf(tokens[i], StringComparison.Ordinal) < 0)
                 {

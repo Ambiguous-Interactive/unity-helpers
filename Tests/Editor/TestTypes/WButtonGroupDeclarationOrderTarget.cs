@@ -23,6 +23,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         public void ValidateConfig() { }
 
         [WButton("Roll Dice", drawOrder: -1, groupName: "Debug")]
-        public int RollDice() => PRNG.Instance.Next(1, 7);
+        public int RollDice()
+        {
+            return PRNG.Instance.Next(1, 7);
+        }
     }
 }

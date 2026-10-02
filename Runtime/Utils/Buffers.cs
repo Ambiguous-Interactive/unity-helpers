@@ -1494,7 +1494,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 TryPeriodicPurge(currentTime);
             }
 
-            _rentCount++;
+            ++_rentCount;
             _lastAccessTime = currentTime;
             _usageTracker.RecordRent(currentTime);
 
@@ -1579,8 +1579,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
-                purged++;
-                _purgeCount++;
+                ++purged;
+                ++_purgeCount;
 
                 InvokeOnPurge(entry.Value, reason);
                 InvokeOnDispose(entry.Value);
@@ -1588,7 +1588,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             if (0 < purged)
             {
-                _fullPurgeOperations++;
+                ++_fullPurgeOperations;
             }
 
             return purged;
@@ -1649,8 +1649,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
-                purged++;
-                _purgeCount++;
+                ++purged;
+                ++_purgeCount;
 
                 InvokeOnPurge(entry.Value, reason);
                 InvokeOnDispose(entry.Value);
@@ -1660,7 +1660,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             if (0 < purged)
             {
-                _fullPurgeOperations++;
+                ++_fullPurgeOperations;
             }
 
             return purged;
@@ -1681,8 +1681,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
-                purged++;
-                _purgeCount++;
+                ++purged;
+                ++_purgeCount;
 
                 InvokeOnPurge(entry.Value, PurgeReason.BudgetExceeded);
                 InvokeOnDispose(entry.Value);
@@ -1775,7 +1775,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
-            _returnCount++;
+            ++_returnCount;
             _usageTracker.RecordReturn(currentTime);
 
             int currentCount = _pool.Count;
@@ -1921,7 +1921,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                     if (effectiveIdleTimeout <= (currentTime - entry.ReturnTime))
                     {
-                        expiredCount++;
+                        ++expiredCount;
                     }
                     else
                     {
@@ -1934,7 +1934,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 if (0 < expiredCount)
                 {
                     T[] expiredValues = new T[expiredCount];
-                    for (int i = 0; i < expiredCount; i++)
+                    for (int i = 0; i < expiredCount; ++i)
                     {
                         expiredValues[i] = _pool[i].Value;
                     }
@@ -1976,13 +1976,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                     {
                         reason = PurgeReason.IdleTimeout;
                         shouldPurge = true;
-                        _idleTimeoutPurges++;
+                        ++_idleTimeoutPurges;
                     }
                     else if (!inHysteresis && hasMaxSize && maxSize < _pool.Count)
                     {
                         reason = PurgeReason.CapacityExceeded;
                         shouldPurge = true;
-                        _capacityPurges++;
+                        ++_capacityPurges;
                     }
                     else if (!inHysteresis && isExplicit)
                     {
@@ -1993,8 +1993,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                     {
                         // Remove before invoking callbacks so reentrant rents cannot observe the purged entry.
                         _pool.RemoveAt(i);
-                        purged++;
-                        _purgeCount++;
+                        ++purged;
+                        ++_purgeCount;
 
                         InvokeOnPurge(entry.Value, reason);
                         InvokeOnDispose(entry.Value);
@@ -2005,14 +2005,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             if (hitPurgeLimit && moreEligibleItems)
             {
                 _hasPendingPurges = true;
-                _partialPurgeOperations++;
+                ++_partialPurgeOperations;
             }
             else
             {
                 _hasPendingPurges = false;
                 if (0 < purged)
                 {
-                    _fullPurgeOperations++;
+                    ++_fullPurgeOperations;
                 }
             }
 
@@ -2034,8 +2034,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 PooledEntry entry = _pool[i];
                 _pool.RemoveAt(i);
-                purged++;
-                _purgeCount++;
+                ++purged;
+                ++_purgeCount;
 
                 InvokeOnPurge(entry.Value, PurgeReason.MemoryPressure);
                 InvokeOnDispose(entry.Value);
@@ -2044,7 +2044,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             _hasPendingPurges = false;
             if (0 < purged)
             {
-                _fullPurgeOperations++;
+                ++_fullPurgeOperations;
             }
 
             return purged;
@@ -2981,7 +2981,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                             purgeReasons ??= new List<PurgeReason>();
                             entriesToPurge.Add(entry);
                             purgeReasons.Add(PurgeReason.IdleTimeout);
-                            expiredCount++;
+                            ++expiredCount;
                             Interlocked.Increment(ref _idleTimeoutPurges);
                         }
                         else
@@ -3044,7 +3044,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                             entriesToPurge.Add(entry);
                             purgeReasons.Add(reason);
                             _pool.RemoveAt(i);
-                            purgeCount++;
+                            ++purgeCount;
                         }
                     }
                 }
@@ -3068,7 +3068,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             if (entriesToPurge != null)
             {
-                for (int i = 0; i < entriesToPurge.Count; i++)
+                for (int i = 0; i < entriesToPurge.Count; ++i)
                 {
                     InvokeOnPurge(entriesToPurge[i].Value, purgeReasons[i]);
                     InvokeOnDispose(entriesToPurge[i].Value);

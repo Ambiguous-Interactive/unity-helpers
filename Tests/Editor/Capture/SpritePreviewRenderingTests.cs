@@ -27,9 +27,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 Assert.Ignore(EditorSurfaceCapture.UnsupportedReason);
             }
             Texture2D source = Track(new Texture2D(16, 8));
-            for (int y = 0; y < source.height; y++)
+            for (int y = 0; y < source.height; ++y)
             {
-                for (int x = 0; x < source.width; x++)
+                for (int x = 0; x < source.width; ++x)
                 {
                     source.SetPixel(x, y, (x + y) % 2 == 0 ? Color.red : Color.green);
                 }

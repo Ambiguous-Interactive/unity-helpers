@@ -74,7 +74,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 if (parameter.type == AnimatorControllerParameterType.Trigger)
                 {
-                    triggerCount++;
+                    ++triggerCount;
                 }
             }
 

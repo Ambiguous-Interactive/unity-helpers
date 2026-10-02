@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         [WButton]
         public override void VirtualButton()
         {
-            DerivedCallCount++;
+            ++DerivedCallCount;
         }
     }
 }

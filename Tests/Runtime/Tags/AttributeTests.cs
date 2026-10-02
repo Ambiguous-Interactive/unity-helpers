@@ -296,7 +296,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 effect.name = "Combination";
                 EffectHandle sharedHandle = EffectHandle.CreateInstance(effect);
 
-                for (int index = 0; index < actions.Length; index++)
+                for (int index = 0; index < actions.Length; ++index)
                 {
                     EffectHandle handle = splitAcrossHandles
                         ? EffectHandle.CreateInstance(effect)

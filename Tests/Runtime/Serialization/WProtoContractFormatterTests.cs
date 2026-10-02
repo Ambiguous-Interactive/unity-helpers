@@ -39,9 +39,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static int GridBytes(int originX, int originY)
         {
             int total = 0;
-            for (int x = originX; x < originX + 40; x++)
+            for (int x = originX; x < originX + 40; ++x)
             {
-                for (int y = originY; y < originY + 25; y++)
+                for (int y = originY; y < originY + 25; ++y)
                 {
                     total += Encode(new FastVector2Int(x, y)).Length;
                 }
@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 oracle = stream.ToArray();
             }
 
-            checks++;
+            ++checks;
             Assert.AreEqual(ToHex(oracle), ToHex(mine), $"{typeof(T).Name} bytes diverged");
 
             /*
@@ -133,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static string ToHex(byte[] bytes)
         {
             char[] characters = new char[bytes.Length * 2];
-            for (int i = 0; i < bytes.Length; i++)
+            for (int i = 0; i < bytes.Length; ++i)
             {
                 characters[i * 2] = "0123456789ABCDEF"[bytes[i] >> 4];
                 characters[(i * 2) + 1] = "0123456789ABCDEF"[bytes[i] & 0xF];
@@ -182,7 +182,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static byte[] BuildNesting(int depth, byte[] innermost)
         {
             byte[] payload = innermost;
-            for (int level = 0; level < depth; level++)
+            for (int level = 0; level < depth; ++level)
             {
                 int lengthSize = WProtoSizes.Varint32Size((uint)payload.Length);
                 byte[] next = new byte[1 + lengthSize + payload.Length];
@@ -208,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static byte[] BuildGroupNesting(int depth)
         {
             byte[] payload = Array.Empty<byte>();
-            for (int level = 0; level < depth; level++)
+            for (int level = 0; level < depth; ++level)
             {
                 byte[] next = new byte[payload.Length + 2];
                 next[0] = (byte)((2 << 3) | WProtoWireType.StartGroup);
@@ -738,7 +738,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         int count = counts[index % counts.Length];
                         uint buffer = buffers[index % buffers.Length];
                         ulong state2 = states[index % states.Length];
-                        index++;
+                        ++index;
                         AssertMatchesOracle(
                             new RandomState(
                                 state1,
@@ -756,7 +756,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
             }
 
-            for (int i = 0; i < 16; i++)
+            for (int i = 0; i < 16; ++i)
             {
                 AssertMatchesOracle(WGuid.NewGuid(), ref checks);
             }
@@ -774,7 +774,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 int depth = 0;
                 for (NestingProbe node = probe; node?.Child != null; node = node.Child)
                 {
-                    depth++;
+                    ++depth;
                 }
 
                 return depth;

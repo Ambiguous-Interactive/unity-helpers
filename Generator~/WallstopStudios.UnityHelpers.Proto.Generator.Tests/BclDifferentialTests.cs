@@ -153,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             Random random = new Random(20260826);
-            for (int index = 0; index < 60; index++)
+            for (int index = 0; index < 60; ++index)
             {
                 long ticks = (long)random.Next(-(1 << 24), 1 << 24) * random.Next(1 << 10);
                 yield return new BclScalarContract
@@ -214,7 +214,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             List<char> codePoints = new List<char>();
-            for (int entry = 0; entry <= index % 4; entry++)
+            for (int entry = 0; entry <= index % 4; ++entry)
             {
                 codePoints.Add((char)random.Next(0, 1 << 16));
             }
@@ -242,7 +242,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             List<DateTime> timeline = new List<DateTime>();
-            for (int entry = 0; entry <= index % 3; entry++)
+            for (int entry = 0; entry <= index % 3; ++entry)
             {
                 timeline.Add(new DateTime(WProtoBcl.EpochTicks + random.Next(1 << 30) * 10000L));
             }
@@ -258,7 +258,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             Dictionary<string, TimeSpan> durations = new Dictionary<string, TimeSpan>();
-            for (int entry = 0; entry <= index % 3; entry++)
+            for (int entry = 0; entry <= index % 3; ++entry)
             {
                 durations["k" + entry] = TimeSpan.FromTicks(random.Next(1 << 28) * 10000L);
             }
@@ -268,7 +268,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static void AssertMatchesOracle(BclScalarContract value, ref int checks)
         {
-            checks++;
+            ++checks;
             string oracle = OracleHex(value);
             string mine = MineHex(value);
 
@@ -442,7 +442,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static byte[] Parse(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }

@@ -777,7 +777,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 {
                     if (string.Equals(method.Name, methodName, System.StringComparison.Ordinal))
                     {
-                        methodCount++;
+                        ++methodCount;
                     }
                 }
 

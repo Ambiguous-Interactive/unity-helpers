@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static WProtoNestedRootContract Build(int value, int bulk)
         {
             byte[] payload = bulk == 0 ? null : new byte[bulk];
-            for (int index = 0; index < bulk; index++)
+            for (int index = 0; index < bulk; ++index)
             {
                 payload[index] = (byte)(index * 31);
             }
@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static WProtoNestedChainContract BuildChain(int links)
         {
             WProtoNestedChainContract head = null;
-            for (int link = 1; link <= links; link++)
+            for (int link = 1; link <= links; ++link)
             {
                 head = new WProtoNestedChainContract { Id = link, Next = head };
             }
@@ -64,7 +64,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static string ToHex(ReadOnlySpan<byte> bytes)
         {
             StringBuilder builder = new(bytes.Length * 2);
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 builder.Append(bytes[index].ToString("X2"));
             }
@@ -254,7 +254,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             )
             {
                 Assert.AreEqual(60 - links, current.Id);
-                links++;
+                ++links;
             }
 
             Assert.AreEqual(60, links);

@@ -90,6 +90,19 @@ For temporary SDK clients, call `StreamableHTTPClientTransport.terminateSession(
 its idle timeout. Repeated probes exhausted the eight-session limit during session 340. Preserve
 errors and check editor status before retrying a tool whose completion is uncertain.
 
+For a synchronous benchmark, poll only `test_status` while it runs. Do not queue `eval`,
+`editor_status`, console queries, or other main-thread commands behind it. A queued request can
+reach its bridge timeout while the benchmark owns the main thread; the resulting error log then
+fails the otherwise valid NUnit case. Preserve that failure and repeat the isolated workload after
+removing the competing request. A timed-out start request does not prove the test job stopped.
+If the start call itself times out, its closed connection can also log an error during the test.
+Schedule the native runner after the HTTP response returns, with a short editor-update delay,
+then poll its status file. Verify that the scheduling response actually returned before execution.
+
+Save completed results before another run. Call `cancel_tests` only for a verified active job:
+Pipeline cancellation can overwrite a completed status file. If results were lost, inspect the
+package's `failed-tests-*.txt` export and Unity's saved `TestResults.xml` before rerunning.
+
 ### What session 224 got wrong first
 
 - **A timing cell that prints `0.000` measured nothing, and reads exactly like "free".** Session 224

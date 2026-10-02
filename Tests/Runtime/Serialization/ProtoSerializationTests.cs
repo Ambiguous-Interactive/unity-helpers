@@ -163,7 +163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             ImmutableBitSet clone = Serializer.ProtoDeserialize<ImmutableBitSet>(data);
 
             Assert.AreEqual(original.Capacity, clone.Capacity);
-            for (int i = 0; i < original.Capacity; i++)
+            for (int i = 0; i < original.Capacity; ++i)
             {
                 Assert.IsTrue(original.TryGet(i, out bool expected));
                 Assert.IsTrue(clone.TryGet(i, out bool actual));

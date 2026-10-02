@@ -123,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             const int measuredIterations = 3;
             byte[] compactJson = Encoding.UTF8.GetBytes("{\"a\":17}");
             byte[] paddedJson = new byte[whitespaceBytes + compactJson.Length];
-            for (int index = 0; index < whitespaceBytes; index++)
+            for (int index = 0; index < whitespaceBytes; ++index)
             {
                 paddedJson[index] = (byte)' ';
             }
@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] compactJson = Encoding.UTF8.GetBytes("{\"a\":17}");
             byte[] paddedJson = new byte[20_000 + compactJson.Length];
-            for (int index = 0; index < 20_000; index++)
+            for (int index = 0; index < 20_000; ++index)
             {
                 paddedJson[index] = (byte)' ';
             }

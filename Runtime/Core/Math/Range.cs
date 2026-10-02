@@ -81,13 +81,25 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             this.endInclusive = endInclusive;
         }
 
-        public static Range<T> Inclusive(T min, T max) => new(min, max, true, true);
+        public static Range<T> Inclusive(T min, T max)
+        {
+            return new(min, max, true, true);
+        }
 
-        public static Range<T> Exclusive(T min, T max) => new(min, max, false, false);
+        public static Range<T> Exclusive(T min, T max)
+        {
+            return new(min, max, false, false);
+        }
 
-        public static Range<T> InclusiveExclusive(T min, T max) => new(min, max, true, false);
+        public static Range<T> InclusiveExclusive(T min, T max)
+        {
+            return new(min, max, true, false);
+        }
 
-        public static Range<T> ExclusiveInclusive(T min, T max) => new(min, max, false, true);
+        public static Range<T> ExclusiveInclusive(T min, T max)
+        {
+            return new(min, max, false, true);
+        }
 
         public bool Equals(Range<T> other)
         {
@@ -153,7 +165,10 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             return maxComparison < 0 || (maxComparison == 0 && endInclusive);
         }
 
-        public bool Contains(T value) => WithinRange(value);
+        public bool Contains(T value)
+        {
+            return WithinRange(value);
+        }
 
         /// <summary>
         /// Tests whether two ordered intervals intersect, respecting both intervals' endpoint inclusivity.

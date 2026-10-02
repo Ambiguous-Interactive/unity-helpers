@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void MultipleSequentialRoundtripsReuseCodecSafely()
         {
             IRandom random = new PcgRandom(42);
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 int length = 128 + i * 17;
                 byte[] data = new byte[length];
@@ -156,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Array.Copy(compressed, corrupted, compressed.Length);
             int start = Math.Max(13, corrupted.Length / 3);
             int span = Math.Min(32, corrupted.Length - start);
-            for (int i = 0; i < span; i++)
+            for (int i = 0; i < span; ++i)
             {
                 corrupted[start + i] ^= 0x5A;
             }
@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             byte[] withTrailing = new byte[compressed.Length + 5];
             Array.Copy(compressed, withTrailing, compressed.Length);
-            for (int i = compressed.Length; i < withTrailing.Length; i++)
+            for (int i = compressed.Length; i < withTrailing.Length; ++i)
             {
                 withTrailing[i] = 0xAA;
             }

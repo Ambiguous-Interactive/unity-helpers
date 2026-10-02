@@ -267,7 +267,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         float regexStartX = startX + 15f;
                         float regexWidth = availableWidth - 15f;
 
-                        for (int i = 0; i < regexesProp.arraySize; i++)
+                        for (int i = 0; i < regexesProp.arraySize; ++i)
                         {
                             SerializedProperty elemProp = regexesProp.GetArrayElementAtIndex(i);
                             Rect fieldRect = new(
@@ -361,7 +361,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         );
                         float exRegexStartX = startX + 15f;
                         float exRegexWidth = availableWidth - 15f;
-                        for (int i = 0; i < excludeRegexesProp.arraySize; i++)
+                        for (int i = 0; i < excludeRegexesProp.arraySize; ++i)
                         {
                             SerializedProperty elemProp = excludeRegexesProp.GetArrayElementAtIndex(
                                 i
@@ -451,7 +451,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         );
                         float exPathStartX = startX + 15f;
                         float exPathWidth = availableWidth - 15f;
-                        for (int i = 0; i < exPathsProp.arraySize; i++)
+                        for (int i = 0; i < exPathsProp.arraySize; ++i)
                         {
                             SerializedProperty elemProp = exPathsProp.GetArrayElementAtIndex(i);
                             Rect fieldRect = new(

@@ -68,7 +68,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _rank = new int[n];
             _setCount = n;
 
-            for (int i = 0; i < n; i++)
+            for (int i = 0; i < n; ++i)
             {
                 _parent[i] = i;
                 _rank[i] = 0;
@@ -132,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             else
             {
                 _parent[rootY] = rootX;
-                _rank[rootX]++;
+                ++_rank[rootX];
             }
 
             _setCount--;
@@ -170,11 +170,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             int memberCount = 0;
             int parentLength = _parent.Length;
-            for (int i = 0; i < parentLength; i++)
+            for (int i = 0; i < parentLength; ++i)
             {
                 if (TryFind(i, out int currentRoot) && currentRoot == root)
                 {
-                    memberCount++;
+                    ++memberCount;
                 }
             }
             size = memberCount;
@@ -201,7 +201,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int parentLength = _parent.Length;
-            for (int i = 0; i < parentLength; i++)
+            for (int i = 0; i < parentLength; ++i)
             {
                 if (TryFind(i, out int currentRoot) && currentRoot == root)
                 {
@@ -250,7 +250,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 out int[] rootToResult
             );
 
-            for (int i = 0; i < elementCount; i++)
+            for (int i = 0; i < elementCount; ++i)
             {
                 if (!TryFind(i, out int root))
                 {
@@ -290,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public void Reset()
         {
             int parentLength = _parent.Length;
-            for (int i = 0; i < parentLength; i++)
+            for (int i = 0; i < parentLength; ++i)
             {
                 _parent[i] = i;
                 _rank[i] = 0;

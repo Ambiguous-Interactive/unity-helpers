@@ -516,7 +516,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             public bool MoveNext()
             {
-                _position++;
+                ++_position;
                 return _position < _items.Count;
             }
 

@@ -515,14 +515,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int successCount = 0;
 
             Thread[] threads = new Thread[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 int threadIndex = t;
                 threads[t] = new Thread(() =>
                 {
                     try
                     {
-                        for (int i = 0; i < iterationsPerThread; i++)
+                        for (int i = 0; i < iterationsPerThread; ++i)
                         {
                             Type type = threadIndex % 2 == 0 ? typeof(int) : typeof(string);
                             int size = PoolSizeEstimator.EstimateItemSizeBytes(type);
@@ -541,12 +541,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 });
             }
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 threads[t].Start();
             }
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 threads[t].Join(TimeSpan.FromSeconds(30));
             }
@@ -564,14 +564,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int successCount = 0;
 
             Thread[] threads = new Thread[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 int threadIndex = t;
                 threads[t] = new Thread(() =>
                 {
                     try
                     {
-                        for (int i = 0; i < iterationsPerThread; i++)
+                        for (int i = 0; i < iterationsPerThread; ++i)
                         {
                             bool enabled = PoolPurgeSettings.SizeAwarePoliciesEnabled;
                             int threshold = PoolPurgeSettings.LargeObjectThresholdBytes;
@@ -595,12 +595,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 });
             }
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 threads[t].Start();
             }
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 threads[t].Join(TimeSpan.FromSeconds(30));
             }
@@ -616,7 +616,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             PoolPurgeSettings.LargeObjectThresholdBytes = 1;
 
             float currentTime = 0f;
-            float TestTimeProvider() => currentTime;
+            float TestTimeProvider()
+            {
+                return currentTime;
+            }
 
             using WallstopGenericPool<SmallClass> pool = new WallstopGenericPool<SmallClass>(
                 () => new SmallClass(),
@@ -658,7 +661,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             PoolPurgeSettings.SizeAwarePoliciesEnabled = true;
 
             float currentTime = 0f;
-            float TestTimeProvider() => currentTime;
+            float TestTimeProvider()
+            {
+                return currentTime;
+            }
 
             using WallstopGenericPool<SmallClass> pool = new WallstopGenericPool<SmallClass>(
                 () => new SmallClass(),

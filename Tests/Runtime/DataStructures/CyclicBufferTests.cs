@@ -22,7 +22,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Assert.Throws<ArgumentException>(() => new CyclicBuffer<int>(-1));
             Assert.Throws<ArgumentException>(() => new CyclicBuffer<int>(int.MinValue));
-            for (int i = 0; i < NumTries; i++)
+            for (int i = 0; i < NumTries; ++i)
             {
                 Assert.Throws<ArgumentException>(() =>
                     new CyclicBuffer<int>(PRNG.Instance.Next(int.MinValue, -1))
@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void CapacityInitializedOk()
         {
-            for (int i = 0; i < NumTries; i++)
+            for (int i = 0; i < NumTries; ++i)
             {
                 int capacity = PRNG.Instance.Next(1, int.MaxValue);
                 CyclicBuffer<int> buffer = new(capacity);
@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void CountInitializedOk()
         {
-            for (int i = 0; i < NumTries; i++)
+            for (int i = 0; i < NumTries; ++i)
             {
                 int capacity = PRNG.Instance.Next(1, int.MaxValue);
                 CyclicBuffer<int> buffer = new(capacity);
@@ -391,7 +391,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ResizeUpwardsPreservesData()
         {
             CyclicBuffer<int> buffer = new(5);
-            for (int i = 1; i <= 10; i++)
+            for (int i = 1; i <= 10; ++i)
             {
                 buffer.Add(i);
             }
@@ -804,7 +804,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void RemoveAllWithComplexPredicate()
         {
             CyclicBuffer<int> buffer = new(10);
-            for (int i = 1; i <= 10; i++)
+            for (int i = 1; i <= 10; ++i)
             {
                 buffer.Add(i);
             }
@@ -1245,7 +1245,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = 0;
             foreach (int unused in buffer)
             {
-                count++;
+                ++count;
             }
 
             Assert.AreEqual(0, count);
@@ -1284,7 +1284,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(3) { 1, 2 };
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 List<int> items = new();
                 foreach (int item in buffer)
@@ -1412,7 +1412,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ResizePreservesOrder()
         {
             CyclicBuffer<int> buffer = new(5);
-            for (int i = 1; i <= 8; i++)
+            for (int i = 1; i <= 8; ++i)
             {
                 buffer.Add(i);
             }
@@ -1438,7 +1438,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CyclicBuffer<int> buffer = new(20);
             List<int> expected = new();
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 int operation = PRNG.Instance.Next(0, 5);
 
@@ -1522,7 +1522,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = 0;
             foreach (int unused in buffer)
             {
-                count++;
+                ++count;
             }
             Assert.AreEqual(0, count);
         }
@@ -1539,7 +1539,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(3, buffer.Count);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 2, 3, 4 }));
 
-            for (int i = 0; i < buffer.Count; i++)
+            for (int i = 0; i < buffer.Count; ++i)
             {
                 Assert.DoesNotThrow(() =>
                 {
@@ -1732,14 +1732,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void TryPopOperationsStayInSyncWithReferenceList()
         {
-            for (int trial = 0; trial < NumTries; trial++)
+            for (int trial = 0; trial < NumTries; ++trial)
             {
                 int capacity = PRNG.Instance.Next(0, 10);
                 CyclicBuffer<int> buffer = new(capacity);
                 List<int> expected = new(0 < capacity ? capacity : 1);
 
                 int operations = PRNG.Instance.Next(30, 90);
-                for (int step = 0; step < operations; step++)
+                for (int step = 0; step < operations; ++step)
                 {
                     int action = PRNG.Instance.Next(0, 3);
                     switch (action)
@@ -1857,7 +1857,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void TryPopFrontMultipleTimes()
         {
             CyclicBuffer<int> buffer = new(10);
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 buffer.Add(i);
             }
@@ -1875,7 +1875,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void TryPopBackMultipleTimes()
         {
             CyclicBuffer<int> buffer = new(10);
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 buffer.Add(i);
             }

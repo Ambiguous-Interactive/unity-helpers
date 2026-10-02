@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         )
         {
             ObjectReferenceKeyframe[] keys = new ObjectReferenceKeyframe[frames.Length];
-            for (int index = 0; index < frames.Length; index++)
+            for (int index = 0; index < frames.Length; ++index)
             {
                 keys[index] = new ObjectReferenceKeyframe
                 {
@@ -126,7 +126,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             AnimationClip clip = Track(new AnimationClip());
             Sprite sprite = MakeSprite(0f, 0f);
             (float, Sprite)[] frames = new (float, Sprite)[count];
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 frames[index] = (index * 0.125f, sprite);
             }
@@ -144,7 +144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Sprite landed = MakeSprite(0f, -3.56f);
             Sprite settled = MakeSprite(0f, -3.5f);
             (float, Sprite)[] frames = new (float, Sprite)[63];
-            for (int index = 0; index < frames.Length; index++)
+            for (int index = 0; index < frames.Length; ++index)
             {
                 frames[index] = (
                     index / 12f,
@@ -312,7 +312,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Sprite first = MakeSprite(0f, 0f);
             Sprite second = MakeSprite(0f, -1f);
             (float, Sprite)[] frames = new (float, Sprite)[count];
-            for (int index = 0; index < frames.Length; index++)
+            for (int index = 0; index < frames.Length; ++index)
             {
                 frames[index] = (index * 0.125f, index < count - 1 ? first : second);
             }

@@ -63,7 +63,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
 
             bool inside = false;
             int j = polygonLength - 1;
-            for (int i = 0; i < polygonLength; i++)
+            for (int i = 0; i < polygonLength; ++i)
             {
                 Vector2 vi = polygon[i];
                 Vector2 vj = polygon[j];
@@ -186,7 +186,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         )
         {
             int polygonLength = polygon.Length;
-            for (int i = 0; i < polygonLength; i++)
+            for (int i = 0; i < polygonLength; ++i)
             {
                 Vector3 relativeVertex = polygon[i] - origin;
                 destination[i] = new Vector2(

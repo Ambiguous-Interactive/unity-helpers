@@ -19,7 +19,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         protected override void OnInstanceCleared()
         {
             base.OnInstanceCleared();
-            ClearedCount++;
+            ++ClearedCount;
             clearing?.Invoke();
         }
     }

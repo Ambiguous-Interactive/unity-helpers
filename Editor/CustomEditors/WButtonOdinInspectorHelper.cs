@@ -116,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             );
             IReadOnlyList<WGroupDrawOperation> operations = layout.Operations;
 
-            for (int index = 0; index < operations.Count; index++)
+            for (int index = 0; index < operations.Count; ++index)
             {
                 WGroupDrawOperation operation = operations[index];
                 if (operation.Type == WGroupDrawOperationType.Group)

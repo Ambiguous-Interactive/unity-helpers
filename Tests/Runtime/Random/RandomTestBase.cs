@@ -929,7 +929,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 }
                 else
                 {
-                    _samples[Math.Min(sampleLength - 1, index)]++;
+                    ++_samples[Math.Min(sampleLength - 1, index)];
                 }
             }
 
@@ -945,7 +945,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             );
             List<int> zeroCountIndexes = new();
             List<int> outsideRange = new();
-            for (int i = 0; i < sampleLength; i++)
+            for (int i = 0; i < sampleLength; ++i)
             {
                 int count = _samples[i];
                 if (count == 0)

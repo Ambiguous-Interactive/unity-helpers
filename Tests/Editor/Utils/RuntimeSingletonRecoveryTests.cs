@@ -132,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             bool cacheRetainedDuringNestedClear = false;
             Action callback = () =>
             {
-                callbacks++;
+                ++callbacks;
                 if (callbacks != 1)
                 {
                     return;
@@ -203,7 +203,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int secondCallbacks = 0;
             first.disabling = () =>
             {
-                firstCallbacks++;
+                ++firstCallbacks;
                 if (firstCallbacks == 1)
                 {
                     RuntimeCleanupPartnerSingleton.ClearInstance();
@@ -211,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             };
             second.disabling = () =>
             {
-                secondCallbacks++;
+                ++secondCallbacks;
                 if (secondCallbacks == 1)
                 {
                     RuntimeCleanupSingleton.ClearInstance();

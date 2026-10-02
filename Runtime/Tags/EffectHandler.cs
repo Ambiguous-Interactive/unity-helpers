@@ -1847,8 +1847,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                             && runtimeState.TryConsumeTick(currentTime)
                         )
                         {
-                            consumedTicksThisUpdate++;
-                            consumedTicks++;
+                            ++consumedTicksThisUpdate;
+                            ++consumedTicks;
                             ApplyPeriodicTick(handle, runtimeState, currentTime, deltaTime);
                         }
 

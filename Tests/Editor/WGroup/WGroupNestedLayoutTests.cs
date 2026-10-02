@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 "\n--- Groups ---",
             };
 
-            for (int i = 0; i < layout.Groups.Count; i++)
+            for (int i = 0; i < layout.Groups.Count; ++i)
             {
                 WGroupDefinition group = layout.Groups[i];
                 lines.Add(
@@ -65,7 +65,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             }
 
             lines.Add("\n--- Operations ---");
-            for (int i = 0; i < layout.Operations.Count; i++)
+            for (int i = 0; i < layout.Operations.Count; ++i)
             {
                 WGroupDrawOperation op = layout.Operations[i];
                 if (op.Type == WGroupDrawOperationType.Group)

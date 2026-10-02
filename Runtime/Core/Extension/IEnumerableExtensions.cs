@@ -414,7 +414,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     while (count < _size && _source.MoveNext())
                     {
                         partition.Add(_source.Current);
-                        count++;
+                        ++count;
                     }
                 }
                 catch

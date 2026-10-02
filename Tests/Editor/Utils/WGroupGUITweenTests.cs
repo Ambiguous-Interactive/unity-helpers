@@ -419,7 +419,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
 
             AnimBool anim = WGroupAnimationState.GetOrCreateAnim(definition, expanded: true);
 
-            for (int iteration = 0; iteration < 100; iteration++)
+            for (int iteration = 0; iteration < 100; ++iteration)
             {
                 bool expanded = iteration % 2 == 0;
                 WGroupAnimationState.GetOrCreateAnim(definition, expanded);

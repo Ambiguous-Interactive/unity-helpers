@@ -456,21 +456,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// of internal defaults, so modifying it won't affect global behavior. Cache and reuse the
         /// returned instance across calls to benefit from System.Text.Json metadata caches.
         /// </summary>
-        public static JsonSerializerOptions CreateNormalJsonOptions() =>
-            SerializerEncoding.GetNormalJsonOptions();
+        public static JsonSerializerOptions CreateNormalJsonOptions()
+        {
+            return SerializerEncoding.GetNormalJsonOptions();
+        }
 
         /// <summary>
         /// Returns a copy of the package's Pretty (indented) JSON options.
         /// </summary>
-        public static JsonSerializerOptions CreatePrettyJsonOptions() =>
-            SerializerEncoding.GetPrettyJsonOptions();
+        public static JsonSerializerOptions CreatePrettyJsonOptions()
+        {
+            return SerializerEncoding.GetPrettyJsonOptions();
+        }
 
         /// <summary>
         /// Returns a copy of the package's Fast JSON options, tuned for hot paths with reduced validation
         /// and features to minimize allocations and branching. See docs for trade-offs.
         /// </summary>
-        public static JsonSerializerOptions CreateFastJsonOptions() =>
-            SerializerEncoding.GetFastJsonOptions();
+        public static JsonSerializerOptions CreateFastJsonOptions()
+        {
+            return SerializerEncoding.GetFastJsonOptions();
+        }
 
         /// <summary>
         /// Returns a copy of the package's Fast POCO JSON options.
@@ -482,8 +488,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// - IncludeFields = false (prefer properties for performance)
         /// - Returns a new instance each call; cache and reuse within your app to leverage STJ metadata caches
         /// </summary>
-        public static JsonSerializerOptions CreateFastPocoJsonOptions() =>
-            new(SerializerEncoding.FastPocoJsonOptions);
+        public static JsonSerializerOptions CreateFastPocoJsonOptions()
+        {
+            return new(SerializerEncoding.FastPocoJsonOptions);
+        }
 
         /// <summary>
         /// Reports whether protobuf serialization will write the byte layout this package documents.
@@ -1257,7 +1265,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             capacity = SerializationCapacityLimits.Clamp(capacity, itemCount);
 
             Deque<T> result = new(capacity);
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < itemCount; ++i)
             {
                 result.PushBack(wrapper.Items[i]);
             }
@@ -1271,7 +1279,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             if (0 < count)
             {
                 items = new T[count];
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < count; ++i)
                 {
                     items[i] = input[i];
                 }
@@ -2977,7 +2985,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             if (options != null)
             {
                 IList<JsonConverter> converters = options.Converters;
-                for (int i = 0; i < converters.Count; i++)
+                for (int i = 0; i < converters.Count; ++i)
                 {
                     JsonConverter converter = converters[i];
                     if (converter != null && converter.CanConvert(type))
@@ -3330,7 +3338,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             int converterCount = converters.Count;
             for (Type candidate = runtimeType; candidate != null; candidate = candidate.BaseType)
             {
-                for (int index = 0; index < converterCount; index++)
+                for (int index = 0; index < converterCount; ++index)
                 {
                     if (converters[index].CanConvert(candidate))
                     {
@@ -3808,9 +3816,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             _position = 0;
         }
 
-        public static Utils.PooledResource<PooledBufferStream> Rent(
-            out PooledBufferStream stream
-        ) => Pool.Get(out stream);
+        public static Utils.PooledResource<PooledBufferStream> Rent(out PooledBufferStream stream)
+        {
+            return Pool.Get(out stream);
+        }
 
         public override void Flush() { }
 
@@ -4013,7 +4022,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         public static Utils.PooledResource<PooledArrayBufferWriter> Rent(
             out PooledArrayBufferWriter writer
-        ) => Pool.Get(out writer);
+        )
+        {
+            return Pool.Get(out writer);
+        }
 
         public void Advance(int count)
         {
@@ -4168,7 +4180,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         public static Utils.PooledResource<PooledReadOnlyMemoryStream> Rent(
             out PooledReadOnlyMemoryStream stream
-        ) => Pool.Get(out stream);
+        )
+        {
+            return Pool.Get(out stream);
+        }
 
         public void SetBuffer(byte[] buffer)
         {

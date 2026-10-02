@@ -299,7 +299,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
 
             yield return TestIMGUIExecutor.Run(() =>
             {
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < 5; ++i)
                 {
                     drawer.OnGUI(position, property, GUIContent.none);
                 }
@@ -351,7 +351,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
 
             yield return TestIMGUIExecutor.Run(() =>
             {
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < 10; ++i)
                 {
                     drawer.OnGUI(position, property, GUIContent.none);
                 }

@@ -1319,7 +1319,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
-        private static void ShowWindow() => GetWindow<SpriteSheetExtractor>(Name);
+        private static void ShowWindow()
+        {
+            GetWindow<SpriteSheetExtractor>(Name);
+        }
 
         private static bool IsTextureFormatSupportedForGetPixels(TextureFormat format)
         {
@@ -5678,7 +5681,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         );
                     }
 
-                    regeneratedCount++;
+                    ++regeneratedCount;
                     entry._cachedAlgorithmResult = null;
                     // Schedule regeneration so algorithm changes preserve existing previews until replacements are ready.
                     SchedulePreviewRegenerationForEntry(entry);

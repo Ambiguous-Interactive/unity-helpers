@@ -383,7 +383,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void TrimExcessDoesNotReduceWhenNearCapacity()
         {
             Heap<int> heap = new(10);
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 9; ++i)
             {
                 heap.Add(i);
             }
@@ -966,7 +966,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Heap<int> heap = Heap<int>.CreateMinHeap();
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 heap.Add(i);
                 heap.Add(i + 10);
@@ -1001,7 +1001,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = 0;
             foreach (int _ in heap)
             {
-                count++;
+                ++count;
             }
 
             Assert.AreEqual(4, count);
@@ -1021,7 +1021,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Heap<int> heap = Heap<int>.CreateMinHeap(new[] { 10, 20, 30, 40, 50 });
 
             int index = -1;
-            for (int i = 0; i < heap.Count; i++)
+            for (int i = 0; i < heap.Count; ++i)
             {
                 if (heap[i] == 40)
                 {
@@ -1103,7 +1103,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Heap<int> heap = Heap<int>.CreateMaxHeap(new[] { 50, 40, 30, 20, 10 });
 
             int index = -1;
-            for (int i = 0; i < heap.Count; i++)
+            for (int i = 0; i < heap.Count; ++i)
             {
                 if (heap[i] == 20)
                 {
@@ -1201,7 +1201,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
 
             int index = -1;
-            for (int i = 0; i < heap.Count; i++)
+            for (int i = 0; i < heap.Count; ++i)
             {
                 if (string.Equals(heap[i], "date", System.StringComparison.Ordinal))
                 {
@@ -1597,7 +1597,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             static IEnumerable<int> GetManyNumbers()
             {
-                for (int i = 0; i < 20; i++)
+                for (int i = 0; i < 20; ++i)
                 {
                     yield return i;
                 }
@@ -1785,7 +1785,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Heap<int> heap = new(2);
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 heap.Add(i);
             }
@@ -1799,7 +1799,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Heap<int> heap = new(2);
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 heap.Add(50 - i);
             }
@@ -1942,7 +1942,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = 0;
             foreach (int _ in heap)
             {
-                count++;
+                ++count;
             }
 
             Assert.AreEqual(0, count);

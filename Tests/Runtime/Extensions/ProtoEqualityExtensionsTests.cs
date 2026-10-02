@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void ProtoEqualsLargeCollectionsReturnsTrue()
         {
             List<int> largeList = new();
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 largeList.Add(i);
             }

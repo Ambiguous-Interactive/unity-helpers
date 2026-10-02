@@ -322,7 +322,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             SerializableDictionaryPropertyDrawer drawer = new();
             string[] testKeys = new string[5];
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 testKeys[i] = $"MultiTest_{Guid.NewGuid():N}";
                 string testValue = $"Value_{i}";
@@ -351,7 +351,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             singleton.dictionary.EditorAfterDeserialize();
             Assert.AreEqual(5, singleton.dictionary.Count, "All 5 entries should persist.");
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 Assert.IsTrue(
                     singleton.dictionary.ContainsKey(testKeys[i]),
@@ -455,7 +455,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             int existingIndex = -1;
-            for (int i = 0; i < keysProperty.arraySize; i++)
+            for (int i = 0; i < keysProperty.arraySize; ++i)
             {
                 SerializedProperty keyProp = keysProperty.GetArrayElementAtIndex(i);
                 if (keyProp.stringValue == testKey)
@@ -955,7 +955,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 if (prop.Name == "Item")
                 {
-                    itemCount++;
+                    ++itemCount;
                 }
             }
 

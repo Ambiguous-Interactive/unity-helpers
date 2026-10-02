@@ -193,7 +193,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             UnityEditor.Editor editor = UnityEditor.Editor.CreateEditor(target);
             WButtonEditorHelper helper = new WButtonEditorHelper();
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 Assert.DoesNotThrow(() => helper.DrawButtonsAtTop(editor));
                 Assert.DoesNotThrow(() => helper.DrawButtonsAtBottom(editor));
@@ -662,7 +662,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             UnityEditor.Editor editor = UnityEditor.Editor.CreateEditor(target);
             WButtonEditorHelper helper = new WButtonEditorHelper();
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 helper.DrawButtonsAtTop(editor);
                 helper.DrawButtonsAtBottom(editor);

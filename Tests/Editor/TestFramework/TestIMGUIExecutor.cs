@@ -167,7 +167,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 ParameterInfo[] panelParams = _createEditorPanel.GetParameters();
                 object[] panelArgs = new object[panelParams.Length];
                 panelArgs[0] = owner;
-                for (int i = 1; i < panelArgs.Length; i++)
+                for (int i = 1; i < panelArgs.Length; ++i)
                 {
                     panelArgs[i] = Type.Missing;
                 }
@@ -234,7 +234,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                         }
                     }
 
-                    passes++;
+                    ++passes;
                     if (actionError != null)
                     {
                         break;
@@ -399,7 +399,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 }
 
                 bool restOptional = true;
-                for (int i = 1; i < parameters.Length; i++)
+                for (int i = 1; i < parameters.Length; ++i)
                 {
                     if (!parameters[i].IsOptional)
                     {

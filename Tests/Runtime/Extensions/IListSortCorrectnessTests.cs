@@ -376,7 +376,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     int index = length - 1;
                     while (0 <= index)
                     {
-                        keys[index]++;
+                        ++keys[index];
                         if (keys[index] < alphabet)
                         {
                             break;
@@ -541,7 +541,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int declared = 0;
             foreach (SortAlgorithm algorithm in EveryAlgorithm())
             {
-                declared++;
+                ++declared;
                 if (!PromisedStability.ContainsKey(algorithm))
                 {
                     missing.Add(algorithm);
@@ -603,7 +603,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int sizes = 0;
             foreach (int size in SizesFor(backing))
             {
-                sizes++;
+                ++sizes;
                 foreach ((string name, Func<int, int, int> keyAt) in Shapes)
                 {
                     int[] keys = new int[size];
@@ -686,7 +686,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             public void Run(int[] keys, string label)
             {
-                Cases++;
+                ++Cases;
                 IList<SortProbe> subject = CreateBacking(_backing, keys);
                 subject.Sort(new SortProbeKeyComparer(), _algorithm);
                 Verify(subject, keys, label);

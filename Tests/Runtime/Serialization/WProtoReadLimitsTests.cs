@@ -157,7 +157,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             while (reader.TryReadTag(out int tag, out int wire))
             {
                 Assert.IsTrue(reader.TrySkipField(tag, wire));
-                count++;
+                ++count;
             }
 
             Assert.AreEqual(limit, count);
@@ -185,7 +185,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             while (reader.TryReadTag(out int tag, out int wire))
             {
                 Assert.IsTrue(reader.TrySkipField(tag, wire));
-                reads++;
+                ++reads;
             }
 
             Assert.AreEqual(limit, reads);
@@ -566,9 +566,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private sealed class PackedFormatter : IWProtoFormatter<int>
         {
-            public int Measure(in int value) => 0;
+            public int Measure(in int value)
+            {
+                return 0;
+            }
 
-            public bool Write(ref WProtoWriter writer, in int value) => true;
+            public bool Write(ref WProtoWriter writer, in int value)
+            {
+                return true;
+            }
 
             public bool TryRead(ref WProtoReader reader, out int value)
             {
@@ -582,13 +588,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             internal int Reads;
 
-            public int Measure(in int value) => 0;
+            public int Measure(in int value)
+            {
+                return 0;
+            }
 
-            public bool Write(ref WProtoWriter writer, in int value) => true;
+            public bool Write(ref WProtoWriter writer, in int value)
+            {
+                return true;
+            }
 
             public bool TryRead(ref WProtoReader reader, out int value)
             {
-                Reads++;
+                ++Reads;
                 value = 1;
                 return true;
             }
@@ -598,13 +610,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             internal int Reads;
 
-            public int Measure(in LimitMarker value) => 0;
+            public int Measure(in LimitMarker value)
+            {
+                return 0;
+            }
 
-            public bool Write(ref WProtoWriter writer, in LimitMarker value) => true;
+            public bool Write(ref WProtoWriter writer, in LimitMarker value)
+            {
+                return true;
+            }
 
             public bool TryRead(ref WProtoReader reader, out LimitMarker value)
             {
-                Reads++;
+                ++Reads;
                 value = default;
                 while (reader.TryReadTag(out int tag, out int wire))
                 {
@@ -622,9 +640,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private sealed class ResettingFormatter : IWProtoFormatter<LimitMarker>
         {
-            public int Measure(in LimitMarker value) => 0;
+            public int Measure(in LimitMarker value)
+            {
+                return 0;
+            }
 
-            public bool Write(ref WProtoWriter writer, in LimitMarker value) => true;
+            public bool Write(ref WProtoWriter writer, in LimitMarker value)
+            {
+                return true;
+            }
 
             public bool TryRead(ref WProtoReader reader, out LimitMarker value)
             {

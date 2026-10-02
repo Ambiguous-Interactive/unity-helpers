@@ -32,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         public void MarkUsed()
         {
-            count++;
+            ++count;
             lastUsedTicks = DateTime.UtcNow.Ticks;
         }
     }
@@ -538,7 +538,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     if (!deletedFolders.Contains(subFolder))
                     {
-                        actualSubFolderCount++;
+                        ++actualSubFolderCount;
                     }
                 }
             }
@@ -734,7 +734,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             DirectoryUsageData[] sortedDirectories = new DirectoryUsageData[list.Count];
             int listCount = list.Count;
-            for (int i = 0; i < listCount; i++)
+            for (int i = 0; i < listCount; ++i)
             {
                 sortedDirectories[i] = list[i];
             }
@@ -763,7 +763,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return sortedDirectories;
             }
             DirectoryUsageData[] result = new DirectoryUsageData[n];
-            for (int i = 0; i < n; i++)
+            for (int i = 0; i < n; ++i)
             {
                 result[i] = sortedDirectories[i];
             }

@@ -604,7 +604,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 case IReadOnlyList<Color> colorList:
                 {
-                    for (int i = 0; i < colorList.Count; i++)
+                    for (int i = 0; i < colorList.Count; ++i)
                     {
                         Color pixel = colorList[i];
                         if (pixel.a <= alphaCutoff)
@@ -782,7 +782,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 case IReadOnlyList<Color> colorList:
                 {
-                    for (int i = 0; i < colorList.Count; i++)
+                    for (int i = 0; i < colorList.Count; ++i)
                     {
                         Color pixel = colorList[i];
                         if (pixel.a <= alphaCutoff)
@@ -884,7 +884,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 case IReadOnlyList<Color> colorList:
                 {
-                    for (int i = 0; i < colorList.Count; i++)
+                    for (int i = 0; i < colorList.Count; ++i)
                     {
                         Color pixel = colorList[i];
                         if (pixel.a <= alphaCutoff)

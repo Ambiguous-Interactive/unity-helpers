@@ -25,7 +25,7 @@ namespace SevenZip.Compression.LZMA
 
             public void Create(uint numPosStates)
             {
-                for (uint posState = _numPosStates; posState < numPosStates; posState++)
+                for (uint posState = _numPosStates; posState < numPosStates; ++posState)
                 {
                     _lowCoder[posState] = new BitTreeDecoder(Base.KNumLowLenBits);
                     _midCoder[posState] = new BitTreeDecoder(Base.KNumMidLenBits);
@@ -36,7 +36,7 @@ namespace SevenZip.Compression.LZMA
             public void Init()
             {
                 _choice.Init();
-                for (uint posState = 0; posState < _numPosStates; posState++)
+                for (uint posState = 0; posState < _numPosStates; ++posState)
                 {
                     _lowCoder[posState].Init();
                     _midCoder[posState].Init();
@@ -79,7 +79,7 @@ namespace SevenZip.Compression.LZMA
 
                 public void Init()
                 {
-                    for (int i = 0; i < 0x300; i++)
+                    for (int i = 0; i < 0x300; ++i)
                     {
                         _decoders[i].Init();
                     }
@@ -135,7 +135,7 @@ namespace SevenZip.Compression.LZMA
                 _numPrevBits = numPrevBits;
                 uint numStates = (uint)1 << (_numPrevBits + _numPosBits);
                 _coders = new Decoder2[numStates];
-                for (uint i = 0; i < numStates; i++)
+                for (uint i = 0; i < numStates; ++i)
                 {
                     _coders[i].Create();
                 }
@@ -144,7 +144,7 @@ namespace SevenZip.Compression.LZMA
             public void Init()
             {
                 uint numStates = (uint)1 << (_numPrevBits + _numPosBits);
-                for (uint i = 0; i < numStates; i++)
+                for (uint i = 0; i < numStates; ++i)
                 {
                     _coders[i].Init();
                 }
@@ -211,7 +211,7 @@ namespace SevenZip.Compression.LZMA
         public Decoder()
         {
             _dictionarySize = 0xFFFFFFFF;
-            for (int i = 0; i < Base.KNumLenToPosStates; i++)
+            for (int i = 0; i < Base.KNumLenToPosStates; ++i)
             {
                 _posSlotDecoder[i] = new BitTreeDecoder(Base.KNumPosSlotBits);
             }
@@ -264,9 +264,9 @@ namespace SevenZip.Compression.LZMA
             _outWindow.Init(outStream, _solid);
 
             uint i;
-            for (i = 0; i < Base.KNumStates; i++)
+            for (i = 0; i < Base.KNumStates; ++i)
             {
-                for (uint j = 0; j <= _posStateMask; j++)
+                for (uint j = 0; j <= _posStateMask; ++j)
                 {
                     uint index = (i << Base.KNumPosStatesBitsMax) + j;
                     _isMatchDecoders[index].Init();
@@ -279,13 +279,13 @@ namespace SevenZip.Compression.LZMA
             }
 
             _literalDecoder.Init();
-            for (i = 0; i < Base.KNumLenToPosStates; i++)
+            for (i = 0; i < Base.KNumLenToPosStates; ++i)
             {
                 _posSlotDecoder[i].Init();
             }
 
             // m_PosSpecDecoder.Init();
-            for (i = 0; i < Base.KNumFullDistances - Base.KEndPosModelIndex; i++)
+            for (i = 0; i < Base.KNumFullDistances - Base.KEndPosModelIndex; ++i)
             {
                 _posDecoders[i].Init();
             }
@@ -327,7 +327,7 @@ namespace SevenZip.Compression.LZMA
                 state.UpdateChar();
                 byte b = _literalDecoder.DecodeNormal(_rangeDecoder, 0, 0);
                 _outWindow.PutByte(b);
-                nowPos64++;
+                ++nowPos64;
             }
             while (nowPos64 < outSize64)
             {
@@ -362,7 +362,7 @@ namespace SevenZip.Compression.LZMA
 
                         _outWindow.PutByte(b);
                         state.UpdateChar();
-                        nowPos64++;
+                        ++nowPos64;
                     }
                     else
                     {
@@ -380,7 +380,7 @@ namespace SevenZip.Compression.LZMA
                                 {
                                     state.UpdateShortRep();
                                     _outWindow.PutByte(_outWindow.GetByte(rep0));
-                                    nowPos64++;
+                                    ++nowPos64;
                                     continue;
                                 }
                             }
@@ -484,7 +484,7 @@ namespace SevenZip.Compression.LZMA
             }
 
             UInt32 dictionarySize = 0;
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 4; ++i)
             {
                 dictionarySize += ((UInt32)(properties[1 + i])) << (i * 8);
             }

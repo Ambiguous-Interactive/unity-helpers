@@ -642,7 +642,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             int pageCount = CalculatePageCount();
             if (_pageIndex < pageCount - 1)
             {
-                _pageIndex++;
+                ++_pageIndex;
                 _focusedOptionIndex = -1;
                 RefreshDisplay();
             }
@@ -724,7 +724,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private void UpdateOptionFocus()
         {
             int optionsContainerChildCount = _optionsContainer.childCount;
-            for (int i = 0; i < optionsContainerChildCount; i++)
+            for (int i = 0; i < optionsContainerChildCount; ++i)
             {
                 VisualElement child = _optionsContainer[i];
                 if (i == _focusedOptionIndex)
@@ -800,7 +800,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (string.IsNullOrEmpty(_searchText))
             {
                 int dataDisplayLabelsLength = _data.DisplayLabels.Length;
-                for (int i = 0; i < dataDisplayLabelsLength; i++)
+                for (int i = 0; i < dataDisplayLabelsLength; ++i)
                 {
                     _filteredIndices.Add(i);
                 }
@@ -808,7 +808,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             else
             {
                 int dataDisplayLabelsLength2 = _data.DisplayLabels.Length;
-                for (int i = 0; i < dataDisplayLabelsLength2; i++)
+                for (int i = 0; i < dataDisplayLabelsLength2; ++i)
                 {
                     string label = GetNormalizedLabel(i);
                     if (0 <= label.IndexOf(_searchText, StringComparison.OrdinalIgnoreCase))
@@ -908,7 +908,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             int startIndex = _pageIndex * pageSize;
             int endIndex = Mathf.Min(startIndex + pageSize, _filteredIndices.Count);
 
-            for (int i = startIndex; i < endIndex; i++)
+            for (int i = startIndex; i < endIndex; ++i)
             {
                 int optionIndex = _filteredIndices[i];
                 VisualElement optionRow = CreateOptionRow(optionIndex);
@@ -1002,12 +1002,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             int count = 0;
             int dataDisplayLabelsLength = _data.DisplayLabels.Length;
-            for (int i = 0; i < dataDisplayLabelsLength; i++)
+            for (int i = 0; i < dataDisplayLabelsLength; ++i)
             {
                 string label = GetNormalizedLabel(i);
                 if (0 <= label.IndexOf(_searchText, StringComparison.OrdinalIgnoreCase))
                 {
-                    count++;
+                    ++count;
                 }
             }
             return count;

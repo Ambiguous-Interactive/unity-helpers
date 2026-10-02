@@ -10,6 +10,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class WyRandomTests : RandomTestBase
     {
-        protected override IRandom NewRandom() => new WyRandom(DeterministicSeed64);
+        protected override IRandom NewRandom()
+        {
+            return new WyRandom(DeterministicSeed64);
+        }
     }
 }

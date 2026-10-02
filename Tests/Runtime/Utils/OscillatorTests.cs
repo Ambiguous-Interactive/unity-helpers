@@ -195,7 +195,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             oscillator.SendMessage("Awake");
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 oscillator.SendMessage("Update");
                 yield return null;
@@ -372,7 +372,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             oscillator.SendMessage("Awake");
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 oscillator.SendMessage("Update");
                 yield return null;
@@ -416,7 +416,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Vector3 minPosition = initialPosition;
             Vector3 maxPosition = initialPosition;
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 oscillator.SendMessage("Update");
                 yield return null;

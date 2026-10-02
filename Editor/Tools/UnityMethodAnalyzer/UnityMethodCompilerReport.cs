@@ -51,14 +51,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 )
             )
             {
-                expected++;
+                ++expected;
                 foreach (AssemblyReport report in Data.assemblies)
                 {
                     if (!string.Equals(report.name, assembly.name, StringComparison.Ordinal))
                     {
                         continue;
                     }
-                    captured++;
+                    ++captured;
                     errors |= report.hasErrors;
                     foreach (MessageData message in report.messages)
                     {

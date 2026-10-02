@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             int groupNamesLength = groupNames.Length;
             string[] normalized = new string[groupNamesLength];
-            for (int index = 0; index < groupNamesLength; index++)
+            for (int index = 0; index < groupNamesLength; ++index)
             {
                 string name = groupNames[index];
                 normalized[index] = string.IsNullOrWhiteSpace(name) ? string.Empty : name.Trim();

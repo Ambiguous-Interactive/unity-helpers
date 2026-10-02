@@ -83,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
 
             SyntaxList<StatementSyntax> statements = body.Statements;
-            for (int index = 0; index < statements.Count; index++)
+            for (int index = 0; index < statements.Count; ++index)
             {
                 InvocationExpressionSyntax invocation = AsBaseCall(statements[index], name);
                 if (invocation == null)
@@ -169,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         )
         {
             int count = 0;
-            for (int index = start; index < statements.Count; index++)
+            for (int index = start; index < statements.Count; ++index)
             {
                 StatementSyntax statement = statements[index];
                 if (
@@ -181,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     continue;
                 }
 
-                count++;
+                ++count;
             }
 
             return count;

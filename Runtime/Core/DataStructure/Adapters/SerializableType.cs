@@ -869,7 +869,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             int leftLength = left.Length;
-            for (int index = 0; index < leftLength; index++)
+            for (int index = 0; index < leftLength; ++index)
             {
                 if (!string.Equals(left[index], right[index], StringComparison.Ordinal))
                 {
@@ -954,7 +954,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             {
                 if (RegexMatchesSignature(signature, regex))
                 {
-                    matches++;
+                    ++matches;
                 }
             }
 
@@ -1104,7 +1104,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
                     if (hasDuplicates)
                     {
-                        for (int i = 0; i < descriptors.Count; i++)
+                        for (int i = 0; i < descriptors.Count; ++i)
                         {
                             SerializableTypeDescriptor descriptor = descriptors[i];
                             if (
@@ -1155,7 +1155,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 _assemblyQualifiedNames = new string[descriptorsLength];
                 _displayNames = new string[descriptorsLength];
                 _tooltips = new string[descriptorsLength];
-                for (int index = 0; index < descriptorsLength; index++)
+                for (int index = 0; index < descriptorsLength; ++index)
                 {
                     _assemblyQualifiedNames[index] = _descriptors[index].AssemblyQualifiedName;
                     _displayNames[index] = _descriptors[index].DisplayName;
@@ -1218,7 +1218,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
                 Type[] arguments = type.GetGenericArguments();
                 int argumentsLength = arguments.Length;
-                for (int index = 0; index < argumentsLength; index++)
+                for (int index = 0; index < argumentsLength; ++index)
                 {
                     if (0 < index)
                     {

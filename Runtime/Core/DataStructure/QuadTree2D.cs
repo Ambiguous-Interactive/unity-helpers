@@ -652,7 +652,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     : north
                         ? 0
                         : 3;
-                counts[quadrant]++;
+                ++counts[quadrant];
             }
 
             int maxChildCount = 0;

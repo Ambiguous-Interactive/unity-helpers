@@ -10,6 +10,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class PcgRandomTests : RandomTestBase
     {
-        protected override IRandom NewRandom() => new PcgRandom(DeterministicGuid);
+        protected override IRandom NewRandom()
+        {
+            return new PcgRandom(DeterministicGuid);
+        }
     }
 }

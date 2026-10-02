@@ -157,7 +157,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, scriptPathOrNull);
             IReadOnlyList<WGroupDrawOperation> operations = layout.Operations;
 
-            for (int index = 0; index < operations.Count; index++)
+            for (int index = 0; index < operations.Count; ++index)
             {
                 WGroupDrawOperation operation = operations[index];
                 if (operation.Type == WGroupDrawOperationType.Group)

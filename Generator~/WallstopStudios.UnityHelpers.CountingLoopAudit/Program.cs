@@ -180,7 +180,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                         continue;
                     }
 
-                    findings++;
+                    ++findings;
                     Console.Error.WriteLine(
                         diagnostic
                             .ToString()

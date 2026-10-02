@@ -281,7 +281,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
             int valuesLength = values.Length;
             string[] names = new string[valuesLength];
 
-            for (int i = 0; i < valuesLength; i++)
+            for (int i = 0; i < valuesLength; ++i)
             {
                 object enumValue = values.GetValue(i);
 
@@ -574,7 +574,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
             {
                 Array values = Enum.GetValues(enumType);
                 int count = Math.Min(values.Length, names.Length);
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < count; ++i)
                 {
                     if (
                         values.GetValue(i) is Enum member

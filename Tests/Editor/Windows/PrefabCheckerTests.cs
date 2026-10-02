@@ -251,7 +251,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 {
                     EditorUi.ProgressForTesting = () =>
                     {
-                        progressCalls++;
+                        ++progressCalls;
                         return false;
                     };
                     EditorUi.ProgressClearedForTesting = () => clearCalls++;
@@ -309,7 +309,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                         || type == LogType.Assert
                     )
                     {
-                        loggedErrors++;
+                        ++loggedErrors;
                     }
                 }
 
@@ -384,7 +384,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                         && condition.Contains("Prefab root GameObject is disabled.")
                     )
                     {
-                        rootWarnings++;
+                        ++rootWarnings;
                     }
                     if (!condition.Contains(nameof(AssignmentComponent.requiredObject)))
                     {
@@ -392,11 +392,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     }
                     if (type == LogType.Error)
                     {
-                        errors++;
+                        ++errors;
                     }
                     else if (type == LogType.Warning)
                     {
-                        warnings++;
+                        ++warnings;
                     }
                 }
 
@@ -655,7 +655,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 // Varying folder counts catches array pooling and sizing defects such as the SystemArrayPool bug.
                 List<string> folders = new();
 
-                for (int i = 0; i < folderCount; i++)
+                for (int i = 0; i < folderCount; ++i)
                 {
                     string folder = Path.Combine(Root, $"TestFolder{i}").SanitizePath();
                     EnsureFolder(folder);

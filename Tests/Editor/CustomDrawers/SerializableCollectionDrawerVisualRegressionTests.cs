@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"{label} rows should advance top-to-bottom by at least their own height (guards overlap/zero-pitch regressions). {diagnostics}"
             );
 
-            for (int i = 1; i < rows.Length; i++)
+            for (int i = 1; i < rows.Length; ++i)
             {
                 Assert.That(
                     rows[i].Rect.y - rows[i - 1].Rect.y,
@@ -139,7 +139,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             keysProperty.arraySize = entries.Count;
             valuesProperty.arraySize = entries.Count;
 
-            for (int i = 0; i < entries.Count; i++)
+            for (int i = 0; i < entries.Count; ++i)
             {
                 DrawerVisualRegressionKey key = entries[i].Key;
                 DormantAssignKey(keysProperty.GetArrayElementAtIndex(i), key);
@@ -184,7 +184,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             DrawerVisualRegressionSetValue[] values = host.set.ToArray();
             itemsProperty.arraySize = values.Length;
-            for (int i = 0; i < values.Length; i++)
+            for (int i = 0; i < values.Length; ++i)
             {
                 DrawerVisualRegressionSetValue value = values[i];
                 DormantAssignValue(
@@ -241,7 +241,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             const int entryCount = 3;
             VisualRegressionDictionaryHost host =
                 CreateScriptableObject<VisualRegressionDictionaryHost>();
-            for (int i = 0; i < entryCount; i++)
+            for (int i = 0; i < entryCount; ++i)
             {
                 host.dictionary.Add(
                     new DrawerVisualRegressionKey(i),
@@ -302,7 +302,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Dictionary drawer should emit matching key/value rects per entry."
             );
 
-            for (int i = 0; i < keySamples.Length; i++)
+            for (int i = 0; i < keySamples.Length; ++i)
             {
                 Assert.That(
                     keySamples[i].ArrayIndex,
@@ -330,7 +330,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 CreateScriptableObject<VisualRegressionDictionaryHost>();
             VisualRegressionSetHost setHost = CreateScriptableObject<VisualRegressionSetHost>();
 
-            for (int i = 0; i < entryCount; i++)
+            for (int i = 0; i < entryCount; ++i)
             {
                 int payload = (i + 1) * 5;
                 dictionaryHost.dictionary.Add(

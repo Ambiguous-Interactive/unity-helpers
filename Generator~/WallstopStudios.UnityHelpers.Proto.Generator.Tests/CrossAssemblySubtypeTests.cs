@@ -623,11 +623,20 @@ namespace Consumer {
 
         private class ReplacementA<T> : IWProtoReplacementFormatter<T>
         {
-            public bool CanWrite(Type runtimeType) => runtimeType == typeof(T);
+            public bool CanWrite(Type runtimeType)
+            {
+                return runtimeType == typeof(T);
+            }
 
-            public int Measure(in T value) => 0;
+            public int Measure(in T value)
+            {
+                return 0;
+            }
 
-            public bool Write(ref WProtoWriter writer, in T value) => true;
+            public bool Write(ref WProtoWriter writer, in T value)
+            {
+                return true;
+            }
 
             public bool TryRead(ref WProtoReader reader, out T value)
             {

@@ -682,9 +682,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void Matrix4X4ConverterCustomMatrixSuccess()
         {
             Matrix4x4 original = new();
-            for (int row = 0; row < 4; row++)
+            for (int row = 0; row < 4; ++row)
             {
-                for (int col = 0; col < 4; col++)
+                for (int col = 0; col < 4; ++col)
                 {
                     original[row, col] = row * 4 + col;
                 }
@@ -693,9 +693,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             string json = Serializer.JsonStringify(original);
             Matrix4x4 deserialized = Serializer.JsonDeserialize<Matrix4x4>(json);
 
-            for (int row = 0; row < 4; row++)
+            for (int row = 0; row < 4; ++row)
             {
-                for (int col = 0; col < 4; col++)
+                for (int col = 0; col < 4; ++col)
                 {
                     Assert.AreEqual(original[row, col], deserialized[row, col]);
                 }
@@ -719,9 +719,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             string json = Serializer.JsonStringify(original);
             Matrix4x4 deserialized = Serializer.JsonDeserialize<Matrix4x4>(json);
 
-            for (int row = 0; row < 4; row++)
+            for (int row = 0; row < 4; ++row)
             {
-                for (int col = 0; col < 4; col++)
+                for (int col = 0; col < 4; ++col)
                 {
                     Assert.AreEqual(original[row, col], deserialized[row, col], 0.0001f);
                 }
@@ -1053,9 +1053,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             SphericalHarmonicsL2 sh = new();
             int index = 0;
-            for (int ch = 0; ch < 3; ch++)
+            for (int ch = 0; ch < 3; ++ch)
             {
-                for (int c = 0; c < 9; c++)
+                for (int c = 0; c < 9; ++c)
                 {
                     sh[ch, c] = index++;
                 }
@@ -1064,9 +1064,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             SphericalHarmonicsL2 deserialized = Serializer.JsonDeserialize<SphericalHarmonicsL2>(
                 json
             );
-            for (int ch = 0; ch < 3; ch++)
+            for (int ch = 0; ch < 3; ++ch)
             {
-                for (int c = 0; c < 9; c++)
+                for (int c = 0; c < 9; ++c)
                 {
                     Assert.AreEqual(sh[ch, c], deserialized[ch, c]);
                 }

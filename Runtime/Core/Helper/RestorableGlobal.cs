@@ -165,7 +165,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             _write = write;
             _comparer = comparer ?? EqualityComparer<T>.Default;
             _entries = new Entry[InitialCapacity];
-            for (int index = 0; index < InitialCapacity; index++)
+            for (int index = 0; index < InitialCapacity; ++index)
             {
                 ref Entry entry = ref _entries[index];
                 entry.freeNext = NoSlot;
@@ -250,7 +250,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             int depth = 0;
             for (int slot = _newest; 0 <= slot; slot = _entries[slot].older)
             {
-                depth++;
+                ++depth;
             }
 
             return depth;
@@ -410,13 +410,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             int created = _slotsCreated;
-            _slotsCreated++;
+            ++_slotsCreated;
             int previousCapacity = _entries.Length;
             if (previousCapacity <= created)
             {
                 int capacity = previousCapacity * 2;
                 Array.Resize(ref _entries, capacity);
-                for (int index = previousCapacity; index < capacity; index++)
+                for (int index = previousCapacity; index < capacity; ++index)
                 {
                     ref Entry entry = ref _entries[index];
                     entry.freeNext = NoSlot;

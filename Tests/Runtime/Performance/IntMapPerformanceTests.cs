@@ -27,6 +27,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class IntMapPerformanceTests
     {
+        private const int BenchmarkTimeoutMilliseconds = 600_000;
+
         private const int ProbeCount = 500_000;
 
         /*
@@ -100,7 +102,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static long RunDictionary(Dictionary<int, int> map, int[] probes, int iterations)
         {
             int accumulated = 0;
-            for (int iteration = 0; iteration < iterations; iteration++)
+            for (int iteration = 0; iteration < iterations; ++iteration)
             {
                 foreach (int probe in probes)
                 {
@@ -117,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static long RunIntMap(IntMap<int> map, int[] probes, int iterations)
         {
             int accumulated = 0;
-            for (int iteration = 0; iteration < iterations; iteration++)
+            for (int iteration = 0; iteration < iterations; ++iteration)
             {
                 foreach (int probe in probes)
                 {
@@ -167,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static int[] KeysThatSurviveRemoval(int[] keys)
         {
             List<int> surviving = new List<int>(keys.Length);
-            for (int index = 0; index < keys.Length; index++)
+            for (int index = 0; index < keys.Length; ++index)
             {
                 if (index % RemovedShare != 0)
                 {
@@ -190,7 +192,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 if (unique.Add(candidate))
                 {
                     keys[written] = candidate;
-                    written++;
+                    ++written;
                 }
             }
 
@@ -202,7 +204,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             HashSet<int> everInserted = new HashSet<int>(keys);
             int[] probes = new int[ProbeCount];
             ulong state = ProbeSeed;
-            for (int index = 0; index < probes.Length; index++)
+            for (int index = 0; index < probes.Length; ++index)
             {
                 bool wantMiss = NextBounded(ref state, 100) < missPercent;
                 if (!wantMiss)
@@ -249,7 +251,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         }
 
         [Test]
-        [Timeout(0)]
+        [Timeout(BenchmarkTimeoutMilliseconds)]
         public void IntMapLookupsComparedAgainstDictionary()
         {
             UnityEngine.Debug.Log("| Workload | Ratio | Reference Spread | Subject Spread |");
@@ -269,7 +271,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                         continue;
                     }
 
-                    stableWorkloads++;
+                    ++stableWorkloads;
                     UnityEngine.Debug.Log(
                         $"| {workload} | {measurement.Ratio:F2} | "
                             + $"{measurement.ReferenceSpread:F4} | {measurement.SubjectSpread:F4} |"

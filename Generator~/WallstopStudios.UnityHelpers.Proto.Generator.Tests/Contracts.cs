@@ -120,7 +120,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoAfterDeserialization]
         private void OnAfterDeserialization()
         {
-            AfterDeserializationRuns++;
+            ++AfterDeserializationRuns;
             Trace.Add(nameof(OnAfterDeserialization));
         }
     }

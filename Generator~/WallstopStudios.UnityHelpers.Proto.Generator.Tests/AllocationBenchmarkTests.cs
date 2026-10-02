@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             long maximumAllocatedBytes = 0;
             double[] nanosecondsPerOperation = new double[measurements.Length];
-            for (int index = 0; index < measurements.Length; index++)
+            for (int index = 0; index < measurements.Length; ++index)
             {
                 maximumAllocatedBytes = Math.Max(
                     maximumAllocatedBytes,
@@ -49,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             long before = GC.GetAllocatedBytesForCurrentThread();
             long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
+            for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
             {
                 WProtoWriteResult result = WProtoFacade.Serialize(value, ref buffer);
                 if (!result.Served || result.Resized)
@@ -69,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             long before = GC.GetAllocatedBytesForCurrentThread();
             long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
+            for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
             {
                 destination.Position = 0;
                 destination.SetLength(0);
@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AllocationContract restored = null;
             long before = GC.GetAllocatedBytesForCurrentThread();
             long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
+            for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
             {
                 if (!WProtoFacade.TryDeserialize(payload, out restored))
                 {
@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AllocationContract restored = null;
             long before = GC.GetAllocatedBytesForCurrentThread();
             long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
+            for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
             {
                 source.Position = 0;
                 restored = ProtoBuf.Serializer.Deserialize<AllocationContract>(source);
@@ -119,13 +119,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static AllocationContract CreateRepresentativeContract()
         {
             int[] values = new int[128];
-            for (int index = 0; index < values.Length; index++)
+            for (int index = 0; index < values.Length; ++index)
             {
                 values[index] = index * 17 + 3;
             }
 
             Dictionary<string, int> scores = new Dictionary<string, int>(32);
-            for (int index = 0; index < 32; index++)
+            for (int index = 0; index < 32; ++index)
             {
                 scores.Add($"score-{index:D2}", index * 23 + 11);
             }
@@ -153,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ProtoBuf.Serializer.Serialize(protobufWriteBuffer, original);
             using MemoryStream protobufReadBuffer = new MemoryStream(buffer, writable: false);
 
-            for (int iteration = 0; iteration < WarmupIterations; iteration++)
+            for (int iteration = 0; iteration < WarmupIterations; ++iteration)
             {
                 WProtoFacade.Serialize(original, ref buffer);
                 Assert.IsTrue(WProtoFacade.TryDeserialize(buffer, out AllocationContract _));
@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Measurement[] protobufNetSerializeRounds = new Measurement[MeasurementRounds];
             Measurement[] wallstopProtoDeserializeRounds = new Measurement[MeasurementRounds];
             Measurement[] protobufNetDeserializeRounds = new Measurement[MeasurementRounds];
-            for (int round = 0; round < MeasurementRounds; round++)
+            for (int round = 0; round < MeasurementRounds; ++round)
             {
                 if ((round & 1) == 0)
                 {
@@ -411,7 +411,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 using MemoryStream protobufNetPayload = new MemoryStream();
                 ProtoBuf.Serializer.Serialize(protobufNetPayload, _value);
 
-                for (int iteration = 0; iteration < WarmupIterations; iteration++)
+                for (int iteration = 0; iteration < WarmupIterations; ++iteration)
                 {
                     Assert.IsTrue(WProtoFacade.TryDeserialize(exact, out T _));
                     protobufNetPayload.Position = 0;
@@ -420,7 +420,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
                 T restored = null;
                 long before = GC.GetAllocatedBytesForCurrentThread();
-                for (int iteration = 0; iteration < ShapeIterations; iteration++)
+                for (int iteration = 0; iteration < ShapeIterations; ++iteration)
                 {
                     if (!WProtoFacade.TryDeserialize(exact, out restored))
                     {
@@ -430,7 +430,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
                 long wallstopProtoBytes = GC.GetAllocatedBytesForCurrentThread() - before;
                 before = GC.GetAllocatedBytesForCurrentThread();
-                for (int iteration = 0; iteration < ShapeIterations; iteration++)
+                for (int iteration = 0; iteration < ShapeIterations; ++iteration)
                 {
                     protobufNetPayload.Position = 0;
                     restored = ProtoBuf.Serializer.Deserialize<T>(protobufNetPayload);
@@ -472,7 +472,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             internal static ArrayShape Representative()
             {
                 int[] values = new int[128];
-                for (int index = 0; index < values.Length; index++)
+                for (int index = 0; index < values.Length; ++index)
                 {
                     values[index] = index * 17 + 3;
                 }
@@ -492,7 +492,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             internal static ListShape Representative()
             {
                 List<int> values = new List<int>(128);
-                for (int index = 0; index < 128; index++)
+                for (int index = 0; index < 128; ++index)
                 {
                     values.Add(index * 17 + 3);
                 }
@@ -526,7 +526,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             internal static MapShape Representative()
             {
                 Dictionary<string, int> scores = new Dictionary<string, int>(32);
-                for (int index = 0; index < 32; index++)
+                for (int index = 0; index < 32; ++index)
                 {
                     scores.Add($"score-{index:D2}", index * 23 + 11);
                 }

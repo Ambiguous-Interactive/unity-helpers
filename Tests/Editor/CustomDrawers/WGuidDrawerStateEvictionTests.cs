@@ -90,7 +90,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.AreEqual(PendingInvalidText, pendingState.displayText);
 
             List<WGuidPropertyDrawer.DrawerState> churnedStates = new(churnedPathCount);
-            for (int pathIndex = 1; pathIndex <= churnedPathCount; pathIndex++)
+            for (int pathIndex = 1; pathIndex <= churnedPathCount; ++pathIndex)
             {
                 churnedStates.Add(
                     WGuidPropertyDrawer.GetState(guids.GetArrayElementAtIndex(pathIndex))
@@ -151,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.IsTrue(oldestState.hasPendingInvalid);
 
             List<WGuidPropertyDrawer.DrawerState> churnedStates = new(EvictionChurnPathCount);
-            for (int pathIndex = 1; pathIndex <= EvictionChurnPathCount; pathIndex++)
+            for (int pathIndex = 1; pathIndex <= EvictionChurnPathCount; ++pathIndex)
             {
                 churnedStates.Add(
                     WGuidPropertyDrawer.GetState(guids.GetArrayElementAtIndex(pathIndex))

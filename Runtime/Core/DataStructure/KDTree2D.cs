@@ -234,8 +234,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private static float GetAxis(in Entry entry, int axis) =>
-            axis == 0 ? entry.position.x : entry.position.y;
+        private static float GetAxis(in Entry entry, int axis)
+        {
+            return axis == 0 ? entry.position.x : entry.position.y;
+        }
 
         private static Bounds CombineChildBounds(Bounds left, Bounds right)
         {
@@ -825,7 +827,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     {
                         while (i <= j && entries[span[i]].position.x < pivot)
                         {
-                            i++;
+                            ++i;
                         }
 
                         while (i <= j && pivot < entries[span[j]].position.x)
@@ -836,7 +838,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         if (i <= j)
                         {
                             (span[i], span[j]) = (span[j], span[i]);
-                            i++;
+                            ++i;
                             j--;
                         }
                     }
@@ -847,7 +849,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     {
                         while (i <= j && entries[span[i]].position.y < pivot)
                         {
-                            i++;
+                            ++i;
                         }
 
                         while (i <= j && pivot < entries[span[j]].position.y)
@@ -858,7 +860,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         if (i <= j)
                         {
                             (span[i], span[j]) = (span[j], span[i]);
-                            i++;
+                            ++i;
                             j--;
                         }
                     }

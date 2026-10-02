@@ -61,7 +61,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     {
                         if (finding.HasDestroyedTarget)
                         {
-                            count++;
+                            ++count;
                         }
                     }
                 }
@@ -113,7 +113,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             {
                 if (ByAsset.TryGetValue(assetOrderElement, out List<ValidationFinding> findings))
                 {
-                    for (int index = 0; index < findings.Count; index++)
+                    for (int index = 0; index < findings.Count; ++index)
                     {
                         ValidationFinding finding = findings[index].WithoutDestroyedTarget();
                         findings[index] = finding;
@@ -159,7 +159,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             // Retain clean assets in coverage so later incremental results can replace them.
             IReadOnlyList<ValidationTarget> targets = run.Targets;
-            for (int index = 0; index < targets.Count; index++)
+            for (int index = 0; index < targets.Count; ++index)
             {
                 string guid = targets[index].AssetGuid;
                 if (!nextByAsset.ContainsKey(guid))
@@ -170,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             IReadOnlyList<ValidationFinding> findings = run.Findings;
-            for (int index = 0; index < findings.Count; index++)
+            for (int index = 0; index < findings.Count; ++index)
             {
                 ValidationFinding finding = findings[index];
                 if (!nextByAsset.TryGetValue(finding.AssetGuid, out List<ValidationFinding> entry))
@@ -227,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 List<ValidationFinding>
             >(StringComparer.Ordinal);
             IReadOnlyList<ValidationFinding> findings = run.Findings;
-            for (int index = 0; index < findings.Count; index++)
+            for (int index = 0; index < findings.Count; ++index)
             {
                 ValidationFinding finding = findings[index];
                 if (string.IsNullOrEmpty(finding.AssetGuid))
@@ -245,10 +245,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             IReadOnlyList<ValidationTarget> targets = run.Targets;
-            _batchDepth++;
+            ++_batchDepth;
             try
             {
-                for (int index = 0; index < targets.Count; index++)
+                for (int index = 0; index < targets.Count; ++index)
                 {
                     string guid = targets[index].AssetGuid;
                     Replace(
@@ -291,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             entry.Clear();
             if (findings != null)
             {
-                for (int index = 0; index < findings.Count; index++)
+                for (int index = 0; index < findings.Count; ++index)
                 {
                     entry.Add(findings[index]);
                 }
@@ -336,7 +336,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             HashSet<string> removing = new HashSet<string>(StringComparer.Ordinal);
-            for (int index = 0; index < assetGuids.Count; index++)
+            for (int index = 0; index < assetGuids.Count; ++index)
             {
                 string assetGuid = assetGuids[index];
                 if (string.IsNullOrEmpty(assetGuid) || !ByAsset.Remove(assetGuid))
@@ -353,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             int kept = 0;
-            for (int index = 0; index < AssetOrder.Count; index++)
+            for (int index = 0; index < AssetOrder.Count; ++index)
             {
                 string assetGuid = AssetOrder[index];
                 if (removing.Contains(assetGuid))
@@ -362,7 +362,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 }
 
                 AssetOrder[kept] = assetGuid;
-                kept++;
+                ++kept;
             }
 
             AssetOrder.RemoveRange(kept, AssetOrder.Count - kept);
@@ -405,13 +405,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             HashSet<string> targetGuids = new HashSet<string>(StringComparer.Ordinal);
             IReadOnlyList<ValidationTarget> targets = run.Targets;
-            for (int index = 0; index < targets.Count; index++)
+            for (int index = 0; index < targets.Count; ++index)
             {
                 targetGuids.Add(targets[index].AssetGuid);
             }
 
             IReadOnlyList<ValidationFinding> findings = run.Findings;
-            for (int index = 0; index < findings.Count; index++)
+            for (int index = 0; index < findings.Count; ++index)
             {
                 string assetGuid = findings[index].AssetGuid;
                 if (string.IsNullOrEmpty(assetGuid) || !targetGuids.Contains(assetGuid))

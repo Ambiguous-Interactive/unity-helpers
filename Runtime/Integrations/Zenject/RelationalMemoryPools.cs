@@ -23,7 +23,10 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
             _container.AssignRelationalComponents(item);
         }
 
-        internal void InternalOnSpawned(TValue item) => OnSpawned(item);
+        internal void InternalOnSpawned(TValue item)
+        {
+            OnSpawned(item);
+        }
     }
 
     /// <summary>

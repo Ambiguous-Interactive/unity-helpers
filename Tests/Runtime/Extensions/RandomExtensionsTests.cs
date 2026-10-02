@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         )
         {
             float sum = 0f;
-            for (int index = 0; index < samples.Count; index++)
+            for (int index = 0; index < samples.Count; ++index)
             {
                 sum += samples[index];
             }
@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     continue;
                 }
 
-                ranged++;
+                ++ranged;
                 string expected = string.Equals(
                     strict.Name,
                     nameof(IRandom.Next),
@@ -523,7 +523,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             PcgRandom cumulative = new(792);
             PcgRandom subset = new(792);
 
-            for (int draw = 0; draw < expectedFloatRace.Length; draw++)
+            for (int draw = 0; draw < expectedFloatRace.Length; ++draw)
             {
                 Assert.IsTrue(
                     floatRace.TryNextWeightedIndexByRace(
@@ -577,7 +577,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int firstCount = 0;
             bool everySelectionSucceeded = true;
             bool everyIndexWasInRange = true;
-            for (int draw = 0; draw < DrawCount; draw++)
+            for (int draw = 0; draw < DrawCount; ++draw)
             {
                 if (!random.TryNextWeightedIndexByRace(weights, out int index))
                 {
@@ -588,7 +588,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 everyIndexWasInRange &= 0 <= index && index <= 1;
                 if (index == 0)
                 {
-                    firstCount++;
+                    ++firstCount;
                 }
             }
 
@@ -618,7 +618,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int raceChanges = 0;
             bool everySelectionSucceeded = true;
 
-            for (int draw = 0; draw < DrawCount; draw++)
+            for (int draw = 0; draw < DrawCount; ++draw)
             {
                 everySelectionSucceeded &= cumulativeOriginal.TryNextWeightedIndex(
                     original,
@@ -630,7 +630,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 );
                 if (oldIndex != newIndex)
                 {
-                    cumulativeChanges++;
+                    ++cumulativeChanges;
                 }
 
                 everySelectionSucceeded &= raceOriginal.TryNextWeightedIndexByRace(
@@ -643,7 +643,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 );
                 if (oldIndex != newIndex)
                 {
-                    raceChanges++;
+                    ++raceChanges;
                 }
             }
 
@@ -714,7 +714,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             double[] uniforms = { 0.9d, 0.1d, 0.8d, 0.2d, 0.7d, 0.3d };
             double[] weights = { 1d, 8d, 2d, 16d, 3d, 7d };
             List<(double score, int index)> oracle = new(weights.Length);
-            for (int index = 0; index < weights.Length; index++)
+            for (int index = 0; index < weights.Length; ++index)
             {
                 double exponential = -Math.Log(1d - uniforms[index]);
                 oracle.Add((Math.Log(exponential) - Math.Log(weights[index]), index));
@@ -763,7 +763,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             Assert.IsTrue(random.TryNextWeightedSubsetByRace(weights, winners.AsSpan()));
             bool ordered = true;
-            for (int index = 0; index < winners.Length; index++)
+            for (int index = 0; index < winners.Length; ++index)
             {
                 ordered &= winners[index] == index;
             }
@@ -786,7 +786,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.That(
                 () =>
                 {
-                    for (int iteration = 0; iteration < AllocationProbe.Iterations; iteration++)
+                    for (int iteration = 0; iteration < AllocationProbe.Iterations; ++iteration)
                     {
                         if (
                             !random.TryNextWeightedSubsetByRace(
@@ -949,11 +949,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 string choice = rng.NextWeighted(weighted);
                 if (string.Equals(choice, "low", System.StringComparison.Ordinal))
                 {
-                    lowCount++;
+                    ++lowCount;
                 }
                 else
                 {
-                    highCount++;
+                    ++highCount;
                 }
             }
 

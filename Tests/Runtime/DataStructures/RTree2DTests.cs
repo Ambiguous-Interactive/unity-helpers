@@ -132,9 +132,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetElementsInBoundsReturnsIntersectingElements()
         {
             List<Bounds> bounds = new();
-            for (int x = 0; x < 10; x++)
+            for (int x = 0; x < 10; ++x)
             {
-                for (int y = 0; y < 10; y++)
+                for (int y = 0; y < 10; ++y)
                 {
                     bounds.Add(new Bounds(new Vector3(x * 10, y * 10, 0), Vector3.one * 5));
                 }
@@ -199,9 +199,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetElementsInRangeReturnsElementsInCircle()
         {
             List<Bounds> bounds = new();
-            for (int x = 0; x < 10; x++)
+            for (int x = 0; x < 10; ++x)
             {
-                for (int y = 0; y < 10; y++)
+                for (int y = 0; y < 10; ++y)
                 {
                     bounds.Add(new Bounds(new Vector3(x * 10, y * 10, 0), Vector3.one * 2));
                 }
@@ -271,7 +271,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetApproximateNearestNeighborsReturnsRequestedCount()
         {
             List<Bounds> bounds = new();
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 bounds.Add(
                     new Bounds(
@@ -367,7 +367,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void LargeDatasetStressTest()
         {
             List<Bounds> bounds = new();
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 bounds.Add(
                     new Bounds(
@@ -396,7 +396,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void CustomBucketSizeAffectsTreeStructure()
         {
             List<Bounds> bounds = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 bounds.Add(new Bounds(new Vector3(i * 10, i * 10, 0), Vector3.one * 2));
             }
@@ -421,7 +421,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void CustomBranchFactorAffectsTreeStructure()
         {
             List<Bounds> bounds = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 bounds.Add(new Bounds(new Vector3(i * 10, i * 10, 0), Vector3.one * 2));
             }
@@ -514,7 +514,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void MultipleQueriesOnSameTreeReturnConsistentResults()
         {
             List<Bounds> bounds = new();
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 bounds.Add(
                     new Bounds(
@@ -538,7 +538,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void LinearArrangementOfBoundsHandledCorrectly()
         {
             List<Bounds> bounds = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 bounds.Add(new Bounds(new Vector3(i * 10, 0, 0), Vector3.one * 2));
             }
@@ -561,9 +561,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GridPatternOfBoundsHandledCorrectly()
         {
             List<Bounds> bounds = new();
-            for (int x = 0; x < 10; x++)
+            for (int x = 0; x < 10; ++x)
             {
-                for (int y = 0; y < 10; y++)
+                for (int y = 0; y < 10; ++y)
                 {
                     bounds.Add(new Bounds(new Vector3(x * 10, y * 10, 0), Vector3.one * 4));
                 }
@@ -580,7 +580,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetElementsInBoundsReusesProvidedList()
         {
             List<Bounds> bounds = new();
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 bounds.Add(new Bounds(new Vector3(i, 0, 0), Vector3.one));
             }
@@ -647,7 +647,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void StrPackingAlgorithmCreatesBalancedStructure()
         {
             List<Bounds> bounds = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 bounds.Add(new Bounds(new Vector3(i, i, 0), Vector3.one));
             }
@@ -671,7 +671,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ColinearPointsHandledCorrectly()
         {
             List<Bounds> bounds = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 bounds.Add(new Bounds(new Vector3(i, 0, 0), Vector3.one * 0.5f));
             }
@@ -720,7 +720,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SingleLineVerticalPointsHandledCorrectly()
         {
             List<Bounds> bounds = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 bounds.Add(new Bounds(new Vector3(0, i, 0), Vector3.one * 0.5f));
             }

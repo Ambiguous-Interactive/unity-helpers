@@ -315,7 +315,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
-        private static void ShowWindow() => GetWindow<SpriteCropper>(Name);
+        private static void ShowWindow()
+        {
+            GetWindow<SpriteCropper>(Name);
+        }
 
         private static void CheckPreProcessNeeded(
             string assetPath,

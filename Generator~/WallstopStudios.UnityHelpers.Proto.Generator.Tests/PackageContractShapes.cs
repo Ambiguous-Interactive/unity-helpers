@@ -241,41 +241,71 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         /// <summary>Appends an element.</summary>
         /// <param name="item">The element.</param>
-        public void Add(T item) => _items.Add(item);
+        public void Add(T item)
+        {
+            _items.Add(item);
+        }
 
         /// <summary>Removes every element.</summary>
-        public void Clear() => _items.Clear();
+        public void Clear()
+        {
+            _items.Clear();
+        }
 
         /// <summary>Reports whether an element is present.</summary>
         /// <param name="item">The element.</param>
-        public bool Contains(T item) => _items.Contains(item);
+        public bool Contains(T item)
+        {
+            return _items.Contains(item);
+        }
 
         /// <summary>Copies the elements into an array.</summary>
         /// <param name="array">The destination.</param>
         /// <param name="arrayIndex">The first index written.</param>
-        public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);
+        public void CopyTo(T[] array, int arrayIndex)
+        {
+            _items.CopyTo(array, arrayIndex);
+        }
 
         /// <summary>Enumerates the elements.</summary>
-        public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
+        public IEnumerator<T> GetEnumerator()
+        {
+            return _items.GetEnumerator();
+        }
 
         /// <summary>Reports the position of an element.</summary>
         /// <param name="item">The element.</param>
-        public int IndexOf(T item) => _items.IndexOf(item);
+        public int IndexOf(T item)
+        {
+            return _items.IndexOf(item);
+        }
 
         /// <summary>Inserts an element.</summary>
         /// <param name="index">The position.</param>
         /// <param name="item">The element.</param>
-        public void Insert(int index, T item) => _items.Insert(index, item);
+        public void Insert(int index, T item)
+        {
+            _items.Insert(index, item);
+        }
 
         /// <summary>Removes the first matching element.</summary>
         /// <param name="item">The element.</param>
-        public bool Remove(T item) => _items.Remove(item);
+        public bool Remove(T item)
+        {
+            return _items.Remove(item);
+        }
 
         /// <summary>Removes the element at a position.</summary>
         /// <param name="index">The position.</param>
-        public void RemoveAt(int index) => _items.RemoveAt(index);
+        public void RemoveAt(int index)
+        {
+            _items.RemoveAt(index);
+        }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 
     /// <summary>
@@ -356,13 +386,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>Enumerates the bits.</summary>
         public IEnumerator<bool> GetEnumerator()
         {
-            for (int index = 0; index < _capacity; index++)
+            for (int index = 0; index < _capacity; ++index)
             {
                 yield return this[index];
             }
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 
     /// <summary>The action an <see cref="ModificationShape"/> performs.</summary>

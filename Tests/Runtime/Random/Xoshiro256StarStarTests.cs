@@ -112,7 +112,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
-        protected override IRandom NewRandom() =>
-            new Xoshiro256StarStar(Seed0, Seed1, Seed2, Seed3);
+        protected override IRandom NewRandom()
+        {
+            return new Xoshiro256StarStar(Seed0, Seed1, Seed2, Seed3);
+        }
     }
 }

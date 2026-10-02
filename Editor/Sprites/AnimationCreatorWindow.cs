@@ -196,7 +196,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             foreach (Sprite sprite in _filteredSprites)
             {
-                processed++;
+                ++processed;
                 if (sprite == null)
                 {
                     // Serialized preview rows can survive reimports that destroy their sprite slices; reject dead entries.
@@ -486,7 +486,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             do
             {
                 candidate = $"{baseName}_{counter}";
-                counter++;
+                ++counter;
             } while (used.Contains(candidate));
             return candidate;
         }
@@ -689,7 +689,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     if (SaveConfig(path))
                     {
-                        savedCount++;
+                        ++savedCount;
                     }
                 }
             }
@@ -1312,7 +1312,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             $"{rec.folder} / {rec.baseName}",
                             $"Frames: {rec.count} | Numeric: {(rec.hasIndex ? "Yes" : "No")}"
                         );
-                        shown++;
+                        ++shown;
                         if (200 <= shown)
                         {
                             EditorGUILayout.LabelField($"Showing first {shown} groups...");
@@ -1341,7 +1341,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                         EditorGUILayout.LabelField(rec.folderPath, info);
                         EditorGUILayout.LabelField("-> Asset Path:", rec.finalAssetPath);
-                        shown++;
+                        ++shown;
                         if (200 <= shown)
                         {
                             EditorGUILayout.LabelField($"Showing first {shown} results...");
@@ -1439,7 +1439,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         int startIndex = _animationDataPageIndex * AnimationDataPageSize;
                         int endIndex = Mathf.Min(startIndex + AnimationDataPageSize, matchCount);
 
-                        for (int i = startIndex; i < endIndex; i++)
+                        for (int i = startIndex; i < endIndex; ++i)
                         {
                             DrawAnimationDataElement(matchingIndices[i]);
                         }
@@ -1489,7 +1489,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 if (GUILayout.Button(">", GUILayout.Width(30)))
                 {
-                    _animationDataPageIndex++;
+                    ++_animationDataPageIndex;
                 }
                 if (GUILayout.Button(">>", GUILayout.Width(30)))
                 {
@@ -1620,7 +1620,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
             float totalDuration = 0f;
 
-            for (int i = 0; i < data.frames.Count; i++)
+            for (int i = 0; i < data.frames.Count; ++i)
             {
                 float normalizedPosition =
                     1 < data.frames.Count ? (float)i / (data.frames.Count - 1) : 0f;
@@ -2329,7 +2329,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     foreach (AnimationData data in dataToCreate)
                     {
-                        currentAnimationIndex++;
+                        ++currentAnimationIndex;
                         string animationName = data.animationName;
                         if (string.IsNullOrWhiteSpace(animationName))
                         {
@@ -2508,7 +2508,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     0f
                 );
 
-                for (int i = 0; i < totalAssets; i++)
+                for (int i = 0; i < totalAssets; ++i)
                 {
                     string guid = assetGuids[i];
                     string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -2530,11 +2530,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         if (_compiledRegex.IsMatch(sprite.name))
                         {
                             _filteredSprites.Add(sprite);
-                            _matchedSpriteCount++;
+                            ++_matchedSpriteCount;
                         }
                         else
                         {
-                            _unmatchedSpriteCount++;
+                            ++_unmatchedSpriteCount;
                         }
                     }
                 }
@@ -2689,7 +2689,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             cycleOffset = 0f,
                         }
                     );
-                    addedCount++;
+                    ++addedCount;
                 }
             }
 

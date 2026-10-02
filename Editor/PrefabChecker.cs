@@ -152,7 +152,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                     if (0 < prefabMissingScripts)
                     {
-                        changedCount++;
+                        ++changedCount;
                         missingCount += prefabMissingScripts;
                     }
                 }
@@ -398,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     );
                     int len = fields.Length;
                     List<FieldInfo> list = new(len);
-                    for (int i = 0; i < len; i++)
+                    for (int i = 0; i < len; ++i)
                     {
                         FieldInfo field = fields[i];
                         bool include =
@@ -466,7 +466,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         {
                             context.LogError($"{message}");
                         }
-                        issueCount++;
+                        ++issueCount;
                     }
                     continue;
                 }
@@ -481,9 +481,9 @@ namespace WallstopStudios.UnityHelpers.Editor
                         {
                             context.LogError($"{message}");
                         }
-                        issueCount++;
+                        ++issueCount;
                     }
-                    index++;
+                    ++index;
                 }
             }
             return issueCount;
@@ -524,7 +524,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     {
                         context.LogError($"{message}");
                     }
-                    issueCount++;
+                    ++issueCount;
                 }
                 if (
                     requiredComponent.m_Type1 != null
@@ -538,7 +538,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     {
                         context.LogError($"{message}");
                     }
-                    issueCount++;
+                    ++issueCount;
                 }
                 if (
                     requiredComponent.m_Type2 != null
@@ -552,7 +552,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     {
                         context.LogError($"{message}");
                     }
-                    issueCount++;
+                    ++issueCount;
                 }
             }
             return issueCount;
@@ -596,7 +596,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     {
                         context.LogWarn($"{message}");
                     }
-                    issueCount++;
+                    ++issueCount;
                 }
             }
             return issueCount;
@@ -748,7 +748,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             try
             {
                 int guidsLength = guids.Length;
-                for (int idx = 0; idx < guidsLength; idx++)
+                for (int idx = 0; idx < guidsLength; ++idx)
                 {
                     if (
                         interactive
@@ -784,7 +784,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         }
                         if (!anyIncluded)
                         {
-                            skippedByLabel++;
+                            ++skippedByLabel;
                             continue;
                         }
                     }
@@ -801,12 +801,12 @@ namespace WallstopStudios.UnityHelpers.Editor
                         }
                         if (anyExcluded)
                         {
-                            skippedByLabel++;
+                            ++skippedByLabel;
                             continue;
                         }
                     }
 
-                    totalPrefabsChecked++;
+                    ++totalPrefabsChecked;
                     int issuesForThisPrefab = 0;
                     using PooledResource<List<string>> resultLease = Buffers<string>.List.Get(
                         out List<string> messages
@@ -819,7 +819,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         const string finding = "Prefab root GameObject is disabled.";
                         messages.Add(finding);
                         prefabWarnings.Add(finding);
-                        issuesForThisPrefab++;
+                        ++issuesForThisPrefab;
                     }
 
                     using PooledResource<List<MonoBehaviour>> componentBufferResource =
@@ -852,7 +852,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                                 $"Detected missing script on GameObject '{ownerName}'.";
                             messages.Add(finding);
                             prefabWarnings.Add(finding);
-                            issuesForThisPrefab++;
+                            ++issuesForThisPrefab;
                             continue;
                         }
                         if (!script)
@@ -939,7 +939,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                                 $"Component '{script.GetType().Name}' on GameObject '{ownerGameObject.name}' is disabled.";
                             messages.Add(finding);
                             prefabWarnings.Add(finding);
-                            issuesForThisPrefab++;
+                            ++issuesForThisPrefab;
                         }
                     }
 
@@ -948,7 +948,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         if (interactive)
                         {
                             int toLog = Mathf.Min(100, prefabWarnings.Count);
-                            for (int m = 0; m < toLog; m++)
+                            for (int m = 0; m < toLog; ++m)
                             {
                                 prefab.LogWarn($"{prefabWarnings[m]}");
                             }
@@ -1084,7 +1084,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     context.LogError($"{message}");
                 }
-                issueCount++;
+                ++issueCount;
             }
             return issueCount;
         }

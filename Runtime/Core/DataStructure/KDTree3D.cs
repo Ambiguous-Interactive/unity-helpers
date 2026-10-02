@@ -904,7 +904,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     while (i <= j && axisValues[span[i]] < pivot)
                     {
-                        i++;
+                        ++i;
                     }
 
                     while (i <= j && pivot < axisValues[span[j]])
@@ -915,7 +915,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     if (i <= j)
                     {
                         (span[i], span[j]) = (span[j], span[i]);
-                        i++;
+                        ++i;
                         j--;
                     }
                 }

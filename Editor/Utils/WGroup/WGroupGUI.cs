@@ -423,7 +423,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     }
                 }
 
-                for (int index = 0; index < propertyCount; index++)
+                for (int index = 0; index < propertyCount; ++index)
                 {
                     string propertyPath = propertyPaths[index];
 

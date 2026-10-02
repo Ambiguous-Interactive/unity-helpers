@@ -62,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.AreEqual(24f, viewModel.FrameRate);
             Assert.AreEqual(2, viewModel.Count);
 
-            for (int i = 0; i < viewModel.Count; i++)
+            for (int i = 0; i < viewModel.Count; ++i)
             {
                 AnimationEventItem item = viewModel.GetEvent(i);
                 Assert.AreEqual(i, item.originalIndex);
@@ -338,7 +338,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             AnimationEvent[] arr = viewModel.BuildEventArray();
 
             Assert.AreEqual(viewModel.Count, arr.Length);
-            for (int i = 0; i < viewModel.Count; i++)
+            for (int i = 0; i < viewModel.Count; ++i)
             {
                 Assert.AreSame(viewModel.GetEvent(i).animationEvent, arr[i]);
             }
@@ -526,7 +526,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         )
         {
             ObjectReferenceKeyframe[] frames = new ObjectReferenceKeyframe[keyframes.Length];
-            for (int i = 0; i < keyframes.Length; i++)
+            for (int i = 0; i < keyframes.Length; ++i)
             {
                 (float time, string spriteName) entry = keyframes[i];
                 frames[i] = new ObjectReferenceKeyframe

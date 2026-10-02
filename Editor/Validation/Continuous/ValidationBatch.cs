@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         public static Result Run(string[] commandLine)
         {
             List<string> folders = Helpers.GetCommandLineArguments(commandLine, FolderArgument);
-            for (int index = 0; index < folders.Count; index++)
+            for (int index = 0; index < folders.Count; ++index)
             {
                 folders[index] = ValidationTargets.NormalizeFolder(folders[index]);
             }
@@ -212,7 +212,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             // Cache deterministic sort keys; AssemblyQualifiedName allocates on each access.
             string[] keys = new string[candidates.Count];
             int[] order = new int[candidates.Count];
-            for (int index = 0; index < candidates.Count; index++)
+            for (int index = 0; index < candidates.Count; ++index)
             {
                 keys[index] = candidates[index].AssemblyQualifiedName;
                 order[index] = index;
@@ -464,7 +464,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         + unused
                         + " unused suppression(s).";
                     int problemsCount = Problems.Count;
-                    for (int index = 0; index < problemsCount; index++)
+                    for (int index = 0; index < problemsCount; ++index)
                     {
                         text += "\n  " + Problems[index];
                     }

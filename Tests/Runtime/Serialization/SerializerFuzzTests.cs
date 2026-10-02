@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static void FuzzThrowing(Action<byte[]> action)
         {
             Random rng = new(unchecked((int)0xCafeBabe));
-            for (int i = 0; i < Iterations; i++)
+            for (int i = 0; i < Iterations; ++i)
             {
                 byte[] payload = RandomPayload(rng, i);
                 try
@@ -52,7 +52,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static void FuzzTry(Func<byte[], bool> action)
         {
             Random rng = new(unchecked((int)0xDeadBeef));
-            for (int i = 0; i < Iterations; i++)
+            for (int i = 0; i < Iterations; ++i)
             {
                 byte[] payload = RandomPayload(rng, i);
                 try
@@ -102,7 +102,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static byte[] Repeat(byte value, int count)
         {
             byte[] buf = new byte[count];
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 buf[i] = value;
             }
@@ -170,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void NullInputFastPathDoesNotAllocateMessageString()
         {
             // Warm up the JIT, type initializers, and any test-runner internal caches.
-            for (int i = 0; i < 16; i++)
+            for (int i = 0; i < 16; ++i)
             {
                 try
                 {
@@ -202,7 +202,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             // Take the MINIMUM over multiple runs to filter out background-GC / test-runner noise.
             long minThrowAlloc = long.MaxValue;
             long minMessageDelta = long.MaxValue;
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 8; ++i)
             {
                 long before = GC.GetAllocatedBytesForCurrentThread();
                 SerializationInputException captured = null;

@@ -364,7 +364,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                             + index.ToString(CultureInfo.InvariantCulture)
                             + "]";
                         WriteNormalizedReferences(child, childPath, references, writer);
-                        index++;
+                        ++index;
                     }
                     writer.WriteEndArray();
                     break;

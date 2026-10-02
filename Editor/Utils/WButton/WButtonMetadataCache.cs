@@ -300,7 +300,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     );
                     entries.Add(metadata);
                     processedBases.Add(baseDefinition);
-                    declarationOrder++;
+                    ++declarationOrder;
                 }
 
                 currentType = currentType.BaseType;
@@ -337,7 +337,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 rawParameters.Length
             ];
             int rawParametersLength = rawParameters.Length;
-            for (int index = 0; index < rawParametersLength; index++)
+            for (int index = 0; index < rawParametersLength; ++index)
             {
                 ParameterInfo parameter = rawParameters[index];
                 if (

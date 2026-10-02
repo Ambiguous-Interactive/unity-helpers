@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.WButton
         [WButton]
         public void SimpleButton()
         {
-            InvocationCount++;
+            ++InvocationCount;
         }
 
         [WButton("Custom Display Name")]

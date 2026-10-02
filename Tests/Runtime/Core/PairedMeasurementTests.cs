@@ -37,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             double[] reference = new double[32];
             double[] subject = new double[32];
-            for (int index = 0; index < reference.Length; index++)
+            for (int index = 0; index < reference.Length; ++index)
             {
                 reference[index] = 100;
                 subject[index] = 100 * subjectDurationRatio;
@@ -55,7 +55,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             double[] reference = new double[32];
             double[] subject = new double[32];
-            for (int index = 0; index < reference.Length; index++)
+            for (int index = 0; index < reference.Length; ++index)
             {
                 reference[index] = 100 + index;
                 subject[index] = reference[index] / 2;
@@ -80,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             double[] reference = new double[32];
             double[] subject = new double[32];
-            for (int index = 0; index < reference.Length; index++)
+            for (int index = 0; index < reference.Length; ++index)
             {
                 reference[index] = 100;
                 subject[index] = index < 16 ? 50 : 200;
@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             double[] reference = new double[count];
             double[] subject = new double[count];
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 reference[index] = milliseconds;
                 subject[index] = milliseconds / 2;
@@ -125,7 +125,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             double[] reference = new double[count];
             double[] subject = new double[count];
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 reference[index] = 100;
                 subject[index] = 90;
@@ -239,17 +239,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             double subject = 0;
             int referenceCount = 0;
             int subjectCount = 0;
-            for (int index = 0; index < order.Length; index++)
+            for (int index = 0; index < order.Length; ++index)
             {
                 if (order[index] == 'A')
                 {
                     reference += index;
-                    referenceCount++;
+                    ++referenceCount;
                 }
                 else
                 {
                     subject += index;
-                    subjectCount++;
+                    ++subjectCount;
                 }
             }
 
@@ -342,13 +342,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             drift = 1.0;
             double referenceTotal = 0;
             double subjectTotal = 0;
-            for (int slot = 0; slot < BenchmarkProtocol.CyclesPerBatch; slot++)
+            for (int slot = 0; slot < BenchmarkProtocol.CyclesPerBatch; ++slot)
             {
                 referenceTotal += 100.0 * drift;
                 drift *= decayPerSlot;
             }
 
-            for (int slot = 0; slot < BenchmarkProtocol.CyclesPerBatch; slot++)
+            for (int slot = 0; slot < BenchmarkProtocol.CyclesPerBatch; ++slot)
             {
                 subjectTotal += 100.0 * trueRatio * drift;
                 drift *= decayPerSlot;

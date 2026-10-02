@@ -40,7 +40,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             >(mapJson);
 
             Assert.AreEqual(list.Count, listAgain.Count, "List count should round-trip");
-            for (int i = 0; i < list.Count; i++)
+            for (int i = 0; i < list.Count; ++i)
             {
                 Assert.AreEqual(list[i], listAgain[i], $"List element {i} should round-trip");
             }

@@ -135,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int frameCount = frames.Count;
             Dictionary<string, float> previousEdges = new(StringComparer.Ordinal);
             int lastMovingFrame = -1;
-            for (int index = 0; index < frameCount; index++)
+            for (int index = 0; index < frameCount; ++index)
             {
                 SpriteAnimationKeyframe frame = frames[index];
                 if (frame.Sprite == null)

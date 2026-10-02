@@ -356,7 +356,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _values = new[] { 1, 2, 3 },
             };
 
-            for (int cycle = 0; cycle < 5; cycle++)
+            for (int cycle = 0; cycle < 5; ++cycle)
             {
                 dictionary.OnAfterDeserialize();
                 dictionary.OnBeforeSerialize();
@@ -542,7 +542,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _items = new[] { "zebra", "apple", "mango", "banana" },
             };
 
-            for (int cycle = 0; cycle < 5; cycle++)
+            for (int cycle = 0; cycle < 5; ++cycle)
             {
                 set.OnAfterDeserialize();
                 set.OnBeforeSerialize();
@@ -630,7 +630,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _items = new[] { "delta", "alpha", "charlie", "bravo" },
             };
 
-            for (int cycle = 0; cycle < 5; cycle++)
+            for (int cycle = 0; cycle < 5; ++cycle)
             {
                 set.OnAfterDeserialize();
                 set.OnBeforeSerialize();
@@ -809,7 +809,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = 1000;
             int[] keys = new int[count];
             string[] values = new string[count];
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 keys[i] = count - i;
                 values[i] = $"value_{count - i}";
@@ -821,13 +821,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _values = values,
             };
 
-            for (int cycle = 0; cycle < 3; cycle++)
+            for (int cycle = 0; cycle < 3; ++cycle)
             {
                 dictionary.OnAfterDeserialize();
                 dictionary.OnBeforeSerialize();
             }
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 Assert.AreEqual(count - i, dictionary._keys[i]);
                 Assert.AreEqual($"value_{count - i}", dictionary._values[i]);
@@ -839,14 +839,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             int count = 1000;
             int[] items = new int[count];
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 items[i] = (i * 7) % 10000;
             }
 
             SerializableHashSet<int> set = new() { _items = items };
 
-            for (int cycle = 0; cycle < 3; cycle++)
+            for (int cycle = 0; cycle < 3; ++cycle)
             {
                 set.OnAfterDeserialize();
                 set.OnBeforeSerialize();
@@ -1157,7 +1157,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _values = new[] { "hundred", "one", "fifty", "twenty-five", "seventy-five" },
             };
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 dictionary.OnAfterDeserialize();
                 dictionary.OnBeforeSerialize();
@@ -1176,7 +1176,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             SerializableSortedSet<int> set = new() { _items = new[] { 100, 1, 50, 25, 75 } };
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 set.OnAfterDeserialize();
                 set.OnBeforeSerialize();
@@ -1195,7 +1195,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             SerializableHashSet<int> set = new() { _items = new[] { 42, 7, 99, 13, 55 } };
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 set.OnAfterDeserialize();
                 set.OnBeforeSerialize();
@@ -1218,7 +1218,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _values = new[] { 1, 2, 3, 4, 5 },
             };
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 dictionary.OnAfterDeserialize();
                 dictionary.OnBeforeSerialize();
@@ -1240,7 +1240,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _items = new[] { "zebra", "apple", "mango", "banana", "cherry" },
             };
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 set.OnAfterDeserialize();
                 set.OnBeforeSerialize();
@@ -1307,7 +1307,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 dict.Remove(key);
             }
-            for (int i = 0; i < keysToAdd.Length; i++)
+            for (int i = 0; i < keysToAdd.Length; ++i)
             {
                 dict.Add(keysToAdd[i], valuesToAdd[i]);
             }
@@ -1390,7 +1390,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set.Remove(50);
             set.Add(60);
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 set.OnBeforeSerialize();
                 set.OnAfterDeserialize();
@@ -1945,7 +1945,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _values = new[] { 1, 2, 3 },
             };
 
-            for (int cycle = 0; cycle < 5; cycle++)
+            for (int cycle = 0; cycle < 5; ++cycle)
             {
                 dictionary.OnAfterDeserialize();
                 dictionary.OnBeforeSerialize();
@@ -2127,7 +2127,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = 1000;
             int[] keys = new int[count];
             string[] values = new string[count];
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 keys[i] = count - i;
                 values[i] = $"value_{count - i}";
@@ -2139,13 +2139,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _values = values,
             };
 
-            for (int cycle = 0; cycle < 3; cycle++)
+            for (int cycle = 0; cycle < 3; ++cycle)
             {
                 dictionary.OnAfterDeserialize();
                 dictionary.OnBeforeSerialize();
             }
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 Assert.AreEqual(count - i, dictionary._keys[i]);
                 Assert.AreEqual($"value_{count - i}", dictionary._values[i]);
@@ -2301,7 +2301,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _values = new[] { "hundred", "one", "fifty", "twenty-five", "seventy-five" },
             };
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 dictionary.OnAfterDeserialize();
                 dictionary.OnBeforeSerialize();
@@ -2324,7 +2324,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 _values = new[] { 1, 2, 3, 4, 5 },
             };
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 dictionary.OnAfterDeserialize();
                 dictionary.OnBeforeSerialize();
@@ -2360,7 +2360,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 dict.Remove(key);
             }
-            for (int i = 0; i < keysToAdd.Length; i++)
+            for (int i = 0; i < keysToAdd.Length; ++i)
             {
                 dict.Add(keysToAdd[i], valuesToAdd[i]);
             }
@@ -2457,7 +2457,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dict.Remove(50);
             dict.Add(60, "sixty");
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 dict.OnBeforeSerialize();
                 dict.OnAfterDeserialize();
@@ -3014,7 +3014,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 dict.Remove(key);
             }
 
-            for (int i = 0; i < keysToAdd.Length; i++)
+            for (int i = 0; i < keysToAdd.Length; ++i)
             {
                 dict.TryAdd(keysToAdd[i], valuesToAdd[i]);
             }

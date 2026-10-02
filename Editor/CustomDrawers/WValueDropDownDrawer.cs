@@ -603,7 +603,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             string[] pathParts = propertyPath.Split('.');
 
             int pathPartsLength = pathParts.Length;
-            for (int i = 0; i < pathPartsLength; i++)
+            for (int i = 0; i < pathPartsLength; ++i)
             {
                 if (current == null)
                 {
@@ -633,7 +633,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                             )
                             {
                                 current = list[arrayIndex];
-                                i++;
+                                ++i;
                                 continue;
                             }
                         }
@@ -881,7 +881,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 )
                 {
                     bool match = true;
-                    for (int i = 0; i < optionsLength && match; i++)
+                    for (int i = 0; i < optionsLength && match; ++i)
                     {
                         if (!Equals(cached.sourceOptions[i], options[i]))
                         {
@@ -1175,7 +1175,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             object current = target;
 
             int pathPartsLength = pathParts.Length;
-            for (int i = 0; i < pathPartsLength - 1; i++)
+            for (int i = 0; i < pathPartsLength - 1; ++i)
             {
                 if (current == null)
                 {
@@ -1205,7 +1205,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                             )
                             {
                                 current = list[arrayIndex];
-                                i++;
+                                ++i;
                                 continue;
                             }
                         }
@@ -1624,7 +1624,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 GenericMenu menu = new();
                 int optionsLength = options.Length;
-                for (int i = 0; i < optionsLength; i++)
+                for (int i = 0; i < optionsLength; ++i)
                 {
                     int capturedIndex = i;
                     bool isSelected = i == currentIndex && !property.hasMultipleDifferentValues;
@@ -1820,7 +1820,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return FormatOptionCached(_options[optionIndex]);
             }
 
-            protected override string GetDefaultValue() => string.Empty;
+            protected override string GetDefaultValue()
+            {
+                return string.Empty;
+            }
         }
 
         internal static class TestHooks

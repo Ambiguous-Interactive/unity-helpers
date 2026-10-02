@@ -34,7 +34,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 while (i <= j && comparer.Compare(array[i], pivot) < 0)
                 {
-                    i++;
+                    ++i;
                 }
 
                 while (i <= j && 0 < comparer.Compare(array[j], pivot))
@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     swapped = true;
                 }
 
-                i++;
+                ++i;
                 j--;
             }
 
@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             while (pivotEnd < right && comparer.Compare(array[pivotEnd + 1], pivot) == 0)
             {
-                pivotEnd++;
+                ++pivotEnd;
             }
 
             return (pivotStart, pivotEnd, swapped || pivotIndex != pivotPosition);

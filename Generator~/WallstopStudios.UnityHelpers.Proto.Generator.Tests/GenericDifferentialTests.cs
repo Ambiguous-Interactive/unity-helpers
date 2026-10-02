@@ -59,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static byte[] ParseHex(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }
@@ -485,20 +485,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             public int Measure(in DateTime value)
             {
-                MeasureCount++;
+                ++MeasureCount;
                 return _inner.Measure(value);
             }
 
             public bool Write(ref WProtoWriter writer, in DateTime value)
             {
-                WriteCount++;
+                ++WriteCount;
                 return _inner.Write(ref writer, value);
             }
 
             public bool TryRead(ref WProtoReader reader, out DateTime value)
             {
                 bool read = _inner.TryRead(ref reader, out DateTime decoded);
-                ReadCount++;
+                ++ReadCount;
                 value = decoded;
                 return read;
             }

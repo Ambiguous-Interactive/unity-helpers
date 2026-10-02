@@ -409,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                     continue;
                 }
 
-                chromeCount++;
+                ++chromeCount;
                 Assert.AreEqual(
                     0f,
                     shrink.value,

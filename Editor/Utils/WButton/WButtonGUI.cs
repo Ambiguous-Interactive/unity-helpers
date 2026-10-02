@@ -573,7 +573,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                         || handle.Status == WButtonInvocationStatus.CancelRequested
                     )
                     {
-                        running++;
+                        ++running;
                         anyCancellable |= handle.SupportsCancellation;
                     }
                 }
@@ -623,12 +623,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             contexts.Clear();
             int targetCount = targets.Length;
 
-            for (int index = 0; index < metadataList.Count; index++)
+            for (int index = 0; index < metadataList.Count; ++index)
             {
                 WButtonMethodMetadata metadata = metadataList[index];
                 bool allValid = true;
 
-                for (int targetIndex = 0; targetIndex < targetCount; targetIndex++)
+                for (int targetIndex = 0; targetIndex < targetCount; ++targetIndex)
                 {
                     if (targets[targetIndex] == null)
                     {
@@ -652,7 +652,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 WButtonMethodState[] states = new WButtonMethodState[targetCount];
                 UnityEngine.Object[] contextTargets = new UnityEngine.Object[targetCount];
 
-                for (int targetIndex = 0; targetIndex < targetCount; targetIndex++)
+                for (int targetIndex = 0; targetIndex < targetCount; ++targetIndex)
                 {
                     UnityEngine.Object target = targets[targetIndex];
                     WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
@@ -705,7 +705,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
 
             int targetsLength = targets.Length;
-            for (int i = 0; i < targetsLength; i++)
+            for (int i = 0; i < targetsLength; ++i)
             {
                 if (!ReferenceEquals(contextTargets[i], targets[i]))
                 {
@@ -1098,7 +1098,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             int startIndex = state._pageIndex * pageSize;
             int endIndex = Mathf.Min(startIndex + pageSize, contexts.Count);
 
-            for (int index = startIndex; index < endIndex; index++)
+            for (int index = startIndex; index < endIndex; ++index)
             {
                 WButtonMethodContext context = contexts[index];
                 DrawMethod(context, triggeredContexts);
@@ -1156,7 +1156,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 {
                     if (GUILayout.Button("Next", GUILayout.Width(50f)))
                     {
-                        state._pageIndex++;
+                        ++state._pageIndex;
                         if (totalPages <= state._pageIndex)
                         {
                             state._pageIndex = totalPages - 1;
@@ -1725,7 +1725,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static void ReadInstanceIds(UnityEngine.Object[] targets, Span<long> destination)
         {
             int targetsLength = targets.Length;
-            for (int i = 0; i < targetsLength; i++)
+            for (int i = 0; i < targetsLength; ++i)
             {
                 UnityEngine.Object target = targets[i];
                 destination[i] = target != null ? target.GetUnityObjectId() : 0;

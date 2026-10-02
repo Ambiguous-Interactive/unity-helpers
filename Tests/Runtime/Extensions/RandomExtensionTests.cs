@@ -577,11 +577,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 seen.Add(result);
                 if (string.Equals(result, "common", System.StringComparison.Ordinal))
                 {
-                    commonCount++;
+                    ++commonCount;
                 }
                 else if (string.Equals(result, "rare", System.StringComparison.Ordinal))
                 {
-                    rareCount++;
+                    ++rareCount;
                 }
             }
 
@@ -631,11 +631,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 seen.Add(result);
                 if (string.Equals(result, "common", System.StringComparison.Ordinal))
                 {
-                    commonCount++;
+                    ++commonCount;
                 }
                 else if (string.Equals(result, "rare", System.StringComparison.Ordinal))
                 {
-                    rareCount++;
+                    ++rareCount;
                 }
             }
 
@@ -678,11 +678,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 seen.Add(result);
                 if (result == 0)
                 {
-                    index0Count++;
+                    ++index0Count;
                 }
                 else if (result == 1)
                 {
-                    index1Count++;
+                    ++index1Count;
                 }
             }
 
@@ -725,7 +725,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             {
                 if (PRNG.Instance.NextBool(0.7f))
                 {
-                    trueCount++;
+                    ++trueCount;
                 }
             }
 

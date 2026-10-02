@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             int count = Mathf.Min(keys.arraySize, values.arraySize);
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 SerializedProperty keyProp = keys.GetArrayElementAtIndex(index);
                 SerializedProperty valueProp = values.GetArrayElementAtIndex(index);
@@ -232,7 +232,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             int count = Mathf.Min(keys.arraySize, values.arraySize);
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 SerializedProperty keyProp = keys.GetArrayElementAtIndex(index);
                 SerializedProperty valueProp = values.GetArrayElementAtIndex(index);
@@ -315,7 +315,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             HashSet<string> currentKeys = new(StringComparer.OrdinalIgnoreCase);
 
             int count = Mathf.Min(keys.arraySize, values.arraySize);
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 SerializedProperty keyProp = keys.GetArrayElementAtIndex(index);
                 SerializedProperty valueProp = values.GetArrayElementAtIndex(index);
@@ -427,7 +427,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             HashSet<string> currentKeys = new(StringComparer.OrdinalIgnoreCase);
 
             int count = Mathf.Min(keys.arraySize, values.arraySize);
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 SerializedProperty keyProp = keys.GetArrayElementAtIndex(index);
                 SerializedProperty valueProp = values.GetArrayElementAtIndex(index);

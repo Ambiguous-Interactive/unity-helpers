@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.TestTypes.Odin.WButton
         [WButton("Test Action")]
         public void TestAction()
         {
-            ActionCount++;
+            ++ActionCount;
         }
 
         [WButton]

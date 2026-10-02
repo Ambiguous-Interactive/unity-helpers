@@ -153,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Deque<int> deque = new(list);
 
             Assert.AreEqual(5, deque.Count);
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 Assert.AreEqual(i + 1, deque[i]);
             }
@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Deque<int> deque = new(enumerable);
 
             Assert.AreEqual(5, deque.Count);
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 Assert.AreEqual(i + 1, deque[i]);
             }
@@ -511,7 +511,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void TrimExcessDoesNotTrimIfAboveThreshold()
         {
             Deque<int> deque = new(10);
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 deque.PushBack(i);
             }
@@ -549,7 +549,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             foreach (int _ in deque)
             {
-                count++;
+                ++count;
             }
 
             Assert.AreEqual(0, count);
@@ -621,7 +621,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             deque.PushBack(5);
 
             int[] expected = { 1, 2, 3, 4, 5 };
-            for (int i = 0; i < expected.Length; i++)
+            for (int i = 0; i < expected.Length; ++i)
             {
                 Assert.AreEqual(expected[i], deque[i]);
             }
@@ -670,13 +670,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Deque<int> deque = new(10);
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 deque.PushBack(i);
             }
 
             Assert.AreEqual(1000, deque.Count);
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 Assert.AreEqual(i, deque[i]);
             }
@@ -687,13 +687,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Deque<int> deque = new(10);
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 deque.PushFront(i);
             }
 
             Assert.AreEqual(1000, deque.Count);
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 Assert.AreEqual(999 - i, deque[i]);
             }
@@ -752,7 +752,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Deque<int> deque = new(8);
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 deque.PushBack(i);
                 if (i % 3 == 0)
@@ -770,7 +770,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] array = deque.ToArray();
             Assert.AreEqual(deque.Count, array.Length);
 
-            for (int i = 0; i < array.Length; i++)
+            for (int i = 0; i < array.Length; ++i)
             {
                 Assert.AreEqual(array[i], deque[i]);
             }

@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [DetectAssetChanged(typeof(TestDetectableAsset))]
         private static void OnLoopingChange(AssetChangeContext context)
         {
-            _invocationCount++;
+            ++_invocationCount;
         }
     }
 }

@@ -390,7 +390,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void SplitAndCombineRoundTripAllKnownCombinations()
         {
-            for (int value = 0; value <= KnownDirectionMask; value++)
+            for (int value = 0; value <= KnownDirectionMask; ++value)
             {
                 Direction direction = (Direction)value;
                 Direction recombined = direction.Split().Combine();

@@ -175,7 +175,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             InspectorSurface surface = null;
             try
             {
-                for (int index = 0; index < image.TargetTypes.Length; index++)
+                for (int index = 0; index < image.TargetTypes.Length; ++index)
                 {
                     targets.Add(CreateTarget(image.TargetTypes[index], owned));
                 }

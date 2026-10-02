@@ -47,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         [WButton]
         public async Task CountingCancellableButton(CancellationToken cancellationToken)
         {
-            InvocationCount++;
+            ++InvocationCount;
             try
             {
                 await Task.Delay(5000, cancellationToken);

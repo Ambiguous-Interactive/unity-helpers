@@ -152,10 +152,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)instanceField.GetValue(instance);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -163,10 +163,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)instanceFieldGetter(instance);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -179,12 +179,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         instanceField.SetValue(instance, value);
                         sink ^= instance.InstanceField;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -193,12 +193,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         instanceFieldSetter(instance, value);
                         sink ^= instance.InstanceField;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -210,10 +210,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)staticField.GetValue(null);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -221,10 +221,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)staticFieldGetter();
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -237,12 +237,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         staticField.SetValue(null, value);
                         sink ^= ReflectionPerfTarget.StaticField;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -251,12 +251,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         staticFieldSetter(value);
                         sink ^= ReflectionPerfTarget.StaticField;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -268,10 +268,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)instanceProperty.GetValue(instance);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -279,10 +279,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)instancePropertyGetter(instance);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -295,12 +295,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         instanceProperty.SetValue(instance, value);
                         sink ^= instance.InstanceProperty;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -309,12 +309,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         instancePropertySetter(instance, value);
                         sink ^= instance.InstanceProperty;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -326,10 +326,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)staticProperty.GetValue(null);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -337,10 +337,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)staticPropertyGetter(null);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -353,12 +353,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         staticProperty.SetValue(null, value);
                         sink ^= ReflectionPerfTarget.StaticProperty;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -367,12 +367,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         staticPropertySetter(null, value);
                         sink ^= ReflectionPerfTarget.StaticProperty;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -385,10 +385,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     object[] arguments = { 3, 5 };
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)instanceMethod.Invoke(instance, arguments);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -397,10 +397,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     object[] arguments = { 3, 5 };
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)instanceMethodInvoker(instance, arguments);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -413,10 +413,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     object[] arguments = { 3, 5 };
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)staticMethod.Invoke(null, arguments);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -425,10 +425,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     object[] arguments = { 3, 5 };
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= (int)staticMethodInvoker(arguments);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -441,12 +441,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     object[] arguments = { 9 };
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         ReflectionPerfTarget created = (ReflectionPerfTarget)
                             constructor.Invoke(arguments);
                         sink ^= created.InstanceField;
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -455,13 +455,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     object[] arguments = { 9 };
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         ReflectionPerfTarget created = (ReflectionPerfTarget)constructorInvoker(
                             arguments
                         );
                         sink ^= created.InstanceField;
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -579,10 +579,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= instance.InstanceField;
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -590,10 +590,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= instanceFieldGetter(instance);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -606,12 +606,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         instance.InstanceField = value;
                         sink ^= instance.InstanceField;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -621,12 +621,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     int count = 0;
                     int value = 0;
                     ReflectionPerfTarget target = instance;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         instanceFieldSetter(ref target, value);
                         sink ^= target.InstanceField;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -638,10 +638,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= ReflectionPerfTarget.StaticField;
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -649,10 +649,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= staticFieldGetter();
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -665,12 +665,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         ReflectionPerfTarget.StaticField = value;
                         sink ^= ReflectionPerfTarget.StaticField;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -679,12 +679,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         staticFieldSetter(value);
                         sink ^= ReflectionPerfTarget.StaticField;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -696,10 +696,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= instance.InstanceProperty;
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -707,10 +707,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= instancePropertyGetter(instance);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -723,12 +723,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         instance.InstanceProperty = value;
                         sink ^= instance.InstanceProperty;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -737,12 +737,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         instancePropertySetter(instance, value);
                         sink ^= instance.InstanceProperty;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -754,10 +754,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= ReflectionPerfTarget.StaticProperty;
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -765,10 +765,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= staticPropertyGetter();
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -781,12 +781,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         ReflectionPerfTarget.StaticProperty = value;
                         sink ^= ReflectionPerfTarget.StaticProperty;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -795,12 +795,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 {
                     int count = 0;
                     int value = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         staticPropertySetter(value);
                         sink ^= ReflectionPerfTarget.StaticProperty;
-                        value++;
-                        count++;
+                        ++value;
+                        ++count;
                     }
 
                     return count;
@@ -812,10 +812,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= instance.Combine(3, 5);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -823,10 +823,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= instanceMethodInvoker(instance, 3, 5);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -838,10 +838,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= ReflectionPerfTarget.StaticCombine(3, 5);
-                        count++;
+                        ++count;
                     }
 
                     return count;
@@ -849,10 +849,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 () =>
                 {
                     int count = 0;
-                    for (int i = 0; i < BatchSize; i++)
+                    for (int i = 0; i < BatchSize; ++i)
                     {
                         sink ^= staticMethodInvoker(3, 5);
-                        count++;
+                        ++count;
                     }
 
                     return count;

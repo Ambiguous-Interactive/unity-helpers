@@ -30,9 +30,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             byte[] valid = Serializer.ProtoSerialize(new MutationSample { Id = 7, Name = "ok" });
             Assert.IsTrue(4 <= valid.Length, "a payload too small to mutate proves nothing");
 
-            for (int position = 0; position < valid.Length; position++)
+            for (int position = 0; position < valid.Length; ++position)
             {
-                for (int bit = 0; bit < 8; bit++)
+                for (int bit = 0; bit < 8; ++bit)
                 {
                     byte[] mutated = (byte[])valid.Clone();
                     mutated[position] ^= (byte)(1 << bit);
@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(0x08, valid[0], "field 1 key expected at byte 0");
             Assert.AreEqual(0x07, valid[1], "Id varint payload expected at byte 1");
 
-            for (int bit = 0; bit < 8; bit++)
+            for (int bit = 0; bit < 8; ++bit)
             {
                 byte[] mutated = (byte[])valid.Clone();
                 mutated[1] ^= (byte)(1 << bit);
@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 new MutationSample { Id = 1234, Name = "truncate me" }
             );
 
-            for (int length = 0; length < valid.Length; length++)
+            for (int length = 0; length < valid.Length; ++length)
             {
                 byte[] prefix = new byte[length];
                 Array.Copy(valid, prefix, length);
@@ -96,7 +96,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 new MutationSample { Id = 55, Name = "cut here" }
             );
 
-            for (int length = 1; length < valid.Length; length++)
+            for (int length = 1; length < valid.Length; ++length)
             {
                 string prefix = valid.Substring(0, length);
                 Assert.DoesNotThrow(
@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
             char[] corruptions = { '"', ':', '{', '}', '[', ']', ',', '0', '\\', '\n' };
 
-            for (int position = 0; position < valid.Length; position++)
+            for (int position = 0; position < valid.Length; ++position)
             {
                 foreach (char replacement in corruptions)
                 {
@@ -141,9 +141,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             int idTokenStart = valid.IndexOf("1234", StringComparison.Ordinal);
             Assert.GreaterOrEqual(idTokenStart, 0, "the id token expected in the payload");
 
-            for (int offset = 0; offset < 4; offset++)
+            for (int offset = 0; offset < 4; ++offset)
             {
-                for (char digit = '0'; digit <= '9'; digit++)
+                for (char digit = '0'; digit <= '9'; ++digit)
                 {
                     if (digit == valid[idTokenStart + offset])
                     {
@@ -174,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
             char[] insertions = { '"', ':', '{', '}', '[', ']', ',', '\\', '\n' };
 
-            for (int position = 0; position <= valid.Length; position++)
+            for (int position = 0; position <= valid.Length; ++position)
             {
                 foreach (char inserted in insertions)
                 {
@@ -202,7 +202,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             int nameStart = valid.IndexOf("abcd", StringComparison.Ordinal);
             Assert.GreaterOrEqual(nameStart, 0, "the name value expected in the payload");
 
-            for (int offset = 0; offset < 4; offset++)
+            for (int offset = 0; offset < 4; ++offset)
             {
                 foreach (string fragment in fragments)
                 {
@@ -229,9 +229,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             byte[] valid = Serializer.JsonSerialize(new MutationSample { Id = 82, Name = "bits" });
             Assert.IsTrue(4 <= valid.Length, "a payload too small to mutate proves nothing");
 
-            for (int position = 0; position < valid.Length; position++)
+            for (int position = 0; position < valid.Length; ++position)
             {
-                for (int bit = 0; bit < 8; bit++)
+                for (int bit = 0; bit < 8; ++bit)
                 {
                     byte[] mutated = (byte[])valid.Clone();
                     mutated[position] ^= (byte)(1 << bit);

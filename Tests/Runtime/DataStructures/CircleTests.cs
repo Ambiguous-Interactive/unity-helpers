@@ -209,7 +209,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void ContainsHandlesRandomPoints()
         {
-            for (int i = 0; i < NumTries; i++)
+            for (int i = 0; i < NumTries; ++i)
             {
                 Vector2 center = new(
                     PRNG.Instance.NextFloat(-100f, 100f),

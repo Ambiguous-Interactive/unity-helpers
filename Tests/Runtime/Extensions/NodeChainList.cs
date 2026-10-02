@@ -36,7 +36,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         /// <summary>Appends an element.</summary>
         /// <param name="item">The element to append.</param>
-        public void Add(T item) => _chain.AddLast(item);
+        public void Add(T item)
+        {
+            _chain.AddLast(item);
+        }
 
         /// <summary>Appends every element of a sequence.</summary>
         /// <param name="items">The elements to append.</param>
@@ -49,21 +52,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         /// <summary>Removes every element.</summary>
-        public void Clear() => _chain.Clear();
+        public void Clear()
+        {
+            _chain.Clear();
+        }
 
         /// <summary>Determines whether the list holds an element.</summary>
         /// <param name="item">The element to look for.</param>
         /// <returns>True when the element is present.</returns>
-        public bool Contains(T item) => _chain.Contains(item);
+        public bool Contains(T item)
+        {
+            return _chain.Contains(item);
+        }
 
         /// <summary>Copies every element into an array.</summary>
         /// <param name="array">The destination array.</param>
         /// <param name="arrayIndex">The destination offset.</param>
-        public void CopyTo(T[] array, int arrayIndex) => _chain.CopyTo(array, arrayIndex);
+        public void CopyTo(T[] array, int arrayIndex)
+        {
+            _chain.CopyTo(array, arrayIndex);
+        }
 
         /// <summary>Enumerates the elements in order.</summary>
         /// <returns>An enumerator over the elements.</returns>
-        public IEnumerator<T> GetEnumerator() => _chain.GetEnumerator();
+        public IEnumerator<T> GetEnumerator()
+        {
+            return _chain.GetEnumerator();
+        }
 
         /// <summary>Finds the index of an element.</summary>
         /// <param name="item">The element to look for.</param>
@@ -79,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     return index;
                 }
 
-                index++;
+                ++index;
             }
 
             return -1;
@@ -102,11 +117,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// <summary>Removes the first occurrence of an element.</summary>
         /// <param name="item">The element to remove.</param>
         /// <returns>True when an element was removed.</returns>
-        public bool Remove(T item) => _chain.Remove(item);
+        public bool Remove(T item)
+        {
+            return _chain.Remove(item);
+        }
 
         /// <summary>Removes the element at an index.</summary>
         /// <param name="index">The index to remove.</param>
-        public void RemoveAt(int index) => _chain.Remove(NodeAt(index));
+        public void RemoveAt(int index)
+        {
+            _chain.Remove(NodeAt(index));
+        }
 
         private LinkedListNode<T> NodeAt(int index)
         {
@@ -124,6 +145,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             return node;
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => _chain.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return _chain.GetEnumerator();
+        }
     }
 }

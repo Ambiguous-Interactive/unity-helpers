@@ -2716,7 +2716,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             float radius = 1f;
             Vector2[] pentagon = new Vector2[5];
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 float angle = Mathf.PI / 2f + i * 2f * Mathf.PI / 5f;
                 pentagon[i] = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
@@ -2747,7 +2747,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     + $"Actual path: [{string.Join(", ", innerPath)}]"
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 int reversedIndex = 4 - i;
                 Assert.AreEqual(

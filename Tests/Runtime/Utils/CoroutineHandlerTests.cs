@@ -32,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             while (!condition() && (frames < maxFrames || Time.time < deadline))
             {
                 yield return null;
-                frames++;
+                ++frames;
             }
 
             Assert.IsTrue(
@@ -111,7 +111,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             {
                 while (true)
                 {
-                    counter++;
+                    ++counter;
                     yield return null;
                 }
             }
@@ -148,7 +148,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             {
                 while (true)
                 {
-                    counter1++;
+                    ++counter1;
                     yield return null;
                 }
             }
@@ -157,7 +157,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             {
                 while (true)
                 {
-                    counter2++;
+                    ++counter2;
                     yield return null;
                 }
             }
@@ -180,9 +180,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             IEnumerator TestCoroutine()
             {
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < 5; ++i)
                 {
-                    frameCount++;
+                    ++frameCount;
                     yield return null;
                 }
             }
@@ -416,7 +416,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             {
                 while (true)
                 {
-                    counter++;
+                    ++counter;
                     yield return null;
                 }
             }

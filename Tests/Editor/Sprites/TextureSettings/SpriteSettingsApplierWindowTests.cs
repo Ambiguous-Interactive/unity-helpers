@@ -102,7 +102,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             string[] dirs = new string[4];
             string[] textures = new string[4];
 
-            for (int i = 0; i < dirs.Length; i++)
+            for (int i = 0; i < dirs.Length; ++i)
             {
                 dirs[i] = (Root + "/MultiDir" + i).SanitizePath();
                 EnsureFolder(dirs[i]);
@@ -414,7 +414,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             EnsureFolder(Path.GetDirectoryName(relPath).SanitizePath());
             Texture2D t = new(w, h, TextureFormat.RGBA32, false);
             Color[] pix = new Color[w * h];
-            for (int i = 0; i < pix.Length; i++)
+            for (int i = 0; i < pix.Length; ++i)
             {
                 pix[i] = c;
             }

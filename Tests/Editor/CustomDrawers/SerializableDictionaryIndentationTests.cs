@@ -3546,7 +3546,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             try
             {
-                for (int level = 0; level <= 5; level++)
+                for (int level = 0; level <= 5; ++level)
                 {
                     EditorGUI.indentLevel = level;
                     Rect indented = EditorGUI.IndentedRect(controlRect);
@@ -3559,7 +3559,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     TestContext.WriteLine($"  Level {level}: x={x:F3}, width={width:F3}");
                 }
 
-                for (int i = 2; i < results.Count; i++)
+                for (int i = 2; i < results.Count; ++i)
                 {
                     Assert.GreaterOrEqual(
                         results[i].x,
@@ -3568,7 +3568,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     );
                 }
 
-                for (int i = 2; i < results.Count; i++)
+                for (int i = 2; i < results.Count; ++i)
                 {
                     Assert.LessOrEqual(
                         results[i].width,

@@ -136,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             RollingHighWaterMark hwm = new RollingHighWaterMark(300f);
             Stopwatch stopwatch = Stopwatch.StartNew();
 
-            for (int i = 0; i < 100000; i++)
+            for (int i = 0; i < 100000; ++i)
             {
                 hwm.Record(i * 0.001f, 1);
             }
@@ -156,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             RollingHighWaterMark hwm = new RollingHighWaterMark(300f);
 
-            for (int i = 0; i < 20000; i++)
+            for (int i = 0; i < 20000; ++i)
             {
                 hwm.Record(i * 0.001f, i % 100);
             }
@@ -174,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             RollingHighWaterMark hwm = new RollingHighWaterMark(300f);
 
-            for (int i = 0; i < 15000; i++)
+            for (int i = 0; i < 15000; ++i)
             {
                 hwm.Record(i * 0.001f, 15000 - i);
             }
@@ -189,7 +189,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             RollingHighWaterMark hwm = new RollingHighWaterMark(10f);
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 int value = i % 2 == 0 ? 100 : 1;
                 hwm.Record(i * 0.001f, value);
@@ -199,7 +199,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"Peak after alternating high/low: {peak}");
             Assert.AreEqual(100, peak);
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 hwm.Record(1.0f + i * 0.001f, 50);
             }
@@ -220,7 +220,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             RollingHighWaterMark hwm = new RollingHighWaterMark(10f);
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 hwm.Record(1.0f, i + 1);
             }
@@ -238,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             RollingHighWaterMark hwm = new RollingHighWaterMark(300f);
             int expectedMax = 0;
 
-            for (int i = 0; i < 15000; i++)
+            for (int i = 0; i < 15000; ++i)
             {
                 int value = i % 500;
                 hwm.Record(i * 0.01f, value);
@@ -353,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             RollingHighWaterMark hwm = new RollingHighWaterMark(10f);
 
-            for (int i = 1; i <= 5; i++)
+            for (int i = 1; i <= 5; ++i)
             {
                 hwm.Record(i, i * 10);
             }
@@ -374,7 +374,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             RollingHighWaterMark separate = new RollingHighWaterMark(300f);
 
             int[] values = { 5, 12, 3, 20, 8, 15, 1, 10 };
-            for (int i = 0; i < values.Length; i++)
+            for (int i = 0; i < values.Length; ++i)
             {
                 float time = 1.0f + i;
                 float combinedAvg = combined.RecordAndGetAverage(time, values[i]);
@@ -525,13 +525,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 bufferMultiplier: 2.0f
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 _tracker.RecordRent(1.0f + i * 0.1f);
                 _tracker.RecordReturn(1.5f + i * 0.1f);
             }
 
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 _tracker.RecordRent(10.0f + i * 0.01f);
             }
@@ -562,13 +562,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 bufferMultiplier: 2.0f
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 _tracker.RecordRent(1.0f + i * 0.1f);
                 _tracker.RecordReturn(1.5f + i * 0.1f);
             }
 
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 _tracker.RecordRent(10.0f + i * 0.01f);
             }
@@ -585,7 +585,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void FrequencyStatisticsReportsCorrectRate()
         {
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 _tracker.RecordRent(1.0f + i * 3.0f);
             }
@@ -647,7 +647,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 bufferMultiplier: 2.0f
             );
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 _tracker.RecordRent(1.0f + i * 0.1f);
             }

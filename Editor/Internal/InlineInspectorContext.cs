@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Internal
 
         public static IDisposable Enter()
         {
-            _scopeDepth++;
+            ++_scopeDepth;
             return new Scope();
         }
 

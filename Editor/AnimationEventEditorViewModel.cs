@@ -58,7 +58,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             FrameRate = clip.frameRate;
             AnimationEvent[] events = clip.events ?? Array.Empty<AnimationEvent>();
             int eventsLength = events.Length;
-            for (int i = 0; i < eventsLength; i++)
+            for (int i = 0; i < eventsLength; ++i)
             {
                 AnimationEvent existing = events[i];
                 _events.Add(new AnimationEventItem(existing) { originalIndex = i });
@@ -332,7 +332,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return true;
             }
 
-            for (int i = 0; i < _events.Count; i++)
+            for (int i = 0; i < _events.Count; ++i)
             {
                 if (
                     !AnimationEventEqualityComparer.Instance.Equals(
@@ -350,7 +350,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         public bool NeedsReordering()
         {
-            for (int i = 1; i < _events.Count; i++)
+            for (int i = 1; i < _events.Count; ++i)
             {
                 AnimationEvent previous = _events[i - 1].animationEvent;
                 AnimationEvent current = _events[i].animationEvent;
@@ -367,7 +367,7 @@ namespace WallstopStudios.UnityHelpers.Editor
         {
             AnimationEvent[] arr = new AnimationEvent[_events.Count];
             int eventsCount = _events.Count;
-            for (int i = 0; i < eventsCount; i++)
+            for (int i = 0; i < eventsCount; ++i)
             {
                 arr[i] = _events[i].animationEvent;
             }

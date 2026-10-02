@@ -460,7 +460,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 bool north = centerY <= position.y;
                 bool up = centerZ <= position.z;
                 int octant = (up ? 4 : 0) | (east ? 2 : 0) | (north ? 1 : 0);
-                counts[octant]++;
+                ++counts[octant];
             }
 
             int maxChildCount = 0;

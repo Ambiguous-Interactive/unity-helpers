@@ -34,14 +34,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             int iterations
         )
         {
-            for (int i = 0; i < warmupIterations; i++)
+            for (int i = 0; i < warmupIterations; ++i)
             {
                 using PooledResource<List<int>> resource = pool.Get(out List<int> list);
                 list.Clear();
             }
 
             Stopwatch stopwatch = Stopwatch.StartNew();
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < iterations; ++i)
             {
                 using PooledResource<List<int>> resource = pool.Get(out List<int> list);
                 list.Clear();
@@ -268,28 +268,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 options: new PoolOptions<List<int>> { Triggers = PurgeTrigger.Periodic }
             );
 
-            for (int i = 0; i < WarmupIterations; i++)
+            for (int i = 0; i < WarmupIterations; ++i)
             {
                 using PooledResource<List<int>> resource = explicitPool.Get(out List<int> list);
                 list.Clear();
             }
 
             Stopwatch explicitStopwatch = Stopwatch.StartNew();
-            for (int i = 0; i < Iterations; i++)
+            for (int i = 0; i < Iterations; ++i)
             {
                 using PooledResource<List<int>> resource = explicitPool.Get(out List<int> list);
                 list.Clear();
             }
             explicitStopwatch.Stop();
 
-            for (int i = 0; i < WarmupIterations; i++)
+            for (int i = 0; i < WarmupIterations; ++i)
             {
                 using PooledResource<List<int>> resource = periodicPool.Get(out List<int> list);
                 list.Clear();
             }
 
             Stopwatch periodicStopwatch = Stopwatch.StartNew();
-            for (int i = 0; i < Iterations; i++)
+            for (int i = 0; i < Iterations; ++i)
             {
                 using PooledResource<List<int>> resource = periodicPool.Get(out List<int> list);
                 list.Clear();
@@ -318,7 +318,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         [Test]
         public void BuffersListPoolRentReturnCompletesWithinBudget()
         {
-            for (int i = 0; i < WarmupIterations; i++)
+            for (int i = 0; i < WarmupIterations; ++i)
             {
                 using PooledResource<List<int>> resource = Buffers<int>.List.Get(
                     out List<int> list
@@ -327,7 +327,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             }
 
             Stopwatch stopwatch = Stopwatch.StartNew();
-            for (int i = 0; i < Iterations; i++)
+            for (int i = 0; i < Iterations; ++i)
             {
                 using PooledResource<List<int>> resource = Buffers<int>.List.Get(
                     out List<int> list
@@ -353,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         [Test]
         public void BuffersHashSetPoolRentReturnCompletesWithinBudget()
         {
-            for (int i = 0; i < WarmupIterations; i++)
+            for (int i = 0; i < WarmupIterations; ++i)
             {
                 using PooledResource<HashSet<int>> resource = Buffers<int>.HashSet.Get(
                     out HashSet<int> set
@@ -362,7 +362,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             }
 
             Stopwatch stopwatch = Stopwatch.StartNew();
-            for (int i = 0; i < Iterations; i++)
+            for (int i = 0; i < Iterations; ++i)
             {
                 using PooledResource<HashSet<int>> resource = Buffers<int>.HashSet.Get(
                     out HashSet<int> set
@@ -388,7 +388,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         [Test]
         public void BuffersDictionaryPoolRentReturnCompletesWithinBudget()
         {
-            for (int i = 0; i < WarmupIterations; i++)
+            for (int i = 0; i < WarmupIterations; ++i)
             {
                 using PooledResource<Dictionary<int, int>> resource = DictionaryBuffer<
                     int,
@@ -398,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             }
 
             Stopwatch stopwatch = Stopwatch.StartNew();
-            for (int i = 0; i < Iterations; i++)
+            for (int i = 0; i < Iterations; ++i)
             {
                 using PooledResource<Dictionary<int, int>> resource = DictionaryBuffer<
                     int,
@@ -435,7 +435,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 options: new PoolOptions<List<int>> { Triggers = PurgeTrigger.Periodic }
             );
 
-            for (int i = 0; i < WarmupIterations; i++)
+            for (int i = 0; i < WarmupIterations; ++i)
             {
                 using PooledResource<List<int>> resource = pool.Get(out List<int> list);
                 list.Clear();
@@ -443,11 +443,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
             Stopwatch stopwatch = Stopwatch.StartNew();
             Task[] tasks = new Task[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 tasks[t] = Task.Run(() =>
                 {
-                    for (int i = 0; i < iterationsPerThread; i++)
+                    for (int i = 0; i < iterationsPerThread; ++i)
                     {
                         using PooledResource<List<int>> resource = pool.Get(out List<int> list);
                         list.Clear();
@@ -492,7 +492,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 }
             );
 
-            for (int i = 0; i < WarmupIterations; i++)
+            for (int i = 0; i < WarmupIterations; ++i)
             {
                 using PooledResource<List<int>> resource = pool.Get(out List<int> list);
                 list.Clear();
@@ -500,11 +500,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
             Stopwatch stopwatch = Stopwatch.StartNew();
             Task[] tasks = new Task[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 tasks[t] = Task.Run(() =>
                 {
-                    for (int i = 0; i < iterationsPerThread; i++)
+                    for (int i = 0; i < iterationsPerThread; ++i)
                     {
                         using PooledResource<List<int>> resource = pool.Get(out List<int> list);
                         list.Clear();

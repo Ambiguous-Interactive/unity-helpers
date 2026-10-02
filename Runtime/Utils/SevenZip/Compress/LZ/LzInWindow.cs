@@ -40,7 +40,7 @@ namespace SevenZip.Compression.LZ
             UInt32 numBytes = bufferOffset + streamPos - offset;
 
             // check negative offset ????
-            for (UInt32 i = 0; i < numBytes; i++)
+            for (UInt32 i = 0; i < numBytes; ++i)
             {
                 bufferBase[i] = bufferBase[offset + i];
             }
@@ -124,7 +124,7 @@ namespace SevenZip.Compression.LZ
 
         public virtual void MovePos()
         {
-            pos++;
+            ++pos;
             if (pos > _posLimit)
             {
                 UInt32 pointerToPostion = bufferOffset + pos;
@@ -153,12 +153,12 @@ namespace SevenZip.Compression.LZ
                 }
             }
 
-            distance++;
+            ++distance;
             // Byte *pby = _buffer + (size_t)_pos + index;
             UInt32 pby = bufferOffset + pos + (UInt32)index;
 
             UInt32 i;
-            for (i = 0; i < limit && bufferBase[pby + i] == bufferBase[pby + i - distance]; i++)
+            for (i = 0; i < limit && bufferBase[pby + i] == bufferBase[pby + i - distance]; ++i)
             {
                 ;
             }

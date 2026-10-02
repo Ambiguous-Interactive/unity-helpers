@@ -329,7 +329,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
         /// </summary>
         /// <param name="optionIndex">The index of the option.</param>
         /// <returns>The tooltip string, or null/empty for no tooltip.</returns>
-        protected virtual string GetTooltip(int optionIndex) => string.Empty;
+        protected virtual string GetTooltip(int optionIndex)
+        {
+            return string.Empty;
+        }
 
         /// <summary>
         /// Gets the index of the currently selected option from the property.
@@ -497,7 +500,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
                 return;
             }
 
-            _pageIndex++;
+            ++_pageIndex;
             UpdateFromProperty();
         }
 
@@ -546,7 +549,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             bool hasSearch = searchActive && !string.IsNullOrWhiteSpace(effectiveSearch);
             if (hasSearch)
             {
-                for (int i = 0; i < OptionCount; i++)
+                for (int i = 0; i < OptionCount; ++i)
                 {
                     if (MatchesSearch(i, effectiveSearch))
                     {
@@ -607,7 +610,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
                 ? Math.Min(filteredCount, startIndex + pageSize)
                 : filteredCount;
 
-            for (int i = startIndex; i < endIndex; i++)
+            for (int i = startIndex; i < endIndex; ++i)
             {
                 int optionIndex = hasSearch ? _filteredIndices[i] : i;
                 string displayLabel = GetNormalizedDisplayLabel(optionIndex);
@@ -919,7 +922,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
 
             int pageChoicesCount = _pageChoices.Count;
             int pageOptionIndicesCount = _pageOptionIndices.Count;
-            for (int i = 0; i < pageChoicesCount && i < pageOptionIndicesCount; i++)
+            for (int i = 0; i < pageChoicesCount && i < pageOptionIndicesCount; ++i)
             {
                 if (string.Equals(_pageChoices[i], optionLabel, StringComparison.Ordinal))
                 {
@@ -927,7 +930,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
                 }
             }
 
-            for (int i = 0; i < OptionCount; i++)
+            for (int i = 0; i < OptionCount; ++i)
             {
                 string label = GetNormalizedDisplayLabel(i);
                 if (string.Equals(label, optionLabel, StringComparison.Ordinal))

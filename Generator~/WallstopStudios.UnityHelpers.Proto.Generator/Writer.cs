@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         internal void Indent()
         {
-            _depth++;
+            ++_depth;
         }
 
         internal void Outdent()

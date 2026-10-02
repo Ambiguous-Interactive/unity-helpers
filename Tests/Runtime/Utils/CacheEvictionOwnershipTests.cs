@@ -339,7 +339,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void DisposeRacingASetDoesNotThrowOrRetainTheEntry()
         {
-            for (int iteration = 0; iteration < 100; iteration++)
+            for (int iteration = 0; iteration < 100; ++iteration)
             {
                 Cache<int, int> cache = CacheBuilder<int, int>.NewBuilder().MaximumSize(4).Build();
                 using Barrier barrier = new(2);

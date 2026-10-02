@@ -701,7 +701,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     }
 
                     ITupleOperation valueTuple = unwrappedValue as ITupleOperation;
-                    for (int index = 0; index < tuple.Elements.Length; index++)
+                    for (int index = 0; index < tuple.Elements.Length; ++index)
                     {
                         IOperation elementValue =
                             valueTuple != null && index < valueTuple.Elements.Length
@@ -724,23 +724,23 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                         && SymbolEqualityComparer.Default.Equals(rebound, assigned)
                     )
                     {
-                        order++;
+                        ++order;
                         return;
                     }
 
                     AddRebind(rebound, assignment, order);
-                    order++;
+                    ++order;
                     return;
                 }
 
                 if (IsSameModeReference(target, value))
                 {
-                    order++;
+                    ++order;
                     return;
                 }
 
                 RecordModeWrite(target, assignment, target.Syntax.GetLocation(), order);
-                order++;
+                ++order;
             }
 
             private void AddRebind(ISymbol symbol, IOperation mutation, int order = 0)

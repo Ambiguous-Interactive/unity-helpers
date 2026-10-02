@@ -108,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             keysProperty.arraySize = entries.Count;
             valuesProperty.arraySize = entries.Count;
 
-            for (int i = 0; i < entries.Count; i++)
+            for (int i = 0; i < entries.Count; ++i)
             {
                 AssignKey(keysProperty.GetArrayElementAtIndex(i), entries[i].Key);
                 AssignValue(valuesProperty.GetArrayElementAtIndex(i), entries[i].Value);
@@ -159,7 +159,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             keysProperty.arraySize = entries.Count;
             valuesProperty.arraySize = entries.Count;
 
-            for (int i = 0; i < entries.Count; i++)
+            for (int i = 0; i < entries.Count; ++i)
             {
                 SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(i);
                 SerializedProperty valueProperty = valuesProperty.GetArrayElementAtIndex(i);
@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
 
             List<int> values = new(property.arraySize);
-            for (int i = 0; i < property.arraySize; i++)
+            for (int i = 0; i < property.arraySize; ++i)
             {
                 SerializedProperty element = property.GetArrayElementAtIndex(i);
                 values.Add(element?.intValue ?? 0);
@@ -231,7 +231,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 return;
             }
 
-            for (int i = 0; i < keysProperty.arraySize; i++)
+            for (int i = 0; i < keysProperty.arraySize; ++i)
             {
                 SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(i);
                 if (!string.Equals(keyProperty.stringValue, key, StringComparison.Ordinal))
@@ -518,7 +518,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PageSizeClampPreventsExcessiveCacheGrowth()
         {
-            for (int i = 0; i < 512; i++)
+            for (int i = 0; i < 512; ++i)
             {
                 _sharedHost.dictionary.Add(i, $"Value {i}");
             }
@@ -572,7 +572,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PaginationStateUsesSerializableDictionaryPageSizeSetting()
         {
-            for (int i = 0; i < 64; i++)
+            for (int i = 0; i < 64; ++i)
             {
                 _sharedHost.dictionary.Add(i, $"Value {i}");
             }
@@ -609,7 +609,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PaginationStateResetsIndexWhenPageSizeChanges()
         {
-            for (int i = 0; i < 120; i++)
+            for (int i = 0; i < 120; ++i)
             {
                 _sharedHost.dictionary.Add(i, $"Value {i}");
             }
@@ -761,7 +761,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SyncSelectionKeepsIndexWithinVisiblePage()
         {
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < 30; ++i)
             {
                 _sharedHost.dictionary.Add(i, $"Item {i}");
             }
@@ -830,7 +830,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void MarkListCacheDirtyClearsCachedEntries()
         {
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 _sharedHost.dictionary.Add(i, $"Entry {i}");
             }
@@ -871,7 +871,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void RemoveEntryAdjustsSelectionWithinPage()
         {
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < 30; ++i)
             {
                 _sharedHost.dictionary.Add(i, $"Item {i}");
             }
@@ -944,7 +944,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PageCacheRebuildsWhenGlobalPageSizeChanges()
         {
-            for (int i = 0; i < 40; i++)
+            for (int i = 0; i < 40; ++i)
             {
                 _sharedHost.dictionary.Add(i, $"Item {i}");
             }
@@ -1009,7 +1009,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void RemoveEntryBacktracksToPreviousPageWhenLastPageIsRemoved()
         {
-            for (int i = 0; i < 21; i++)
+            for (int i = 0; i < 21; ++i)
             {
                 _sharedHost.dictionary.Add(i, $"Item {i}");
             }
@@ -1190,7 +1190,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 Assert.Less(index, expectedKeys.Length);
                 Assert.AreEqual(expectedKeys[index], pair.Key);
-                index++;
+                ++index;
             }
 
             Assert.AreEqual(expectedKeys.Length, index);
@@ -1264,7 +1264,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 Assert.Less(index, expectedOrder.Length);
                 Assert.AreSame(expectedOrder[index], pair.Key);
-                index++;
+                ++index;
             }
 
             Assert.AreEqual(expectedOrder.Length, index);
@@ -6013,7 +6013,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             bool foundTestKey = false;
-            for (int i = 0; i < keysProperty.arraySize; i++)
+            for (int i = 0; i < keysProperty.arraySize; ++i)
             {
                 if (keysProperty.GetArrayElementAtIndex(i).stringValue == testKey)
                 {
@@ -6058,7 +6058,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             List<string> testKeys = new();
             SerializableDictionaryPropertyDrawer drawer = new();
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 string testKey = $"MultiCommitTest_{i}_{Guid.NewGuid():N}";
                 testKeys.Add(testKey);
@@ -6546,7 +6546,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             string cacheKey = drawer.GetListKey(dictionaryProperty);
             int cycles = 3;
 
-            for (int cycle = 0; cycle < cycles; cycle++)
+            for (int cycle = 0; cycle < cycles; ++cycle)
             {
                 keysProperty.GetArrayElementAtIndex(0).objectReferenceValue = null;
                 serializedObject.ApplyModifiedPropertiesWithoutUndo();
@@ -7398,7 +7398,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             string[] testKeys = { "Alpha", "Alpha", "Beta", "Beta", "Gamma" };
-            for (int i = 0; i < testKeys.Length; i++)
+            for (int i = 0; i < testKeys.Length; ++i)
             {
                 keysProperty.InsertArrayElementAtIndex(i);
                 keysProperty.GetArrayElementAtIndex(i).stringValue = testKeys[i];

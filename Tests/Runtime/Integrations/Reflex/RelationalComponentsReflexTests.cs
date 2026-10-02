@@ -428,7 +428,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
             public void Assign(Component component)
             {
                 LastComponent = component;
-                CallCount++;
+                ++CallCount;
                 if (component != null)
                 {
                     _assignedComponents.Add(component);
@@ -459,7 +459,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
                 Component[] components = root.GetComponentsInChildren<Component>(
                     includeInactiveChildren
                 );
-                for (int i = 0; i < components.Length; i++)
+                for (int i = 0; i < components.Length; ++i)
                 {
                     Assign(components[i]);
                 }

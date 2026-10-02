@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     {
         private static int FindDictionaryKeyIndex(SerializedProperty keysProperty, string key)
         {
-            for (int index = 0; index < keysProperty.arraySize; index++)
+            for (int index = 0; index < keysProperty.arraySize; ++index)
             {
                 SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
                 if (string.Equals(keyProperty.stringValue, key, StringComparison.OrdinalIgnoreCase))
@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
             Assert.That(metadata, Is.Not.Empty);
             int previousOrder = metadata[0].DrawOrder;
-            for (int index = 1; index < metadata.Count; index++)
+            for (int index = 1; index < metadata.Count; ++index)
             {
                 int currentOrder = metadata[index].DrawOrder;
                 Assert.That(previousOrder, Is.LessThanOrEqualTo(currentOrder));
@@ -177,7 +177,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             List<(string Key, Color ButtonColor, Color TextColor)> originalEntries = new(
                 keys.arraySize
             );
-            for (int index = 0; index < keys.arraySize; index++)
+            for (int index = 0; index < keys.arraySize; ++index)
             {
                 SerializedProperty keyProperty = keys.GetArrayElementAtIndex(index);
                 SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
@@ -244,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 serialized.Update();
                 keys.arraySize = originalEntries.Count;
                 values.arraySize = originalEntries.Count;
-                for (int index = 0; index < originalEntries.Count; index++)
+                for (int index = 0; index < originalEntries.Count; ++index)
                 {
                     (string Key, Color ButtonColor, Color TextColor) original = originalEntries[
                         index

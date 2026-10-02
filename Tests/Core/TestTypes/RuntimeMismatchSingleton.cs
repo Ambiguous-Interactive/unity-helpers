@@ -22,7 +22,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         protected override void Awake()
         {
             base.Awake();
-            AwakeCount++;
+            ++AwakeCount;
         }
     }
 }

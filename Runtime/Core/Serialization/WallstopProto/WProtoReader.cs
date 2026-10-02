@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            _fieldCount++;
+            ++_fieldCount;
             fieldNumber = number;
             wireType = type;
             return true;
@@ -282,7 +282,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             ulong result = 0;
             int index = _position;
-            for (int shift = 0; shift < WProtoSizes.MaxVarintBytes; shift++)
+            for (int shift = 0; shift < WProtoSizes.MaxVarintBytes; ++shift)
             {
                 if (_buffer.Length <= index)
                 {
@@ -411,7 +411,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             ulong result = 0;
-            for (int offset = 0; offset < sizeof(ulong); offset++)
+            for (int offset = 0; offset < sizeof(ulong); ++offset)
             {
                 result |= (ulong)_buffer[start + offset] << (offset * 8);
             }
@@ -906,11 +906,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             // Offset indexing measured faster than slicing this varint scan.
             int count = 0;
             int bufferLength = _buffer.Length;
-            for (int index = _position; index < bufferLength; index++)
+            for (int index = _position; index < bufferLength; ++index)
             {
                 if ((_buffer[index] & 0x80) == 0)
                 {
-                    count++;
+                    ++count;
                 }
             }
 

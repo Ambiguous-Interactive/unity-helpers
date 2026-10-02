@@ -35,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static List<string> Repeat(string value, int count)
         {
             List<string> all = new List<string>(count);
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 all.Add(value);
             }
@@ -67,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             const string Expected = "0801";
 
-            for (int iteration = 0; iteration < Iterations; iteration++)
+            for (int iteration = 0; iteration < Iterations; ++iteration)
             {
                 WProtoGeneric<int>.Reset();
 
@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Exception[] failures = new Exception[Threads];
                 Thread[] workers = new Thread[Threads];
 
-                for (int index = 0; index < Threads; index++)
+                for (int index = 0; index < Threads; ++index)
                 {
                     int slot = index;
                     workers[slot] = new Thread(() =>
@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     worker.Join();
                 }
 
-                for (int index = 0; index < Threads; index++)
+                for (int index = 0; index < Threads; ++index)
                 {
                     Assert.IsNull(
                         failures[index],
@@ -122,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void RacingResolversAgreeOnTheResolvedShape()
         {
-            for (int iteration = 0; iteration < Iterations; iteration++)
+            for (int iteration = 0; iteration < Iterations; ++iteration)
             {
                 WProtoGeneric<int>.Reset();
 
@@ -130,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 List<string> observations = new List<string>();
                 Thread[] workers = new Thread[Threads];
 
-                for (int index = 0; index < Threads; index++)
+                for (int index = 0; index < Threads; ++index)
                 {
                     workers[index] = new Thread(() =>
                     {

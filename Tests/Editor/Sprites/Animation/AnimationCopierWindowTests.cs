@@ -40,8 +40,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             }
         }
 
-        private static string ToFull(string rel) =>
-            Path.Combine(
+        private static string ToFull(string rel)
+        {
+            return Path.Combine(
                     Application.dataPath.Substring(
                         0,
                         Application.dataPath.Length - "Assets".Length
@@ -49,6 +50,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                     rel
                 )
                 .SanitizePath();
+        }
 
         private static void ModifyClip(string relPath)
         {
@@ -405,7 +407,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                     string folderName = Path.GetFileName(folder);
                     if (folderName.StartsWith("Nested", System.StringComparison.OrdinalIgnoreCase))
                     {
-                        nestedCount++;
+                        ++nestedCount;
                     }
                 }
 

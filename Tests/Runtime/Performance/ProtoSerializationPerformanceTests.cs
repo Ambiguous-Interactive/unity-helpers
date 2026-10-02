@@ -17,26 +17,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed partial class ProtoSerializationPerformanceTests
     {
+        private const int BenchmarkTimeoutMilliseconds = 600_000;
+
         private const int Iterations = 10_000;
 
-        private static SmallMsg MakeSmall(int i) => new() { Id = i, Name = "Name_" + i };
+        private static SmallMsg MakeSmall(int i)
+        {
+            return new() { Id = i, Name = "Name_" + i };
+        }
 
-        private static MediumMsg MakeMedium(int i, int len) =>
-            new()
+        private static MediumMsg MakeMedium(int i, int len)
+        {
+            return new()
             {
                 Id = i,
                 Name = new string('x', (i % 17) + 8),
                 Values = MakeIntArray(len, seed: i),
             };
+        }
 
-        private static LargeMsg MakeLarge(int i, int blobSize, int nestedLen) =>
-            new()
+        private static LargeMsg MakeLarge(int i, int blobSize, int nestedLen)
+        {
+            return new()
             {
                 Identifier = "2f3a9b4c-8d1f-4cba-8df7-2af00f5c6c1e",
                 Description = new string('d', (i % 31) + 64),
                 Blob = MakeBytes(blobSize, seed: i),
                 Nested = MakeMedium(i, nestedLen),
             };
+        }
 
         private static void RunSerializeBenchmark<T>(
             string label,
@@ -143,7 +152,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return b;
         }
 
-        [Test, Timeout(0)]
+        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
         public void CompareSerializeSmallMediumLarge()
         {
             UnityEngine.Debug.Log(
@@ -158,7 +167,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             RunSerializeBenchmark("Large", () => MakeLarge(123, 8 * 1024, 64), out int largeSize);
         }
 
-        [Test, Timeout(0)]
+        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
         public void CompareDeserializeSmallMediumLarge()
         {
             UnityEngine.Debug.Log("| Payload | WallstopProto (ms) | protobuf-net (ms) | Speedup |");

@@ -351,7 +351,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static void CloseAll(Writer writer, int count)
         {
-            for (int closed = 0; closed < count; closed++)
+            for (int closed = 0; closed < count; ++closed)
             {
                 Close(writer);
             }
@@ -687,7 +687,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 writer.Line("if (" + Access + " != null)" + Writer.Open);
                 writer.Indent();
-                open++;
+                ++open;
             }
 
             writer.Line(

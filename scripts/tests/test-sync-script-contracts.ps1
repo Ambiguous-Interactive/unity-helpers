@@ -304,6 +304,7 @@ function Run-AgentValidationContractTests {
     'npm run format:csharp:check',
     'npm run lint:csharp-naming',
     'npm run lint:duplicate-usings',
+    'npm run lint:comparison-direction',
     'npm run lint:spelling:config',
     'npm run validate:devcontainer',
     'npm run validate:hook-sync',
@@ -319,7 +320,7 @@ function Run-AgentValidationContractTests {
 
   $localValidationRetainsFullAggregate = $validateLocalScript -ceq $expectedLocalScript
   Write-TestResult `
-    -TestName 'Explicit local validation retains the former complete developer aggregate' `
+    -TestName 'Explicit local validation retains all required developer checks' `
     -Passed $localValidationRetainsFullAggregate `
     -Message "validate:local = $validateLocalScript"
 

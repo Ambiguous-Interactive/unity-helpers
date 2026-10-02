@@ -80,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         )
         {
             List<string> values = new List<string>(choices.Count);
-            for (int index = 0; index < choices.Count; index++)
+            for (int index = 0; index < choices.Count; ++index)
                 values.Add(choices[index]);
             int selected = values.IndexOf(current);
             DropdownField field = new DropdownField(label, values, Math.Max(0, selected));
@@ -273,7 +273,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 int hits = 0;
                 foreach (ValidationFinding finding in _known)
                     if (string.Equals(finding.RuleId, rule.RuleId, System.StringComparison.Ordinal))
-                        hits++;
+                        ++hits;
                 AddLabel(row, hits + " hits", "dx-muted");
                 if (authored)
                 {
@@ -598,7 +598,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             int validationWorkspaceSettingsCategoriesLength = ValidationWorkspaceSettings
                 .Categories
                 .Length;
-            for (int index = 0; index < validationWorkspaceSettingsCategoriesLength; index++)
+            for (int index = 0; index < validationWorkspaceSettingsCategoriesLength; ++index)
             {
                 int categoryIndex = index;
                 VisualElement row = Element(_settingsContent, "sentinel-rule-row", "dx-row");
@@ -607,7 +607,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     ValidationWorkspaceSettings.Categories[index],
                     "sentinel-trigger-label"
                 );
-                for (int mode = 0; mode < 3; mode++)
+                for (int mode = 0; mode < 3; ++mode)
                 {
                     int choice = mode;
                     Button toggle = new Button(() =>
@@ -695,7 +695,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             AddLabel(_settingsContent, "SUPPRESSIONS", "sentinel-section-title");
             if (_suppressions.Count == 0)
                 AddLabel(_settingsContent, "Nothing suppressed.", "dx-muted");
-            for (int index = 0; index < _suppressions.Ids.Count; index++)
+            for (int index = 0; index < _suppressions.Ids.Count; ++index)
             {
                 string id = _suppressions.Ids[index];
                 ValidationFinding finding = default;

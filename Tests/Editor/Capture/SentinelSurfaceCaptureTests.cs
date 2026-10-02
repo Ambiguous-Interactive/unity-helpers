@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             surface.style.backgroundColor = root.style.backgroundColor;
             foreach (string className in root.GetClasses())
                 surface.AddToClassList(className);
-            for (int index = 0; index < root.styleSheets.count; index++)
+            for (int index = 0; index < root.styleSheets.count; ++index)
                 surface.styleSheets.Add(root.styleSheets[index]);
             while (0 < root.childCount)
                 surface.Add(root.ElementAt(0));

@@ -120,7 +120,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 Helpers.CommandLineArgumentProvider = () =>
                 {
-                    providerCalls++;
+                    ++providerCalls;
                     return arguments;
                 };
                 Assert.IsTrue(Helpers.GetCommandLineArgument(name) == null);

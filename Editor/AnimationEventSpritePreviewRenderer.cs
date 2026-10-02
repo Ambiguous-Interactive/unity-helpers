@@ -217,9 +217,9 @@ namespace WallstopStudios.UnityHelpers.Editor
                 Vector2 offset = textureRect.position;
                 int offsetX = Mathf.CeilToInt(offset.x);
                 int offsetY = Mathf.CeilToInt(offset.y);
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < width; ++x)
                 {
-                    for (int y = 0; y < height; y++)
+                    for (int y = 0; y < height; ++y)
                     {
                         Color pixel = sourceTexture.GetPixel(offsetX + x, offsetY + y);
                         texture.SetPixel(x, y, pixel);

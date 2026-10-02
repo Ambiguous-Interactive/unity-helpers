@@ -42,9 +42,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     }
                     SphericalHarmonicsL2 sh = new();
                     int idx = 0;
-                    for (int ch = 0; ch < 3; ch++)
+                    for (int ch = 0; ch < 3; ++ch)
                     {
-                        for (int c = 0; c < 9; c++)
+                        for (int c = 0; c < 9; ++c)
                         {
                             sh[ch, c] = coeffs[idx++];
                         }
@@ -105,9 +105,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             writer.WriteStartObject();
             writer.WritePropertyName(CoeffsProp);
             writer.WriteStartArray();
-            for (int ch = 0; ch < 3; ch++)
+            for (int ch = 0; ch < 3; ++ch)
             {
-                for (int c = 0; c < 9; c++)
+                for (int c = 0; c < 9; ++c)
                 {
                     writer.WriteNumberValue(value[ch, c]);
                 }

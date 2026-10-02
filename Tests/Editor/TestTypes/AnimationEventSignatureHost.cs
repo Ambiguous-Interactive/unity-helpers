@@ -36,6 +36,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         public void TwoParameters(int value, string text) { }
 
         [AnimationEvent]
-        public int NonVoidReturn() => 0;
+        public int NonVoidReturn()
+        {
+            return 0;
+        }
     }
 }

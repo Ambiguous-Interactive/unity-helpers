@@ -95,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             double last = EditorApplication.timeSinceStartup;
             try
             {
-                for (int i = 0; i < targets.Count; i++)
+                for (int i = 0; i < targets.Count; ++i)
                 {
                     string rel = targets[i];
                     double now = EditorApplication.timeSinceStartup;
@@ -116,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         )
                     )
                     {
-                        _texturesThatWillChange++;
+                        ++_texturesThatWillChange;
                         _assetsThatWillChange.Add(rel);
                     }
                 }
@@ -369,7 +369,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
             EditorGUILayout.EndHorizontal();
-            for (int i = 0; i < platformOverrides.Count; i++)
+            for (int i = 0; i < platformOverrides.Count; ++i)
             {
                 string name = platformOverrides[i]?.platformName?.Trim();
                 if (!string.IsNullOrEmpty(name) && Array.IndexOf(knownNames, name) < 0)
@@ -452,7 +452,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (_showPreviewOfChanges)
                 {
                     int toShow = Mathf.Min(_assetsThatWillChange.Count, 200);
-                    for (int i = 0; i < toShow; i++)
+                    for (int i = 0; i < toShow; ++i)
                     {
                         EditorGUILayout.LabelField(_assetsThatWillChange[i]);
                     }
@@ -493,7 +493,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             int platformOverrideCount = platformOverrides?.Count ?? 0;
-            for (int i = 0; i < platformOverrideCount; i++)
+            for (int i = 0; i < platformOverrideCount; ++i)
             {
                 PlatformOverrideEntry p = platformOverrides[i];
                 string existing = p?.platformName;
@@ -537,7 +537,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 TextureSettingsApplierAPI.PlatformOverride[] arr =
                     new TextureSettingsApplierAPI.PlatformOverride[platformOverrides.Count];
-                for (int i = 0; i < platformOverrides.Count; i++)
+                for (int i = 0; i < platformOverrides.Count; ++i)
                 {
                     PlatformOverrideEntry e = platformOverrides[i];
                     arr[i] = new TextureSettingsApplierAPI.PlatformOverride

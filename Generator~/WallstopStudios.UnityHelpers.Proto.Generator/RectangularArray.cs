@@ -327,7 +327,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line(_elementQualified, "[] ", Inner.ReadLocal, " = null;");
             Inner.EmitReadLocals(writer);
             writer.Line("int " + DimensionCount + " = 0;");
-            for (int axis = 0; axis < _rank; axis++)
+            for (int axis = 0; axis < _rank; ++axis)
             {
                 writer.Line("int " + Dimension(axis) + " = 0;");
             }
@@ -483,7 +483,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             writer.Line("switch (" + DimensionCount + ")" + Writer.Open);
             writer.Indent();
-            for (int axis = 0; axis < _rank; axis++)
+            for (int axis = 0; axis < _rank; ++axis)
             {
                 writer.Line("case " + axis + ":" + Writer.Open);
                 writer.Indent();
@@ -534,7 +534,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string firstDimension = Dimension(0);
             string product = "(long)" + firstDimension;
             string largest = firstDimension;
-            for (int axis = 1; axis < _rank; axis++)
+            for (int axis = 1; axis < _rank; ++axis)
             {
                 product =
                     NestedCollections.Proto
@@ -578,7 +578,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             string lengths = Dimension(0);
             string indices = Axis(0);
-            for (int axis = 1; axis < _rank; axis++)
+            for (int axis = 1; axis < _rank; ++axis)
             {
                 lengths += ", " + Dimension(axis);
                 indices += ", " + Axis(axis);
@@ -586,7 +586,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             writer.Line("value = " + _creationPrefix + "[" + lengths + "]" + _creationSuffix + ";");
             writer.Line("int flat = 0;");
-            for (int axis = 0; axis < _rank; axis++)
+            for (int axis = 0; axis < _rank; ++axis)
             {
                 writer.Line(
                     "for (int "
@@ -605,7 +605,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             writer.Line("value[" + indices + "] = " + Inner.ReadLocal + "[flat];");
             writer.Line("flat++;");
-            for (int axis = 0; axis < _rank; axis++)
+            for (int axis = 0; axis < _rank; ++axis)
             {
                 writer.Outdent();
                 writer.Line("}");

@@ -341,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(root);
             GameObject current = root;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 GameObject next = new($"DeepLevel{i}", typeof(SpriteRenderer));
                 Track(next);

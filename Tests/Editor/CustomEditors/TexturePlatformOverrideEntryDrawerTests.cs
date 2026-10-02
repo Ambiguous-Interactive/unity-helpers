@@ -391,7 +391,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             {
                 try
                 {
-                    for (int i = 0; i < 10; i++)
+                    for (int i = 0; i < 10; ++i)
                     {
                         _drawer.OnGUI(position, entryProperty, GUIContent.none);
                     }
@@ -448,7 +448,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             _serializedObject.Update();
             heights.Add(_drawer.GetPropertyHeight(entryProperty, GUIContent.none));
 
-            for (int i = 1; i < heights.Count; i++)
+            for (int i = 1; i < heights.Count; ++i)
             {
                 Assert.IsTrue(
                     heights[i - 1] < heights[i],
@@ -473,7 +473,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 try
                 {
                     float y = 0f;
-                    for (int i = 0; i < count; i++)
+                    for (int i = 0; i < count; ++i)
                     {
                         SerializedProperty element = entriesProperty.GetArrayElementAtIndex(i);
                         float height = _drawer.GetPropertyHeight(element, GUIContent.none);
@@ -595,7 +595,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
 
             yield return TestIMGUIExecutor.Run(() =>
             {
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < 5; ++i)
                 {
                     _drawer.OnGUI(position, entryProperty, GUIContent.none);
                 }
@@ -726,7 +726,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
 
             yield return TestIMGUIExecutor.Run(() =>
             {
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < 10; ++i)
                 {
                     _drawer.OnGUI(position, entryProperty, GUIContent.none);
                 }

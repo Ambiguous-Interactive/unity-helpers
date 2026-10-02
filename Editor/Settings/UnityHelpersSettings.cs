@@ -2070,7 +2070,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             using IndentLevelScope indentScope = IndentLevelScope.Indent();
 
-            for (int index = 0; index < patternsProperty.arraySize; index++)
+            for (int index = 0; index < patternsProperty.arraySize; ++index)
             {
                 SerializedProperty element = patternsProperty.GetArrayElementAtIndex(index);
                 SerializedProperty patternProperty = element.FindPropertyRelative(
@@ -2137,7 +2137,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     IReadOnlyList<string> defaults =
                         SerializableTypeCatalog.GetDefaultIgnorePatterns();
                     int defaultCount = defaults.Count;
-                    for (int index = 0; index < defaultCount; index++)
+                    for (int index = 0; index < defaultCount; ++index)
                     {
                         SerializedProperty patternProperty = AppendSerializableTypePatternElement(
                             patternsProperty
@@ -3661,7 +3661,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         IReadOnlyList<WGroupDrawOperation> operations = layout.Operations;
 
                         int operationCount = operations.Count;
-                        for (int index = 0; index < operationCount; index++)
+                        for (int index = 0; index < operationCount; ++index)
                         {
                             WGroupDrawOperation operation = operations[index];
                             if (operation.Type == WGroupDrawOperationType.Group)
@@ -4176,7 +4176,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     }
                 }
 
-                paletteIndex++;
+                ++paletteIndex;
             }
 
             return changed;
@@ -4257,7 +4257,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             {
                 IReadOnlyList<string> defaults = SerializableTypeCatalog.GetDefaultIgnorePatterns();
                 int defaultCount = defaults.Count;
-                for (int index = 0; index < defaultCount; index++)
+                for (int index = 0; index < defaultCount; ++index)
                 {
                     _serializableTypeIgnorePatterns.Add(
                         new SerializableTypeIgnorePattern(defaults[index])

@@ -159,9 +159,15 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
 
         internal Material BaseMaterialForTests => _baseMaterial;
 
-        internal void InvokeStartForTests() => Start();
+        internal void InvokeStartForTests()
+        {
+            Start();
+        }
 
-        internal void InvokeOnDestroyForTests() => OnDestroy();
+        internal void InvokeOnDestroyForTests()
+        {
+            OnDestroy();
+        }
 
         /// <summary>
         /// Ensures this component owns a dedicated material instance and reapplies mask and color data.

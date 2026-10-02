@@ -94,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Tests
             }
 
             string current = parts[0];
-            for (int i = 1; i < parts.Length; i++)
+            for (int i = 1; i < parts.Length; ++i)
             {
                 string next = current + "/" + parts[i];
                 if (!AssetDatabase.IsValidFolder(next))
@@ -1112,7 +1112,7 @@ namespace WallstopStudios.UnityHelpers.Tests
             _createdFolders.Add(wallstopRoot);
             yield return null;
 
-            for (int i = 0; i < cleanupInvocationCount; i++)
+            for (int i = 0; i < cleanupInvocationCount; ++i)
             {
                 PersistentDirectorySettings.CleanupLegacyEmptyFolders();
                 yield return null;
@@ -1525,7 +1525,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 + $"FoldersCreated: [{string.Join(", ", scenario.FoldersToCreate)}], "
                 + $"AssetsCreated: [{string.Join(", ", scenario.AssetPaths)}]";
 
-            for (int i = 0; i < scenario.CleanupInvocationCount; i++)
+            for (int i = 0; i < scenario.CleanupInvocationCount; ++i)
             {
                 PersistentDirectorySettings.CleanupLegacyEmptyFolders();
                 yield return null;
@@ -1639,7 +1639,10 @@ namespace WallstopStudios.UnityHelpers.Tests
                 CleanupInvocationCount = 0 < cleanupInvocationCount ? cleanupInvocationCount : 1;
             }
 
-            public override string ToString() => Description;
+            public override string ToString()
+            {
+                return Description;
+            }
         }
     }
 #endif

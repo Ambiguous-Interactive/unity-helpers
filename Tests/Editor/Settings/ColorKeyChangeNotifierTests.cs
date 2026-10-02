@@ -281,7 +281,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             List<Color> originalColors = new();
             List<string> changedKeyNames = new();
 
-            for (int index = 0; index < Math.Min(2, keys.arraySize); index++)
+            for (int index = 0; index < Math.Min(2, keys.arraySize); ++index)
             {
                 SerializedProperty keyProp = keys.GetArrayElementAtIndex(index);
                 SerializedProperty valueProp = values.GetArrayElementAtIndex(index);
@@ -316,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 );
             }
 
-            for (int index = 0; index < changedKeyNames.Count; index++)
+            for (int index = 0; index < changedKeyNames.Count; ++index)
             {
                 SerializedProperty valueProp = values.GetArrayElementAtIndex(index);
                 SerializedProperty buttonColorProp = valueProp.FindPropertyRelative(
@@ -607,7 +607,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
         private void OnWButtonColorKeysChanged(HashSet<string> changedKeys)
         {
-            _wbuttonEventCount++;
+            ++_wbuttonEventCount;
             if (changedKeys != null)
             {
                 foreach (string key in changedKeys)
@@ -619,7 +619,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
         private void OnWEnumToggleButtonsColorKeysChanged(HashSet<string> changedKeys)
         {
-            _wenumEventCount++;
+            ++_wenumEventCount;
             if (changedKeys != null)
             {
                 foreach (string key in changedKeys)

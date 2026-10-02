@@ -158,7 +158,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         continue;
                     }
 
-                    numberless++;
+                    ++numberless;
                     if (!TryManifestTag(candidate, declaration.BaseType, out int _))
                     {
                         missing.Add(candidate.Name);

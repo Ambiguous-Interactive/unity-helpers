@@ -497,7 +497,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Vector2[] polygon = new Vector2[vertexCount];
             float radius = 10f;
 
-            for (int i = 0; i < vertexCount; i++)
+            for (int i = 0; i < vertexCount; ++i)
             {
                 float angle = (float)i / vertexCount * Mathf.PI * 2f;
                 polygon[i] = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
@@ -515,7 +515,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         {
             Vector2[] pentagon = new Vector2[5];
             float radius = 10f;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 float angle = (float)i / 5 * Mathf.PI * 2f - Mathf.PI / 2f;
                 pentagon[i] = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
@@ -537,7 +537,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             float outerRadius = 10f;
             float innerRadius = 4f;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 float angle = (float)i / 10 * Mathf.PI * 2f - Mathf.PI / 2f;
                 float radius = i % 2 == 0 ? outerRadius : innerRadius;

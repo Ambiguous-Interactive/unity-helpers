@@ -305,7 +305,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                 StringBuilder builder = new(_failures.Count * 512);
 
-                for (int i = 0; i < _failures.Count; i++)
+                for (int i = 0; i < _failures.Count; ++i)
                 {
                     FailedTestInfo failure = _failures[i];
 

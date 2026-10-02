@@ -205,7 +205,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     while (start < end)
                     {
                         (list[start], list[end]) = (list[end], list[start]);
-                        start++;
+                        ++start;
                         end--;
                     }
 

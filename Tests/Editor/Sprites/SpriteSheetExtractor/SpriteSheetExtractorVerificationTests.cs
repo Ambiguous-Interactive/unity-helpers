@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 string arrayContent = json.Substring(arrayStart + 1, arrayEnd - arrayStart - 1);
                 string[] parts = arrayContent.Split(',');
                 metadata.SpriteDimensions = new int[parts.Length];
-                for (int i = 0; i < parts.Length; i++)
+                for (int i = 0; i < parts.Length; ++i)
                 {
                     metadata.SpriteDimensions[i] = int.Parse(parts[i].Trim());
                 }
@@ -145,7 +145,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 string arrayContent = json.Substring(arrayStart + 1, arrayEnd - arrayStart - 1);
                 string[] parts = arrayContent.Split(',');
                 metadata.GridSize = new int[parts.Length];
-                for (int i = 0; i < parts.Length; i++)
+                for (int i = 0; i < parts.Length; ++i)
                 {
                     metadata.GridSize[i] = int.Parse(parts[i].Trim());
                 }
@@ -256,7 +256,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             {
                 System.Text.StringBuilder sb = new System.Text.StringBuilder();
                 sb.AppendLine("[");
-                for (int i = 0; i < expectedNames.Count; i++)
+                for (int i = 0; i < expectedNames.Count; ++i)
                 {
                     sb.Append($"    \"{expectedNames[i]}\"");
                     if (i < expectedNames.Count - 1)
@@ -354,7 +354,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             GoldenMetadata metadata = LoadGoldenMetadata(goldenFileName);
             string baseName = Path.GetFileNameWithoutExtension(metadata.SourceFile);
 
-            for (int i = 0; i < metadata.ExpectedNames.Count; i++)
+            for (int i = 0; i < metadata.ExpectedNames.Count; ++i)
             {
                 string expectedName = metadata.ExpectedNames[i];
                 Assert.That(
@@ -763,7 +763,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 GoldenMetadata metadata = LoadGoldenMetadata(goldenFile);
                 string baseName = Path.GetFileNameWithoutExtension(metadata.SourceFile);
 
-                for (int i = 0; i < metadata.ExpectedNames.Count; i++)
+                for (int i = 0; i < metadata.ExpectedNames.Count; ++i)
                 {
                     string expectedPattern = $"{baseName}_{i}";
                     Assert.That(
@@ -867,7 +867,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     string sourceFile = Path.GetFileName(texturePath);
                     string baseName = Path.GetFileNameWithoutExtension(sourceFile);
                     List<string> expectedNames = new List<string>(spriteCount);
-                    for (int i = 0; i < spriteCount; i++)
+                    for (int i = 0; i < spriteCount; ++i)
                     {
                         expectedNames.Add($"{baseName}_{i}");
                     }

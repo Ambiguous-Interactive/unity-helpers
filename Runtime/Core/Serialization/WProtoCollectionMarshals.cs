@@ -347,7 +347,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             capacity = SerializationCapacityLimits.Clamp(capacity, itemCount);
 
             Deque<T> restored = new Deque<T>(capacity);
-            for (int index = 0; index < itemCount; index++)
+            for (int index = 0; index < itemCount; ++index)
             {
                 restored.PushBack(wrapper.Items[index]);
             }
@@ -372,7 +372,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             if (0 < count)
             {
                 items = new T[count];
-                for (int index = 0; index < count; index++)
+                for (int index = 0; index < count; ++index)
                 {
                     items[index] = value[index];
                 }

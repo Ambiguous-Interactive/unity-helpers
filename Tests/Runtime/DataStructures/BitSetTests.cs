@@ -176,7 +176,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void TrySetMultipleBitsInSameWordWorks()
         {
             BitSet bits = new(64);
-            for (int i = 0; i < 64; i++)
+            for (int i = 0; i < 64; ++i)
             {
                 Assert.IsTrue(bits.TrySet(i));
             }
@@ -300,7 +300,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void TryFlipMultipleTimesTogglesCorrectly()
         {
             BitSet bits = new(64);
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 Assert.IsTrue(bits.TryFlip(5));
                 bool expected = i % 2 == 0;
@@ -461,7 +461,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             BitSet bits = new(capacity);
             bits.SetAll();
             Assert.AreEqual(capacity, bits.CountSetBits());
-            for (int i = 0; i < capacity; i++)
+            for (int i = 0; i < capacity; ++i)
             {
                 Assert.IsTrue(bits[i], $"Bit {i} should be set");
             }
@@ -471,7 +471,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SetAllAfterPartialSetSetsRemainingBits()
         {
             BitSet bits = new(100);
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 Assert.IsTrue(bits.TrySet(i));
             }
@@ -530,17 +530,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void FlipAllPartiallySetFlipsCorrectly()
         {
             BitSet bits = new(100);
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 Assert.IsTrue(bits.TrySet(i));
             }
             bits.FlipAll();
             Assert.AreEqual(50, bits.CountSetBits());
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 Assert.IsFalse(bits[i]);
             }
-            for (int i = 50; i < 100; i++)
+            for (int i = 50; i < 100; ++i)
             {
                 Assert.IsTrue(bits[i]);
             }
@@ -618,7 +618,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void AllPartiallySetReturnsFalse()
         {
             BitSet bits = new(64);
-            for (int i = 0; i < 63; i++)
+            for (int i = 0; i < 63; ++i)
             {
                 Assert.IsTrue(bits.TrySet(i));
             }
@@ -1084,16 +1084,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ResizeExpandingPreservesExistingBits()
         {
             BitSet bits = new(10);
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 bits.TrySet(i);
             }
             bits.Resize(100);
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 Assert.IsTrue(bits[i]);
             }
-            for (int i = 10; i < 100; i++)
+            for (int i = 10; i < 100; ++i)
             {
                 Assert.IsFalse(bits[i]);
             }
@@ -1355,14 +1355,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int iterations = 0;
             foreach (bool unused in bits)
             {
-                iterations++;
+                ++iterations;
             }
             Assert.AreEqual(5, iterations);
 
             iterations = 0;
             foreach (bool bit in bits)
             {
-                iterations++;
+                ++iterations;
             }
             Assert.AreEqual(5, iterations);
         }

@@ -79,21 +79,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 }
 
                 IRandom generator = (IRandom)parameterless.Invoke(null);
-                for (int i = 0; i < DrawsBeforeSnapshot; i++)
+                for (int i = 0; i < DrawsBeforeSnapshot; ++i)
                 {
                     generator.NextUint();
                 }
 
                 RandomState snapshot = generator.InternalState;
                 uint[] expected = new uint[ComparedDraws];
-                for (int i = 0; i < ComparedDraws; i++)
+                for (int i = 0; i < ComparedDraws; ++i)
                 {
                     expected[i] = generator.NextUint();
                 }
 
                 IRandom restored = (IRandom)fromSnapshot.Invoke(new object[] { snapshot });
                 int firstMismatch = -1;
-                for (int i = 0; i < ComparedDraws; i++)
+                for (int i = 0; i < ComparedDraws; ++i)
                 {
                     if (restored.NextUint() != expected[i])
                     {

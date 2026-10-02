@@ -194,8 +194,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// (same guarantee as LogAssert.Expect's "expected log did not appear"). EditMode (where the
         /// suppressing handler is not installed) falls back to LogAssert.Expect.
         /// </summary>
-        protected static void ExpectError(UnityEngine.LogType type, string pattern) =>
+        protected static void ExpectError(UnityEngine.LogType type, string pattern)
+        {
             ExpectError(type, new System.Text.RegularExpressions.Regex(pattern));
+        }
 
         protected static void ExpectError(
             UnityEngine.LogType type,
@@ -244,8 +246,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return;
             }
 
-            static string Escape(string value) =>
-                System.Text.RegularExpressions.Regex.Escape(value);
+            static string Escape(string value)
+            {
+                return System.Text.RegularExpressions.Regex.Escape(value);
+            }
 
             string pattern =
                 $@"^\d+(\.\d+)?\|{Escape(ownerName)}\[{Escape(ownerType)}\]\|Unable to find "
@@ -309,7 +313,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             lock (_expectedErrorLock)
             {
-                for (int i = 0; i < _toleratedLogs.Count; i++)
+                for (int i = 0; i < _toleratedLogs.Count; ++i)
                 {
                     if (
                         _toleratedLogs[i].type == logType
@@ -511,7 +515,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     Object.Destroy(obj); // UNH-SUPPRESS: Required for PlayMode test cleanup
                 }
 
-                for (int i = 0; i < TrackedObjectDestroyMaxFrames; i++)
+                for (int i = 0; i < TrackedObjectDestroyMaxFrames; ++i)
                 {
                     bool hasLiveObject = false;
                     foreach (Object obj in snapshot)
@@ -671,7 +675,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 if (leakedRoots != null)
                 {
                     sweepFailure = DestroyLeakedRootsAndDescribe(leakedRoots);
-                    for (int i = 0; i < TrackedObjectDestroyMaxFrames; i++)
+                    for (int i = 0; i < TrackedObjectDestroyMaxFrames; ++i)
                     {
                         yield return null;
                     }
@@ -905,7 +909,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             _testStartScenes.Clear();
 
             int sceneCount = SceneManager.sceneCount;
-            for (int i = 0; i < sceneCount; i++)
+            for (int i = 0; i < sceneCount; ++i)
             {
                 Scene scene = SceneManager.GetSceneAt(i);
                 if (!scene.IsValid() || !scene.isLoaded)
@@ -943,7 +947,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             List<GameObject> leaked = null;
             int sceneCount = SceneManager.sceneCount;
-            for (int i = 0; i < sceneCount; i++)
+            for (int i = 0; i < sceneCount; ++i)
             {
                 Scene scene = SceneManager.GetSceneAt(i);
                 if (!scene.IsValid() || !scene.isLoaded || !_testStartScenes.Contains(scene))
@@ -1190,7 +1194,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             string objectName = obj.name;
             long objectId = obj.GetUnityObjectId();
 
-            for (int i = 0; i < maxFrames; i++)
+            for (int i = 0; i < maxFrames; ++i)
             {
                 if (obj == null)
                 {
@@ -1222,7 +1226,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         private static string DrainUnityMainThreadDispatchersForTeardown()
         {
             const int MaxDrainPasses = 8;
-            for (int i = 0; i < MaxDrainPasses; i++)
+            for (int i = 0; i < MaxDrainPasses; ++i)
             {
                 int pendingActionCount =
                     UnityMainThreadDispatcher.GetPendingActionCountForTesting();
@@ -1453,7 +1457,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             string[] parts = folderPath.Split('/');
             string current = parts[0];
 
-            for (int i = 1; i < parts.Length; i++)
+            for (int i = 1; i < parts.Length; ++i)
             {
                 string desiredName = parts[i];
                 string intendedNext = current + "/" + desiredName;
@@ -1521,7 +1525,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         private static void TryPromoteAnotherScene(Scene current)
         {
             int count = SceneManager.sceneCount;
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 Scene candidate = SceneManager.GetSceneAt(i);
                 if (candidate.IsValid() && candidate.isLoaded && candidate != current)
@@ -1591,7 +1595,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             string[] parts = folderPath.Split('/');
             string current = parts[0];
 
-            for (int i = 1; i < parts.Length; i++)
+            for (int i = 1; i < parts.Length; ++i)
             {
                 string desiredName = parts[i];
                 string intendedNext = current + "/" + desiredName;
@@ -1866,7 +1870,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// </summary>
         protected static void ForceAssetUnloaded(string assetPath, int maxRefreshes = 10)
         {
-            for (int i = 0; i < maxRefreshes; i++)
+            for (int i = 0; i < maxRefreshes; ++i)
             {
                 using (AssetDatabaseBatchHelper.PauseBatch())
                 {
@@ -1899,7 +1903,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// </summary>
         protected static IEnumerator WaitUntilFolderValid(string folderPath, int maxRefreshes = 10)
         {
-            for (int i = 0; i < maxRefreshes; i++)
+            for (int i = 0; i < maxRefreshes; ++i)
             {
                 if (UnityEditor.AssetDatabase.IsValidFolder(folderPath))
                 {
@@ -2694,7 +2698,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
                     lock (_expectedErrorLock)
                     {
-                        for (int i = 0; i < _expectedErrors.Count; i++)
+                        for (int i = 0; i < _expectedErrors.Count; ++i)
                         {
                             if (
                                 _expectedErrors[i].type == logType
@@ -2731,26 +2735,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             /// <summary>
             /// Gets the list of known duplicate folder patterns for verification.
             /// </summary>
-            public static (
-                string parentPath,
-                string baseName
-            )[] GetKnownDuplicateFolderPatterns() => KnownDuplicateFolderPatterns;
+            public static (string parentPath, string baseName)[] GetKnownDuplicateFolderPatterns()
+            {
+                return KnownDuplicateFolderPatterns;
+            }
 
             /// <summary>
             /// Exposes IsProtectedPath for testing.
             /// </summary>
-            public static bool TestIsProtectedPath(string path) => IsProtectedPath(path);
+            public static bool TestIsProtectedPath(string path)
+            {
+                return IsProtectedPath(path);
+            }
 
             /// <summary>
             /// Exposes IsKnownDuplicatePollution for testing.
             /// </summary>
-            public static bool TestIsKnownDuplicatePollution(string path) =>
-                IsKnownDuplicatePollution(path);
+            public static bool TestIsKnownDuplicatePollution(string path)
+            {
+                return IsKnownDuplicatePollution(path);
+            }
 
             /// <summary>
             /// Gets the list of protected folders for verification.
             /// </summary>
-            public static string[] GetProtectedFolders() => ProtectedFolders;
+            public static string[] GetProtectedFolders()
+            {
+                return ProtectedFolders;
+            }
         }
 #endif
     }

@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                inspected++;
+                ++inspected;
                 all.AddRange(findings);
             }
 

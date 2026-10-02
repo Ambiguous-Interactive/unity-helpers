@@ -117,9 +117,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 if (_suppressions.IsSuppressed(in finding))
                     continue;
                 if (finding.Severity == ValidationSeverity.Error)
-                    errors++;
+                    ++errors;
                 if (finding.Severity == ValidationSeverity.Warning)
-                    warnings++;
+                    ++warnings;
             }
             _badge = ValidationResults.HasRun
                 ? "Sentinel · " + errors + " ! · " + warnings + " ⚠"

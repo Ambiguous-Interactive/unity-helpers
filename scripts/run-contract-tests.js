@@ -29,6 +29,11 @@ const { runChecks, runRegistry } = require("./check-runner");
 /** A check whose `run` is executed with `bash -c` from the repository root. */
 const CHECKS = [
   // Test-suite and source hygiene.
+  {
+    id: "csharp-syntax",
+    name: "C# syntax policies and migration controls",
+    run: "npm run lint:csharp-syntax"
+  },
   { id: "lint-tests", name: "Test lifecycle linter", run: "npm run lint:tests" },
   { id: "check-eol", name: "Line-ending checker", run: "npm run test:check-eol" },
   {

@@ -1031,7 +1031,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             internal void IncrementAxisCornerInsertions()
             {
-                AxisCornerInsertions++;
+                ++AxisCornerInsertions;
             }
 
             internal void IncrementAxisPathInsertions(int amount)
@@ -1044,22 +1044,22 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             internal void IncrementCandidateConnections()
             {
-                CandidateConnections++;
+                ++CandidateConnections;
             }
 
             internal void IncrementDuplicateRemovals()
             {
-                DuplicateRemovals++;
+                ++DuplicateRemovals;
             }
 
             internal void IncrementDiagonalPruned()
             {
-                DiagonalPruned++;
+                ++DiagonalPruned;
             }
 
             internal void IncrementAxisNeighborVisits()
             {
-                AxisNeighborVisits++;
+                ++AxisNeighborVisits;
             }
 
             internal void MaybeRecordFrontierSize(int size)

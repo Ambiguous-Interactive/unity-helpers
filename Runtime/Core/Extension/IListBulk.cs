@@ -42,7 +42,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 list[i] = scratch[i];
             }
@@ -75,12 +75,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            for (int i = 0; i < tail; i++)
+            for (int i = 0; i < tail; ++i)
             {
                 list[i] = scratch[head + i];
             }
 
-            for (int i = 0; i < head; i++)
+            for (int i = 0; i < head; ++i)
             {
                 list[tail + i] = scratch[i];
             }

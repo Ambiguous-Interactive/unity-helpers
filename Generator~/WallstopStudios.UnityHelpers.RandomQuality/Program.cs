@@ -188,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
                 {
                     ulong sample = sixtyFourBit ? random.NextUlong() : random.NextUint();
                     int sampleBytes = Math.Min(sampleWidth, count - offset);
-                    for (int index = 0; index < sampleBytes; index++)
+                    for (int index = 0; index < sampleBytes; ++index)
                     {
                         buffer[offset + index] = (byte)(sample >> (index * 8));
                     }
@@ -222,7 +222,7 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
 
         private static bool TryOption(string[] args, string name, out string value)
         {
-            for (int index = 0; index + 1 < args.Length; index++)
+            for (int index = 0; index + 1 < args.Length; ++index)
             {
                 if (string.Equals(args[index], name, StringComparison.Ordinal))
                 {

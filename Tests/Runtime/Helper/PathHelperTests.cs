@@ -151,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void SanitizePathWithVeryLongPathConvertsAllBackslashes()
         {
             string longPath = "C:\\";
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 longPath += $"Folder{i}\\";
             }

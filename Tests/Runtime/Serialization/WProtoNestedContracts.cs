@@ -34,13 +34,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WProtoBeforeSerialization]
         private void OnBeforeSerialization()
         {
-            BeforeSerializationRuns++;
+            ++BeforeSerializationRuns;
         }
 
         [WProtoAfterSerialization]
         private void OnAfterSerialization()
         {
-            AfterSerializationRuns++;
+            ++AfterSerializationRuns;
         }
     }
 

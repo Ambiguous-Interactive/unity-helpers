@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
 
         private ScriptableMismatchSingleton()
         {
-            CreatedCount++;
+            ++CreatedCount;
         }
 
         public static void ClearForTests()

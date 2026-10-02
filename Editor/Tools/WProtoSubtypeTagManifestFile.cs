@@ -265,7 +265,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             bool editor = false;
             int segmentsLength = segments.Length;
-            for (int index = 1; index < segmentsLength; index++)
+            for (int index = 1; index < segmentsLength; ++index)
             {
                 if (string.Equals(segments[index], "Editor", StringComparison.Ordinal))
                 {
@@ -285,7 +285,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <summary>
         /// The <c>.asmdef</c> that would take a file written into a directory, if one would.
         /// </summary>
-        /// <param name="directory">The project-relative directory, using either slash.</param>
+        /// <param name="directory">The project-relative directory, using either slash; blank directories have no owner.</param>
         /// <param name="assemblyDefinitionPaths">
         /// Every <c>.asmdef</c> path worth considering; only the ones at or above
         /// <paramref name="directory"/> can claim it, so the rest are ignored.
@@ -312,13 +312,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             IReadOnlyList<string> assemblyDefinitionPaths
         )
         {
-            if (string.IsNullOrEmpty(directory) || assemblyDefinitionPaths == null)
+            if (string.IsNullOrWhiteSpace(directory) || assemblyDefinitionPaths == null)
             {
                 return null;
             }
 
             string target = Normalize(directory);
-            if (string.IsNullOrEmpty(target))
+            if (string.IsNullOrWhiteSpace(target))
             {
                 return null;
             }
@@ -327,7 +327,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             int deepest = -1;
             foreach (string path in assemblyDefinitionPaths)
             {
-                if (string.IsNullOrEmpty(path))
+                if (string.IsNullOrWhiteSpace(path))
                 {
                     continue;
                 }
@@ -609,7 +609,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private static bool Claims(string ownerDirectory, string targetDirectory)
         {
-            if (string.IsNullOrEmpty(ownerDirectory))
+            if (string.IsNullOrWhiteSpace(ownerDirectory))
             {
                 return false;
             }
@@ -629,7 +629,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 if (character == '/')
                 {
-                    depth++;
+                    ++depth;
                 }
             }
 

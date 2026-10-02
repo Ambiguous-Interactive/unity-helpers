@@ -463,7 +463,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             StringBuilder builder = new();
-            for (int index = 0; index < keys.Count; index++)
+            for (int index = 0; index < keys.Count; ++index)
             {
                 if (0 < index)
                 {

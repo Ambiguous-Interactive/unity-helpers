@@ -24,71 +24,123 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
 
         public static void ClearHeightCache() { }
 
-        public static float GetHelpBoxHeight(string message) => default;
+        public static float GetHelpBoxHeight(string message)
+        {
+            return default;
+        }
 
-        public static MessageType ToMessageType(ValidateAssignmentMessageType messageType) =>
-            default;
+        public static MessageType ToMessageType(ValidateAssignmentMessageType messageType)
+        {
+            return default;
+        }
 
         public static HelpBoxMessageType ToHelpBoxMessageType(
             ValidateAssignmentMessageType messageType
-        ) => default;
+        )
+        {
+            return default;
+        }
 
-        public static MessageType GetMessageType(ValidateAssignmentAttribute validateAttribute) =>
-            default;
+        public static MessageType GetMessageType(ValidateAssignmentAttribute validateAttribute)
+        {
+            return default;
+        }
 
         public static HelpBoxMessageType GetHelpBoxMessageType(
             ValidateAssignmentAttribute validateAttribute
-        ) => default;
+        )
+        {
+            return default;
+        }
 
-        public static MessageType ToMessageType(WNotNullMessageType messageType) => default;
+        public static MessageType ToMessageType(WNotNullMessageType messageType)
+        {
+            return default;
+        }
 
-        public static HelpBoxMessageType ToHelpBoxMessageType(WNotNullMessageType messageType) =>
-            default;
+        public static HelpBoxMessageType ToHelpBoxMessageType(WNotNullMessageType messageType)
+        {
+            return default;
+        }
 
-        public static MessageType GetMessageType(WNotNullAttribute notNullAttribute) => default;
+        public static MessageType GetMessageType(WNotNullAttribute notNullAttribute)
+        {
+            return default;
+        }
 
-        public static HelpBoxMessageType GetHelpBoxMessageType(
-            WNotNullAttribute notNullAttribute
-        ) => default;
+        public static HelpBoxMessageType GetHelpBoxMessageType(WNotNullAttribute notNullAttribute)
+        {
+            return default;
+        }
 
         public static string GetValidateAssignmentMessage(
             SerializedProperty property,
             ValidateAssignmentAttribute validateAttribute
-        ) => default;
+        )
+        {
+            return default;
+        }
 
         public static string GetValidateAssignmentMessage(
             string fieldName,
             ValidateAssignmentAttribute validateAttribute
-        ) => default;
+        )
+        {
+            return default;
+        }
 
         public static string GetNotNullMessage(
             SerializedProperty property,
             WNotNullAttribute notNullAttribute
-        ) => default;
+        )
+        {
+            return default;
+        }
 
-        public static string GetNotNullMessage(
-            string fieldName,
-            WNotNullAttribute notNullAttribute
-        ) => default;
+        public static string GetNotNullMessage(string fieldName, WNotNullAttribute notNullAttribute)
+        {
+            return default;
+        }
 
-        public static bool IsValueNull(object value) => default;
+        public static bool IsValueNull(object value)
+        {
+            return default;
+        }
 
-        public static bool IsValueInvalid(object value) => default;
+        public static bool IsValueInvalid(object value)
+        {
+            return default;
+        }
 
-        public static bool IsPropertyNull(SerializedProperty property) => default;
+        public static bool IsPropertyNull(SerializedProperty property)
+        {
+            return default;
+        }
 
-        public static bool IsPropertyInvalid(SerializedProperty property) => default;
+        public static bool IsPropertyInvalid(SerializedProperty property)
+        {
+            return default;
+        }
 
-        public static bool IsGenericPropertyInvalid(SerializedProperty property) => default;
+        public static bool IsGenericPropertyInvalid(SerializedProperty property)
+        {
+            return default;
+        }
 
         public static bool DrawValidateAssignmentHelpBoxIfNeeded(
             SerializedProperty property,
             ValidateAssignmentAttribute validateAttribute
-        ) => default;
+        )
+        {
+            return default;
+        }
 
         public static bool DrawNotNullHelpBoxIfNeeded(
             SerializedProperty property,
             WNotNullAttribute notNullAttribute
-        ) => default;
+        )
+        {
+            return default;
+        }
     }
 }

@@ -970,7 +970,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             OdinShowIfCollectionTarget target =
                 CreateScriptableObject<OdinShowIfCollectionTarget>();
             target.listCondition = new List<int>();
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < itemCount; ++i)
             {
                 target.listCondition.Add(i);
             }
@@ -1053,7 +1053,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             OdinShowIfCollectionTarget target =
                 CreateScriptableObject<OdinShowIfCollectionTarget>();
             target.listCondition = new List<int>(itemCount);
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < itemCount; ++i)
             {
                 target.listCondition.Add(i);
             }
@@ -1298,7 +1298,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             bool testCompleted = false;
             Exception caughtException = null;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 target.showDependent = i % 2 == 0;
                 int iteration = i;

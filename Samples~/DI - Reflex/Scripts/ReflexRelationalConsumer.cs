@@ -67,7 +67,7 @@ namespace Samples.UnityHelpers.DI.Reflex
                 return;
             }
 
-            for (int i = 0; i < _childParticles.Length; i++)
+            for (int i = 0; i < _childParticles.Length; ++i)
             {
                 ParticleSystem system = _childParticles[i];
                 if (system == null)

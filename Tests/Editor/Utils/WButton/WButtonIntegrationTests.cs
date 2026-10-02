@@ -126,7 +126,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             UnityEditor.Editor editor = Track(UnityEditor.Editor.CreateEditor(target));
             WButtonEditorHelper helper = new WButtonEditorHelper();
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 Assert.DoesNotThrow(
                     () =>
@@ -853,7 +853,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 new List<WButtonMethodContext> { context }
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 Assert.DoesNotThrow(
                     () => helper.DrawAllButtonsAndProcessInvocations(editor),
@@ -917,7 +917,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
 
             System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 helper.DrawAllButtonsAndProcessInvocations(editor);
             }
@@ -940,7 +940,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             UnityEditor.Editor editor = Track(UnityEditor.Editor.CreateEditor(target));
             WButtonEditorHelper helper = new WButtonEditorHelper();
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 Assert.DoesNotThrow(
                     () =>
@@ -957,7 +957,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         [Test]
         public void MemoryDoesNotLeakAcrossEditorSessions()
         {
-            for (int session = 0; session < 10; session++)
+            for (int session = 0; session < 10; ++session)
             {
                 IntegrationTargetSimple target = Track(
                     ScriptableObject.CreateInstance<IntegrationTargetSimple>()
@@ -965,7 +965,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 UnityEditor.Editor editor = Track(UnityEditor.Editor.CreateEditor(target));
                 WButtonEditorHelper helper = new WButtonEditorHelper();
 
-                for (int i = 0; i < 50; i++)
+                for (int i = 0; i < 50; ++i)
                 {
                     helper.DrawAllButtonsAndProcessInvocations(editor);
                 }

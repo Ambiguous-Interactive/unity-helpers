@@ -80,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 GenericMenu menu = new();
                 int optionsLength = options.Length;
-                for (int i = 0; i < optionsLength; i++)
+                for (int i = 0; i < optionsLength; ++i)
                 {
                     int capturedIndex = i;
                     bool isSelected = i == currentIndex && !property.hasMultipleDifferentValues;
@@ -803,7 +803,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return _options[optionIndex] ?? string.Empty;
             }
 
-            protected override string GetDefaultValue() => string.Empty;
+            protected override string GetDefaultValue()
+            {
+                return string.Empty;
+            }
 
             protected override bool MatchesSearch(int optionIndex, string searchTerm)
             {
@@ -961,7 +964,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _serializedObject.Update();
 
                 int newIndex = arrayProperty.arraySize;
-                arrayProperty.arraySize++;
+                ++arrayProperty.arraySize;
                 SerializedProperty newElement = arrayProperty.GetArrayElementAtIndex(newIndex);
                 if (newElement.propertyType == SerializedPropertyType.String)
                 {
@@ -1063,7 +1066,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 if (arrayProperty != null)
                 {
                     int size = arrayProperty.arraySize;
-                    for (int i = 0; i < size; i++)
+                    for (int i = 0; i < size; ++i)
                     {
                         _indices.Add(i);
                     }

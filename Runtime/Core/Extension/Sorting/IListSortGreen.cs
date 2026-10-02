@@ -97,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int leftTrim = left;
             while (leftTrim <= mid && comparer.Compare(array[leftTrim], array[mid + 1]) <= 0)
             {
-                leftTrim++;
+                ++leftTrim;
             }
 
             int rightTrim = right;

@@ -72,7 +72,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 foreach (string declaration in pair.Value)
                 {
-                    count++;
+                    ++count;
                     builder.Append("\n  ");
                     builder.Append(pair.Key);
                     builder.Append(": ");

@@ -110,7 +110,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.AreEqual(preWarmCount * 2, callOrder.Count);
 
-            for (int i = 0; i < preWarmCount; i++)
+            for (int i = 0; i < preWarmCount; ++i)
             {
                 int getIndex = i * 2;
                 int releaseIndex = i * 2 + 1;
@@ -305,7 +305,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreSame(Array.Empty<int>(), zeroA);
             Assert.AreSame(zeroA, zeroB);
 
-            for (int i = 0; i < 32; i++)
+            for (int i = 0; i < 32; ++i)
             {
                 using PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
                     0,
@@ -328,7 +328,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             HashSet<int> smallHashes = new();
             HashSet<int> largeHashes = new();
 
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < iterations; ++i)
             {
                 using PooledArray<int> small = WallstopFastArrayPool<int>.Get(
                     smallSize,
@@ -344,7 +344,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 largeHashes.Add(RuntimeHelpers.GetHashCode(largeArray));
             }
 
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < iterations; ++i)
             {
                 using PooledArray<int> small = WallstopFastArrayPool<int>.Get(
                     smallSize,
@@ -361,7 +361,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 );
             }
 
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < iterations; ++i)
             {
                 using PooledArray<int> large = WallstopFastArrayPool<int>.Get(
                     largeSize,
@@ -452,7 +452,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             using (PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(size, out int[] array))
             {
-                for (int i = 0; i < size; i++)
+                for (int i = 0; i < size; ++i)
                 {
                     array[i] = i + 1;
                 }
@@ -462,7 +462,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 size,
                 out int[] reused
             );
-            for (int i = 0; i < size; i++)
+            for (int i = 0; i < size; ++i)
             {
                 Assert.AreEqual(i + 1, reused[i]);
             }
@@ -477,7 +477,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             try
             {
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < count; ++i)
                 {
                     PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(size, out int[] array);
                     pooledArrays.Add(pooled);
@@ -569,7 +569,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             const int maxSize = 100;
             IRandom random = new PcgRandom(42);
 
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < iterations; ++i)
             {
                 int size = random.Next(1, maxSize);
                 using PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
@@ -579,7 +579,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
                 Assert.AreEqual(size, array.Length);
 
-                for (int j = 0; j < Math.Min(10, size); j++)
+                for (int j = 0; j < Math.Min(10, size); ++j)
                 {
                     array[j] = random.Next();
                 }
@@ -602,7 +602,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int[][] allocatedArrays = new int[arrayCount][];
 
             List<PooledArray<int>> pooledArrays = new();
-            for (int i = 0; i < arrayCount; i++)
+            for (int i = 0; i < arrayCount; ++i)
             {
                 PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
                     arraySize,
@@ -668,7 +668,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int[][] allocatedArrays = new int[arrayCount][];
             List<PooledArray<int>> pooledArrays = new();
 
-            for (int i = 0; i < arrayCount; i++)
+            for (int i = 0; i < arrayCount; ++i)
             {
                 PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
                     arraySize,
@@ -876,7 +876,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             ConcurrentQueue<ScenarioException> exceptions = new();
             Task[] tasks = new Task[scenario.ThreadCount];
 
-            for (int t = 0; t < scenario.ThreadCount; t++)
+            for (int t = 0; t < scenario.ThreadCount; ++t)
             {
                 int threadId = t;
                 tasks[t] = Task.Run(async () =>
@@ -961,7 +961,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                             $"DifferentSizes thread {threadId} iteration {i} expected length {size}"
                         );
 
-                        for (int j = 0; j < Math.Min(5, size); j++)
+                        for (int j = 0; j < Math.Min(5, size); ++j)
                         {
                             array[j] = threadId * 1000 + i * 10 + j;
                         }
@@ -1001,7 +1001,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                             $"SameSize thread {threadId} iteration {i} expected length {arraySize}"
                         );
 
-                        for (int j = 0; j < arraySize; j++)
+                        for (int j = 0; j < arraySize; ++j)
                         {
                             Assert.AreEqual(
                                 0,
@@ -1046,7 +1046,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                             $"MixedSizes thread {threadId} iteration {i} expected length {size}"
                         );
 
-                        for (int j = 0; j < size; j++)
+                        for (int j = 0; j < size; ++j)
                         {
                             Assert.AreEqual(
                                 0,
@@ -1096,7 +1096,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                             $"RapidAllocation thread {threadId} iteration {i} expected length {size}"
                         );
 
-                        for (int j = 0; j < size; j++)
+                        for (int j = 0; j < size; ++j)
                         {
                             array[j] = (byte)(threadId + i + j);
                         }
@@ -1125,7 +1125,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     int[] threadSizes = { baseSize, baseSize + 3, baseSize + 6 };
                     List<PooledArray<int>> rentals = new();
 
-                    for (int i = 0; i < allocationsPerThread; i++)
+                    for (int i = 0; i < allocationsPerThread; ++i)
                     {
                         int size = threadSizes[i % threadSizes.Length];
                         PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
@@ -1207,7 +1207,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                             $"ArrayPoolClear thread {threadId} iteration {i} expected length {arraySize}"
                         );
 
-                        for (int j = 0; j < arraySize; j++)
+                        for (int j = 0; j < arraySize; ++j)
                         {
                             Assert.AreEqual(
                                 0,
@@ -1251,7 +1251,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                             $"ArrayPoolMixedSizes thread {threadId} iteration {i} expected length {size}"
                         );
 
-                        for (int j = 0; j < size; j++)
+                        for (int j = 0; j < size; ++j)
                         {
                             Assert.AreEqual(
                                 0,
@@ -1294,7 +1294,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             List<Exception> exceptions = new();
             Barrier barrier = new(threadCount);
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 int threadId = t;
                 tasks[t] = Task.Run(() =>
@@ -1342,7 +1342,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             List<Exception> exceptions = new();
             int completedThreads = 0;
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 int threadId = t;
                 tasks[t] = Task.Run(() =>
@@ -1360,7 +1360,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
                             Assert.AreEqual(size, array.Length);
 
-                            for (int j = 0; j < Math.Min(10, size); j++)
+                            for (int j = 0; j < Math.Min(10, size); ++j)
                             {
                                 array[j] = threadId * 1000.0f + i + j * 0.1f;
                             }
@@ -1945,7 +1945,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             const int size = 10;
             using (PooledArray<int> pooled = WallstopArrayPool<int>.Get(size, out int[] array))
             {
-                for (int i = 0; i < size; i++)
+                for (int i = 0; i < size; ++i)
                 {
                     array[i] = i + 1;
                 }
@@ -1955,7 +1955,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 size,
                 out int[] reused
             );
-            for (int i = 0; i < size; i++)
+            for (int i = 0; i < size; ++i)
             {
                 Assert.AreEqual(0, reused[i]);
             }
@@ -1980,7 +1980,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             try
             {
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < 3; ++i)
                 {
                     PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(size, out int[] array);
                     arrays.Add(array);
@@ -2062,7 +2062,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 out int[] buffer
             );
 
-            for (int i = 0; i < requestedSize; i++)
+            for (int i = 0; i < requestedSize; ++i)
             {
                 Assert.AreEqual(0, buffer[i]);
             }
@@ -2154,12 +2154,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 out int[] buffer
             );
 
-            for (int i = 0; i < pooled.length; i++)
+            for (int i = 0; i < pooled.length; ++i)
             {
                 buffer[i] = i * 2;
             }
 
-            for (int i = 0; i < pooled.length; i++)
+            for (int i = 0; i < pooled.length; ++i)
             {
                 Assert.AreEqual(i * 2, buffer[i]);
             }
@@ -2207,7 +2207,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Assert.AreEqual(size, pooled.length);
                 Assert.GreaterOrEqual(buffer.Length, size);
 
-                for (int i = 0; i < pooled.length; i++)
+                for (int i = 0; i < pooled.length; ++i)
                 {
                     buffer[i] = (byte)(i % 256);
                 }
@@ -2419,7 +2419,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     out PoolRootProbe[] buffer
                 );
                 rented = buffer;
-                for (int i = 0; i < buffer.Length; i++)
+                for (int i = 0; i < buffer.Length; ++i)
                 {
                     buffer[i] = new PoolRootProbe();
                 }
@@ -2430,7 +2430,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 out PoolRootProbe[] reused
             );
             Assert.AreSame(rented, reused);
-            for (int i = 0; i < reused.Length; i++)
+            for (int i = 0; i < reused.Length; ++i)
             {
                 Assert.IsTrue(
                     reused[i] == null,
@@ -2451,7 +2451,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                         out PoolRootProbeHolder[] buffer
                     );
                 rented = buffer;
-                for (int i = 0; i < buffer.Length; i++)
+                for (int i = 0; i < buffer.Length; ++i)
                 {
                     buffer[i] = new PoolRootProbeHolder { probe = new PoolRootProbe(), tag = i };
                 }
@@ -2463,7 +2463,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     out PoolRootProbeHolder[] reused
                 );
             Assert.AreSame(rented, reused);
-            for (int i = 0; i < reused.Length; i++)
+            for (int i = 0; i < reused.Length; ++i)
             {
                 Assert.IsTrue(
                     reused[i].probe == null,
@@ -2488,7 +2488,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                         out PoolBlittableProbe[] buffer
                     );
                 rented = buffer;
-                for (int i = 0; i < buffer.Length; i++)
+                for (int i = 0; i < buffer.Length; ++i)
                 {
                     buffer[i] = new PoolBlittableProbe { value = i + 1 };
                 }
@@ -2525,7 +2525,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             PoolBlittableProbe[] dirtied = System.Buffers.ArrayPool<PoolBlittableProbe>.Shared.Rent(
                 requestedSize
             );
-            for (int i = 0; i < dirtied.Length; i++)
+            for (int i = 0; i < dirtied.Length; ++i)
             {
                 dirtied[i] = new PoolBlittableProbe { value = -1 };
             }
@@ -2538,7 +2538,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 out PoolBlittableProbe[] buffer
             );
             Assert.AreSame(dirtied, buffer);
-            for (int i = 0; i < requestedSize; i++)
+            for (int i = 0; i < requestedSize; ++i)
             {
                 Assert.AreEqual(0, buffer[i].value);
             }

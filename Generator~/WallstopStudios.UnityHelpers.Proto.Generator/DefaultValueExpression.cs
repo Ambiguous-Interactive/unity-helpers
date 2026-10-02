@@ -308,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                                 + BitConverter
                                     .ToInt16(bytes, 6)
                                     .ToString(CultureInfo.InvariantCulture);
-                            for (int index = 8; index < bytes.Length; index++)
+                            for (int index = 8; index < bytes.Length; ++index)
                             {
                                 literal +=
                                     ", (byte)"

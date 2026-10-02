@@ -162,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                     foreach (Type derivedType in allCandidates)
                     {
-                        singletonsProcessed++;
+                        ++singletonsProcessed;
 
                         if (
                             byName.TryGetValue(derivedType.Name, out List<Type> group)
@@ -176,7 +176,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                                 );
                             }
                             // Name collisions are permanently skipped, count as "success" to avoid retry loops
-                            singletonsSucceeded++;
+                            ++singletonsSucceeded;
                             continue;
                         }
 
@@ -255,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             {
                                 anyChanges = true;
                             }
-                            singletonsSucceeded++;
+                            ++singletonsSucceeded;
                             continue;
                         }
 
@@ -269,7 +269,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                                 $"ScriptableObjectSingletonCreator: Singleton target path already occupied at {targetAssetPath}. Skipping creation for {derivedType.FullName}."
                             );
                             // Path is occupied - this is a permanent skip, count as success to avoid retry loops
-                            singletonsSucceeded++;
+                            ++singletonsSucceeded;
                             continue;
                         }
 
@@ -343,7 +343,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         );
                         UpdateSingletonMetadataEntry(derivedType, targetAssetPath);
                         anyChanges = true;
-                        singletonsSucceeded++;
+                        ++singletonsSucceeded;
                     }
 
                     // Clean folders after batching ends so AssetDatabase reflects completed writes.
@@ -502,7 +502,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
             else
             {
-                _consecutiveZeroProgressRetries++;
+                ++_consecutiveZeroProgressRetries;
             }
 
             // Prevents an infinite loop when every remaining singleton is permanently blocked.
@@ -524,7 +524,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return;
             }
 
-            _retryAttempts++;
+            ++_retryAttempts;
 
             _ensureScheduled = true;
             EditorApplication.delayCall += RunScheduledEnsure;
@@ -658,7 +658,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     LogVerbose(
                         $"ScriptableObjectSingletonCreator: Deleted duplicate singleton asset for {type.FullName} at '{assetPath}' (identical to canonical at '{canonicalAssetPath}')."
                     );
-                    removed++;
+                    ++removed;
 
                     if (
                         !string.IsNullOrWhiteSpace(parentFolder)
@@ -1397,7 +1397,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
 
             int partsLength = parts.Length;
-            for (int i = 1; i < partsLength; i++)
+            for (int i = 1; i < partsLength; ++i)
             {
                 string desiredName = parts[i];
 
@@ -1598,7 +1598,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
 
             int partsLength = parts.Length;
-            for (int i = 1; i < partsLength; i++)
+            for (int i = 1; i < partsLength; ++i)
             {
                 string desired = parts[i];
 

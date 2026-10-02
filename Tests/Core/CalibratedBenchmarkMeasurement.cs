@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             double[] logs = new double[referenceMilliseconds.Length];
             bool completeBatches = logs.Length % BenchmarkProtocol.CyclesPerBatch == 0;
             bool sufficient = 32 <= logs.Length && completeBatches;
-            for (int index = 0; index < logs.Length; index++)
+            for (int index = 0; index < logs.Length; ++index)
             {
                 double reference = referenceMilliseconds[index];
                 double subject = subjectMilliseconds[index];
@@ -184,18 +184,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             uint state = unchecked((uint)seed) | 1;
             double[] ratios = new double[BootstrapRepetitions];
-            for (int repetition = 0; repetition < ratios.Length; repetition++)
+            for (int repetition = 0; repetition < ratios.Length; ++repetition)
             {
                 double sum = 0;
                 // Preserve correlation inside each counterbalanced batch by resampling whole batches.
                 int batches = logs.Length / BenchmarkProtocol.CyclesPerBatch;
-                for (int batch = 0; batch < batches; batch++)
+                for (int batch = 0; batch < batches; ++batch)
                 {
                     state ^= state << 13;
                     state ^= state >> 17;
                     state ^= state << 5;
                     int offset = (int)(state % (uint)batches) * BenchmarkProtocol.CyclesPerBatch;
-                    for (int cycle = 0; cycle < BenchmarkProtocol.CyclesPerBatch; cycle++)
+                    for (int cycle = 0; cycle < BenchmarkProtocol.CyclesPerBatch; ++cycle)
                     {
                         sum += logs[offset + cycle];
                     }
@@ -313,7 +313,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 Array.Sort(sorted);
                 Median = Quantile(sorted, 0.5);
                 P95 = Quantile(sorted, 0.95);
-                for (int index = 0; index < sorted.Length; index++)
+                for (int index = 0; index < sorted.Length; ++index)
                 {
                     sorted[index] = Math.Abs(sorted[index] - Median);
                 }

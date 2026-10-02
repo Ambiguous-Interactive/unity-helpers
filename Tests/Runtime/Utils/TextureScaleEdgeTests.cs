@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             TextureScale.Point(texture, 2, 2);
             Color[] afterPoint = texture.GetPixels();
-            for (int i = 0; i < before.Length; i++)
+            for (int i = 0; i < before.Length; ++i)
             {
                 Assert.That(afterPoint[i].r, Is.EqualTo(before[i].r).Within(1e-5f));
                 Assert.That(afterPoint[i].g, Is.EqualTo(before[i].g).Within(1e-5f));
@@ -109,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             TextureScale.Bilinear(texture, 2, 2);
             Color[] afterBilinear = texture.GetPixels();
-            for (int i = 0; i < before.Length; i++)
+            for (int i = 0; i < before.Length; ++i)
             {
                 Assert.That(afterBilinear[i].r, Is.EqualTo(before[i].r).Within(1e-5f));
                 Assert.That(afterBilinear[i].g, Is.EqualTo(before[i].g).Within(1e-5f));

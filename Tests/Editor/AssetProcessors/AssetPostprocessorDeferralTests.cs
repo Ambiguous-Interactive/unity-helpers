@@ -83,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 Action action = null;
                 action = () =>
                 {
-                    callCount++;
+                    ++callCount;
                     remaining--;
                     if (0 < remaining)
                     {
@@ -123,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 Action action = null;
                 action = () =>
                 {
-                    callCount++;
+                    ++callCount;
                     AssetPostprocessorDeferral.Schedule(CreateNeverTerminatingAction());
                 };
                 return action;
@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             Action drain = null;
             drain = () =>
             {
-                callCount++;
+                ++callCount;
                 remaining--;
                 if (0 < remaining)
                 {
@@ -324,7 +324,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             public void Drain()
             {
-                CallCount++;
+                ++CallCount;
             }
         }
     }

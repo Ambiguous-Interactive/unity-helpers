@@ -69,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static long MeasurePlanned(BulkNode value, ref byte[] buffer, int iterations)
         {
             long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < iterations; iteration++)
+            for (int iteration = 0; iteration < iterations; ++iteration)
             {
                 WProtoWriteResult result = WProtoFacade.Serialize(value, ref buffer);
                 if (!result.Served || result.Resized)
@@ -89,7 +89,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         )
         {
             long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < iterations; iteration++)
+            for (int iteration = 0; iteration < iterations; ++iteration)
             {
                 _ = formatter.Measure(value);
                 WProtoWriter writer = new WProtoWriter(buffer);
@@ -335,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 byte[] plannedBuffer = new byte[size];
                 byte[] baselineBuffer = new byte[size];
 
-                for (int iteration = 0; iteration < 100; iteration++)
+                for (int iteration = 0; iteration < 100; ++iteration)
                 {
                     _ = WProtoFacade.Serialize(value, ref plannedBuffer);
                     _ = formatter.Measure(value);
@@ -435,7 +435,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             public bool Write(ref WProtoWriter writer, in RawPayload value)
             {
                 PayloadStart = writer.Position;
-                for (int index = 0; index < value.Length; index++)
+                for (int index = 0; index < value.Length; ++index)
                 {
                     if (!writer.TryWriteVarint32(0))
                     {
@@ -501,7 +501,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             public bool Write(ref WProtoWriter writer, in Node value)
             {
-                for (int index = 0; index < value.PayloadLength; index++)
+                for (int index = 0; index < value.PayloadLength; ++index)
                 {
                     if (!writer.TryWriteVarint32(0))
                     {
@@ -646,7 +646,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             public bool Write(ref WProtoWriter writer, in RawPayload value)
             {
-                for (int index = 0; index < value.Length; index++)
+                for (int index = 0; index < value.Length; ++index)
                 {
                     if (!writer.TryWriteVarint32(0))
                     {

@@ -667,13 +667,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             PoolPurgeSettings.ClearBuiltInTypeConfigurations();
 
             System.Threading.Thread[] threads = new System.Threading.Thread[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 threads[t] = new System.Threading.Thread(() =>
                 {
                     try
                     {
-                        for (int i = 0; i < iterationsPerThread; i++)
+                        for (int i = 0; i < iterationsPerThread; ++i)
                         {
                             PoolPurgeEffectiveOptions options =
                                 PoolPurgeSettings.GetEffectiveOptions<List<int>>();
@@ -697,12 +697,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 });
             }
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 threads[t].Start();
             }
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 threads[t].Join(TimeSpan.FromSeconds(30));
             }

@@ -475,7 +475,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static void CloseAll(Writer writer, int count)
         {
-            for (int closed = 0; closed < count; closed++)
+            for (int closed = 0; closed < count; ++closed)
             {
                 Close(writer);
             }
@@ -938,7 +938,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 writer.Line("if (" + Access + " != null)" + Writer.Open);
                 writer.Indent();
-                open++;
+                ++open;
             }
 
             if (IsArray)
@@ -956,7 +956,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + Writer.Open
                 );
                 writer.Indent();
-                open++;
+                ++open;
                 writer.Line(
                     _elementQualified
                         + " "
@@ -981,7 +981,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + Writer.Open
                 );
                 writer.Indent();
-                open++;
+                ++open;
             }
 
             if (_elementIsReference)
@@ -1088,7 +1088,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 writer.Line("if (" + guard + ")" + Writer.Open);
                 writer.Indent();
-                open++;
+                ++open;
             }
 
             // Packed scalars cannot recurse and must retain the enclosing nesting depth.

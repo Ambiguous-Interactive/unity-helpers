@@ -216,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             float sum = 0f;
-            for (int index = 0; index < iterations; index++)
+            for (int index = 0; index < iterations; ++index)
             {
                 sum += random.NextFloat(min, max);
             }

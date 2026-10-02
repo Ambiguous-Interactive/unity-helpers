@@ -59,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             DisjointSet ds = new(5);
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 Assert.IsTrue(ds.TryFind(i, out int rep));
                 Assert.AreEqual(i, rep);
@@ -334,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void TryGetSetSizeForCompletelyConnectedSet()
         {
             DisjointSet ds = new(10);
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 9; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(i, i + 1));
             }
@@ -520,7 +520,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             ds.Reset();
 
             Assert.AreEqual(5, ds.SetCount);
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 Assert.IsTrue(ds.TryGetSetSize(i, out int size));
                 Assert.AreEqual(1, size);
@@ -531,7 +531,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ResetFromCompletelyConnected()
         {
             DisjointSet ds = new(10);
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 9; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(i, i + 1));
             }
@@ -580,7 +580,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             DisjointSet ds = new(1000);
 
-            for (int i = 0; i < 999; i++)
+            for (int i = 0; i < 999; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(i, i + 1));
             }
@@ -595,7 +595,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             DisjointSet ds = new(100);
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(i * 2, i * 2 + 1));
             }
@@ -608,7 +608,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             DisjointSet ds = new(10);
 
-            for (int i = 1; i < 10; i++)
+            for (int i = 1; i < 10; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(0, i));
             }
@@ -623,7 +623,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             DisjointSet ds = new(10);
 
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 9; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(i, i + 1));
             }
@@ -725,7 +725,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 if (ds.TryUnion(u, v))
                 {
-                    edgesAdded++;
+                    ++edgesAdded;
                 }
             }
 
@@ -769,12 +769,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int topSentinel = 24;
             int bottomSentinel = 25;
 
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 4; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(topSentinel, i));
             }
 
-            for (int i = 20; i < 24; i++)
+            for (int i = 20; i < 24; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(bottomSentinel, i));
             }
@@ -795,7 +795,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             DisjointSet ds = new(1000);
             IRandom rng = new PcgRandom(42);
 
-            for (int i = 0; i < 5000; i++)
+            for (int i = 0; i < 5000; ++i)
             {
                 int x = rng.Next(1000);
                 int y = rng.Next(1000);
@@ -990,7 +990,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<int> elements = Enumerable.Range(0, 1000).ToList();
             DisjointSet<int> ds = new(elements);
 
-            for (int i = 0; i < 999; i++)
+            for (int i = 0; i < 999; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(i, i + 1));
             }
@@ -1086,7 +1086,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             DisjointSet ds = new(20);
             Assert.AreEqual(20, ds.Count);
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(i, i + 1));
             }
@@ -1102,12 +1102,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             DisjointSet ds = new(100);
 
-            for (int i = 0; i < 99; i++)
+            for (int i = 0; i < 99; ++i)
             {
                 Assert.IsTrue(ds.TryUnion(i, i + 1));
             }
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 Assert.IsTrue(ds.TryFind(i, out _));
             }

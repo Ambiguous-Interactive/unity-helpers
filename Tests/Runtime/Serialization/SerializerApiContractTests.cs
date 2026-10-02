@@ -28,8 +28,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private static readonly Type SerializerType = typeof(Serializer);
 
-        private static bool IsDataParameter(ParameterInfo p) =>
-            p.ParameterType == typeof(byte[]) || p.ParameterType == typeof(string);
+        private static bool IsDataParameter(ParameterInfo p)
+        {
+            return p.ParameterType == typeof(byte[]) || p.ParameterType == typeof(string);
+        }
 
         private static bool IsDeserializeMethod(MethodInfo m)
         {
@@ -161,7 +163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
                 object[] args = new object[parameters.Length];
                 args[0] = null;
-                for (int i = 1; i < parameters.Length; i++)
+                for (int i = 1; i < parameters.Length; ++i)
                 {
                     ParameterInfo p = parameters[i];
                     // Use a valid codec so Unknown configuration errors cannot masquerade as null-payload failures.

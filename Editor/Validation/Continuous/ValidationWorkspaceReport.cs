@@ -26,18 +26,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             int failures = 0;
             int suppressed = 0;
             int casesLength = cases.Length;
-            for (int index = 0; index < casesLength; index++)
+            for (int index = 0; index < casesLength; ++index)
             {
                 ValidationFinding finding = run.Findings[index];
                 bool skipped = effective.IsSuppressed(in finding);
                 bool failed = !skipped && threshold <= finding.Severity;
                 if (skipped)
                 {
-                    suppressed++;
+                    ++suppressed;
                 }
                 else if (failed)
                 {
-                    failures++;
+                    ++failures;
                 }
 
                 using PooledResource<StringBuilder> textLease = Buffers.StringBuilder.Get(
@@ -106,7 +106,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 );
                 foreach (string item in cases)
                     writer.WriteRaw(item);
-                for (int index = 0; index < run.Failures.Count; index++)
+                for (int index = 0; index < run.Failures.Count; ++index)
                     WriteError(writer, run.Failures[index].ToString());
                 if (incomplete)
                     WriteError(

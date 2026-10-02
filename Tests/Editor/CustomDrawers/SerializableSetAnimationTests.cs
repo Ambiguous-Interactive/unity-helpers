@@ -171,11 +171,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 if (0.01f < offset)
                 {
-                    positiveCount++;
+                    ++positiveCount;
                 }
                 else if (offset < -0.01f)
                 {
-                    negativeCount++;
+                    ++negativeCount;
                 }
             }
 
@@ -751,7 +751,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             const double currentTime = 2.7d;
             const int cycleLimit = 3;
 
-            for (int arrayIndex = 0; arrayIndex < 20; arrayIndex++)
+            for (int arrayIndex = 0; arrayIndex < 20; ++arrayIndex)
             {
                 float setOffset = SerializableSetPropertyDrawer.EvaluateDuplicateShakeOffset(
                     arrayIndex,

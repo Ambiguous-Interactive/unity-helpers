@@ -172,15 +172,25 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int WireType => WProtoWireType.Varint;
 
-            public bool IsDefault(in int value) => value == 0;
+            public bool IsDefault(in int value)
+            {
+                return value == 0;
+            }
 
-            public int MeasureValue(in int value) => WProtoSizes.Int32Size(value);
+            public int MeasureValue(in int value)
+            {
+                return WProtoSizes.Int32Size(value);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in int value) =>
-                writer.TryWriteInt32(value);
+            public bool WriteValue(ref WProtoWriter writer, in int value)
+            {
+                return writer.TryWriteInt32(value);
+            }
 
-            public bool TryReadValue(ref WProtoReader reader, out int value) =>
-                reader.TryReadInt32(out value);
+            public bool TryReadValue(ref WProtoReader reader, out int value)
+            {
+                return reader.TryReadInt32(out value);
+            }
         }
 
         private sealed class EnumFormatter<T> : IWProtoScalarFormatter<T>
@@ -197,17 +207,24 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _signed = signed;
             }
 
-            public bool IsDefault(in T value) => Numeric(value) == 0;
+            public bool IsDefault(in T value)
+            {
+                return Numeric(value) == 0;
+            }
 
-            public int MeasureValue(in T value) =>
-                _size == 8
+            public int MeasureValue(in T value)
+            {
+                return _size == 8
                     ? WProtoSizes.Int64Size(Numeric(value))
                     : WProtoSizes.Int32Size(unchecked((int)Numeric(value)));
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in T value) =>
-                _size == 8
+            public bool WriteValue(ref WProtoWriter writer, in T value)
+            {
+                return _size == 8
                     ? writer.TryWriteInt64(Numeric(value))
                     : writer.TryWriteInt32(unchecked((int)Numeric(value)));
+            }
 
             public bool TryReadValue(ref WProtoReader reader, out T value)
             {
@@ -284,45 +301,75 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int WireType => WProtoWireType.Varint;
 
-            public bool IsDefault(in long value) => value == 0;
+            public bool IsDefault(in long value)
+            {
+                return value == 0;
+            }
 
-            public int MeasureValue(in long value) => WProtoSizes.Int64Size(value);
+            public int MeasureValue(in long value)
+            {
+                return WProtoSizes.Int64Size(value);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in long value) =>
-                writer.TryWriteInt64(value);
+            public bool WriteValue(ref WProtoWriter writer, in long value)
+            {
+                return writer.TryWriteInt64(value);
+            }
 
-            public bool TryReadValue(ref WProtoReader reader, out long value) =>
-                reader.TryReadInt64(out value);
+            public bool TryReadValue(ref WProtoReader reader, out long value)
+            {
+                return reader.TryReadInt64(out value);
+            }
         }
 
         private sealed class UInt32Formatter : IWProtoScalarFormatter<uint>
         {
             public int WireType => WProtoWireType.Varint;
 
-            public bool IsDefault(in uint value) => value == 0;
+            public bool IsDefault(in uint value)
+            {
+                return value == 0;
+            }
 
-            public int MeasureValue(in uint value) => WProtoSizes.Varint32Size(value);
+            public int MeasureValue(in uint value)
+            {
+                return WProtoSizes.Varint32Size(value);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in uint value) =>
-                writer.TryWriteVarint32(value);
+            public bool WriteValue(ref WProtoWriter writer, in uint value)
+            {
+                return writer.TryWriteVarint32(value);
+            }
 
-            public bool TryReadValue(ref WProtoReader reader, out uint value) =>
-                reader.TryReadVarint32(out value);
+            public bool TryReadValue(ref WProtoReader reader, out uint value)
+            {
+                return reader.TryReadVarint32(out value);
+            }
         }
 
         private sealed class UInt64Formatter : IWProtoScalarFormatter<ulong>
         {
             public int WireType => WProtoWireType.Varint;
 
-            public bool IsDefault(in ulong value) => value == 0;
+            public bool IsDefault(in ulong value)
+            {
+                return value == 0;
+            }
 
-            public int MeasureValue(in ulong value) => WProtoSizes.Varint64Size(value);
+            public int MeasureValue(in ulong value)
+            {
+                return WProtoSizes.Varint64Size(value);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in ulong value) =>
-                writer.TryWriteVarint64(value);
+            public bool WriteValue(ref WProtoWriter writer, in ulong value)
+            {
+                return writer.TryWriteVarint64(value);
+            }
 
-            public bool TryReadValue(ref WProtoReader reader, out ulong value) =>
-                reader.TryReadVarint64(out value);
+            public bool TryReadValue(ref WProtoReader reader, out ulong value)
+            {
+                return reader.TryReadVarint64(out value);
+            }
         }
 
         /// <remarks>
@@ -336,12 +383,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int WireType => WProtoWireType.Varint;
 
-            public bool IsDefault(in char value) => value == '\0';
+            public bool IsDefault(in char value)
+            {
+                return value == '\0';
+            }
 
-            public int MeasureValue(in char value) => WProtoSizes.Varint32Size(value);
+            public int MeasureValue(in char value)
+            {
+                return WProtoSizes.Varint32Size(value);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in char value) =>
-                writer.TryWriteVarint32(value);
+            public bool WriteValue(ref WProtoWriter writer, in char value)
+            {
+                return writer.TryWriteVarint32(value);
+            }
 
             public bool TryReadValue(ref WProtoReader reader, out char value)
             {
@@ -360,12 +415,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int WireType => WProtoWireType.Varint;
 
-            public bool IsDefault(in short value) => value == 0;
+            public bool IsDefault(in short value)
+            {
+                return value == 0;
+            }
 
-            public int MeasureValue(in short value) => WProtoSizes.Int32Size(value);
+            public int MeasureValue(in short value)
+            {
+                return WProtoSizes.Int32Size(value);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in short value) =>
-                writer.TryWriteInt32(value);
+            public bool WriteValue(ref WProtoWriter writer, in short value)
+            {
+                return writer.TryWriteInt32(value);
+            }
 
             public bool TryReadValue(ref WProtoReader reader, out short value)
             {
@@ -384,12 +447,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int WireType => WProtoWireType.Varint;
 
-            public bool IsDefault(in ushort value) => value == 0;
+            public bool IsDefault(in ushort value)
+            {
+                return value == 0;
+            }
 
-            public int MeasureValue(in ushort value) => WProtoSizes.Varint32Size(value);
+            public int MeasureValue(in ushort value)
+            {
+                return WProtoSizes.Varint32Size(value);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in ushort value) =>
-                writer.TryWriteVarint32(value);
+            public bool WriteValue(ref WProtoWriter writer, in ushort value)
+            {
+                return writer.TryWriteVarint32(value);
+            }
 
             public bool TryReadValue(ref WProtoReader reader, out ushort value)
             {
@@ -408,12 +479,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int WireType => WProtoWireType.Varint;
 
-            public bool IsDefault(in sbyte value) => value == 0;
+            public bool IsDefault(in sbyte value)
+            {
+                return value == 0;
+            }
 
-            public int MeasureValue(in sbyte value) => WProtoSizes.Int32Size(value);
+            public int MeasureValue(in sbyte value)
+            {
+                return WProtoSizes.Int32Size(value);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in sbyte value) =>
-                writer.TryWriteInt32(value);
+            public bool WriteValue(ref WProtoWriter writer, in sbyte value)
+            {
+                return writer.TryWriteInt32(value);
+            }
 
             public bool TryReadValue(ref WProtoReader reader, out sbyte value)
             {
@@ -432,12 +511,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int WireType => WProtoWireType.Varint;
 
-            public bool IsDefault(in byte value) => value == 0;
+            public bool IsDefault(in byte value)
+            {
+                return value == 0;
+            }
 
-            public int MeasureValue(in byte value) => WProtoSizes.Varint32Size(value);
+            public int MeasureValue(in byte value)
+            {
+                return WProtoSizes.Varint32Size(value);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in byte value) =>
-                writer.TryWriteVarint32(value);
+            public bool WriteValue(ref WProtoWriter writer, in byte value)
+            {
+                return writer.TryWriteVarint32(value);
+            }
 
             public bool TryReadValue(ref WProtoReader reader, out byte value)
             {
@@ -456,45 +543,75 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int WireType => WProtoWireType.Varint;
 
-            public bool IsDefault(in bool value) => !value;
+            public bool IsDefault(in bool value)
+            {
+                return !value;
+            }
 
-            public int MeasureValue(in bool value) => 1;
+            public int MeasureValue(in bool value)
+            {
+                return 1;
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in bool value) =>
-                writer.TryWriteBool(value);
+            public bool WriteValue(ref WProtoWriter writer, in bool value)
+            {
+                return writer.TryWriteBool(value);
+            }
 
-            public bool TryReadValue(ref WProtoReader reader, out bool value) =>
-                reader.TryReadBool(out value);
+            public bool TryReadValue(ref WProtoReader reader, out bool value)
+            {
+                return reader.TryReadBool(out value);
+            }
         }
 
         private sealed class SingleFormatter : IWProtoScalarFormatter<float>
         {
             public int WireType => WProtoWireType.Fixed32;
 
-            public bool IsDefault(in float value) => value == 0f;
+            public bool IsDefault(in float value)
+            {
+                return value == 0f;
+            }
 
-            public int MeasureValue(in float value) => 4;
+            public int MeasureValue(in float value)
+            {
+                return 4;
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in float value) =>
-                writer.TryWriteSingle(value);
+            public bool WriteValue(ref WProtoWriter writer, in float value)
+            {
+                return writer.TryWriteSingle(value);
+            }
 
-            public bool TryReadValue(ref WProtoReader reader, out float value) =>
-                reader.TryReadSingle(out value);
+            public bool TryReadValue(ref WProtoReader reader, out float value)
+            {
+                return reader.TryReadSingle(out value);
+            }
         }
 
         private sealed class DoubleFormatter : IWProtoScalarFormatter<double>
         {
             public int WireType => WProtoWireType.Fixed64;
 
-            public bool IsDefault(in double value) => value == 0d;
+            public bool IsDefault(in double value)
+            {
+                return value == 0d;
+            }
 
-            public int MeasureValue(in double value) => 8;
+            public int MeasureValue(in double value)
+            {
+                return 8;
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in double value) =>
-                writer.TryWriteDouble(value);
+            public bool WriteValue(ref WProtoWriter writer, in double value)
+            {
+                return writer.TryWriteDouble(value);
+            }
 
-            public bool TryReadValue(ref WProtoReader reader, out double value) =>
-                reader.TryReadDouble(out value);
+            public bool TryReadValue(ref WProtoReader reader, out double value)
+            {
+                return reader.TryReadDouble(out value);
+            }
         }
 
         private sealed class StringFormatter : IWProtoScalarFormatter<string>
@@ -502,28 +619,45 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             public int WireType => WProtoWireType.LengthDelimited;
 
             // Empty strings need a tag and zero length; only null is absent.
-            public bool IsDefault(in string value) => value == null;
+            public bool IsDefault(in string value)
+            {
+                return value == null;
+            }
 
-            public int MeasureValue(in string value) => WProtoSizes.StringSize(value);
+            public int MeasureValue(in string value)
+            {
+                return WProtoSizes.StringSize(value);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in string value) =>
-                writer.TryWriteString(value);
+            public bool WriteValue(ref WProtoWriter writer, in string value)
+            {
+                return writer.TryWriteString(value);
+            }
 
-            public bool TryReadValue(ref WProtoReader reader, out string value) =>
-                reader.TryReadString(out value);
+            public bool TryReadValue(ref WProtoReader reader, out string value)
+            {
+                return reader.TryReadString(out value);
+            }
         }
 
         private sealed class BytesFormatter : IWProtoScalarFormatter<byte[]>
         {
             public int WireType => WProtoWireType.LengthDelimited;
 
-            public bool IsDefault(in byte[] value) => value == null;
+            public bool IsDefault(in byte[] value)
+            {
+                return value == null;
+            }
 
-            public int MeasureValue(in byte[] value) =>
-                WProtoSizes.LengthDelimitedSize(value.Length);
+            public int MeasureValue(in byte[] value)
+            {
+                return WProtoSizes.LengthDelimitedSize(value.Length);
+            }
 
-            public bool WriteValue(ref WProtoWriter writer, in byte[] value) =>
-                writer.TryWriteBytes(value);
+            public bool WriteValue(ref WProtoWriter writer, in byte[] value)
+            {
+                return writer.TryWriteBytes(value);
+            }
 
             public bool TryReadValue(ref WProtoReader reader, out byte[] value)
             {

@@ -10,7 +10,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class SquirrelRandomTests : RandomTestBase
     {
-        protected override IRandom NewRandom() => new SquirrelRandom(DeterministicSeedInt);
+        protected override IRandom NewRandom()
+        {
+            return new SquirrelRandom(DeterministicSeedInt);
+        }
 
         protected override double GetDeviationFor(string caller)
         {

@@ -560,7 +560,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int newItem = 1000;
             while (uniqueItems.Contains(newItem))
             {
-                newItem++;
+                ++newItem;
             }
             set.Add(newItem);
 
@@ -1138,7 +1138,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set._items = userOrder;
             set.OnAfterDeserialize();
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 set.OnBeforeSerialize();
                 set.OnAfterDeserialize();
@@ -1157,7 +1157,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set._items = userOrder;
             set.OnAfterDeserialize();
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 set.OnBeforeSerialize();
                 set.OnAfterDeserialize();
@@ -1219,7 +1219,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             SerializableHashSet<string> set = new();
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 bool added = set.Add($"item_{i}");
                 Assert.IsTrue(added);
@@ -1235,7 +1235,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ToArrayLengthMatchesCountForVariousSizes(int size)
         {
             SerializableHashSet<int> set = new();
-            for (int i = 0; i < size; i++)
+            for (int i = 0; i < size; ++i)
             {
                 bool added = set.Add(i);
                 Assert.IsTrue(added);
@@ -1293,7 +1293,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] result = intSet.ToPersistedOrderArray();
 
             Assert.AreEqual(5, result.Length);
-            for (int i = 0; i < existingOrder.Length; i++)
+            for (int i = 0; i < existingOrder.Length; ++i)
             {
                 Assert.AreEqual(existingOrder[i], result[i]);
             }
@@ -1462,7 +1462,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             SerializableHashSet<int> largeSet = new();
             const int count = 10000;
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 largeSet.Add(i);
             }

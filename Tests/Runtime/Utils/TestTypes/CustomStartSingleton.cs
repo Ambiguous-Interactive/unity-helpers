@@ -19,7 +19,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         protected override void Start()
         {
             base.Start();
-            startCallCount++;
+            ++startCallCount;
             started?.Invoke();
         }
     }

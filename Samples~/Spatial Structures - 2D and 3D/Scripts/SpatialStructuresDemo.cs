@@ -26,7 +26,7 @@ namespace Samples.UnityHelpers.SpatialStructures
         {
             IRandom rng = PRNG.Instance;
             List<Vector2> points = new List<Vector2>(pointCount);
-            for (int i = 0; i < pointCount; i++)
+            for (int i = 0; i < pointCount; ++i)
             {
                 float x = rng.NextFloat(-areaSize.x * 0.5f, areaSize.x * 0.5f);
                 float y = rng.NextFloat(-areaSize.y * 0.5f, areaSize.y * 0.5f);

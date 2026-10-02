@@ -760,7 +760,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 yield return new RepeatedContract { Shorts = value };
             }
 
-            for (int step = 0; step < 60; step++)
+            for (int step = 0; step < 60; ++step)
             {
                 yield return new RepeatedContract
                 {
@@ -799,7 +799,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// </remarks>
         private static void AssertMatchesOracle(RepeatedContract value, ref int checks)
         {
-            checks++;
+            ++checks;
             string oracle = OracleHex(value);
             string mine = MineHex(value);
 
@@ -869,7 +869,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             if (expected.Blobs != null)
             {
-                for (int index = 0; index < expected.Blobs.Length; index++)
+                for (int index = 0; index < expected.Blobs.Length; ++index)
                 {
                     CollectionAssert.AreEqual(
                         expected.Blobs[index],
@@ -952,7 +952,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static byte[] Parse(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }

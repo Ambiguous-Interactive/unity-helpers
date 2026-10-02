@@ -78,7 +78,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     }
 
                     array[j] = element;
-                    i++;
+                    ++i;
                 }
             }
 
@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 array[j] = element;
                 gap = i;
-                i++;
+                ++i;
             }
         }
     }

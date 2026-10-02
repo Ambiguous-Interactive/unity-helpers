@@ -139,7 +139,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             }
 
             List<PaletteDictionaryEntrySnapshot> entries = new(keysProperty.arraySize);
-            for (int index = 0; index < keysProperty.arraySize; index++)
+            for (int index = 0; index < keysProperty.arraySize; ++index)
             {
                 SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
                 SerializedProperty valueProperty = valuesProperty.GetArrayElementAtIndex(index);
@@ -216,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             keysProperty.arraySize = entries.Count;
             valuesProperty.arraySize = entries.Count;
 
-            for (int index = 0; index < entries.Count; index++)
+            for (int index = 0; index < entries.Count; ++index)
             {
                 PaletteDictionaryEntrySnapshot entry = entries[index];
                 SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
@@ -274,7 +274,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             int count = Mathf.Max(0, keysProperty.arraySize);
             string[] keys = new string[count];
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 keys[index] = keysProperty.GetArrayElementAtIndex(index).stringValue;
             }
@@ -299,7 +299,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
         private static int FindDictionaryIndex(SerializedProperty keysProperty, string targetKey)
         {
-            for (int index = 0; index < keysProperty.arraySize; index++)
+            for (int index = 0; index < keysProperty.arraySize; ++index)
             {
                 SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
                 if (
@@ -469,7 +469,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                     UnityHelpersSettings.SerializedPropertyNames.SerializableTypeIgnorePatterns
                 );
                 patternsProperty.ClearArray();
-                for (int index = 0; index < backup.Length; index++)
+                for (int index = 0; index < backup.Length; ++index)
                 {
                     patternsProperty.InsertArrayElementAtIndex(index);
                     SerializedProperty element = patternsProperty.GetArrayElementAtIndex(index);
@@ -616,7 +616,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             patterns.ClearArray();
             IReadOnlyList<string> defaults = SerializableTypeCatalog.GetDefaultIgnorePatterns();
-            for (int index = 0; index < defaults.Count; index++)
+            for (int index = 0; index < defaults.Count; ++index)
             {
                 SerializedProperty defaultElement = patterns.AppendArrayElement();
                 defaultElement
@@ -750,7 +750,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             );
 
             List<(string Key, Color Button, Color Text)> originalEntries = new(keys.arraySize);
-            for (int index = 0; index < keys.arraySize; index++)
+            for (int index = 0; index < keys.arraySize; ++index)
             {
                 SerializedProperty keyProperty = keys.GetArrayElementAtIndex(index);
                 SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
@@ -774,7 +774,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             );
             if (legacyPalette != null)
             {
-                for (int index = 0; index < legacyPalette.arraySize; index++)
+                for (int index = 0; index < legacyPalette.arraySize; ++index)
                 {
                     SerializedProperty element = legacyPalette.GetArrayElementAtIndex(index);
                     SerializedProperty keyProperty = element.FindPropertyRelative(
@@ -841,7 +841,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 if (legacyPalette != null)
                 {
                     legacyPalette.arraySize = legacyEntries.Count;
-                    for (int index = 0; index < legacyEntries.Count; index++)
+                    for (int index = 0; index < legacyEntries.Count; ++index)
                     {
                         SerializedProperty element = legacyPalette.GetArrayElementAtIndex(index);
                         (string Key, Color Button, Color Text) originalLegacy = legacyEntries[
@@ -869,7 +869,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
                 keys.arraySize = originalEntries.Count;
                 values.arraySize = originalEntries.Count;
-                for (int index = 0; index < originalEntries.Count; index++)
+                for (int index = 0; index < originalEntries.Count; ++index)
                 {
                     (string Key, Color Button, Color Text) original = originalEntries[index];
                     SerializedProperty keyProperty = keys.GetArrayElementAtIndex(index);

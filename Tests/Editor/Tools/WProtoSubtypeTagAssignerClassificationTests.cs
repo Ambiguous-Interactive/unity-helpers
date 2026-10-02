@@ -80,6 +80,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             return files;
         }
 
+        [TestCase(null, null, TestName = "ManifestOwner.Directory.Null.ReturnsNone")]
+        [TestCase("", null, TestName = "ManifestOwner.Directory.Empty.ReturnsNone")]
+        [TestCase(" ", null, TestName = "ManifestOwner.Directory.Space.ReturnsNone")]
+        [TestCase(
+            "\t\r\n",
+            null,
+            TestName = "ManifestOwner.Directory.ControlWhitespace.ReturnsNone"
+        )]
+        [TestCase(
+            "\u2003",
+            null,
+            TestName = "ManifestOwner.Directory.UnicodeWhitespace.ReturnsNone"
+        )]
+        [TestCase(
+            "Assets/ Game",
+            "Assets/ Game/Game.asmdef",
+            TestName = "ManifestOwner.Directory.LeadingSpace.RemainsLiteral"
+        )]
+        [TestCase(
+            "Assets/Game ",
+            "Assets/Game /Game.asmdef",
+            TestName = "ManifestOwner.Directory.TrailingSpace.RemainsLiteral"
+        )]
+        public void ManifestOwnershipRejectsBlankDirectoriesAndPreservesLiteralSpaces(
+            string directory,
+            string expected
+        )
+        {
+            string claimant = WProtoSubtypeTagManifestFile.AssemblyDefinitionClaiming(
+                directory,
+                new[] { directory + "/Game.asmdef" }
+            );
+            Assert.AreEqual(expected, claimant);
+        }
+
         [Test]
         public void AnOccupiedManifestPathIsUnreadableWithoutThrowing()
         {

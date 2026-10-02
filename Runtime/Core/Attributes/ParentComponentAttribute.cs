@@ -611,7 +611,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     buffer.AddRange(components);
 
                     current = current.parent;
-                    depth++;
+                    ++depth;
                 }
 
                 return buffer;
@@ -685,7 +685,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     }
 
                     current = current.parent;
-                    depth++;
+                    ++depth;
                 }
             }
             finally
@@ -707,7 +707,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             while (current != null && current != target)
             {
                 current = current.parent;
-                depth++;
+                ++depth;
             }
             return current == target ? depth : int.MaxValue;
         }

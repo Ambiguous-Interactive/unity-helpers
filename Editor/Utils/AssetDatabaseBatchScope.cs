@@ -405,7 +405,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 string current = segments[0];
                 int segmentsLength = segments.Length;
-                for (int i = 1; i < segmentsLength; i++)
+                for (int i = 1; i < segmentsLength; ++i)
                 {
                     string next = current + "/" + segments[i];
                     if (
@@ -646,7 +646,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             lock (Lock)
             {
                 int previousDepth = _batchDepth;
-                _batchDepth++;
+                ++_batchDepth;
                 return previousDepth == 0;
             }
         }
@@ -662,11 +662,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             lock (Lock)
             {
                 int previousDepth = _batchDepth;
-                _batchDepth++;
+                ++_batchDepth;
                 bool isOutermost = previousDepth == 0;
                 if (isOutermost)
                 {
-                    _actualUnityBatchDepth++;
+                    ++_actualUnityBatchDepth;
                 }
                 return isOutermost;
             }
@@ -768,7 +768,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             int allowAutoRefreshFailures = 0;
             int stopAssetEditingFailures = 0;
 
-            for (int i = 0; i < depthToCleanup; i++)
+            for (int i = 0; i < depthToCleanup; ++i)
             {
                 try
                 {
@@ -776,7 +776,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
                 catch (Exception allowAutoRefreshException)
                 {
-                    allowAutoRefreshFailures++;
+                    ++allowAutoRefreshFailures;
                     Debug.LogError(
                         $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {nameof(ResetBatchDepth)} (iteration {i + 1}/{depthToCleanup}): {allowAutoRefreshException}"
                     );
@@ -788,7 +788,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
                 catch (Exception stopAssetEditingException)
                 {
-                    stopAssetEditingFailures++;
+                    ++stopAssetEditingFailures;
                     Debug.LogError(
                         $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {nameof(ResetBatchDepth)} (iteration {i + 1}/{depthToCleanup}): {stopAssetEditingException}"
                     );
@@ -935,7 +935,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             lock (Lock)
             {
-                _actualUnityBatchDepth++;
+                ++_actualUnityBatchDepth;
             }
 
             if (!startAssetEditingSucceeded || !disallowAutoRefreshSucceeded)

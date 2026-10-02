@@ -31,7 +31,10 @@ namespace UnityEditor.Overlays
     {
         protected ToolbarOverlay(params string[] ids) { }
 
-        public override VisualElement CreatePanelContent() => null;
+        public override VisualElement CreatePanelContent()
+        {
+            return null;
+        }
     }
 }
 

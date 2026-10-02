@@ -19,26 +19,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class JsonSerializationPerformanceTests
     {
+        private const int BenchmarkTimeoutMilliseconds = 600_000;
+
         private const int Iterations = 10_000;
 
-        private static SmallMsg MakeSmall(int i) => new() { Id = i, Name = "Name_" + i };
+        private static SmallMsg MakeSmall(int i)
+        {
+            return new() { Id = i, Name = "Name_" + i };
+        }
 
-        private static MediumMsg MakeMedium(int i, int len) =>
-            new()
+        private static MediumMsg MakeMedium(int i, int len)
+        {
+            return new()
             {
                 Id = i,
                 Name = new string('x', (i % 17) + 8),
                 Values = MakeIntArray(len, seed: i),
             };
+        }
 
-        private static LargeMsg MakeLarge(int i, int blobSize, int nestedLen) =>
-            new()
+        private static LargeMsg MakeLarge(int i, int blobSize, int nestedLen)
+        {
+            return new()
             {
                 Guid = Guid.NewGuid(),
                 Description = new string('d', (i % 31) + 64),
                 Blob = MakeBytes(blobSize, seed: i),
                 Nested = MakeMedium(i, nestedLen),
             };
+        }
 
         private static void RunSerializeBenchmark<T>(
             string label,
@@ -266,7 +275,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return b;
         }
 
-        [Test, Timeout(0)]
+        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
         public void CompareSerializeSmallMediumLarge()
         {
             UnityEngine.Debug.Log(
@@ -281,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             RunSerializeBenchmark("Large", () => MakeLarge(123, 8 * 1024, 64), out int largeSize);
         }
 
-        [Test, Timeout(0)]
+        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
         public void CompareDeserializeSmallMediumLarge()
         {
             UnityEngine.Debug.Log(
@@ -296,7 +305,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             RunDeserializeBenchmark("Large", MakeLarge(123, 8 * 1024, 64));
         }
 
-        [Test, Timeout(0)]
+        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
         public void BenchmarkStringifyVsSerialize()
         {
             UnityEngine.Debug.Log("| Payload | JsonStringify (ms) | JsonSerialize (ms) | Ratio |");
@@ -307,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             RunStringifyVsSerializeBenchmark("Large", MakeLarge(123, 8 * 1024, 64));
         }
 
-        [Test, Timeout(0)]
+        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
         public void BenchmarkLargeCollectionSerialization()
         {
             MediumMsg msg = MakeMedium(999, 50_000);
@@ -376,7 +385,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             );
         }
 
-        [Test, Timeout(0)]
+        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
         public void BenchmarkDeeplyNestedObjectSerialization()
         {
             MediumMsg root = MakeMedium(0, 10);

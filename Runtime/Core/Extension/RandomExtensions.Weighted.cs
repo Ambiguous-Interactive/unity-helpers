@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 throw new ArgumentException("Weights cannot be empty", nameof(weights));
             }
             double total = 0;
-            for (int i = 0; i < weights.Count; i++)
+            for (int i = 0; i < weights.Count; ++i)
             {
                 float weight = weights[i];
                 if (!float.IsFinite(weight))
@@ -47,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             double r = random.NextDouble() * total;
             double acc = 0;
-            for (int i = 0; i < weights.Count; i++)
+            for (int i = 0; i < weights.Count; ++i)
             {
                 float w = weights[i];
                 if (w <= 0)
@@ -230,7 +230,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             double cumulative = 0d;
             int lastPositiveIndex = 0;
             int weightsLength = weights.Length;
-            for (int weightIndex = 0; weightIndex < weightsLength; weightIndex++)
+            for (int weightIndex = 0; weightIndex < weightsLength; ++weightIndex)
             {
                 double weight = weights[weightIndex];
                 if (!(0d < weight))
@@ -284,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             double bestScore = double.PositiveInfinity;
             int selectedIndex = 0;
             int weightsLength = weights.Length;
-            for (int weightIndex = 0; weightIndex < weightsLength; weightIndex++)
+            for (int weightIndex = 0; weightIndex < weightsLength; ++weightIndex)
             {
                 double score = RaceScore(random.NextDouble(), weights[weightIndex]);
                 if (score < bestScore)
@@ -331,7 +331,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             double bestScore = double.PositiveInfinity;
             int selectedIndex = 0;
             int weightsLength = weights.Length;
-            for (int weightIndex = 0; weightIndex < weightsLength; weightIndex++)
+            for (int weightIndex = 0; weightIndex < weightsLength; ++weightIndex)
             {
                 double score = RaceScore(random.NextDouble(), weights[weightIndex]);
                 if (score < bestScore)
@@ -453,7 +453,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int selectedCount = 0;
             int weightsLength = weights.Length;
-            for (int weightIndex = 0; weightIndex < weightsLength; weightIndex++)
+            for (int weightIndex = 0; weightIndex < weightsLength; ++weightIndex)
             {
                 double score = RaceScore(random.NextDouble(), weights[weightIndex]);
                 if (!(0d < weights[weightIndex]))
@@ -466,7 +466,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     scoreScratch[selectedCount] = score;
                     destination[selectedCount] = weightIndex;
                     SiftWeightedRaceUp(scoreScratch, destination, selectedCount);
-                    selectedCount++;
+                    ++selectedCount;
                     continue;
                 }
 
@@ -653,7 +653,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 if (0d < weight)
                 {
-                    count++;
+                    ++count;
                 }
             }
 
@@ -684,7 +684,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 if (0f < weight)
                 {
-                    count++;
+                    ++count;
                 }
             }
 

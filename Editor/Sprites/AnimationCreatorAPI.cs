@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 int frameCount = frames.Count;
-                for (int index = 0; index < frameCount; index++)
+                for (int index = 0; index < frameCount; ++index)
                 {
                     if (frames[index] == null)
                     {
@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[frameCount];
                 float currentTime = 0f;
 
-                for (int index = 0; index < frameCount; index++)
+                for (int index = 0; index < frameCount; ++index)
                 {
                     keyframes[index].time = currentTime;
                     keyframes[index].value = frames[index];

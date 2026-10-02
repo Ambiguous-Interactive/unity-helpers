@@ -140,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return keyframes;
             }
 
-            for (int i = 0; i < curve.length; i++)
+            for (int i = 0; i < curve.length; ++i)
             {
                 keyframes.Add(CurveKeyframe.FromKeyframe(curve[i]));
             }
@@ -167,7 +167,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             Keyframe[] unityKeyframes = new Keyframe[keyframes.Count];
-            for (int i = 0; i < keyframes.Count; i++)
+            for (int i = 0; i < keyframes.Count; ++i)
             {
                 unityKeyframes[i] = keyframes[i].ToKeyframe();
             }

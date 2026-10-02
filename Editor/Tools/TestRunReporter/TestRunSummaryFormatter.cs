@@ -331,7 +331,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             StringBuilder builder = new(value.Length);
             int valueLength = value.Length;
-            for (int i = 0; i < valueLength; i++)
+            for (int i = 0; i < valueLength; ++i)
             {
                 char character = value[i];
                 if (character != EscapePrefix || value.Length <= i + 1)
@@ -340,7 +340,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     continue;
                 }
 
-                i++;
+                ++i;
                 char escaped = value[i];
                 switch (escaped)
                 {
@@ -472,7 +472,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             int valueLength = value.Length;
-            for (int i = 0; i < valueLength; i++)
+            for (int i = 0; i < valueLength; ++i)
             {
                 char character = value[i];
                 switch (character)
@@ -543,7 +543,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             int index = (int)node.status;
             if (0 <= index && index < counts.Length)
             {
-                counts[index]++;
+                ++counts[index];
             }
         }
 

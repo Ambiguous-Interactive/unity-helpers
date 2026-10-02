@@ -130,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (components is IReadOnlyList<Component> readonlyList)
             {
-                for (int i = 0; i < readonlyList.Count; i++)
+                for (int i = 0; i < readonlyList.Count; ++i)
                 {
                     Assign(readonlyList[i]);
                 }

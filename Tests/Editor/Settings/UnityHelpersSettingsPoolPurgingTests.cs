@@ -761,7 +761,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             finally
             {
                 configurationsProperty.ClearArray();
-                for (int i = 0; i < originalArraySize; i++)
+                for (int i = 0; i < originalArraySize; ++i)
                 {
                     configurationsProperty.InsertArrayElementAtIndex(i);
                 }
@@ -803,7 +803,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             finally
             {
                 configurationsProperty.ClearArray();
-                for (int i = 0; i < originalArraySize; i++)
+                for (int i = 0; i < originalArraySize; ++i)
                 {
                     configurationsProperty.InsertArrayElementAtIndex(i);
                 }
@@ -870,7 +870,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             finally
             {
                 configurationsProperty.ClearArray();
-                for (int i = 0; i < originalArraySize; i++)
+                for (int i = 0; i < originalArraySize; ++i)
                 {
                     configurationsProperty.InsertArrayElementAtIndex(i);
                 }
@@ -929,7 +929,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             finally
             {
                 configurationsProperty.ClearArray();
-                for (int i = 0; i < originalArraySize; i++)
+                for (int i = 0; i < originalArraySize; ++i)
                 {
                     configurationsProperty.InsertArrayElementAtIndex(i);
                 }
@@ -981,7 +981,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 PoolPurgeSettings.ClearTypeConfigurations();
 
                 configurationsProperty.ClearArray();
-                for (int i = 0; i < originalArraySize; i++)
+                for (int i = 0; i < originalArraySize; ++i)
                 {
                     configurationsProperty.InsertArrayElementAtIndex(i);
                 }
@@ -1063,7 +1063,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             finally
             {
                 configurationsProperty.ClearArray();
-                for (int i = 0; i < originalArraySize; i++)
+                for (int i = 0; i < originalArraySize; ++i)
                 {
                     configurationsProperty.InsertArrayElementAtIndex(i);
                 }
@@ -1099,7 +1099,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             finally
             {
                 configurationsProperty.ClearArray();
-                for (int i = 0; i < originalArraySize; i++)
+                for (int i = 0; i < originalArraySize; ++i)
                 {
                     configurationsProperty.InsertArrayElementAtIndex(i);
                 }
@@ -1135,7 +1135,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             finally
             {
                 configurationsProperty.ClearArray();
-                for (int i = 0; i < originalArraySize; i++)
+                for (int i = 0; i < originalArraySize; ++i)
                 {
                     configurationsProperty.InsertArrayElementAtIndex(i);
                 }
@@ -1237,7 +1237,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             finally
             {
                 configurationsProperty.ClearArray();
-                for (int i = 0; i < originalArraySize; i++)
+                for (int i = 0; i < originalArraySize; ++i)
                 {
                     configurationsProperty.InsertArrayElementAtIndex(i);
                 }

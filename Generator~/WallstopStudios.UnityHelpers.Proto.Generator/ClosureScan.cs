@@ -112,7 +112,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return false;
             }
 
-            for (int index = 0; index < arguments.Length; index++)
+            for (int index = 0; index < arguments.Length; ++index)
             {
                 ITypeParameterSymbol parameter = definition.TypeParameters[index];
                 ITypeSymbol argument = arguments[index];
@@ -183,7 +183,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             ITypeSymbol[] closed = new ITypeSymbol[arguments.Count];
-            for (int index = 0; index < arguments.Count; index++)
+            for (int index = 0; index < arguments.Count; ++index)
             {
                 closed[index] = arguments[index];
             }
@@ -300,7 +300,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             ITypeSymbol[] closed = new ITypeSymbol[named.TypeArguments.Length];
-            for (int index = 0; index < closed.Length; index++)
+            for (int index = 0; index < closed.Length; ++index)
             {
                 closed[index] = Substitute(
                     named.TypeArguments[index],

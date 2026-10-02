@@ -287,8 +287,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             );
         }
 
-        internal static string DescribeBytes(int length) =>
-            length switch
+        internal static string DescribeBytes(int length)
+        {
+            return length switch
             {
                 < 0 => "byte[?]",
                 0 => "byte[0]",
@@ -296,9 +297,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     + length.ToString(System.Globalization.CultureInfo.InvariantCulture)
                     + "]",
             };
+        }
 
-        internal static string DescribeString(int length) =>
-            length switch
+        internal static string DescribeString(int length)
+        {
+            return length switch
             {
                 < 0 => "string(len=?)",
                 0 => "string(len=0)",
@@ -306,18 +309,25 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     + length.ToString(System.Globalization.CultureInfo.InvariantCulture)
                     + ")",
             };
+        }
 
-        internal static string DescribeNull(string parameterName) =>
-            string.Equals(parameterName, "data", StringComparison.Ordinal)
-            || string.IsNullOrEmpty(parameterName)
+        internal static string DescribeNull(string parameterName)
+        {
+            return
+                string.Equals(parameterName, "data", StringComparison.Ordinal)
+                || string.IsNullOrEmpty(parameterName)
                 ? "null"
                 : "null " + parameterName;
+        }
 
-        internal static string DescribeEmpty(string parameterName) =>
-            string.Equals(parameterName, "data", StringComparison.Ordinal)
-            || string.IsNullOrEmpty(parameterName)
+        internal static string DescribeEmpty(string parameterName)
+        {
+            return
+                string.Equals(parameterName, "data", StringComparison.Ordinal)
+                || string.IsNullOrEmpty(parameterName)
                 ? "empty"
                 : "empty " + parameterName;
+        }
 
         internal static Type ResolveTypeOrNull(string assemblyQualifiedName)
         {

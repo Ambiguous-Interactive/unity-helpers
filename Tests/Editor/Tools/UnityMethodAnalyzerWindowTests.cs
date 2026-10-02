@@ -434,7 +434,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 AddCompilerDiagnostic($"TestClass{i}.cs");
             }
@@ -610,7 +610,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             AnalysisWaitResult result = default;
             yield return WaitForAnalysisCompletion(window, 10f, r => result = r);
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 yield return null;
                 UnityMethodAnalyzerWindow.FlushMainThreadQueue();
@@ -669,7 +669,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 AddCompilerDiagnostic($"ProgressTest{i}.cs");
             }
@@ -709,7 +709,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
             window._sourcePaths = new List<string> { _tempDir };
 
-            for (int iteration = 0; iteration < 3; iteration++)
+            for (int iteration = 0; iteration < 3; ++iteration)
             {
                 window._isAnalyzing = false;
                 TaskCompletionSource<bool> tcs = new();
@@ -740,7 +740,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 AddCompilerDiagnostic($"LargeTest{i}.cs");
             }
@@ -756,7 +756,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             AnalysisWaitResult result = default;
             yield return WaitForAnalysisCompletion(window, 30f, r => result = r);
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 yield return null;
                 UnityMethodAnalyzerWindow.FlushMainThreadQueue();
@@ -780,7 +780,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 AddCompilerDiagnostic($"Test{i}.cs");
             }
@@ -797,7 +797,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 yield return null;
                 waitTime += Time.deltaTime;
-                frameCount++;
+                ++frameCount;
             }
 
             string statusAfterCancel = window._statusMessage;
@@ -819,7 +819,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < 30; ++i)
             {
                 AddCompilerDiagnostic($"Test{i}.cs");
             }
@@ -837,7 +837,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 yield return null;
                 waitTime += Time.deltaTime;
-                frameCount++;
+                ++frameCount;
             }
 
             bool isAnalyzing = window._isAnalyzing;
@@ -859,7 +859,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < 30; ++i)
             {
                 AddCompilerDiagnostic($"Test{i}.cs");
             }
@@ -877,7 +877,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 yield return null;
                 waitTime += Time.deltaTime;
-                frameCount++;
+                ++frameCount;
             }
 
             bool isAnalyzing = window._isAnalyzing;
@@ -893,7 +893,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < 30; ++i)
             {
                 AddCompilerDiagnostic($"Test{i}.cs");
             }
@@ -911,7 +911,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 yield return null;
                 waitTime += Time.deltaTime;
-                frameCount++;
+                ++frameCount;
             }
 
             bool isAnalyzing = window._isAnalyzing;
@@ -957,7 +957,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 AddCompilerDiagnostic($"Test{i}.cs");
             }
@@ -967,7 +967,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window.StartAnalysis();
             yield return null;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 window.CancelAnalysis();
             }
@@ -978,7 +978,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 yield return null;
                 waitTime += Time.deltaTime;
-                frameCount++;
+                ++frameCount;
             }
 
             bool isAnalyzing = window._isAnalyzing;
@@ -1001,14 +1001,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 AddCompilerDiagnostic($"Test{i}.cs");
             }
 
             window._sourcePaths = new List<string> { _tempDir };
 
-            for (int cycle = 0; cycle < 5; cycle++)
+            for (int cycle = 0; cycle < 5; ++cycle)
             {
                 float waitTime = 0f;
                 while (waitTime < 2f && window._isAnalyzing)
@@ -1028,7 +1028,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 yield return null;
                 finalWait += Time.deltaTime;
-                frameCount++;
+                ++frameCount;
             }
 
             bool isAnalyzing = window._isAnalyzing;
@@ -1509,7 +1509,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window._groupBySeverity = false;
             window._groupByCategory = false;
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 int selection = i % 3;
                 switch (selection)
@@ -1553,7 +1553,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window._groupBySeverity = false;
             window._groupByCategory = false;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 SimulateGroupByClickRaw(
                     window,
@@ -1577,7 +1577,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window._groupBySeverity = true;
             window._groupByCategory = false;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 SimulateGroupByClickRaw(
                     window,
@@ -1604,7 +1604,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window._groupBySeverity = false;
             window._groupByCategory = true;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 SimulateGroupByClickRaw(
                     window,
@@ -1628,9 +1628,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             UnityMethodAnalyzerWindow window = CreateWindow();
 
             string[] states = { "File", "Severity", "Category" };
-            for (int from = 0; from < 3; from++)
+            for (int from = 0; from < 3; ++from)
             {
-                for (int to = 0; to < 3; to++)
+                for (int to = 0; to < 3; ++to)
                 {
                     if (from == to)
                     {
@@ -1815,7 +1815,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < 30; ++i)
             {
                 AddCompilerDiagnostic($"CancelTimeTest{i}.cs");
             }
@@ -1834,7 +1834,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             while (window._isAnalyzing && Time.realtimeSinceStartup - startTime < maxWaitTime)
             {
                 yield return null;
-                frameCount++;
+                ++frameCount;
             }
 
             float elapsedTime = Time.realtimeSinceStartup - startTime;
@@ -1952,7 +1952,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < fileCount; i++)
+            for (int i = 0; i < fileCount; ++i)
             {
                 AddCompilerDiagnostic($"ImmediateTest{i}.cs");
             }
@@ -2151,7 +2151,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
             MethodAnalyzer firstAnalyzer = _window._analyzer;
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 _window.Initialize();
                 Assert.IsTrue(
@@ -2336,7 +2336,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             )
             {
                 yield return null;
-                frameCount++;
+                ++frameCount;
 
                 if (frameCount % 100 == 0)
                 {
@@ -2543,7 +2543,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Task simpleTask = Task.Run(() =>
             {
                 int sum = 0;
-                for (int i = 0; i < 100; i++)
+                for (int i = 0; i < 100; ++i)
                 {
                     sum += i;
                 }
@@ -2643,7 +2643,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < fileCount; i++)
+            for (int i = 0; i < fileCount; ++i)
             {
                 AddCompilerDiagnostic($"FileCountTest{i}.cs");
             }
@@ -2727,7 +2727,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             )
             {
                 yield return null;
-                frameCount++;
+                ++frameCount;
 
                 if (frameCount % 50 == 0)
                 {
@@ -2756,13 +2756,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 if (completionSignaled || noLongerAnalyzing)
                 {
                     yield return null;
-                    frameCount++;
+                    ++frameCount;
                     UnityMethodAnalyzerWindow.FlushMainThreadQueue();
                     break;
                 }
 
                 yield return null;
-                frameCount++;
+                ++frameCount;
             }
 
             float realWaitTime = Time.realtimeSinceStartup - startRealTime;
@@ -2867,7 +2867,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            for (int i = 0; i < fileCount; i++)
+            for (int i = 0; i < fileCount; ++i)
             {
                 AddCompilerDiagnostic($"VaryingTest{i}.cs");
             }

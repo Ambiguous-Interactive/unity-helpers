@@ -123,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 onRelease: item =>
                 {
                     item.WasReset = true;
-                    releaseCount++;
+                    ++releaseCount;
                 },
                 options: new PoolOptions<TestPoolItem>
                 {
@@ -224,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     observedReasons.Add(reason);
                     if (reason == PurgeReason.CapacityExceeded)
                     {
-                        capacityPurgeCount++;
+                        ++capacityPurgeCount;
                     }
                 },
             };
@@ -237,7 +237,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Held simultaneously: a sequential get/dispose would never reach MaxPoolSize.
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 4; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -280,7 +280,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Held simultaneously: a sequential get/dispose would reuse one item.
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -516,7 +516,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < itemCount; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -808,7 +808,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Triggers = PurgeTrigger.OnReturn,
                 OnPurge = (_, _) =>
                 {
-                    purgeCount++;
+                    ++purgeCount;
                     throw new InvalidOperationException("Test exception");
                 },
                 TimeProvider = TestTimeProvider,
@@ -856,7 +856,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -879,7 +879,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -905,7 +905,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Held simultaneously: a sequential get/dispose would reuse one item.
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -948,7 +948,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Peak size only moves while items are held concurrently.
             List<PooledResource<TestPoolItem>> rentedResources = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 rentedResources.Add(pool.Get());
             }
@@ -1185,7 +1185,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 onDisposal: item =>
                 {
                     item.WasDisposed = true;
-                    disposeCount++;
+                    ++disposeCount;
                 },
                 options: new PoolOptions<TestPoolItem>
                 {
@@ -1220,7 +1220,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 onDisposal: item =>
                 {
                     item.WasDisposed = true;
-                    disposeCount++;
+                    ++disposeCount;
                 },
                 options: new PoolOptions<TestPoolItem>
                 {
@@ -1383,7 +1383,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Held simultaneously: a sequential get/dispose would reuse one item.
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -1484,7 +1484,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -1532,7 +1532,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Triggers = PurgeTrigger.OnRent,
                 OnPurge = (_, reason) =>
                 {
-                    purgeCount++;
+                    ++purgeCount;
                     purgeReasons.Add(reason);
                 },
                 TimeProvider = TestTimeProvider,
@@ -1544,7 +1544,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -1829,11 +1829,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             Task[] tasks = new Task[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 tasks[t] = Task.Run(() =>
                 {
-                    for (int i = 0; i < iterations; i++)
+                    for (int i = 0; i < iterations; ++i)
                     {
                         using PooledResource<TestPoolItem> resource = pool.Get(
                             out TestPoolItem item
@@ -1871,11 +1871,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             Task[] tasks = new Task[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 tasks[t] = Task.Run(() =>
                 {
-                    for (int i = 0; i < iterations; i++)
+                    for (int i = 0; i < iterations; ++i)
                     {
                         using PooledResource<TestPoolItem> resource = pool.Get();
                         if (i % 10 == 0)
@@ -1907,12 +1907,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             Task[] tasks = new Task[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 int threadId = t;
                 tasks[t] = Task.Run(() =>
                 {
-                    for (int i = 0; i < iterations; i++)
+                    for (int i = 0; i < iterations; ++i)
                     {
                         if (threadId % 2 == 0)
                         {
@@ -1951,7 +1951,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[0] = Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     pool.MaxPoolSize = i % 20;
                     int _ = pool.MaxPoolSize;
@@ -1960,7 +1960,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[1] = Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     pool.IdleTimeoutSeconds = i * 0.1f;
                     float _ = pool.IdleTimeoutSeconds;
@@ -1969,7 +1969,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[2] = Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     pool.MinRetainCount = i % 5;
                     int _ = pool.MinRetainCount;
@@ -1978,7 +1978,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[3] = Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     pool.Triggers = (PurgeTrigger)(i % 15);
                     PurgeTrigger _ = pool.Triggers;
@@ -2401,7 +2401,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Triggers = PurgeTrigger.OnRent,
                 OnPurge = (_, reason) =>
                 {
-                    purgeCount++;
+                    ++purgeCount;
                     purgeReasons.Add(reason);
                 },
                 TimeProvider = TestTimeProvider,
@@ -2413,7 +2413,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -2502,7 +2502,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 );
 
                 List<PooledResource<TestPoolItem>> resources = new();
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < 5; ++i)
                 {
                     resources.Add(pool.Get());
                 }
@@ -2832,7 +2832,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             while (pool.HasPendingPurges && iterations < 10)
             {
                 totalPurged += pool.Purge();
-                iterations++;
+                ++iterations;
             }
 
             Assert.That(
@@ -3122,7 +3122,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Held simultaneously: a sequential get/dispose would reuse one item.
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -3139,7 +3139,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             _currentTime = 10f;
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -3173,7 +3173,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Held simultaneously: a sequential get/dispose would reuse one item.
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -3221,7 +3221,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Held simultaneously: a sequential get/dispose would reuse one item.
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -3260,7 +3260,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
 
             const int iterations = 100_000;
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < iterations; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -3361,7 +3361,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                         reasons.Add(reason);
                         if (reason == PurgeReason.CapacityExceeded)
                         {
-                            capacityPurges++;
+                            ++capacityPurges;
                         }
                     },
                 }
@@ -3369,7 +3369,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             const int pairs = 5;
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < pairs; i++)
+            for (int i = 0; i < pairs; ++i)
             {
                 resources.Add(pool.Get());
             }
@@ -3420,14 +3420,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                         reasons.Add(reason);
                         if (reason == PurgeReason.CapacityExceeded)
                         {
-                            capacityPurges++;
+                            ++capacityPurges;
                         }
                     },
                 }
             );
 
             List<PooledResource<TestPoolItem>> rented = new();
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 rented.Add(pool.Get());
             }
@@ -3537,7 +3537,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -3578,14 +3578,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     {
                         if (reason == PurgeReason.IdleTimeout)
                         {
-                            idlePurges++;
+                            ++idlePurges;
                         }
                     },
                 }
             );
 
             List<PooledResource<TestPoolItem>> rented = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 rented.Add(pool.Get());
             }
@@ -3641,7 +3641,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> batch = new();
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 4; ++i)
             {
                 batch.Add(pool.Get());
             }

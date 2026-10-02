@@ -395,7 +395,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ChildMultipleTester tester = root.AddComponent<ChildMultipleTester>();
             GameObject current = root;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 GameObject next = new($"ChildDeepLevel{i}", typeof(SpriteRenderer));
                 Track(next);

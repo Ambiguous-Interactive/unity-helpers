@@ -211,8 +211,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         [Obsolete(
             "Use Refresh to read captured compiler diagnostics. Recompile scripts in Unity to update them."
         )]
-        public void Analyze(string rootPath, IEnumerable<string> directories) =>
+        public void Analyze(string rootPath, IEnumerable<string> directories)
+        {
             Refresh(rootPath, directories);
+        }
 
         /// <summary>
         /// Reads the current compiler snapshot with cancellation; this does not start compilation.

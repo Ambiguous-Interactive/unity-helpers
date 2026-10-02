@@ -112,7 +112,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             {
                 return false;
             }
-            for (int index = 0; index < prefixLength; index++)
+            for (int index = 0; index < prefixLength; ++index)
             {
                 if (bytes[index] != prefix[index])
                 {
@@ -204,7 +204,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return false;
             }
             int leftLength = left.Length;
-            for (int index = 0; index < leftLength; index++)
+            for (int index = 0; index < leftLength; ++index)
             {
                 if (left[index] != right[index])
                 {

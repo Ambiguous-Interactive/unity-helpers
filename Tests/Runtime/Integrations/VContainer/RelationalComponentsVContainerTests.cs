@@ -555,7 +555,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
             public void Assign(Component component)
             {
                 LastComponent = component;
-                CallCount++;
+                ++CallCount;
                 component?.AssignRelationalComponents();
             }
 
@@ -579,7 +579,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
                     return;
                 }
 
-                HierarchyCallCount++;
+                ++HierarchyCallCount;
                 Component[] components = root.GetComponentsInChildren<Component>(
                     includeInactiveChildren
                 );

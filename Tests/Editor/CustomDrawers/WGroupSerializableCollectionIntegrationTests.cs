@@ -1236,7 +1236,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 EditorGUI.indentLevel = 0;
 
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < 5; ++i)
                 {
                     GroupGUIWidthUtility.ResetForTests();
                     using (
@@ -3737,7 +3737,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             IntegrationTestWGroupSetHost host =
                 CreateScriptableObject<IntegrationTestWGroupSetHost>();
 
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 host.set.Add(i);
             }

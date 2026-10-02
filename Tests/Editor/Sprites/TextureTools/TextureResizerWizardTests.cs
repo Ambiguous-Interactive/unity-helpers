@@ -598,7 +598,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             EnsureFolder(dir);
             Texture2D t = new(w, h, TextureFormat.RGBA32, false);
             Color[] pix = new Color[w * h];
-            for (int i = 0; i < pix.Length; i++)
+            for (int i = 0; i < pix.Length; ++i)
             {
                 pix[i] = c;
             }
@@ -624,23 +624,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 this.texture = texture;
             }
 
-            public void Add(Texture2D item) => throw new System.NotSupportedException();
-
-            public void Clear() => throw new System.NotSupportedException();
-
-            public bool Contains(Texture2D item) => item == texture;
-
-            public void CopyTo(Texture2D[] array, int arrayIndex) =>
+            public void Add(Texture2D item)
+            {
                 throw new System.NotSupportedException();
+            }
+
+            public void Clear()
+            {
+                throw new System.NotSupportedException();
+            }
+
+            public bool Contains(Texture2D item)
+            {
+                return item == texture;
+            }
+
+            public void CopyTo(Texture2D[] array, int arrayIndex)
+            {
+                throw new System.NotSupportedException();
+            }
 
             public IEnumerator<Texture2D> GetEnumerator()
             {
                 yield return texture;
             }
 
-            public bool Remove(Texture2D item) => throw new System.NotSupportedException();
+            public bool Remove(Texture2D item)
+            {
+                throw new System.NotSupportedException();
+            }
 
-            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
         }
     }
 #endif

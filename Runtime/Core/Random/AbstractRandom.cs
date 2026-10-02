@@ -284,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 if (exclusions.Contains(value))
                 {
-                    excludedCount++;
+                    ++excludedCount;
                 }
             }
 
@@ -1278,7 +1278,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 octaves,
                 out Vector2[] octaveOffsets
             );
-            for (int i = 0; i < octaves; i++)
+            for (int i = 0; i < octaves; ++i)
             {
                 float offsetX = NextFloat(-octaveOffsetRange, octaveOffsetRange);
                 float offsetY = NextFloat(-octaveOffsetRange, octaveOffsetRange);
@@ -1298,7 +1298,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     float amplitude = 1;
                     float frequency = 1;
                     float noiseHeight = 0;
-                    for (int i = 0; i < octaves; i++)
+                    for (int i = 0; i < octaves; ++i)
                     {
                         float sampleX =
                             (x - halfWidth) / scale * frequency + octaveOffsets[i].x + baseOffset.x;
@@ -1766,7 +1766,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             while (enumerator.MoveNext())
             {
-                seen++;
+                ++seen;
                 if (NextUlong(seen) == 0)
                 {
                     selection = enumerator.Current;

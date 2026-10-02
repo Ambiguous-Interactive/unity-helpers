@@ -491,11 +491,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     {
                         if (issue.Severity == IssueSeverity.Critical)
                         {
-                            criticalCount++;
+                            ++criticalCount;
                         }
                         else if (issue.Severity == IssueSeverity.High)
                         {
-                            highCount++;
+                            ++highCount;
                         }
                     }
 
@@ -587,14 +587,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 {
                     foreach (AnalyzerIssue issue in fileIssues)
                     {
-                        totalCount++;
+                        ++totalCount;
                         if (issue.Severity == IssueSeverity.Critical)
                         {
-                            totalCritical++;
+                            ++totalCritical;
                         }
                         else if (issue.Severity == IssueSeverity.High)
                         {
-                            totalHigh++;
+                            ++totalHigh;
                         }
                     }
                 }
@@ -627,11 +627,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     {
                         if (issue.Severity == IssueSeverity.Critical)
                         {
-                            criticalCount++;
+                            ++criticalCount;
                         }
                         else if (issue.Severity == IssueSeverity.High)
                         {
-                            highCount++;
+                            ++highCount;
                         }
                     }
 
@@ -696,11 +696,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 group.issues.Add(issue);
                 if (issue.Severity == IssueSeverity.Critical)
                 {
-                    group.critical++;
+                    ++group.critical;
                 }
                 else if (issue.Severity == IssueSeverity.High)
                 {
-                    group.high++;
+                    ++group.high;
                 }
 
                 fileGroups[issue.FilePath] = group;

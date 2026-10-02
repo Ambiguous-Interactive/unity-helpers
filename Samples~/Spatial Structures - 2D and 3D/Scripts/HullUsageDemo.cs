@@ -72,7 +72,7 @@ namespace Samples.UnityHelpers.SpatialStructures
             float halfHeight = gridlessBounds.y * 0.5f;
             int horizontalSamples = Mathf.Max(2, gridlessEdgeSamplesPerSide);
 
-            for (int i = 0; i < horizontalSamples; i++)
+            for (int i = 0; i < horizontalSamples; ++i)
             {
                 float t = i / (float)(horizontalSamples - 1);
                 float x = Mathf.Lerp(-halfWidth, halfWidth, t);
@@ -80,7 +80,7 @@ namespace Samples.UnityHelpers.SpatialStructures
                 points.Add(new Vector2(x * 0.7f, halfHeight));
             }
 
-            for (int i = 1; i < horizontalSamples - 1; i++)
+            for (int i = 1; i < horizontalSamples - 1; ++i)
             {
                 float t = i / (float)(horizontalSamples - 1);
                 float y = Mathf.Lerp(-halfHeight * 0.75f, halfHeight * 0.75f, t);
@@ -103,7 +103,7 @@ namespace Samples.UnityHelpers.SpatialStructures
 
 #pragma warning disable WPROTO028 // Transient debug geometry is never serialized by WallstopProto.
             List<Vector3> loop = new List<Vector3>(hull.Count);
-            for (int i = 0; i < hull.Count; i++)
+            for (int i = 0; i < hull.Count; ++i)
             {
                 Vector2 point = hull[i];
                 loop.Add(new Vector3(point.x, point.y, 0f));
@@ -140,13 +140,13 @@ namespace Samples.UnityHelpers.SpatialStructures
             int height = Mathf.Max(3, gridFootprint.y);
             List<FastVector3Int> tiles = new List<FastVector3Int>(width * height);
 
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < width; ++x)
             {
                 tiles.Add(new FastVector3Int(x, 0, 0));
                 tiles.Add(new FastVector3Int(x, height - 1, 0));
             }
 
-            for (int y = 1; y < height - 1; y++)
+            for (int y = 1; y < height - 1; ++y)
             {
                 tiles.Add(new FastVector3Int(0, y, 0));
                 tiles.Add(new FastVector3Int(width - 1, y, 0));
@@ -167,7 +167,7 @@ namespace Samples.UnityHelpers.SpatialStructures
 
 #pragma warning disable WPROTO028 // Transient debug geometry is never serialized by WallstopProto.
             List<Vector3> loop = new List<Vector3>(hull.Count);
-            for (int i = 0; i < hull.Count; i++)
+            for (int i = 0; i < hull.Count; ++i)
             {
                 Vector3 worldPoint = grid.CellToWorld((Vector3Int)hull[i]);
                 loop.Add(worldPoint);
@@ -184,7 +184,7 @@ namespace Samples.UnityHelpers.SpatialStructures
                 return;
             }
 
-            for (int i = 0; i < points.Count; i++)
+            for (int i = 0; i < points.Count; ++i)
             {
                 Vector3 start = points[i];
                 Vector3 end = points[(i + 1) % points.Count];

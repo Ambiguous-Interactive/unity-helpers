@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         protected override void Awake()
         {
             base.Awake();
-            awakeCallCount++;
+            ++awakeCallCount;
             awakened?.Invoke(this);
         }
     }

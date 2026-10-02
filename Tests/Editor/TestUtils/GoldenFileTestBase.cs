@@ -253,7 +253,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestUtils
             string[] parts = GoldenFileDirectory.Split('/');
             string currentPath = parts[0];
 
-            for (int i = 1; i < parts.Length; i++)
+            for (int i = 1; i < parts.Length; ++i)
             {
                 string nextPath = currentPath + "/" + parts[i];
                 if (!AssetDatabase.IsValidFolder(nextPath))

@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     out Color[] premultiplied
                 );
                 int pixelsLength = pixels.Length;
-                for (int i = 0; i < pixelsLength; i++)
+                for (int i = 0; i < pixelsLength; ++i)
                 {
                     premultiplied[i] = TextureResampling.Premultiply(pixels[i]);
                 }
@@ -169,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             float twoSigmaSquare = 2.0f * sigma * sigma;
             float sum = 0f;
 
-            for (int i = 0; i < size; i++)
+            for (int i = 0; i < size; ++i)
             {
                 int distance = i - radius;
                 kernel[i] =
@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 sum += kernel[i];
             }
 
-            for (int i = 0; i < size; i++)
+            for (int i = 0; i < size; ++i)
             {
                 kernel[i] /= sum;
             }
@@ -202,7 +202,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             bool wroteOutput = false;
             try
             {
-                for (int i = 0; i < textures.Count; i++)
+                for (int i = 0; i < textures.Count; ++i)
                 {
                     Texture2D originalTexture = textures[i];
                     if (originalTexture == null)
@@ -219,7 +219,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     {
                         if (TryWriteBlurredTexture(originalTexture, radius))
                         {
-                            successfulCount++;
+                            ++successfulCount;
                             wroteOutput = true;
                         }
                     }
@@ -230,7 +230,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                             exception
                         );
                     }
-                    processedCount++;
+                    ++processedCount;
                 }
 
                 if (wroteOutput)
@@ -328,7 +328,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
                 else
                 {
-                    for (int i = 0; i < aCount; i++)
+                    for (int i = 0; i < aCount; ++i)
                     {
                         if (!ReferenceEquals(_lastSeenImageSources[i], imageSources[i]))
                         {
@@ -545,7 +545,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     return;
                 }
 
-                for (int y = 0; y < _height; y++)
+                for (int y = 0; y < _height; ++y)
                 {
                     ExecuteHorizontalPartition(y);
                 }
@@ -559,7 +559,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     return;
                 }
 
-                for (int x = 0; x < _width; x++)
+                for (int x = 0; x < _width; ++x)
                 {
                     ExecuteVerticalPartition(x);
                 }
@@ -568,13 +568,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             private void ExecuteHorizontalPartition(int y)
             {
                 int yOffset = y * _width;
-                for (int x = 0; x < _width; x++)
+                for (int x = 0; x < _width; ++x)
                 {
                     Color weightedSum = Color.clear;
                     Color straightSum = Color.clear;
                     float weightTotal = 0f;
 
-                    for (int k = -_radius; k <= _radius; k++)
+                    for (int k = -_radius; k <= _radius; ++k)
                     {
                         int currentX = x + k;
                         if (0 <= currentX && currentX < _width)
@@ -592,13 +592,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             private void ExecuteVerticalPartition(int x)
             {
-                for (int y = 0; y < _height; y++)
+                for (int y = 0; y < _height; ++y)
                 {
                     Color weightedSum = Color.clear;
                     Color straightSum = Color.clear;
                     float weightTotal = 0f;
 
-                    for (int k = -_radius; k <= _radius; k++)
+                    for (int k = -_radius; k <= _radius; ++k)
                     {
                         int currentY = y + k;
                         if (0 <= currentY && currentY < _height)

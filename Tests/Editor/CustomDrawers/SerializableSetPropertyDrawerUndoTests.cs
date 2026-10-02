@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
 
             List<string> values = new(itemsProperty.arraySize);
-            for (int i = 0; i < itemsProperty.arraySize; i++)
+            for (int i = 0; i < itemsProperty.arraySize; ++i)
             {
                 SerializedProperty element = itemsProperty.GetArrayElementAtIndex(i);
                 values.Add(
@@ -140,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void TryAddNewElementUndoWorksWithVaryingInitialSetSizes(int initialCount)
         {
             HashSetHost host = CreateScriptableObject<HashSetHost>();
-            for (int i = 0; i < initialCount; i++)
+            for (int i = 0; i < initialCount; ++i)
             {
                 host.set.Add(i * 100);
             }
@@ -205,7 +205,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void TryClearSetUndoWorksWithVaryingSetSizes(int initialCount)
         {
             HashSetHost host = CreateScriptableObject<HashSetHost>();
-            for (int i = 0; i < initialCount; i++)
+            for (int i = 0; i < initialCount; ++i)
             {
                 host.set.Add(i * 10);
             }
@@ -395,7 +395,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             int arraySize = itemsProperty.arraySize;
             List<int> originalOrder = new();
-            for (int i = 0; i < arraySize; i++)
+            for (int i = 0; i < arraySize; ++i)
             {
                 originalOrder.Add(itemsProperty.GetArrayElementAtIndex(i).intValue);
             }
@@ -417,7 +417,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             string afterSortOrder = FormatArrayContents(itemsProperty);
-            for (int i = 0; i < itemsProperty.arraySize - 1; i++)
+            for (int i = 0; i < itemsProperty.arraySize - 1; ++i)
             {
                 Assert.LessOrEqual(
                     itemsProperty.GetArrayElementAtIndex(i).intValue,
@@ -434,7 +434,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             string afterUndoOrder = FormatArrayContents(itemsProperty);
 
-            for (int i = 0; i < originalOrder.Count && i < itemsProperty.arraySize; i++)
+            for (int i = 0; i < originalOrder.Count && i < itemsProperty.arraySize; ++i)
             {
                 Assert.AreEqual(
                     originalOrder[i],
@@ -973,7 +973,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.AreEqual(0, host.set.Count, "Set should start empty.");
 
             int numberOfAdds = 5;
-            for (int i = 0; i < numberOfAdds; i++)
+            for (int i = 0; i < numberOfAdds; ++i)
             {
                 if (0 < i)
                 {
@@ -1014,7 +1014,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void ConsecutiveRemovesCanBeUndoneIndividually(int removalCount)
         {
             HashSetHost host = CreateScriptableObject<HashSetHost>();
-            for (int i = 0; i < removalCount + 2; i++)
+            for (int i = 0; i < removalCount + 2; ++i)
             {
                 host.set.Add(i * 100);
             }
@@ -1034,7 +1034,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableHashSetSerializedPropertyNames.Items
             );
 
-            for (int i = 0; i < removalCount; i++)
+            for (int i = 0; i < removalCount; ++i)
             {
                 if (0 < i)
                 {
@@ -1096,7 +1096,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             int expectedCountAfterAdds = initialCount + addCount;
-            for (int i = 0; i < addCount; i++)
+            for (int i = 0; i < addCount; ++i)
             {
                 if (0 < i)
                 {
@@ -1121,7 +1121,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Undo.IncrementCurrentGroup();
 
             int expectedCountAfterRemoves = expectedCountAfterAdds - safeRemoveCount;
-            for (int i = 0; i < safeRemoveCount; i++)
+            for (int i = 0; i < safeRemoveCount; ++i)
             {
                 if (0 < i)
                 {
@@ -1144,7 +1144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Count after {safeRemoveCount} removes. After adds ({expectedCountAfterAdds}): [{afterAdds}], After removes ({host.set.Count}): [{afterRemoves}]."
             );
 
-            for (int i = 0; i < safeRemoveCount; i++)
+            for (int i = 0; i < safeRemoveCount; ++i)
             {
                 Undo.PerformUndo();
                 serializedObject.Update();
@@ -1156,7 +1156,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Count after undoing {safeRemoveCount} removes. Expected {expectedCountAfterAdds}, got {host.set.Count}. After removes: [{afterRemoves}], After undo removes: [{afterUndoRemoves}]."
             );
 
-            for (int i = 0; i < addCount; i++)
+            for (int i = 0; i < addCount; ++i)
             {
                 Undo.PerformUndo();
                 serializedObject.Update();
@@ -1176,7 +1176,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void ConsecutiveMovesCanBeUndoneIndividually(int moveCount)
         {
             HashSetHost host = CreateScriptableObject<HashSetHost>();
-            for (int i = 0; i < moveCount + 2; i++)
+            for (int i = 0; i < moveCount + 2; ++i)
             {
                 host.set.Add(i * 100);
             }
@@ -1195,7 +1195,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             List<string> stateHistory = new() { FormatSetContents(host.set) };
 
-            for (int i = 0; i < moveCount; i++)
+            for (int i = 0; i < moveCount; ++i)
             {
                 if (0 < i)
                 {
@@ -1317,7 +1317,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int operationCount = 4;
             List<int> expectedCounts = new() { 0 };
 
-            for (int i = 0; i < operationCount; i++)
+            for (int i = 0; i < operationCount; ++i)
             {
                 if (0 < i)
                 {
@@ -1340,7 +1340,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Should have {operationCount} entries after adds. Contents: [{FormatSetContents(host.set)}]."
             );
 
-            for (int i = 0; i < operationCount; i++)
+            for (int i = 0; i < operationCount; ++i)
             {
                 Undo.PerformUndo();
                 serializedObject.Update();
@@ -1353,7 +1353,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
             }
 
-            for (int i = 0; i < operationCount; i++)
+            for (int i = 0; i < operationCount; ++i)
             {
                 Undo.PerformRedo();
                 serializedObject.Update();
@@ -1508,7 +1508,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Set should have one more entry. Initial ({initialCount}): [{initialContents}], After add ({afterAddCount}): [{afterAddContents}]."
             );
 
-            for (int cycle = 0; cycle < cycleCount; cycle++)
+            for (int cycle = 0; cycle < cycleCount; ++cycle)
             {
                 Undo.PerformUndo();
                 serializedObject.Update();

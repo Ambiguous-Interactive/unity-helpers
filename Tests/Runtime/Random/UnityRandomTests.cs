@@ -329,7 +329,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.AreEqual(expected, legacy.NextUint());
         }
 
-        protected override IRandom NewRandom() => new UnityRandom(DeterministicSeedInt);
+        protected override IRandom NewRandom()
+        {
+            return new UnityRandom(DeterministicSeedInt);
+        }
     }
 #pragma warning restore WUH005
 }

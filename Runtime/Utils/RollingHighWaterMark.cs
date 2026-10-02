@@ -222,7 +222,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     bucket.Peak = value;
                 }
                 bucket.Sum += value;
-                bucket.Count++;
+                ++bucket.Count;
             }
             else
             {
@@ -235,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             _runningSum += value;
-            _sampleCount++;
+            ++_sampleCount;
             if (_cachedPeak < value)
             {
                 _cachedPeak = value;
@@ -671,14 +671,14 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                _currentlyRented++;
-                _totalRentalCount++;
+                ++_currentlyRented;
+                ++_totalRentalCount;
 
                 if (0f < _previousRentalTime && _previousRentalTime <= currentTime)
                 {
                     float interRentalTime = currentTime - _previousRentalTime;
                     _totalInterRentalTimeSeconds += interRentalTime;
-                    _interRentalCount++;
+                    ++_interRentalCount;
                 }
 
                 _previousRentalTime = currentTime;
@@ -1189,7 +1189,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             if (incrementRental)
             {
-                _rentalCountThisWindow++;
+                ++_rentalCountThisWindow;
             }
 
             if (_windowStartTime <= 0f)
