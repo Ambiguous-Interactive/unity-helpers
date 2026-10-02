@@ -808,6 +808,136 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void CompareThenReplaceDoesNotProtectAgainstNoncooperatingDestinationEdits(bool text)
+        {
+            string path = WriteDirectly("external-edit.txt", "expected");
+            bool observedExternalEdit = false;
+            DurableFile.BeforeStagedSwapForTests = _ =>
+            {
+                File.WriteAllText(path, "external edit");
+                observedExternalEdit = string.Equals(
+                    File.ReadAllText(path),
+                    "external edit",
+                    StringComparison.Ordinal
+                );
+            };
+            try
+            {
+                if (text)
+                {
+                    Assert.IsTrue(
+                        DurableFile.TryCompareThenReplaceAllText(
+                            path,
+                            true,
+                            "expected",
+                            "replacement",
+                            out bool exchanged,
+                            out Exception error
+                        ),
+                        error?.ToString()
+                    );
+                    Assert.IsTrue(exchanged);
+                }
+                else
+                {
+                    Assert.IsTrue(
+                        DurableFile.TryCompareThenReplaceBytes(
+                            path,
+                            Encoding.UTF8.GetBytes("expected"),
+                            Encoding.UTF8.GetBytes("replacement"),
+                            out Exception error
+                        ),
+                        error?.ToString()
+                    );
+                }
+            }
+            finally
+            {
+                DurableFile.BeforeStagedSwapForTests = null;
+            }
+            Assert.IsTrue(observedExternalEdit);
+            Assert.AreEqual("replacement", File.ReadAllText(path));
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        [TestCase(0, false)]
+        [TestCase(0, true)]
+        [TestCase(1, false)]
+        [TestCase(1, true)]
+        [TestCase(2, false)]
+        [TestCase(2, true)]
+        public void AsyncReplacementRefusesCancellationAfterStaging(
+            int operation,
+            bool destinationExists
+        )
+        {
+            string path = Path.Combine(_testDirectory, "cancel-after-staging.txt");
+            if (destinationExists)
+            {
+                File.WriteAllText(path, "previous document");
+            }
+            string source = WriteDirectly("cancel-copy-source.txt", "replacement");
+            using CancellationTokenSource cancellation = new();
+            bool reachedPublication = false;
+            DurableFile.BeforeStagedSwapForTests = stagingPath =>
+            {
+                reachedPublication = true;
+                Assert.AreEqual("replacement", File.ReadAllText(stagingPath));
+                cancellation.Cancel();
+            };
+            Exception failure;
+            try
+            {
+                Task<Exception> write;
+                switch (operation)
+                {
+                    case 0:
+                        write = DurableFile
+                            .WriteAllTextAsync(path, "replacement", cancellation.Token)
+                            .AsTask();
+                        break;
+                    case 1:
+                        write = DurableFile
+                            .WriteAllBytesAsync(
+                                path,
+                                Encoding.UTF8.GetBytes("replacement"),
+                                cancellation.Token
+                            )
+                            .AsTask();
+                        break;
+                    default:
+                        write = DurableFile.CopyAsync(source, path, cancellation.Token).AsTask();
+                        break;
+                }
+                Assert.IsTrue(
+                    write.Wait(TimeSpan.FromSeconds(10)),
+                    "The write must reach a terminal result."
+                );
+                failure = write.Result;
+            }
+            finally
+            {
+                cancellation.Cancel();
+                DurableFile.BeforeStagedSwapForTests = null;
+            }
+            Assert.IsTrue(reachedPublication);
+            Assert.IsInstanceOf<OperationCanceledException>(failure);
+            Assert.AreEqual(destinationExists, File.Exists(path));
+            if (destinationExists)
+            {
+                Assert.AreEqual("previous document", File.ReadAllText(path));
+            }
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+            Assert.AreEqual("replacement", File.ReadAllText(source));
+            Assert.IsTrue(
+                DurableFile.TryWriteAllText(path, "retry", out Exception retryError),
+                retryError?.ToString()
+            );
+            Assert.AreEqual("retry", File.ReadAllText(path));
+        }
+
         [Test]
         public void CompareThenReplaceOwnsStagingFromBeforeComparisonThroughSwap()
         {

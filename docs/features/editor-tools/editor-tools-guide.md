@@ -1322,7 +1322,11 @@ bool repaired = PrefabChecker.TryRemoveMissingScripts(
 ```
 
 **Export Report (JSON)** and **Export Report (CSV)** write the same findings to a file for a build
-step or a review. The complete report is staged before replacing an existing file.
+step or a review. The complete report is staged before replacing an existing file. JSON contains
+`folders` and `items`; each item contains its prefab `path` and a `messages` array. JSON export uses
+[Serializer](../serialization/serialization.md) with indented output and retains empty arrays and
+special characters in findings. Earlier JSON exports omitted both readonly report fields and wrote
+an empty object; rerun the scan to regenerate those reports.
 
 Annotate the fields you actually care about so the null check stays useful:
 

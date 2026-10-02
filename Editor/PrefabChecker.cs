@@ -11,12 +11,14 @@ namespace WallstopStudios.UnityHelpers.Editor
     using System.IO;
     using System.Reflection;
     using System.Text;
+    using System.Text.Json;
     using UnityEditor;
     using UnityEditorInternal;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
@@ -31,6 +33,8 @@ namespace WallstopStudios.UnityHelpers.Editor
         private const int MaxTransformScanForMissingOwner = 5000;
 
         private const string DefaultPrefabsFolder = "Assets/Prefabs";
+
+        private static readonly JsonSerializerOptions ReportJsonOptions = CreateReportJsonOptions();
 
         private static readonly Dictionary<Type, List<FieldInfo>> FieldsByType = new();
         private static readonly Dictionary<Type, List<FieldInfo>> ListFieldsByType = new();
@@ -169,6 +173,38 @@ namespace WallstopStudios.UnityHelpers.Editor
                 error = $"Could not inspect prefab folders: {exception.Message}";
                 return false;
             }
+        }
+
+        internal static bool TryExportReportJson(
+            ScanReport report,
+            string path,
+            out Exception error
+        )
+        {
+            if (report == null)
+            {
+                error = new ArgumentNullException(nameof(report));
+                return false;
+            }
+
+            try
+            {
+                string json = Serializer.JsonStringify(report, ReportJsonOptions);
+                return DurableFile.TryWriteAllText(path, json, out error);
+            }
+            catch (Exception exception)
+            {
+                error = exception;
+                return false;
+            }
+        }
+
+        private static JsonSerializerOptions CreateReportJsonOptions()
+        {
+            JsonSerializerOptions options = Serializer.CreateFastPocoJsonOptions();
+            options.IncludeFields = true;
+            options.WriteIndented = true;
+            return options;
         }
 
         private static ValueTuple<int, string> RemoveMissingScriptsFromPrefab(
@@ -1632,19 +1668,13 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return;
             }
 
-            try
+            if (!TryExportReportJson(_lastReport, savePath, out Exception error))
             {
-                string json = JsonUtility.ToJson(_lastReport, true);
-                if (!DurableFile.TryWriteAllText(savePath, json, out Exception writeError))
-                {
-                    throw writeError;
-                }
-                this.Log($"Saved report to: {savePath}");
+                this.LogError($"Failed to save report", error);
+                return;
             }
-            catch (Exception e)
-            {
-                this.LogError($"Failed to save report", e);
-            }
+
+            this.Log($"Saved report to: {savePath}");
         }
 
         private void ExportLastReportCsv()

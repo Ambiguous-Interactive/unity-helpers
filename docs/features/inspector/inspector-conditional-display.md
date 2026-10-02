@@ -52,6 +52,10 @@ public class WeaponConfig : MonoBehaviour
 )]
 ```
 
+`conditionField` must contain a nonblank member name; null, empty, or whitespace-only names
+throw `ArgumentException` when the attribute is constructed. Use `nameof` for direct members.
+The name is preserved exactly, so whitespace around a member name is not trimmed.
+
 ---
 
 ## Comparison Operators
@@ -198,6 +202,9 @@ public float hardModeMultiplier = 2.5f;
 ---
 
 ### String
+
+String values retain their literal contents. `IsNullOrEmpty` treats whitespace-only strings
+as nonempty, `IsNotNullOrEmpty` accepts them, and equality compares them without trimming.
 
 <!-- doc-sample: compiles -->
 
