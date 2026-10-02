@@ -92,6 +92,12 @@ Tips
 
 - Capacity grows geometrically as needed; call `TrimExcess()` after spikes to return memory.
 - Indexer is in logical order (0 is front, Count-1 is back).
+- `CopyTo(array, arrayIndex)` writes in logical order and leaves elements outside the destination
+  range unchanged. Copies of at least 64 elements use one or two bulk copies when the destination
+  has exactly the deque's element type. Smaller copies and covariant destination arrays retain
+  element-by-element writes.
+- `ToArray(ref array)` reuses a sufficiently large destination and leaves its unused tail unchanged.
+  `ToArray()` allocates its result array.
 
 ## Binary Heap (Priority Queue)
 

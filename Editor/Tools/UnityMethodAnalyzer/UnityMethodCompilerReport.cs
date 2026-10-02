@@ -7,15 +7,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text.Json;
     using UnityEditor;
     using UnityEditor.Compilation;
-    using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
     using CompilationAssembly = UnityEditor.Compilation.Assembly;
 
     [InitializeOnLoad]
     internal static class UnityMethodCompilerReport
     {
         private const string SessionKey = "WallstopStudios.UnityHelpers.UnityMethodCompilerReport";
+        private static readonly JsonSerializerOptions SessionJsonOptions = new()
+        {
+            IncludeFields = true,
+        };
         private static readonly ReportData Data;
         private static bool IsCompiling;
         private static bool IgnorePlayerCompilation;
@@ -23,17 +28,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         static UnityMethodCompilerReport()
         {
             string saved = SessionState.GetString(SessionKey, string.Empty);
-            try
-            {
-                Data = string.IsNullOrEmpty(saved)
-                    ? new ReportData()
-                    : JsonUtility.FromJson<ReportData>(saved);
-            }
-            catch (ArgumentException)
-            {
-                Data = new ReportData();
-            }
-            Data ??= new ReportData();
+            Data = ReadSessionData(saved);
             CompilationPipeline.compilationStarted += OnCompilationStarted;
             CompilationPipeline.assemblyCompilationFinished += OnAssemblyFinished;
             CompilationPipeline.compilationFinished += OnCompilationFinished;
@@ -115,6 +110,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     + " Current editor defines only. Player-only code and files not included in compilation are outside this report.";
         }
 
+        internal static ReportData ReadSessionData(string saved)
+        {
+            if (
+                string.IsNullOrWhiteSpace(saved)
+                || !Serializer.TryJsonDeserialize(
+                    saved,
+                    out ReportData data,
+                    options: SessionJsonOptions
+                )
+                || !TryNormalizeReport(data)
+            )
+            {
+                return new ReportData();
+            }
+            return data;
+        }
+
+        internal static string WriteSessionData(ReportData data)
+        {
+            return Serializer.JsonStringify(
+                TryNormalizeReport(data) ? data : new ReportData(),
+                SessionJsonOptions
+            );
+        }
+
         private static void OnCompilationStarted(object context)
         {
             IgnorePlayerCompilation = BuildPipeline.isBuildingPlayer;
@@ -161,31 +181,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 IgnorePlayerCompilation = false;
                 return;
             }
-            SessionState.SetString(SessionKey, JsonUtility.ToJson(Data));
+            SessionState.SetString(SessionKey, WriteSessionData(Data));
         }
 
-        [Serializable]
-        private sealed class ReportData
+        private static bool TryNormalizeReport(ReportData data)
         {
-            public List<AssemblyReport> assemblies = new();
-        }
-
-        [Serializable]
-        private sealed class AssemblyReport
-        {
-            public string name;
-            public bool hasErrors;
-            public List<MessageData> messages = new();
-        }
-
-        [Serializable]
-        private sealed class MessageData
-        {
-            public string file;
-            public int line;
-            public int column;
-            public string message;
-            public bool error;
+            if (data?.assemblies == null)
+            {
+                return false;
+            }
+            HashSet<string> names = new(StringComparer.Ordinal);
+            foreach (AssemblyReport assembly in data.assemblies)
+            {
+                if (
+                    assembly == null
+                    || string.IsNullOrWhiteSpace(assembly.name)
+                    || assembly.messages == null
+                    || !names.Add(assembly.name)
+                )
+                {
+                    return false;
+                }
+                foreach (MessageData message in assembly.messages)
+                {
+                    if (message == null || message.line < 0 || message.column < 0)
+                    {
+                        return false;
+                    }
+                    message.file ??= string.Empty;
+                    message.message ??= string.Empty;
+                    assembly.hasErrors |= message.error;
+                }
+            }
+            return true;
         }
     }
 #endif

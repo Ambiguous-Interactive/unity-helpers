@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Unity Method Analyzer recovery from corrupt compiler snapshots while preserving saved report compatibility ([#870](https://github.com/Ambiguous-Interactive/unity-helpers/issues/870)).
+- Fix test run summary ownership so blank tokens cannot finish or discard running markers; valid tokens retain their literal spaces ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix subtype manifest ownership lookup accepting whitespace-only directories; valid folder names containing spaces remain unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix relational component assigner and injection constructors being stripped from High-stripping IL2CPP players using Zenject, VContainer, or Reflex ([#916](https://github.com/Ambiguous-Interactive/unity-helpers/issues/916)).
 - Fix WButton coroutines retaining resources when cancelled, completed, or faulted. Nested callback updates also leave each routine intact ([#911](https://github.com/Ambiguous-Interactive/unity-helpers/issues/911)).
@@ -47,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Improve large `Deque<T>` array transfers with contiguous copies, preserving logical order, offsets, and covariant destination behavior ([#904](https://github.com/Ambiguous-Interactive/unity-helpers/issues/904)).
 - Improve `JesseSort` for mixed regions, sparse disorder, and natural runs using the upstream live-phase design ([#747](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)).
 - Improve parent and child collection transfers with bulk copying for `Component` fields while retaining typed enumeration for derived components ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 

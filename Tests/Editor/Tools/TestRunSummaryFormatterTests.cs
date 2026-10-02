@@ -311,6 +311,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.AreEqual(value, TestRunSummaryFormatter.Unescape(escaped));
         }
 
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u2003")]
+        public void BlankOwnerFieldsAreRefusedAndReturnEmpty(string owner)
+        {
+            string marker = TestRunSummaryFormatter.FormatRunningMarker(
+                TestMode.EditMode,
+                StartedUtc,
+                owner
+            );
+
+            string line = FirstLineOf(marker);
+            Assert.That(TestRunSummaryFormatter.IsRunningLine(line), Is.True);
+            Assert.That(
+                TestRunSummaryFormatter.TryParseOwner(line, out string parsedOwner),
+                Is.False
+            );
+            Assert.That(parsedOwner, Is.Empty);
+        }
+
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u2003")]
+        [TestCase(" value ")]
+        public void SerializedWhitespaceValuesRemainLiteral(string value)
+        {
+            string key = nameof(value);
+            string line = key + "=" + TestRunSummaryFormatter.Escape(value);
+
+            Assert.That(TestRunSummaryFormatter.TryGetField(line, key, out string parsed), Is.True);
+            Assert.That(parsed, Is.EqualTo(value));
+            Assert.That(
+                TestRunSummaryFormatter.Unescape(TestRunSummaryFormatter.Escape(value)),
+                Is.EqualTo(value)
+            );
+        }
+
         [Test]
         public void EscapeHandlesNullAsEmpty()
         {

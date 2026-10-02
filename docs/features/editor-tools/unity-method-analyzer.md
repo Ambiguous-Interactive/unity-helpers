@@ -14,7 +14,12 @@ It no longer guesses declarations or inheritance from source text.
 4. Double-click a diagnostic to open its source location.
 
 Recompilation is asynchronous and may reload the editor domain. Captured reports survive that
-reload within the editor session. Refreshing a report does not compile scripts or walk directories.
+reload within the editor session. The session JSON retains the assembly names, error flags, and
+complete diagnostic fields from earlier versions. An unreadable or structurally corrupt snapshot
+resets to no captured coverage; recompile scripts to repopulate it. Missing optional diagnostic
+strings become empty strings. Explicit null collections, null entries, duplicate assembly names,
+and negative source positions invalidate the snapshot rather than silently dropping findings.
+Refreshing a report does not compile scripts or walk directories.
 The directory list filters files already included in Unity's compilation; files outside the
 project's compiled assemblies are not analyzed. Empty or whitespace-only source paths are ignored.
 

@@ -91,6 +91,76 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.That(TestRunSummaryFile.TryDiscardRun(path, nameof(owner)), Is.False);
         }
 
+        [TestCase(null, false)]
+        [TestCase(null, true)]
+        [TestCase("", false)]
+        [TestCase("", true)]
+        [TestCase(" ", false)]
+        [TestCase(" ", true)]
+        [TestCase("\t\r\n", false)]
+        [TestCase("\t\r\n", true)]
+        [TestCase("\u2003", false)]
+        [TestCase("\u2003", true)]
+        public void BlankOwnersCannotFinishOrDiscardMalformedMarkers(string owner, bool finish)
+        {
+            string marker = TestRunSummaryFormatter.FormatRunningMarker(
+                TestMode.EditMode,
+                StartedUtc,
+                owner
+            );
+            File.WriteAllText(_summaryPath, marker);
+
+            Assert.That(TestRunSummaryFile.IsMarkedRunning(_summaryPath), Is.True);
+            Assert.That(
+                TestRunSummaryFile.TryBeginRun(
+                    _summaryPath,
+                    TestMode.EditMode,
+                    FinishedUtc,
+                    out string newOwner
+                ),
+                Is.False
+            );
+            Assert.That(newOwner, Is.Empty);
+            Assert.That(File.ReadAllText(_summaryPath), Is.EqualTo(marker));
+
+            bool changed = finish
+                ? TestRunSummaryFile.TryFinishRun(
+                    _summaryPath,
+                    owner,
+                    TestMode.EditMode,
+                    FinishedUtc,
+                    new TestRunResultNode()
+                )
+                : TestRunSummaryFile.TryDiscardRun(_summaryPath, owner);
+
+            Assert.That(changed, Is.False);
+            Assert.That(File.ReadAllText(_summaryPath), Is.EqualTo(marker));
+            Assert.That(
+                TestRunSummaryFile.TryReadOwner(_summaryPath, out string parsedOwner),
+                Is.False
+            );
+            Assert.That(parsedOwner, Is.Empty);
+        }
+
+        [TestCase("summary with spaces.txt")]
+        [TestCase(" summary with spaces.txt")]
+        public void LiteralSpacesInSummaryPathsAndNonblankOwnersArePreserved(string fileName)
+        {
+            string path = Path.Combine(_workingDirectory, fileName);
+            string owner = " owner token ";
+            File.WriteAllText(
+                path,
+                TestRunSummaryFormatter.FormatRunningMarker(TestMode.EditMode, StartedUtc, owner)
+            );
+
+            Assert.That(TestRunSummaryFile.TryReadOwner(path, out string parsedOwner), Is.True);
+            Assert.That(parsedOwner, Is.EqualTo(owner));
+            Assert.That(TestRunSummaryFile.TryDiscardRun(path, owner.Trim()), Is.False);
+            Assert.That(File.Exists(path), Is.True);
+            Assert.That(TestRunSummaryFile.TryDiscardRun(path, owner), Is.True);
+            Assert.That(File.Exists(path), Is.False);
+        }
+
         [Test]
         public void EditModeAndPlayModeResolveToDifferentPathsUnderTemp()
         {
