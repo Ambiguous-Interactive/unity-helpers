@@ -38,7 +38,10 @@ function Assert-FixtureExplicitExitContract {
     $parent = $node.Parent
     while ($null -ne $parent) {
       if ($parent -is [System.Management.Automation.Language.FunctionDefinitionAst] -or
-          $parent -is [System.Management.Automation.Language.ScriptBlockExpressionAst]) { return $false }
+          $parent -is [System.Management.Automation.Language.ScriptBlockExpressionAst]) {
+        if ($isReturn) { return $false }
+        break
+      }
       if ($parent -is [System.Management.Automation.Language.LoopStatementAst] -or
           $parent -is [System.Management.Automation.Language.SwitchStatementAst]) { $hasContainingLoop = $true }
       $parent = $parent.Parent
@@ -100,13 +103,29 @@ function Test-IsolatedFixtureHarness {
       @{ Name = 'NativeMissingExit'; Content = 'git --version > $null'; Diagnostic = 'without an exit status' },
       @{ Name = 'UnreachableExitAfterReturn'; Content = 'git --version > $null; return; exit 0'; Diagnostic = 'without an exit status' },
       @{ Name = 'ConditionalMissingExit'; Content = 'git --version > $null; if ($false) { exit 0 }'; Diagnostic = 'without an exit status' },
-      @{ Name = 'UnscopedBreakBeforeExit'; Content = 'git --version > $null; break; exit 0'; Diagnostic = 'without an exit status' }
+      @{ Name = 'UnscopedBreakBeforeExit'; Content = 'git --version > $null; break; exit 0'; Diagnostic = 'without an exit status' },
+      @{ Name = 'FunctionBreakBeforeExit'; Content = 'function Stop-Fixture { break }; git --version > $null; Stop-Fixture; exit 7'; Diagnostic = 'without an exit status' },
+      @{ Name = 'FunctionContinueBeforeExit'; Content = 'function Stop-Fixture { continue }; git --version > $null; Stop-Fixture; exit 7'; Diagnostic = 'without an exit status' },
+      @{ Name = 'ScriptBlockBreakBeforeExit'; Content = 'git --version > $null; & { break }; exit 7'; Diagnostic = 'without an exit status' },
+      @{ Name = 'ScriptBlockContinueBeforeExit'; Content = 'git --version > $null; & { continue }; exit 7'; Diagnostic = 'without an exit status' },
+      @{ Name = 'FunctionLabeledBreak'; Content = 'function Stop-Fixture { :inside foreach ($item in @(1)) { break inside } }; git --version > $null; Stop-Fixture; exit 7'; Diagnostic = 'without an exit status' },
+      @{ Name = 'ScriptBlockLabeledContinue'; Content = 'git --version > $null; & { :inside foreach ($item in @(1)) { continue inside } }; exit 7'; Diagnostic = 'without an exit status' }
     )) {
       Set-Content -LiteralPath $controlPath -Value $control.Content
       $rejected = $false
       try { $null = Invoke-IsolatedFixture -ScriptPath $controlPath }
       catch { $rejected = $_.Exception.Message.Contains($control.Diagnostic) }
       Write-TestResult "Runspace.Rejects$($control.Name)" $rejected
+    }
+    foreach ($control in @(
+      @{ Name = 'FunctionReturn'; Content = 'function Get-FixtureResult { return "function-return" }; Get-FixtureResult; exit 7'; Output = 'function-return' },
+      @{ Name = 'FunctionScopedLoopEscapes'; Content = 'function Get-FixtureResult { foreach ($item in @(1, 2)) { if ($item -eq 1) { continue }; break }; "function-loop" }; Get-FixtureResult; exit 7'; Output = 'function-loop' },
+      @{ Name = 'FunctionScopedSwitchBreak'; Content = 'function Get-FixtureResult { switch (1) { 1 { break } }; "function-switch" }; Get-FixtureResult; exit 7'; Output = 'function-switch' },
+      @{ Name = 'ScriptBlockScopedLoopEscapes'; Content = '& { foreach ($item in @(1, 2)) { if ($item -eq 1) { continue }; break }; "script-block-loop" }; exit 7'; Output = 'script-block-loop' }
+    )) {
+      Set-Content -LiteralPath $controlPath -Value $control.Content
+      $result = Invoke-IsolatedFixture -ScriptPath $controlPath
+      Write-TestResult "Runspace.Accepts$($control.Name)" ($result.ExitCode -eq 7 -and $result.Output.Contains($control.Output))
     }
     Set-Content -LiteralPath $controlPath -Value "if (Get-Variable FixtureControlState -Scope Global -ErrorAction SilentlyContinue) { exit 7 }; `$global:FixtureControlState = 1; exit 0"
     $first = Invoke-IsolatedFixture -ScriptPath $controlPath

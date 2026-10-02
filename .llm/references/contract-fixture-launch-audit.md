@@ -117,7 +117,7 @@ of evaluating raw script content.
 ## Template, git configuration, and npm package migration evidence
 
 The three suites share [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1).
-Each suite runs thirteen controls for exact 0/1/7 status and host/warning output capture,
+Each suite runs twenty-three controls for exact 0/1/7 status and host/warning output capture,
 missing-status rejection, error-stream rejection for exits 0 and 1, throw rejection,
 fresh global state, native-success-without-exit rejection, unreachable exits after script returns,
 conditional missing exits, unscoped loop escapes, and a CLI observation of native implicit success. Each invocation owns and
@@ -127,16 +127,20 @@ require exact exit 1 while preserving their existing diagnostic assertions. Envi
 configuration, native npm/git execution, package-canary cleanup, and alternate working
 directory coverage remain in the original fixtures.
 
-The template suite preserves 24 original assertions and adds thirteen harness controls plus
-one CLI parity assertion (38 total). The git configuration suite preserves 14 original
-assertions and adds the same fourteen controls (28 total). The npm package suite preserves 18
-original assertions and adds thirteen harness controls (31 total); its real `-Check` integration
+The template suite preserves 24 original assertions and adds twenty-three harness controls plus
+one CLI parity assertion (48 total). The git configuration suite preserves 14 original
+assertions and adds the same twenty-four controls (38 total). The npm package suite preserves 18
+original assertions and adds twenty-three harness controls (41 total); its real `-Check` integration
 smoke remains. No production gate policy changed.
 
 Before invocation, the shared harness parses the unchanged file and requires an explicit
 terminal exit, complete terminal if/else exit branches, or a terminal try body and catch
 branches ending in exits. It refuses script-level returns and unscoped or labeled loop escapes that could bypass those exits;
-returns inside functions or local script blocks remain valid. This is a bounded structural
+returns inside functions or local script blocks remain valid. Break/continue inside those
+boundaries require a containing loop or switch within that same function or script block;
+parent loops outside the boundary cannot justify the escape. Labeled escapes are rejected.
+Six negative controls cover unscoped function/block break and continue plus labeled escapes;
+four positive controls preserve function returns and scoped function/block loops and switches. This is a bounded structural
 contract for the three selected scripts, not a universal PowerShell control-flow proof.
 `LASTEXITCODE` supplies the exact observed status only after this structural check succeeds.
 The native-only control exits 0 under real CLI execution and fails the runspace harness,
@@ -167,6 +171,14 @@ Sequential local timings were 6.314, 2.696, and 27.042 seconds respectively. The
 include four more rejection cases than the initial suite: native status without exit,
 return before an unreachable exit, missing conditional exit, and unscoped break before
 exit. The larger sample variation reinforces that hosted performance acceptance remains open.
+
+A follow-up fixed an additional escape path: a function or invoked script block containing
+unscoped `break`/`continue` could skip the terminal exit after a successful native command.
+Final full suites with all 23 harness controls passed **48/48 template in 1.641 seconds**,
+**38/38 git configuration in 1.720 seconds**, and **41/41 npm changelog in 19.294 seconds**.
+Independent adversarial review reproduced all four function/block break/continue cases and
+confirmed rejection, then ran the shared harness at 23/23. These local results supersede the
+preceding pre-follow-up assertion totals without changing the original fixture assertions.
 
 ## Remaining acceptance work
 

@@ -78,7 +78,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <inheritdoc />
         public IEnumerator<T> GetEnumerator()
         {
+            /* This contract fixture deliberately exercises an interface-typed enumeration boundary. */
+#pragma warning disable WUH022
             return _items.GetEnumerator();
+#pragma warning restore WUH022
         }
 
         /// <summary>Stages the elements the wrapper is written from.</summary>
