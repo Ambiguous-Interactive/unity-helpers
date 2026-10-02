@@ -5,10 +5,8 @@ The audit was inspected on 2026-10-02. It does not certify that the issue is com
 
 ## Scope and method
 
-Parse each `scripts/tests/*.ps1` file with the PowerShell parser and inspect executable
-`CommandAst` nodes whose command name is `pwsh` or `powershell`, including their `.exe`
-forms. Also search for variable executable paths, `ProcessStartInfo`, and process runner
-helpers. Text inside comments and here-strings is fixture input, not an executable launch.
+Parse `scripts/tests/*.ps1` and inspect executable `CommandAst` nodes named `pwsh` or `powershell`, including `.exe` forms.
+Also search variable executable paths, `ProcessStartInfo`, and process runner helpers. Comments and here-strings are fixture input, not launches.
 
 After the template, git configuration, and npm package fixture migrations, the direct-command
 scan found **37 launch sites in 22 PowerShell test files**. A site inside a helper can execute several times, so this is
@@ -101,11 +99,9 @@ runspaces; the ranking call retains real `pwsh -File` binding. Ten controls prov
 rejection, warning capture, global-state isolation, and native implicit-status parity with CLI.
 Missing-file and malformed-XML tests require exit 1 and their specific diagnostic.
 
-A sequential comparison on the same devcontainer host measured the original 12/12 suite at
-**1.978 seconds** and the revised 22/22 suite at **1.846 seconds**. The baseline came from
-`HEAD`; its temporary copy resolved the repository from the working directory to preserve
-access to the unchanged reporter. These are local observations, not hosted timing claims.
-A separate initial revised run took 7.466 seconds; that variation prevents a broad speed claim.
+Sequential same-host devcontainer runs measured original **12/12 at 1.978 seconds** and revised **22/22 at 1.846 seconds**.
+The baseline came from `HEAD`; its temporary copy resolved the repository from the working directory to reach the unchanged reporter.
+These are local observations. An initial revised run took 7.466 seconds; variation prevents a broad speed or hosted timing claim.
 
 `HadErrors` alone is not an error-stream check: PowerShell sets it for an intentional nonzero
 script exit without an error record. The harness rejects actual error records and thrown
@@ -157,50 +153,28 @@ before and after, then the initial complete revised suites before the stricter e
 | Git push configuration | 14/14, 3.513 s             | 14/14, 1.173 s            | 24/24, 2.211 s              |
 | Npm package changelog  | 18/18, 25.968 s            | 18/18, 19.849 s           | 27/27, 22.181 s             |
 
-The original-case comparison used temporary copies with repository resolution fixed to the
-original test directory. The revised comparison omitted only the newly added harness and
-CLI parity assertions; the original assertions and content calls remained. The full revised
-suite includes every CLI parity call. The subsequent strict-contract runs are recorded below. These local observations show a git/npm improvement,
-not a speed gain for the template suite or a hosted-runner claim. Earlier local runs varied
-(1.776/3.579/19.742 s before and 2.735/3.356/23.973 s after with controls); npm packing and
-the shared working tree contribute to the limits of a single sample.
+Temporary original-case copies resolved the repository from the original test directory. Revised original-case measurements omitted only new harness
+and CLI parity assertions; the complete revised suites include them. Local results show git/npm improvement, not a template or hosted speed gain.
+Earlier runs varied (1.776/3.579/19.742 s before; 2.735/3.356/23.973 s after with controls); npm packing and the shared tree limit a single sample.
 
-After the explicit-terminal-exit refinement, final full-suite verification passed
-**38/38 template**, **28/28 git configuration**, and **31/31 npm changelog** assertions.
-Sequential local timings were 6.314, 2.696, and 27.042 seconds respectively. These runs
-include four more rejection cases than the initial suite: native status without exit,
-return before an unreachable exit, missing conditional exit, and unscoped break before
-exit. The larger sample variation reinforces that hosted performance acceptance remains open.
+The explicit-terminal-exit refinement passed **38/38 template in 6.314 seconds**, **28/28 git configuration in 2.696 seconds**,
+and **31/31 npm changelog in 27.042 seconds**. Four added controls rejected native status without exit, return before unreachable exit,
+missing conditional exit, and unscoped break before exit. Sample variation leaves hosted performance acceptance open.
 
-A follow-up fixed an additional escape path: a function or invoked script block containing
-unscoped `break`/`continue` could skip the terminal exit after a successful native command.
-Final full suites with all 23 harness controls passed **48/48 template in 1.641 seconds**,
-**38/38 git configuration in 1.720 seconds**, and **41/41 npm changelog in 19.294 seconds**.
-Independent adversarial review reproduced all four function/block break/continue cases and
-confirmed rejection, then ran the shared harness at 23/23. These local results supersede the
-preceding pre-follow-up assertion totals without changing the original fixture assertions.
+A follow-up rejected unscoped function/block `break`/`continue` that could bypass terminal exit after a successful native command.
+With all 23 controls, final suites passed **48/48 template in 1.641 seconds**, **38/38 git configuration in 1.720 seconds**,
+and **41/41 npm changelog in 19.294 seconds**. Independent review reproduced and confirmed rejection of all four escape cases,
+then passed the shared harness at 23/23. These results supersede earlier totals; every original fixture assertion remains.
 
 ## Release tag verifier migration evidence
 
-All 24 original assertions remain. The repeated package/version checks now use the shared
-strict runspace harness, including its 23 rejection, status, stream, and isolation controls.
-Four added real CLI assertions preserve successful tag/source/path binding and identical
-GitHub output-file content, empty tag and empty source ref diagnostics, and exact exit 64
-for an unexpected argument. Every original negative case still requires exact exit 1 and
-its original diagnostic assertion.
-
-The production verifier now ends with explicit `exit 0`. Its CLI success already returned 0;
-this makes success satisfy the same terminal-exit contract as the migrated scripts without
-inferring success from an absent status. The existing failure function still exits 1, and
-unexpected arguments still exit 64. The fixture continues to restore `GITHUB_OUTPUT` in a
-`finally` block and removes its temporary output files.
-
-A sequential comparison on the same devcontainer host passed the original **24/24 in
-3.888 seconds**, then the revised **51/51 in 1.918 seconds**. The revised run includes all
-original content assertions, 23 harness controls, and four CLI controls. These are local
-single-sample observations, not hosted performance acceptance. The retained CLI helper
-is still one executable launch site, so the direct-command inventory remains 37 sites in
-22 PowerShell test files; the site's execution count is lower.
+The verifier preserves 24 original assertions and adds 23 shared strict-runspace controls plus four CLI controls (51 total).
+CLI controls prove matching tag/source/path binding and GitHub outputs, empty tag/source ref diagnostics, and unexpected-argument exit 64.
+Original negative cases retain exact exit 1 and their diagnostics. Explicit terminal `exit 0` preserves CLI success while satisfying the shared contract;
+missing status is never inferred as success. The fixture restores `GITHUB_OUTPUT` in `finally` and removes temporary output files.
+Sequential same-host devcontainer runs passed **24/24 in 3.888 seconds** before and **51/51 in 1.918 seconds** after, including every added control.
+These are local single-sample observations, not hosted acceptance. The retained CLI helper remains one source launch site;
+the inventory stays **37 sites in 22 PowerShell test files**, with fewer executions of that site.
 
 ## Remaining acceptance work
 
