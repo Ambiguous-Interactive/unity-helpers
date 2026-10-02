@@ -217,7 +217,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            for (int offset = 0; offset < sizeof(ulong); offset++)
+            for (int offset = 0; offset < sizeof(ulong); ++offset)
             {
                 _buffer[start + offset] = (byte)(value >> (offset * 8));
             }
@@ -556,7 +556,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             if (nested)
             {
-                _depth++;
+                ++_depth;
             }
 
             token = new WProtoLengthToken(prefixStart, _position, reservedPrefixSize, nested);

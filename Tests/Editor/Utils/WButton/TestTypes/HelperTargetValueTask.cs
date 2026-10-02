@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         public async ValueTask ValueTaskButton()
         {
             await Task.Delay(50);
-            CompletionCount++;
+            ++CompletionCount;
         }
     }
 }

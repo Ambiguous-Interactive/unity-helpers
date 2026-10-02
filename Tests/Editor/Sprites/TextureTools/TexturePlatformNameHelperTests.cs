@@ -37,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             Assert.AreSame(a, b);
 
-            for (int i = 1; i < a.Length; i++)
+            for (int i = 1; i < a.Length; ++i)
             {
                 Assert.LessOrEqual(
                     string.Compare(a[i - 1], a[i], System.StringComparison.Ordinal),

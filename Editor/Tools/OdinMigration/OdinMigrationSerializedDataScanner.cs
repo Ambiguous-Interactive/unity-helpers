@@ -43,11 +43,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 findings = parsedFindings;
                 return false;
             }
-            for (int documentIndex = 0; documentIndex < documentCount; documentIndex++)
+            for (int documentIndex = 0; documentIndex < documentCount; ++documentIndex)
             {
                 IReadOnlyList<AuthoredAssetEntry> entries = documents[documentIndex].Entries;
                 int entryCount = entries.Count;
-                for (int entryIndex = 0; entryIndex < entryCount; entryIndex++)
+                for (int entryIndex = 0; entryIndex < entryCount; ++entryIndex)
                 {
                     AuthoredAssetEntry entry = entries[entryIndex];
                     if (
@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             int position = 0;
             if (source[0] == '\ufeff')
             {
-                position++;
+                ++position;
             }
             if (0 <= source.IndexOf('\0'))
             {
@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         private static bool TargetsSerializationData(string source, int start, int end)
         {
-            for (int position = start; position < end; position++)
+            for (int position = start; position < end; ++position)
             {
                 if (position != start && source[position - 1] != '.')
                 {
@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 int segmentEnd = position;
                 while (segmentEnd < end && source[segmentEnd] != '.' && source[segmentEnd] != '[')
                 {
-                    segmentEnd++;
+                    ++segmentEnd;
                 }
                 int length = segmentEnd - position;
                 if (
@@ -175,11 +175,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             if (quote == '\'' || quote == '"')
             {
                 int scalarStart = start + 1;
-                for (int position = scalarStart; position < end; position++)
+                for (int position = scalarStart; position < end; ++position)
                 {
                     if (quote == '"' && source[position] == '\\')
                     {
-                        position++;
+                        ++position;
                         continue;
                     }
                     if (
@@ -189,7 +189,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         && source[position + 1] == '\''
                     )
                     {
-                        position++;
+                        ++position;
                         continue;
                     }
                     if (source[position] == quote)
@@ -205,7 +205,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
 
             int scalarEnd = end;
-            for (int position = start; position < end; position++)
+            for (int position = start; position < end; ++position)
             {
                 if (
                     source[position] == '#'
@@ -219,7 +219,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             int unquotedStart = start;
             while (unquotedStart < scalarEnd && char.IsWhiteSpace(source[unquotedStart]))
             {
-                unquotedStart++;
+                ++unquotedStart;
             }
             while (unquotedStart < scalarEnd && char.IsWhiteSpace(source[scalarEnd - 1]))
             {
@@ -234,7 +234,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             while (position < end && char.IsWhiteSpace(source[position]))
             {
-                position++;
+                ++position;
             }
         }
     }

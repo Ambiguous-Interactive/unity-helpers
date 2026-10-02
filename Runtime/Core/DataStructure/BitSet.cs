@@ -281,7 +281,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public void SetAll()
         {
             int bitsLength = _bits.Length;
-            for (int i = 0; i < bitsLength; i++)
+            for (int i = 0; i < bitsLength; ++i)
             {
                 _bits[i] = ulong.MaxValue;
             }
@@ -308,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public void FlipAll()
         {
             int bitsLength = _bits.Length;
-            for (int i = 0; i < bitsLength; i++)
+            for (int i = 0; i < bitsLength; ++i)
             {
                 _bits[i] = ~_bits[i];
             }
@@ -355,7 +355,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             ClearAll();
 
-            for (int i = shift; i < _capacity; i++)
+            for (int i = shift; i < _capacity; ++i)
             {
                 int sourceIndex = i - shift;
                 int sourceWordIndex = sourceIndex >> 6;
@@ -385,7 +385,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            for (int i = 0; i < _capacity - shift; i++)
+            for (int i = 0; i < _capacity - shift; ++i)
             {
                 if (TryGet(i + shift, out bool value) && value)
                 {
@@ -397,7 +397,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
-            for (int i = _capacity - shift; i < _capacity; i++)
+            for (int i = _capacity - shift; i < _capacity; ++i)
             {
                 TryClear(i);
             }
@@ -443,7 +443,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int fullSegments = _capacity >> BitsPerLongShift;
-            for (int i = 0; i < fullSegments; i++)
+            for (int i = 0; i < fullSegments; ++i)
             {
                 if (_bits[i] != ulong.MaxValue)
                 {
@@ -483,7 +483,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int bitsLength = _bits.Length;
-            for (int i = 0; i < bitsLength; i++)
+            for (int i = 0; i < bitsLength; ++i)
             {
                 _bits[i] &= other._bits[i];
             }
@@ -507,7 +507,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int minLength = Math.Min(_bits.Length, other._bits.Length);
-            for (int i = 0; i < minLength; i++)
+            for (int i = 0; i < minLength; ++i)
             {
                 _bits[i] |= other._bits[i];
             }
@@ -531,7 +531,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int minLength = Math.Min(_bits.Length, other._bits.Length);
-            for (int i = 0; i < minLength; i++)
+            for (int i = 0; i < minLength; ++i)
             {
                 _bits[i] ^= other._bits[i];
             }
@@ -550,7 +550,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             results.Clear();
-            for (int i = 0; i < _capacity; i++)
+            for (int i = 0; i < _capacity; ++i)
             {
                 if (TryGet(i, out bool value) && value)
                 {
@@ -566,7 +566,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public IEnumerable<int> EnumerateSetIndices()
         {
-            for (int i = 0; i < _capacity; i++)
+            for (int i = 0; i < _capacity; ++i)
             {
                 if (TryGet(i, out bool value) && value)
                 {

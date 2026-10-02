@@ -86,7 +86,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             string trimmed = query == null ? string.Empty : query.Trim();
-            for (int index = 0; index < findings.Count; index++)
+            for (int index = 0; index < findings.Count; ++index)
             {
                 ValidationFinding finding = findings[index];
                 if (finding.Severity < minimum)
@@ -130,23 +130,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             int foundWarnings = 0;
             int foundInfos = 0;
             int count = findings == null ? 0 : findings.Count;
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 switch (findings[index].Severity)
                 {
                     case ValidationSeverity.Error:
                     {
-                        foundErrors++;
+                        ++foundErrors;
                         break;
                     }
                     case ValidationSeverity.Warning:
                     {
-                        foundWarnings++;
+                        ++foundWarnings;
                         break;
                     }
                     default:
                     {
-                        foundInfos++;
+                        ++foundInfos;
                         break;
                     }
                 }

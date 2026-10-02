@@ -511,7 +511,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                 if (_trackScopeDepth)
                 {
-                    _scopeDepth++;
+                    ++_scopeDepth;
                     _totalPadding += _padding;
                     _totalLeftPadding += _leftPadding;
                     _totalRightPadding += _rightPadding;
@@ -556,7 +556,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 _rightPadding = resolvedRight;
                 _trackScopeDepth = true;
 
-                _scopeDepth++;
+                ++_scopeDepth;
                 _totalPadding += _padding;
                 _totalLeftPadding += _leftPadding;
                 _totalRightPadding += _rightPadding;

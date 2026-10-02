@@ -575,7 +575,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             int maxAssignments = 0 < attribute.MaxCount ? attribute.MaxCount : int.MaxValue;
 
             // Unity queries already guarantee element-type membership.
-            for (int readIndex = 0; readIndex < componentCount; readIndex++)
+            for (int readIndex = 0; readIndex < componentCount; ++readIndex)
             {
                 Component candidate = components[readIndex];
 
@@ -679,7 +679,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             if (!allowInterfaces && !elementType.IsSealed)
             {
                 int writeIndex = 0;
-                for (int index = 0; index < buffer.Count; index++)
+                for (int index = 0; index < buffer.Count; ++index)
                 {
                     Component candidate = buffer[index];
                     if (candidate != null && candidate.GetType() == elementType)

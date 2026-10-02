@@ -207,11 +207,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return new BoundingBox3D(localMin, localMax);
         }
 
-        public BoundingBox3D Encapsulate(Vector3 point) => ExpandToInclude(point);
+        public BoundingBox3D Encapsulate(Vector3 point)
+        {
+            return ExpandToInclude(point);
+        }
 
-        public BoundingBox3D Encapsulate(BoundingBox3D other) => ExpandToInclude(other);
+        public BoundingBox3D Encapsulate(BoundingBox3D other)
+        {
+            return ExpandToInclude(other);
+        }
 
-        public BoundingBox3D Union(BoundingBox3D other) => ExpandToInclude(other);
+        public BoundingBox3D Union(BoundingBox3D other)
+        {
+            return ExpandToInclude(other);
+        }
 
         public BoundingBox3D EnsureMinimumSize(float minimum)
         {

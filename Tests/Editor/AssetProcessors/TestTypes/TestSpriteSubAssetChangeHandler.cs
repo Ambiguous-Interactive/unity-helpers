@@ -47,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
 
             IReadOnlyList<string> createdPaths = context.CreatedAssetPaths;
-            for (int i = 0; i < createdPaths.Count; i++)
+            for (int i = 0; i < createdPaths.Count; ++i)
             {
                 string createdPath = createdPaths[i];
                 if (

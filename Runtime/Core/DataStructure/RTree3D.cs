@@ -346,7 +346,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = 0; i < length; ++i)
                 {
                     ulong key = source[i]._sortKey;
-                    counts[(int)((key >> shift) & (BucketCount - 1))]++;
+                    ++counts[(int)((key >> shift) & (BucketCount - 1))];
                 }
 
                 int total = 0;

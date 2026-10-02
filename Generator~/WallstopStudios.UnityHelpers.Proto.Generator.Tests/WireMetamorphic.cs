@@ -206,7 +206,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 return results;
             }
 
-            for (int index = 0; index < fields.Count; index++)
+            for (int index = 0; index < fields.Count; ++index)
             {
                 Field field = fields[index];
                 if (

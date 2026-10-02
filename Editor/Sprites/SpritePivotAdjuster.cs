@@ -526,7 +526,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 SumX += x;
                 SumY += y;
-                Count++;
+                ++Count;
             }
         }
 

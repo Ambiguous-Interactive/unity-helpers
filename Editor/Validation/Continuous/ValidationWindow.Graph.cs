@@ -114,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     );
                     _conditionGraphNodes.Add(node);
                     _graphNodes.Add(node);
-                    index++;
+                    ++index;
                 }
             }
             _graphContent.Add(_reportNode);
@@ -140,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             private void DrawConnections(MeshGenerationContext context)
             {
-                for (int index = 1; index < _nodes.Count; index++)
+                for (int index = 1; index < _nodes.Count; ++index)
                 {
                     Rect first = _nodes[index - 1].worldBound;
                     Rect second = _nodes[index].worldBound;

@@ -19,7 +19,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         [SerializeField]
         internal string privateString = "hello";
 
-        public string GetPrivateString() => privateString;
+        public string GetPrivateString()
+        {
+            return privateString;
+        }
 
         [Serializable]
         public class Inner
@@ -35,7 +38,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
             [SerializeField]
             internal Inner inner = new();
 
-            public Inner GetInner() => inner;
+            public Inner GetInner()
+            {
+                return inner;
+            }
         }
     }
 }

@@ -132,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 Assert.Less(index, expectedKeys.Length);
                 Assert.AreEqual(expectedKeys[index], pair.Key);
-                index++;
+                ++index;
             }
 
             Assert.AreEqual(expectedKeys.Length, index);
@@ -181,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 Assert.Less(index, expectedKeys.Length);
                 Assert.AreEqual(expectedKeys[index], pair.Key);
-                index++;
+                ++index;
             }
 
             Assert.AreEqual(expectedKeys.Length, index);

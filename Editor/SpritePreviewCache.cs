@@ -37,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Editor
         )
         {
             long pixels = 0;
-            for (int level = 0; level < mipmapCount; level++)
+            for (int level = 0; level < mipmapCount; ++level)
             {
                 pixels += (long)width * height;
                 width = Math.Max(1, width / 2);
@@ -48,7 +48,10 @@ namespace WallstopStudios.UnityHelpers.Editor
             return pixels * bytesPerPixel * 2 + 4096;
         }
 
-        private static bool WasProvided(Sprite sprite) => !ReferenceEquals(sprite, null);
+        private static bool WasProvided(Sprite sprite)
+        {
+            return !ReferenceEquals(sprite, null);
+        }
 
         internal bool TryGetValue(Sprite sprite, out Texture2D texture)
         {
@@ -108,8 +111,10 @@ namespace WallstopStudios.UnityHelpers.Editor
             return true;
         }
 
-        internal bool CanRetain(long estimatedBytes) =>
-            0 < _maximumEntries && estimatedBytes <= MaximumEstimatedBytes;
+        internal bool CanRetain(long estimatedBytes)
+        {
+            return 0 < _maximumEntries && estimatedBytes <= MaximumEstimatedBytes;
+        }
 
         internal void Clear()
         {

@@ -83,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 string name = Path.GetFileName(folder);
                 if (IsTempDuplicateFolder(name) && AssetDatabase.DeleteAsset(folder))
                 {
-                    deletedCount++;
+                    ++deletedCount;
                 }
             }
 
@@ -111,7 +111,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         public static int CleanupTempDuplicatesWithRetry(int maxRetries = DefaultRetryCount)
         {
             int totalDeleted = 0;
-            for (int attempt = 0; attempt < maxRetries; attempt++)
+            for (int attempt = 0; attempt < maxRetries; ++attempt)
             {
                 int deletedCount = CleanupTempDuplicates();
                 totalDeleted += deletedCount;

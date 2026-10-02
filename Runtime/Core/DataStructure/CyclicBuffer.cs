@@ -357,7 +357,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _serializedItemsLease.Dispose();
 
             _serializedItemsLease = Buffers<T>.List.Get(out List<T> buffer);
-            for (int i = 0; i < Count; i++)
+            for (int i = 0; i < Count; ++i)
             {
                 buffer.Add(_buffer[AdjustedIndexFor(i)]);
             }

@@ -10,6 +10,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class SplitMix64RandomTests : RandomTestBase
     {
-        protected override IRandom NewRandom() => new SplitMix64(DeterministicSeed64);
+        protected override IRandom NewRandom()
+        {
+            return new SplitMix64(DeterministicSeed64);
+        }
     }
 }

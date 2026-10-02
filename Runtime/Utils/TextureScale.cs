@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 bool reachedTheEnd = false;
                 try
                 {
-                    for (int i = 0; i < cores - 1; i++)
+                    for (int i = 0; i < cores - 1; ++i)
                     {
                         int start = slice * i;
                         int end = slice * (i + 1);
@@ -239,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                                 countdown.Signal();
                             }
                         });
-                        dispatched++;
+                        ++dispatched;
                     }
 
                     // Record slice failure so the first failure wins without masking another exception during unwinding.
@@ -380,7 +380,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                             out premultiplied
                         );
                         int sourceLength = source.Length;
-                        for (int j = 0; j < sourceLength; j++)
+                        for (int j = 0; j < sourceLength; ++j)
                         {
                             premultiplied[j] = TextureResampling.Premultiply(source[j]);
                         }
@@ -410,7 +410,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             int maxSourceX = sourceWidth - 1;
             int maxSourceY = sourceHeight - 1;
 
-            for (int y = startY; y < endY; y++)
+            for (int y = startY; y < endY; ++y)
             {
                 float sourceYFloat = TextureResampling.BilinearSourceCoordinate(
                     y,
@@ -426,7 +426,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 int y2Offset = sourceY2 * sourceWidth;
                 int destRow = y * destWidth;
 
-                for (int x = 0; x < destWidth; x++)
+                for (int x = 0; x < destWidth; ++x)
                 {
                     float sourceXFloat = TextureResampling.BilinearSourceCoordinate(
                         x,
@@ -503,12 +503,12 @@ namespace WallstopStudios.UnityHelpers.Utils
             int maxSourceX = sourceWidth - 1;
             int maxSourceY = sourceHeight - 1;
 
-            for (int y = startY; y < endY; y++)
+            for (int y = startY; y < endY; ++y)
             {
                 int sourceY =
                     TextureResampling.NearestSourceIndex(y, ratioY, maxSourceY) * sourceWidth;
                 int destRow = y * destWidth;
-                for (int x = 0; x < destWidth; x++)
+                for (int x = 0; x < destWidth; ++x)
                 {
                     dest[destRow + x] = source[
                         sourceY + TextureResampling.NearestSourceIndex(x, ratioX, maxSourceX)

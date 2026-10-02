@@ -245,7 +245,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(extractor._discoveredSheets.Count, Is.GreaterThanOrEqualTo(1));
 
             bool found = false;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath == Shared2x2Path)
                 {
@@ -270,7 +270,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.IsTrue(extractor._discoveredSheets != null);
 
             bool found = false;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath == SharedSingleModePath)
                 {
@@ -295,7 +295,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
             Assert.IsTrue(entry != null, "Should find shared_4x4 entry");
 
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 entry._sprites[i]._isSelected = false;
             }
@@ -314,7 +314,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
             Assert.IsTrue(entry != null, "Should find shared_4x4 entry");
 
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 entry._sprites[i]._isSelected = true;
             }
@@ -409,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             bool anyFound = false;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 SpriteSheetExtractor.SpriteSheetEntry entry = extractor._discoveredSheets[i];
                 if (0 < entry._sprites.Count)
@@ -473,9 +473,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SpriteSheetExtractor extractor = CreateExtractorWithSharedFixtures();
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
-                for (int j = 0; j < extractor._discoveredSheets[i]._sprites.Count; j++)
+                for (int j = 0; j < extractor._discoveredSheets[i]._sprites.Count; ++j)
                 {
                     extractor._discoveredSheets[i]._sprites[j]._isSelected = false;
                 }
@@ -498,14 +498,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor._paddingBottom = 5;
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 extractor._discoveredSheets[i]._useGlobalSettings = false;
             }
 
             extractor.ApplyGlobalSettingsToAll();
 
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 SpriteSheetExtractor.SpriteSheetEntry entry = extractor._discoveredSheets[i];
                 Assert.That(entry._useGlobalSettings, Is.False);
@@ -800,7 +800,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, targetPath);
             Assert.IsTrue(entry != null, $"Should find {sheetType} sheet");
 
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 entry._sprites[i]._isSelected = false;
             }
@@ -818,10 +818,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: true);
 
             bool foundAnyWithPreviews = false;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 SpriteSheetExtractor.SpriteSheetEntry entry = extractor._discoveredSheets[i];
-                for (int j = 0; j < entry._sprites.Count; j++)
+                for (int j = 0; j < entry._sprites.Count; ++j)
                 {
                     if (entry._sprites[j]._previewTexture != null)
                     {
@@ -972,14 +972,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
             Assert.IsTrue(entry != null, "Should find shared_4x4");
 
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 entry._sprites[i]._usePivotOverride = false;
             }
 
             extractor.EnableAllPivotOverrides(entry);
 
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 Assert.That(
                     entry._sprites[i]._usePivotOverride,
@@ -998,14 +998,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
             Assert.IsTrue(entry != null, "Should find shared_4x4");
 
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 entry._sprites[i]._usePivotOverride = true;
             }
 
             extractor.DisableAllPivotOverrides(entry);
 
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 Assert.That(
                     entry._sprites[i]._usePivotOverride,
@@ -1226,7 +1226,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             bool foundShared = false;
             bool foundSecond = false;
 
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains("test_"))
                 {
@@ -1284,7 +1284,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 );
 
             Assert.That(reversedOrder.Count, Is.EqualTo(originalOrder.Count));
-            for (int i = 0; i < originalOrder.Count; i++)
+            for (int i = 0; i < originalOrder.Count; ++i)
             {
                 Assert.That(
                     reversedOrder[i],
@@ -1315,7 +1315,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     SpriteSheetExtractor.SortMode.ByName
                 );
 
-            for (int i = 1; i < sortedByName.Count; i++)
+            for (int i = 1; i < sortedByName.Count; ++i)
             {
                 int comparison = string.Compare(
                     sortedByName[i - 1]._originalName,
@@ -1342,7 +1342,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (
                     extractor
@@ -1370,7 +1370,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (
                     extractor
@@ -1396,7 +1396,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains($"aspect_{width}x{height}"))
                 {
@@ -1440,7 +1440,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains("boundary_test"))
                 {
@@ -1514,7 +1514,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.GenerateAllPreviewTexturesInBatch(extractor._discoveredSheets);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains("aspect_ratio_test"))
                 {
@@ -1601,7 +1601,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
             List<Texture2D> originalTextures = new();
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 originalTextures.Add(entry._sprites[i]._previewTexture);
             }
@@ -1609,7 +1609,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.SchedulePreviewRegeneration(entry);
             extractor.GenerateAllPreviewTexturesInBatch(extractor._discoveredSheets);
 
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 Assert.IsTrue(entry._sprites[i]._previewTexture != null);
             }
@@ -1639,7 +1639,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 Assert.DoesNotThrow(() => extractor.SchedulePreviewRegeneration(entry));
             }
@@ -1724,7 +1724,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, Shared4x4Path);
 
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 if (entry._sprites[i]._previewTexture != null)
                 {
@@ -1959,7 +1959,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains("alpha_threshold_test"))
                 {
@@ -1978,7 +1978,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             int totalSprites = 0;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 totalSprites += extractor._discoveredSheets[i]._sprites.Count;
             }
@@ -1986,7 +1986,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.GenerateAllPreviewTexturesInBatch(extractor._discoveredSheets);
 
             int newTotalSprites = 0;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 newTotalSprites += extractor._discoveredSheets[i]._sprites.Count;
             }
@@ -2004,7 +2004,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains("large_2048"))
                 {
@@ -2026,7 +2026,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains("varying_sizes"))
                 {
@@ -2052,7 +2052,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains($"npot_{width}x{height}"))
                 {
@@ -2073,7 +2073,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains("npot_test"))
                 {
@@ -2094,7 +2094,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains("prime_test"))
                 {
@@ -2125,7 +2125,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
             SpriteSheetExtractor.SpriteSheetEntry entry = null;
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath.Contains("single_mode_sprite"))
                 {
@@ -2152,7 +2152,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 entry != null,
                 $"[{testContext}] Entry should not be null when checking selection state"
             );
-            for (int i = 0; i < entry._sprites.Count; i++)
+            for (int i = 0; i < entry._sprites.Count; ++i)
             {
                 Assert.That(
                     entry._sprites[i]._isSelected,

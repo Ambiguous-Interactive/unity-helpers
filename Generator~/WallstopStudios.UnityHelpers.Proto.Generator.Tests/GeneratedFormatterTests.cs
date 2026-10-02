@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static ChainContract BuildChain(int links)
         {
             ChainContract head = null;
-            for (int link = 1; link <= links; link++)
+            for (int link = 1; link <= links; ++link)
             {
                 head = new ChainContract { Id = link, Next = head };
             }
@@ -329,14 +329,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void ASubMessageCrossingTheLengthPrefixWidthStaysExact()
         {
             // Crossing 127 bytes widens every enclosing prefix, exposing incorrect back-patch shifts.
-            for (int length = 0; length <= 300; length++)
+            for (int length = 0; length <= 300; ++length)
             {
                 BulkHolder holder = new BulkHolder
                 {
                     Child = new BulkContract { Payload = new byte[length] },
                     Trailer = 7,
                 };
-                for (int index = 0; index < length; index++)
+                for (int index = 0; index < length; ++index)
                 {
                     holder.Child.Payload[index] = (byte)(index * 31);
                 }
@@ -411,7 +411,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             for (ChainContract current = restored; current != null; current = current.Next)
             {
                 Assert.AreEqual(head.Id - links, current.Id);
-                links++;
+                ++links;
             }
 
             Assert.AreEqual(60, links);

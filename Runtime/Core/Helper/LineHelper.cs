@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 double maxDistance = 0;
                 int indexFarthest = 0;
 
-                for (int index = firstPoint; index < lastPoint; index++)
+                for (int index = firstPoint; index < lastPoint; ++index)
                 {
                     double distance = InternalPerpendicularDistance(
                         points[firstPoint],

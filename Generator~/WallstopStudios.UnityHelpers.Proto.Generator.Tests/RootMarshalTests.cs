@@ -83,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static byte[] Parse(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }
@@ -963,7 +963,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             public int Measure(in Unserviceable value)
             {
-                MeasureCount++;
+                ++MeasureCount;
                 return 0;
             }
 
@@ -993,7 +993,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             public int MeasureValue(in Unserviceable value)
             {
-                MeasureCount++;
+                ++MeasureCount;
                 return WProtoSizes.Int32Size(value.Value);
             }
 

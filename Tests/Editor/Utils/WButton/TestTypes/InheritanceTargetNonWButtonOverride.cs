@@ -11,7 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
 
         public override void VirtualMethodNotOverriddenAsWButton()
         {
-            DerivedCallCount++;
+            ++DerivedCallCount;
         }
     }
 }

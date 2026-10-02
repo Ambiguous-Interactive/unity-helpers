@@ -80,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (1 < Property.ValueEntry.ValueCount)
             {
                 object firstValue = Property.ValueEntry.WeakValues[0];
-                for (int i = 1; i < Property.ValueEntry.ValueCount; i++)
+                for (int i = 1; i < Property.ValueEntry.ValueCount; ++i)
                 {
                     if (!Equals(firstValue, Property.ValueEntry.WeakValues[i]))
                     {
@@ -292,7 +292,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             GenericMenu menu = new();
             int optionsLength = options.Length;
-            for (int i = 0; i < optionsLength; i++)
+            for (int i = 0; i < optionsLength; ++i)
             {
                 int capturedIndex = i;
                 bool isSelected = i == currentIndex && !hasMultipleDifferentValues;

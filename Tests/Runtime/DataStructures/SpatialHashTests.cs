@@ -421,7 +421,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 if (string.Equals(entry, "far", System.StringComparison.Ordinal))
                 {
-                    farCount++;
+                    ++farCount;
                 }
             }
 
@@ -463,7 +463,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 if (entry == 1)
                 {
-                    duplicateOnes++;
+                    ++duplicateOnes;
                 }
             }
 
@@ -824,7 +824,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             SpatialHash2D<int> hash = Track(new SpatialHash2D<int>(1.0f));
             int count = 1000;
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 hash.Insert(new Vector2(0.5f, 0.5f), i);
             }
@@ -842,9 +842,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             SpatialHash2D<string> hash = Track(new SpatialHash2D<string>(1.0f));
             int gridSize = 100;
 
-            for (int x = 0; x < gridSize; x++)
+            for (int x = 0; x < gridSize; ++x)
             {
-                for (int y = 0; y < gridSize; y++)
+                for (int y = 0; y < gridSize; ++y)
                 {
                     hash.Insert(new Vector2(x + 0.5f, y + 0.5f), $"item_{x}_{y}");
                 }
@@ -857,7 +857,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void StressTestQueryLargeRadius()
         {
             SpatialHash2D<int> hash = Track(new SpatialHash2D<int>(1.0f));
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 hash.Insert(new Vector2(i * 0.5f, i * 0.5f), i);
             }
@@ -887,9 +887,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             SpatialHash2D<string> hash = Track(new SpatialHash2D<string>(1.0f));
             string shared = "shared_item";
 
-            for (int x = 0; x < 3; x++)
+            for (int x = 0; x < 3; ++x)
             {
-                for (int y = 0; y < 3; y++)
+                for (int y = 0; y < 3; ++y)
                 {
                     hash.Insert(new Vector2(x + 0.5f, y + 0.5f), shared);
                 }
@@ -906,9 +906,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             SpatialHash2D<string> hash = Track(new SpatialHash2D<string>(1.0f));
 
-            for (int iteration = 0; iteration < 10; iteration++)
+            for (int iteration = 0; iteration < 10; ++iteration)
             {
-                for (int i = 0; i < 100; i++)
+                for (int i = 0; i < 100; ++i)
                 {
                     hash.Insert(new Vector2(i, i), $"iter{iteration}_item{i}");
                 }
@@ -1037,9 +1037,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void EdgeCaseQueryRectSpanningManyCells()
         {
             SpatialHash2D<string> hash = Track(new SpatialHash2D<string>(1.0f));
-            for (int x = 0; x < 50; x++)
+            for (int x = 0; x < 50; ++x)
             {
-                for (int y = 0; y < 50; y++)
+                for (int y = 0; y < 50; ++y)
                 {
                     hash.Insert(new Vector2(x + 0.5f, y + 0.5f), $"{x},{y}");
                 }
@@ -1073,9 +1073,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void EdgeCaseQueryRectPartialOverlap()
         {
             SpatialHash2D<string> hash = Track(new SpatialHash2D<string>(1.0f));
-            for (int x = 0; x < 10; x++)
+            for (int x = 0; x < 10; ++x)
             {
-                for (int y = 0; y < 10; y++)
+                for (int y = 0; y < 10; ++y)
                 {
                     hash.Insert(new Vector2(x + 0.5f, y + 0.5f), $"{x},{y}");
                 }
@@ -1092,9 +1092,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void EdgeCaseQueryRectSingleRowOrColumn()
         {
             SpatialHash2D<string> hash = Track(new SpatialHash2D<string>(1.0f));
-            for (int x = 0; x < 10; x++)
+            for (int x = 0; x < 10; ++x)
             {
-                for (int y = 0; y < 10; y++)
+                for (int y = 0; y < 10; ++y)
                 {
                     hash.Insert(new Vector2(x + 0.5f, y + 0.5f), $"{x},{y}");
                 }
@@ -1158,11 +1158,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void EdgeCase3DQueryBoxSpanningManyCells()
         {
             SpatialHash3D<string> hash = Track(new SpatialHash3D<string>(1.0f));
-            for (int x = 0; x < 10; x++)
+            for (int x = 0; x < 10; ++x)
             {
-                for (int y = 0; y < 10; y++)
+                for (int y = 0; y < 10; ++y)
                 {
-                    for (int z = 0; z < 10; z++)
+                    for (int z = 0; z < 10; ++z)
                     {
                         hash.Insert(new Vector3(x + 0.5f, y + 0.5f, z + 0.5f), $"{x},{y},{z}");
                     }
@@ -1180,11 +1180,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void EdgeCase3DQueryBoxPartialOverlap()
         {
             SpatialHash3D<string> hash = Track(new SpatialHash3D<string>(1.0f));
-            for (int x = 0; x < 10; x++)
+            for (int x = 0; x < 10; ++x)
             {
-                for (int y = 0; y < 10; y++)
+                for (int y = 0; y < 10; ++y)
                 {
-                    for (int z = 0; z < 10; z++)
+                    for (int z = 0; z < 10; ++z)
                     {
                         hash.Insert(new Vector3(x + 0.5f, y + 0.5f, z + 0.5f), $"{x},{y},{z}");
                     }
@@ -1202,11 +1202,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void EdgeCase3DQueryBoxSinglePlane()
         {
             SpatialHash3D<string> hash = Track(new SpatialHash3D<string>(1.0f));
-            for (int x = 0; x < 5; x++)
+            for (int x = 0; x < 5; ++x)
             {
-                for (int y = 0; y < 5; y++)
+                for (int y = 0; y < 5; ++y)
                 {
-                    for (int z = 0; z < 5; z++)
+                    for (int z = 0; z < 5; ++z)
                     {
                         hash.Insert(new Vector3(x + 0.5f, y + 0.5f, z + 0.5f), $"{x},{y},{z}");
                     }

@@ -98,7 +98,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             {
                 using (PooledResource<TestPoolItem> _ = pool.Get()) { }
 
-                rentsNeeded++;
+                ++rentsNeeded;
                 PoolStatistics stats = pool.GetStatistics();
                 totalPurged = (int)stats.PurgeCount;
 
@@ -342,7 +342,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             while (minRetain < pool.Count && iterations < 10)
             {
                 pool.Purge();
-                iterations++;
+                ++iterations;
             }
 
             Assert.AreEqual(minRetain, pool.Count);
@@ -523,7 +523,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             while (minRetainCount < pool.Count && iterations < 50)
             {
                 int purgedThisRound = pool.Purge();
-                iterations++;
+                ++iterations;
 
                 TestContext.WriteLine(
                     $"Iteration {iterations}: purged={purgedThisRound}, pool.Count={pool.Count}, total purged={purgeCount}"
@@ -599,7 +599,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int iterations = 0;
             while (minRetainCount < pool.Count && iterations < 50)
             {
-                iterations++;
+                ++iterations;
 
                 if (trigger == PurgeTrigger.Explicit)
                 {
@@ -666,7 +666,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             while (minRetainCount < pool.Count && iterations < preWarmCount + 5)
             {
                 int purged = pool.Purge();
-                iterations++;
+                ++iterations;
 
                 TestContext.WriteLine(
                     $"Iteration {iterations}: purged={purged}, pool.Count={pool.Count}"
@@ -825,7 +825,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             while (minRetainCount < pool.Count && iterations < 50)
             {
                 pool.Purge();
-                iterations++;
+                ++iterations;
 
                 Assert.GreaterOrEqual(
                     pool.Count,

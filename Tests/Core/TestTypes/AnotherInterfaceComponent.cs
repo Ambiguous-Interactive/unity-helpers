@@ -7,6 +7,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
 
     public sealed class AnotherInterfaceComponent : MonoBehaviour, ITestInterface
     {
-        public string GetTestValue() => "Another";
+        public string GetTestValue()
+        {
+            return "Another";
+        }
     }
 }

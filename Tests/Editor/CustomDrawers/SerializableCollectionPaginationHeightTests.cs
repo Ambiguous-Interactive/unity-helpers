@@ -30,7 +30,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryHeightRecalculatesWhenPageIndexChanges()
         {
             DictionaryPageTestHost host = CreateScriptableObject<DictionaryPageTestHost>();
-            for (int i = 0; i < LargePageCount + SmallPageCount; i++)
+            for (int i = 0; i < LargePageCount + SmallPageCount; ++i)
             {
                 host.dictionary.Add(i, $"Value {i}");
             }
@@ -92,7 +92,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryHeightRecalculatesImmediatelyOnPageSwitch()
         {
             DictionaryPageTestHost host = CreateScriptableObject<DictionaryPageTestHost>();
-            for (int i = 0; i < LargePageCount + SmallPageCount; i++)
+            for (int i = 0; i < LargePageCount + SmallPageCount; ++i)
             {
                 host.dictionary.Add(i, $"Value {i}");
             }
@@ -151,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryHeightCacheInvalidatesOnPageIndexChange()
         {
             DictionaryPageTestHost host = CreateScriptableObject<DictionaryPageTestHost>();
-            for (int i = 0; i < LargePageCount + SmallPageCount; i++)
+            for (int i = 0; i < LargePageCount + SmallPageCount; ++i)
             {
                 host.dictionary.Add(i, $"Value {i}");
             }
@@ -217,7 +217,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryHeightStaysConsistentWithinSamePage()
         {
             DictionaryPageTestHost host = CreateScriptableObject<DictionaryPageTestHost>();
-            for (int i = 0; i < LargePageCount; i++)
+            for (int i = 0; i < LargePageCount; ++i)
             {
                 host.dictionary.Add(i, $"Value {i}");
             }
@@ -265,7 +265,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryHeightCorrectAfterRapidPageSwitching()
         {
             DictionaryPageTestHost host = CreateScriptableObject<DictionaryPageTestHost>();
-            for (int i = 0; i < LargePageCount + SmallPageCount; i++)
+            for (int i = 0; i < LargePageCount + SmallPageCount; ++i)
             {
                 host.dictionary.Add(i, $"Value {i}");
             }
@@ -339,7 +339,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             ComplexDictionaryPageTestHost host =
                 CreateScriptableObject<ComplexDictionaryPageTestHost>();
-            for (int i = 0; i < LargePageCount + SmallPageCount; i++)
+            for (int i = 0; i < LargePageCount + SmallPageCount; ++i)
             {
                 host.dictionary.Add(
                     i,
@@ -406,7 +406,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void HashSetHeightRecalculatesWhenPageIndexChanges()
         {
             SetPageTestHost host = CreateScriptableObject<SetPageTestHost>();
-            for (int i = 0; i < LargePageCount + SmallPageCount; i++)
+            for (int i = 0; i < LargePageCount + SmallPageCount; ++i)
             {
                 host.hashSet.Add(i);
             }
@@ -463,7 +463,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void HashSetHeightRecalculatesImmediatelyOnPageSwitch()
         {
             SetPageTestHost host = CreateScriptableObject<SetPageTestHost>();
-            for (int i = 0; i < LargePageCount + SmallPageCount; i++)
+            for (int i = 0; i < LargePageCount + SmallPageCount; ++i)
             {
                 host.hashSet.Add(i);
             }
@@ -511,7 +511,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void HashSetHeightCacheInvalidatesOnPageIndexChange()
         {
             SetPageTestHost host = CreateScriptableObject<SetPageTestHost>();
-            for (int i = 0; i < LargePageCount + SmallPageCount; i++)
+            for (int i = 0; i < LargePageCount + SmallPageCount; ++i)
             {
                 host.hashSet.Add(i);
             }
@@ -565,7 +565,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void HashSetHeightStaysConsistentWithinSamePage()
         {
             SetPageTestHost host = CreateScriptableObject<SetPageTestHost>();
-            for (int i = 0; i < LargePageCount; i++)
+            for (int i = 0; i < LargePageCount; ++i)
             {
                 host.hashSet.Add(i);
             }
@@ -608,7 +608,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void HashSetHeightCorrectAfterRapidPageSwitching()
         {
             SetPageTestHost host = CreateScriptableObject<SetPageTestHost>();
-            for (int i = 0; i < LargePageCount + SmallPageCount; i++)
+            for (int i = 0; i < LargePageCount + SmallPageCount; ++i)
             {
                 host.hashSet.Add(i);
             }
@@ -670,7 +670,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void HashSetWithComplexValuesHeightRecalculatesOnPageSwitch()
         {
             ComplexSetPageTestHost host = CreateScriptableObject<ComplexSetPageTestHost>();
-            for (int i = 0; i < LargePageCount + SmallPageCount; i++)
+            for (int i = 0; i < LargePageCount + SmallPageCount; ++i)
             {
                 host.hashSet.Add(
                     new ComplexSetPageTestValue
@@ -725,7 +725,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryHeightCorrectWhenSwitchingFromFullToEmptyishPage()
         {
             DictionaryPageTestHost host = CreateScriptableObject<DictionaryPageTestHost>();
-            for (int i = 0; i < SmallPageSize + 1; i++)
+            for (int i = 0; i < SmallPageSize + 1; ++i)
             {
                 host.dictionary.Add(i, $"Value {i}");
             }
@@ -789,7 +789,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void HashSetHeightCorrectWhenSwitchingFromFullToEmptyishPage()
         {
             SetPageTestHost host = CreateScriptableObject<SetPageTestHost>();
-            for (int i = 0; i < SmallPageSize + 1; i++)
+            for (int i = 0; i < SmallPageSize + 1; ++i)
             {
                 host.hashSet.Add(i);
             }
@@ -837,7 +837,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             DictionaryPageTestHost host = CreateScriptableObject<DictionaryPageTestHost>();
             int totalItems = SmallPageSize * 2 + 1;
-            for (int i = 0; i < totalItems; i++)
+            for (int i = 0; i < totalItems; ++i)
             {
                 host.dictionary.Add(i, $"Value {i}");
             }
@@ -904,7 +904,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             SetPageTestHost host = CreateScriptableObject<SetPageTestHost>();
             int totalItems = SmallPageSize * 2 + 1;
-            for (int i = 0; i < totalItems; i++)
+            for (int i = 0; i < totalItems; ++i)
             {
                 host.hashSet.Add(i);
             }
@@ -960,7 +960,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             DictionaryPageTestHost host = CreateScriptableObject<DictionaryPageTestHost>();
             int totalItems = SmallPageSize * 3 + 1;
-            for (int i = 0; i < totalItems; i++)
+            for (int i = 0; i < totalItems; ++i)
             {
                 host.dictionary.Add(i, $"Value {i}");
             }
@@ -1018,7 +1018,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             SetPageTestHost host = CreateScriptableObject<SetPageTestHost>();
             int totalItems = SmallPageSize * 3 + 1;
-            for (int i = 0; i < totalItems; i++)
+            for (int i = 0; i < totalItems; ++i)
             {
                 host.hashSet.Add(i);
             }

@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix subtype manifest ownership lookup accepting whitespace-only directories; valid folder names containing spaces remain unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix relational component assigner and injection constructors being stripped from High-stripping IL2CPP players using Zenject, VContainer, or Reflex ([#916](https://github.com/Ambiguous-Interactive/unity-helpers/issues/916)).
 - Fix WButton coroutines retaining resources when cancelled, completed, or faulted. Nested callback updates also leave each routine intact ([#911](https://github.com/Ambiguous-Interactive/unity-helpers/issues/911)).
 - Fix persistent runtime singletons losing their authored world placement when detached from transformed parents ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).

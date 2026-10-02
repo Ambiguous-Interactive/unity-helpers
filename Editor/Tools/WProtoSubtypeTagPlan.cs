@@ -366,7 +366,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             // Choose the smallest free number to keep ordinary discriminator varints compact.
-            for (int candidate = 1; candidate <= MaxFieldNumber; candidate++)
+            for (int candidate = 1; candidate <= MaxFieldNumber; ++candidate)
             {
                 if (ReservedRangeStart <= candidate && candidate <= ReservedRangeEnd)
                 {

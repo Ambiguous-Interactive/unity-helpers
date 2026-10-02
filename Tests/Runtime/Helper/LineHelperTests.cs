@@ -569,7 +569,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             List<Vector2> points = new();
             int segments = 36;
-            for (int i = 0; i <= segments; i++)
+            for (int i = 0; i <= segments; ++i)
             {
                 float angle = i * 2f * Mathf.PI / segments;
                 points.Add(new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)));
@@ -619,7 +619,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void SimplifyPreciseHandlesLargeDataset()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 points.Add(new Vector2(i, Mathf.Sin(i * 0.1f)));
             }

@@ -23,27 +23,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.WButton
         public async Task AsyncTaskButton()
         {
             await Task.Delay(50);
-            TaskCompletionCount++;
+            ++TaskCompletionCount;
         }
 
         [WButton]
         public async ValueTask AsyncValueTaskButton()
         {
             await Task.Delay(50);
-            ValueTaskCompletionCount++;
+            ++ValueTaskCompletionCount;
         }
 
         [WButton]
         public IEnumerator EnumeratorButton()
         {
             yield return null;
-            EnumeratorCompletionCount++;
+            ++EnumeratorCompletionCount;
         }
 
         [WButton]
         public void SyncButton()
         {
-            SyncCompletionCount++;
+            ++SyncCompletionCount;
         }
     }
 #endif

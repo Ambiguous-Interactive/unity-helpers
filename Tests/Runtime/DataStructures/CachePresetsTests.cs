@@ -160,13 +160,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
         {
             using Cache<string, int> cache = CachePresets.LongLived<string, int>().Build();
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 cache.Set($"key{i}", i);
             }
 
             Assert.AreEqual(50, cache.Count);
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 Assert.IsTrue(cache.TryGet($"key{i}", out int value));
                 Assert.AreEqual(i, value);
@@ -201,7 +201,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
         {
             using Cache<string, int> cache = CachePresets.LongLived<string, int>().Build();
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 cache.Set($"key{i}", i);
             }
@@ -359,13 +359,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
         {
             using Cache<int, int> cache = CachePresets.HighThroughput<int, int>().Build();
 
-            for (int i = 0; i < 500; i++)
+            for (int i = 0; i < 500; ++i)
             {
                 cache.Set(i, i * 2);
             }
 
             Assert.AreEqual(500, cache.Count);
-            for (int i = 0; i < 500; i++)
+            for (int i = 0; i < 500; ++i)
             {
                 Assert.IsTrue(cache.TryGet(i, out int value));
                 Assert.AreEqual(i * 2, value);
@@ -400,7 +400,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
         {
             using Cache<int, int> cache = CachePresets.HighThroughput<int, int>().Build();
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 cache.Set(i, i);
             }
@@ -850,7 +850,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
                 .OnEviction((k, v, r) => evictions.Add((k, v, r)))
                 .Build();
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 cache.Set(i, i * 10);
             }
@@ -1178,7 +1178,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
         {
             using Cache<int, int> cache = CachePresets.ShortLived<int, int>().Build();
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 cache.Set(i, i);
             }
@@ -1193,7 +1193,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
         {
             using Cache<int, int> cache = CachePresets.LongLived<int, int>().Build();
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 cache.Set(i, i);
             }
@@ -1209,7 +1209,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
         {
             using Cache<int, int> cache = CachePresets.SessionCache<int, int>().Build();
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 cache.Set(i, i);
             }
@@ -1353,7 +1353,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
 
             foreach (Cache<int, int> cache in caches)
             {
-                for (int i = 0; i < entryCount; i++)
+                for (int i = 0; i < entryCount; ++i)
                 {
                     cache.Set(i, i * 2);
                 }
@@ -1362,7 +1362,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
             foreach (Cache<int, int> cache in caches)
             {
                 Assert.AreEqual(entryCount, cache.Count);
-                for (int i = 0; i < entryCount; i++)
+                for (int i = 0; i < entryCount; ++i)
                 {
                     Assert.IsTrue(cache.TryGet(i, out int value));
                     Assert.AreEqual(i * 2, value);

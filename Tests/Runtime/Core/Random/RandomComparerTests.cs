@@ -52,11 +52,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Random
                 _values = new Queue<int>(values);
             }
 
-            private static T NotSupported<T>() => throw new NotSupportedException();
+            private static T NotSupported<T>()
+            {
+                throw new NotSupportedException();
+            }
 
             public int Next()
             {
-                NextCallCount++;
+                ++NextCallCount;
                 if (!_values.TryDequeue(out int value))
                 {
                     throw new InvalidOperationException("No more values configured");
@@ -65,84 +68,195 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Random
                 return value;
             }
 
-            public int Next(int max) => NotSupported<int>();
+            public int Next(int max)
+            {
+                return NotSupported<int>();
+            }
 
-            public int Next(int min, int max) => NotSupported<int>();
+            public int Next(int min, int max)
+            {
+                return NotSupported<int>();
+            }
 
-            public uint NextUint() => NotSupported<uint>();
+            public uint NextUint()
+            {
+                return NotSupported<uint>();
+            }
 
-            public uint NextUint(uint max) => NotSupported<uint>();
+            public uint NextUint(uint max)
+            {
+                return NotSupported<uint>();
+            }
 
-            public uint NextUint(uint min, uint max) => NotSupported<uint>();
+            public uint NextUint(uint min, uint max)
+            {
+                return NotSupported<uint>();
+            }
 
-            public short NextShort() => NotSupported<short>();
+            public short NextShort()
+            {
+                return NotSupported<short>();
+            }
 
-            public short NextShort(short max) => NotSupported<short>();
+            public short NextShort(short max)
+            {
+                return NotSupported<short>();
+            }
 
-            public short NextShort(short min, short max) => NotSupported<short>();
+            public short NextShort(short min, short max)
+            {
+                return NotSupported<short>();
+            }
 
-            public byte NextByte() => NotSupported<byte>();
+            public byte NextByte()
+            {
+                return NotSupported<byte>();
+            }
 
-            public byte NextByte(byte max) => NotSupported<byte>();
+            public byte NextByte(byte max)
+            {
+                return NotSupported<byte>();
+            }
 
-            public byte NextByte(byte min, byte max) => NotSupported<byte>();
+            public byte NextByte(byte min, byte max)
+            {
+                return NotSupported<byte>();
+            }
 
-            public long NextLong() => NotSupported<long>();
+            public long NextLong()
+            {
+                return NotSupported<long>();
+            }
 
-            public long NextLong(long max) => NotSupported<long>();
+            public long NextLong(long max)
+            {
+                return NotSupported<long>();
+            }
 
-            public long NextLong(long min, long max) => NotSupported<long>();
+            public long NextLong(long min, long max)
+            {
+                return NotSupported<long>();
+            }
 
-            public ulong NextUlong() => NotSupported<ulong>();
+            public ulong NextUlong()
+            {
+                return NotSupported<ulong>();
+            }
 
-            public ulong NextUlong(ulong max) => NotSupported<ulong>();
+            public ulong NextUlong(ulong max)
+            {
+                return NotSupported<ulong>();
+            }
 
-            public ulong NextUlong(ulong min, ulong max) => NotSupported<ulong>();
+            public ulong NextUlong(ulong min, ulong max)
+            {
+                return NotSupported<ulong>();
+            }
 
-            public bool NextBool() => NotSupported<bool>();
+            public bool NextBool()
+            {
+                return NotSupported<bool>();
+            }
 
-            public void NextBytes(byte[] buffer) => throw new NotSupportedException();
+            public void NextBytes(byte[] buffer)
+            {
+                throw new NotSupportedException();
+            }
 
-            public float NextFloat() => NotSupported<float>();
+            public float NextFloat()
+            {
+                return NotSupported<float>();
+            }
 
-            public float NextFloat(float max) => NotSupported<float>();
+            public float NextFloat(float max)
+            {
+                return NotSupported<float>();
+            }
 
-            public float NextFloat(float min, float max) => NotSupported<float>();
+            public float NextFloat(float min, float max)
+            {
+                return NotSupported<float>();
+            }
 
-            public double NextDouble() => NotSupported<double>();
+            public double NextDouble()
+            {
+                return NotSupported<double>();
+            }
 
-            public double NextDouble(double max) => NotSupported<double>();
+            public double NextDouble(double max)
+            {
+                return NotSupported<double>();
+            }
 
-            public double NextDouble(double min, double max) => NotSupported<double>();
+            public double NextDouble(double min, double max)
+            {
+                return NotSupported<double>();
+            }
 
-            public double NextGaussian(double mean, double stdDev) => NotSupported<double>();
+            public double NextGaussian(double mean, double stdDev)
+            {
+                return NotSupported<double>();
+            }
 
-            public Guid NextGuid() => NotSupported<Guid>();
+            public Guid NextGuid()
+            {
+                return NotSupported<Guid>();
+            }
 
-            public WGuid NextWGuid() => NotSupported<WGuid>();
+            public WGuid NextWGuid()
+            {
+                return NotSupported<WGuid>();
+            }
 
-            public T NextOf<T>(IEnumerable<T> enumerable) => NotSupported<T>();
+            public T NextOf<T>(IEnumerable<T> enumerable)
+            {
+                return NotSupported<T>();
+            }
 
-            public T NextOf<T>(IReadOnlyCollection<T> collection) => NotSupported<T>();
+            public T NextOf<T>(IReadOnlyCollection<T> collection)
+            {
+                return NotSupported<T>();
+            }
 
-            public T NextOf<T>(IReadOnlyList<T> list) => NotSupported<T>();
+            public T NextOf<T>(IReadOnlyList<T> list)
+            {
+                return NotSupported<T>();
+            }
 
-            public T NextOfParams<T>(params T[] elements) => NotSupported<T>();
+            public T NextOfParams<T>(params T[] elements)
+            {
+                return NotSupported<T>();
+            }
 
             public T NextEnum<T>()
-                where T : unmanaged, Enum => NotSupported<T>();
+                where T : unmanaged, Enum
+            {
+                return NotSupported<T>();
+            }
 
             public T NextEnumExcept<T>(T exception1)
-                where T : unmanaged, Enum => NotSupported<T>();
+                where T : unmanaged, Enum
+            {
+                return NotSupported<T>();
+            }
 
             public T NextEnumExcept<T>(T exception1, T exception2)
-                where T : unmanaged, Enum => NotSupported<T>();
+                where T : unmanaged, Enum
+            {
+                return NotSupported<T>();
+            }
 
             public T NextEnumExcept<T>(T exception1, T exception2, T exception3)
-                where T : unmanaged, Enum => NotSupported<T>();
+                where T : unmanaged, Enum
+            {
+                return NotSupported<T>();
+            }
 
             public T NextEnumExcept<T>(T exception1, T exception2, T exception3, T exception4)
-                where T : unmanaged, Enum => NotSupported<T>();
+                where T : unmanaged, Enum
+            {
+                return NotSupported<T>();
+            }
 
             public T NextEnumExcept<T>(
                 T exception1,
@@ -151,7 +265,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Random
                 T exception4,
                 params T[] exceptions
             )
-                where T : unmanaged, Enum => NotSupported<T>();
+                where T : unmanaged, Enum
+            {
+                return NotSupported<T>();
+            }
 
             public float[,] NextNoiseMap(
                 float[,] noiseMap,
@@ -163,9 +280,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Random
                 UnityEngine.Vector2 baseOffset = default,
                 float octaveOffsetRange = 100000,
                 bool normalize = true
-            ) => NotSupported<float[,]>();
+            )
+            {
+                return NotSupported<float[,]>();
+            }
 
-            public IRandom Copy() => NotSupported<IRandom>();
+            public IRandom Copy()
+            {
+                return NotSupported<IRandom>();
+            }
         }
     }
 }

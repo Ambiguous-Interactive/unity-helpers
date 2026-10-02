@@ -537,7 +537,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             while (!usedNames.Add(name))
             {
                 name = $"{stem}-{suffix}.proto";
-                suffix++;
+                ++suffix;
             }
 
             return name;
@@ -558,7 +558,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
 
                 int segmentLength = segment.Length;
-                for (int index = 1; index < segmentLength; index++)
+                for (int index = 1; index < segmentLength; ++index)
                 {
                     char character = segment[index];
                     if (

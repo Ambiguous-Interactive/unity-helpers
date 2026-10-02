@@ -569,11 +569,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             const int poolsPerThread = 10;
 
             System.Threading.Tasks.Task[] tasks = new System.Threading.Tasks.Task[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 tasks[t] = System.Threading.Tasks.Task.Run(() =>
                 {
-                    for (int i = 0; i < poolsPerThread; i++)
+                    for (int i = 0; i < poolsPerThread; ++i)
                     {
                         WallstopGenericPool<TestPoolItem> pool = new(
                             () => new TestPoolItem(),
@@ -613,7 +613,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 TimeProvider = TestTimeProvider,
             };
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 pools.Add(
                     new WallstopGenericPool<TestPoolItem>(
@@ -627,7 +627,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             const int purgeCount = 20;
             System.Threading.Tasks.Task[] tasks = new System.Threading.Tasks.Task[purgeCount];
 
-            for (int i = 0; i < purgeCount; i++)
+            for (int i = 0; i < purgeCount; ++i)
             {
                 tasks[i] = System.Threading.Tasks.Task.Run(() =>
                     PoolPurgeSettings.PurgeAllPools(
@@ -653,7 +653,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[0] = System.Threading.Tasks.Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     PoolPurgeSettings.PurgeOnLowMemory = i % 2 == 0;
                     bool _ = PoolPurgeSettings.PurgeOnLowMemory;
@@ -662,7 +662,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[1] = System.Threading.Tasks.Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     PoolPurgeSettings.PurgeOnAppBackground = i % 2 == 0;
                     bool _ = PoolPurgeSettings.PurgeOnAppBackground;
@@ -671,7 +671,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[2] = System.Threading.Tasks.Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     PoolPurgeSettings.PurgeOnSceneUnload = i % 2 == 0;
                     bool _ = PoolPurgeSettings.PurgeOnSceneUnload;
@@ -680,7 +680,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             tasks[3] = System.Threading.Tasks.Task.Run(() =>
             {
-                for (int i = 0; i < iterations; i++)
+                for (int i = 0; i < iterations; ++i)
                 {
                     PoolPurgeSettings.ResetToDefaults();
                 }

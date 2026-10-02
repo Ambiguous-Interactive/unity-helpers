@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static void RunCorpus<T>(int seed, Func<Random, T> make, bool byteIdentical)
         {
             Random random = new Random(seed);
-            for (int iteration = 0; iteration < Iterations; iteration++)
+            for (int iteration = 0; iteration < Iterations; ++iteration)
             {
                 T value = make(random);
                 string context = $"seed {seed}, iteration {iteration}";
@@ -126,7 +126,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             value.Values = new Dictionary<string, int>();
             int entries = random.Next(0, 6);
-            for (int index = 0; index < entries; index++)
+            for (int index = 0; index < entries; ++index)
             {
                 value.Values[Text(random) ?? "k" + index] = random.Next(-64, 64);
             }
@@ -183,7 +183,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             T[] values = new T[shape == 1 ? 0 : random.Next(1, 6)];
-            for (int index = 0; index < values.Length; index++)
+            for (int index = 0; index < values.Length; ++index)
             {
                 values[index] = element();
             }
@@ -235,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             const string Alphabet = "abzAZ09 _é世😀";
             StringBuilder builder = new StringBuilder();
             int length = random.Next(1, 8);
-            for (int index = 0; index < length; index++)
+            for (int index = 0; index < length; ++index)
             {
                 builder.Append(Alphabet[random.Next(Alphabet.Length)]);
             }
@@ -291,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static byte[] Parse(string hex)
         {
             byte[] payload = new byte[hex.Length / 2];
-            for (int index = 0; index < payload.Length; index++)
+            for (int index = 0; index < payload.Length; ++index)
             {
                 payload[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }

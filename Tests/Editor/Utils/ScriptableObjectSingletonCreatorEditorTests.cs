@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 return intended;
             }
 
-            for (int i = 1; i < parts.Length; i++)
+            for (int i = 1; i < parts.Length; ++i)
             {
                 string desired = parts[i];
                 string next = current + "/" + desired;

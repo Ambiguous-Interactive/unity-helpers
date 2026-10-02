@@ -34,7 +34,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 window._axis = "All Issues";
                 window._query = finding.AssetPath;
                 window.Refresh();
-                for (int index = 0; index < window._visible.Count; index++)
+                for (int index = 0; index < window._visible.Count; ++index)
                     if (
                         string.Equals(
                             window._visible[index].Id,
@@ -244,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             int targetedUndoCount = 0;
             foreach (Action restore in undo)
                 if (restore != null)
-                    targetedUndoCount++;
+                    ++targetedUndoCount;
             Say(
                 undo.Count
                     + " fixes applied · "
@@ -262,7 +262,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                                 if (undo[index] != null)
                                 {
                                     undo[index]();
-                                    restored++;
+                                    ++restored;
                                 }
                             }
                             catch (Exception thrown)

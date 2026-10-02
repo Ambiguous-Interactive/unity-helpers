@@ -293,7 +293,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 bufferMultiplier: 3.0f
             );
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 tracker.RecordRent((float)i);
                 tracker.RecordReturn((float)i + 0.5f);
@@ -438,7 +438,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             Assert.DoesNotThrow(() =>
             {
-                for (int i = 0; i < 100; i++)
+                for (int i = 0; i < 100; ++i)
                 {
                     MemoryPressureMonitor.Update();
                 }
@@ -497,12 +497,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 bufferMultiplier: 10.0f
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 tracker.RecordRent((float)i);
             }
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 tracker.RecordReturn((float)i + 0.5f);
             }
@@ -523,12 +523,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 bufferMultiplier: 10.0f
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 tracker.RecordRent((float)i);
             }
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 tracker.RecordReturn((float)i + 0.5f);
             }
@@ -764,7 +764,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             object exceptionLock = new();
 
             Thread[] threads = new Thread[threadCount];
-            for (int i = 0; i < threadCount; i++)
+            for (int i = 0; i < threadCount; ++i)
             {
                 threads[i] = new Thread(() =>
                 {
@@ -773,7 +773,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                         Interlocked.Increment(ref readyCount);
                         startEvent.WaitOne();
 
-                        for (int j = 0; j < iterationsPerThread; j++)
+                        for (int j = 0; j < iterationsPerThread; ++j)
                         {
                             MemoryPressureMonitor.Update();
                             Thread.SpinWait(10);
@@ -822,7 +822,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Thread[] threads = new Thread[threadCount];
 
-            for (int i = 0; i < writerThreads; i++)
+            for (int i = 0; i < writerThreads; ++i)
             {
                 threads[i] = new Thread(() =>
                 {
@@ -831,7 +831,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                         Interlocked.Increment(ref readyCount);
                         startEvent.WaitOne();
 
-                        for (int j = 0; j < iterationsPerThread; j++)
+                        for (int j = 0; j < iterationsPerThread; ++j)
                         {
                             MemoryPressureMonitor.Update();
                             MemoryPressureMonitor.ForceUpdate();
@@ -849,7 +849,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 threads[i].Start();
             }
 
-            for (int i = writerThreads; i < threadCount; i++)
+            for (int i = writerThreads; i < threadCount; ++i)
             {
                 threads[i] = new Thread(() =>
                 {
@@ -858,7 +858,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                         Interlocked.Increment(ref readyCount);
                         startEvent.WaitOne();
 
-                        for (int j = 0; j < iterationsPerThread; j++)
+                        for (int j = 0; j < iterationsPerThread; ++j)
                         {
                             MemoryPressureLevel pressure = MemoryPressureMonitor.CurrentPressure;
                             Assert.That(
@@ -910,7 +910,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             object exceptionLock = new();
 
             Thread[] threads = new Thread[threadCount];
-            for (int i = 0; i < threadCount; i++)
+            for (int i = 0; i < threadCount; ++i)
             {
                 int threadIndex = i;
                 threads[i] = new Thread(() =>
@@ -920,7 +920,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                         Interlocked.Increment(ref readyCount);
                         startEvent.WaitOne();
 
-                        for (int j = 0; j < iterationsPerThread; j++)
+                        for (int j = 0; j < iterationsPerThread; ++j)
                         {
                             bool expectedValue = (threadIndex + j) % 2 == 0;
                             MemoryPressureMonitor.Enabled = expectedValue;
@@ -972,7 +972,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Thread[] threads = new Thread[threadCount];
 
-            for (int i = 0; i < threadCount; i++)
+            for (int i = 0; i < threadCount; ++i)
             {
                 int operation = i % 4;
                 threads[i] = new Thread(() =>
@@ -982,7 +982,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                         Interlocked.Increment(ref readyCount);
                         startEvent.WaitOne();
 
-                        for (int j = 0; j < iterationsPerThread; j++)
+                        for (int j = 0; j < iterationsPerThread; ++j)
                         {
                             switch (operation)
                             {
@@ -1043,7 +1043,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Thread[] threads = new Thread[threadCount];
 
-            for (int i = 0; i < threadCount / 2; i++)
+            for (int i = 0; i < threadCount / 2; ++i)
             {
                 threads[i] = new Thread(() =>
                 {
@@ -1052,7 +1052,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                         Interlocked.Increment(ref readyCount);
                         startEvent.WaitOne();
 
-                        for (int j = 0; j < iterationsPerThread; j++)
+                        for (int j = 0; j < iterationsPerThread; ++j)
                         {
                             MemoryPressureMonitor.Update();
                             MemoryPressureMonitor.ForceUpdate();
@@ -1070,7 +1070,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 threads[i].Start();
             }
 
-            for (int i = threadCount / 2; i < threadCount; i++)
+            for (int i = threadCount / 2; i < threadCount; ++i)
             {
                 threads[i] = new Thread(() =>
                 {
@@ -1079,7 +1079,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                         Interlocked.Increment(ref readyCount);
                         startEvent.WaitOne();
 
-                        for (int j = 0; j < iterationsPerThread; j++)
+                        for (int j = 0; j < iterationsPerThread; ++j)
                         {
                             MemoryPressureMonitor.Reset();
                             Thread.SpinWait(20);
@@ -1124,7 +1124,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Thread[] threads = new Thread[threadCount];
 
-            for (int i = 0; i < threadCount; i++)
+            for (int i = 0; i < threadCount; ++i)
             {
                 int threadIndex = i;
                 threads[i] = new Thread(() =>
@@ -1134,7 +1134,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                         Interlocked.Increment(ref readyCount);
                         startEvent.WaitOne();
 
-                        for (int j = 0; j < iterationsPerThread; j++)
+                        for (int j = 0; j < iterationsPerThread; ++j)
                         {
                             switch (threadIndex % 4)
                             {

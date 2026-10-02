@@ -102,10 +102,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(Vector2Surrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override Vector2Surrogate ToSurrogate(in Vector2 value) => value;
+        protected override Vector2Surrogate ToSurrogate(in Vector2 value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override Vector2 FromSurrogate(in Vector2Surrogate surrogate) => surrogate;
+        protected override Vector2 FromSurrogate(in Vector2Surrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="Vector3"/> root through its surrogate.</summary>
@@ -117,10 +123,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(Vector3Surrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override Vector3Surrogate ToSurrogate(in Vector3 value) => value;
+        protected override Vector3Surrogate ToSurrogate(in Vector3 value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override Vector3 FromSurrogate(in Vector3Surrogate surrogate) => surrogate;
+        protected override Vector3 FromSurrogate(in Vector3Surrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="Quaternion"/> root through its surrogate.</summary>
@@ -132,10 +144,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(QuaternionSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override QuaternionSurrogate ToSurrogate(in Quaternion value) => value;
+        protected override QuaternionSurrogate ToSurrogate(in Quaternion value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override Quaternion FromSurrogate(in QuaternionSurrogate surrogate) => surrogate;
+        protected override Quaternion FromSurrogate(in QuaternionSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="Color"/> root through its surrogate.</summary>
@@ -146,10 +164,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(ColorSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override ColorSurrogate ToSurrogate(in Color value) => value;
+        protected override ColorSurrogate ToSurrogate(in Color value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override Color FromSurrogate(in ColorSurrogate surrogate) => surrogate;
+        protected override Color FromSurrogate(in ColorSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="Color32"/> root through its surrogate.</summary>
@@ -161,10 +185,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(Color32Surrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override Color32Surrogate ToSurrogate(in Color32 value) => value;
+        protected override Color32Surrogate ToSurrogate(in Color32 value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override Color32 FromSurrogate(in Color32Surrogate surrogate) => surrogate;
+        protected override Color32 FromSurrogate(in Color32Surrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="Rect"/> root through its surrogate.</summary>
@@ -175,10 +205,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(RectSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override RectSurrogate ToSurrogate(in Rect value) => value;
+        protected override RectSurrogate ToSurrogate(in Rect value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override Rect FromSurrogate(in RectSurrogate surrogate) => surrogate;
+        protected override Rect FromSurrogate(in RectSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="RectInt"/> root through its surrogate.</summary>
@@ -190,10 +226,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(RectIntSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override RectIntSurrogate ToSurrogate(in RectInt value) => value;
+        protected override RectIntSurrogate ToSurrogate(in RectInt value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override RectInt FromSurrogate(in RectIntSurrogate surrogate) => surrogate;
+        protected override RectInt FromSurrogate(in RectIntSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="Bounds"/> root through its surrogate.</summary>
@@ -205,10 +247,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(BoundsSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override BoundsSurrogate ToSurrogate(in Bounds value) => value;
+        protected override BoundsSurrogate ToSurrogate(in Bounds value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override Bounds FromSurrogate(in BoundsSurrogate surrogate) => surrogate;
+        protected override Bounds FromSurrogate(in BoundsSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="BoundsInt"/> root through its surrogate.</summary>
@@ -220,10 +268,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(BoundsIntSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override BoundsIntSurrogate ToSurrogate(in BoundsInt value) => value;
+        protected override BoundsIntSurrogate ToSurrogate(in BoundsInt value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override BoundsInt FromSurrogate(in BoundsIntSurrogate surrogate) => surrogate;
+        protected override BoundsInt FromSurrogate(in BoundsIntSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="Vector2Int"/> root through its surrogate.</summary>
@@ -235,10 +289,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(Vector2IntSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override Vector2IntSurrogate ToSurrogate(in Vector2Int value) => value;
+        protected override Vector2IntSurrogate ToSurrogate(in Vector2Int value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override Vector2Int FromSurrogate(in Vector2IntSurrogate surrogate) => surrogate;
+        protected override Vector2Int FromSurrogate(in Vector2IntSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="Vector3Int"/> root through its surrogate.</summary>
@@ -250,10 +310,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(Vector3IntSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override Vector3IntSurrogate ToSurrogate(in Vector3Int value) => value;
+        protected override Vector3IntSurrogate ToSurrogate(in Vector3Int value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override Vector3Int FromSurrogate(in Vector3IntSurrogate surrogate) => surrogate;
+        protected override Vector3Int FromSurrogate(in Vector3IntSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes a <see cref="Resolution"/> root through its surrogate.</summary>
@@ -273,11 +339,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         /// <inheritdoc />
 #pragma warning disable CS0618 // The surrogate conversion is obsolete but retains the required wire contract.
-        protected override ResolutionSurrogate ToSurrogate(in Resolution value) => value;
+        protected override ResolutionSurrogate ToSurrogate(in Resolution value)
+        {
+            return value;
+        }
 #pragma warning restore CS0618
 
         /// <inheritdoc />
-        protected override Resolution FromSurrogate(in ResolutionSurrogate surrogate) => surrogate;
+        protected override Resolution FromSurrogate(in ResolutionSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 #endif
 
@@ -290,10 +362,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(ParabolaSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override ParabolaSurrogate ToSurrogate(in Parabola value) => value;
+        protected override ParabolaSurrogate ToSurrogate(in Parabola value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override Parabola FromSurrogate(in ParabolaSurrogate surrogate) => surrogate;
+        protected override Parabola FromSurrogate(in ParabolaSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 
     /// <summary>Serializes an <see cref="ImmutableBitSet"/> root through its surrogate.</summary>
@@ -311,10 +389,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(ImmutableBitSetSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-        protected override ImmutableBitSetSurrogate ToSurrogate(in ImmutableBitSet value) => value;
+        protected override ImmutableBitSetSurrogate ToSurrogate(in ImmutableBitSet value)
+        {
+            return value;
+        }
 
         /// <inheritdoc />
-        protected override ImmutableBitSet FromSurrogate(in ImmutableBitSetSurrogate surrogate) =>
-            surrogate;
+        protected override ImmutableBitSet FromSurrogate(in ImmutableBitSetSurrogate surrogate)
+        {
+            return surrogate;
+        }
     }
 }

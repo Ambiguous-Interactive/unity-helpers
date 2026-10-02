@@ -34,7 +34,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [DetectAssetChanged(typeof(TestDetectableAsset))]
         private static void OnReentrantChange(AssetChangeContext context)
         {
-            _invocationCount++;
+            ++_invocationCount;
             if (
                 _triggerNestedChange
                 && _invocationCount == 1

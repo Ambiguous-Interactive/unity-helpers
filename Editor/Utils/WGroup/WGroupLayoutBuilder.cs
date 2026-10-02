@@ -209,7 +209,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 Buffers<GroupContext>.GetList(4, out List<GroupContext> activeAutoContexts);
 
             List<PropertyDescriptor> descriptors = new(entries.Count);
-            for (int i = 0; i < entries.Count; i++)
+            for (int i = 0; i < entries.Count; ++i)
             {
                 PropertyMetadataEntry entry = entries[i];
                 if (
@@ -239,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 return EmptyLayout;
             }
 
-            for (int index = 0; index < descriptors.Count; index++)
+            for (int index = 0; index < descriptors.Count; ++index)
             {
                 PropertyDescriptor descriptor = descriptors[index];
                 HashSet<GroupContext> explicitContexts = null;
@@ -543,7 +543,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             GroupContext context
         )
         {
-            for (int index = 0; index < activeAutoContexts.Count; index++)
+            for (int index = 0; index < activeAutoContexts.Count; ++index)
             {
                 if (ReferenceEquals(activeAutoContexts[index], context))
                 {
@@ -601,7 +601,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     continue;
                 }
 
-                for (int nameIndex = 0; nameIndex < groupNames.Count; nameIndex++)
+                for (int nameIndex = 0; nameIndex < groupNames.Count; ++nameIndex)
                 {
                     string groupName = groupNames[nameIndex];
                     if (string.IsNullOrEmpty(groupName))
@@ -677,7 +677,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                                     for (
                                         int memberIndex = 0;
                                         memberIndex < definitionPropertyPathsCount;
-                                        memberIndex++
+                                        ++memberIndex
                                     )
                                     {
                                         consumed.Add(definition.PropertyPaths[memberIndex]);
@@ -691,7 +691,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                             for (
                                 int memberIndex = 0;
                                 memberIndex < definition.PropertyPaths.Count;
-                                memberIndex++
+                                ++memberIndex
                             )
                             {
                                 consumed.Add(definition.PropertyPaths[memberIndex]);

@@ -135,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             List<IValidationRule> kept = new List<IValidationRule>(rules.Count);
-            for (int index = 0; index < rules.Count; index++)
+            for (int index = 0; index < rules.Count; ++index)
             {
                 IValidationRule rule = rules[index];
                 if (rule != null)
@@ -155,7 +155,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             List<ValidationTarget> kept = new List<ValidationTarget>(targets.Count);
-            for (int index = 0; index < targets.Count; index++)
+            for (int index = 0; index < targets.Count; ++index)
             {
                 ValidationTarget target = targets[index];
                 if (target.IsValid())
@@ -188,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             do
             {
                 ProcessOneTarget(_targets[_nextTarget]);
-                _nextTarget++;
+                ++_nextTarget;
             } while (!IsComplete && Stopwatch.GetTimestamp() - started < budgetTicks);
 
             return IsComplete;

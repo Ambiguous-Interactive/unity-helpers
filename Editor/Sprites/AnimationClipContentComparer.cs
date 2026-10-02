@@ -166,7 +166,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
             int aLength = a.Length;
-            for (int i = 0; i < aLength; i++)
+            for (int i = 0; i < aLength; ++i)
             {
                 AnimationEvent evtA = a[i];
                 AnimationEvent evtB = b[i];
@@ -259,7 +259,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Array.Sort(destBindings, CompareEditorCurveBinding);
 
             int sourceBindingsLength = sourceBindings.Length;
-            for (int i = 0; i < sourceBindingsLength; i++)
+            for (int i = 0; i < sourceBindingsLength; ++i)
             {
                 EditorCurveBinding srcBinding = sourceBindings[i];
                 EditorCurveBinding dstBinding = destBindings[i];
@@ -304,7 +304,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Array.Sort(destBindings, CompareEditorCurveBinding);
 
             int sourceBindingsLength = sourceBindings.Length;
-            for (int i = 0; i < sourceBindingsLength; i++)
+            for (int i = 0; i < sourceBindingsLength; ++i)
             {
                 EditorCurveBinding srcBinding = sourceBindings[i];
                 EditorCurveBinding dstBinding = destBindings[i];
@@ -402,7 +402,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             int keysALength = keysA.Length;
-            for (int i = 0; i < keysALength; i++)
+            for (int i = 0; i < keysALength; ++i)
             {
                 Keyframe kA = keysA[i];
                 Keyframe kB = keysB[i];
@@ -457,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             int aLength = a.Length;
-            for (int i = 0; i < aLength; i++)
+            for (int i = 0; i < aLength; ++i)
             {
                 ObjectReferenceKeyframe kA = a[i];
                 ObjectReferenceKeyframe kB = b[i];

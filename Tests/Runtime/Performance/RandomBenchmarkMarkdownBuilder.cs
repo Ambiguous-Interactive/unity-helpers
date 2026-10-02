@@ -136,7 +136,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 + $"<td align=\"right\">{Format(result.NextIntRangePerSecond)}</td>"
                 + "</tr>";
 
-            string Format(double value) => value.ToString("N0", CultureInfo.InvariantCulture);
+            string Format(double value)
+            {
+                return value.ToString("N0", CultureInfo.InvariantCulture);
+            }
         }
 
         private static List<string> BuildEmptyPlaceholder()

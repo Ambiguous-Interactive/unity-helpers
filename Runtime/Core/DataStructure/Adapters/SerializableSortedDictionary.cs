@@ -598,7 +598,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             TValue[] result = new TValue[count];
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 result[i] = GetValue(_values, i);
             }
@@ -698,7 +698,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             KeyValuePair<TKey, TValue>[] result = new KeyValuePair<TKey, TValue>[count];
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 result[i] = new KeyValuePair<TKey, TValue>(_keys[i], GetValue(_values, i));
             }
@@ -775,7 +775,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             bool encounteredNullReference = false;
             bool keySupportsNullCheck = TypeSupportsNullReferences(typeof(TKey));
             int length = _keys.Length;
-            for (int index = 0; index < length; index++)
+            for (int index = 0; index < length; ++index)
             {
                 TKey key = _keys[index];
                 TValue value = GetValue(_values, index);
@@ -815,7 +815,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
             int length = _boxedValues.Length;
             TValueCache[] rehydrated = new TValueCache[length];
-            for (int index = 0; index < length; index++)
+            for (int index = 0; index < length; ++index)
             {
                 SerializableDictionary.Cache<TValueCache> box = _boxedValues[index];
                 rehydrated[index] = box == null ? default : box.Data;
@@ -843,7 +843,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 _boxedValues = new SerializableDictionary.Cache<TValueCache>[length];
             }
 
-            for (int index = 0; index < length; index++)
+            for (int index = 0; index < length; ++index)
             {
                 SerializableDictionary.Cache<TValueCache> box = _boxedValues[index];
                 if (box == null)
@@ -894,7 +894,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             {
                 _keys[index] = pair.Key;
                 SetValue(_values, index, pair.Value);
-                index++;
+                ++index;
             }
 
             _preserveSerializedEntries = true;
@@ -918,7 +918,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     .Get(out SortedSet<TKey> fastPathSeenKeys);
 
                 bool allKeysMatch = true;
-                for (int i = 0; i < arrayLength; i++)
+                for (int i = 0; i < arrayLength; ++i)
                 {
                     TKey key = _keys[i];
                     if (key == null || !_dictionary.ContainsKey(key) || !fastPathSeenKeys.Add(key))
@@ -930,7 +930,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
                 if (allKeysMatch)
                 {
-                    for (int i = 0; i < arrayLength; i++)
+                    for (int i = 0; i < arrayLength; ++i)
                     {
                         TKey key = _keys[i];
                         if (_dictionary.TryGetValue(key, out TValue value))
@@ -953,7 +953,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 .GetSortedSetPool(_dictionary.Comparer)
                 .Get(out SortedSet<TKey> seenKeys);
 
-            for (int i = 0; i < arrayLength; i++)
+            for (int i = 0; i < arrayLength; ++i)
             {
                 TKey key = _keys[i];
                 if (key != null && _dictionary.TryGetValue(key, out TValue value))
@@ -979,7 +979,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _keys = new TKey[newCount];
             _values = new TValueCache[newCount];
 
-            for (int i = 0; i < newCount; i++)
+            for (int i = 0; i < newCount; ++i)
             {
                 _keys[i] = newKeys[i];
                 SetValue(_values, i, newValues[i]);

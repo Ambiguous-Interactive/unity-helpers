@@ -170,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             {
                 try
                 {
-                    for (int i = 0; i < 10; i++)
+                    for (int i = 0; i < 10; ++i)
                     {
                         editor.OnInspectorGUI();
                     }
@@ -335,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.IsTrue(0 < metadata.Count, "Should find WButton methods");
 
             bool foundGroupedMethod = false;
-            for (int i = 0; i < metadata.Count; i++)
+            for (int i = 0; i < metadata.Count; ++i)
             {
                 if (!string.IsNullOrEmpty(metadata[i].GroupName))
                 {
@@ -368,7 +368,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.IsTrue(2 <= metadata.Count, "Should find multiple WButton methods");
 
             bool hasExplicitDrawOrder = false;
-            for (int i = 0; i < metadata.Count; i++)
+            for (int i = 0; i < metadata.Count; ++i)
             {
                 if (metadata[i].DrawOrder != 0)
                 {

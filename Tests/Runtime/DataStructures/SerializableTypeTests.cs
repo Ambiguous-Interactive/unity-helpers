@@ -348,7 +348,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableTypeCatalog.GetFilteredDescriptors("SerializableType");
 
             bool found = false;
-            for (int index = 0; index < filtered.Count; index++)
+            for (int index = 0; index < filtered.Count; ++index)
             {
                 SerializableTypeCatalog.SerializableTypeDescriptor descriptor = filtered[index];
                 if (descriptor.Type == typeof(SerializableType))
@@ -653,7 +653,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableTypeCatalog.GetFilteredDescriptors("SerializableType");
 
             bool found = false;
-            for (int index = 0; index < filtered.Count; index++)
+            for (int index = 0; index < filtered.Count; ++index)
             {
                 SerializableTypeCatalog.SerializableTypeDescriptor descriptor = filtered[index];
                 if (descriptor.Type == typeof(SerializableType))
@@ -676,7 +676,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableTypeCatalog.GetFilteredDescriptors(assemblyQualifiedName);
 
             bool found = false;
-            for (int index = 0; index < filtered.Count; index++)
+            for (int index = 0; index < filtered.Count; ++index)
             {
                 SerializableTypeCatalog.SerializableTypeDescriptor descriptor = filtered[index];
                 if (descriptor.Type == typeof(SerializableType))
@@ -698,7 +698,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             IReadOnlyList<SerializableTypeCatalog.SerializableTypeDescriptor> initial =
                 SerializableTypeCatalog.GetFilteredDescriptors("SerializableType");
             bool initiallyFound = false;
-            for (int index = 0; index < initial.Count; index++)
+            for (int index = 0; index < initial.Count; ++index)
             {
                 SerializableTypeCatalog.SerializableTypeDescriptor descriptor = initial[index];
                 if (descriptor.Type == typeof(SerializableType))
@@ -727,7 +727,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     SerializableTypeCatalog.GetFilteredDescriptors("SerializableType");
 
                 bool found = false;
-                for (int index = 0; index < filtered.Count; index++)
+                for (int index = 0; index < filtered.Count; ++index)
                 {
                     SerializableTypeCatalog.SerializableTypeDescriptor descriptor = filtered[index];
                     if (descriptor.Type == typeof(SerializableType))
@@ -753,7 +753,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableTypeCatalog.GetFilteredDescriptors("SerializableType");
 
             bool restoredFound = false;
-            for (int index = 0; index < restored.Count; index++)
+            for (int index = 0; index < restored.Count; ++index)
             {
                 SerializableTypeCatalog.SerializableTypeDescriptor descriptor = restored[index];
                 if (descriptor.Type == typeof(SerializableType))

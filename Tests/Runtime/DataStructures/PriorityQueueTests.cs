@@ -311,7 +311,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(3, queue.Count);
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 Assert.IsTrue(queue.TryDequeue(out int value));
                 Assert.AreEqual(5, value);

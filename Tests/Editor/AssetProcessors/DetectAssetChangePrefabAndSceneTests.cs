@@ -81,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             {
                 if (recorded != null && expectedIds.Contains(recorded.GetUnityObjectId()))
                 {
-                    count++;
+                    ++count;
                 }
             }
             return count;
@@ -109,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
 
             List<AssetChangeContext> result = new();
-            for (int i = 0; i < recordedInstances.Count && i < recordedContexts.Count; i++)
+            for (int i = 0; i < recordedInstances.Count && i < recordedContexts.Count; ++i)
             {
                 T recorded = recordedInstances[i];
                 if (recorded != null && expectedIds.Contains(recorded.GetUnityObjectId()))

@@ -339,7 +339,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private static IEnumerator TestCoroutine(Action onComplete)
         {
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 yield return null;
             }
@@ -349,9 +349,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         private static IEnumerator ComplexTestCoroutine(Action<int> onComplete)
         {
             int count = 0;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
-                count++;
+                ++count;
                 yield return null;
             }
             onComplete?.Invoke(count);
@@ -360,7 +360,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         private static async Task CreateDelayedTask(Action onComplete)
         {
             // Use Task.Yield instead of Task.Delay to avoid threading issues
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 await Task.Yield();
             }
@@ -370,7 +370,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         private static async Task<T> CreateDelayedTask<T>(Func<T> factory)
         {
             // Use Task.Yield instead of Task.Delay to avoid threading issues
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 await Task.Yield();
             }
@@ -510,7 +510,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
 
             int[] invocations = new int[continuationCount];
-            for (int index = 0; index < continuationCount; index++)
+            for (int index = 0; index < continuationCount; ++index)
             {
                 int captured = index;
                 awaiter.OnCompleted(() => invocations[captured]++);
@@ -523,7 +523,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             await Task.Yield();
 
-            for (int index = 0; index < continuationCount; index++)
+            for (int index = 0; index < continuationCount; ++index)
             {
                 Assert.AreEqual(
                     1,

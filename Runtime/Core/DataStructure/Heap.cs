@@ -116,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     int capacity = Math.Max(DefaultCapacity, readonlyList.Count);
                     _items = new T[capacity];
-                    for (int i = 0; i < readonlyList.Count; i++)
+                    for (int i = 0; i < readonlyList.Count; ++i)
                     {
                         _items[_count++] = readonlyList[i];
                     }
@@ -255,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _items[_count] = item;
             HeapifyUp(_count);
-            _count++;
+            ++_count;
         }
 
         /// <summary>
@@ -311,7 +311,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public bool Contains(T item)
         {
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < _count; ++i)
             {
                 if (_comparer.Compare(_items[i], item) == 0)
                 {

@@ -117,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             ParameterInfo[] parameters = constructor.GetParameters();
             object[] arguments = new object[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
+            for (int i = 0; i < parameters.Length; ++i)
             {
                 Type parameterType = parameters[i].ParameterType;
                 arguments[i] = parameterType.IsEnum

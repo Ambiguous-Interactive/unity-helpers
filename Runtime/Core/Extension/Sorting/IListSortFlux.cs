@@ -118,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 if (comparer.Compare(array[i], pivot1) < 0)
                 {
                     SortSwap(array, i, lt);
-                    lt++;
+                    ++lt;
                 }
                 else if (0 < comparer.Compare(array[i], pivot2))
                 {
@@ -131,14 +131,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     if (comparer.Compare(array[i], pivot1) < 0)
                     {
                         SortSwap(array, i, lt);
-                        lt++;
+                        ++lt;
                     }
                 }
-                i++;
+                ++i;
             }
 
             lt--;
-            gt++;
+            ++gt;
             SortSwap(array, left, lt);
             SortSwap(array, right, gt);
 

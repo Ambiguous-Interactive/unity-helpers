@@ -688,7 +688,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             {
                 int arrayLength = array.Length;
                 object[] boxed = new object[arrayLength];
-                for (int i = 0; i < arrayLength; i++)
+                for (int i = 0; i < arrayLength; ++i)
                 {
                     boxed[i] = array.GetValue(i);
                 }

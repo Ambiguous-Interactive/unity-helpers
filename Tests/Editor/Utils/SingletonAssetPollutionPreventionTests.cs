@@ -224,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             string[] parts = metadataFolder.Split('/');
             string current = parts[0];
-            for (int i = 1; i < parts.Length; i++)
+            for (int i = 1; i < parts.Length; ++i)
             {
                 string next = current + "/" + parts[i];
                 if (!AssetDatabase.IsValidFolder(next))
@@ -591,7 +591,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 AssetDatabase.FindAssets("t:ScriptableObject", new[] { ResourcesRoot })
             );
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
                 ScriptableObjectSingletonCreator.TypeFilter = null;
@@ -863,7 +863,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Description = description;
             }
 
-            public override string ToString() => $"{(Path ?? "(null)")} - {Description}";
+            public override string ToString()
+            {
+                return $"{(Path ?? "(null)")} - {Description}";
+            }
         }
 
         public sealed class DuplicateFolderTestCase
@@ -883,7 +886,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Description = description;
             }
 
-            public override string ToString() => $"{FolderBaseName} in {ParentPath}";
+            public override string ToString()
+            {
+                return $"{FolderBaseName} in {ParentPath}";
+            }
         }
     }
 #endif

@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             int dispatchersLength = dispatchers.Length;
             string[] descriptions = new string[dispatchersLength];
-            for (int i = 0; i < dispatchersLength; i++)
+            for (int i = 0; i < dispatchersLength; ++i)
             {
                 UnityMainThreadDispatcher dispatcher = dispatchers[i];
                 if (dispatcher == null)

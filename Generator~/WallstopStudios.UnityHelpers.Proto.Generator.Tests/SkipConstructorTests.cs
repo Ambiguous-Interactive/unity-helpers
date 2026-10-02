@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static T Read<T>(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }

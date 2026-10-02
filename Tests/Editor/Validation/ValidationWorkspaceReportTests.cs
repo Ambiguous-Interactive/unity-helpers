@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private static ValidationRun Run(params ValidationFinding[] findings)
         {
             ReportRule[] rules = new ReportRule[findings.Length];
-            for (int index = 0; index < findings.Length; index++)
+            for (int index = 0; index < findings.Length; ++index)
             {
                 rules[index] = new ReportRule(findings[index]);
             }
@@ -433,7 +433,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 _finding = finding;
             }
 
-            public bool AppliesTo(in ValidationTarget target) => true;
+            public bool AppliesTo(in ValidationTarget target)
+            {
+                return true;
+            }
 
             public void Validate(
                 in ValidationTarget target,

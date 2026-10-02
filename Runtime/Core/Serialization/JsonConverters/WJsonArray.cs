@@ -133,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             }
 
             writer.WriteStartArray();
-            for (int index = 0; index < values.Count; index++)
+            for (int index = 0; index < values.Count; ++index)
             {
                 JsonSerializer.Serialize(writer, values[index], options);
             }
@@ -219,7 +219,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             }
 
             _items[_count] = item;
-            _count++;
+            ++_count;
         }
 
         /// <summary>

@@ -26,9 +26,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static int GridBytes(int originX, int originY)
         {
             int total = 0;
-            for (int x = originX; x < originX + 40; x++)
+            for (int x = originX; x < originX + 40; ++x)
             {
-                for (int y = originY; y < originY + 25; y++)
+                for (int y = originY; y < originY + 25; ++y)
                 {
                     total += Encode(new GridCellShape { X = x, Y = y }).Length / 2;
                 }
@@ -91,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static byte[] Parse(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }
@@ -133,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             int checks = 0;
             foreach (ZigZagContract value in Corpus())
             {
-                checks++;
+                ++checks;
                 string oracle = OracleHex(value);
                 Assert.AreEqual(oracle, Encode(value), "the two encoders disagree");
 

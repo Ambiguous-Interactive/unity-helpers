@@ -75,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             builder.Append("', but found ");
             builder.Append(matches.Count);
             builder.AppendLine(":");
-            for (int i = 0; i < matches.Count; i++)
+            for (int i = 0; i < matches.Count; ++i)
             {
                 LogRecord match = matches[i];
                 builder.Append("  [");

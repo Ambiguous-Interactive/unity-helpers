@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             while (start < end)
             {
                 (array[start], array[end]) = (array[end], array[start]);
-                start++;
+                ++start;
                 end--;
             }
         }
@@ -89,21 +89,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     if (0 < comparer.Compare(buffer[leftIndex], array[rightIndex]))
                     {
                         array[dest] = array[rightIndex];
-                        rightIndex++;
+                        ++rightIndex;
                     }
                     else
                     {
                         array[dest] = buffer[leftIndex];
-                        leftIndex++;
+                        ++leftIndex;
                     }
-                    dest++;
+                    ++dest;
                 }
 
                 while (leftIndex < leftLimit)
                 {
                     array[dest] = buffer[leftIndex];
-                    leftIndex++;
-                    dest++;
+                    ++leftIndex;
+                    ++dest;
                 }
             }
             else
@@ -154,7 +154,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             while (index < count)
             {
                 int start = index;
-                index++;
+                ++index;
                 if (index == count)
                 {
                     runs.Add((start, 1));
@@ -171,7 +171,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     {
                         if (nextCompare <= 0)
                         {
-                            index++;
+                            ++index;
                             continue;
                         }
                     }
@@ -180,7 +180,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         // Only strictly descending runs may be reversed without reordering equal elements.
                         if (0 < nextCompare)
                         {
-                            index++;
+                            ++index;
                             continue;
                         }
                     }
@@ -218,14 +218,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 while (runEnd < count && 0 <= comparer.Compare(array[runEnd], array[runEnd - 1]))
                 {
-                    runEnd++;
+                    ++runEnd;
                 }
             }
             else
             {
                 while (runEnd < count && comparer.Compare(array[runEnd], array[runEnd - 1]) < 0)
                 {
-                    runEnd++;
+                    ++runEnd;
                 }
 
                 SortReverse(array, start, runEnd - 1);

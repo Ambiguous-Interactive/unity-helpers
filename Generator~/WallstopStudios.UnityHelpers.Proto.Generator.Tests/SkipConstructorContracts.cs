@@ -47,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>Builds an instance the way a caller would, deriving state up front.</summary>
         public SkippingContract()
         {
-            ConstructorWitness.Constructions++;
+            ++ConstructorWitness.Constructions;
             Seed = -1;
             Derived = "constructed";
         }
@@ -120,7 +120,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>Builds an instance the way a caller would, deriving state up front.</summary>
         public ConstructingContract()
         {
-            ConstructorWitness.Constructions++;
+            ++ConstructorWitness.Constructions;
             Seed = -1;
             Derived = "constructed";
         }

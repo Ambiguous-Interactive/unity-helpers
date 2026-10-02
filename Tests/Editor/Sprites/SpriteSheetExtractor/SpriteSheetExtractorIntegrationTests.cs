@@ -358,7 +358,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
                 Color[] pixels = extracted.GetPixels();
                 bool hasNonZeroPixels = false;
-                for (int i = 0; i < pixels.Length; i++)
+                for (int i = 0; i < pixels.Length; ++i)
                 {
                     if (0.01f < pixels[i].a)
                     {

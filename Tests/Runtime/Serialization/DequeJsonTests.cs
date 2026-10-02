@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 deserialized.Count,
                 "Count should match after round-trip"
             );
-            for (int i = 0; i < original.Count; i++)
+            for (int i = 0; i < original.Count; ++i)
             {
                 Assert.AreEqual(original[i], deserialized[i], $"Element at {i} should match");
             }
@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             string json = Serializer.JsonStringify(original);
             Deque<Vector2> deserialized = Serializer.JsonDeserialize<Deque<Vector2>>(json);
             Assert.AreEqual(original.Count, deserialized.Count, "Count should match for vectors");
-            for (int i = 0; i < original.Count; i++)
+            for (int i = 0; i < original.Count; ++i)
             {
                 Assert.AreEqual(original[i], deserialized[i], $"Vector at {i} should match");
             }
@@ -63,7 +63,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 deserialized.Count,
                 "Count should match under fast options"
             );
-            for (int i = 0; i < original.Count; i++)
+            for (int i = 0; i < original.Count; ++i)
             {
                 Assert.AreEqual(
                     original[i],

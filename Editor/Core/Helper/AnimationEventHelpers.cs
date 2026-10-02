@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                         {
                             int parametersLength = parameters.Length;
                             paramTypes = new Type[parametersLength];
-                            for (int pi = 0; pi < parametersLength; pi++)
+                            for (int pi = 0; pi < parametersLength; ++pi)
                             {
                                 paramTypes[pi] = parameters[pi].ParameterType;
                             }

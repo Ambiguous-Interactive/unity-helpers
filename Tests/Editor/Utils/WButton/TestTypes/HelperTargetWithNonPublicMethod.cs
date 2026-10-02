@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         [WButton]
         internal void InternalButton()
         {
-            InternalCallCount++;
+            ++InternalCallCount;
         }
     }
 }

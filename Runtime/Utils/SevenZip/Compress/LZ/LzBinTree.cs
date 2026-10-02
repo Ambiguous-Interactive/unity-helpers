@@ -58,7 +58,7 @@ namespace SevenZip.Compression.LZ
         public override void Init()
         {
             base.Init();
-            for (UInt32 i = 0; i < _hashSizeSum; i++)
+            for (UInt32 i = 0; i < _hashSizeSum; ++i)
             {
                 _hash[i] = KEmptyHashValue;
             }
@@ -129,7 +129,7 @@ namespace SevenZip.Compression.LZ
                 }
 
                 _hashMask = hs;
-                hs++;
+                ++hs;
                 hs += _kFixHashSize;
             }
             if (hs != _hashSizeSum)
@@ -402,7 +402,7 @@ namespace SevenZip.Compression.LZ
 
         private void NormalizeLinks(UInt32[] items, UInt32 numItems, UInt32 subValue)
         {
-            for (UInt32 i = 0; i < numItems; i++)
+            for (UInt32 i = 0; i < numItems; ++i)
             {
                 UInt32 value = items[i];
                 if (value <= subValue)

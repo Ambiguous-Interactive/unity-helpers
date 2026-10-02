@@ -95,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(expected.Position.z, actual.Position.z);
             int count = expected.Entries == null ? 0 : expected.Entries.Count;
             Assert.AreEqual(count, actual.Entries == null ? 0 : actual.Entries.Count);
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 Assert.AreEqual(expected.Entries[index].GetType(), actual.Entries[index].GetType());
                 Assert.AreEqual(expected.Entries[index].Name, actual.Entries[index].Name);

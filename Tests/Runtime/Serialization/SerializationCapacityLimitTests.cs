@@ -127,7 +127,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(restored.Capacity, attempted.Capacity);
 
             // Clamping is not truncation: the deque still works, and grows past the clamp on demand.
-            for (int index = 0; index < 32; index++)
+            for (int index = 0; index < 32; ++index)
             {
                 restored.PushBack(index);
             }
@@ -276,7 +276,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void ACyclicBufferWithinTheLimitStillRoundTrips()
         {
             CyclicBuffer<int> buffer = new(4);
-            for (int index = 0; index < 6; index++)
+            for (int index = 0; index < 6; ++index)
             {
                 buffer.Add(index);
             }

@@ -41,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     )
                 )
                 {
-                    count++;
+                    ++count;
                 }
             }
             return count;
@@ -261,9 +261,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         public void BlurredTextureMatchesInputDimensions()
         {
             Texture2D tex = Track(new Texture2D(8, 8, TextureFormat.RGBA32, false));
-            for (int y = 0; y < tex.height; y++)
+            for (int y = 0; y < tex.height; ++y)
             {
-                for (int x = 0; x < tex.width; x++)
+                for (int x = 0; x < tex.width; ++x)
                 {
                     tex.SetPixel(x, y, Color.white);
                 }
@@ -297,14 +297,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         public void BlurDoesNotBleedColorFromInvisibleNeighbors()
         {
             Color[] pixels = new Color[8];
-            for (int i = 0; i < pixels.Length; i++)
+            for (int i = 0; i < pixels.Length; ++i)
             {
                 pixels[i] = i < 4 ? new Color(1f, 0f, 0f, 1f) : new Color(0f, 1f, 0f, 0f);
             }
 
             Color[] blurred = Blur(8, 1, pixels, 3);
 
-            for (int i = 0; i < blurred.Length; i++)
+            for (int i = 0; i < blurred.Length; ++i)
             {
                 if (blurred[i].a <= Tolerance)
                 {
@@ -320,7 +320,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         {
             Color transparentWhite = new(1f, 1f, 1f, 0f);
             Color[] pixels = new Color[16];
-            for (int i = 0; i < pixels.Length; i++)
+            for (int i = 0; i < pixels.Length; ++i)
             {
                 pixels[i] = transparentWhite;
             }
@@ -337,7 +337,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         public void SequentialAndParallelBlurProduceEquivalentPixels()
         {
             Color[] pixels = new Color[256];
-            for (int i = 0; i < pixels.Length; i++)
+            for (int i = 0; i < pixels.Length; ++i)
             {
                 float alpha = i % 5 == 0 ? 0f : (i % 11) / 10f;
                 pixels[i] = new Color((i % 3) / 2f, (i % 7) / 6f, (i % 13) / 12f, alpha);
@@ -347,7 +347,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Color[] parallel = Blur(16, 16, pixels, 3, true);
 
             Assert.That(parallel.Length, Is.EqualTo(sequential.Length));
-            for (int i = 0; i < parallel.Length; i++)
+            for (int i = 0; i < parallel.Length; ++i)
             {
                 Assert.That(parallel[i], Is.EqualTo(sequential[i]), $"pixel {i}");
             }
@@ -359,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         {
             Color uniform = new(0.2f, 0.4f, 0.8f, 0.5f);
             Color[] pixels = new Color[36];
-            for (int i = 0; i < pixels.Length; i++)
+            for (int i = 0; i < pixels.Length; ++i)
             {
                 pixels[i] = uniform;
             }

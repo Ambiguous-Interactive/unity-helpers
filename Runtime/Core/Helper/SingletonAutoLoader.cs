@@ -41,20 +41,28 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-        private static void AutoLoadAfterAssemblies() =>
+        private static void AutoLoadAfterAssemblies()
+        {
             ExecuteForLoadType(RuntimeInitializeLoadType.AfterAssembliesLoaded);
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
-        private static void AutoLoadBeforeSplashScreen() =>
+        private static void AutoLoadBeforeSplashScreen()
+        {
             ExecuteForLoadType(RuntimeInitializeLoadType.BeforeSplashScreen);
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void AutoLoadBeforeSceneLoad() =>
+        private static void AutoLoadBeforeSceneLoad()
+        {
             ExecuteForLoadType(RuntimeInitializeLoadType.BeforeSceneLoad);
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void AutoLoadAfterSceneLoad() =>
+        private static void AutoLoadAfterSceneLoad()
+        {
             ExecuteForLoadType(RuntimeInitializeLoadType.AfterSceneLoad);
+        }
 
         private static void ExecuteForLoadType(RuntimeInitializeLoadType loadType)
         {
@@ -104,7 +112,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
 
-            for (int i = 0; i < entries.Count; i++)
+            for (int i = 0; i < entries.Count; ++i)
             {
                 AttributeMetadataCache.AutoLoadSingletonEntry entry = entries[i];
                 if (entry == null || entry.loadType != loadType)

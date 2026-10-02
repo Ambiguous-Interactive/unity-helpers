@@ -1223,7 +1223,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Indent();
 
             StringBuilder condition = new StringBuilder();
-            for (int index = 0; index < encodedTypeParameters.Count; index++)
+            for (int index = 0; index < encodedTypeParameters.Count; ++index)
             {
                 if (0 < index)
                 {
@@ -1876,7 +1876,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 current = current.BaseType
             )
             {
-                depth++;
+                ++depth;
             }
 
             return depth;
@@ -1972,7 +1972,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     .Append(") || conditional")
                     .Append(index)
                     .Append(".CanServe())");
-                index++;
+                ++index;
             }
 
             writer.Line("return " + chain + ";");
@@ -2892,7 +2892,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             StringBuilder builder = new StringBuilder("<");
-            for (int index = 0; index < symbol.TypeParameters.Length; index++)
+            for (int index = 0; index < symbol.TypeParameters.Length; ++index)
             {
                 if (0 < index)
                 {

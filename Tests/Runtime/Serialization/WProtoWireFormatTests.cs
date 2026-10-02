@@ -34,7 +34,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static string ToHex(ReadOnlySpan<byte> bytes)
         {
             StringBuilder builder = new(bytes.Length * 2);
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 builder.Append(bytes[index].ToString("X2"));
             }
@@ -45,7 +45,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static byte[] FromHex(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }
@@ -668,7 +668,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] payload = { 1, 2, 3 };
             WProtoReader reader = new(payload);
-            for (int index = 0; index < consumedBytes; index++)
+            for (int index = 0; index < consumedBytes; ++index)
             {
                 Assert.IsTrue(reader.TryReadVarint32(out _));
             }
@@ -799,7 +799,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void GroupNestingIsBoundedAtTheDocumentedDepth(int depth, bool expectSkipped)
         {
             byte[] payload = new byte[depth * 2];
-            for (int index = 0; index < depth; index++)
+            for (int index = 0; index < depth; ++index)
             {
                 payload[index] = 0x0B;
                 payload[payload.Length - 1 - index] = 0x0C;

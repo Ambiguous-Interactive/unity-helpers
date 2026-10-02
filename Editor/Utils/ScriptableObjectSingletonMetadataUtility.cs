@@ -340,13 +340,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     if (needsUpdate)
                     {
                         metadata.SetOrUpdateEntry(newEntry);
-                        updated++;
+                        ++updated;
                     }
                 }
                 else
                 {
                     metadata.SetOrUpdateEntry(newEntry);
-                    added++;
+                    ++added;
                 }
             }
 
@@ -377,13 +377,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         if (asset == null)
                         {
                             metadata.RemoveEntry(existingTypeName);
-                            removed++;
+                            ++removed;
                         }
                     }
                     else
                     {
                         metadata.RemoveEntry(existingTypeName);
-                        removed++;
+                        ++removed;
                     }
                 }
             }

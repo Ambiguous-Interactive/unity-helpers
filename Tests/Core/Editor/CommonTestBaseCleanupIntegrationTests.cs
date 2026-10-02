@@ -163,7 +163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         public void CleanupTrackedFoldersAndAssetsInsideNestedBatchMaintainsCorrectDepth(int depth)
         {
             List<AssetDatabaseBatchScope> scopes = new List<AssetDatabaseBatchScope>();
-            for (int i = 0; i < depth; i++)
+            for (int i = 0; i < depth; ++i)
             {
                 scopes.Add(AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false));
             }
@@ -206,7 +206,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [TestCase(10, TestName = "MultipleConsecutiveCleanups.Count10")]
         public void MultipleConsecutiveCleanupCallsMaintainZeroDepth(int cleanupCount)
         {
-            for (int i = 0; i < cleanupCount; i++)
+            for (int i = 0; i < cleanupCount; ++i)
             {
                 CreateTestFolder();
 
@@ -241,7 +241,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     "Pre-condition: should be at depth 1"
                 );
 
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < 3; ++i)
                 {
                     CreateTestFolder();
                     CleanupTrackedFoldersAndAssets();
@@ -524,7 +524,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             {
                 string[] parts = TestFolderRoot.Split('/');
                 string currentPath = parts[0];
-                for (int i = 1; i < parts.Length; i++)
+                for (int i = 1; i < parts.Length; ++i)
                 {
                     string nextPath = $"{currentPath}/{parts[i]}";
                     if (!AssetDatabase.IsValidFolder(nextPath))

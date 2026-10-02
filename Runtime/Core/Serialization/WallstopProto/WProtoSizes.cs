@@ -51,7 +51,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             while (0x80UL <= value)
             {
                 value >>= 7;
-                size++;
+                ++size;
             }
 
             return size;
@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             // Enclosing finally blocks unwind the depth; resetting here would make it negative.
             int sizePlanEntry = ReserveSizePlanEntry();
-            _messageDepth++;
+            ++_messageDepth;
             try
             {
                 int payloadSize = formatter.Measure(value);
@@ -266,7 +266,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             int index = _sizePlanArenaCount++;
-            _sizePlanCount++;
+            ++_sizePlanCount;
             _sizePlanArena[index] = 0;
             return index;
         }

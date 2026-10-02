@@ -121,7 +121,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             HashSet<string> written = new HashSet<string>(StringComparer.Ordinal);
             IReadOnlyList<ValidationFinding> safe = Safe(findings);
-            for (int index = 0; index < safe.Count; index++)
+            for (int index = 0; index < safe.Count; ++index)
             {
                 ValidationFinding finding = safe[index];
                 if (!written.Add(finding.Id))
@@ -191,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
             IReadOnlyList<ValidationFinding> safe = Safe(findings);
-            for (int index = 0; index < safe.Count; index++)
+            for (int index = 0; index < safe.Count; ++index)
             {
                 seen.Add(safe[index].Id);
             }

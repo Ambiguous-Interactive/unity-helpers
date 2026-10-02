@@ -392,7 +392,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             using (
                 delete.Borrow(_ =>
                 {
-                    deleteCalls++;
+                    ++deleteCalls;
                     return true;
                 })
             )

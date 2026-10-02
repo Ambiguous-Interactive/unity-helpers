@@ -599,7 +599,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
             int requestCount = 0;
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 ManualRecompile.SkipCompilationRequestForTests = true;
                 ManualRecompile.AssetsRefreshedForTests = () => requestCount++;

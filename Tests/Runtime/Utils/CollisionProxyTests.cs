@@ -73,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             proxy.OnTriggerStay += _ =>
             {
-                stayCount++;
+                ++stayCount;
             };
 
             yield return new WaitForFixedUpdate();
@@ -192,7 +192,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             proxy.OnCollisionStay += _ =>
             {
-                stayCount++;
+                ++stayCount;
             };
 
             yield return new WaitForFixedUpdate();
@@ -269,15 +269,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             proxy.OnTriggerEnter += _ =>
             {
-                subscriber1Count++;
+                ++subscriber1Count;
             };
             proxy.OnTriggerEnter += _ =>
             {
-                subscriber2Count++;
+                ++subscriber2Count;
             };
             proxy.OnTriggerEnter += _ =>
             {
-                subscriber3Count++;
+                ++subscriber3Count;
             };
 
             go.transform.position = Vector3.zero;
@@ -374,7 +374,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             void Handler(Collider2D collider)
             {
-                invokeCount++;
+                ++invokeCount;
             }
         }
 

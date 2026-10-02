@@ -170,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     continue;
                 }
 
-                compared++;
+                ++compared;
                 if (!SameMap(protobuf, wallstop))
                 {
                     mismatches.Add(

@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     builder.Append('*');
                 }
 
-                for (int rank = 1; rank < arrayRank; rank++)
+                for (int rank = 1; rank < arrayRank; ++rank)
                 {
                     builder.Append(',');
                 }
@@ -41,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 builder.Append(type.GetGenericTypeDefinition().FullName).Append('[');
                 Type[] arguments = type.GetGenericArguments();
-                for (int index = 0; index < arguments.Length; index++)
+                for (int index = 0; index < arguments.Length; ++index)
                 {
                     if (0 < index)
                     {

@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
         {
             // Returns more than the default page size (25) to trigger popup path
             int[] options = new int[50];
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 options[i] = (i + 1) * 10;
             }
@@ -68,7 +68,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
         {
             // Returns 100+ options to ensure popup path is triggered
             int[] options = new int[150];
-            for (int i = 0; i < 150; i++)
+            for (int i = 0; i < 150; ++i)
             {
                 options[i] = (i + 1) * 5;
             }

@@ -53,6 +53,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class JsonCodegenPerformanceTests
     {
+        private const int BenchmarkTimeoutMilliseconds = 600_000;
+
         private const int MeasurementBatches = 3;
 
         private const int SmallAbilityCount = 4;
@@ -179,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
             int written = 0;
-            for (int index = 0; index < iterations; index++)
+            for (int index = 0; index < iterations; ++index)
             {
                 buffer.Clear();
                 writer.Reset();
@@ -200,7 +202,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
             int accumulated = 0;
-            for (int index = 0; index < iterations; index++)
+            for (int index = 0; index < iterations; ++index)
             {
                 SaveSlot decoded = JsonSerializer.Deserialize<SaveSlot>(payload, options);
                 accumulated += decoded.Level;
@@ -221,7 +223,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             ulong state = PayloadSeed;
             List<int> abilities = new List<int>(abilityCount);
-            for (int index = 0; index < abilityCount; index++)
+            for (int index = 0; index < abilityCount; ++index)
             {
                 abilities.Add(NextBounded(ref state, AbilityIdBound));
             }
@@ -263,7 +265,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         }
 
         [Test]
-        [Timeout(0)]
+        [Timeout(BenchmarkTimeoutMilliseconds)]
         public void GeneratedConverterShapeComparedAgainstReflection()
         {
             UnityEngine.Debug.Log("| Workload | Ratio | Reference Spread | Subject Spread |");

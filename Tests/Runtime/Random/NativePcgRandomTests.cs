@@ -35,14 +35,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             const int Buckets = 8;
             int[] counts = new int[Buckets];
-            for (int i = 0; i < DistributionSamples; i++)
+            for (int i = 0; i < DistributionSamples; ++i)
             {
-                counts[random.NextUint() & (Buckets - 1)]++;
+                ++counts[random.NextUint() & (Buckets - 1)];
             }
 
             double expected = (double)DistributionSamples / Buckets;
             double chiSquare = 0;
-            for (int i = 0; i < Buckets; i++)
+            for (int i = 0; i < Buckets; ++i)
             {
                 double delta = counts[i] - expected;
                 chiSquare += delta * delta / expected;
@@ -73,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             // Every Guid whose eighth byte is even used to yield an even increment.
             byte[] bytes = new byte[16];
-            for (int i = 0; i < 256; i++)
+            for (int i = 0; i < 256; ++i)
             {
                 bytes[8] = (byte)i;
                 NativePcgRandom random = new(new Guid(bytes));
@@ -106,7 +106,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             NativePcgRandom random = new(12345);
             float maximum = float.MinValue;
-            for (int i = 0; i < DistributionSamples; i++)
+            for (int i = 0; i < DistributionSamples; ++i)
             {
                 float value = random.NextFloat();
                 if (!(0f <= value && value < 1f))
@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         public void NextFloatScaleIsExactForEveryMantissa()
         {
             const int MantissaCount = 1 << 24;
-            for (int mantissa = 0; mantissa < MantissaCount; mantissa++)
+            for (int mantissa = 0; mantissa < MantissaCount; ++mantissa)
             {
                 float value = mantissa * NativePcgRandom.FloatScale;
                 if (1f <= value)
@@ -146,7 +146,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             NativePcgRandom random = new(54321);
             double maximum = double.MinValue;
-            for (int i = 0; i < DistributionSamples; i++)
+            for (int i = 0; i < DistributionSamples; ++i)
             {
                 double value = random.NextDouble();
                 if (!(0.0 <= value && value < 1.0))
@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         public void NextLongIsNeverNegative()
         {
             NativePcgRandom random = new(777);
-            for (int i = 0; i < DistributionSamples; i++)
+            for (int i = 0; i < DistributionSamples; ++i)
             {
                 long value = random.NextLong();
                 if (value < 0L)
@@ -183,11 +183,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             NativePcgRandom random = new(999);
             int trueCount = 0;
-            for (int i = 0; i < DistributionSamples; i++)
+            for (int i = 0; i < DistributionSamples; ++i)
             {
                 if (random.NextBool())
                 {
-                    trueCount++;
+                    ++trueCount;
                 }
             }
 
@@ -206,7 +206,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             NativePcgRandom flipper = new(4242);
             NativePcgRandom reference = new(4242);
 
-            for (int i = 0; i < 32; i++)
+            for (int i = 0; i < 32; ++i)
             {
                 flipper.NextBool();
             }
@@ -251,7 +251,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             NativePcgRandom random = new(31337);
             int[] counts = new int[exclusiveMax];
             int samples = (int)exclusiveMax * 20_000;
-            for (int i = 0; i < samples; i++)
+            for (int i = 0; i < samples; ++i)
             {
                 uint value = random.NextUint(exclusiveMax);
                 if (!(value < exclusiveMax))
@@ -262,7 +262,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                         "NextUint(max) returned a value at or above max."
                     );
                 }
-                counts[value]++;
+                ++counts[value];
             }
 
             double expected = (double)samples / exclusiveMax;
@@ -301,7 +301,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             HashSet<uint> distinctBounded = new();
             HashSet<bool> distinctBools = new();
             HashSet<long> distinctLongs = new();
-            for (int i = 0; i < 256; i++)
+            for (int i = 0; i < 256; ++i)
             {
                 distinctUints.Add(uints.NextUint());
                 distinctBounded.Add(bounded.NextUint(10));
@@ -397,7 +397,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         public void SeededStreamIsUnchanged(int seed, uint[] expected)
         {
             NativePcgRandom random = new(seed);
-            for (int i = 0; i < expected.Length; i++)
+            for (int i = 0; i < expected.Length; ++i)
             {
                 Assert.AreEqual(expected[i], random.NextUint(), $"Seed {seed}, draw {i}.");
             }
@@ -444,7 +444,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             NativePcgRandom first = new(2024);
             NativePcgRandom second = new(2024);
-            for (int i = 0; i < 1_000; i++)
+            for (int i = 0; i < 1_000; ++i)
             {
                 Assert.AreEqual(first.NextUint(), second.NextUint());
                 Assert.AreEqual(first.NextBool(), second.NextBool());
@@ -460,7 +460,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             NativePcgRandom first = new(1);
             NativePcgRandom second = new(2);
             bool diverged = false;
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 if (first.NextUint() != second.NextUint())
                 {

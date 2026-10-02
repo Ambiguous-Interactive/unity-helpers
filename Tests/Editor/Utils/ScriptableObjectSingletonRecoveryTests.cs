@@ -109,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int callbacks = 0;
             asset.clearing = () =>
             {
-                callbacks++;
+                ++callbacks;
                 Assert.AreSame(asset, LifecycleScriptableSingleton.Instance);
                 if (reenter && callbacks == 1)
                 {
@@ -163,7 +163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int secondCallbacks = 0;
             first.clearing = () =>
             {
-                firstCallbacks++;
+                ++firstCallbacks;
                 if (firstCallbacks == 1)
                 {
                     DestroyedAssetSingleton.ClearInstance();
@@ -171,7 +171,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             };
             second.clearing = () =>
             {
-                secondCallbacks++;
+                ++secondCallbacks;
                 Assert.AreSame(first, LifecycleScriptableSingleton.Instance);
                 Assert.AreSame(second, DestroyedAssetSingleton.Instance);
                 if (secondCallbacks == 1)

@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
 
         private AutoScriptableSingleton()
         {
-            CreatedCount++;
+            ++CreatedCount;
         }
 
         public static void ClearForTests()

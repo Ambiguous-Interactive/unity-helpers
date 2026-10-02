@@ -118,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             ReflectionHelpers.ClearFieldSetterCache();
             GameObject root = CreateExactTypeCandidates("ExactRoot");
             GameObject ancestor = root;
-            for (int level = 1; level < depth; level++)
+            for (int level = 1; level < depth; ++level)
             {
                 GameObject next = CreateExactTypeCandidates("ExactAncestor");
                 next.transform.SetParent(ancestor.transform);

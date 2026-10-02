@@ -45,7 +45,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
         [Test]
         public void GetFallbackOptionLabelStartsWithOpenParen()
         {
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 string label = DropDownShared.GetFallbackOptionLabel(i);
                 Assert.That(

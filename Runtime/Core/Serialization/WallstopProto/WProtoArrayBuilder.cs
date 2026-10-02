@@ -108,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             _items[_count] = item;
-            _count++;
+            ++_count;
         }
 
         /// <summary>

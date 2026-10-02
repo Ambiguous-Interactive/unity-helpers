@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
 
             string current = parts[0];
-            for (int i = 1; i < parts.Length; i++)
+            for (int i = 1; i < parts.Length; ++i)
             {
                 string desired = parts[i];
                 string next = current + "/" + desired;
@@ -1492,7 +1492,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 Assert.DoesNotThrow(
                     () =>

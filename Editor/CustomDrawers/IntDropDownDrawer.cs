@@ -35,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 if (cached.Length == options.Length)
                 {
                     bool match = true;
-                    for (int i = 0; i < optionsLength && match; i++)
+                    for (int i = 0; i < optionsLength && match; ++i)
                     {
                         if (
                             !string.Equals(
@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string[] displayOptions = new string[optionsLength];
-            for (int i = 0; i < optionsLength; i++)
+            for (int i = 0; i < optionsLength; ++i)
             {
                 displayOptions[i] = DropDownShared.GetCachedIntString(options[i]);
             }
@@ -119,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 GenericMenu menu = new();
                 int optionsLength = options.Length;
-                for (int i = 0; i < optionsLength; i++)
+                for (int i = 0; i < optionsLength; ++i)
                 {
                     int capturedIndex = i;
                     bool isSelected = i == selectedIndex && !property.hasMultipleDifferentValues;
@@ -465,7 +465,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return _options[optionIndex];
             }
 
-            protected override int GetDefaultValue() => 0 < _options.Length ? _options[0] : 0;
+            protected override int GetDefaultValue()
+            {
+                return 0 < _options.Length ? _options[0] : 0;
+            }
         }
     }
 #endif

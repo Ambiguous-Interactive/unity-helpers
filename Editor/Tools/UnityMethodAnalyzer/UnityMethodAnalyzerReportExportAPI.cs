@@ -207,7 +207,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
             try
             {
-                for (int i = 0; i < issues.Count; i++)
+                for (int i = 0; i < issues.Count; ++i)
                 {
                     if (issues[i] == null)
                     {

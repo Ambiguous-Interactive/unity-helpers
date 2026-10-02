@@ -309,7 +309,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return null;
             }
             ITypeSymbol[] arguments = new ITypeSymbol[method.TypeArguments.Length];
-            for (int index = 0; index < arguments.Length; index++)
+            for (int index = 0; index < arguments.Length; ++index)
             {
                 arguments[index] = method.TypeArguments[index];
             }

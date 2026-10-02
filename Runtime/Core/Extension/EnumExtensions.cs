@@ -79,7 +79,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 arrayLength = windowLength;
                 namesArray = new string[arrayLength];
 
-                for (int i = 0; i < valueCount; i++)
+                for (int i = 0; i < valueCount; ++i)
                 {
                     T value = values[i];
                     if (EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
@@ -214,7 +214,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             FieldInfo[] fields = type.GetFields(BindingFlags.Public | BindingFlags.Static);
             int fieldCount = fields.Length;
             T[] fieldValues = new T[fieldCount];
-            for (int i = 0; i < fieldCount; i++)
+            for (int i = 0; i < fieldCount; ++i)
             {
                 fieldValues[i] = (T)fields[i].GetValue(null);
             }
@@ -236,7 +236,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 arrayLength = windowLength;
                 namesArray = new string[arrayLength];
 
-                for (int i = 0; i < fieldCount; i++)
+                for (int i = 0; i < fieldCount; ++i)
                 {
                     FieldInfo field = fields[i];
                     string name = field.IsAttributeDefined(
@@ -268,7 +268,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     fieldCount
                 );
 
-                for (int i = 0; i < fieldCount; i++)
+                for (int i = 0; i < fieldCount; ++i)
                 {
                     FieldInfo field = fields[i];
                     string name = field.IsAttributeDefined(

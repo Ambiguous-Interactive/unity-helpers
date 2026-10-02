@@ -48,14 +48,14 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             // Skip before invoking the action because the allocation-counter crash prevents reporting any result.
             IgnoreIfAllocationMeasurementUnavailable();
 
-            for (int i = 0; i < warmupIterations; i++)
+            for (int i = 0; i < warmupIterations; ++i)
             {
                 action();
             }
 
             long before = GC.GetAllocatedBytesForCurrentThread();
 
-            for (int i = 0; i < measuredIterations; i++)
+            for (int i = 0; i < measuredIterations; ++i)
             {
                 action();
             }

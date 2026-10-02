@@ -50,7 +50,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             string[] names = Enum.GetNames(typeof(T));
             CollectionAssert.AreEqual(values, EnumValues<T>.Values.ToArray());
 
-            for (int i = 0; i < values.Length; i++)
+            for (int i = 0; i < values.Length; ++i)
             {
                 Assert.AreEqual(
                     names[i],
@@ -686,7 +686,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void CachedNamePerformanceWithRepeatedCalls()
         {
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 _ = TestEnum.First.ToCachedName();
                 _ = TestEnum.Second.ToCachedName();
@@ -697,7 +697,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void DisplayNamePerformanceWithRepeatedCalls()
         {
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 _ = SmallTestEnum.First.ToDisplayName();
                 _ = SmallTestEnum.Second.ToDisplayName();
@@ -709,7 +709,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void HasFlagNoAllocPerformanceWithRepeatedCalls()
         {
             TestEnum value = TestEnum.First | TestEnum.Second;
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 _ = value.HasFlagNoAlloc(TestEnum.First);
                 _ = value.HasFlagNoAlloc(TestEnum.Second);
@@ -772,7 +772,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void CachedNameDoesNotAllocate()
         {
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 Assert.AreEqual(TestEnum.First.ToString("G"), TestEnum.First.ToCachedName());
                 Assert.AreEqual(
@@ -807,7 +807,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void DisplayNameDoesNotAllocate()
         {
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 _ = TestEnum.First.ToDisplayName();
                 _ = TinyTestEnum.First.ToDisplayName();
@@ -871,7 +871,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void DisplayNamesWithLargeCollection()
         {
             List<TestEnum> values = new();
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 values.Add(TestEnum.First);
                 values.Add(TestEnum.Second);
@@ -886,7 +886,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void CachedNamesWithLargeCollection()
         {
             List<TestEnum> values = new();
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 values.Add(TestEnum.First);
                 values.Add(TestEnum.Second);

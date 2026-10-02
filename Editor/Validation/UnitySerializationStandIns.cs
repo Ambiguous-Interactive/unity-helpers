@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             int argumentsLength = arguments.Length;
             string[] names = new string[argumentsLength];
-            for (int index = 0; index < argumentsLength; index++)
+            for (int index = 0; index < argumentsLength; ++index)
             {
                 names[index] = Readable(arguments[index]);
             }
@@ -155,7 +155,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             Type[] arguments = type.GetGenericArguments();
             int argumentsLength = arguments.Length;
-            for (int index = 0; index < argumentsLength; index++)
+            for (int index = 0; index < argumentsLength; ++index)
             {
                 if (0 < index)
                 {

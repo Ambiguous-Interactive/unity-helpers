@@ -88,7 +88,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             RestorableGlobal<int> owner = NewOwner(100);
             RestorableGlobal<int>.Scope[] scopes = new RestorableGlobal<int>.Scope[5];
-            for (int index = 0; index < scopes.Length; index++)
+            for (int index = 0; index < scopes.Length; ++index)
             {
                 scopes[index] = owner.Borrow(index + 1);
             }
@@ -371,7 +371,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         private void WriteCell(int value)
         {
-            _writesAttempted++;
+            ++_writesAttempted;
             if (_writeThrows)
             {
                 throw new InvalidOperationException("the setter refused");

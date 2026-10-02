@@ -162,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             {
                 return false;
             }
-            for (int index = 0; index < method.Parameters.Length; index++)
+            for (int index = 0; index < method.Parameters.Length; ++index)
             {
                 IParameterSymbol parameter = method.Parameters[index];
                 string expectedName = signature.Parameters[index];

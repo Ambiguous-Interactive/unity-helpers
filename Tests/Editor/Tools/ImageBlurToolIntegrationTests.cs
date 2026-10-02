@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     )
                 )
                 {
-                    count++;
+                    ++count;
                 }
             }
             return count;
@@ -133,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     2,
                     (_, message) =>
                     {
-                        reportCount++;
+                        ++reportCount;
                         completionMessage = message;
                     }
                 )
@@ -302,7 +302,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             try
             {
                 Color[] pixels = new Color[texture.width * texture.height];
-                for (int i = 0; i < pixels.Length; i++)
+                for (int i = 0; i < pixels.Length; ++i)
                 {
                     pixels[i] = color;
                 }

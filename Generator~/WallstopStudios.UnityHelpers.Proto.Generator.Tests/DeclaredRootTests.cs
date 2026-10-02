@@ -391,7 +391,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private sealed class ConcreteDerivedFormatter : IWProtoFormatter<ConcreteDerived>
         {
-            public int Measure(in ConcreteDerived value) => 1;
+            public int Measure(in ConcreteDerived value)
+            {
+                return 1;
+            }
 
             public bool Write(ref WProtoWriter writer, in ConcreteDerived value)
             {
@@ -407,9 +410,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private sealed class PlainRootFormatter : IWProtoFormatter<UnformattedRoot>
         {
-            public int Measure(in UnformattedRoot value) => 0;
+            public int Measure(in UnformattedRoot value)
+            {
+                return 0;
+            }
 
-            public bool Write(ref WProtoWriter writer, in UnformattedRoot value) => true;
+            public bool Write(ref WProtoWriter writer, in UnformattedRoot value)
+            {
+                return true;
+            }
 
             public bool TryRead(ref WProtoReader reader, out UnformattedRoot value)
             {

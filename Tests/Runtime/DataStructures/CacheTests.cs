@@ -347,7 +347,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "key1",
                 k =>
                 {
-                    factoryCallCount++;
+                    ++factoryCallCount;
                     return 100;
                 }
             );
@@ -735,11 +735,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .ProtectedRatio(0.8f)
                 .TimeProvider(TimeProvider)
                 .Build();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 cache.Set(i, i);
             }
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 8; ++i)
             {
                 cache.TryGet(i, out _);
             }
@@ -771,7 +771,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .ThrashThreshold(0.5f)
                 .TimeProvider(TimeProvider)
                 .Build();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 cache.Set(i, i);
             }
@@ -1588,7 +1588,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 cache.Set($"key{i}", i);
             }
@@ -1609,7 +1609,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 cache.Set($"key{i}", i);
             }
@@ -1633,7 +1633,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .Build();
 
             cache.Resize(0);
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 cache.Set(i, i);
             }
@@ -1655,7 +1655,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .MaximumWeight(100)
                 .Weigher(static (_, value) => value.Length)
                 .Build();
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 cache.Set(i, "value");
             }
@@ -2509,14 +2509,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 cache.Set(i, i * 2);
             }
 
             Assert.AreEqual(10000, cache.Count);
 
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 Assert.IsTrue(cache.TryGet(i, out int value));
                 Assert.AreEqual(i * 2, value);
@@ -2533,27 +2533,27 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 cache.Set(i, i);
             }
 
             Assert.AreEqual(10000, cache.Count);
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 _currentTime += 0.001f;
                 cache.TryGet(i, out _);
             }
 
-            for (int i = 10000; i < 15000; i++)
+            for (int i = 10000; i < 15000; ++i)
             {
                 cache.Set(i, i);
             }
 
             Assert.AreEqual(10000, cache.Count);
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 Assert.IsTrue(cache.ContainsKey(i), $"Key {i} should exist");
             }
@@ -2569,19 +2569,19 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < 15000; i++)
+            for (int i = 0; i < 15000; ++i)
             {
                 cache.Set(i, i);
             }
 
             Assert.AreEqual(10000, cache.Count);
 
-            for (int i = 0; i < 5000; i++)
+            for (int i = 0; i < 5000; ++i)
             {
                 Assert.IsFalse(cache.ContainsKey(i), $"Key {i} should have been evicted");
             }
 
-            for (int i = 5000; i < 15000; i++)
+            for (int i = 5000; i < 15000; ++i)
             {
                 Assert.IsTrue(cache.ContainsKey(i), $"Key {i} should exist");
             }
@@ -2596,7 +2596,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 cache.Set(i, i);
             }
@@ -2616,7 +2616,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 cache.Set(i, i);
             }
@@ -2635,7 +2635,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 cache.Set(i, i);
             }
@@ -2710,7 +2710,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < capacity; i++)
+            for (int i = 0; i < capacity; ++i)
             {
                 cache.Set(i, i);
             }
@@ -2721,7 +2721,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Cache with capacity {capacity} should contain exactly {capacity} items after filling"
             );
 
-            for (int i = 0; i < capacity; i++)
+            for (int i = 0; i < capacity; ++i)
             {
                 Assert.IsTrue(
                     cache.TryGet(i, out int value),
@@ -2750,7 +2750,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < itemsToAdd; i++)
+            for (int i = 0; i < itemsToAdd; ++i)
             {
                 cache.Set(i, i);
             }
@@ -2803,7 +2803,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < initialCount; i++)
+            for (int i = 0; i < initialCount; ++i)
             {
                 cache.Set(i, i);
             }
@@ -2850,14 +2850,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             System.Threading.CountdownEvent countdownEvent = new(threadCount);
             Exception capturedException = null;
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 int threadIndex = t;
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try
                     {
-                        for (int i = 0; i < operationsPerThread; i++)
+                        for (int i = 0; i < operationsPerThread; ++i)
                         {
                             int key = threadIndex * operationsPerThread + i;
                             cache.Set(key, key);
@@ -2892,7 +2892,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 cache.Set(i, i);
             }
@@ -2902,13 +2902,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             System.Threading.CountdownEvent countdownEvent = new(threadCount);
             Exception capturedException = null;
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try
                     {
-                        for (int i = 0; i < operationsPerThread; i++)
+                        for (int i = 0; i < operationsPerThread; ++i)
                         {
                             int key = i % 100;
                             cache.TryGet(key, out int _);
@@ -2947,14 +2947,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             System.Threading.CountdownEvent countdownEvent = new(threadCount);
             Exception capturedException = null;
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 int threadIndex = t;
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try
                     {
-                        for (int i = 0; i < operationsPerThread; i++)
+                        for (int i = 0; i < operationsPerThread; ++i)
                         {
                             if (i % 2 == 0)
                             {
@@ -2996,7 +2996,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 cache.Set(i, i);
             }
@@ -3006,14 +3006,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             System.Threading.CountdownEvent countdownEvent = new(threadCount);
             Exception capturedException = null;
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 int threadIndex = t;
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try
                     {
-                        for (int i = 0; i < operationsPerThread; i++)
+                        for (int i = 0; i < operationsPerThread; ++i)
                         {
                             int key = threadIndex * operationsPerThread + i;
                             cache.TryRemove(key);
@@ -3054,14 +3054,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             System.Threading.CountdownEvent countdownEvent = new(threadCount);
             Exception capturedException = null;
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 int threadIndex = t;
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try
                     {
-                        for (int i = 0; i < operationsPerThread; i++)
+                        for (int i = 0; i < operationsPerThread; ++i)
                         {
                             int key = threadIndex * operationsPerThread + i;
                             cache.Set(key, key);
@@ -3102,13 +3102,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Exception capturedException = null;
             int[] loadCounts = new int[sharedKeyRange];
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try
                     {
-                        for (int i = 0; i < sharedKeyRange; i++)
+                        for (int i = 0; i < sharedKeyRange; ++i)
                         {
                             cache.GetOrAdd(
                                 i,
@@ -3304,7 +3304,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(initialCapacity, cache.Capacity, "Should start at InitialCapacity");
 
-            for (int i = 0; i < maxSize; i++)
+            for (int i = 0; i < maxSize; ++i)
             {
                 cache.Set($"key{i}", i);
             }
@@ -3335,7 +3335,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Should start at InitialCapacity"
             );
 
-            for (int i = 0; i < maxSize; i++)
+            for (int i = 0; i < maxSize; ++i)
             {
                 cache.Set($"key{i}", i);
             }
@@ -3372,7 +3372,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Should start at InitialCapacity with growth factor {growthFactor}"
             );
 
-            for (int i = 0; i < maxSize; i++)
+            for (int i = 0; i < maxSize; ++i)
             {
                 cache.Set($"key{i}", i);
             }
@@ -3406,7 +3406,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Initial capacity should be at or below MaximumSize"
             );
 
-            for (int i = 0; i < maxSize; i++)
+            for (int i = 0; i < maxSize; ++i)
             {
                 cache.Set($"key{i}", i);
             }
@@ -3823,7 +3823,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CacheOptions<string, int> options = new() { MaximumSize = 10 };
             using Cache<string, int> cache = new(options);
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 cache.Set($"key{i}", i);
             }
@@ -3899,7 +3899,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"InitialCapacity of {initialCapacity} should be respected when smaller than MaximumSize ({maxSize})"
             );
 
-            for (int i = 0; i < initialCapacity; i++)
+            for (int i = 0; i < initialCapacity; ++i)
             {
                 cache.Set($"key{i}", i);
             }
@@ -3972,7 +3972,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
 
             int previousCapacity = cache.Capacity;
-            for (int i = 0; i < maxSize; i++)
+            for (int i = 0; i < maxSize; ++i)
             {
                 cache.Set($"key{i}", i);
                 if (previousCapacity < cache.Capacity)
@@ -4013,14 +4013,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Capacity should equal MaximumSize for small caches"
             );
 
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < itemCount; ++i)
             {
                 cache.Set(i, i * 10);
             }
 
             Assert.That(cache.Count, Is.EqualTo(itemCount), $"Should contain {itemCount} items");
 
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < itemCount; ++i)
             {
                 Assert.That(
                     cache.TryGet(i, out int value),
@@ -4041,9 +4041,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            for (int round = 0; round < 5; round++)
+            for (int round = 0; round < 5; ++round)
             {
-                for (int i = 0; i < maxSize * 2; i++)
+                for (int i = 0; i < maxSize * 2; ++i)
                 {
                     cache.Set(round * 100 + i, i);
                     Assert.That(
@@ -4053,7 +4053,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     );
                 }
 
-                for (int i = 0; i < maxSize / 2; i++)
+                for (int i = 0; i < maxSize / 2; ++i)
                 {
                     cache.TryRemove(round * 100 + i);
                 }

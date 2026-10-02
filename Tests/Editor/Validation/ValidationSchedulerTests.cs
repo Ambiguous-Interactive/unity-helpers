@@ -145,7 +145,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     ValidationScheduler.DefaultBudgetMilliseconds,
                     finished =>
                     {
-                        callbacks++;
+                        ++callbacks;
                         Assert.AreSame(run, finished);
                         Assert.IsTrue(finished.IsCancelled);
                     }
@@ -174,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     ValidationScheduler.DefaultBudgetMilliseconds,
                     finished =>
                     {
-                        callbacks++;
+                        ++callbacks;
                         // Release scheduler state before invoking the completion callback.
                         Assert.IsFalse(ValidationScheduler.IsRunning);
                         ValidationScheduler.Stop();
@@ -236,7 +236,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         run,
                         onComplete: completed =>
                         {
-                            callbacks++;
+                            ++callbacks;
                             restarted = ValidationScheduler.TryStart(PendingRun());
                         }
                     )
@@ -271,14 +271,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 applies = () =>
                 {
-                    calls++;
+                    ++calls;
                     if (boundary == 0)
                         cancel();
                     return true;
                 },
                 validate = () =>
                 {
-                    calls++;
+                    ++calls;
                     if (boundary == 2)
                         cancel();
                 },
@@ -296,7 +296,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 },
                 _ =>
                 {
-                    calls++;
+                    ++calls;
                     if (boundary == 1)
                         cancel();
                     return null;
@@ -341,13 +341,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             public Func<bool> applies;
             public Action validate;
 
-            public bool AppliesTo(in ValidationTarget target) => applies();
+            public bool AppliesTo(in ValidationTarget target)
+            {
+                return applies();
+            }
 
             public void Validate(
                 in ValidationTarget target,
                 Object asset,
                 List<ValidationFinding> findings
-            ) => validate();
+            )
+            {
+                validate();
+            }
         }
 
         /// <summary>Captures what was logged, and passes everything else through.</summary>

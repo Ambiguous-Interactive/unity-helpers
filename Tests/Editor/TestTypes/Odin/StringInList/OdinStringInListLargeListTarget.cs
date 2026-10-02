@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.StringInList
         {
             public static IEnumerable<string> GetLargeList()
             {
-                for (int i = 0; i < 200; i++)
+                for (int i = 0; i < 200; ++i)
                 {
                     yield return $"Item_{i:D3}";
                 }

@@ -2721,7 +2721,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void ToCasePerformanceMultipleCalls()
         {
             string input = "TestValue";
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 _ = input.ToCase(StringCase.PascalCase);
                 _ = input.ToCase(StringCase.CamelCase);

@@ -718,7 +718,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(10000, immutable.Capacity);
             Assert.AreEqual(100, immutable.CountSetBits());
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 if (i % 100 == 0)
                 {
@@ -799,7 +799,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ComplexScenarioEnumerationAfterConversion()
         {
             BitSet bits = new(100);
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 if (i % 7 == 0)
                 {
@@ -813,7 +813,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             foreach (int index in immutable.EnumerateSetIndices())
             {
                 Assert.AreEqual(0, index % 7);
-                count++;
+                ++count;
             }
 
             Assert.AreEqual(15, count);

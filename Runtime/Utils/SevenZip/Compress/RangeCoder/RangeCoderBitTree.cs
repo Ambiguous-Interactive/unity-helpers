@@ -22,7 +22,7 @@ namespace SevenZip.Compression.RangeCoder
 
         public void Init()
         {
-            for (uint i = 1; i < (1 << NumBitLevels); i++)
+            for (uint i = 1; i < (1 << NumBitLevels); ++i)
             {
                 Models[i].Init();
             }
@@ -43,7 +43,7 @@ namespace SevenZip.Compression.RangeCoder
         public void ReverseEncode(Encoder rangeEncoder, UInt32 symbol)
         {
             UInt32 m = 1;
-            for (UInt32 i = 0; i < NumBitLevels; i++)
+            for (UInt32 i = 0; i < NumBitLevels; ++i)
             {
                 UInt32 bit = symbol & 1;
                 Models[m].Encode(rangeEncoder, bit);
@@ -108,7 +108,7 @@ namespace SevenZip.Compression.RangeCoder
         )
         {
             UInt32 m = 1;
-            for (int i = 0; i < NumBitLevels; i++)
+            for (int i = 0; i < NumBitLevels; ++i)
             {
                 UInt32 bit = symbol & 1;
                 Models[startIndex + m].Encode(rangeEncoder, bit);
@@ -131,7 +131,7 @@ namespace SevenZip.Compression.RangeCoder
 
         public void Init()
         {
-            for (uint i = 1; i < (1 << NumBitLevels); i++)
+            for (uint i = 1; i < (1 << NumBitLevels); ++i)
             {
                 Models[i].Init();
             }
@@ -152,7 +152,7 @@ namespace SevenZip.Compression.RangeCoder
         {
             uint m = 1;
             uint symbol = 0;
-            for (int bitIndex = 0; bitIndex < NumBitLevels; bitIndex++)
+            for (int bitIndex = 0; bitIndex < NumBitLevels; ++bitIndex)
             {
                 uint bit = Models[m].Decode(rangeDecoder);
                 m <<= 1;
@@ -171,7 +171,7 @@ namespace SevenZip.Compression.RangeCoder
         {
             uint m = 1;
             uint symbol = 0;
-            for (int bitIndex = 0; bitIndex < NumBitLevels; bitIndex++)
+            for (int bitIndex = 0; bitIndex < NumBitLevels; ++bitIndex)
             {
                 uint bit = Models[startIndex + m].Decode(rangeDecoder);
                 m <<= 1;

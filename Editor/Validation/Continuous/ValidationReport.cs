@@ -61,7 +61,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             IReadOnlyList<ValidationFinding> findings =
                 run == null ? Array.Empty<ValidationFinding>() : run.Findings;
-            for (int index = 0; index < findings.Count; index++)
+            for (int index = 0; index < findings.Count; ++index)
             {
                 ValidationFinding finding = findings[index];
                 bool suppressed = effective.IsSuppressed(finding);
@@ -81,13 +81,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
                 if (!suppressed)
                 {
-                    document.unsuppressedCount++;
+                    ++document.unsuppressedCount;
                 }
             }
 
             IReadOnlyList<ValidationRuleFailure> failures =
                 run == null ? Array.Empty<ValidationRuleFailure>() : run.Failures;
-            for (int index = 0; index < failures.Count; index++)
+            for (int index = 0; index < failures.Count; ++index)
             {
                 ValidationRuleFailure failure = failures[index];
                 document.failures.Add(
@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             IReadOnlyList<string> unused = effective.UnusedIn(findings);
-            for (int index = 0; index < unused.Count; index++)
+            for (int index = 0; index < unused.Count; ++index)
             {
                 document.unusedSuppressions.Add(unused[index]);
             }
@@ -142,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             ValidationSuppressions effective = suppressions ?? ValidationSuppressions.Empty;
             IReadOnlyList<ValidationFinding> findings = run.Findings;
-            for (int index = 0; index < findings.Count; index++)
+            for (int index = 0; index < findings.Count; ++index)
             {
                 ValidationFinding finding = findings[index];
                 if (threshold <= finding.Severity && !effective.IsSuppressed(finding))

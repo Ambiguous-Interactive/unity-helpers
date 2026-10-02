@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         [WButton]
         public virtual void VirtualButton()
         {
-            BaseCallCount++;
+            ++BaseCallCount;
         }
     }
 }

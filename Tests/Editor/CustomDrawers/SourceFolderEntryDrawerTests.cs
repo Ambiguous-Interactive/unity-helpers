@@ -641,7 +641,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             yield return TestIMGUIExecutor.Run(() =>
             {
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < 5; ++i)
                 {
                     _drawer.OnGUI(position, entryProp, GUIContent.none);
                 }
@@ -669,7 +669,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             yield return TestIMGUIExecutor.Run(() =>
             {
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < 5; ++i)
                 {
                     _drawer.OnGUI(position, entryProp, GUIContent.none);
                 }
@@ -695,7 +695,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             yield return TestIMGUIExecutor.Run(() =>
             {
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < 10; ++i)
                 {
                     _drawer.OnGUI(position, entryProp, GUIContent.none);
                 }

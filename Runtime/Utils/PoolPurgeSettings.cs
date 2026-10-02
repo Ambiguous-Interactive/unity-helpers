@@ -1959,11 +1959,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                         continue;
                     }
 
-                    livePoolCount++;
+                    ++livePoolCount;
 
                     if (pool is IPoolStatistics stats)
                     {
-                        statsPoolCount++;
+                        ++statsPoolCount;
                         totalItems += stats.CurrentPooledCount;
                         float accessTime = stats.LastAccessTime;
                         if (accessTime < oldestAccessTime)
@@ -2057,7 +2057,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             long remaining = currentTotal - maxItems;
-            for (int i = 0; i < BudgetEnforcementPools.Count && 0 < remaining; i++)
+            for (int i = 0; i < BudgetEnforcementPools.Count && 0 < remaining; ++i)
             {
                 IPoolStatistics pool = BudgetEnforcementPools[i];
                 int currentPoolCount = pool.CurrentPooledCount;
@@ -2094,7 +2094,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static void SortPoolsByLastAccessTime(List<IPoolStatistics> pools)
         {
             int count = pools.Count;
-            for (int i = 1; i < count; i++)
+            for (int i = 1; i < count; ++i)
             {
                 IPoolStatistics key = pools[i];
                 float keyTime = key.LastAccessTime;

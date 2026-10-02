@@ -124,7 +124,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _dense[_count] = value;
             _sparse[value] = _count;
-            _count++;
+            ++_count;
             return true;
         }
 
@@ -241,7 +241,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             results.Clear();
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < _count; ++i)
             {
                 results.Add(_dense[i]);
             }
@@ -399,7 +399,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _elements[index] = element;
             _dense[_count] = index;
             _sparse[index] = _count;
-            _count++;
+            ++_count;
             return true;
         }
 
@@ -487,7 +487,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 throw new ArgumentException("Destination array is not large enough.");
             }
 
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < _count; ++i)
             {
                 int elementIndex = _dense[i];
                 array[arrayIndex + i] = _elements[elementIndex];
@@ -500,7 +500,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public T[] ToArray()
         {
             T[] result = new T[_count];
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < _count; ++i)
             {
                 int elementIndex = _dense[i];
                 result[i] = _elements[elementIndex];
@@ -520,7 +520,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             results.Clear();
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < _count; ++i)
             {
                 int elementIndex = _dense[i];
                 results.Add(_elements[elementIndex]);
@@ -568,7 +568,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 if (0 < count)
                 {
                     _pooledArray = SystemArrayPool<T>.Get(count, out T[] temp);
-                    for (int i = 0; i < count; i++)
+                    for (int i = 0; i < count; ++i)
                     {
                         temp[i] = elements[dense[i]];
                     }

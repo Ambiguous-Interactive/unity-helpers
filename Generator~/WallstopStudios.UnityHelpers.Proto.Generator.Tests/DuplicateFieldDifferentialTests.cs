@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static bool TryDecodeChain(int links)
         {
             List<byte> payload = new List<byte>();
-            for (int level = 0; level < links; level++)
+            for (int level = 0; level < links; ++level)
             {
                 List<byte> wrapped = new List<byte> { 0x12 };
                 int length = payload.Count;
@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static byte[] Parse(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
+            for (int index = 0; index < bytes.Length; ++index)
             {
                 bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
             }

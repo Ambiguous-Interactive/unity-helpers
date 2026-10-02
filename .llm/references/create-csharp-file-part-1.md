@@ -107,6 +107,13 @@ namespace WallstopStudios.UnityHelpers.Core
 - ✅ `List<string> items = new List<string>();`
 - ❌ `var items = new List<string>();`
 
+Named methods and local functions also use brace bodies. Properties, accessors, operators and
+lambdas may use expression bodies. Use prefix increment when the prior value is discarded; keep
+postfix when an expression uses the prior value. `npm run lint:csharp-syntax` enforces these two
+syntax policies in Local Gates, including every conditional branch. Its `:fix` sibling applies the
+mechanical migration; format changed C# files afterward. The tool stays host-only and adds no
+consumer diagnostic or Unity assembly.
+
 ### 4. Braces Required for All Control Structures
 
 ```csharp

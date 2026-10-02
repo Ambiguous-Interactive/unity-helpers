@@ -547,7 +547,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             EnsureFolder(Path.GetDirectoryName(relPath).SanitizePath());
             Texture2D t = new(w, h, TextureFormat.RGBA32, false) { alphaIsTransparency = true };
             Color[] pix = new Color[w * h];
-            for (int i = 0; i < pix.Length; i++)
+            for (int i = 0; i < pix.Length; ++i)
             {
                 pix[i] = c;
             }
@@ -562,7 +562,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             EnsureFolder(Path.GetDirectoryName(relPath).SanitizePath());
             Texture2D t = new(w, h, TextureFormat.RGBA32, false) { alphaIsTransparency = true };
             Color[] pix = new Color[w * h];
-            for (int i = 0; i < pix.Length; i++)
+            for (int i = 0; i < pix.Length; ++i)
             {
                 pix[i] = new Color(0f, 0f, 0f, 0f);
             }

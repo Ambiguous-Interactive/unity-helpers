@@ -49,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             GameObject root = Track(new GameObject("MaxCountRoot", typeof(ChildMaxCountTester)));
             ChildMaxCountTester tester = root.GetComponent<ChildMaxCountTester>();
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 GameObject child = Track(new GameObject($"Child{i}", typeof(SpriteRenderer)));
                 child.transform.SetParent(root.transform);
@@ -69,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         {
             GameObject root = Track(new GameObject("MaxCountRoot"));
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 root.AddComponent<BoxCollider>();
             }
@@ -407,7 +407,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(root);
             ChildCombinedTester tester = root.GetComponent<ChildCombinedTester>();
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 GameObject child = new($"PlayerChild{i}", typeof(SpriteRenderer));
                 Track(child);
@@ -415,7 +415,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 child.transform.SetParent(root.transform);
             }
 
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 2; ++i)
             {
                 GameObject child = new($"EnemyChild{i}", typeof(SpriteRenderer));
                 Track(child);

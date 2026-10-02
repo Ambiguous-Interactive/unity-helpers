@@ -61,6 +61,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
-        protected override IRandom NewRandom() => new DotNetRandom(DeterministicGuid);
+        protected override IRandom NewRandom()
+        {
+            return new DotNetRandom(DeterministicGuid);
+        }
     }
 }

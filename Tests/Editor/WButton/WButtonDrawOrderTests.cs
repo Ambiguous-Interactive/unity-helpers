@@ -37,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(metadata, Is.Not.Empty);
 
             int previousOrder = int.MinValue;
-            for (int index = 0; index < metadata.Count; index++)
+            for (int index = 0; index < metadata.Count; ++index)
             {
                 int currentOrder = metadata[index].DrawOrder;
                 Assert.That(

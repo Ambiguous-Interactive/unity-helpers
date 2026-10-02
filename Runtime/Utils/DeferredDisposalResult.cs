@@ -18,6 +18,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             _disposeAsync = disposeAsync ?? throw new ArgumentNullException(nameof(disposeAsync));
         }
 
-        public ValueTask DisposeAsync() => _disposeAsync();
+        public ValueTask DisposeAsync()
+        {
+            return _disposeAsync();
+        }
     }
 }

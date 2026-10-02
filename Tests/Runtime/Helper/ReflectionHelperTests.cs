@@ -51,36 +51,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         public static void StaticVoidMethod()
         {
-            StaticMethodCallCount++;
+            ++StaticMethodCallCount;
         }
 
         public static int StaticIntMethod()
         {
-            StaticMethodCallCount++;
+            ++StaticMethodCallCount;
             return 42;
         }
 
         public static string StaticStringMethod()
         {
-            StaticMethodCallCount++;
+            ++StaticMethodCallCount;
             return "test";
         }
 
         public static bool StaticBoolMethod()
         {
-            StaticMethodCallCount++;
+            ++StaticMethodCallCount;
             return true;
         }
 
         public static int StaticMethodWithParam(int param)
         {
-            StaticMethodCallCount++;
+            ++StaticMethodCallCount;
             return param * 2;
         }
 
         public static int StaticMethodTwoParams(int a, int b)
         {
-            StaticMethodCallCount++;
+            ++StaticMethodCallCount;
             return a + b;
         }
 
@@ -91,13 +91,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         public static int StaticMethodMultipleParams(int a, string b, bool c)
         {
-            StaticMethodCallCount++;
+            ++StaticMethodCallCount;
             return a + (b?.Length ?? 0) + (c ? 1 : 0);
         }
 
         public static int StaticMethodFourParams(int a, int b, int c, int d)
         {
-            StaticMethodCallCount++;
+            ++StaticMethodCallCount;
             return a + b + c + d;
         }
 
@@ -123,36 +123,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         public void InstanceVoidMethod()
         {
-            instanceMethodCallCount++;
+            ++instanceMethodCallCount;
         }
 
         public int InstanceIntMethod()
         {
-            instanceMethodCallCount++;
+            ++instanceMethodCallCount;
             return 100;
         }
 
         public string InstanceStringMethod()
         {
-            instanceMethodCallCount++;
+            ++instanceMethodCallCount;
             return "instance";
         }
 
         public int InstanceMethodWithParam(string param)
         {
-            instanceMethodCallCount++;
+            ++instanceMethodCallCount;
             return param?.Length ?? 0;
         }
 
         public int InstanceMethodThreeParams(int a, string b, bool c)
         {
-            instanceMethodCallCount++;
+            ++instanceMethodCallCount;
             return a + (b?.Length ?? 0) + (c ? 1 : 0);
         }
 
         public int InstanceSum(int a, int b)
         {
-            instanceMethodCallCount++;
+            ++instanceMethodCallCount;
             return a + b;
         }
 
@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         public int InstanceSumFour(int a, int b, int c, int d)
         {
-            instanceMethodCallCount++;
+            ++instanceMethodCallCount;
             return a + b + c + d;
         }
 
@@ -280,7 +280,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public int x;
         public int y;
 
-        public int Sum(int a, int b) => a + b + x + y;
+        public int Sum(int a, int b)
+        {
+            return a + b + x + y;
+        }
     }
 
     public sealed class IndexerClass
@@ -298,7 +301,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     {
         public static void RefInc(ref int x)
         {
-            x++;
+            ++x;
         }
 
         public static void OutSet(out int x)
@@ -1294,7 +1297,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
             Assert.IsTrue(constructor != null);
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 TestConstructorClass instance = constructor();
                 Assert.IsTrue(instance != null);
@@ -3153,7 +3156,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             public void Dispose()
             {
-                state[0]++;
+                ++state[0];
             }
         }
 

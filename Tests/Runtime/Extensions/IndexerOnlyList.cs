@@ -58,7 +58,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             Grow(_count + 1);
             _storage[_count] = item;
-            _count++;
+            ++_count;
         }
 
         /// <summary>Appends every element of a sequence.</summary>
@@ -81,7 +81,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// <summary>Determines whether the list holds an element.</summary>
         /// <param name="item">The element to look for.</param>
         /// <returns>True when the element is present.</returns>
-        public bool Contains(T item) => 0 <= IndexOf(item);
+        public bool Contains(T item)
+        {
+            return 0 <= IndexOf(item);
+        }
 
         /// <summary>Copies every element into an array.</summary>
         /// <param name="array">The destination array.</param>
@@ -131,7 +134,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Grow(_count + 1);
             Array.Copy(_storage, index, _storage, index + 1, _count - index);
             _storage[index] = item;
-            _count++;
+            ++_count;
         }
 
         /// <summary>Removes the first occurrence of an element.</summary>
@@ -179,6 +182,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Array.Resize(ref _storage, capacity);
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 }

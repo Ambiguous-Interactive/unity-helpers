@@ -297,7 +297,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             try
             {
-                for (int iteration = 0; iteration < 5; iteration++)
+                for (int iteration = 0; iteration < 5; ++iteration)
                 {
                     bool expectedState = iteration % 2 == 0;
                     property.isExpanded = expectedState;
@@ -397,7 +397,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             {
                 property.isExpanded = !originalState;
 
-                for (int cycle = 0; cycle < 3; cycle++)
+                for (int cycle = 0; cycle < 3; ++cycle)
                 {
                     cached.UpdateIfRequiredOrScript();
 
@@ -438,7 +438,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 wButtonColors.isExpanded = true;
                 cached.ApplyModifiedPropertiesWithoutUndo();
 
-                for (int frame = 0; frame < 10; frame++)
+                for (int frame = 0; frame < 10; ++frame)
                 {
                     SerializedObject frameCached = GetCachedSerializedObject(settings);
                     frameCached.UpdateIfRequiredOrScript();
@@ -456,7 +456,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 wButtonColors.isExpanded = false;
                 cached.ApplyModifiedPropertiesWithoutUndo();
 
-                for (int frame = 0; frame < 10; frame++)
+                for (int frame = 0; frame < 10; ++frame)
                 {
                     SerializedObject frameCached = GetCachedSerializedObject(settings);
                     frameCached.UpdateIfRequiredOrScript();
@@ -486,7 +486,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             int toggleCount = 0;
             bool? lastState = null;
 
-            for (int frame = 0; frame < 5; frame++)
+            for (int frame = 0; frame < 5; ++frame)
             {
                 using SerializedObject newObject = new(settings);
                 newObject.UpdateIfRequiredOrScript();
@@ -498,7 +498,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 {
                     if (lastState.HasValue && property.isExpanded != lastState.Value)
                     {
-                        toggleCount++;
+                        ++toggleCount;
                     }
                     lastState = property.isExpanded;
 
@@ -661,7 +661,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             try
             {
-                for (int frame = 0; frame < 10; frame++)
+                for (int frame = 0; frame < 10; ++frame)
                 {
                     property.isExpanded = !property.isExpanded;
 

@@ -7,6 +7,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
 
     public class RelationalExactComponent : MonoBehaviour, ITestInterface
     {
-        public string GetTestValue() => nameof(RelationalExactComponent);
+        public string GetTestValue()
+        {
+            return nameof(RelationalExactComponent);
+        }
     }
 }

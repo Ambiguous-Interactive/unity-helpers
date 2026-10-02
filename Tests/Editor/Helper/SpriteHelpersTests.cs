@@ -305,7 +305,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 new Texture2D(width, height, TextureFormat.RGBA32, false)
             );
             Color[] pixels = new Color[width * height];
-            for (int i = 0; i < pixels.Length; i++)
+            for (int i = 0; i < pixels.Length; ++i)
             {
                 pixels[i] = new Color(
                     (float)i / pixels.Length,

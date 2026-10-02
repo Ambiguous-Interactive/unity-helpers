@@ -52,7 +52,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 out List<string> folderAssetPaths
             );
 
-            for (int i = 0; i < _directoriesProp.arraySize; i++)
+            for (int i = 0; i < _directoriesProp.arraySize; ++i)
             {
                 Object dir = _directoriesProp.GetArrayElementAtIndex(i).objectReferenceValue;
                 if (dir == null)
@@ -78,7 +78,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             HashSet<string> allowedExtensions = new(StringComparer.OrdinalIgnoreCase);
             int spriteFileExtensionsPropArraySize = _spriteFileExtensionsProp.arraySize;
-            for (int i = 0; i < spriteFileExtensionsPropArraySize; i++)
+            for (int i = 0; i < spriteFileExtensionsPropArraySize; ++i)
             {
                 string ext = _spriteFileExtensionsProp.GetArrayElementAtIndex(i).stringValue;
                 if (string.IsNullOrWhiteSpace(ext))
@@ -122,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             int spritesPropArraySize = _spritesProp.arraySize;
-            for (int i = 0; i < spritesPropArraySize; i++)
+            for (int i = 0; i < spritesPropArraySize; ++i)
             {
                 Sprite sprite =
                     _spritesProp.GetArrayElementAtIndex(i).objectReferenceValue as Sprite;
@@ -215,7 +215,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             double lastUpdateTime = EditorApplication.timeSinceStartup;
             try
             {
-                for (int i = 0; i < targetFiles.Count; i++)
+                for (int i = 0; i < targetFiles.Count; ++i)
                 {
                     (string _, string relativePath) = targetFiles[i];
 
@@ -243,7 +243,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         )
                     )
                     {
-                        _spritesThatWillChange++;
+                        ++_spritesThatWillChange;
                         _assetsThatWillChange.Add(relativePath);
                     }
                 }
@@ -484,7 +484,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (_showPreviewOfChanges)
                 {
                     int toShow = Mathf.Min(_assetsThatWillChange.Count, 200);
-                    for (int i = 0; i < toShow; i++)
+                    for (int i = 0; i < toShow; ++i)
                     {
                         EditorGUILayout.LabelField(_assetsThatWillChange[i]);
                     }

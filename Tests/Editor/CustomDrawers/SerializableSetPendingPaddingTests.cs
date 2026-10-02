@@ -349,7 +349,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void SetWithManyElementsHandledCorrectly()
         {
             PaddingTestSetHost host = CreateScriptableObject<PaddingTestSetHost>();
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 host.set.Add(i);
             }
@@ -609,7 +609,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         )
         {
             PaddingTestSetHost host = CreateScriptableObject<PaddingTestSetHost>();
-            for (int i = 0; i < elementCount; i++)
+            for (int i = 0; i < elementCount; ++i)
             {
                 host.set.Add(i);
             }

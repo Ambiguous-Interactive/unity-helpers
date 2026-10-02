@@ -69,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
 
             string[] values = new string[itemsProperty.arraySize];
-            for (int index = 0; index < itemsProperty.arraySize; index++)
+            for (int index = 0; index < itemsProperty.arraySize; ++index)
             {
                 values[index] = itemsProperty.GetArrayElementAtIndex(index).stringValue;
             }
@@ -101,7 +101,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
 
             List<int> values = new(property.arraySize);
-            for (int i = 0; i < property.arraySize; i++)
+            for (int i = 0; i < property.arraySize; ++i)
             {
                 SerializedProperty element = property.GetArrayElementAtIndex(i);
                 values.Add(element?.intValue ?? 0);
@@ -298,7 +298,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void GetPropertyHeightClampsPageSize()
         {
             HashSetHost host = CreateScriptableObject<HashSetHost>();
-            for (int i = 0; i < 128; i++)
+            for (int i = 0; i < 128; ++i)
             {
                 host.set.Add(i);
             }
@@ -2195,7 +2195,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             string[] snapshot = new string[itemsProperty.arraySize];
-            for (int index = 0; index < snapshot.Length; index++)
+            for (int index = 0; index < snapshot.Length; ++index)
             {
                 snapshot[index] = itemsProperty.GetArrayElementAtIndex(index).stringValue;
             }
@@ -4708,7 +4708,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             SerializableSetPropertyDrawer drawer = new();
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 inspector.ClearElements();
                 inspector.SynchronizeSerializedState();
@@ -5993,7 +5993,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 state.animationStartTimes.Count,
                 "All duplicate indices should have animation times."
             );
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 6; ++i)
             {
                 Assert.IsTrue(
                     state.animationStartTimes.ContainsKey(i),

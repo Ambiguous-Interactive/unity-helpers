@@ -1088,7 +1088,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             SerializedProperty firstProperty = keysProperty.GetArrayElementAtIndex(0);
             object previous = GetPropertyValue(firstProperty, keyType);
 
-            for (int index = 1; index < count; index++)
+            for (int index = 1; index < count; ++index)
             {
                 SerializedProperty currentProperty = keysProperty.GetArrayElementAtIndex(index);
                 object currentKey = GetPropertyValue(currentProperty, keyType);
@@ -1977,7 +1977,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     return false;
                 }
 
-                for (int index = 0; index < leftList.Count; index++)
+                for (int index = 0; index < leftList.Count; ++index)
                 {
                     object leftItem = leftList[index];
                     object rightItem = rightList[index];
@@ -2522,7 +2522,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             summaryBuilder.Append("Null keys detected at indices ");
 
-            for (int i = 0; i < displayCount; i++)
+            for (int i = 0; i < displayCount; ++i)
             {
                 if (0 < i)
                 {
@@ -2598,7 +2598,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 count,
                 out List<int> positions
             );
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 positions.Add(indices[index] + 1);
             }
@@ -2609,7 +2609,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             builder.Append(formattedKey);
             builder.Append("\" is assigned to entries ");
 
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 if (0 < index)
                 {
@@ -2653,7 +2653,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 endIndex = Mathf.Min(startIndex + effectivePageSize, cache.itemCount);
             }
 
-            for (int i = startIndex; i < endIndex; i++)
+            for (int i = startIndex; i < endIndex; ++i)
             {
                 PageEntry entry = new() { arrayIndex = i };
                 cache.entries.Add(entry);
@@ -2673,7 +2673,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             int cacheentriesCount = cache.entries.Count;
-            for (int i = 0; i < cacheentriesCount; i++)
+            for (int i = 0; i < cacheentriesCount; ++i)
             {
                 if (cache.entries[i].arrayIndex == globalIndex)
                 {
@@ -2696,7 +2696,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            for (int i = 0; i < orderedIndices.Count; i++)
+            for (int i = 0; i < orderedIndices.Count; ++i)
             {
                 int desiredIndex = pageStart + i;
                 int currentIndex = orderedIndices[i];
@@ -2711,7 +2711,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 if (currentIndex < desiredIndex)
                 {
                     int orderedIndicesCount2 = orderedIndices.Count;
-                    for (int j = i + 1; j < orderedIndicesCount2; j++)
+                    for (int j = i + 1; j < orderedIndicesCount2; ++j)
                     {
                         if (currentIndex < orderedIndices[j] && orderedIndices[j] <= desiredIndex)
                         {
@@ -2722,11 +2722,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 else
                 {
                     int orderedIndicesCount3 = orderedIndices.Count;
-                    for (int j = i + 1; j < orderedIndicesCount3; j++)
+                    for (int j = i + 1; j < orderedIndicesCount3; ++j)
                     {
                         if (desiredIndex <= orderedIndices[j] && orderedIndices[j] < currentIndex)
                         {
-                            orderedIndices[j]++;
+                            ++orderedIndices[j];
                         }
                     }
                 }
@@ -3488,7 +3488,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             int count = keysProperty.arraySize;
-            for (int index = 0; index < count; index++)
+            for (int index = 0; index < count; ++index)
             {
                 SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
                 destination.Add(keyProperty?.stringValue ?? "<null>");
@@ -3612,7 +3612,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             keyBuilder.Append('|');
 
             int targetsLength = targets.Length;
-            for (int index = 0; index < targetsLength; index++)
+            for (int index = 0; index < targetsLength; ++index)
             {
                 long id = targets[index] != null ? targets[index].GetUnityObjectId() : 0;
                 keyBuilder.Append(id);
@@ -3761,7 +3761,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             cache.indices.Clear();
             cache.arraySize = keysProperty.arraySize;
             int count = keysProperty.arraySize;
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 SerializedProperty element = keysProperty.GetArrayElementAtIndex(i);
                 object keyValue = GetPropertyValue(element, keyType) ?? NullKeySentinel;
@@ -3784,7 +3784,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             )
             {
                 int count = property.arraySize;
-                for (int index = 0; index < count; index++)
+                for (int index = 0; index < count; ++index)
                 {
                     SerializedProperty keyProperty = property.GetArrayElementAtIndex(index);
                     yield return (index, GetPropertyValue(keyProperty, type));
@@ -4591,7 +4591,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             unchecked
             {
-                pending.valueRevision++;
+                ++pending.valueRevision;
             }
 
             InvalidatePendingDuplicateCache(pending);
@@ -4858,7 +4858,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             object current = target;
             int elementsLength = elements.Length;
-            for (int index = 0; index < elementsLength - 1; index++)
+            for (int index = 0; index < elementsLength - 1; ++index)
             {
                 current = GetPathComponentValue(current, elements[index]);
                 if (current == null)
@@ -5071,7 +5071,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             property.arraySize = listValue.Count;
-            for (int index = 0; index < listValue.Count; index++)
+            for (int index = 0; index < listValue.Count; ++index)
             {
                 SerializedProperty elementProperty = property.GetArrayElementAtIndex(index);
                 object elementValue = listValue[index];
@@ -5382,7 +5382,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Array keysArray = Array.CreateInstance(keyType, count);
             Array valuesArray = Array.CreateInstance(valueType, count);
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 SerializedProperty keyProp = keysProperty.GetArrayElementAtIndex(i);
                 SerializedProperty valueProp = GetValueElement(valuesProperty, i);
@@ -6904,7 +6904,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 using PooledResource<List<KeyValueSnapshot>> entriesLease =
                     Buffers<KeyValueSnapshot>.GetList(count, out List<KeyValueSnapshot> entries);
                 {
-                    for (int index = 0; index < count; index++)
+                    for (int index = 0; index < count; ++index)
                     {
                         SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
                         SerializedProperty valueProperty = GetValueElement(valuesProperty, index);
@@ -6976,7 +6976,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     int newSelectedIndex = -1;
                     if (selectedKey != null)
                     {
-                        for (int index = 0; index < entries.Count; index++)
+                        for (int index = 0; index < entries.Count; ++index)
                         {
                             if (ValuesEqual(entries[index].key, selectedKey))
                             {
@@ -9907,7 +9907,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 _lastArraySize = currentArraySize;
                 int count = currentArraySize;
-                for (int index = 0; index < count; index++)
+                for (int index = 0; index < count; ++index)
                 {
                     SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
                     object keyValue =
@@ -10042,7 +10042,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _summaryBuilder = summaryBuilder;
                 _summaryBuilder.Clear();
 
-                for (int index = 0; index < count; index++)
+                for (int index = 0; index < count; ++index)
                 {
                     SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
                     object keyValue =
@@ -10078,13 +10078,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         continue;
                     }
 
-                    duplicateGroupCount++;
+                    ++duplicateGroupCount;
                     HasDuplicates = true;
                     string formattedKey = FormatDuplicateKeyDisplay(entry.Key);
                     string tooltip = BuildDuplicateTooltip(formattedKey, indices);
 
                     int indicesCount = indices.Count;
-                    for (int occurrence = 0; occurrence < indicesCount; occurrence++)
+                    for (int occurrence = 0; occurrence < indicesCount; ++occurrence)
                     {
                         int arrayIndex = indices[occurrence];
                         DuplicateKeyInfo info = new()
@@ -10102,7 +10102,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                             _summaryBuilder.AppendLine();
                         }
                         AppendDuplicateSummaryLine(formattedKey, indices);
-                        displayedSummaryGroups++;
+                        ++displayedSummaryGroups;
                     }
                 }
 
@@ -10189,7 +10189,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _summaryBuilder.Append(" at entries ");
 
                 int summaryIndicesScratchCount = _summaryIndicesScratch.Count;
-                for (int index = 0; index < summaryIndicesScratchCount; index++)
+                for (int index = 0; index < summaryIndicesScratchCount; ++index)
                 {
                     if (0 < index)
                     {

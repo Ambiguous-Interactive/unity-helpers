@@ -89,7 +89,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 WProtoFacade.TrySerialize(new ScalarContract { Int32 = 7 }, out byte[] exact)
             );
             Assert.AreEqual(exact.Length, written);
-            for (int index = 0; index < written; index++)
+            for (int index = 0; index < written; ++index)
             {
                 Assert.AreEqual(exact[index], buffer[index], "byte " + index);
             }
@@ -164,7 +164,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 WProtoFacade.TrySerialize(new ScalarContract { Int32 = 1 }, out byte[] exact)
             );
             Assert.AreEqual(exact.Length, small);
-            for (int index = 0; index < small; index++)
+            for (int index = 0; index < small; ++index)
             {
                 Assert.AreEqual(exact[index], buffer[index], "byte " + index);
             }
@@ -317,9 +317,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private sealed class BrokenFormatter : IWProtoFormatter<FacadeBrokenContract>
         {
-            public int Measure(in FacadeBrokenContract value) => 4;
+            public int Measure(in FacadeBrokenContract value)
+            {
+                return 4;
+            }
 
-            public bool Write(ref WProtoWriter writer, in FacadeBrokenContract value) => true;
+            public bool Write(ref WProtoWriter writer, in FacadeBrokenContract value)
+            {
+                return true;
+            }
 
             public bool TryRead(ref WProtoReader reader, out FacadeBrokenContract value)
             {

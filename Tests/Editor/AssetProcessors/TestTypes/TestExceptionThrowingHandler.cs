@@ -41,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [DetectAssetChanged(typeof(TestDetectableAsset))]
         private static void OnAssetChangedWithException(AssetChangeContext context)
         {
-            _invocationCount++;
+            ++_invocationCount;
             if (_shouldThrow)
             {
                 throw new InvalidOperationException(

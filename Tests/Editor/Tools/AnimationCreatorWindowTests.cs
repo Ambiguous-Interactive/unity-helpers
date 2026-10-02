@@ -412,7 +412,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Array values = Enum.GetValues(typeof(FramerateMode));
             HashSet<int> intValues = new();
 
-            for (int i = 0; i < values.Length; i++)
+            for (int i = 0; i < values.Length; ++i)
             {
                 object value = values.GetValue(i);
                 int intValue = (int)value;
@@ -699,7 +699,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.AreEqual(frameCount, keyframes.Length);
 
             float expectedInterval = 1f / fps;
-            for (int i = 1; i < keyframes.Length; i++)
+            for (int i = 1; i < keyframes.Length; ++i)
             {
                 float actualInterval = keyframes[i].time - keyframes[i - 1].time;
                 Assert.AreEqual(
@@ -799,7 +799,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 bindings[0]
             );
 
-            for (int i = 0; i < frames.Count; i++)
+            for (int i = 0; i < frames.Count; ++i)
             {
                 Assert.AreSame(
                     frames[i],
@@ -911,7 +911,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 frames = CreateSpriteList(5),
             };
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 float fps = AnimationCreatorWindow.GetCurrentFpsForTests(data, i);
                 Assert.AreEqual(24f, fps, 0.01f, $"Frame {i} should have constant FPS");
@@ -931,7 +931,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             };
 
             float previousFps = 0f;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 float fps = AnimationCreatorWindow.GetCurrentFpsForTests(data, i);
                 Assert.Greater(fps, previousFps, $"Frame {i} FPS should be greater than previous");
@@ -952,7 +952,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             };
 
             float previousFps = float.MaxValue;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 float fps = AnimationCreatorWindow.GetCurrentFpsForTests(data, i);
                 Assert.Less(fps, previousFps, $"Frame {i} FPS should be less than previous");
@@ -1013,7 +1013,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 bindings[0]
             );
 
-            for (int i = 0; i < keyframes.Length; i++)
+            for (int i = 0; i < keyframes.Length; ++i)
             {
                 Assert.IsTrue(
                     keyframes[i].value != null,
@@ -1116,7 +1116,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             {
                 if (keyframesElement.value == null)
                 {
-                    nullCount++;
+                    ++nullCount;
                 }
             }
 
@@ -1152,7 +1152,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
             Assert.AreEqual(frameCount, keyframes.Length);
 
-            for (int i = 0; i < frameCount; i++)
+            for (int i = 0; i < frameCount; ++i)
             {
                 Assert.AreSame(
                     frames[i],
@@ -1194,7 +1194,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "Curve framerate mode should also have exact keyframe count"
             );
 
-            for (int i = 0; i < keyframes.Length; i++)
+            for (int i = 0; i < keyframes.Length; ++i)
             {
                 Assert.IsTrue(
                     keyframes[i].value != null,
@@ -1351,7 +1351,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         private List<Sprite> CreateSpriteList(int count)
         {
             List<Sprite> sprites = new(count);
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 sprites.Add(null);
             }
@@ -1363,7 +1363,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> sprites = new(count);
             Texture2D texture = Track(new Texture2D(4, 4, TextureFormat.RGBA32, false));
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 Sprite sprite = Track(
                     Sprite.Create(texture, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f))

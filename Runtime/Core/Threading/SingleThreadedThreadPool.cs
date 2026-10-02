@@ -343,14 +343,20 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
                 _valueTaskFunc = valueTaskFunc;
             }
 
-            public static WorkItem FromAction(Action action) =>
-                new(WorkItemType.Action, action: action);
+            public static WorkItem FromAction(Action action)
+            {
+                return new(WorkItemType.Action, action: action);
+            }
 
-            public static WorkItem FromTask(Func<Task> taskFunc) =>
-                new(WorkItemType.Task, taskFunc: taskFunc);
+            public static WorkItem FromTask(Func<Task> taskFunc)
+            {
+                return new(WorkItemType.Task, taskFunc: taskFunc);
+            }
 
-            public static WorkItem FromValueTask(Func<ValueTask> valueTaskFunc) =>
-                new(WorkItemType.ValueTask, valueTaskFunc: valueTaskFunc);
+            public static WorkItem FromValueTask(Func<ValueTask> valueTaskFunc)
+            {
+                return new(WorkItemType.ValueTask, valueTaskFunc: valueTaskFunc);
+            }
 
             public ValueTask ExecuteAsync()
             {

@@ -1347,7 +1347,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     );
                 }
 
-                for (int i = 0; i < indexCount; i++)
+                for (int i = 0; i < indexCount; ++i)
                 {
                     object arg = indexArgs[i];
                     Type parameterType = indices[i].ParameterType;

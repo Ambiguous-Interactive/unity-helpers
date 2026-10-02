@@ -67,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             GameObject root = Track(new GameObject("OracleRoot", typeof(Rigidbody)));
             root.GetComponent<Rigidbody>().isKinematic = true;
             GameObject ancestor = root;
-            for (int level = 1; level < depth; level++)
+            for (int level = 1; level < depth; ++level)
             {
                 GameObject next = Track(new GameObject("OracleAncestor"));
                 next.transform.SetParent(ancestor.transform);

@@ -103,7 +103,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             get
             {
                 float currentTime = _timeProvider();
-                for (int i = 0; i < _entries.Length; i++)
+                for (int i = 0; i < _entries.Length; ++i)
                 {
                     if (_entries[i].IsAlive && !IsExpired(i, currentTime))
                     {
@@ -264,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             keys.Clear();
             float currentTime = _timeProvider();
             int entriesLength = _entries.Length;
-            for (int i = 0; i < entriesLength; i++)
+            for (int i = 0; i < entriesLength; ++i)
             {
                 if (_entries[i].IsAlive && !IsExpired(i, currentTime))
                 {
@@ -549,7 +549,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             // Eviction callbacks and destination setters can change the requested keys.
-            for (int i = 0; i < keys.Count; i++)
+            for (int i = 0; i < keys.Count; ++i)
             {
                 TKey key = keys[i];
                 if (TryGet(key, out TValue value))
@@ -591,7 +591,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             // Set dispatches eviction callbacks before the next input entry is read.
-            for (int i = 0; i < entries.Count; i++)
+            for (int i = 0; i < entries.Count; ++i)
             {
                 KeyValuePair<TKey, TValue> entry = entries[i];
                 Set(entry.Key, entry.Value);
@@ -635,7 +635,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
                 float currentTime = _timeProvider();
                 int entriesLength = _entries.Length;
-                for (int i = 0; i < entriesLength; i++)
+                for (int i = 0; i < entriesLength; ++i)
                 {
                     if (_entries[i].IsAlive && IsExpired(i, currentTime))
                     {
@@ -674,7 +674,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     return;
                 }
                 int toEvict = (int)(_count * percentage);
-                for (int i = 0; i < toEvict && 0 < _count; i++)
+                for (int i = 0; i < toEvict && 0 < _count; ++i)
                 {
                     EvictOne(EvictionReason.Capacity);
                 }
@@ -756,7 +756,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             _freeListHead = 0;
             int entriesLength = _entries.Length;
-            for (int i = 0; i < entriesLength - 1; i++)
+            for (int i = 0; i < entriesLength - 1; ++i)
             {
                 _entries[i].NextIndex = i + 1;
             }
@@ -904,7 +904,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _keyToIndex.TryAdd(key, newIndex);
 #endif
 
-            _count++;
+            ++_count;
             _currentWeight += weight;
 
             if (_peakSize < _count)
@@ -919,7 +919,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private void ClearEntriesUnlocked()
         {
             int entriesLength = _entries.Length;
-            for (int i = 0; i < entriesLength; i++)
+            for (int i = 0; i < entriesLength; ++i)
             {
                 if (_entries[i].IsAlive)
                 {
@@ -1013,7 +1013,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     PromoteInSlru(index);
                     break;
                 case EvictionPolicy.Lfu:
-                    _entries[index].Frequency++;
+                    ++_entries[index].Frequency;
                     break;
                 case EvictionPolicy.Fifo:
                 case EvictionPolicy.Random:
@@ -1081,7 +1081,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int oldLength = _entries.Length;
             _entries = newEntries;
 
-            for (int i = oldLength; i < newCapacity - 1; i++)
+            for (int i = oldLength; i < newCapacity - 1; ++i)
             {
                 _entries[i].NextIndex = i + 1;
             }
@@ -1130,7 +1130,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int oldLength = _entries.Length;
             _entries = newEntries;
 
-            for (int i = oldLength; i < newCapacity - 1; i++)
+            for (int i = oldLength; i < newCapacity - 1; ++i)
             {
                 _entries[i].NextIndex = i + 1;
             }
@@ -1139,7 +1139,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _capacity = newCapacity;
             UpdateProtectedCapacityForAdaptiveGrowth();
-            _growthEvents++;
+            ++_growthEvents;
             _recentEvictionCount = 0;
         }
 
@@ -1208,7 +1208,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             if (victim != InvalidIndex)
             {
                 EvictEntry(victim, reason);
-                _recentEvictionCount++;
+                ++_recentEvictionCount;
             }
         }
 
@@ -1216,7 +1216,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             float currentTime = _timeProvider();
             int entriesLength = _entries.Length;
-            for (int i = 0; i < entriesLength; i++)
+            for (int i = 0; i < entriesLength; ++i)
             {
                 if (_entries[i].IsAlive && IsExpired(i, currentTime))
                 {
@@ -1248,7 +1248,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float oldestAccess = float.MaxValue;
 
             int entriesLength = _entries.Length;
-            for (int i = 0; i < entriesLength; i++)
+            for (int i = 0; i < entriesLength; ++i)
             {
                 ref CacheEntry entry = ref _entries[i];
                 if (!entry.IsAlive)
@@ -1281,7 +1281,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int current = 0;
 
             int entriesLength = _entries.Length;
-            for (int i = 0; i < entriesLength; i++)
+            for (int i = 0; i < entriesLength; ++i)
             {
                 if (_entries[i].IsAlive)
                 {
@@ -1289,7 +1289,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     {
                         return i;
                     }
-                    current++;
+                    ++current;
                 }
             }
 
@@ -1445,7 +1445,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _probationTail = index;
             }
 
-            _probationCount++;
+            ++_probationCount;
         }
 
         private void PromoteInSlru(int index)
@@ -1483,7 +1483,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _protectedTail = index;
             }
 
-            _protectedCount++;
+            ++_protectedCount;
         }
 
         private void MoveToProtectedHead(int index)
@@ -1708,7 +1708,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             try
             {
 #pragma warning disable WUH013 // A rented array may be larger; only its initialized prefix is valid.
-                for (int i = 0; i < notificationCount; i++)
+                for (int i = 0; i < notificationCount; ++i)
                 {
                     InvokeEvictionCallback(notifications[i]);
                 }

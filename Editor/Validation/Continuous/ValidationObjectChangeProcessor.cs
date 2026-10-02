@@ -92,7 +92,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             if (!ValidationAutoRun.IsActive)
                 return;
             List<string> guids = new List<string>();
-            for (int index = 0; index < SceneManager.sceneCount; index++)
+            for (int index = 0; index < SceneManager.sceneCount; ++index)
             {
                 Scene scene = SceneManager.GetSceneAt(index);
                 if (scene.isLoaded && scene.isDirty && !string.IsNullOrEmpty(scene.path))

@@ -418,7 +418,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
-            for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
+            for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; ++frame)
             {
                 yield return null;
 
@@ -478,14 +478,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             if (foldersToVerify == null || foldersToVerify.Length == 0)
             {
-                for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
+                for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; ++frame)
                 {
                     yield return null;
                 }
                 yield break;
             }
 
-            for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
+            for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; ++frame)
             {
                 yield return null;
 

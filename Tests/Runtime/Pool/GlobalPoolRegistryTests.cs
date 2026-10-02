@@ -252,7 +252,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int purged1 = GlobalPoolRegistry.TryEnforceBudgetIfNeeded();
             Assert.AreEqual(10, purged1);
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 using (pool.Get()) { }
             }
@@ -339,7 +339,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Triggers = PurgeTrigger.Explicit,
                 OnPurge = (_, reason) =>
                 {
-                    purgeCallbackCount++;
+                    ++purgeCallbackCount;
                     capturedReason = reason;
                 },
             };
@@ -632,7 +632,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             GlobalPoolRegistry.GlobalMaxPooledItems = 100;
 
             List<WallstopGenericPool<TestPoolItem>> pools = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 pools.Add(CreateTestPool(preWarmCount: 20));
             }
@@ -762,7 +762,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         /// </summary>
         private static bool TryForceCollectOrphanPools(int expectedAliveCount)
         {
-            for (int attempt = 0; attempt < 10; attempt++)
+            for (int attempt = 0; attempt < 10; ++attempt)
             {
                 GC.Collect();
                 GC.WaitForPendingFinalizers();

@@ -317,7 +317,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static string RepeatedArrayPrefix(int repeats)
         {
             StringBuilder builder = new(repeats * 3);
-            for (int repeat = 0; repeat < repeats; repeat++)
+            for (int repeat = 0; repeat < repeats; ++repeat)
             {
                 builder.Append("[1,");
             }
@@ -328,7 +328,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             StringBuilder builder = new(elements * 2 + 2);
             builder.Append('[');
-            for (int element = 0; element < elements; element++)
+            for (int element = 0; element < elements; ++element)
             {
                 if (0 < element)
                 {
@@ -380,7 +380,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 using (document)
                 {
                     int nodeCount = CountNodes(document.RootElement);
-                    for (int node = 0; node < nodeCount; node++)
+                    for (int node = 0; node < nodeCount; ++node)
                     {
                         foreach (string hostile in HostileValues)
                         {
@@ -414,14 +414,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
             }
 
-            for (int sample = 1; sample <= TruncationSamples && sample < seed.Length; sample++)
+            for (int sample = 1; sample <= TruncationSamples && sample < seed.Length; ++sample)
             {
                 yield return seed.Substring(0, seed.Length * sample / (TruncationSamples + 1));
             }
 
             System.Random random = new(unchecked((int)0x5EED_F0DD));
             char[] scratch = seed.ToCharArray();
-            for (int sample = 0; sample < ByteMutationSamples; sample++)
+            for (int sample = 0; sample < ByteMutationSamples; ++sample)
             {
                 int index = random.Next(scratch.Length);
                 char original = scratch[index];
@@ -490,7 +490,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         }
                     }
                     propertyCount += originalProperties.Count;
-                    for (int index = 0; index < originalProperties.Count; index++)
+                    for (int index = 0; index < originalProperties.Count; ++index)
                     {
                         JsonProperty originalProperty = originalProperties[index];
                         JsonProperty transformedProperty = transformedProperties[
@@ -529,7 +529,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     {
                         return false;
                     }
-                    for (int index = 0; index < originalItems.Count; index++)
+                    for (int index = 0; index < originalItems.Count; ++index)
                     {
                         if (
                             !EquivalentStructureIsReversed(
@@ -563,7 +563,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     continue;
                 }
 
-                propertyCount++;
+                ++propertyCount;
                 ReadOnlySpan<byte> rawName = reader.ValueSpan;
                 if (rawName.Length == 0)
                 {
@@ -579,7 +579,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     {
                         return false;
                     }
-                    for (int digit = 2; digit < 6; digit++)
+                    for (int digit = 2; digit < 6; ++digit)
                     {
                         byte value = rawName[index + digit];
                         bool isHex =
@@ -650,7 +650,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         }
                         builder.Append('\n').Append(' ', (depth + 1) * 2);
                         WriteEquivalentJson(builder, item, depth + 1);
-                        itemIndex++;
+                        ++itemIndex;
                     }
                     if (0 < itemIndex)
                     {
@@ -666,7 +666,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private static void AppendEscapedPropertyName(StringBuilder builder, string name)
         {
-            for (int index = 0; index < name.Length; index++)
+            for (int index = 0; index < name.Length; ++index)
             {
                 builder
                     .Append("\\u")
@@ -705,7 +705,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         )
         {
             int index = cursor;
-            cursor++;
+            ++cursor;
 
             if (index == mutation.NodeIndex && propertyName != null)
             {
@@ -760,7 +760,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             )
             {
                 writer.WriteStartArray();
-                for (int repeat = 0; repeat < GrownArrayLength; repeat++)
+                for (int repeat = 0; repeat < GrownArrayLength; ++repeat)
                 {
                     foreach (JsonElement item in element.EnumerateArray())
                     {
@@ -884,14 +884,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 case JsonValueKind.Object:
                     foreach (JsonProperty property in element.EnumerateObject())
                     {
-                        cursor++;
+                        ++cursor;
                         SkipSubtree(property.Value, ref cursor);
                     }
                     break;
                 case JsonValueKind.Array:
                     foreach (JsonElement item in element.EnumerateArray())
                     {
-                        cursor++;
+                        ++cursor;
                         SkipSubtree(item, ref cursor);
                     }
                     break;
@@ -1014,14 +1014,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             foreach (string payload in Corpus(target))
             {
-                examined++;
+                ++examined;
                 try
                 {
                     object decoded = JsonSerializer.Deserialize(payload, target.Type, options);
                     if (decoded != null)
                     {
                         // A reference-type null result bypasses the converter and cannot count toward converter coverage.
-                        accepted++;
+                        ++accepted;
                     }
                 }
                 catch (JsonException) { }
@@ -1031,7 +1031,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
                 catch (Exception unexpected)
                 {
-                    failureCount++;
+                    ++failureCount;
                     if (failureCount <= 5)
                     {
                         failures
@@ -1335,7 +1335,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     continue;
                 }
 
-                acceptedSeedCount++;
+                ++acceptedSeedCount;
                 object transformed = JsonSerializer.Deserialize(equivalent, target.Type, options);
                 string originalCanonical = JsonSerializer.Serialize(original, target.Type, options);
                 string transformedCanonical = JsonSerializer.Serialize(

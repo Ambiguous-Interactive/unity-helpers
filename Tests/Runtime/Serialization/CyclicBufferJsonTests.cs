@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void CyclicBufferRoundTripsWithCapacity()
         {
             CyclicBuffer<int> original = new(5);
-            for (int i = 1; i <= 7; i++)
+            for (int i = 1; i <= 7; ++i)
             {
                 original.Add(i);
             }
@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             foreach (int v in original)
             {
                 Assert.AreEqual(v, deserialized[idx], $"Element {idx} should match");
-                idx++;
+                ++idx;
             }
         }
 
@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     deserialized[idx],
                     $"Element {idx} should match under fast options"
                 );
-                idx++;
+                ++idx;
             }
         }
     }

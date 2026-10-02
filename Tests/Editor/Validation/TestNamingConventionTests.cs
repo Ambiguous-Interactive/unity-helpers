@@ -142,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
 
                 string relativePath = GetRelativePath(filePath, packagePath);
-                for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+                for (int lineIndex = 0; lineIndex < lines.Length; ++lineIndex)
                 {
                     visitor(relativePath, lineIndex + 1, lines[lineIndex]);
                 }
@@ -233,7 +233,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             if (!string.IsNullOrEmpty(assemblyLocation))
             {
                 string current = Path.GetDirectoryName(assemblyLocation);
-                for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); i++)
+                for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); ++i)
                 {
                     if (File.Exists(Path.Combine(current, "package.json")))
                     {
@@ -531,7 +531,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         violations.AppendLine(
                             $"  - Method: {typeName}.{method.Name} [{assemblyName}]"
                         );
-                        violationCount++;
+                        ++violationCount;
                     }
                 }
             );
@@ -549,7 +549,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                             violations.AppendLine(
                                 $"  - {relativePath}:{lineNumber}: TestName=\"{testName}\""
                             );
-                            violationCount++;
+                            ++violationCount;
                         }
                     }
 
@@ -562,7 +562,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                             violations.AppendLine(
                                 $"  - {relativePath}:{lineNumber}: SetName(\"{setNameValue}\")"
                             );
-                            violationCount++;
+                            ++violationCount;
                         }
                     }
                 }

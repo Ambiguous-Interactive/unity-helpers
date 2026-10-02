@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             float step = Mathf.PI * 2f / sampleCount;
-            for (int i = 0; i < sampleCount; i++)
+            for (int i = 0; i < sampleCount; ++i)
             {
                 float angle = i * step;
                 Vector2 pointOnCircle =
@@ -96,7 +96,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             // Unity path access can throw; return every per-path rent even when the collider disappears.
             try
             {
-                for (int i = 0; i < originalCount; i++)
+                for (int i = 0; i < originalCount; ++i)
                 {
                     Vector2[] path = col.GetPath(i);
                     PooledResource<List<Vector2>> lease = Buffers<Vector2>.List.Get(

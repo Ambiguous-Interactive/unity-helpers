@@ -193,7 +193,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int eventCount = 0;
             matcher.colliderUpdated += () =>
             {
-                eventCount++;
+                ++eventCount;
             };
 
             matcher.SendMessage("Update");
@@ -340,7 +340,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int eventCount = 0;
             matcher.colliderUpdated += () =>
             {
-                eventCount++;
+                ++eventCount;
             };
 
             renderer.sprite = _testSprite;
@@ -371,10 +371,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int eventCount = 0;
             matcher.colliderUpdated += () =>
             {
-                eventCount++;
+                ++eventCount;
             };
 
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 2; ++i)
             {
                 matcher.SendMessage("Update");
                 yield return null;

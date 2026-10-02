@@ -170,6 +170,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
-        protected override IRandom NewRandom() => new Sfc64Random(Seed0, Seed1, Seed2);
+        protected override IRandom NewRandom()
+        {
+            return new Sfc64Random(Seed0, Seed1, Seed2);
+        }
     }
 }

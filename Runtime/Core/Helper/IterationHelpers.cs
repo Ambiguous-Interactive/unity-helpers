@@ -17,9 +17,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             int firstDimensionLength = array.GetLength(0);
             int secondDimensionLength = array.GetLength(1);
-            for (int i = 0; i < firstDimensionLength; i++)
+            for (int i = 0; i < firstDimensionLength; ++i)
             {
-                for (int j = 0; j < secondDimensionLength; j++)
+                for (int j = 0; j < secondDimensionLength; ++j)
                 {
                     yield return (i, j);
                 }
@@ -34,9 +34,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             buffer.Clear();
             int firstDimensionLength = array.GetLength(0);
             int secondDimensionLength = array.GetLength(1);
-            for (int i = 0; i < firstDimensionLength; i++)
+            for (int i = 0; i < firstDimensionLength; ++i)
             {
-                for (int j = 0; j < secondDimensionLength; j++)
+                for (int j = 0; j < secondDimensionLength; ++j)
                 {
                     (int i, int j) tuple = (i, j);
                     buffer.Add(tuple);
@@ -54,11 +54,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             int firstDimensionLength = array.GetLength(0);
             int secondDimensionLength = array.GetLength(1);
             int thirdDimensionLength = array.GetLength(2);
-            for (int i = 0; i < firstDimensionLength; i++)
+            for (int i = 0; i < firstDimensionLength; ++i)
             {
-                for (int j = 0; j < secondDimensionLength; j++)
+                for (int j = 0; j < secondDimensionLength; ++j)
                 {
-                    for (int k = 0; k < thirdDimensionLength; k++)
+                    for (int k = 0; k < thirdDimensionLength; ++k)
                     {
                         yield return (i, j, k);
                     }
@@ -78,11 +78,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             int firstDimensionLength = array.GetLength(0);
             int secondDimensionLength = array.GetLength(1);
             int thirdDimensionLength = array.GetLength(2);
-            for (int i = 0; i < firstDimensionLength; i++)
+            for (int i = 0; i < firstDimensionLength; ++i)
             {
-                for (int j = 0; j < secondDimensionLength; j++)
+                for (int j = 0; j < secondDimensionLength; ++j)
                 {
-                    for (int k = 0; k < thirdDimensionLength; k++)
+                    for (int k = 0; k < thirdDimensionLength; ++k)
                     {
                         (int i, int j, int k) tuple = (i, j, k);
                         buffer.Add(tuple);

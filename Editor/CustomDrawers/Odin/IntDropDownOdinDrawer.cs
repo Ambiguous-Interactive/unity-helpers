@@ -49,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 if (cached.Length == options.Length)
                 {
                     bool match = true;
-                    for (int i = 0; i < optionsLength && match; i++)
+                    for (int i = 0; i < optionsLength && match; ++i)
                     {
                         if (
                             !string.Equals(
@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string[] displayOptions = new string[optionsLength];
-            for (int i = 0; i < optionsLength; i++)
+            for (int i = 0; i < optionsLength; ++i)
             {
                 displayOptions[i] = DropDownShared.GetCachedIntString(options[i]);
             }
@@ -114,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (1 < Property.ValueEntry.ValueCount)
             {
                 object firstValue = Property.ValueEntry.WeakValues[0];
-                for (int i = 1; i < Property.ValueEntry.ValueCount; i++)
+                for (int i = 1; i < Property.ValueEntry.ValueCount; ++i)
                 {
                     if (!Equals(firstValue, Property.ValueEntry.WeakValues[i]))
                     {
@@ -221,7 +221,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             GenericMenu menu = new();
             int optionsLength = options.Length;
-            for (int i = 0; i < optionsLength; i++)
+            for (int i = 0; i < optionsLength; ++i)
             {
                 int capturedIndex = i;
                 bool isSelected = i == currentIndex && !hasMultipleDifferentValues;
@@ -238,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             IList weakTargets = Property.Tree.WeakTargets;
             List<UnityEngine.Object> validTargets = new(weakTargets.Count);
-            for (int i = 0; i < weakTargets.Count; i++)
+            for (int i = 0; i < weakTargets.Count; ++i)
             {
                 if (weakTargets[i] is UnityEngine.Object unityObject && unityObject != null)
                 {

@@ -93,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
         private static void RunRapidCounterCycles(int cycleCount)
         {
-            for (int i = 0; i < cycleCount; i++)
+            for (int i = 0; i < cycleCount; ++i)
             {
                 bool isOutermost = AssetDatabaseBatchHelper.IncrementBatchDepthWithUnityCall();
                 if (!isOutermost)
@@ -525,7 +525,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [TestCase(50, TestName = "SequentialScopes.Count50", Category = "Stress")]
         public void MultipleSequentialScopesWorkCorrectly(int scopeCount)
         {
-            for (int i = 0; i < scopeCount; i++)
+            for (int i = 0; i < scopeCount; ++i)
             {
                 Assert.That(
                     AssetDatabaseBatchHelper.IsCurrentlyBatching,
@@ -634,7 +634,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             List<AssetDatabaseBatchScope> scopes = new List<AssetDatabaseBatchScope>();
 
-            for (int i = 0; i < nestingLevel; i++)
+            for (int i = 0; i < nestingLevel; ++i)
             {
                 scopes.Add(AssetDatabaseBatchHelper.BeginBatch());
                 Assert.That(
@@ -682,7 +682,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [TestCase(50, TestName = "RapidUnityCycles.Count50", Category = "Stress")]
         public void RapidOpenCloseCyclesWorkCorrectly(int cycleCount)
         {
-            for (int cycle = 0; cycle < cycleCount; cycle++)
+            for (int cycle = 0; cycle < cycleCount; ++cycle)
             {
                 using (AssetDatabaseBatchHelper.BeginBatch())
                 {
@@ -711,7 +711,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [TestCase(50, TestName = "RapidNestedUnityCycles.Count50", Category = "Stress")]
         public void RapidNestedOpenCloseCyclesWorkCorrectly(int cycleCount)
         {
-            for (int cycle = 0; cycle < cycleCount; cycle++)
+            for (int cycle = 0; cycle < cycleCount; ++cycle)
             {
                 using (AssetDatabaseBatchHelper.BeginBatch())
                 {
@@ -782,14 +782,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             List<bool> results = new List<bool>();
 
-            for (int i = 0; i < incrementCount; i++)
+            for (int i = 0; i < incrementCount; ++i)
             {
                 results.Add(AssetDatabaseBatchHelper.IncrementBatchDepth());
             }
 
             Assert.That(results[0], Is.True, "First increment should return true");
 
-            for (int i = 1; i < incrementCount; i++)
+            for (int i = 1; i < incrementCount; ++i)
             {
                 Assert.That(
                     results[i],
@@ -870,7 +870,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [TestCase(10, TestName = "DecrementBelowZero.Count10")]
         public void MultipleDecrementsFromZeroRemainAtZero(int decrementCount)
         {
-            for (int i = 0; i < decrementCount; i++)
+            for (int i = 0; i < decrementCount; ++i)
             {
                 bool result = AssetDatabaseBatchHelper.DecrementBatchDepth();
 
@@ -922,7 +922,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [TestCase(50, TestName = "ResetFromDepth.Depth50")]
         public void ResetBatchDepthWorksFromAnyDepth(int initialDepth)
         {
-            for (int i = 0; i < initialDepth; i++)
+            for (int i = 0; i < initialDepth; ++i)
             {
                 AssetDatabaseBatchHelper.IncrementBatchDepth();
             }
@@ -1143,7 +1143,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         public void ForceResetAssetDatabaseHandlesVariousDepths(int depth)
         {
             List<AssetDatabaseBatchScope> scopes = new List<AssetDatabaseBatchScope>();
-            for (int i = 0; i < depth; i++)
+            for (int i = 0; i < depth; ++i)
             {
                 scopes.Add(AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false));
             }
@@ -1264,7 +1264,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             List<AssetDatabaseBatchScope> scopes = new List<AssetDatabaseBatchScope>();
 
-            for (int i = 0; i < refreshSettings.Length; i++)
+            for (int i = 0; i < refreshSettings.Length; ++i)
             {
                 scopes.Add(
                     AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: refreshSettings[i])
@@ -1330,7 +1330,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             AssetDatabaseBatchScope scope = AssetDatabaseBatchHelper.BeginBatch();
 
-            for (int i = 0; i < disposeCount; i++)
+            for (int i = 0; i < disposeCount; ++i)
             {
                 // Repeated disposal must not reach the depth counter.
                 scope.Dispose();
@@ -1638,7 +1638,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             Thread[] threads = new Thread[threadCount];
 
-            for (int t = 0; t < threadCount; t++)
+            for (int t = 0; t < threadCount; ++t)
             {
                 int threadIndex = t;
                 threads[t] = new Thread(() =>
@@ -1647,7 +1647,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     {
                         startSignal.Wait();
 
-                        for (int i = 0; i < iterationsPerThread; i++)
+                        for (int i = 0; i < iterationsPerThread; ++i)
                         {
                             AssetDatabaseBatchHelper.IncrementBatchDepth();
                             Thread.SpinWait(10);
@@ -1702,7 +1702,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     }
                 );
 
-                for (int i = 0; i < readCount; i++)
+                for (int i = 0; i < readCount; ++i)
                 {
                     Assert.That(
                         readResults[i],
@@ -1804,7 +1804,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             List<AssetDatabaseBatchScope> scopes = new List<AssetDatabaseBatchScope>();
 
-            for (int i = 0; i < depth; i++)
+            for (int i = 0; i < depth; ++i)
             {
                 bool shouldRefresh = i % 2 == 0;
                 scopes.Add(AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: shouldRefresh));
@@ -1880,7 +1880,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             int scopeCount = disposalOrder.Length;
             AssetDatabaseBatchScope[] scopes = new AssetDatabaseBatchScope[scopeCount];
 
-            for (int i = 0; i < scopeCount; i++)
+            for (int i = 0; i < scopeCount; ++i)
             {
                 scopes[i] = AssetDatabaseBatchHelper.BeginBatch();
             }
@@ -1891,7 +1891,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 $"Should be at depth {scopeCount} before disposal"
             );
 
-            for (int i = 0; i < disposalOrder.Length; i++)
+            for (int i = 0; i < disposalOrder.Length; ++i)
             {
                 int scopeIndex = disposalOrder[i];
                 bool isLastDisposal = i == disposalOrder.Length - 1;
@@ -2039,14 +2039,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             List<AssetDatabaseBatchScope> scopes = new List<AssetDatabaseBatchScope>();
 
-            for (int i = 0; i < totalDepth - throwAtDepth; i++)
+            for (int i = 0; i < totalDepth - throwAtDepth; ++i)
             {
                 scopes.Add(AssetDatabaseBatchHelper.BeginBatch());
             }
 
             try
             {
-                for (int i = 0; i < throwAtDepth; i++)
+                for (int i = 0; i < throwAtDepth; ++i)
                 {
                     using (AssetDatabaseBatchHelper.BeginBatch())
                     {
@@ -2228,7 +2228,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             const int highDepth = 1000;
 
-            for (int i = 0; i < highDepth; i++)
+            for (int i = 0; i < highDepth; ++i)
             {
                 AssetDatabaseBatchHelper.IncrementBatchDepth();
             }
@@ -2244,7 +2244,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Should be batching at high depth"
             );
 
-            for (int i = 0; i < highDepth; i++)
+            for (int i = 0; i < highDepth; ++i)
             {
                 AssetDatabaseBatchHelper.DecrementBatchDepth();
             }
@@ -2663,7 +2663,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 ResetCountersOnly leaves Unity asset editing active while scoped disposal can no longer detect
                 ownership. Explicit cleanup prevents later assembly reload failures.
             */
-            for (int i = 0; i < actualUnityDepthBeforeReset; i++)
+            for (int i = 0; i < actualUnityDepthBeforeReset; ++i)
             {
                 AssetDatabase.AllowAutoRefresh();
                 AssetDatabase.StopAssetEditing();
@@ -3020,7 +3020,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             List<AssetDatabaseBatchScope> scopes = new List<AssetDatabaseBatchScope>();
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 scopes.Add(AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false));
             }

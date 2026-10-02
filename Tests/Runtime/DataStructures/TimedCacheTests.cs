@@ -140,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<string> cache = new(
                 () =>
                 {
-                    producerCalls++;
+                    ++producerCalls;
                     return null;
                 },
                 1f
@@ -158,7 +158,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<object> cache = new(
                 () =>
                 {
-                    producerCalls++;
+                    ++producerCalls;
                     return new object();
                 },
                 1f
@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<float> cache = new(
                 () =>
                 {
-                    producerCalls++;
+                    ++producerCalls;
                     return 3.14f;
                 },
                 1f
@@ -238,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<int> cache = new(
                 () =>
                 {
-                    producerCalls++;
+                    ++producerCalls;
                     if (producerCalls == 1)
                     {
                         throw new InvalidOperationException("First call fails");
@@ -596,7 +596,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             _ = cache.Value;
             Assert.AreEqual(2, producerCalls);
 
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 2; ++i)
             {
                 cache.Reset();
                 int callsAfterReset = producerCalls;
@@ -729,7 +729,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<int> cache = new(
                 () =>
                 {
-                    producerCalls++;
+                    ++producerCalls;
                     sideEffectCounter += 10;
                     return producerCalls;
                 },
@@ -757,7 +757,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<Vector3> cache = new(
                 () =>
                 {
-                    producerCalls++;
+                    ++producerCalls;
                     return new Vector3(1f, 2f, 3f);
                 },
                 1f
@@ -796,7 +796,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<int> cache = new(
                 () =>
                 {
-                    producerCalls++;
+                    ++producerCalls;
                     if (producerCalls < 3)
                     {
                         throw new InvalidOperationException($"Call {producerCalls} fails");
@@ -836,7 +836,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<int> cacheInt = new(
                 () =>
                 {
-                    producerCalls++;
+                    ++producerCalls;
                     return default;
                 },
                 1f
@@ -850,7 +850,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<bool> cacheBool = new(
                 () =>
                 {
-                    producerCalls++;
+                    ++producerCalls;
                     return default;
                 },
                 1f
@@ -868,7 +868,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<string> nullCache = new(
                 () =>
                 {
-                    nullProducerCalls++;
+                    ++nullProducerCalls;
                     return null;
                 },
                 1f
@@ -878,7 +878,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<string> defaultCache = new(
                 () =>
                 {
-                    defaultProducerCalls++;
+                    ++defaultProducerCalls;
                     return default;
                 },
                 1f
@@ -937,7 +937,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<List<int>> cache = new(
                 () =>
                 {
-                    producerCalls++;
+                    ++producerCalls;
                     return new List<int> { 1, 2, 3 };
                 },
                 1f
@@ -961,7 +961,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             TimedCache<int> cache = new(
                 () =>
                 {
-                    externalCounter++;
+                    ++externalCounter;
                     return externalCounter * 10;
                 },
                 1f
@@ -1020,9 +1020,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             public float Now;
 
-            public float Get() => Now;
+            public float Get()
+            {
+                return Now;
+            }
 
-            public void Advance(float delta) => Now += delta;
+            public void Advance(float delta)
+            {
+                Now += delta;
+            }
         }
     }
 }

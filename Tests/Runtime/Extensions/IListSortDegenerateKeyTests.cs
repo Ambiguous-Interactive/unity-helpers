@@ -106,7 +106,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             public int Compare(int x, int y)
             {
-                Comparisons++;
+                ++Comparisons;
                 return x.CompareTo(y);
             }
         }

@@ -146,7 +146,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     int capacity = Math.Max(DefaultCapacity, list.Count);
                     _items = new T[capacity];
-                    for (int i = 0; i < list.Count; i++)
+                    for (int i = 0; i < list.Count; ++i)
                     {
                         PushBack(list[i]);
                     }
@@ -222,7 +222,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _head = _head.WrappedAdd(-1, _items.Length);
             _items[_head] = item;
-            _count++;
+            ++_count;
         }
 
         /// <summary>
@@ -238,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _items[_tail] = item;
             _tail = _tail.WrappedIncrement(_items.Length);
-            _count++;
+            ++_count;
         }
 
         /// <summary>
@@ -341,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public bool Contains(T item)
         {
             EqualityComparer<T> comparer = EqualityComparer<T>.Default;
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < _count; ++i)
             {
                 int actualIndex = (_head + i) % _items.Length;
                 if (comparer.Equals(_items[actualIndex], item))
@@ -370,7 +370,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 throw new ArgumentException("Destination array is not large enough.");
             }
 
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < _count; ++i)
             {
                 int actualIndex = (_head + i) % _items.Length;
                 array[arrayIndex + i] = _items[actualIndex];
@@ -435,7 +435,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _serializedItemsLease.Dispose();
 
             _serializedItemsLease = Buffers<T>.List.Get(out List<T> buffer);
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < _count; ++i)
             {
                 int actualIndex = (_head + i) % _items.Length;
                 buffer.Add(_items[actualIndex]);
@@ -477,7 +477,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             _items = new T[capacity];
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < itemCount; ++i)
             {
                 _items[i] = _serializedItems[i];
             }

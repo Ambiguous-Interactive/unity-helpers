@@ -227,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     int after = position + token.Length;
                     while (after < masked.Length && char.IsWhiteSpace(masked[after]))
                     {
-                        after++;
+                        ++after;
                     }
                     if (after < masked.Length && masked[after] == '<')
                     {
@@ -378,7 +378,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     return;
                 }
-                position++;
+                ++position;
             }
         }
 
@@ -538,11 +538,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             {
                 return false;
             }
-            position++;
+            ++position;
             SkipWhitespace(source, ref position, argumentsEnd);
             if (position < argumentsEnd && source[position] == '@')
             {
-                position++;
+                ++position;
             }
             if (!TryReadIdentifier(source, ref position, argumentsEnd, out _))
             {
@@ -553,7 +553,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             {
                 return false;
             }
-            position++;
+            ++position;
             SkipWhitespace(source, ref position, argumentsEnd);
             if (position != argumentsEnd)
             {
@@ -582,12 +582,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         )
         {
             int depth = 0;
-            for (int index = opening; index < limit; index++)
+            for (int index = opening; index < limit; ++index)
             {
                 char character = source[index];
                 if (character == openingCharacter)
                 {
-                    depth++;
+                    ++depth;
                 }
                 else if (character == closingCharacter && --depth == 0)
                 {
@@ -637,7 +637,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 }
                 else
                 {
-                    index++;
+                    ++index;
                 }
             }
             return new string(masked);
@@ -648,14 +648,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             int count = 0;
             while (start + count < characters.Length && characters[start + count] == character)
             {
-                count++;
+                ++count;
             }
             return count;
         }
 
         private static void MaskCharacters(char[] characters, ref int index, int count)
         {
-            for (int maskedCount = 0; maskedCount < count; maskedCount++)
+            for (int maskedCount = 0; maskedCount < count; ++maskedCount)
             {
                 characters[index++] = ' ';
             }
@@ -676,7 +676,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     characters[index] = ' ';
                 }
-                index++;
+                ++index;
             }
         }
 
@@ -717,7 +717,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     characters[index] = ' ';
                 }
-                index++;
+                ++index;
             }
         }
 
@@ -743,11 +743,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     {
                         return;
                     }
-                    index++;
+                    ++index;
                     continue;
                 }
                 characters[index] = ' ';
-                index++;
+                ++index;
                 if (character == quote)
                 {
                     if (verbatim && index < characters.Length && characters[index] == quote)
@@ -763,7 +763,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     {
                         characters[index] = ' ';
                     }
-                    index++;
+                    ++index;
                 }
             }
         }
@@ -792,7 +792,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 && (limit <= position + 1 || source[position + 1] != ':')
             )
             {
-                position++;
+                ++position;
                 return source.Substring(targetSpan.Start, targetSpan.Length);
             }
             position = original;
@@ -803,7 +803,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             while (position < limit && char.IsWhiteSpace(source[position]))
             {
-                position++;
+                ++position;
             }
         }
 
@@ -860,7 +860,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             int start = position++;
             while (position < limit && IsIdentifierCharacter(source[position]))
             {
-                position++;
+                ++position;
             }
             span = new TextSpan(start, position - start);
             return true;
@@ -901,7 +901,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
             while (position < limit && source[position] == '.')
             {
-                position++;
+                ++position;
                 if (!TryReadIdentifier(source, ref position, limit, out _))
                 {
                     span = default;
@@ -987,12 +987,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             int declarationStart = position;
             int angleDepth = 0;
             int sourceLength = source.Length;
-            for (; position < sourceLength; position++)
+            for (; position < sourceLength; ++position)
             {
                 char character = source[position];
                 if (character == '<')
                 {
-                    angleDepth++;
+                    ++angleDepth;
                     continue;
                 }
                 if (character == '>' && 0 < angleDepth)
@@ -1069,7 +1069,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     return false;
                 }
-                position++;
+                ++position;
                 SkipWhitespace(source, ref position, bracketEnd);
                 ReadAttributeTarget(source, ref position, bracketEnd);
                 while (position < bracketEnd)
@@ -1129,7 +1129,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     {
                         break;
                     }
-                    position++;
+                    ++position;
                 }
                 position = bracketEnd + 1;
             }
@@ -1163,7 +1163,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     if (source[position] == ']')
                     {
-                        depth++;
+                        ++depth;
                     }
                     else if (source[position] == '[')
                     {
@@ -1208,11 +1208,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             {
                 if (TryReadIdentifier(header, ref position, header.Length, out _))
                 {
-                    identifierCount++;
+                    ++identifierCount;
                 }
                 else
                 {
-                    position++;
+                    ++position;
                 }
             }
             return 2 <= identifierCount;
@@ -1294,13 +1294,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             {
                 List<int> starts = new List<int> { 0 };
                 int sourceLength = source.Length;
-                for (int index = 0; index < sourceLength; index++)
+                for (int index = 0; index < sourceLength; ++index)
                 {
                     if (source[index] == '\r')
                     {
                         if (index + 1 < source.Length && source[index + 1] == '\n')
                         {
-                            index++;
+                            ++index;
                         }
                         starts.Add(index + 1);
                     }
@@ -1351,7 +1351,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         int end = index + 1;
                         while (end < source.Length && IsIdentifierCharacter(source[end]))
                         {
-                            end++;
+                            ++end;
                         }
                         if (
                             bracketDepth == 0
@@ -1366,7 +1366,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         {
                             headerDeclaresType = true;
                         }
-                        for (int fill = index + 1; fill < end; fill++)
+                        for (int fill = index + 1; fill < end; ++fill)
                         {
                             compilationUnit[fill] = atCompilationUnit;
                             directTypeBody[fill] = atDirectTypeBody;
@@ -1378,7 +1378,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     switch (source[index])
                     {
                         case '(':
-                            parenthesisDepth++;
+                            ++parenthesisDepth;
                             if (bracketDepth == 0)
                             {
                                 headerHasParentheses = true;
@@ -1391,7 +1391,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             }
                             break;
                         case '[':
-                            bracketDepth++;
+                            ++bracketDepth;
                             break;
                         case ']':
                             if (0 < bracketDepth)
@@ -1417,7 +1417,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             headerHasParentheses = false;
                             break;
                     }
-                    index++;
+                    ++index;
                 }
                 int finalBraceCount = braceKinds.Count;
                 compilationUnit[source.Length] = finalBraceCount == 0;
@@ -1432,7 +1432,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     return false;
                 }
                 int expectedLength = expected.Length;
-                for (int index = 0; index < expectedLength; index++)
+                for (int index = 0; index < expectedLength; ++index)
                 {
                     if (source[start + index] != expected[index])
                     {

@@ -154,7 +154,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 new List<ValidationFinding> { Finding(FirstGuid, "retained") }
             );
             int notifications = 0;
-            void CountNotification() => notifications++;
+            void CountNotification()
+            {
+                ++notifications;
+            }
             ValidationStatusSurfaces.StatusChanged += CountNotification;
             try
             {
@@ -340,7 +343,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 ValidationResults.RecordedAssetGuids
             ).ToArray();
             int raised = 0;
-            void Count() => raised++;
+            void Count()
+            {
+                ++raised;
+            }
 
             ValidationResults.Changed += Count;
             try
@@ -405,7 +411,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         )
         {
             int raised = 0;
-            void Count() => raised++;
+            void Count()
+            {
+                ++raised;
+            }
 
             ValidationResults.Changed += Count;
             try
@@ -641,7 +650,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ValidationResults.Replace(ThirdGuid, null);
 
             int raised = 0;
-            void Count() => raised++;
+            void Count()
+            {
+                ++raised;
+            }
 
             int forgotten;
             ValidationResults.Changed += Count;
@@ -674,7 +686,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ValidationResults.Replace(FirstGuid, null);
 
             int raised = 0;
-            void Count() => raised++;
+            void Count()
+            {
+                ++raised;
+            }
 
             ValidationResults.Changed += Count;
             try
@@ -789,7 +804,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         public void AScopedMergeRaisesOnce()
         {
             int raised = 0;
-            void Count() => raised++;
+            void Count()
+            {
+                ++raised;
+            }
 
             ValidationResults.Changed += Count;
             try
@@ -816,8 +834,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         public void ASubscriberThatThrowsDoesNotStopTheOthers()
         {
             int reached = 0;
-            void Throw() => throw new System.InvalidOperationException("deliberate");
-            void Reach() => reached++;
+            void Throw()
+            {
+                throw new System.InvalidOperationException("deliberate");
+            }
+            void Reach()
+            {
+                ++reached;
+            }
 
             ExpectError(UnityEngine.LogType.Exception, "InvalidOperationException: deliberate");
             ValidationResults.Changed += Throw;

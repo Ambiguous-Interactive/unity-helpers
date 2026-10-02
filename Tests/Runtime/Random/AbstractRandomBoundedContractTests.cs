@@ -38,7 +38,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         private static uint[] CreateBounds32()
         {
             HashSet<uint> bounds = new() { uint.MaxValue, 1000u };
-            for (int shift = 0; shift < 32; shift++)
+            for (int shift = 0; shift < 32; ++shift)
             {
                 uint power = 1u << shift;
                 bounds.Add(power);
@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         private static ulong[] CreateBounds64()
         {
             HashSet<ulong> bounds = new() { ulong.MaxValue, 1000UL };
-            for (int shift = 0; shift < 64; shift++)
+            for (int shift = 0; shift < 64; ++shift)
             {
                 ulong power = 1UL << shift;
                 bounds.Add(power);

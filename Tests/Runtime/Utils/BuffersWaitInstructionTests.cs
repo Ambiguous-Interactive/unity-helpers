@@ -869,7 +869,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             if (useRealtime)
             {
-                for (int i = 0; i < 100; i++)
+                for (int i = 0; i < 100; ++i)
                 {
                     WaitForSecondsRealtime instance = Buffers.GetWaitForSecondsRealTime(i * 0.01f);
                     Assert.NotNull(instance);
@@ -883,7 +883,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             else
             {
-                for (int i = 0; i < 100; i++)
+                for (int i = 0; i < 100; ++i)
                 {
                     WaitForSeconds instance = Buffers.GetWaitForSeconds(i * 0.01f);
                     Assert.NotNull(instance);
@@ -995,7 +995,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             if (useRealtime)
             {
                 WaitForSecondsRealtime first = Buffers.GetWaitForSecondsRealTime(0.1f);
-                for (int i = 0; i < 100; i++)
+                for (int i = 0; i < 100; ++i)
                 {
                     WaitForSecondsRealtime same = Buffers.GetWaitForSecondsRealTime(0.1f);
                     Assert.AreSame(first, same);
@@ -1009,7 +1009,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             else
             {
                 WaitForSeconds first = Buffers.GetWaitForSeconds(0.1f);
-                for (int i = 0; i < 100; i++)
+                for (int i = 0; i < 100; ++i)
                 {
                     WaitForSeconds same = Buffers.GetWaitForSeconds(0.1f);
                     Assert.AreSame(first, same);
@@ -1190,12 +1190,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             if (useRealtime)
             {
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < 10; ++i)
                 {
                     Buffers.GetWaitForSecondsRealTime(i * 0.1f);
                     if (0 < i)
                     {
-                        expectedEvictions++;
+                        ++expectedEvictions;
                     }
                     Assert.AreEqual(
                         expectedEvictions,
@@ -1207,12 +1207,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             else
             {
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < 10; ++i)
                 {
                     Buffers.GetWaitForSeconds(i * 0.1f);
                     if (0 < i)
                     {
-                        expectedEvictions++;
+                        ++expectedEvictions;
                     }
                     Assert.AreEqual(
                         expectedEvictions,
@@ -1243,7 +1243,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             };
             float[] expectedOutputs = { 0.2f, 0.2f, 0.4f, 0.4f, 0.6f, 0.6f, 0.8f, 0.8f, 1.0f };
 
-            for (int i = 0; i < halfwayInputs.Length; i++)
+            for (int i = 0; i < halfwayInputs.Length; ++i)
             {
                 float input = halfwayInputs[i];
                 float expected = expectedOutputs[i];

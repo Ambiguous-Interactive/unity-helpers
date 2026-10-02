@@ -63,7 +63,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 HashSet<string> expectedDestinations = new(StringComparer.OrdinalIgnoreCase);
                 HashSet<string> sourcePaths = new(StringComparer.OrdinalIgnoreCase);
                 int sourceGuidsLength = sourceGuids.Length;
-                for (int index = 0; index < sourceGuidsLength; index++)
+                for (int index = 0; index < sourceGuidsLength; ++index)
                 {
                     string sourcePath = AssetDatabase.GUIDToAssetPath(sourceGuids[index]);
                     if (
@@ -122,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     );
                     HashSet<string> destinationPaths = new(StringComparer.OrdinalIgnoreCase);
                     int destinationGuidsLength = destinationGuids.Length;
-                    for (int index = 0; index < destinationGuidsLength; index++)
+                    for (int index = 0; index < destinationGuidsLength; ++index)
                     {
                         string destinationPath = AssetDatabase.GUIDToAssetPath(
                             destinationGuids[index]
@@ -250,7 +250,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     batch = AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false);
                 }
-                for (int index = 0; index < selectedAssetPaths.Count; index++)
+                for (int index = 0; index < selectedAssetPaths.Count; ++index)
                 {
                     string selected = selectedAssetPaths[index];
                     if (
@@ -266,7 +266,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         || !seen.Add(path)
                     )
                     {
-                        failed++;
+                        ++failed;
                         diagnostics.Add(
                             $"{selected ?? "<null>"}: {(string.IsNullOrEmpty(pathError) ? "A duplicate asset path was selected." : pathError)}"
                         );
@@ -276,7 +276,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     string selectionRoot = deletingDestination ? destinationRoot : sourceRoot;
                     if (!IsSameOrChild(path, selectionRoot) || !IsStandaloneClipPath(path))
                     {
-                        failed++;
+                        ++failed;
                         diagnostics.Add(
                             $"Selected asset is not a standalone animation clip under '{selectionRoot}': '{path}'."
                         );
@@ -297,21 +297,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         );
                         if (!item.Succeeded)
                         {
-                            failed++;
+                            ++failed;
                             diagnostics.Add($"{path}: {item.Error}");
                         }
                         else if (item.Eligible)
                         {
-                            processed++;
+                            ++processed;
                         }
                         else
                         {
-                            skipped++;
+                            ++skipped;
                         }
                     }
                     catch (Exception exception)
                     {
-                        failed++;
+                        ++failed;
                         diagnostics.Add($"{path}: {exception.Message}");
                     }
                 }

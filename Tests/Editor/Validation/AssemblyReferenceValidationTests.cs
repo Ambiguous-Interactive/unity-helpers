@@ -346,7 +346,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             if (!string.IsNullOrEmpty(assemblyLocation))
             {
                 string current = Path.GetDirectoryName(assemblyLocation);
-                for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); i++)
+                for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); ++i)
                 {
                     if (File.Exists(Path.Combine(current, "package.json")))
                     {
@@ -383,7 +383,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 const int levelsToPackageRoot = 3;
                 string currentDir = Path.GetDirectoryName(scriptPath);
-                for (int i = 0; i < levelsToPackageRoot; i++)
+                for (int i = 0; i < levelsToPackageRoot; ++i)
                 {
                     currentDir = Path.Combine(currentDir, "..");
                 }
@@ -397,7 +397,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return null;
         }
 
-        private static string GetScriptFilePath([CallerFilePath] string path = "") => path;
+        private static string GetScriptFilePath([CallerFilePath] string path = "")
+        {
+            return path;
+        }
 
         /// <summary>
         /// Verifies all production assemblies can be loaded.
@@ -1042,7 +1045,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 if (!t.IsPublic && !t.IsNestedPublic)
                 {
-                    internalRuntimeTypes++;
+                    ++internalRuntimeTypes;
                 }
             }
 
@@ -1051,7 +1054,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 if (!t.IsPublic && !t.IsNestedPublic)
                 {
-                    internalEditorTypes++;
+                    ++internalEditorTypes;
                 }
             }
 
@@ -1211,7 +1214,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                             $"{assemblyName}: rootNamespace is '{rootNamespace}' but types use different namespaces:"
                         );
                         int maxEntries = Math.Min(5, mismatchedTypes.Count);
-                        for (int i = 0; i < maxEntries; i++)
+                        for (int i = 0; i < maxEntries; ++i)
                         {
                             issueBuilder.Append("\n  ");
                             issueBuilder.Append(mismatchedTypes[i]);

@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         {
             get
             {
-                ReceiverEvaluations++;
+                ++ReceiverEvaluations;
                 return Target;
             }
         }
@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         {
             get
             {
-                ArgumentEvaluations++;
+                ++ArgumentEvaluations;
                 return ArgumentEvaluations;
             }
         }

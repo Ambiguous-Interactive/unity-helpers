@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             string[] names = new string[filtered.Count];
             int selectedIndex = -1;
-            for (int i = 0; i < filtered.Count; i++)
+            for (int i = 0; i < filtered.Count; ++i)
             {
                 AnimationClip clip = filtered[i];
                 names[i] = clip != null ? clip.name : string.Empty;

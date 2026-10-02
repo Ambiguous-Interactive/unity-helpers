@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void FormatOptionEvictsLeastRecentlyUsedOption()
         {
-            for (int optionIndex = 0; optionIndex < ControlOptionCount; optionIndex++)
+            for (int optionIndex = 0; optionIndex < ControlOptionCount; ++optionIndex)
             {
                 object option = optionIndex;
                 _ = DropDownShared.FormatOption(option);
@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             for (
                 int optionIndex = ControlOptionCount;
                 optionIndex < ChurnedOptionCount;
-                optionIndex++
+                ++optionIndex
             )
             {
                 object option = optionIndex;
@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + "retained entry from an evicted one and the eviction below is unobservable."
             );
 
-            for (int optionIndex = 0; optionIndex < ChurnedOptionCount; optionIndex++)
+            for (int optionIndex = 0; optionIndex < ChurnedOptionCount; ++optionIndex)
             {
                 object option = optionIndex;
                 _ = formatOption(option);
@@ -171,7 +171,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void FormatOptionDoesNotRootDestroyedObjects()
         {
             List<BoundedDrawerCacheChurnHost> destroyedOptions = new(DestroyedOptionCount);
-            for (int optionIndex = 0; optionIndex < DestroyedOptionCount; optionIndex++)
+            for (int optionIndex = 0; optionIndex < DestroyedOptionCount; ++optionIndex)
             {
                 BoundedDrawerCacheChurnHost option =
                     CreateScriptableObject<BoundedDrawerCacheChurnHost>();
@@ -192,7 +192,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 UnityEngine.Object.DestroyImmediate(option); // UNH-SUPPRESS: the destroyed option is the subject
             }
 
-            for (int optionIndex = 0; optionIndex < ChurnedOptionCount; optionIndex++)
+            for (int optionIndex = 0; optionIndex < ChurnedOptionCount; ++optionIndex)
             {
                 object option = optionIndex;
                 _ = DropDownShared.FormatOption(option);

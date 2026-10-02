@@ -185,7 +185,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 {
                     Assert.AreEqual(buffer.Count, restored.Count);
                     Assert.AreEqual(buffer.Capacity, restored.Capacity);
-                    for (int index = 0; index < buffer.Count; index++)
+                    for (int index = 0; index < buffer.Count; ++index)
                     {
                         Assert.AreEqual(buffer[index], restored[index]);
                     }

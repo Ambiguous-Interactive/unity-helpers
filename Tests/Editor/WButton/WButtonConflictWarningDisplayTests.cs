@@ -858,7 +858,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                     )
                 )
                 {
-                    invalidPlacementGroupCount++;
+                    ++invalidPlacementGroupCount;
                     Assert.AreEqual(
                         invalidPlacement,
                         entry.Key._groupPlacement,
@@ -973,7 +973,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             yield return TestIMGUIExecutor.Run(() =>
             {
-                for (int i = 0; i < drawIterations; i++)
+                for (int i = 0; i < drawIterations; ++i)
                 {
                     DrawButtonsWithDefaults(editor, paginationStates, foldoutStates);
                 }

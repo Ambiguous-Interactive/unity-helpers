@@ -120,7 +120,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.AreEqual(5, pool.Count);
 
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 _currentTime = 1f + i * 0.1f;
                 using (PooledResource<TestPoolItem> resource = pool.Get(out TestPoolItem _)) { }
@@ -192,7 +192,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.AreEqual(10, pool.Count);
 
-            for (int interval = 1; interval <= 3; interval++)
+            for (int interval = 1; interval <= 3; ++interval)
             {
                 _currentTime = 1f + interval * 2f + 1f;
                 using (PooledResource<TestPoolItem> resource = pool.Get(out TestPoolItem _)) { }
@@ -264,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> rented = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 _currentTime = 1f + i * 0.01f;
                 rented.Add(pool.Get(out TestPoolItem _));
@@ -321,7 +321,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> rented = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 _currentTime = 1f + i * 0.01f;
                 rented.Add(pool.Get(out TestPoolItem _));
@@ -385,7 +385,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> rented = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 _currentTime = 1f + i * 0.01f;
                 rented.Add(pool.Get(out TestPoolItem _));
@@ -405,7 +405,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             _currentTime = 4f;
 
             int totalPurged = 0;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 totalPurged += pool.Purge();
             }
@@ -446,7 +446,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             _currentTime = 5f;
 
             int totalPurged = 0;
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 totalPurged += pool.Purge();
             }
@@ -487,7 +487,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             _currentTime = 10f;
 
             int totalPurged = 0;
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 totalPurged += pool.Purge();
             }
@@ -517,7 +517,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> rented = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 rented.Add(pool.Get(out TestPoolItem _));
             }
@@ -558,7 +558,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> rented = new();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 rented.Add(pool.Get(out TestPoolItem _));
             }
@@ -625,7 +625,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             List<PooledResource<TestPoolItem>> rented = new();
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 rented.Add(pool.Get(out TestPoolItem _));
             }
@@ -683,7 +683,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 10_000; i++)
+            for (int i = 0; i < 10_000; ++i)
             {
                 using (PooledResource<TestPoolItem> resource = pool.Get(out TestPoolItem _)) { }
             }

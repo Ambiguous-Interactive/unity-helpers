@@ -117,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 typeof(AnimationEventSignatureHost)
             );
 
-            for (int i = 1; i < methods.Count; i++)
+            for (int i = 1; i < methods.Count; ++i)
             {
                 Assert.LessOrEqual(
                     string.Compare(methods[i - 1].Name, methods[i].Name, StringComparison.Ordinal),

@@ -899,7 +899,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void AFreshNumberSkipsTheReservedProtobufRange()
         {
             List<WProtoSubtypeTagPlan.Entry> reserved = new List<WProtoSubtypeTagPlan.Entry>();
-            for (int tag = 1; tag < 19000; tag++)
+            for (int tag = 1; tag < 19000; ++tag)
             {
                 reserved.Add(new WProtoSubtypeTagPlan.Entry("filler" + tag, "N.Base", tag));
             }

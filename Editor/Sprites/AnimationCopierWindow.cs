@@ -539,11 +539,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        internal void CopyChanged() => CopyAnimationsInternal(CopyMode.Changed);
+        internal void CopyChanged()
+        {
+            CopyAnimationsInternal(CopyMode.Changed);
+        }
 
-        internal void CopyNew() => CopyAnimationsInternal(CopyMode.New);
+        internal void CopyNew()
+        {
+            CopyAnimationsInternal(CopyMode.New);
+        }
 
-        internal void CopyAll() => CopyAnimationsInternal(CopyMode.All);
+        internal void CopyAll()
+        {
+            CopyAnimationsInternal(CopyMode.All);
+        }
 
         private void BindSerializedState()
         {
@@ -1153,7 +1162,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     if (GUILayout.Button("Select All", GUILayout.Width(100)))
                     {
-                        for (int i = 0; i < animationFileInfos.Count; i++)
+                        for (int i = 0; i < animationFileInfos.Count; ++i)
                         {
                             AnimationFileInfo info = animationFileInfos[i];
                             info.Selected = true;
@@ -1161,7 +1170,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     if (GUILayout.Button("Select None", GUILayout.Width(100)))
                     {
-                        for (int i = 0; i < animationFileInfos.Count; i++)
+                        for (int i = 0; i < animationFileInfos.Count; ++i)
                         {
                             AnimationFileInfo info = animationFileInfos[i];
                             info.Selected = false;
@@ -1169,7 +1178,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     if (GUILayout.Button("Select Filtered", GUILayout.Width(120)))
                     {
-                        for (int i = 0; i < animationFileInfos.Count; i++)
+                        for (int i = 0; i < animationFileInfos.Count; ++i)
                         {
                             AnimationFileInfo info = animationFileInfos[i];
                             info.Selected = true;
@@ -1177,7 +1186,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     if (GUILayout.Button("Clear Filtered", GUILayout.Width(120)))
                     {
-                        for (int i = 0; i < animationFileInfos.Count; i++)
+                        for (int i = 0; i < animationFileInfos.Count; ++i)
                         {
                             AnimationFileInfo info = animationFileInfos[i];
                             info.Selected = false;
@@ -1185,7 +1194,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                for (int i = 0; i < animationFileInfos.Count; i++)
+                for (int i = 0; i < animationFileInfos.Count; ++i)
                 {
                     AnimationFileInfo info = animationFileInfos[i];
                     using (new EditorGUILayout.HorizontalScope())
@@ -1241,7 +1250,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     IList<AnimationFileInfo> arr = ApplyFilterAndSort(list.ToList()).AsList();
                     sb.AppendLine($"== {inputTitle} ({arr.Count}) ==");
-                    for (int i = 0; i < arr.Count; i++)
+                    for (int i = 0; i < arr.Count; ++i)
                     {
                         AnimationFileInfo info = arr[i];
                         string path = useSource ? info.RelativePath : info.DestinationRelativePath;

@@ -513,7 +513,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     {
                         ordered.Add(list[position]);
                         ++writeIndex;
-                        position++;
+                        ++position;
                     }
 
                     if (list.Count <= position)
@@ -541,7 +541,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         {
                             ordered.Add(list[position]);
                             ++writeIndex;
-                            position++;
+                            ++position;
                         }
                         if (length <= writeIndex)
                         {
@@ -764,7 +764,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         return added;
                     }
 
-                    added++;
+                    ++added;
                     if (maxAssignments <= added)
                     {
                         return added;

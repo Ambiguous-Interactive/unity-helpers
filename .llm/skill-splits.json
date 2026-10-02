@@ -41,7 +41,7 @@
     },
     {
       "name": "create-csharp-file",
-      "sha256": "7973be58e84cc3f2d6a6a953642afdfc2794a3cca72c8f5d7eb95de436029d23",
+      "sha256": "8723db59b1dc9854c0e51efd46521c97590420d72a5091e1f1bf9e73ae1a19c2",
       "parts": [
         "create-csharp-file-part-1.md",
         "create-csharp-file-part-2.md",

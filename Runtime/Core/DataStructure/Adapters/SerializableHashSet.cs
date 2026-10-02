@@ -824,7 +824,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     .Get(out HashSet<T> fastPathSeenItems);
 
                 bool allItemsMatchAndUnique = true;
-                for (int i = 0; i < arrayLength; i++)
+                for (int i = 0; i < arrayLength; ++i)
                 {
                     T item = _items[i];
 
@@ -847,7 +847,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 .GetHashSetPool(SetComparer)
                 .Get(out HashSet<T> seenItems);
 
-            for (int i = 0; i < arrayLength; i++)
+            for (int i = 0; i < arrayLength; ++i)
             {
                 T item = _items[i];
                 if (_set.Contains(item) && seenItems.Add(item))
@@ -898,7 +898,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             bool encounteredNullReference = false;
             bool supportsNullCheck = TypeSupportsNullReferences(typeof(T));
             // Hashing and logging callbacks can rebuild the serialized items.
-            for (int index = 0; index < _items.Length; index++)
+            for (int index = 0; index < _items.Length; ++index)
             {
                 T value = _items[index];
                 if (supportsNullCheck && ReferenceEquals(value, null))
@@ -1208,7 +1208,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
             int length = values.Length;
             T[] convertedItems = new T[length];
-            for (int index = 0; index < length; index++)
+            for (int index = 0; index < length; ++index)
             {
                 object raw = values.GetValue(index);
                 if (!TryConvertToElement(raw, out T converted))

@@ -395,7 +395,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (noneMatch)
                     {
                         AddEditorLayer(clip);
-                        clipsAddedCount++;
+                        ++clipsAddedCount;
                         lastValidDirectory = Path.GetDirectoryName(assetPath);
                     }
                     else
@@ -464,7 +464,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (!alreadyExists)
                     {
                         AddEditorLayer(clip);
-                        clipsAddedCount++;
+                        ++clipsAddedCount;
                     }
                     else
                     {
@@ -603,7 +603,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _loadedClipsContainer.Remove(_loadedClipDropPlaceholder);
             }
 
-            for (int i = 0; i < _loadedEditorLayers.Count; i++)
+            for (int i = 0; i < _loadedEditorLayers.Count; ++i)
             {
                 EditorLayerData editorLayer = _loadedEditorLayers[i];
 
@@ -773,7 +773,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 int loadedClipsContainerChildCount = _loadedClipsContainer.childCount;
-                for (int i = 0; i < loadedClipsContainerChildCount; i++)
+                for (int i = 0; i < loadedClipsContainerChildCount; ++i)
                 {
                     VisualElement child = _loadedClipsContainer[i];
                     if (child == _draggedLoadedClipElement)
@@ -853,11 +853,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (0 <= placeholderVisualIndex)
                 {
                     int itemsBeforePlaceholder = -1;
-                    for (int i = 0; i < placeholderVisualIndex; i++)
+                    for (int i = 0; i < placeholderVisualIndex; ++i)
                     {
                         if (_loadedClipsContainer[i] != _loadedClipDropPlaceholder)
                         {
-                            itemsBeforePlaceholder++;
+                            ++itemsBeforePlaceholder;
                         }
                         else
                         {
@@ -1010,7 +1010,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 int framesContainerChildCount = _framesContainer.childCount;
-                for (int i = 0; i < framesContainerChildCount; i++)
+                for (int i = 0; i < framesContainerChildCount; ++i)
                 {
                     VisualElement child = _framesContainer[i];
                     if (child == _draggedFrameElement)
@@ -1092,14 +1092,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (0 <= placeholderVisualIndex)
                 {
                     int itemsBeforePlaceholder = 0;
-                    for (int i = 0; i < placeholderVisualIndex; i++)
+                    for (int i = 0; i < placeholderVisualIndex; ++i)
                     {
                         if (
                             _framesContainer[i] != _draggedFrameElement
                             && _framesContainer[i] != _frameDropPlaceholder
                         )
                         {
-                            itemsBeforePlaceholder++;
+                            ++itemsBeforePlaceholder;
                         }
                     }
                     targetDataIndex = itemsBeforePlaceholder;
@@ -1204,7 +1204,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < _activeEditorLayer.Sprites.Count; i++)
+            for (int i = 0; i < _activeEditorLayer.Sprites.Count; ++i)
             {
                 Sprite sprite = _activeEditorLayer.Sprites[i];
 

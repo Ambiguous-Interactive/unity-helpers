@@ -97,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             SparseSet set = new(10);
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 Assert.IsTrue(set.TryAdd(i));
             }
@@ -745,24 +745,24 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             SparseSet set = new(1000);
 
-            for (int i = 0; i < 500; i++)
+            for (int i = 0; i < 500; ++i)
             {
                 Assert.IsTrue(set.TryAdd(i));
             }
 
-            for (int i = 0; i < 250; i++)
+            for (int i = 0; i < 250; ++i)
             {
                 Assert.IsTrue(set.TryRemove(i));
             }
 
             Assert.AreEqual(250, set.Count);
 
-            for (int i = 0; i < 250; i++)
+            for (int i = 0; i < 250; ++i)
             {
                 Assert.IsFalse(set.Contains(i));
             }
 
-            for (int i = 250; i < 500; i++)
+            for (int i = 250; i < 500; ++i)
             {
                 Assert.IsTrue(set.Contains(i));
             }
@@ -1129,19 +1129,19 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             SparseSet<int> set = new(1000);
 
-            for (int i = 0; i < 500; i++)
+            for (int i = 0; i < 500; ++i)
             {
                 Assert.IsTrue(set.TryAdd(i));
             }
 
-            for (int i = 0; i < 250; i++)
+            for (int i = 0; i < 250; ++i)
             {
                 Assert.IsTrue(set.TryRemove(i));
             }
 
             Assert.AreEqual(250, set.Count);
 
-            for (int i = 250; i < 500; i++)
+            for (int i = 250; i < 500; ++i)
             {
                 Assert.IsTrue(set.Contains(i));
             }

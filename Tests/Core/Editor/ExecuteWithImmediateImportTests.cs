@@ -257,7 +257,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             System.Collections.Generic.List<AssetDatabaseBatchScope> scopes =
                 new System.Collections.Generic.List<AssetDatabaseBatchScope>();
-            for (int i = 0; i < depth; i++)
+            for (int i = 0; i < depth; ++i)
             {
                 scopes.Add(AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false));
             }
@@ -298,7 +298,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             System.Collections.Generic.List<AssetDatabaseBatchScope> scopes =
                 new System.Collections.Generic.List<AssetDatabaseBatchScope>();
-            for (int i = 0; i < depth; i++)
+            for (int i = 0; i < depth; ++i)
             {
                 scopes.Add(AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false));
             }

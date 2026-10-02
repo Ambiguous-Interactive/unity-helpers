@@ -128,7 +128,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         int remaining = allPathsLength - topN;
                         if (0 < remaining)
                         {
-                            for (int idx = topN; idx < allPathsLength; idx++)
+                            for (int idx = topN; idx < allPathsLength; ++idx)
                             {
                                 DirectoryUsageData dirData = allPaths[idx];
                                 Rect moreHistoryButtonRect = new(
@@ -463,7 +463,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             using (new EditorGUI.IndentLevelScope())
             {
                 // Path selection can apply properties and resize the array through OnValidate.
-                for (int i = 0; i < listProp.arraySize; i++)
+                for (int i = 0; i < listProp.arraySize; ++i)
                 {
                     SerializedProperty elementProp = listProp.GetArrayElementAtIndex(i);
                     using (new EditorGUILayout.HorizontalScope())
@@ -528,7 +528,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             using (new EditorGUI.IndentLevelScope())
             {
                 // Path selection can apply properties and resize the array through OnValidate.
-                for (int i = 0; i < listProp.arraySize; i++)
+                for (int i = 0; i < listProp.arraySize; ++i)
                 {
                     SerializedProperty elementProp = listProp.GetArrayElementAtIndex(i);
                     using (new EditorGUILayout.HorizontalScope())
@@ -792,7 +792,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     int remaining = allPathsLength - topN;
                     if (0 < remaining)
                     {
-                        for (int idx = topN; idx < allPathsLength; idx++)
+                        for (int idx = topN; idx < allPathsLength; ++idx)
                         {
                             DirectoryUsageData dirData = allPaths[idx];
                             if (

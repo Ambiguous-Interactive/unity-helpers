@@ -205,11 +205,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return measurements[measurements.Length / 2];
         }
 
-        private static double TimestampTicksToMicroseconds(long elapsed) =>
-            elapsed * (1_000_000d / Stopwatch.Frequency);
+        private static double TimestampTicksToMicroseconds(long elapsed)
+        {
+            return elapsed * (1_000_000d / Stopwatch.Frequency);
+        }
 
-        private static StartupContract<TMarker> MakeStartupContract<TMarker>() =>
-            new StartupContract<TMarker>
+        private static StartupContract<TMarker> MakeStartupContract<TMarker>()
+        {
+            return new StartupContract<TMarker>
             {
                 Id = 42,
                 Label = "startup",
@@ -222,8 +225,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 },
                 Child = new StartupChild { Sequence = 987_654_321L, Name = "nested" },
             };
+        }
 
-        [Test, Timeout(0)]
+        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
         public void CompareGeneratedRegistrationAndFirstApiUse()
         {
             Assert.AreEqual(28, StartupContractClosures.Length);

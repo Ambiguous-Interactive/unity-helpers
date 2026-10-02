@@ -144,7 +144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             GameObject root = Track(new GameObject("Root", typeof(ChildArrayTester)));
             ChildArrayTester tester = root.GetComponent<ChildArrayTester>();
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 GameObject child = Track(new GameObject($"Child{i}", typeof(SpriteRenderer)));
                 child.transform.SetParent(root.transform);

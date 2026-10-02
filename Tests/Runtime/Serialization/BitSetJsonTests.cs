@@ -22,7 +22,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             string json = Serializer.JsonStringify(original);
             BitSet deserialized = Serializer.JsonDeserialize<BitSet>(json);
             Assert.AreEqual(original.Capacity, deserialized.Capacity, "Capacity should match");
-            for (int i = 0; i < original.Capacity; i++)
+            for (int i = 0; i < original.Capacity; ++i)
             {
                 Assert.AreEqual(original[i], deserialized[i], $"Bit {i} should match");
             }
@@ -42,7 +42,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 deserialized.Capacity,
                 "Capacity should match under fast options"
             );
-            for (int i = 0; i < original.Capacity; i++)
+            for (int i = 0; i < original.Capacity; ++i)
             {
                 Assert.AreEqual(
                     original[i],

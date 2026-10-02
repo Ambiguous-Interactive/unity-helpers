@@ -298,7 +298,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             PruneColinearOnHull(concaveHull);
             return concaveHull;
 
-            Vector2 CellToWorld(FastVector3Int cell) => grid.CellToWorld(cell);
+            Vector2 CellToWorld(FastVector3Int cell)
+            {
+                return grid.CellToWorld(cell);
+            }
         }
 
         private static Bounds? CalculateWorldBounds(

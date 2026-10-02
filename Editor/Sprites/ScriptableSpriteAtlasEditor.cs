@@ -307,7 +307,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             continue;
                         }
 
-                        currentConfig++;
+                        ++currentConfig;
                         float progress = (float)currentConfig / totalConfigs;
                         Utils.EditorUi.ShowProgress(
                             "Generating Sprite Atlases",
@@ -686,7 +686,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 bool pathExists = false;
                                 int sourceFolderEntriesPropArraySize =
                                     sourceFolderEntriesProp.arraySize;
-                                for (int j = 0; j < sourceFolderEntriesPropArraySize; j++)
+                                for (int j = 0; j < sourceFolderEntriesPropArraySize; ++j)
                                 {
                                     SerializedProperty entryProp =
                                         sourceFolderEntriesProp.GetArrayElementAtIndex(j);
@@ -937,7 +937,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     SerializedProperty newElement = spritesListProp.AppendArrayElement();
                     newElement.objectReferenceValue = sprite;
-                    addedCount++;
+                    ++addedCount;
                 }
             }
 
@@ -987,7 +987,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     element.objectReferenceValue = null;
                     spritesListProp.DeleteArrayElementAtIndex(i);
-                    countRemoved++;
+                    ++countRemoved;
                 }
             }
 

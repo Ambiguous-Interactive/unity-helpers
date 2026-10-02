@@ -682,7 +682,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
             long instanceId = instance.GetUnityObjectId();
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 yield return null;
             }
@@ -1072,7 +1072,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestRuntimeSingleton first = TestRuntimeSingleton.Instance;
             GameObject firstObject = Track(first.gameObject);
             first.testValue = 99;
-            for (int index = 0; index < duplicateCount; index++)
+            for (int index = 0; index < duplicateCount; ++index)
             {
                 GameObject duplicate = Track(new GameObject("Pending duplicate"));
                 duplicate.AddComponent<TestRuntimeSingleton>();
@@ -1104,7 +1104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             TestRuntimeSingleton[] cleared = new TestRuntimeSingleton[3];
             GameObject[] clearedObjects = new GameObject[cleared.Length];
-            for (int index = 0; index < cleared.Length; index++)
+            for (int index = 0; index < cleared.Length; ++index)
             {
                 TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
                 Track(instance.gameObject);
@@ -1420,7 +1420,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             {
                 if (type == LogType.Warning && RefusalPattern.IsMatch(condition))
                 {
-                    refusals++;
+                    ++refusals;
                 }
             }
         }

@@ -485,7 +485,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
             );
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 AttributeMetadataCacheGenerator.GenerateCache();
                 yield return null;

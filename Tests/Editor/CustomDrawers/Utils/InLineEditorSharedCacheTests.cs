@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
         [TestCaseSource(nameof(FoldoutStateCases))]
         public void FoldoutStatesUnderLimitAcceptsAll(int numberOfEntries, int expectedCount)
         {
-            for (int i = 0; i < numberOfEntries; i++)
+            for (int i = 0; i < numberOfEntries; ++i)
             {
                 InLineEditorShared.SetFoldoutState($"foldout{i}", i % 2 == 0);
             }
@@ -125,7 +125,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
                 Is.EqualTo(expectedCount)
             );
 
-            for (int i = 0; i < numberOfEntries; i++)
+            for (int i = 0; i < numberOfEntries; ++i)
             {
                 bool expected = i % 2 == 0;
                 Assert.That(
@@ -182,7 +182,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
         [TestCaseSource(nameof(ScrollPositionCases))]
         public void ScrollPositionsUnderLimitAcceptsAll(int numberOfEntries)
         {
-            for (int i = 0; i < numberOfEntries; i++)
+            for (int i = 0; i < numberOfEntries; ++i)
             {
                 InLineEditorShared.SetScrollPosition($"scroll{i}", new Vector2(i, i * 2));
             }
@@ -192,7 +192,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
                 Is.EqualTo(numberOfEntries)
             );
 
-            for (int i = 0; i < numberOfEntries; i++)
+            for (int i = 0; i < numberOfEntries; ++i)
             {
                 Vector2 position = InLineEditorShared.GetScrollPosition($"scroll{i}");
                 Assert.That(position.x, Is.EqualTo(i).Within(0.001f));

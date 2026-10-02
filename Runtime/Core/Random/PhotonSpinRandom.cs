@@ -408,7 +408,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                         _elements[k] += RotateLeft(mix[i], 25);
                         _elements[k] ^= _c;
                         mix[i] += _elements[k];
-                        k++;
+                        ++k;
                     }
 
                     if (

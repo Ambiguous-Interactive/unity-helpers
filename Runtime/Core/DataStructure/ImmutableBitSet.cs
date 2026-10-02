@@ -208,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
             int fullSegments = _capacity >> BitsPerLongShift;
-            for (int i = 0; i < fullSegments; i++)
+            for (int i = 0; i < fullSegments; ++i)
             {
                 if (_bits[i] != ulong.MaxValue)
                 {
@@ -239,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 throw new ArgumentNullException(nameof(results));
             }
             results.Clear();
-            for (int i = 0; i < _capacity; i++)
+            for (int i = 0; i < _capacity; ++i)
             {
                 if (TryGet(i, out bool value) && value)
                 {
@@ -255,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public IEnumerable<int> EnumerateSetIndices()
         {
-            for (int i = 0; i < _capacity; i++)
+            for (int i = 0; i < _capacity; ++i)
             {
                 if (TryGet(i, out bool value) && value)
                 {
@@ -276,7 +276,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return result;
             }
 
-            for (int i = 0; i < _capacity; i++)
+            for (int i = 0; i < _capacity; ++i)
             {
                 if (TryGet(i, out bool value) && value)
                 {

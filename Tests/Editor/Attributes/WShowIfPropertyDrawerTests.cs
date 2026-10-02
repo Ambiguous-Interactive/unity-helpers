@@ -1088,7 +1088,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 new WShowIfAttribute(nameof(TestContainer.boolCondition))
             );
 
-            for (int iteration = 0; iteration < 5; iteration++)
+            for (int iteration = 0; iteration < 5; ++iteration)
             {
                 bool expectedShow = iteration % 2 == 1;
                 container.boolCondition = expectedShow;

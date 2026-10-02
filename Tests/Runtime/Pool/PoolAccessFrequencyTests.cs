@@ -199,7 +199,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -278,7 +278,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -359,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -392,7 +392,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             _currentTime = 90f;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -456,7 +456,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 _currentTime = i * 2f;
                 using PooledResource<TestPoolItem> resource = pool.Get();
@@ -515,7 +515,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             PoolStatistics beforeStats = pool.GetStatistics();
             float beforeRentalsPerMin = beforeStats.RentalsPerMinute;
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 _currentTime = i * 0.1f;
                 using PooledResource<TestPoolItem> resource = pool.Get();
@@ -538,7 +538,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 _currentTime = i * 0.5f;
                 using PooledResource<TestPoolItem> resource = pool.Get();
@@ -574,7 +574,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -876,7 +876,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -903,12 +903,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Task[] tasks = new Task[threadCount];
             int totalOperations = 0;
 
-            for (int i = 0; i < threadCount; i++)
+            for (int i = 0; i < threadCount; ++i)
             {
                 int threadIndex = i;
                 tasks[i] = Task.Run(() =>
                 {
-                    for (int j = 0; j < operationsPerThread; j++)
+                    for (int j = 0; j < operationsPerThread; ++j)
                     {
                         float time = threadIndex * 1000f + j * 0.01f;
                         tracker.RecordRent(time);
@@ -944,7 +944,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             int operationsPerThread = 100;
-            for (int i = 0; i < threadCount * operationsPerThread; i++)
+            for (int i = 0; i < threadCount * operationsPerThread; ++i)
             {
                 tracker.RecordRent(i * 0.01f);
             }
@@ -952,12 +952,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Task[] tasks = new Task[threadCount];
             int totalOperations = 0;
 
-            for (int i = 0; i < threadCount; i++)
+            for (int i = 0; i < threadCount; ++i)
             {
                 int threadIndex = i;
                 tasks[i] = Task.Run(() =>
                 {
-                    for (int j = 0; j < operationsPerThread; j++)
+                    for (int j = 0; j < operationsPerThread; ++j)
                     {
                         float time = threadIndex * 1000f + j * 0.01f + 1000f;
                         tracker.RecordReturn(time);
@@ -993,12 +993,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int rentOperations = 0;
             int returnOperations = 0;
 
-            for (int i = 0; i < threadCount; i++)
+            for (int i = 0; i < threadCount; ++i)
             {
                 int threadIndex = i;
                 tasks[i * 2] = Task.Run(() =>
                 {
-                    for (int j = 0; j < operationsPerThread; j++)
+                    for (int j = 0; j < operationsPerThread; ++j)
                     {
                         float time = threadIndex * 1000f + j * 0.01f;
                         tracker.RecordRent(time);
@@ -1008,7 +1008,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
                 tasks[i * 2 + 1] = Task.Run(() =>
                 {
-                    for (int j = 0; j < operationsPerThread; j++)
+                    for (int j = 0; j < operationsPerThread; ++j)
                     {
                         float time = threadIndex * 1000f + j * 0.01f + 500f;
                         tracker.RecordReturn(time);
@@ -1186,12 +1186,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 bufferMultiplier: 1.5f
             );
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 tracker.RecordRent(i * 1f);
             }
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 tracker.RecordReturn(10f + i * 1f);
             }
@@ -1471,7 +1471,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 rentalInterval = 60f / rentalCount;
             }
 
-            for (int i = 0; i < rentalCount; i++)
+            for (int i = 0; i < rentalCount; ++i)
             {
                 _currentTime = 1f + (i * rentalInterval);
                 using (PooledResource<TestPoolItem> resource = pool.Get()) { }
@@ -1545,7 +1545,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Pool should not be high frequency initially"
             );
 
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 20; ++i)
             {
                 _currentTime = 61f + (i * 0.5f);
                 using PooledResource<TestPoolItem> resource = pool.Get();
@@ -1645,7 +1645,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Initial rent count should be 1 after single rental"
             );
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 PoolStatistics stats = pool.GetStatistics();
                 Assert.That(
@@ -1675,7 +1675,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -1686,7 +1686,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             float initialRentalsPerMin = initialStats.RentalsPerMinute;
             long initialRentCount = initialStats.RentCount;
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 _currentTime += 0.1f;
                 PoolStatistics stats = pool.GetStatistics();
@@ -1719,7 +1719,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -1758,7 +1758,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -1807,7 +1807,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
 
             const int actualRentals = 3;
-            for (int i = 0; i < actualRentals; i++)
+            for (int i = 0; i < actualRentals; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -1820,7 +1820,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"Initial rent count should be {actualRentals}"
             );
 
-            for (int i = 0; i < statisticsCallCount; i++)
+            for (int i = 0; i < statisticsCallCount; ++i)
             {
                 pool.GetStatistics();
             }
@@ -1860,7 +1860,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             _currentTime = 50f;
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 _currentTime += 1f;
                 pool.GetStatistics();
@@ -1903,7 +1903,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Average inter-rental time should be (2 + 3) / 2 = 2.5"
             );
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 _currentTime += 1f;
                 pool.GetStatistics();
@@ -1930,7 +1930,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 _currentTime = i + 1f;
                 using PooledResource<TestPoolItem> resource = pool.Get();
@@ -1943,7 +1943,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     $"Rent count should be {i + 1} after rental {i + 1}"
                 );
 
-                for (int j = 0; j < 5; j++)
+                for (int j = 0; j < 5; ++j)
                 {
                     PoolStatistics extraStats = pool.GetStatistics();
                     Assert.That(
@@ -2042,14 +2042,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     MinRetainCount = 0,
                     OnPurge = (_, reason) =>
                     {
-                        purgeCount++;
+                        ++purgeCount;
                         purgeReasons.Add(reason);
                     },
                     TimeProvider = TestTimeProvider,
                 }
             );
 
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < itemCount; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -2108,7 +2108,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < itemCount; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -2164,14 +2164,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     SpikeThresholdMultiplier = 1.5f,
                     OnPurge = (_, reason) =>
                     {
-                        purgeCount++;
+                        ++purgeCount;
                         purgeReasons.Add(reason);
                     },
                     TimeProvider = TestTimeProvider,
                 }
             );
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -2227,7 +2227,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -2306,7 +2306,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             // Hold all resources simultaneously to force creation of multiple items
             List<PooledResource<TestPoolItem>> resources = new();
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < itemCount; ++i)
             {
                 PooledResource<TestPoolItem> resource = pool.Get();
                 resources.Add(resource);
@@ -2395,7 +2395,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -2456,7 +2456,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
@@ -2519,14 +2519,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     SpikeThresholdMultiplier = 1.5f,
                     OnPurge = (_, reason) =>
                     {
-                        purgeCount++;
+                        ++purgeCount;
                         reasons.Add(reason);
                     },
                     TimeProvider = TestTimeProvider,
                 }
             );
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }

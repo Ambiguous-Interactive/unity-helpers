@@ -219,7 +219,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     : default;
                 try
                 {
-                    for (int index = 0; index < textureGuids.Count; index++)
+                    for (int index = 0; index < textureGuids.Count; ++index)
                     {
                         string guid = textureGuids[index];
                         string path = string.IsNullOrWhiteSpace(guid)
@@ -274,18 +274,18 @@ namespace WallstopStudios.UnityHelpers.Editor
                         );
                         if (!fit.NeedsChange || importer.maxTextureSize == fit.TargetSize)
                         {
-                            unchanged++;
+                            ++unchanged;
                             continue;
                         }
 
-                        changed++;
+                        ++changed;
                         if (fit.Grew)
                         {
-                            grown++;
+                            ++grown;
                         }
                         if (fit.Shrank)
                         {
-                            shrunk++;
+                            ++shrunk;
                         }
                         if (!applyChanges)
                         {

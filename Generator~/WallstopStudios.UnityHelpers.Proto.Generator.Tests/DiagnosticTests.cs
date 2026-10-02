@@ -270,7 +270,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             int tag = 0;
             foreach ((string name, int levels) in members)
             {
-                tag++;
+                ++tag;
                 source.Append("    [WProtoMember(").Append(tag).Append(")] public ");
                 source.Append(
                     string.Concat(Enumerable.Repeat("System.Collections.Generic.List<", levels))

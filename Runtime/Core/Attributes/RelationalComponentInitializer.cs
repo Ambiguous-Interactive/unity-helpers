@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     continue;
                 }
 
-                report.TypesVisited++;
+                ++report.TypesVisited;
 
                 try
                 {
@@ -55,7 +55,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
                 catch (Exception e)
                 {
-                    report.Errors++;
+                    ++report.Errors;
                     Debug.LogError(
                         $"RelationalComponents.Initialize: Error pre-warming type '{type.FullName}': {e}"
                     );
@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
                 if (field == null)
                 {
-                    report.Warnings++;
+                    ++report.Warnings;
                     Debug.LogWarning(
                         $"RelationalComponents.Initialize: Field '{fieldMeta.FieldName}' not found on '{componentType.FullName}'."
                     );
@@ -130,11 +130,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     Type elementType = fieldMeta.ElementType ?? InferElementType(field.FieldType);
                     PrewarmCollectionCreators(fieldMeta.FieldKind, elementType);
 
-                    warmed++;
+                    ++warmed;
                 }
                 catch (Exception e)
                 {
-                    report.Errors++;
+                    ++report.Errors;
                     Debug.LogError(
                         $"RelationalComponents.Initialize: Error warming field '{componentType.FullName}.{fieldMeta.FieldName}': {e}"
                     );
@@ -343,7 +343,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 {
                     return;
                 }
-                TypesWarmed++;
+                ++TypesWarmed;
                 FieldsWarmed += warmedCount;
                 WarmedFieldsPerType[type] = warmedCount;
             }

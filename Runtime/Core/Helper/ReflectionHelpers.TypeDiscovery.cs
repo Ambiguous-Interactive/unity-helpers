@@ -671,7 +671,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     builder.Append('*');
                 }
 
-                for (int rank = 1; rank < arrayRank; rank++)
+                for (int rank = 1; rank < arrayRank; ++rank)
                 {
                     builder.Append(',');
                 }
@@ -685,7 +685,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 builder.Append(type.GetGenericTypeDefinition().FullName).Append('[');
                 Type[] arguments = type.GetGenericArguments();
                 int argumentsLength = arguments.Length;
-                for (int index = 0; index < argumentsLength; index++)
+                for (int index = 0; index < argumentsLength; ++index)
                 {
                     if (0 < index)
                     {
@@ -832,7 +832,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             int indexParamsLength = indexParams.Length;
-            for (int i = 0; i < indexParamsLength; i++)
+            for (int i = 0; i < indexParamsLength; ++i)
             {
                 if (indexParams[i].ParameterType != expectedIndexParameterTypes[i])
                 {

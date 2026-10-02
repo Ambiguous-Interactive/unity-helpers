@@ -114,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             double[] subjectSamples = new double[referenceSamples.Length];
             int referenceIndex = 0;
             int subjectIndex = 0;
-            for (int batch = 0; batch < CalibratedBatches; batch++)
+            for (int batch = 0; batch < CalibratedBatches; ++batch)
             {
                 foreach (bool isSubject in BatchSlots)
                 {
@@ -151,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         public static string BatchOrder()
         {
             char[] order = new char[BatchSlots.Length];
-            for (int index = 0; index < BatchSlots.Length; index++)
+            for (int index = 0; index < BatchSlots.Length; ++index)
             {
                 order[index] = BatchSlots[index] ? 'B' : 'A';
             }
@@ -188,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             int referenceCount = 0;
             int subjectCount = 0;
 
-            for (int batch = 0; batch < batches; batch++)
+            for (int batch = 0; batch < batches; ++batch)
             {
                 foreach (bool batchSlotsElement in BatchSlots)
                 {
@@ -224,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             double logSum = 0;
-            for (int index = 0; index < referenceCycles.Length; index++)
+            for (int index = 0; index < referenceCycles.Length; ++index)
             {
                 double referenceValue = referenceCycles[index];
                 double subjectValue = subjectCycles[index];
@@ -312,7 +312,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             do
             {
                 Interlocked.Exchange(ref _calibratedSink, work(1));
-                executions++;
+                ++executions;
             } while (executions < 3 || stopwatch.Elapsed.TotalMilliseconds < 100);
             return stopwatch.Elapsed.TotalMilliseconds;
         }

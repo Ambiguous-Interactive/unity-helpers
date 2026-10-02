@@ -65,6 +65,11 @@ don't guess. Every CI test run prints the slowest fixtures/cases (NUnit `duratio
 wall-clock gate, add `-FixtureBudgetSeconds <N> -FailOverBudget` (start lenient, tighten as fixtures are
 optimized) — this is the durable guarantee that the suite stays fast regardless of HOW a fixture got slow.
 
+Use an explicit positive `Timeout` budget for long benchmark cases. `Timeout(0)` does not
+provide an unlimited budget in the Unity runner: the RNG benchmark completed its work but failed
+with a zero-timeout result. Size the case budget above the complete workload, including calibration
+and report generation; keep the benchmark category and its measured sample counts intact.
+
 ## Smarter coverage, not brute force
 
 Big speedups come from sizing work to the goal, not from looping more:

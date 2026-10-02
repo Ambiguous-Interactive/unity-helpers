@@ -377,7 +377,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                  */
                 if (MaxDepth < _depth + existing.Depth)
                 {
-                    DepthRefusals++;
+                    ++DepthRefusals;
                     return null;
                 }
 
@@ -387,7 +387,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (MaxDepth <= _depth)
             {
-                DepthRefusals++;
+                ++DepthRefusals;
                 return null;
             }
 
@@ -415,7 +415,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             int enclosingChildDepth = _childDepth;
             _childDepth = 0;
-            _depth++;
+            ++_depth;
             Member inner;
             try
             {

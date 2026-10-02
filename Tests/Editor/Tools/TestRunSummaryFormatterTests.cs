@@ -523,7 +523,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             TestRunResultNode root = new();
             TestRunResultNode current = root;
-            for (int i = 0; i < 4 * TestRunSummaryFormatter.MaximumTreeDepth; i++)
+            for (int i = 0; i < 4 * TestRunSummaryFormatter.MaximumTreeDepth; ++i)
             {
                 TestRunResultNode child = new()
                 {
@@ -554,7 +554,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             TestRunResultNode root = new();
             TestRunResultNode assembly = new() { fullName = "Large.dll" };
             root.children.Add(assembly);
-            for (int i = 0; i < leafCount; i++)
+            for (int i = 0; i < leafCount; ++i)
             {
                 assembly.children.Add(
                     new TestRunResultNode

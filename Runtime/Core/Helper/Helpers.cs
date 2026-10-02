@@ -90,7 +90,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
 
-            for (int index = 0; index + 1 < arguments.Count; index++)
+            for (int index = 0; index + 1 < arguments.Count; ++index)
             {
                 if (string.Equals(arguments[index], name, StringComparison.Ordinal))
                 {
@@ -116,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return values;
             }
 
-            for (int index = 0; index + 1 < arguments.Count; index++)
+            for (int index = 0; index + 1 < arguments.Count; ++index)
             {
                 if (string.Equals(arguments[index], name, StringComparison.Ordinal))
                 {
@@ -1515,7 +1515,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 int count = readonlyList.Count;
                 string[] buffer = new string[count];
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < count; ++i)
                 {
                     buffer[i] = readonlyList[i];
                 }

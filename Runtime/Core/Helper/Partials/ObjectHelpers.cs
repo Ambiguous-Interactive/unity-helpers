@@ -391,20 +391,26 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>
         /// Immediately destroys all direct child GameObjects.
         /// </summary>
-        public static void DestroyAllChildrenGameObjectsImmediately(this GameObject gameObject) =>
+        public static void DestroyAllChildrenGameObjectsImmediately(this GameObject gameObject)
+        {
             gameObject.InternalDestroyAllChildrenGameObjects(go => Object.DestroyImmediate(go));
+        }
 
         /// <summary>
         /// Destroys all direct child GameObjects using Destroy (play mode safe).
         /// </summary>
-        public static void PlayDestroyAllChildrenGameObjects(this GameObject gameObject) =>
+        public static void PlayDestroyAllChildrenGameObjects(this GameObject gameObject)
+        {
             gameObject.InternalDestroyAllChildrenGameObjects(go => go.Destroy());
+        }
 
         /// <summary>
         /// Destroys all direct child GameObjects using Destroy (editor utility).
         /// </summary>
-        public static void EditorDestroyAllChildrenGameObjects(this GameObject gameObject) =>
+        public static void EditorDestroyAllChildrenGameObjects(this GameObject gameObject)
+        {
             gameObject.InternalDestroyAllChildrenGameObjects(go => go.Destroy());
+        }
 
         /// <summary>
         /// Returns true if the GameObject represents a prefab asset or prefab stage content (Editor), or is not in a scene (Runtime).

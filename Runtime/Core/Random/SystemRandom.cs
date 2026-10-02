@@ -252,7 +252,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             int seedArrayLength = _seedArray.Length;
-            for (int index = 1; index < seedArrayLength; index++)
+            for (int index = 1; index < seedArrayLength; ++index)
             {
                 if (_seedArray[index] != 0)
                 {

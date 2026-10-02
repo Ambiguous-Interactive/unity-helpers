@@ -1468,7 +1468,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
                 string[] parts = folderPath.Split('/');
                 string current = parts[0];
-                for (int i = 1; i < parts.Length; i++)
+                for (int i = 1; i < parts.Length; ++i)
                 {
                     string next = current + "/" + parts[i];
                     if (!AssetDatabase.IsValidFolder(next))

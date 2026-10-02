@@ -148,18 +148,18 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            for (int i = 0; i < mid; i++)
+            for (int i = 0; i < mid; ++i)
             {
                 buffer[i] = array[start + i];
             }
 
             int rightLength = length - mid;
-            for (int i = 0; i < rightLength; i++)
+            for (int i = 0; i < rightLength; ++i)
             {
                 array[start + i] = array[start + mid + i];
             }
 
-            for (int i = 0; i < mid; i++)
+            for (int i = 0; i < mid; ++i)
             {
                 array[start + rightLength + i] = buffer[i];
             }
@@ -394,7 +394,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static int YamFillBuffer<T>(T[] array, T[] buffer, int from, int to, int head)
         {
             int count = to - from + 1;
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 buffer[head - count + 1 + i] = array[from + i];
             }
@@ -404,7 +404,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static void YamDrainBuffer<T>(T[] array, int start, T[] buffer, int head, int count)
         {
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 array[start + i] = buffer[head - count + 1 + i];
             }
@@ -412,7 +412,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static void YamCopyDown<T>(T[] array, int source, int destination, int count)
         {
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 array[destination - i] = array[source - i];
             }
@@ -426,7 +426,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int count
         )
         {
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 array[destination - i] = buffer[head - i];
             }
@@ -512,7 +512,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 if (state.sequenceScore < YamSequenceScoreMax)
                 {
-                    state.sequenceScore++;
+                    ++state.sequenceScore;
                 }
             }
             else if (half - threshold < bufferCount && YamSequenceScoreMin < state.sequenceScore)

@@ -51,7 +51,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             {
                 IReadOnlyList<HandlerEntry> entries = LazyEntries.Value;
                 List<Type> types = new(entries.Count);
-                for (int i = 0; i < entries.Count; i++)
+                for (int i = 0; i < entries.Count; ++i)
                 {
                     types.Add(entries[i].HandlerType);
                 }
@@ -158,7 +158,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             IReadOnlyList<HandlerEntry> entries = LazyEntries.Value;
             List<string> diagnostics = new();
-            for (int i = 0; i < entries.Count; i++)
+            for (int i = 0; i < entries.Count; ++i)
             {
                 HandlerEntry entry = entries[i];
                 int contextsCount =
@@ -271,7 +271,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                             */
                             string rawMessage = ex.Message ?? string.Empty;
                             StringBuilder sanitizedBuilder = new(rawMessage.Length);
-                            for (int c = 0; c < rawMessage.Length; c++)
+                            for (int c = 0; c < rawMessage.Length; ++c)
                             {
                                 char ch = rawMessage[c];
                                 if (ch == '<')
@@ -317,7 +317,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 Reset throwing flags before draining, then clear recorded state after the drain has invoked
                 handlers.
             */
-            for (int i = 0; i < entries.Count; i++)
+            for (int i = 0; i < entries.Count; ++i)
             {
                 HandlerEntry entry = entries[i];
                 try
@@ -337,7 +337,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static void ClearAllInternal(IReadOnlyList<HandlerEntry> entries)
         {
-            for (int i = 0; i < entries.Count; i++)
+            for (int i = 0; i < entries.Count; ++i)
             {
                 HandlerEntry entry = entries[i];
                 try
@@ -534,7 +534,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     int count = 0;
                     foreach (object _ in enumerable)
                     {
-                        count++;
+                        ++count;
                     }
                     return count;
                 }
@@ -747,7 +747,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 int count = 0;
                 foreach (object _ in enumerable)
                 {
-                    count++;
+                    ++count;
                 }
                 return count;
             }

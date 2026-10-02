@@ -90,7 +90,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             int[] numbers = new int[1 + (alsoReserved == null ? 0 : alsoReserved.Length)];
             numbers[0] = fieldNumber;
             int numbersLength = numbers.Length;
-            for (int index = 1; index < numbersLength; index++)
+            for (int index = 1; index < numbersLength; ++index)
             {
                 numbers[index] = alsoReserved[index - 1];
             }
@@ -109,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             string[] names = new string[1 + (alsoReserved == null ? 0 : alsoReserved.Length)];
             names[0] = memberName;
             int namesLength = names.Length;
-            for (int index = 1; index < namesLength; index++)
+            for (int index = 1; index < namesLength; ++index)
             {
                 names[index] = alsoReserved[index - 1];
             }

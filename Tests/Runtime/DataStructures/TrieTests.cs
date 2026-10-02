@@ -760,7 +760,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = 0;
             foreach (string word in trie)
             {
-                count++;
+                ++count;
             }
 
             Assert.AreEqual(0, count);
@@ -889,7 +889,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void EnumeratorHandlesManyWords()
         {
             List<string> words = new();
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 words.Add($"word{i}");
             }
@@ -924,7 +924,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = 0;
             foreach (string word in trie)
             {
-                count++;
+                ++count;
                 if (count == 3)
                 {
                     break;
@@ -1085,7 +1085,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void EnumeratorHandlesDeeplyNestedSingleBranch()
         {
             List<string> words = new();
-            for (int i = 1; i <= 100; i++)
+            for (int i = 1; i <= 100; ++i)
             {
                 words.Add(new string('a', i));
             }
@@ -1105,7 +1105,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void EnumeratorHandlesWideBranching()
         {
             List<string> words = new();
-            for (char c = 'a'; c <= 'z'; c++)
+            for (char c = 'a'; c <= 'z'; ++c)
             {
                 words.Add(c.ToString());
             }
@@ -1311,7 +1311,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetWordsWithPrefixStressTestWithManyResults()
         {
             List<string> words = new();
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 words.Add($"prefix{i}");
             }
@@ -1327,7 +1327,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             List<string> words = new();
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 words.Add(new string('a', i + 1));
                 words.Add(new string('b', i + 1));
@@ -2473,7 +2473,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = 0;
             foreach (string value in trie)
             {
-                count++;
+                ++count;
             }
 
             Assert.AreEqual(0, count);
@@ -2628,7 +2628,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = 0;
             foreach (int value in trie)
             {
-                count++;
+                ++count;
                 if (count == 3)
                 {
                     break;
@@ -2704,7 +2704,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GenericEnumeratorHandlesManyEntries()
         {
             Dictionary<string, int> dict = new();
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 dict[$"key{i}"] = i;
             }
@@ -2870,7 +2870,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GenericEnumeratorHandlesDeeplyNestedSingleBranch()
         {
             Dictionary<string, int> dict = new();
-            for (int i = 1; i <= 100; i++)
+            for (int i = 1; i <= 100; ++i)
             {
                 dict[new string('a', i)] = i;
             }
@@ -2890,7 +2890,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GenericEnumeratorHandlesWideBranching()
         {
             Dictionary<string, int> dict = new();
-            for (char c = 'a'; c <= 'z'; c++)
+            for (char c = 'a'; c <= 'z'; ++c)
             {
                 dict[c.ToString()] = c - 'a';
             }
@@ -3165,7 +3165,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetValuesWithPrefixStressTestWithManyResults()
         {
             Dictionary<string, int> dict = new();
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 dict[$"prefix{i}"] = i;
             }
@@ -3182,7 +3182,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Dictionary<string, int> dict = new();
             int counter = 0;
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 dict[new string('a', i + 1)] = counter++;
                 dict[new string('b', i + 1)] = counter++;

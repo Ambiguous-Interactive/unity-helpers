@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             {
                 return false;
             }
-            for (int index = 0; index < first.Parameters.Length; index++)
+            for (int index = 0; index < first.Parameters.Length; ++index)
             {
                 IParameterSymbol left = first.Parameters[index];
                 IParameterSymbol right = second.Parameters[index];

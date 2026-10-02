@@ -379,7 +379,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
 
             string longPath = projectRoot + "/Assets";
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 longPath += $"/Folder{i}";
             }

@@ -767,7 +767,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     )
                 )
                 {
-                    healthTicks++;
+                    ++healthTicks;
                 }
                 else if (
                     string.Equals(
@@ -777,7 +777,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     )
                 )
                 {
-                    armorTicks++;
+                    ++armorTicks;
                 }
             }
 

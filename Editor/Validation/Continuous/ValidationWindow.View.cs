@@ -280,7 +280,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                                 )
                         )
                     )
-                        count++;
+                        ++count;
                 }
                 entry.Value.text = entry.Key + "  " + count;
                 entry.Value.EnableInClassList(
@@ -293,7 +293,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 int count = 0;
                 foreach (ValidationFinding finding in _known)
                     if (finding.Severity == entry.Key)
-                        count++;
+                        ++count;
                 entry.Value.text = entry.Key + " " + count;
                 entry.Value.EnableInClassList(
                     "dx-selected",

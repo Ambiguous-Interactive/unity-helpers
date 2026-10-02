@@ -568,7 +568,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         return false;
                     }
 
-                    value++;
+                    ++value;
                 }
 
                 return !reader.Malformed;

@@ -213,7 +213,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             SerializableList<int> list = new SerializableList<int> { 1, 2, 300 };
             SerializableList<int> restoredList = RoundTrip(list);
             Assert.AreEqual(list.Count, restoredList.Count);
-            for (int index = 0; index < list.Count; index++)
+            for (int index = 0; index < list.Count; ++index)
             {
                 Assert.AreEqual(list[index], restoredList[index]);
             }
@@ -274,14 +274,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void AGeneratorResumesItsStreamAfterARoundTrip()
         {
             PcgRandom generator = new PcgRandom();
-            for (int index = 0; index < 5; index++)
+            for (int index = 0; index < 5; ++index)
             {
                 generator.NextUint();
             }
 
             PcgRandom restored = RoundTrip(generator);
 
-            for (int index = 0; index < 16; index++)
+            for (int index = 0; index < 16; ++index)
             {
                 Assert.AreEqual(
                     generator.NextUint(),
@@ -305,14 +305,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void AGeneratorThatSkipsItsConstructorResumesFromThePayload()
         {
             DotNetRandom generator = new DotNetRandom();
-            for (int index = 0; index < 5; index++)
+            for (int index = 0; index < 5; ++index)
             {
                 generator.NextUint();
             }
 
             DotNetRandom restored = RoundTrip(generator);
 
-            for (int index = 0; index < 16; index++)
+            for (int index = 0; index < 16; ++index)
             {
                 Assert.AreEqual(
                     generator.NextUint(),

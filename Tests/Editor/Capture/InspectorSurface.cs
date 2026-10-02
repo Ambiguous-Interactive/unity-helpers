@@ -91,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             InspectorSurface surface = new(root);
             try
             {
-                for (int index = 0; index < targets.Count; index++)
+                for (int index = 0; index < targets.Count; ++index)
                 {
                     Object target = targets[index];
                     if (target == null)

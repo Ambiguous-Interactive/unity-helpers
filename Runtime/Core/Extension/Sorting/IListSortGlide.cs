@@ -155,14 +155,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     array[dest++] = leftBuffer[leftIndex++];
                     leftRemaining--;
-                    leftWins++;
+                    ++leftWins;
                     rightWins = 0;
                 }
                 else
                 {
                     array[dest++] = array[rightIndex++];
                     rightRemaining--;
-                    rightWins++;
+                    ++rightWins;
                     leftWins = 0;
                 }
 

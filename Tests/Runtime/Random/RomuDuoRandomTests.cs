@@ -10,7 +10,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class RomuDuoRandomTests : RandomTestBase
     {
-        protected override IRandom NewRandom() =>
-            new RomuDuo(DeterministicSeed64, DeterministicSeed64B);
+        protected override IRandom NewRandom()
+        {
+            return new RomuDuo(DeterministicSeed64, DeterministicSeed64B);
+        }
     }
 }

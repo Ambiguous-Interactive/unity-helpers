@@ -93,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(original.Count, deserialized.Count);
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
-            for (int i = 0; i < original.Count; i++)
+            for (int i = 0; i < original.Count; ++i)
             {
                 Assert.AreEqual(original[i], deserialized[i]);
             }
@@ -119,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(original.Count, deserialized.Count);
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
-            for (int i = 0; i < original.Count; i++)
+            for (int i = 0; i < original.Count; ++i)
             {
                 Assert.AreEqual(original[i], deserialized[i]);
             }
@@ -135,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(original.Count, deserialized.Count);
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
-            for (int i = 0; i < original.Count; i++)
+            for (int i = 0; i < original.Count; ++i)
             {
                 Assert.AreEqual(original[i], deserialized[i]);
             }
@@ -154,7 +154,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             BitSet deserialized = SerializeDeserialize(original);
 
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
-            for (int i = 0; i < original.Capacity; i++)
+            for (int i = 0; i < original.Capacity; ++i)
             {
                 Assert.IsTrue(original.TryGet(i, out bool origVal));
                 Assert.IsTrue(deserialized.TryGet(i, out bool deserVal));
@@ -189,7 +189,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             ImmutableBitSet deserialized = SerializeDeserializeImmutable(original);
 
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
-            for (int i = 0; i < original.Capacity; i++)
+            for (int i = 0; i < original.Capacity; ++i)
             {
                 Assert.IsTrue(original.TryGet(i, out bool origVal));
                 Assert.IsTrue(deserialized.TryGet(i, out bool deserVal));
@@ -237,7 +237,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
             Assert.AreEqual(1, deserialized.CountSetBits());
             Assert.IsTrue(deserialized[123]);
-            for (int i = 0; i < original.Capacity; i++)
+            for (int i = 0; i < original.Capacity; ++i)
             {
                 if (i != 123)
                 {
@@ -264,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
             Assert.AreEqual(original.CountSetBits(), deserialized.CountSetBits());
-            for (int i = 0; i < original.Capacity; i++)
+            for (int i = 0; i < original.Capacity; ++i)
             {
                 Assert.IsTrue(original.TryGet(i, out bool origVal));
                 Assert.IsTrue(deserialized.TryGet(i, out bool deserVal));
@@ -373,7 +373,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         )
         {
             SerializableDictionary<string, int> original = new();
-            for (int i = 0; i < keys.Length; i++)
+            for (int i = 0; i < keys.Length; ++i)
             {
                 original.Add(keys[i], values[i]);
             }
@@ -474,7 +474,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Deque<string> deserialized = SerializeDeserialize(original);
 
             Assert.AreEqual(original.Count, deserialized.Count);
-            for (int i = 0; i < original.Count; i++)
+            for (int i = 0; i < original.Count; ++i)
             {
                 Assert.AreEqual(original[i], deserialized[i]);
             }
@@ -492,7 +492,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Deque<int> deserialized = SerializeDeserialize(original);
 
             Assert.AreEqual(original.Count, deserialized.Count);
-            for (int i = 0; i < original.Count; i++)
+            for (int i = 0; i < original.Count; ++i)
             {
                 Assert.AreEqual(original[i], deserialized[i]);
             }
@@ -525,7 +525,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Deque<int> deserialized = SerializeDeserialize(original);
 
             Assert.AreEqual(original.Count, deserialized.Count);
-            for (int i = 0; i < original.Count; i++)
+            for (int i = 0; i < original.Count; ++i)
             {
                 Assert.AreEqual(original[i], deserialized[i]);
             }
@@ -545,7 +545,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(original.Count, deserialized.Count);
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
 
-            for (int i = 0; i < original.Capacity; i++)
+            for (int i = 0; i < original.Capacity; ++i)
             {
                 Assert.AreEqual(
                     original.Contains(i),
@@ -570,7 +570,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SparseSetFullSerializesAndDeserializes()
         {
             SparseSet original = new(8);
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 8; ++i)
             {
                 Assert.IsTrue(original.TryAdd(i));
             }
@@ -579,7 +579,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(original.Count, deserialized.Count);
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
-            for (int i = 0; i < original.Capacity; i++)
+            for (int i = 0; i < original.Capacity; ++i)
             {
                 Assert.AreEqual(original.Contains(i), deserialized.Contains(i), $"Element {i}");
             }

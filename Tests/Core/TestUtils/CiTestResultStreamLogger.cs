@@ -74,13 +74,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     switch (result.TestStatus)
                     {
                         case TestStatus.Passed:
-                            passed++;
+                            ++passed;
                             break;
                         case TestStatus.Failed:
-                            failed++;
+                            ++failed;
                             break;
                         default:
-                            other++;
+                            ++other;
                             break;
                     }
 

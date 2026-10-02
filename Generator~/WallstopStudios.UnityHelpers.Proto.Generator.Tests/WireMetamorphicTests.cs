@@ -281,7 +281,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     continue;
                 }
 
-                transformed++;
+                ++transformed;
                 Assert.AreNotEqual(
                     ToHex(original),
                     ToHex(reordered),
@@ -308,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     )
                 )
                 {
-                    transformed++;
+                    ++transformed;
                     Assert.Greater(
                         injected.Length,
                         original.Length,
@@ -344,7 +344,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     )
                 )
                 {
-                    transformed++;
+                    ++transformed;
                     AssertDecodesTheSame(value, split, "sub-message split");
                 }
             }
@@ -383,7 +383,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
                 foreach (byte[] payload in rewritten)
                 {
-                    checks++;
+                    ++checks;
                     using System.IO.MemoryStream stream = new System.IO.MemoryStream(payload);
                     RepeatedContract theirs = ProtoBuf.Serializer.Deserialize<RepeatedContract>(
                         stream

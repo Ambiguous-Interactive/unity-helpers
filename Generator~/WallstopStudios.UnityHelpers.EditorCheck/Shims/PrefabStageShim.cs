@@ -22,8 +22,14 @@ namespace UnityEditor.SceneManagement
 
     public static class PrefabStageUtility
     {
-        public static PrefabStage GetPrefabStage(GameObject gameObject) => null;
+        public static PrefabStage GetPrefabStage(GameObject gameObject)
+        {
+            return null;
+        }
 
-        public static PrefabStage GetCurrentPrefabStage() => null;
+        public static PrefabStage GetCurrentPrefabStage()
+        {
+            return null;
+        }
     }
 }

@@ -34,8 +34,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 if (compare < 0)
                 {
                     SortSwap(array, i, lt);
-                    lt++;
-                    i++;
+                    ++lt;
+                    ++i;
                 }
                 else if (0 < compare)
                 {
@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 else
                 {
-                    i++;
+                    ++i;
                 }
             }
 

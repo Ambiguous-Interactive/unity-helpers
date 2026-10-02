@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         [WButton]
         public void ConcreteButton()
         {
-            ConcreteCallCount++;
+            ++ConcreteCallCount;
         }
     }
 }

@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             CollectionAssert.AreEqual(expected.matrices, actual.matrices);
             Assert.IsTrue(actual.keyframes != null);
             Assert.AreEqual(expected.keyframes.Length, actual.keyframes.Length);
-            for (int index = 0; index < expected.keyframes.Length; index++)
+            for (int index = 0; index < expected.keyframes.Length; ++index)
             {
                 KeyframeSurrogate left = expected.keyframes[index];
                 KeyframeSurrogate right = actual.keyframes[index];

@@ -421,7 +421,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 int skipped = SkipLiteralOrComment(source, i);
                 if (skipped != i)
                 {
-                    for (int f = i; f < skipped; f++)
+                    for (int f = i; f < skipped; ++f)
                     {
                         char c = source[f];
                         /*
@@ -435,7 +435,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
 
                 builder.Append(source[i]);
-                i++;
+                ++i;
             }
 
             return builder.ToString();
@@ -607,7 +607,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             string methodName
         )
         {
-            for (int i = 0; i < sourcePaths.Count; i++)
+            for (int i = 0; i < sourcePaths.Count; ++i)
             {
                 string path = sourcePaths[i];
                 string sourceText;
@@ -636,7 +636,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             Func<string, string> selector
         )
         {
-            for (int i = 0; i < paths.Count; i++)
+            for (int i = 0; i < paths.Count; ++i)
             {
                 yield return selector(paths[i]);
             }
@@ -707,7 +707,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 char c = source[i];
                 if (char.IsWhiteSpace(c))
                 {
-                    i++;
+                    ++i;
                     continue;
                 }
 
@@ -734,7 +734,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                             break;
                         }
 
-                        stop++;
+                        ++stop;
                     }
 
                     i = stop;
@@ -766,7 +766,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 char c = source[i];
                 if (c == '(')
                 {
-                    parenDepth++;
+                    ++parenDepth;
                 }
                 else if (c == ')')
                 {
@@ -774,7 +774,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
                 else if (c == '{')
                 {
-                    braceDepth++;
+                    ++braceDepth;
                 }
                 else if (c == '}')
                 {
@@ -782,7 +782,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
                 else if (c == '[')
                 {
-                    bracketDepth++;
+                    ++bracketDepth;
                 }
                 else if (c == ']')
                 {
@@ -793,7 +793,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     return i;
                 }
 
-                i++;
+                ++i;
             }
 
             return -1;
@@ -815,7 +815,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 char c = source[i];
                 if (c == '{')
                 {
-                    depth++;
+                    ++depth;
                 }
                 else if (c == '}')
                 {
@@ -826,7 +826,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     }
                 }
 
-                i++;
+                ++i;
             }
 
             return -1;
@@ -887,7 +887,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     return i;
                 }
 
-                i++;
+                ++i;
             }
 
             return -1;
@@ -909,7 +909,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 char c = source[i];
                 if (c == '(')
                 {
-                    depth++;
+                    ++depth;
                 }
                 else if (c == ')')
                 {
@@ -920,7 +920,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     }
                 }
 
-                i++;
+                ++i;
             }
 
             return -1;
@@ -961,7 +961,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 int j = i + 2;
                 while (j < source.Length && source[j] != '\n')
                 {
-                    j++;
+                    ++j;
                 }
 
                 return j;
@@ -977,7 +977,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         return j + 2;
                     }
 
-                    j++;
+                    ++j;
                 }
 
                 return source.Length;
@@ -999,7 +999,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         return j + 1;
                     }
 
-                    j++;
+                    ++j;
                 }
 
                 return source.Length;
@@ -1011,7 +1011,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 int quoteRun = 0;
                 while (i + quoteRun < source.Length && source[i + quoteRun] == '"')
                 {
-                    quoteRun++;
+                    ++quoteRun;
                 }
 
                 if (3 <= quoteRun)
@@ -1020,7 +1020,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     while (j <= source.Length - quoteRun)
                     {
                         bool closes = true;
-                        for (int k = 0; k < quoteRun; k++)
+                        for (int k = 0; k < quoteRun; ++k)
                         {
                             if (source[j + k] != '"')
                             {
@@ -1034,7 +1034,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                             return j + quoteRun;
                         }
 
-                        j++;
+                        ++j;
                     }
 
                     return source.Length;
@@ -1066,7 +1066,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         return j + 1;
                     }
 
-                    j++;
+                    ++j;
                 }
 
                 return source.Length;
@@ -1109,7 +1109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     return j;
                 }
 
-                j++;
+                ++j;
             }
 
             return source.Length;
@@ -1554,7 +1554,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         )
                     )
                     {
-                        terminalMatches++;
+                        ++terminalMatches;
                     }
                 }
 
@@ -1575,7 +1575,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         )
                     )
                     {
-                        delegatingMatches++;
+                        ++delegatingMatches;
                     }
                 }
 
@@ -1859,7 +1859,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             };
 
             HashSet<string> discoveredNames = new(StringComparer.Ordinal);
-            for (int i = 0; i < discovered.Count; i++)
+            for (int i = 0; i < discovered.Count; ++i)
             {
                 discoveredNames.Add(discovered[i].Name);
             }
@@ -1911,14 +1911,20 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 Detail = detail;
             }
 
-            public static MethodBodySearchResult NotFound() =>
-                new(BodySearchStatus.NotFound, null, null, null);
+            public static MethodBodySearchResult NotFound()
+            {
+                return new(BodySearchStatus.NotFound, null, null, null);
+            }
 
-            public static MethodBodySearchResult Found(string body, string sourcePath) =>
-                new(BodySearchStatus.Found, body, sourcePath, null);
+            public static MethodBodySearchResult Found(string body, string sourcePath)
+            {
+                return new(BodySearchStatus.Found, body, sourcePath, null);
+            }
 
-            public static MethodBodySearchResult ReadError(string detail) =>
-                new(BodySearchStatus.ReadError, null, null, detail);
+            public static MethodBodySearchResult ReadError(string detail)
+            {
+                return new(BodySearchStatus.ReadError, null, null, detail);
+            }
         }
     }
 }

@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         [WButton]
         public static void StaticButton()
         {
-            StaticCallCount++;
+            ++StaticCallCount;
         }
     }
 }

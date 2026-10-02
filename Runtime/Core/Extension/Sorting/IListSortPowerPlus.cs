@@ -188,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             MergeRuns(array, buffer, left.start, left.length, right.start, right.length, comparer);
 
             left.length += right.length;
-            left.version++;
+            ++left.version;
 
             int nextIndex = right.next;
             left.next = nextIndex;
@@ -200,7 +200,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             right.active = false;
             right.prev = -1;
             right.next = -1;
-            right.version++;
+            ++right.version;
 
             if (0 <= left.prev)
             {

@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 p |= 1;
-                head++;
+                ++head;
             }
 
             SmoothSortTrinkle(array, head, p, pshift, false, comparer);

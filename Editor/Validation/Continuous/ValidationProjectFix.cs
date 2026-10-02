@@ -32,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         )
         {
             List<Request> prepared = new List<Request>();
-            for (int index = 0; index < requests.Count; index++)
+            for (int index = 0; index < requests.Count; ++index)
             {
                 Request request = requests[index];
                 try

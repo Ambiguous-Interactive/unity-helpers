@@ -117,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetElementsInRangeWithVeryLargeRangeReturnsAll()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 points.Add(new Vector2(Random.NextFloat(-50, 50), Random.NextFloat(-50, 50)));
             }
@@ -145,9 +145,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetElementsInBoundsReturnsElementsWithinBounds()
         {
             List<Vector2> points = new();
-            for (int x = 0; x < 10; x++)
+            for (int x = 0; x < 10; ++x)
             {
-                for (int y = 0; y < 10; y++)
+                for (int y = 0; y < 10; ++y)
                 {
                     points.Add(new Vector2(x, y));
                 }
@@ -215,7 +215,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetApproximateNearestNeighborsReturnsRequestedCount()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 points.Add(new Vector2(Random.NextFloat(-100, 100), Random.NextFloat(-100, 100)));
             }
@@ -242,7 +242,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void UnbalancedTreeHandlesSortedInput()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 points.Add(new Vector2(i, i));
             }
@@ -279,7 +279,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void LargeDatasetStressTest()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 10000; ++i)
             {
                 points.Add(
                     new Vector2(Random.NextFloat(-1000, 1000), Random.NextFloat(-1000, 1000))
@@ -300,7 +300,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void CustomBucketSizeAffectsTreeStructure()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 points.Add(new Vector2(i, i));
             }
@@ -326,7 +326,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ColinearPointsHandledCorrectly()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 points.Add(new Vector2(i, 0));
             }
@@ -369,7 +369,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SingleLineVerticalPointsHandledCorrectly()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 points.Add(new Vector2(0, i));
             }
@@ -444,7 +444,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void MultipleQueriesOnSameTreeReturnConsistentResults()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 points.Add(new Vector2(Random.NextFloat(-50, 50), Random.NextFloat(-50, 50)));
             }
@@ -489,7 +489,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void WorstCaseSequentialInsertionStillWorks()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; ++i)
             {
                 points.Add(new Vector2(i, 0));
             }
@@ -521,7 +521,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void RandomOrderInputProducesCorrectResults()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100; ++i)
             {
                 points.Add(new Vector2(Random.NextFloat(-100, 100), Random.NextFloat(-100, 100)));
             }
@@ -537,7 +537,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void PathologicalDataPatternHandledCorrectly()
         {
             List<Vector2> points = new();
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 points.Add(new Vector2(i, 0));
                 points.Add(new Vector2(0, i));

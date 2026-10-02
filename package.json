@@ -264,6 +264,8 @@
     "test:lint-comment-block-form": "node scripts/tests/test-lint-comment-block-form.js",
     "lint:comment-block-form:fix": "pwsh -NoProfile -File scripts/lint-comment-block-form.ps1 -Fix",
     "test:out-parameters": "node scripts/tests/test-out-parameter-discipline.js",
+    "lint:csharp-syntax": "dotnet run --project \"Generator~/WallstopStudios.UnityHelpers.SyntaxPolicy/WallstopStudios.UnityHelpers.SyntaxPolicy.csproj\" --no-launch-profile",
+    "lint:csharp-syntax:fix": "npm run lint:csharp-syntax -- --fix",
     "typecheck:unity": "npm run typecheck:unity:legacy && npm run typecheck:unity:odin && npm run typecheck:unity:singlethreaded && npm run typecheck:unity:default && npm run typecheck:editor && npm run typecheck:tests && npm run typecheck:editor-tests && npm run typecheck:integrations && npm run typecheck:random-quality && npm run lint:doc-samples:reuse-checks",
     "typecheck:unity:clean": "node scripts/typecheck-clean.js",
     "typecheck:controls": "node scripts/typecheck-controls.js",

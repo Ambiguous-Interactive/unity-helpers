@@ -83,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 {
                     while (index < code.Length && code[index] != '\n')
                     {
-                        index++;
+                        ++index;
                     }
                     color = darkTheme ? "#8CBF73" : "#477A32";
                 }
@@ -97,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                             index += 2;
                             break;
                         }
-                        index++;
+                        ++index;
                     }
                     color = darkTheme ? "#8CBF73" : "#477A32";
                 }
@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 {
                     do
                     {
-                        index++;
+                        ++index;
                     } while (
                         index < code.Length
                         && (char.IsLetterOrDigit(code[index]) || code[index] == '.')
@@ -116,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 {
                     do
                     {
-                        index++;
+                        ++index;
                     } while (
                         index < code.Length
                         && (char.IsLetterOrDigit(code[index]) || code[index] == '_')
@@ -135,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 {
                     do
                     {
-                        index++;
+                        ++index;
                     } while (
                         index < code.Length
                         && !char.IsLetterOrDigit(code[index])
@@ -184,7 +184,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     }
                     return index + 1;
                 }
-                index++;
+                ++index;
             }
             return index;
         }
@@ -194,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             output.Append("<noparse>");
             int end = start + length;
             int noParseCloseLength = NoParseClose.Length;
-            for (int index = start; index < end; index++)
+            for (int index = start; index < end; ++index)
             {
                 if (
                     code[index] == '<'

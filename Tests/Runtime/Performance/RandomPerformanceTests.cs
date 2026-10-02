@@ -16,6 +16,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class RandomPerformanceTests
     {
+        private const int BenchmarkTimeoutMilliseconds = 600_000;
+
         private const int NumInvocationsPerIteration = 100_000;
         private const ulong DeterministicSeedBase = 0x6C8E9CF5709321D5UL;
         private const ulong DeterministicSeedIncrement = 0x9E3779B97F4A7C15UL;
@@ -151,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             {
                 IRandom pivot = generators[pivotIndex];
                 WarmupGenerator(pivot);
-                for (int index = 0; index < results.Count; index++)
+                for (int index = 0; index < results.Count; ++index)
                 {
                     if (index == pivotIndex)
                     {
@@ -179,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             // Normalize fallback and paired ratios to the same pivot scale.
             double pivotThroughput = 0 <= pivotIndex ? results[pivotIndex].NextUintPerSecond : 0;
             double divisor = 0 < pivotThroughput ? pivotThroughput : 1;
-            for (int index = 0; index < results.Count; index++)
+            for (int index = 0; index < results.Count; ++index)
             {
                 if (ratios[index] <= 0)
                 {
@@ -201,7 +203,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 return;
             }
 
-            for (int index = 0; index < results.Count; index++)
+            for (int index = 0; index < results.Count; ++index)
             {
                 double normalized = ratios[index] / best;
                 results[index].SpeedRatio = normalized;
@@ -233,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 return -1;
             }
 
-            for (int index = 0; index < generators.Count; index++)
+            for (int index = 0; index < generators.Count; ++index)
             {
                 if (generators[index] is IllusionFlow)
                 {
@@ -393,7 +395,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         // Restore UnityEngine.Random after measuring it so other fixtures retain their original state.
 #pragma warning disable WUH005
-        [Test, Timeout(0)]
+        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
         public void Benchmark()
         {
             TimeSpan timeout = TimeSpan.FromSeconds(1);

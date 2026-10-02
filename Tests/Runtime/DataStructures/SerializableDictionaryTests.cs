@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int keyedCount = 0;
             foreach (KeyValuePair<string, int> pair in dictionary)
             {
-                keyedCount++;
+                ++keyedCount;
                 Assert.IsTrue(dictionary.ContainsKey(pair.Key));
                 Assert.AreEqual(dictionary[pair.Key], pair.Value);
             }
@@ -302,7 +302,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Array.Copy(serializedKeys, keysCopy, serializedKeys.Length);
 
             IntCache[] valuesCopy = new IntCache[serializedValues.Length];
-            for (int index = 0; index < serializedValues.Length; index++)
+            for (int index = 0; index < serializedValues.Length; ++index)
             {
                 IntCache cache = new() { Data = serializedValues[index].Data };
                 valuesCopy[index] = cache;
@@ -569,7 +569,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(rebuiltKeys != null);
             Assert.IsTrue(rebuiltValues != null);
             Dictionary<int, string> snapshot = new();
-            for (int index = 0; index < rebuiltKeys.Length; index++)
+            for (int index = 0; index < rebuiltKeys.Length; ++index)
             {
                 snapshot[rebuiltKeys[index]] = rebuiltValues[index];
             }
@@ -812,7 +812,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int newKey = 1000;
             while (uniqueKeys.Contains(newKey))
             {
-                newKey++;
+                ++newKey;
             }
             dictionary.Add(newKey, "new");
 
@@ -1021,7 +1021,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary._values = (int[])originalValues.Clone();
             dictionary.OnAfterDeserialize();
 
-            for (int cycle = 0; cycle < 3; cycle++)
+            for (int cycle = 0; cycle < 3; ++cycle)
             {
                 dictionary.OnBeforeSerialize();
 
@@ -1333,7 +1333,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(keys.Length, values.Length);
             Assert.AreEqual(keys.Length, pairs.Length);
 
-            for (int i = 0; i < keys.Length; i++)
+            for (int i = 0; i < keys.Length; ++i)
             {
                 Assert.AreEqual(keys[i], pairs[i].Key);
                 Assert.AreEqual(values[i], pairs[i].Value);
@@ -1358,7 +1358,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(keys.Length, values.Length);
             Assert.AreEqual(keys.Length, pairs.Length);
 
-            for (int i = 0; i < keys.Length; i++)
+            for (int i = 0; i < keys.Length; ++i)
             {
                 Assert.AreEqual(userKeys[i], keys[i]);
                 Assert.AreEqual(userValues[i], values[i]);
@@ -1403,7 +1403,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary._values = (int[])values.Clone();
             dictionary.OnAfterDeserialize();
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 dictionary.OnBeforeSerialize();
                 dictionary.OnAfterDeserialize();
@@ -1426,7 +1426,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary._values = (int[])values.Clone();
             dictionary.OnAfterDeserialize();
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 dictionary.OnBeforeSerialize();
                 dictionary.OnAfterDeserialize();
@@ -1465,7 +1465,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ToArrayLengthMatchesCountForVariousSizes(int size)
         {
             SerializableDictionary<int, string> dictionary = new();
-            for (int i = 0; i < size; i++)
+            for (int i = 0; i < size; ++i)
             {
                 dictionary[i] = $"value_{i}";
             }
@@ -1538,7 +1538,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] resultKeys = dictionary.ToPersistedOrderKeysArray();
 
             Assert.AreEqual(5, resultKeys.Length);
-            for (int i = 0; i < existingKeys.Length; i++)
+            for (int i = 0; i < existingKeys.Length; ++i)
             {
                 Assert.AreEqual(existingKeys[i], resultKeys[i]);
             }
@@ -1800,7 +1800,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             Assert.AreEqual(enumerationResult.Count, arrayResult.Length);
-            for (int i = 0; i < arrayResult.Length; i++)
+            for (int i = 0; i < arrayResult.Length; ++i)
             {
                 Assert.AreEqual(enumerationResult[i].Key, arrayResult[i].Key);
                 Assert.AreEqual(enumerationResult[i].Value, arrayResult[i].Value);
@@ -1825,7 +1825,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             Assert.AreEqual(enumerationResult.Count, arrayResult.Length);
-            for (int i = 0; i < arrayResult.Length; i++)
+            for (int i = 0; i < arrayResult.Length; ++i)
             {
                 Assert.AreEqual(enumerationResult[i], arrayResult[i]);
             }
@@ -1849,7 +1849,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             Assert.AreEqual(enumerationResult.Count, arrayResult.Length);
-            for (int i = 0; i < arrayResult.Length; i++)
+            for (int i = 0; i < arrayResult.Length; ++i)
             {
                 Assert.AreEqual(enumerationResult[i], arrayResult[i]);
             }

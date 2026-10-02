@@ -15,7 +15,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         protected internal void AllowDerived() { }
 
         [AnimationEvent]
-        private int InvalidReturn() => 0;
+        private int InvalidReturn()
+        {
+            return 0;
+        }
 
         [AnimationEvent]
         private void InvalidParameter(Vector3 _) { }

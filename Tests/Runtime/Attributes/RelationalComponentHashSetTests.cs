@@ -41,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             GameObject root = Track(new GameObject("Root", typeof(ChildHashSetTester)));
             ChildHashSetTester tester = root.GetComponent<ChildHashSetTester>();
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 GameObject child = Track(new GameObject($"Child{i}", typeof(SpriteRenderer)));
                 child.transform.SetParent(root.transform);
@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         {
             GameObject root = Track(new GameObject("Root"));
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 root.AddComponent<BoxCollider>();
             }
@@ -100,7 +100,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             GameObject root = Track(new GameObject("Root", typeof(ChildHashSetMaxCountTester)));
             ChildHashSetMaxCountTester tester = root.GetComponent<ChildHashSetMaxCountTester>();
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; ++i)
             {
                 GameObject child = Track(new GameObject($"Child{i}", typeof(SpriteRenderer)));
                 child.transform.SetParent(root.transform);

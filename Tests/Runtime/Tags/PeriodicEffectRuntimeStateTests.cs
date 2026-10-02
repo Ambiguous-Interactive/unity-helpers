@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             int consumedTicks = 0;
             while (state.TryConsumeTick(0.35f))
             {
-                consumedTicks++;
+                ++consumedTicks;
             }
 
             Assert.AreEqual(3, consumedTicks);
@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             int consumedTicks = 0;
             while (state.TryConsumeTick(1f))
             {
-                consumedTicks++;
+                ++consumedTicks;
             }
 
             Assert.AreEqual(2, consumedTicks);

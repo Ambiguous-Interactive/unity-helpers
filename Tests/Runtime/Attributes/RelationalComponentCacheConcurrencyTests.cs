@@ -157,7 +157,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             int mismatchCount = 0;
             using Barrier startLine = new(LookupThreadCount);
             Thread[] workers = new Thread[LookupThreadCount];
-            for (int index = 0; index < LookupThreadCount; index++)
+            for (int index = 0; index < LookupThreadCount; ++index)
             {
                 int slot = index;
                 workers[slot] = new Thread(() =>
@@ -167,7 +167,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                         startLine.SignalAndWait(ThreadJoinTimeout);
                         Array first = lookup(SubjectComponentType);
                         observed[slot] = first;
-                        for (int repeat = 1; repeat < LookupsPerThread; repeat++)
+                        for (int repeat = 1; repeat < LookupsPerThread; ++repeat)
                         {
                             if (first != lookup(SubjectComponentType))
                             {
@@ -267,14 +267,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             int partialResultCount = 0;
             using Barrier startLine = new(LookupThreadCount + 1);
             Thread[] workers = new Thread[LookupThreadCount + 1];
-            for (int index = 0; index < LookupThreadCount; index++)
+            for (int index = 0; index < LookupThreadCount; ++index)
             {
                 workers[index] = new Thread(() =>
                 {
                     try
                     {
                         startLine.SignalAndWait(ThreadJoinTimeout);
-                        for (int repeat = 0; repeat < LookupsPerThread; repeat++)
+                        for (int repeat = 0; repeat < LookupsPerThread; ++repeat)
                         {
                             Array resolved = lookup(SubjectComponentType);
                             if (resolved == null)
@@ -298,7 +298,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 try
                 {
                     startLine.SignalAndWait(ThreadJoinTimeout);
-                    for (int round = 0; round < ResetRounds; round++)
+                    for (int round = 0; round < ResetRounds; ++round)
                     {
                         clearCache();
                     }
@@ -340,14 +340,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             int disagreementCount = 0;
             using Barrier startLine = new(LookupThreadCount);
             Thread[] workers = new Thread[LookupThreadCount];
-            for (int index = 0; index < LookupThreadCount; index++)
+            for (int index = 0; index < LookupThreadCount; ++index)
             {
                 workers[index] = new Thread(() =>
                 {
                     try
                     {
                         startLine.SignalAndWait(ThreadJoinTimeout);
-                        for (int repeat = 0; repeat < LookupsPerThread; repeat++)
+                        for (int repeat = 0; repeat < LookupsPerThread; ++repeat)
                         {
                             if (!component.AreAnyAssignmentsInvalid())
                             {
@@ -423,7 +423,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                     return;
                 }
 
-                _activeDepth++;
+                ++_activeDepth;
                 if (DeepestObservedDepth < _activeDepth)
                 {
                     DeepestObservedDepth = _activeDepth;
@@ -432,7 +432,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 try
                 {
                     LastReentrantResult = _reentrantProbe();
-                    ReentrantCallCount++;
+                    ++ReentrantCallCount;
                 }
                 catch (Exception exception)
                 {

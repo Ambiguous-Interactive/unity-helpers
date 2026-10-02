@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             int serializedFileCount = serializedAssetPaths.Count;
             int totalFiles = sourceFileCount + serializedFileCount;
 
-            for (int index = 0; index < sourceFileCount; index++)
+            for (int index = 0; index < sourceFileCount; ++index)
             {
                 string assetPath = assetPaths[index];
                 if (context.ShouldCancel(assetPath, index, totalFiles))
@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 }
                 if (OdinMigrationSourceAnalyzer.LooksGenerated(assetPath, decoded.Source))
                 {
-                    result.GeneratedFiles++;
+                    ++result.GeneratedFiles;
                     continue;
                 }
 
@@ -86,7 +86,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 );
                 result.Blockers += analysis.Blockers.Count;
                 result.ManualReviews += analysis.ManualReviews.Count;
-                result.AnalyzedFiles++;
+                ++result.AnalyzedFiles;
                 if (
                     0 < analysis.ReplacementCount
                     || 0 < analysis.Blockers.Count
@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return result;
             }
 
-            for (int index = 0; index < serializedFileCount; index++)
+            for (int index = 0; index < serializedFileCount; ++index)
             {
                 string assetPath = serializedAssetPaths[index];
                 if (context.ShouldCancel(assetPath, sourceFileCount + index, totalFiles))
@@ -192,7 +192,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 );
                 return;
             }
-            result.SerializedAssetsScanned++;
+            ++result.SerializedAssetsScanned;
             result.SerializedDataFindings += findings.Count;
             if (0 < findings.Count)
             {

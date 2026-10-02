@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     {
                         int row = y / cellHeight;
                         int rowStart = y * width;
-                        for (int x = 0; x < width; x++)
+                        for (int x = 0; x < width; ++x)
                         {
                             int col = x / cellWidth;
                             int spriteIndex = row * gridColumns + col;
@@ -66,19 +66,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             }
             else
             {
-                for (int row = 0; row < gridRows; row++)
+                for (int row = 0; row < gridRows; ++row)
                 {
-                    for (int col = 0; col < gridColumns; col++)
+                    for (int col = 0; col < gridColumns; ++col)
                     {
                         int spriteIndex = row * gridColumns + col;
                         float hue = (float)spriteIndex / totalCells;
                         Color cellColor = Color.HSVToRGB(hue, 0.8f, 0.9f);
                         int startX = col * cellWidth;
                         int startY = row * cellHeight;
-                        for (int y = startY; y < startY + cellHeight; y++)
+                        for (int y = startY; y < startY + cellHeight; ++y)
                         {
                             int rowStart = y * width;
-                            for (int x = startX; x < startX + cellWidth; x++)
+                            for (int x = startX; x < startX + cellWidth; ++x)
                             {
                                 pixels[rowStart + x] = cellColor;
                             }
@@ -235,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             UnityEditor.U2D.Sprites.SpriteRect[] spriteRects =
                 new UnityEditor.U2D.Sprites.SpriteRect[spritesheet.Length];
-            for (int i = 0; i < spritesheet.Length; i++)
+            for (int i = 0; i < spritesheet.Length; ++i)
             {
                 SpriteMetaData meta = spritesheet[i];
                 spriteRects[i] = new UnityEditor.U2D.Sprites.SpriteRect
@@ -273,7 +273,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 SpriteSheetExtractor.SpriteSheetEntry entry = extractor._discoveredSheets[i];
                 entry._isSelected = false;
@@ -374,9 +374,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             if (mode == SpriteImportMode.Multiple)
             {
                 SpriteMetaData[] spritesheet = new SpriteMetaData[gridColumns * gridRows];
-                for (int row = 0; row < gridRows; row++)
+                for (int row = 0; row < gridRows; ++row)
                 {
-                    for (int col = 0; col < gridColumns; col++)
+                    for (int col = 0; col < gridColumns; ++col)
                     {
                         int index = row * gridColumns + col;
                         spritesheet[index] = new SpriteMetaData
@@ -454,7 +454,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             string assetPath
         )
         {
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            for (int i = 0; i < extractor._discoveredSheets.Count; ++i)
             {
                 if (extractor._discoveredSheets[i]._assetPath == assetPath)
                 {
@@ -562,9 +562,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             importer.textureCompression = TextureImporterCompression.Uncompressed;
 
             SpriteMetaData[] spritesheet = new SpriteMetaData[gridColumns * gridRows];
-            for (int row = 0; row < gridRows; row++)
+            for (int row = 0; row < gridRows; ++row)
             {
-                for (int col = 0; col < gridColumns; col++)
+                for (int col = 0; col < gridColumns; ++col)
                 {
                     int index = row * gridColumns + col;
                     spritesheet[index] = new SpriteMetaData
@@ -777,9 +777,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int cellHeight = texture.height / gridRows;
 
             SpriteMetaData[] spritesheet = new SpriteMetaData[gridColumns * gridRows];
-            for (int row = 0; row < gridRows; row++)
+            for (int row = 0; row < gridRows; ++row)
             {
-                for (int col = 0; col < gridColumns; col++)
+                for (int col = 0; col < gridColumns; ++col)
                 {
                     int index = row * gridColumns + col;
                     spritesheet[index] = new SpriteMetaData
@@ -828,9 +828,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int cellHeight = texture.height / gridRows;
 
             SpriteMetaData[] spritesheet = new SpriteMetaData[gridColumns * gridRows];
-            for (int row = 0; row < gridRows; row++)
+            for (int row = 0; row < gridRows; ++row)
             {
-                for (int col = 0; col < gridColumns; col++)
+                for (int col = 0; col < gridColumns; ++col)
                 {
                     int index = row * gridColumns + col;
                     spritesheet[index] = new SpriteMetaData
@@ -882,7 +882,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             string targetDir = directory ?? Root;
             string[] paths = new string[configs.Length];
 
-            for (int i = 0; i < configs.Length; i++)
+            for (int i = 0; i < configs.Length; ++i)
             {
                 SpriteSheetConfig config = configs[i];
 
@@ -919,7 +919,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
-                for (int i = 0; i < paths.Length; i++)
+                for (int i = 0; i < paths.Length; ++i)
                 {
                     AssetDatabase.ImportAsset(paths[i]);
                 }
@@ -927,7 +927,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
-                for (int i = 0; i < paths.Length; i++)
+                for (int i = 0; i < paths.Length; ++i)
                 {
                     SpriteSheetConfig config = configs[i];
                     int cellWidth = config.Width / config.GridColumns;
@@ -947,9 +947,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     SpriteMetaData[] spritesheet = new SpriteMetaData[
                         config.GridColumns * config.GridRows
                     ];
-                    for (int row = 0; row < config.GridRows; row++)
+                    for (int row = 0; row < config.GridRows; ++row)
                     {
-                        for (int col = 0; col < config.GridColumns; col++)
+                        for (int col = 0; col < config.GridColumns; ++col)
                         {
                             int index = row * config.GridColumns + col;
                             spritesheet[index] = new SpriteMetaData

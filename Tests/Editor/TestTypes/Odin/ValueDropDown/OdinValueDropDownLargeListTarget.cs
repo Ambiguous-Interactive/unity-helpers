@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.ValueDropDown
         {
             public static IEnumerable<int> GetLargeList()
             {
-                for (int i = 0; i < 100; i++)
+                for (int i = 0; i < 100; ++i)
                 {
                     yield return i;
                 }

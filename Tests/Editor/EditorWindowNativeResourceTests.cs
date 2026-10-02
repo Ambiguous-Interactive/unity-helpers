@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
                 ScriptableObject.CreateInstance<AnimationEventEditor>()
             );
             Texture2D texture = Track(new Texture2D(1, 1));
-            for (int index = 0; index < 129; index++)
+            for (int index = 0; index < 129; ++index)
             {
                 Sprite sprite = Track(Sprite.Create(texture, new Rect(0, 0, 1, 1), Vector2.zero));
                 window._spriteTextureCache.Add(sprite, texture);
@@ -42,7 +42,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
         {
             Texture2D borrowed = Track(new Texture2D(2, 2));
             Sprite sprite = Track(Sprite.Create(borrowed, new Rect(0, 0, 2, 2), Vector2.zero));
-            for (int cycle = 0; cycle < 2; cycle++)
+            for (int cycle = 0; cycle < 2; ++cycle)
             {
                 AnimationCreatorWindow window = Track(
                     ScriptableObject.CreateInstance<AnimationCreatorWindow>()

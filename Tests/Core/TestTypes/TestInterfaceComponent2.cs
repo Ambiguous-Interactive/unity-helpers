@@ -7,6 +7,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
 
     internal sealed class TestInterfaceComponent2 : MonoBehaviour, ITestInterface
     {
-        public string GetTestValue() => "Test";
+        public string GetTestValue()
+        {
+            return "Test";
+        }
     }
 }

@@ -280,7 +280,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
 
             float a = 0f;
             float b = 1f;
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 50; ++i)
             {
                 float m = 0.5f * (a + b);
                 float gm = G(m);

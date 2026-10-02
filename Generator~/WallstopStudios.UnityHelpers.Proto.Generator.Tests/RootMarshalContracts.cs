@@ -84,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>Stages the elements the wrapper is written from.</summary>
         public void OnBeforeSerialize()
         {
-            StageCount++;
+            ++StageCount;
             Staged = ToArray();
         }
 
