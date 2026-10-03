@@ -65,6 +65,74 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
+        private static bool TryBorrowedBufferCall<TState>(
+            BorrowedBufferTrackingPool<int> pool,
+            int length,
+            TState state,
+            BufferFunc<int, TState, int> callback,
+            bool action,
+            out int result,
+            out Exception error,
+            bool clearArray = false
+        )
+        {
+            if (action)
+            {
+                BufferAction<int, (TState State, BufferFunc<int, TState, int> Callback)> adapter =
+                    callback == null
+                        ? null
+                        : static (span, pair) =>
+                        {
+                            pair.Callback(span, pair.State);
+                        };
+                result = default;
+                return SystemArrayPool<int>.TryWithBufferActionCore(
+                    pool,
+                    length,
+                    (state, callback),
+                    adapter,
+                    out error,
+                    clearArray
+                );
+            }
+            return SystemArrayPool<int>.TryWithBufferCore(
+                pool,
+                length,
+                state,
+                callback,
+                out result,
+                out error,
+                clearArray
+            );
+        }
+
+        private static void AssertBorrowedReferenceBuffer<T>(
+            T initialValue,
+            Action<T[]> initialize,
+            BufferFunc<T, int, object> callback
+        )
+        {
+            BorrowedBufferTrackingPool<T> pool = new BorrowedBufferTrackingPool<T>(initialValue)
+            {
+                InitializeRental = initialize,
+            };
+            bool success = SystemArrayPool<T>.TryWithBufferCore(
+                pool,
+                3,
+                0,
+                callback,
+                out object result,
+                out Exception error
+            );
+            Assert.That(success, Is.True);
+            Assert.That(result == null, Is.True);
+            Assert.That(error == null, Is.True);
+            Assert.That(pool.ReturnCount, Is.EqualTo(1));
+            Assert.That(pool.ActiveCount, Is.EqualTo(0));
+            Assert.That(pool.LastClearOnReturn, Is.True);
+            CollectionAssert.AreEqual(new T[pool.LastReturned.Length], pool.LastReturned);
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -1994,6 +2062,462 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 {
                     WallstopFastArrayPool<int>.Get(0, out _).Dispose();
                 }
+            }
+        }
+
+        [TestCase(0, false, TestName = "BorrowedBuffer.Result.Empty")]
+        [TestCase(1, false, TestName = "BorrowedBuffer.Result.Single")]
+        [TestCase(3, false, TestName = "BorrowedBuffer.Result.LogicalPrefix")]
+        [TestCase(10000, false, TestName = "BorrowedBuffer.Result.Large")]
+        [TestCase(0, true, TestName = "BorrowedBuffer.Action.Empty")]
+        [TestCase(1, true, TestName = "BorrowedBuffer.Action.Single")]
+        [TestCase(3, true, TestName = "BorrowedBuffer.Action.LogicalPrefix")]
+        [TestCase(10000, true, TestName = "BorrowedBuffer.Action.Large")]
+        public void SystemArrayPoolTryWithBufferOwnsLogicalStorageAndPreservesState(
+            int length,
+            bool action
+        )
+        {
+            BorrowedBufferTrackingPool<int> pool = new BorrowedBufferTrackingPool<int>(7);
+            int[] state = { length, 5, 0 };
+            bool success = TryBorrowedBufferCall(
+                pool,
+                length,
+                state,
+                static (span, callerState) =>
+                {
+                    Assert.That(span.Length, Is.EqualTo(callerState[0]));
+                    ++callerState[2];
+                    span.Fill(callerState[1]);
+                    int sum = 0;
+                    foreach (int value in span)
+                    {
+                        sum += value;
+                    }
+                    return sum;
+                },
+                action,
+                out int result,
+                out Exception error
+            );
+            Assert.That(success, Is.True);
+            Assert.That(error == null, Is.True);
+            Assert.That(result, Is.EqualTo(action ? 0 : length * 5));
+            Assert.That(state[2], Is.EqualTo(1));
+            Assert.That(pool.RentCount, Is.EqualTo(length == 0 ? 0 : 1));
+            Assert.That(pool.ReturnCount, Is.EqualTo(pool.RentCount));
+            Assert.That(pool.ActiveCount, Is.EqualTo(0));
+            if (0 < length)
+            {
+                Assert.That(pool.LastRented[length], Is.EqualTo(7));
+                Assert.That(pool.LastClearOnReturn, Is.False);
+            }
+        }
+
+        [TestCase(-1, false, false, TestName = "BorrowedBuffer.Result.NegativeLength")]
+        [TestCase(3, true, false, TestName = "BorrowedBuffer.Result.NullCallback")]
+        [TestCase(0, true, false, TestName = "BorrowedBuffer.Result.EmptyNullCallback")]
+        [TestCase(-1, false, true, TestName = "BorrowedBuffer.Action.NegativeLength")]
+        [TestCase(3, true, true, TestName = "BorrowedBuffer.Action.NullCallback")]
+        [TestCase(0, true, true, TestName = "BorrowedBuffer.Action.EmptyNullCallback")]
+        public void SystemArrayPoolTryWithBufferInvalidInputsReportFailureWithoutRenting(
+            int length,
+            bool missingCallback,
+            bool action
+        )
+        {
+            BorrowedBufferTrackingPool<int> pool = new BorrowedBufferTrackingPool<int>(7);
+            int[] state = { 0 };
+            BufferFunc<int, int[], int> callback = missingCallback
+                ? null
+                : static (span, counter) => ++counter[0];
+            bool success = TryBorrowedBufferCall(
+                pool,
+                length,
+                state,
+                callback,
+                action,
+                out int result,
+                out Exception error
+            );
+            Assert.That(success, Is.False);
+            Assert.That(result, Is.EqualTo(0));
+            Assert.That(
+                error,
+                Is.TypeOf(
+                    missingCallback
+                        ? typeof(ArgumentNullException)
+                        : typeof(ArgumentOutOfRangeException)
+                )
+            );
+            Assert.That(state[0], Is.EqualTo(0));
+            Assert.That(pool.RentCount, Is.EqualTo(0));
+            Assert.That(pool.ReturnCount, Is.EqualTo(0));
+        }
+
+        [TestCase(false, TestName = "BorrowedBuffer.Result.RentFailure")]
+        [TestCase(true, TestName = "BorrowedBuffer.Action.RentFailure")]
+        public void SystemArrayPoolTryWithBufferRentFailurePreservesErrorAndDoesNotInvokeOrReturn(
+            bool action
+        )
+        {
+            Exception original = new InvalidOperationException("Rent failure");
+            BorrowedBufferTrackingPool<int> pool = new BorrowedBufferTrackingPool<int>(7)
+            {
+                RentFailure = original,
+            };
+            int[] state = { 0 };
+            bool success = TryBorrowedBufferCall(
+                pool,
+                int.MaxValue,
+                state,
+                static (span, counter) => ++counter[0],
+                action,
+                out int result,
+                out Exception error
+            );
+            Assert.That(success, Is.False);
+            Assert.That(result, Is.EqualTo(0));
+            Assert.That(error, Is.SameAs(original));
+            Assert.That(state[0], Is.EqualTo(0));
+            Assert.That(pool.RentCount, Is.EqualTo(1));
+            Assert.That(pool.ReturnCount, Is.EqualTo(0));
+            Assert.That(pool.ActiveCount, Is.EqualTo(0));
+        }
+
+        [TestCase(false, TestName = "BorrowedBuffer.Result.CallbackFailure")]
+        [TestCase(true, TestName = "BorrowedBuffer.Action.CallbackFailure")]
+        public void SystemArrayPoolTryWithBufferCallbackFailureReturnsRentalAndKeepsStateSideEffects(
+            bool action
+        )
+        {
+            Exception original = new InvalidOperationException("Callback failure");
+            BorrowedBufferTrackingPool<int> pool = new BorrowedBufferTrackingPool<int>(7);
+            int[] counter = { 0 };
+            bool success = TryBorrowedBufferCall(
+                pool,
+                3,
+                (counter, original),
+                static (span, state) =>
+                {
+                    ++state.counter[0];
+                    throw state.original;
+                },
+                action,
+                out int result,
+                out Exception error
+            );
+            Assert.That(success, Is.False);
+            Assert.That(result, Is.EqualTo(0));
+            Assert.That(error, Is.SameAs(original));
+            Assert.That(counter[0], Is.EqualTo(1));
+            Assert.That(pool.ReturnCount, Is.EqualTo(1));
+            Assert.That(pool.ActiveCount, Is.EqualTo(0));
+        }
+
+        [TestCase(false, false, TestName = "BorrowedBuffer.Result.ReturnFailsAfterRelease")]
+        [TestCase(true, false, TestName = "BorrowedBuffer.Result.ReturnFailsBeforeRelease")]
+        [TestCase(false, true, TestName = "BorrowedBuffer.Action.ReturnFailsAfterRelease")]
+        [TestCase(true, true, TestName = "BorrowedBuffer.Action.ReturnFailsBeforeRelease")]
+        public void SystemArrayPoolTryWithBufferCleanupFailureReportsOneAttemptAndKeepsStateSideEffects(
+            bool beforeRelease,
+            bool action
+        )
+        {
+            Exception original = new InvalidOperationException("Return failure");
+            BorrowedBufferTrackingPool<int> pool = new BorrowedBufferTrackingPool<int>(7)
+            {
+                ReturnFailure = original,
+                FailBeforeRelease = beforeRelease,
+            };
+            int[] counter = { 0 };
+            bool success = TryBorrowedBufferCall(
+                pool,
+                3,
+                counter,
+                static (span, state) => ++state[0],
+                action,
+                out int result,
+                out Exception error
+            );
+            Assert.That(success, Is.False);
+            Assert.That(result, Is.EqualTo(0));
+            Assert.That(error, Is.SameAs(original));
+            Assert.That(counter[0], Is.EqualTo(1));
+            Assert.That(pool.ReturnCount, Is.EqualTo(1));
+            Assert.That(pool.ActiveCount, Is.EqualTo(beforeRelease ? 1 : 0));
+        }
+
+        [TestCase(false, false, TestName = "BorrowedBuffer.Result.CombinedFailureAfterRelease")]
+        [TestCase(true, false, TestName = "BorrowedBuffer.Result.CombinedFailureBeforeRelease")]
+        [TestCase(false, true, TestName = "BorrowedBuffer.Action.CombinedFailureAfterRelease")]
+        [TestCase(true, true, TestName = "BorrowedBuffer.Action.CombinedFailureBeforeRelease")]
+        public void SystemArrayPoolTryWithBufferPreservesBothOperationAndCleanupFailures(
+            bool beforeRelease,
+            bool action
+        )
+        {
+            Exception callbackFailure = new InvalidOperationException("Callback failure");
+            Exception returnFailure = new InvalidOperationException("Return failure");
+            BorrowedBufferTrackingPool<int> pool = new BorrowedBufferTrackingPool<int>(7)
+            {
+                ReturnFailure = returnFailure,
+                FailBeforeRelease = beforeRelease,
+            };
+            bool success = TryBorrowedBufferCall(
+                pool,
+                3,
+                callbackFailure,
+                static (span, failure) => throw failure,
+                action,
+                out int result,
+                out Exception error
+            );
+            Assert.That(success, Is.False);
+            Assert.That(result, Is.EqualTo(0));
+            Assert.That(error, Is.TypeOf<AggregateException>());
+            AggregateException aggregate = (AggregateException)error;
+            Assert.That(aggregate.InnerExceptions.Count, Is.EqualTo(2));
+            Assert.That(aggregate.InnerExceptions[0], Is.SameAs(callbackFailure));
+            Assert.That(aggregate.InnerExceptions[1], Is.SameAs(returnFailure));
+            Assert.That(pool.ReturnCount, Is.EqualTo(1));
+            Assert.That(pool.ActiveCount, Is.EqualTo(beforeRelease ? 1 : 0));
+        }
+
+        [Test]
+        public void SystemArrayPoolTryWithBufferNestedCallsHaveIndependentRentals()
+        {
+            BorrowedBufferTrackingPool<int> pool = new BorrowedBufferTrackingPool<int>(7);
+            bool success = SystemArrayPool<int>.TryWithBufferCore(
+                pool,
+                3,
+                pool,
+                static (outer, sharedPool) =>
+                {
+                    outer[0] = 42;
+                    bool nested = SystemArrayPool<int>.TryWithBufferCore(
+                        sharedPool,
+                        2,
+                        sharedPool,
+                        static (inner, nestedPool) =>
+                        {
+                            Assert.That(nestedPool.ActiveCount, Is.EqualTo(2));
+                            inner[0] = 99;
+                            return inner.Length;
+                        },
+                        out int nestedResult,
+                        out Exception nestedError
+                    );
+                    Assert.That(nested, Is.True);
+                    Assert.That(nestedResult, Is.EqualTo(2));
+                    Assert.That(nestedError == null, Is.True);
+                    return outer[0];
+                },
+                out int result,
+                out Exception error
+            );
+            Assert.That(success, Is.True);
+            Assert.That(result, Is.EqualTo(42));
+            Assert.That(error == null, Is.True);
+            Assert.That(pool.RentCount, Is.EqualTo(2));
+            Assert.That(pool.ReturnCount, Is.EqualTo(2));
+            Assert.That(pool.ActiveCount, Is.EqualTo(0));
+        }
+
+        [TestCase(false, TestName = "BorrowedBuffer.NumericInput.Uninitialized")]
+        [TestCase(true, TestName = "BorrowedBuffer.NumericInput.Cleared")]
+        public void SystemArrayPoolTryWithBufferNumericClearingChangesOnlyLogicalPrefix(
+            bool clearArray
+        )
+        {
+            BorrowedBufferTrackingPool<int> pool = new BorrowedBufferTrackingPool<int>(7);
+            bool success = SystemArrayPool<int>.TryWithBufferCore(
+                pool,
+                3,
+                clearArray,
+                static (span, clear) =>
+                {
+                    foreach (int value in span)
+                    {
+                        Assert.That(value, Is.EqualTo(clear ? 0 : 7));
+                    }
+                    return span.Length;
+                },
+                out int result,
+                out Exception error,
+                clearArray
+            );
+            Assert.That(success, Is.True);
+            Assert.That(result, Is.EqualTo(3));
+            Assert.That(error == null, Is.True);
+            Assert.That(pool.LastReturned[3], Is.EqualTo(7));
+            Assert.That(pool.LastClearOnReturn, Is.False);
+        }
+
+        [TestCase(false, TestName = "BorrowedBuffer.ReferenceInput.ArraySelfAlias")]
+        [TestCase(true, TestName = "BorrowedBuffer.ReferenceInput.StructArraySelfAlias")]
+        public void SystemArrayPoolTryWithBufferReferencePrefixInitializationPreventsBackingArrayEscapeAndClearsWholeReturn(
+            bool nestedReferences
+        )
+        {
+            if (nestedReferences)
+            {
+                AssertBorrowedReferenceBuffer(
+                    new BorrowedBufferReferenceElement { Value = new object() },
+                    static array =>
+                    {
+                        array[0] = new BorrowedBufferReferenceElement { Value = array };
+                        array[2] = new BorrowedBufferReferenceElement { Value = array };
+                    },
+                    static (span, state) =>
+                    {
+                        foreach (BorrowedBufferReferenceElement element in span)
+                        {
+                            Assert.That(element.Value == null, Is.True);
+                        }
+                        return span[2].Value;
+                    }
+                );
+            }
+            else
+            {
+                AssertBorrowedReferenceBuffer<object>(
+                    new object(),
+                    static array =>
+                    {
+                        array[0] = array;
+                        array[2] = array;
+                    },
+                    static (span, state) =>
+                    {
+                        foreach (object element in span)
+                        {
+                            Assert.That(element == null, Is.True);
+                        }
+                        return span[2];
+                    }
+                );
+            }
+        }
+
+        [Test]
+        public void SystemArrayPoolTryWithBufferAllowsElementObjectsToOutliveStorage()
+        {
+            object owned = new object();
+            BorrowedBufferTrackingPool<object> pool = new BorrowedBufferTrackingPool<object>(
+                new object()
+            );
+            bool success = SystemArrayPool<object>.TryWithBufferCore(
+                pool,
+                3,
+                owned,
+                static (span, state) =>
+                {
+                    span.Fill(state);
+                    return span[0];
+                },
+                out object result,
+                out Exception error
+            );
+            Assert.That(success, Is.True);
+            Assert.That(error == null, Is.True);
+            Assert.That(result, Is.SameAs(owned));
+            CollectionAssert.AreEqual(new object[pool.LastReturned.Length], pool.LastReturned);
+        }
+
+        [Test]
+        public void SystemArrayPoolTryWithBufferClearsReferencesWrittenByThrowingCallback()
+        {
+            Exception original = new InvalidOperationException("Reference callback failure");
+            BorrowedBufferTrackingPool<object> pool = new BorrowedBufferTrackingPool<object>(
+                new object()
+            );
+            bool success = SystemArrayPool<object>.TryWithBufferCore<Exception, object>(
+                pool,
+                3,
+                original,
+                static (span, failure) =>
+                {
+                    span.Fill(failure);
+                    throw failure;
+                },
+                out object result,
+                out Exception error
+            );
+            Assert.That(success, Is.False);
+            Assert.That(result == null, Is.True);
+            Assert.That(error, Is.SameAs(original));
+            Assert.That(pool.ReturnCount, Is.EqualTo(1));
+            Assert.That(pool.ActiveCount, Is.EqualTo(0));
+            CollectionAssert.AreEqual(new object[pool.LastReturned.Length], pool.LastReturned);
+        }
+
+        [Test]
+        public void SystemArrayPoolTryWithBufferAllowsIndependentOwnedCopiesToEscape()
+        {
+            BorrowedBufferTrackingPool<int> pool = new BorrowedBufferTrackingPool<int>(7);
+            bool success = SystemArrayPool<int>.TryWithBufferCore(
+                pool,
+                3,
+                21,
+                static (span, state) =>
+                {
+                    span.Fill(state);
+                    return span.ToArray();
+                },
+                out int[] result,
+                out Exception error
+            );
+            Assert.That(success, Is.True);
+            Assert.That(error == null, Is.True);
+            CollectionAssert.AreEqual(new[] { 21, 21, 21 }, result);
+            Assert.That(result, Is.Not.SameAs(pool.LastReturned));
+            pool.LastReturned[0] = -1;
+            Assert.That(result[0], Is.EqualTo(21));
+        }
+
+        [Test]
+        public void SystemArrayPoolTryWithBufferPublicOverloadsDoNotAcquireDisposalLeases()
+        {
+            DisposalLease probe = DisposalLeases.Acquire();
+            DisposalLease control = default;
+            try
+            {
+                int slot = probe.SlotForTests;
+                Assert.That(probe.TryClaim(), Is.True);
+                long beforeControl = DisposalLeases.CurrentGeneration(slot);
+                control = DisposalLeases.Acquire();
+                Assert.That(control.SlotForTests, Is.EqualTo(slot));
+                Assert.That(control.TryClaim(), Is.True);
+                Assert.That(DisposalLeases.CurrentGeneration(slot), Is.EqualTo(beforeControl + 2));
+                long before = DisposalLeases.CurrentGeneration(slot);
+                bool success = SystemArrayPool<int>.TryWithBuffer(
+                    3,
+                    4,
+                    static (span, state) => span.Length + state,
+                    out int result,
+                    out Exception error
+                );
+                int[] actionState = { 0 };
+                bool actionSuccess = SystemArrayPool<int>.TryWithBuffer(
+                    2,
+                    actionState,
+                    static (span, state) => state[0] = span.Length,
+                    out Exception actionError
+                );
+                long after = DisposalLeases.CurrentGeneration(slot);
+                Assert.That(success, Is.True);
+                Assert.That(result, Is.EqualTo(7));
+                Assert.That(error == null, Is.True);
+                Assert.That(actionSuccess, Is.True);
+                Assert.That(actionError == null, Is.True);
+                Assert.That(actionState[0], Is.EqualTo(2));
+                Assert.That(after, Is.EqualTo(before));
+            }
+            finally
+            {
+                control.TryClaim();
+                probe.TryClaim();
             }
         }
 

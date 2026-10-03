@@ -23,6 +23,7 @@
 - [Global Pool Registry](#global-pool-registry)
 - [Pooling IDisposable Objects](#pooling-idisposable-objects)
 - [Renting an Array](#renting-an-array)
+- [Borrowing a Buffer for One Operation](#borrowing-a-buffer-for-one-operation)
 - [Best Practices](#best-practices)
 
 ---
@@ -576,7 +577,7 @@ PoolPurgeSettings.Configure<byte[]>(o =>
 
 ## Renting an Array
 
-`SystemArrayPool<T>` rents from the process-wide `ArrayPool<T>.Shared`. Two consequences follow,
+`SystemArrayPool<T>.Get` rents from the process-wide `ArrayPool<T>.Shared`. Two consequences follow,
 and they pull in opposite directions.
 
 **A rented array is longer than you asked for.** The shared pool rounds a request up to its bucket
@@ -604,6 +605,78 @@ array before reading it (a sort's scratch buffer, a copy destination) should not
 For an exactly-sized array whose size comes from a small, known set, use `WallstopArrayPool<T>`,
 which is always zeroed on return. Do not use it for a size derived from a collection count: it
 creates a permanent bucket per distinct size.
+
+## Borrowing a Buffer for One Operation
+
+`SystemArrayPool<T>.TryWithBuffer` owns the rental while a synchronous callback receives a
+`Span<T>` of exactly the requested logical length. It issues no disposable lease. Use this when
+the buffer is needed only during that callback; keep `Get` for lifetimes that extend beyond one
+operation. Existing `Get` leases retain their copy-safe disposal checks.
+
+Both overloads take `length`, explicit `state`, `callback`, `out Exception error`, and optional
+`clearArray`. The action overload accepts `BufferAction<T, TState>`. The result overload accepts
+`BufferFunc<T, TState, TResult>` and adds `out TResult result` before `error`. Static callbacks can
+use the state parameter without capturing local variables.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Utils;
+
+bool success = SystemArrayPool<int>.TryWithBuffer<int, int>(
+    4,
+    3,
+    static (buffer, multiplier) =>
+    {
+        int total = 0;
+        int count = buffer.Length;
+        for (int index = 0; index < count; ++index)
+        {
+            buffer[index] = multiplier * (index + 1);
+            total += buffer[index];
+        }
+        return total;
+    },
+    out int sum,
+    out Exception error
+);
+
+if (success)
+{
+    Debug.Log(sum); // 30
+}
+else
+{
+    Debug.LogException(error);
+}
+```
+
+A zero length invokes the callback once with an empty span and performs no rent or return.
+Negative lengths and null callbacks report failure before renting. Reference-bearing elements,
+including structs with reference fields, always have their logical prefix cleared before the
+callback. This prevents stale elements from exposing the backing array through a reference stored
+inside it. These types also request clearing of the full physical array on return. For types
+without references, input clearing is optional; use `clearArray: true` when reading before writing.
+Otherwise, initialize each element before reading it.
+
+Rent, callback, and return failures produce `false` with an observable `error`; a failed result
+resets to `default`. Callback exceptions remain available through `error`, and simultaneous callback
+and cleanup failures are both reported. After a successful rent, `finally` makes one return attempt.
+A return failure does not guarantee successful release and is not retried. Changes to caller state
+or other callback side effects are not rolled back on failure. Fatal runtime failures remain outside
+ordinary error recovery.
+
+The borrowed span cannot be stored on the heap, captured, boxed, returned as `TResult`, or retained
+by an async callback. State, objects stored in elements, and owned copies such as `buffer.ToArray()`
+may outlive the callback; this API does not grant deep ownership of those objects. The storage
+contract assumes ordinary span operations and compliant underlying pool use. Low-level escape tools
+such as `Unsafe`, `MemoryMarshal.CreateSpan`, reflection, and native interop are outside that
+contract; disabling unsafe blocks alone does not exclude those tools.
+
+Reference clearing and callback invocation still perform runtime work. Removing disposal-lease work
+does not establish a timing or allocation improvement for a particular workload.
 
 ---
 

@@ -3312,6 +3312,188 @@ namespace WallstopStudios.UnityHelpers.Utils
             array = rented;
             return new PooledArray<T>(rented, minimumLength);
         }
+
+        /// <summary>Processes a private rental synchronously without issuing a disposal handle.</summary>
+        /// <typeparam name="TState">The explicit caller state type.</typeparam>
+        /// <typeparam name="TResult">The independent result type.</typeparam>
+        /// <param name="length">The logical buffer length; must be non-negative.</param>
+        /// <param name="state">Caller state passed by value.</param>
+        /// <param name="callback">A synchronous operation over the logical buffer.</param>
+        /// <param name="result">The callback result on success; default on failure.</param>
+        /// <param name="error">The original failure, or both operation and cleanup failures in an aggregate.</param>
+        /// <param name="clearArray">Whether to initialize reference-free elements before invocation.</param>
+        /// <returns>True when the callback and cleanup succeeded; otherwise false.</returns>
+        /// <remarks>
+        /// Reference-containing elements are always initialized before invocation and cleared on return.
+        /// Reference-free elements require writing before reading unless clearArray is true.
+        /// Zero length invokes the callback once without renting. Negative length or null callback
+        /// reports failure without invoking it. After a successful rent, cleanup attempts return once;
+        /// a failed return is not retried. Callback/state side effects persist on failure.
+        /// Borrowed storage must not escape through unsafe or low-level APIs. Independently owned
+        /// copies and objects stored in elements may escape. Fatal runtime failures are outside
+        /// ordinary error recovery guarantees.
+        /// </remarks>
+        public static bool TryWithBuffer<TState, TResult>(
+            int length,
+            TState state,
+            BufferFunc<T, TState, TResult> callback,
+            out TResult result,
+            out Exception error,
+            bool clearArray = false
+        )
+        {
+            return TryWithBufferCore(
+                System.Buffers.ArrayPool<T>.Shared,
+                length,
+                state,
+                callback,
+                out result,
+                out error,
+                clearArray
+            );
+        }
+
+        /// <summary>Processes a private rental synchronously without returning a value.</summary>
+        /// <typeparam name="TState">The explicit caller state type.</typeparam>
+        /// <param name="length">The logical buffer length; must be non-negative.</param>
+        /// <param name="state">Caller state passed by value.</param>
+        /// <param name="callback">A synchronous operation over the logical buffer.</param>
+        /// <param name="error">The original failure, or both operation and cleanup failures in an aggregate.</param>
+        /// <param name="clearArray">Whether to initialize reference-free elements before invocation.</param>
+        /// <returns>True when the callback and cleanup succeeded; otherwise false.</returns>
+        /// <remarks>
+        /// Reference-containing elements are always initialized before invocation and cleared on return.
+        /// Zero length invokes the callback once without renting. Callback/state side effects persist
+        /// on failure, and cleanup makes one return attempt without retrying a failed return.
+        /// Borrowed storage must not escape through unsafe or low-level APIs. Reference-free elements
+        /// require writing before reading unless clearArray is true. Fatal runtime failures are outside
+        /// ordinary error recovery guarantees.
+        /// </remarks>
+        public static bool TryWithBuffer<TState>(
+            int length,
+            TState state,
+            BufferAction<T, TState> callback,
+            out Exception error,
+            bool clearArray = false
+        )
+        {
+            return TryWithBufferActionCore(
+                System.Buffers.ArrayPool<T>.Shared,
+                length,
+                state,
+                callback,
+                out error,
+                clearArray
+            );
+        }
+
+        internal static bool TryWithBufferActionCore<TState>(
+            System.Buffers.ArrayPool<T> pool,
+            int length,
+            TState state,
+            BufferAction<T, TState> callback,
+            out Exception error,
+            bool clearArray = false
+        )
+        {
+            if (length < 0)
+            {
+                error = new ArgumentOutOfRangeException(nameof(length));
+                return false;
+            }
+            if (callback == null)
+            {
+                error = new ArgumentNullException(nameof(callback));
+                return false;
+            }
+            return TryWithBufferCore(
+                pool,
+                length,
+                (state, callback),
+                static (buffer, pair) =>
+                {
+                    pair.callback(buffer, pair.state);
+                    return true;
+                },
+                out bool ignored,
+                out error,
+                clearArray
+            );
+        }
+
+        internal static bool TryWithBufferCore<TState, TResult>(
+            System.Buffers.ArrayPool<T> pool,
+            int length,
+            TState state,
+            BufferFunc<T, TState, TResult> callback,
+            out TResult result,
+            out Exception error,
+            bool clearArray = false
+        )
+        {
+            if (length < 0)
+            {
+                result = default;
+                error = new ArgumentOutOfRangeException(nameof(length));
+                return false;
+            }
+            if (callback == null)
+            {
+                result = default;
+                error = new ArgumentNullException(nameof(callback));
+                return false;
+            }
+            TResult callbackResult = default;
+            Exception operationError = null;
+            T[] array = null;
+            try
+            {
+                if (length == 0)
+                {
+                    callbackResult = callback(Span<T>.Empty, state);
+                }
+                else
+                {
+                    array = pool.Rent(length);
+                    Span<T> logicalBuffer = array.AsSpan(0, length);
+                    if (clearArray || PooledArrayClearPolicy<T>.ClearOnReturn)
+                    {
+                        logicalBuffer.Clear();
+                    }
+                    callbackResult = callback(logicalBuffer, state);
+                }
+            }
+            catch (Exception failure)
+            {
+                operationError = failure;
+            }
+            finally
+            {
+                if (array != null)
+                {
+                    try
+                    {
+                        pool.Return(array, PooledArrayClearPolicy<T>.ClearOnReturn);
+                    }
+                    catch (Exception returnFailure)
+                    {
+                        operationError =
+                            operationError == null
+                                ? returnFailure
+                                : new AggregateException(operationError, returnFailure);
+                    }
+                }
+            }
+            if (operationError != null)
+            {
+                result = default;
+                error = operationError;
+                return false;
+            }
+            result = callbackResult;
+            error = null;
+            return true;
+        }
     }
 
     /// <summary>

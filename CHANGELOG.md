@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `SystemArrayPool<T>.TryWithBuffer` for synchronous borrowed spans with explicit state, optional results, and reported callback or cleanup errors ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Add `WUH022` to report boxing disposable structs and suggest concrete or constrained generic disposal ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Add opt-in `WUH021` to flag repeated size observations, including interface `Count`, known `Length`/`LongLength` properties, and non-predicate LINQ `Count()`/`LongCount()`, when one snapshot is intended.
 - Add `WUH020` to suggest non-throwing queue and stack reads when compatible `Try` methods are available ([#912](https://github.com/Ambiguous-Interactive/unity-helpers/issues/912)).
