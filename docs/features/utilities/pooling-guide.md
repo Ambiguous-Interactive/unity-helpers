@@ -687,6 +687,12 @@ before checking non-inferiority. Diagnostic runs cannot satisfy that acceptance 
 timings reject adoption while leaving the shipped decoder intact. The candidate
 stays in test code until player timing, allocation and retained-memory evidence supports adoption.
 
+`BorrowedBufferPreflightTests` records runtime identity, all empty clock brackets, and retained-boxing
+allocation controls before reporting an unqualified channel. The pre-Unity-6 IL2CPP allocation
+counter is compiled out because it can crash those players. These records remain diagnostic:
+binary, corpus and build settings are unverified, and retained-memory accounting is not calibrated.
+Passing clock or managed-byte controls cannot establish campaign eligibility or candidate adoption.
+
 ---
 
 ### Performance Tips
