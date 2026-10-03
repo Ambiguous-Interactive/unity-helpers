@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 {
     using System;
     using System.Diagnostics;
+    using System.Globalization;
     using System.IO;
     using System.Runtime.CompilerServices;
     using System.Text;
@@ -85,12 +86,72 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 && maximumTicks * microsecondsPerTick <= MaximumEmptyBracketMicroseconds;
         }
 
+        private static bool IsSupportedIl2CppCounterVersion(string version)
+        {
+            if (string.IsNullOrEmpty(version) || 0 <= version.IndexOf('\0'))
+            {
+                return false;
+            }
+            string[] components = version.Split('.');
+            if (
+                components.Length != 3
+                || !string.Equals(components[0], "6000", StringComparison.Ordinal)
+                || !int.TryParse(
+                    components[1],
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out int minor
+                )
+                || minor < 2
+            )
+            {
+                return false;
+            }
+            string patchAndBuild = components[2];
+            int suffixIndex = patchAndBuild.IndexOf('f');
+            if (suffixIndex < 0)
+            {
+                suffixIndex = patchAndBuild.IndexOf('p');
+            }
+            return 0 < suffixIndex
+                && int.TryParse(
+                    patchAndBuild.Substring(0, suffixIndex),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out int patch
+                )
+                && 0 <= patch
+                && int.TryParse(
+                    patchAndBuild.Substring(suffixIndex + 1),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out int build
+                )
+                && 0 < build;
+        }
+
+        private static bool CanCaptureThreadAllocations()
+        {
+#if ENABLE_IL2CPP && !UNITY_6000_2_OR_NEWER
+            return false;
+#elif ENABLE_IL2CPP
+            return IsSupportedIl2CppCounterVersion(Application.unityVersion);
+#else
+            return true;
+#endif
+        }
+
         private static AllocationObservation[] CaptureAllocations(int seed, out string counterError)
         {
-#if ENABLE_IL2CPP && !UNITY_6000_0_OR_NEWER
+#if ENABLE_IL2CPP && !UNITY_6000_2_OR_NEWER
             counterError = null;
             return Array.Empty<AllocationObservation>();
 #else
+            if (!CanCaptureThreadAllocations())
+            {
+                counterError = null;
+                return Array.Empty<AllocationObservation>();
+            }
             AllocationObservation[] observations = new AllocationObservation[
                 WarmupWindows + AllocationRepetitions * 4
             ];
@@ -200,7 +261,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return true;
         }
 
-#if !ENABLE_IL2CPP || UNITY_6000_0_OR_NEWER
+#if !ENABLE_IL2CPP || UNITY_6000_2_OR_NEWER
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static AllocationObservation MeasureBoxes(int count, int seed)
         {
@@ -344,24 +405,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     writer.WriteEndObject();
                 }
                 writer.WriteEndArray();
-#if ENABLE_IL2CPP && !UNITY_6000_0_OR_NEWER
-                writer.WriteString("AllocatedBytesState", UnsupportedState);
-                writer.WriteString(
-                    "AllocatedBytesReason",
-                    "The thread allocation counter crashes pre-Unity-6 IL2CPP players; all calls are compiled out."
-                );
-#else
-                writer.WriteString(
-                    "AllocatedBytesState",
-                    counterError != null ? UnsupportedState
-                        : allocationsPassed ? PassedState
-                        : RejectedState
-                );
-                writer.WriteString(
-                    "AllocatedBytesReason",
-                    "Same-thread managed-byte controls only; worker and native allocation channels are unverified."
-                );
-#endif
+                if (!CanCaptureThreadAllocations())
+                {
+                    writer.WriteString("AllocatedBytesState", UnsupportedState);
+                    writer.WriteString(
+                        "AllocatedBytesReason",
+                        "The IL2CPP thread allocation counter requires a supported stable Unity 6.2 or later Unity 6 version; older, prerelease, and unknown versions are skipped before every counter call."
+                    );
+                }
+                else
+                {
+                    writer.WriteString(
+                        "AllocatedBytesState",
+                        counterError != null ? UnsupportedState
+                            : allocationsPassed ? PassedState
+                            : RejectedState
+                    );
+                    writer.WriteString(
+                        "AllocatedBytesReason",
+                        "Same-thread managed-byte controls only; worker and native allocation channels are unverified."
+                    );
+                }
                 writer.WriteString("CounterError", counterError);
                 writer.WriteBoolean("HasIncompleteWindow", counterError != null);
                 if (counterError != null)
@@ -453,6 +517,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             ref string declarationSha256,
             ref string corpusSha256
         );
+
+        [TestCase("6000.2.0f1", true)]
+        [TestCase("6000.5.2f1", true)]
+        [TestCase("6000.2.0p1", true)]
+        [TestCase("6000.0.99f1", false)]
+        [TestCase("6000.1.4f1", false)]
+        [TestCase("6000.2.0a1", false)]
+        [TestCase("6000.2.0b6", false)]
+        [TestCase("6000.2.0rc1", false)]
+        [TestCase("6000.2.0f0", false)]
+        [TestCase("6000.2.0f1-extra", false)]
+        [TestCase("6000.2.0f1\0", false)]
+        [TestCase("6000.2.0f1.1", false)]
+        [TestCase("6000.2.0", false)]
+        [TestCase("7000.2.0f1", false)]
+        [TestCase("6000.2147483648.0f1", false)]
+        [TestCase("", false)]
+        [TestCase(null, false)]
+        public void Il2CppCounterVersionRequiresKnownStableRelease(string version, bool expected)
+        {
+            Assert.That(IsSupportedIl2CppCounterVersion(version), Is.EqualTo(expected));
+        }
 
         [TestCase(0, true, TestName = "Clock.Qualified.Passed")]
         [TestCase(1, false, TestName = "Clock.ZeroFrequency.Rejected")]

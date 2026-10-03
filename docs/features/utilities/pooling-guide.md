@@ -688,8 +688,17 @@ timings reject adoption while leaving the shipped decoder intact. The candidate
 stays in test code until player timing, allocation and retained-memory evidence supports adoption.
 
 `BorrowedBufferPreflightTests` records runtime identity, all empty clock brackets, and retained-boxing
-allocation controls before reporting an unqualified channel. The pre-Unity-6 IL2CPP allocation
-counter is compiled out because it can crash those players. These records remain diagnostic:
+allocation controls before reporting an unqualified channel. The IL2CPP thread allocation counter
+is compiled out unless `UNITY_6000_2_OR_NEWER` is defined. Unity documents the
+`GetAllocatedBytesForCurrentThread` crash fix (UUM-100690) in
+[6000.1.4f1](https://unity.com/releases/editor/whats-new/6000.1.4f1) and
+[6000.2.0f1](https://unity.com/releases/editor/whats-new/6000.2.0f1). The conservative Unity 6.2 cutoff
+also excludes fixed Unity 6.1 patches because the minor-version symbol cannot distinguish them from
+earlier Unity 6.1 releases. Before any IL2CPP counter call, a runtime check also requires an exact
+`6000.minor.patch` version with minor at least 2 and a final (`f`) or patch (`p`) release suffix with a
+positive build number. Alpha, beta, malformed, and unknown major versions report an unsupported
+channel with no counter calls. A permitted counter still needs positive calibration in the exact player;
+this guard does not establish native AOT safety or allocation eligibility. These records remain diagnostic:
 binary, corpus and build settings are unverified, and retained-memory accounting is not calibrated.
 Passing clock or managed-byte controls cannot establish campaign eligibility or candidate adoption.
 
