@@ -2770,7 +2770,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <returns>True if the config was saved successfully, false otherwise.</returns>
         internal bool SaveConfig(SpriteSheetEntry entry)
         {
-            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
+            if (entry == null || string.IsNullOrWhiteSpace(entry._assetPath))
             {
                 return false;
             }
@@ -2840,7 +2840,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <returns>True if the config was loaded successfully, false otherwise.</returns>
         internal bool LoadConfig(SpriteSheetEntry entry)
         {
-            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
+            if (entry == null || string.IsNullOrWhiteSpace(entry._assetPath))
             {
                 return false;
             }
@@ -2919,7 +2919,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <param name="entry">The entry to auto-load config for.</param>
         internal void TryAutoLoadConfig(SpriteSheetEntry entry)
         {
-            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
+            if (entry == null || string.IsNullOrWhiteSpace(entry._assetPath))
             {
                 return;
             }

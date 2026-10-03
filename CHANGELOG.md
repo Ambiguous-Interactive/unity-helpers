@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix sprite sheet configuration save/load accepting blank texture paths; valid filenames containing spaces and serialized hashes keep their exact values ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank custom validation messages hiding the default warning in standard and Odin inspectors; nonblank messages and serialized string values retain their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank prefixes in inline editor headers when a field label contains only whitespace ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix dropdowns showing invisible labels for Unity objects with whitespace-only names; object names, references, and literal string options stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
