@@ -1628,11 +1628,17 @@ A key may be any integral type, `bool`, `string`, a floating-point type or an en
 protobuf-net accepts, which is wider than the protobuf specification's. A `byte[]` or message key is
 refused, because neither has a stable identity to key on once round-tripped.
 
-**Three behaviors were measured rather than assumed.** The entry obeys the ordinary omission rules,
-so `{"a": 0}` encodes as key only. A missing key or value decodes to that type's protobuf default,
-and for a string that is `""` rather than a `null` that would throw inside the dictionary. And a
-repeated key is last-wins, applied through the indexer rather than `Add`, which would throw on the
-second occurrence of a key a hostile payload repeated.
+Map entries follow protobuf-net 3.2.56. Zero enum keys and empty string keys are written.
+Default numeric keys, including `float` and `double`, and default `bool` keys are omitted.
+A zero `int` or `double` value is omitted, so `{"a": 0}` carries only its key.
+
+A missing key or value decodes to that type's protobuf default. A missing string is `""`,
+which can serve as a dictionary key. Historical keyless enum entries and explicit zero numeric
+keys remain readable. Repeated keys are last-wins, applied through the indexer rather than `Add`.
+Rewriting an older payload can change its bytes and hash while preserving its map contents.
+
+Both protobuf-net majors retain zero enum keys. For enum-keyed maps with `double` values,
+2.4.9 writes a zero value that 3.2.56 omits. WallstopProto writes the 3.2.56 form and reads both.
 
 **A dictionary may be a `struct`**, on the same terms a collection may: it is never null-checked, and
 it is assigned back to its member after reading because everything in between operated on a copy.

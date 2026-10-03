@@ -59,6 +59,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             byte[] buffer = new byte[formatter.Measure(value)];
             WProtoWriter writer = new(buffer);
             Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
 
             return ToHex(writer.Written);
         }
@@ -84,6 +85,89 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WProtoReader reader = new(buffer);
             Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
             return restored;
+        }
+
+        [TestCase(WProtoButtonType.None, 0d, "0A020800")]
+        [TestCase(WProtoButtonType.None, 1d, "0A0B080011000000000000F03F")]
+        [TestCase(WProtoButtonType.Primary, 0d, "0A020801")]
+        [TestCase(WProtoButtonType.Primary, 1d, "0A0B080111000000000000F03F")]
+        public void EnumMapKeysMatchV3GoldenBytes(
+            WProtoButtonType key,
+            double value,
+            string expected
+        )
+        {
+            WProtoZeroKeyMapContract contract = new WProtoZeroKeyMapContract
+            {
+                ByEnum = new Dictionary<WProtoButtonType, double> { { key, value } },
+            };
+            using MemoryStream stream = new MemoryStream();
+            ProtoBuf.Serializer.Serialize(stream, contract);
+            Assert.AreEqual(expected, ToHex(stream.ToArray()));
+            Assert.AreEqual(expected, Encode(contract));
+        }
+
+        [TestCase(0, 0d, "1200")]
+        [TestCase(0, 1d, "120911000000000000F03F")]
+        [TestCase(1, 0d, "12020801")]
+        [TestCase(1, 1d, "120B080111000000000000F03F")]
+        public void IntegerMapKeysRetainDefaultOmission(int key, double value, string expected)
+        {
+            WProtoZeroKeyMapContract contract = new WProtoZeroKeyMapContract
+            {
+                ByInteger = new Dictionary<int, double> { { key, value } },
+            };
+            using MemoryStream stream = new MemoryStream();
+            ProtoBuf.Serializer.Serialize(stream, contract);
+            Assert.AreEqual(expected, ToHex(stream.ToArray()));
+            Assert.AreEqual(expected, Encode(contract));
+        }
+
+        [TestCase(0f, "1A0911000000000000F03F")]
+        [TestCase(1.5f, "1A0E0D0000C03F11000000000000F03F")]
+        public void SingleMapKeysMatchActualOracle(float key, string expected)
+        {
+            WProtoZeroKeyMapContract contract = new WProtoZeroKeyMapContract
+            {
+                BySingle = new Dictionary<float, double> { { key, 1d } },
+            };
+            using MemoryStream stream = new MemoryStream();
+            ProtoBuf.Serializer.Serialize(stream, contract);
+            Assert.AreEqual(expected, ToHex(stream.ToArray()));
+            Assert.AreEqual(expected, Encode(contract));
+        }
+
+        [TestCase(0d, "220911000000000000F03F")]
+        [TestCase(1.5d, "221209000000000000F83F11000000000000F03F")]
+        public void DoubleMapKeysMatchActualOracle(double key, string expected)
+        {
+            WProtoZeroKeyMapContract contract = new WProtoZeroKeyMapContract
+            {
+                ByDouble = new Dictionary<double, double> { { key, 1d } },
+            };
+            using MemoryStream stream = new MemoryStream();
+            ProtoBuf.Serializer.Serialize(stream, contract);
+            Assert.AreEqual(expected, ToHex(stream.ToArray()));
+            Assert.AreEqual(expected, Encode(contract));
+        }
+
+        [TestCase("0A00", 0d)]
+        [TestCase("0A020800", 0d)]
+        [TestCase("0A0911000000000000F03F", 1d)]
+        [TestCase("0A0B080011000000000000F03F", 1d)]
+        public void EnumMapReadsHistoricalKeylessAndExplicitZeroEntries(string hex, double expected)
+        {
+            WProtoReader reader = new WProtoReader(Parse(hex));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<WProtoZeroKeyMapContract>()
+                    .TryRead(ref reader, out WProtoZeroKeyMapContract read)
+            );
+            using MemoryStream stream = new MemoryStream(Parse(hex));
+            WProtoZeroKeyMapContract oracle =
+                ProtoBuf.Serializer.Deserialize<WProtoZeroKeyMapContract>(stream);
+            CollectionAssert.AreEquivalent(oracle.ByEnum, read.ByEnum);
+            Assert.AreEqual(expected, read.ByEnum[WProtoButtonType.None]);
         }
 
         [Test]

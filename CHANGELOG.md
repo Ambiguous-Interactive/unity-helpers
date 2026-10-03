@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix WallstopProto map keys to match protobuf-net 3.2.56: write zero enum keys and omit zero floating-point keys while preserving reads of older payloads ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Fix periodic effects repeating ticks before their cadence at large clocks; initial delays, tick limits, refresh phase, and catch-up limits are preserved ([#934](https://github.com/Ambiguous-Interactive/unity-helpers/issues/934)).
 - Fix cache and effect lifetimes at large clocks, including small timing offsets and jitter; preserve remaining effect time and disabled cache expiry ([#932](https://github.com/Ambiguous-Interactive/unity-helpers/issues/932)).
 - Fix discarded worker jobs retaining captured references after shutdown, including submissions racing disposal ([#844](https://github.com/Ambiguous-Interactive/unity-helpers/issues/844)).
