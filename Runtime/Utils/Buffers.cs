@@ -1429,10 +1429,29 @@ namespace WallstopStudios.UnityHelpers.Utils
             float warmTime = _timeProvider();
             for (int i = 0; i < preWarmCount; ++i)
             {
-                T value = _producer();
-                _onGet?.Invoke(value);
-                _onRelease?.Invoke(value);
-                _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
+                T value = default;
+                bool ownsItem = false;
+                try
+                {
+                    value = _producer();
+                    ownsItem = true;
+                    _onGet?.Invoke(value);
+                    _onRelease?.Invoke(value);
+                    _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
+                }
+                catch
+                {
+                    if (ownsItem)
+                    {
+                        InvokeOnDispose(value);
+                    }
+                    foreach (PooledEntry entry in _pool)
+                    {
+                        InvokeOnDispose(entry.Value);
+                    }
+                    _pool.Clear();
+                    throw;
+                }
             }
             int warmCount = _pool.Count;
             if (_peakSize < warmCount)
@@ -1453,6 +1472,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// If the pool is empty, a new instance is created using the producer function.
         /// </summary>
         /// <remarks>
+        /// A failed producer or acquisition callback balances active rental tracking. An item whose
+        /// acquisition callback fails is retired through the disposal callback before the original
+        /// failure propagates. Acquisition callbacks execute outside the storage lock.
         /// The configured release callback may dispose this pool. In that case the returned item is
         /// retired through the disposal callback instead of being retained.
         /// </remarks>
@@ -1467,6 +1489,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// If the pool is empty, a new instance is created using the producer function.
         /// </summary>
         /// <remarks>
+        /// A failed producer or acquisition callback balances active rental tracking. An item whose
+        /// acquisition callback fails is retired through the disposal callback before the original
+        /// failure propagates. Acquisition callbacks execute outside the storage lock.
         /// The configured release callback may dispose this pool. In that case the returned item is
         /// retired through the disposal callback instead of being retained.
         /// </remarks>
@@ -1477,7 +1502,15 @@ namespace WallstopStudios.UnityHelpers.Utils
             if (_disposed)
             {
                 T produced = _producer();
-                _onGet?.Invoke(produced);
+                try
+                {
+                    _onGet?.Invoke(produced);
+                }
+                catch
+                {
+                    InvokeOnDispose(produced);
+                    throw;
+                }
                 value = produced;
                 return new PooledResource<T>(produced, _untrackedReturnAction);
             }
@@ -1498,26 +1531,39 @@ namespace WallstopStudios.UnityHelpers.Utils
             _lastAccessTime = currentTime;
             _usageTracker.RecordRent(currentTime);
 
-            T rented;
-            int poolCount = _pool.Count;
-            if (0 < poolCount)
+            T rented = default;
+            bool ownsItem = false;
+            try
             {
-                int lastIndex = poolCount - 1;
-                rented = _pool[lastIndex].Value;
-                _pool.RemoveAt(lastIndex);
-            }
-            else
-            {
-                rented = _producer();
+                int poolCount = _pool.Count;
+                if (0 < poolCount)
+                {
+                    int lastIndex = poolCount - 1;
+                    rented = _pool[lastIndex].Value;
+                    _pool.RemoveAt(lastIndex);
+                }
+                else
+                {
+                    rented = _producer();
+                }
+                ownsItem = true;
 
                 int totalInCirculation = _pool.Count + _usageTracker.CurrentlyRented;
                 if (_peakSize < totalInCirculation)
                 {
                     _peakSize = totalInCirculation;
                 }
+                _onGet?.Invoke(rented);
             }
-
-            _onGet?.Invoke(rented);
+            catch
+            {
+                _usageTracker.RecordRetiredReturn();
+                if (ownsItem)
+                {
+                    InvokeOnDispose(rented);
+                }
+                throw;
+            }
             value = rented;
             return new PooledResource<T>(rented, _returnAction);
         }
@@ -2392,10 +2438,29 @@ namespace WallstopStudios.UnityHelpers.Utils
             float warmTime = _timeProvider();
             for (int i = 0; i < preWarmCount; ++i)
             {
-                T value = _producer();
-                _onGet?.Invoke(value);
-                _onRelease?.Invoke(value);
-                _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
+                T value = default;
+                bool ownsItem = false;
+                try
+                {
+                    value = _producer();
+                    ownsItem = true;
+                    _onGet?.Invoke(value);
+                    _onRelease?.Invoke(value);
+                    _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
+                }
+                catch
+                {
+                    if (ownsItem)
+                    {
+                        InvokeOnDispose(value);
+                    }
+                    foreach (PooledEntry entry in _pool)
+                    {
+                        InvokeOnDispose(entry.Value);
+                    }
+                    _pool.Clear();
+                    throw;
+                }
             }
             int warmCount = _pool.Count;
             if (_peakSize < warmCount)
@@ -2417,6 +2482,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// This method is thread-safe.
         /// </summary>
         /// <remarks>
+        /// A failed producer or acquisition callback balances active rental tracking. An item whose
+        /// acquisition callback fails is retired through the disposal callback before the original
+        /// failure propagates. Acquisition callbacks execute outside the storage lock.
         /// The configured release callback may dispose this pool. In that case the returned item is
         /// retired through the disposal callback instead of being retained.
         /// </remarks>
@@ -2432,6 +2500,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// This method is thread-safe.
         /// </summary>
         /// <remarks>
+        /// A failed producer or acquisition callback balances active rental tracking. An item whose
+        /// acquisition callback fails is retired through the disposal callback before the original
+        /// failure propagates. Acquisition callbacks execute outside the storage lock.
         /// The configured release callback may dispose this pool. In that case the returned item is
         /// retired through the disposal callback instead of being retained.
         /// </remarks>
@@ -2442,7 +2513,15 @@ namespace WallstopStudios.UnityHelpers.Utils
             if (Volatile.Read(ref _disposed) != 0)
             {
                 T produced = _producer();
-                _onGet?.Invoke(produced);
+                try
+                {
+                    _onGet?.Invoke(produced);
+                }
+                catch
+                {
+                    InvokeOnDispose(produced);
+                    throw;
+                }
                 value = produced;
                 return new PooledResource<T>(produced, _untrackedReturnAction);
             }
@@ -2464,36 +2543,57 @@ namespace WallstopStudios.UnityHelpers.Utils
             Volatile.Write(ref _lastAccessTime, currentTime);
             _usageTracker.RecordRent(currentTime);
 
-            lock (_lock)
+            T rented = default;
+            bool ownsItem = false;
+            try
             {
-                int poolCount = _pool.Count;
-                if (0 < poolCount)
+                bool fromPool = false;
+                lock (_lock)
                 {
-                    int lastIndex = poolCount - 1;
-                    T pooled = _pool[lastIndex].Value;
-                    _pool.RemoveAt(lastIndex);
-                    _onGet?.Invoke(pooled);
-                    value = pooled;
-                    return new PooledResource<T>(pooled, _returnAction);
+                    int poolCount = _pool.Count;
+                    if (0 < poolCount)
+                    {
+                        int lastIndex = poolCount - 1;
+                        rented = _pool[lastIndex].Value;
+                        _pool.RemoveAt(lastIndex);
+                        fromPool = true;
+                        ownsItem = true;
+                    }
                 }
+                if (!fromPool)
+                {
+                    rented = _producer();
+                    ownsItem = true;
+                }
+
+                int totalInCirculation = CurrentPooledCount + _usageTracker.CurrentlyRented;
+                int peak = _peakSize;
+                while (peak < totalInCirculation)
+                {
+                    int original = Interlocked.CompareExchange(
+                        ref _peakSize,
+                        totalInCirculation,
+                        peak
+                    );
+                    if (original == peak)
+                    {
+                        break;
+                    }
+                    peak = original;
+                }
+                _onGet?.Invoke(rented);
             }
-
-            T created = _producer();
-
-            int totalInCirculation = _pool.Count + _usageTracker.CurrentlyRented;
-            int peak = _peakSize;
-            while (peak < totalInCirculation)
+            catch
             {
-                int original = Interlocked.CompareExchange(ref _peakSize, totalInCirculation, peak);
-                if (original == peak)
+                _usageTracker.RecordRetiredReturn();
+                if (ownsItem)
                 {
-                    break;
+                    InvokeOnDispose(rented);
                 }
-                peak = original;
+                throw;
             }
-            _onGet?.Invoke(created);
-            value = created;
-            return new PooledResource<T>(created, _returnAction);
+            value = rented;
+            return new PooledResource<T>(rented, _returnAction);
         }
 
         /// <summary>

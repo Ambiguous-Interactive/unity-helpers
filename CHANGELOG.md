@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix discarded worker jobs retaining captured references after shutdown, including submissions racing disposal ([#844](https://github.com/Ambiguous-Interactive/unity-helpers/issues/844)).
+- Fix pool acquisition and warm-up failures leaking items or leaving phantom active rentals; acquisition callbacks can query pool state across threads ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
+- Fix timed cache refresh failures changing cached values or consuming initial jitter, and preserve expiry when finite lifetime plus jitter exceeds float range ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).
+- Fix singleton loading to use the Resources root when configured subfolders contain only slashes and whitespace; spaces inside valid folders are preserved ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix invisible whitespace-only toggle captions by showing `(Unnamed)`; literal string values and padded captions stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix sprite sheet automatic config lookup throwing for invalid paths; invalid paths and missing sidecars preserve loaded settings ([#929](https://github.com/Ambiguous-Interactive/unity-helpers/issues/929)).
 - Fix sprite sheet configuration save/load accepting blank texture paths; valid filenames containing spaces and serialized hashes keep their exact values ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).

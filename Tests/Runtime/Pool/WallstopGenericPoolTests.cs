@@ -1267,6 +1267,179 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(2, disposeCount);
         }
 
+        [TestCase(false, 0, false, false, TestName = "RentFailure.Created.Producer.Disposal")]
+        [TestCase(
+            false,
+            0,
+            false,
+            true,
+            TestName = "RentFailure.Created.Producer.ThrowingDisposal"
+        )]
+        [TestCase(false, 1, false, false, TestName = "RentFailure.Created.OnGet.Disposal")]
+        [TestCase(false, 1, false, true, TestName = "RentFailure.Created.OnGet.ThrowingDisposal")]
+        [TestCase(true, 1, false, false, TestName = "RentFailure.Pooled.OnGet.Disposal")]
+        [TestCase(true, 1, false, true, TestName = "RentFailure.Pooled.OnGet.ThrowingDisposal")]
+        [TestCase(false, 1, true, false, TestName = "RentFailure.Disposed.OnGet.Disposal")]
+        [TestCase(false, 1, true, true, TestName = "RentFailure.Disposed.OnGet.ThrowingDisposal")]
+        [TestCase(false, 0, true, false, TestName = "RentFailure.Disposed.Producer.Disposal")]
+        [TestCase(
+            false,
+            0,
+            true,
+            true,
+            TestName = "RentFailure.Disposed.Producer.ThrowingDisposal"
+        )]
+        public void FailedRentRetiresOwnedItemAndPreservesFailure(
+            bool preWarm,
+            int failurePhase,
+            bool disposed,
+            bool disposalThrows
+        )
+        {
+            int disposalCount = 0;
+            bool fail = false;
+            InvalidOperationException original = new InvalidOperationException("rent failed");
+            using WallstopGenericPool<TestPoolItem> pool = new(
+                () =>
+                {
+                    if (fail && failurePhase == 0)
+                    {
+                        throw original;
+                    }
+                    return new TestPoolItem();
+                },
+                preWarmCount: preWarm ? 1 : 0,
+                onGet: _ =>
+                {
+                    if (fail && failurePhase == 1)
+                    {
+                        throw original;
+                    }
+                },
+                onDisposal: _ =>
+                {
+                    ++disposalCount;
+                    if (disposalThrows)
+                    {
+                        throw new InvalidOperationException("disposal failed");
+                    }
+                },
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    TimeProvider = TestTimeProvider,
+                }
+            );
+            if (disposed)
+            {
+                pool.Dispose();
+            }
+            fail = true;
+            Exception observed = Assert.Throws<InvalidOperationException>(() => pool.Get());
+            Assert.That(observed, Is.SameAs(original));
+            Assert.That(pool.CurrentlyRented, Is.Zero);
+            Assert.That(pool.Count, Is.Zero);
+            Assert.That(disposalCount, Is.EqualTo(failurePhase == 1 ? 1 : 0));
+            fail = false;
+            using (pool.Get())
+            {
+                Assert.That(pool.CurrentlyRented, Is.EqualTo(disposed ? 0 : 1));
+            }
+            Assert.That(pool.CurrentlyRented, Is.Zero);
+        }
+
+        [TestCase(0, false, TestName = "WarmFailure.Producer")]
+        [TestCase(1, false, TestName = "WarmFailure.OnGet")]
+        [TestCase(2, false, TestName = "WarmFailure.OnRelease")]
+        [TestCase(0, true, TestName = "WarmFailure.Producer.ThrowingDisposal")]
+        [TestCase(1, true, TestName = "WarmFailure.OnGet.ThrowingDisposal")]
+        [TestCase(2, true, TestName = "WarmFailure.OnRelease.ThrowingDisposal")]
+        public void FailedPrewarmRetiresEveryCreatedItem(int failurePhase, bool disposalThrows)
+        {
+            int created = 0;
+            int disposed = 0;
+            InvalidOperationException original = new InvalidOperationException("warm failed");
+            Exception observed = Assert.Throws<InvalidOperationException>(() =>
+                new WallstopGenericPool<TestPoolItem>(
+                    () =>
+                    {
+                        if (created == 1 && failurePhase == 0)
+                        {
+                            throw original;
+                        }
+                        ++created;
+                        return new TestPoolItem();
+                    },
+                    preWarmCount: 3,
+                    onGet: _ =>
+                    {
+                        if (created == 2 && failurePhase == 1)
+                        {
+                            throw original;
+                        }
+                    },
+                    onRelease: _ =>
+                    {
+                        if (created == 2 && failurePhase == 2)
+                        {
+                            throw original;
+                        }
+                    },
+                    onDisposal: _ =>
+                    {
+                        ++disposed;
+                        if (disposalThrows)
+                        {
+                            throw new InvalidOperationException("warm disposal failed");
+                        }
+                    },
+                    options: new PoolOptions<TestPoolItem>
+                    {
+                        Triggers = PurgeTrigger.Explicit,
+                        TimeProvider = TestTimeProvider,
+                    }
+                )
+            );
+            Assert.That(observed, Is.SameAs(original));
+            Assert.That(created, Is.EqualTo(failurePhase == 0 ? 1 : 2));
+            Assert.That(disposed, Is.EqualTo(created));
+        }
+
+#if !SINGLE_THREADED
+        [Test]
+        public void AcquisitionCallbackCanQueryPoolFromWorker()
+        {
+            bool query = false;
+            WallstopGenericPool<TestPoolItem> pool = null;
+            pool = new WallstopGenericPool<TestPoolItem>(
+                () => new TestPoolItem(),
+                preWarmCount: 1,
+                onGet: _ =>
+                {
+                    if (query)
+                    {
+                        Task<int> read = Task.Run(() => pool.Count);
+                        Assert.That(read.Wait(TimeSpan.FromSeconds(5)), Is.True);
+                        Assert.That(read.Result, Is.Zero);
+                    }
+                },
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    TimeProvider = TestTimeProvider,
+                }
+            );
+            using (pool)
+            {
+                query = true;
+                using (pool.Get())
+                {
+                    Assert.That(pool.CurrentlyRented, Is.EqualTo(1));
+                }
+            }
+        }
+#endif
+
         private float TestTimeProvider()
         {
             return _currentTime;

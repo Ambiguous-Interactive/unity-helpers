@@ -20,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// <remarks>
     /// Use for expensive computations that can be reused for a short period (e.g., path costs, counts, queries).
     /// Optionally introduces a one-time jitter to spread refreshes across frames when many caches exist.
+    /// Failed factories or time providers preserve the cached value, timer, and initial jitter.
     /// </remarks>
     public sealed class TimedCache<T>
     {
@@ -36,15 +37,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
                 else
                 {
-                    float expiration =
-                        _cacheTtl + (_shouldUseJitter && !_usedJitter ? _jitterAmount : 0f);
-                    if (_lastRead.Value + expiration < CurrentTime)
+                    double expiration =
+                        (double)_cacheTtl + (_shouldUseJitter && !_usedJitter ? _jitterAmount : 0f);
+                    double elapsed = (double)CurrentTime - _lastRead.Value;
+                    if (expiration < elapsed)
                     {
-                        if (_shouldUseJitter)
-                        {
-                            _usedJitter = true;
-                        }
-                        ResetInternal(consumeJitter: false);
+                        ResetInternal(consumeJitter: true);
                     }
                 }
 
@@ -108,8 +106,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void ResetInternal(bool consumeJitter)
         {
-            _value = _valueProducer();
-            _lastRead = CurrentTime;
+            T value = _valueProducer();
+            float refreshedAt = CurrentTime;
+            _value = value;
+            _lastRead = refreshedAt;
             if (consumeJitter && _shouldUseJitter)
             {
                 _usedJitter = true;

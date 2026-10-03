@@ -26,6 +26,72 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class ScriptableObjectSingletonRecoveryTests : CommonTestBase
     {
+        [TestCase(null, TestName = "LoadPath.NullFolder.UsesTypeName")]
+        [TestCase("", TestName = "LoadPath.EmptyFolder.UsesTypeName")]
+        [TestCase(" \t\r\n", TestName = "LoadPath.BlankFolder.UsesTypeName")]
+        [TestCase("///", TestName = "LoadPath.SlashFolder.UsesTypeName")]
+        [TestCase("/ \t /", TestName = "LoadPath.SlashWrappedBlankFolder.UsesTypeName")]
+        [TestCase("/\u2003/", TestName = "LoadPath.SlashWrappedUnicodeBlankFolder.UsesTypeName")]
+        public void BlankResourceFolderFallsBackToTypeName(string resourcesPath)
+        {
+            Assert.AreEqual(
+                nameof(AbsentAssetSingleton),
+                AbsentAssetSingleton.BuildLoadPath(resourcesPath, nameof(AbsentAssetSingleton))
+            );
+        }
+
+        [TestCase(
+            "Sub Folder",
+            "Sub Folder/AbsentAssetSingleton",
+            TestName = "LoadPath.EmbeddedSpaces.Preserved"
+        )]
+        [TestCase(
+            " /Sub/Folder/ ",
+            "Sub/Folder/AbsentAssetSingleton",
+            TestName = "LoadPath.OuterWhitespaceAndSlashes.Trimmed"
+        )]
+        public void NonblankResourceFolderPreservesPath(string resourcesPath, string expected)
+        {
+            Assert.AreEqual(
+                expected,
+                AbsentAssetSingleton.BuildLoadPath(resourcesPath, nameof(AbsentAssetSingleton))
+            );
+        }
+
+        [TestCase(null, TestName = "LoadPath.NullType.Rejected")]
+        [TestCase("", TestName = "LoadPath.EmptyType.Rejected")]
+        [TestCase(" \t", TestName = "LoadPath.BlankType.Rejected")]
+        public void BlankTypeNameCannotBuildResourceLoadPath(string typeName)
+        {
+            Assert.That(AbsentAssetSingleton.BuildLoadPath("Sub/Folder", typeName), Is.Null);
+        }
+
+        [TestCase(null, TestName = "CanonicalPath.Null.Rejected")]
+        [TestCase("", TestName = "CanonicalPath.Empty.Rejected")]
+        [TestCase(" \t", TestName = "CanonicalPath.Blank.Rejected")]
+        [TestCase("///", TestName = "CanonicalPath.Slashes.Rejected")]
+        [TestCase("/ \t /", TestName = "CanonicalPath.SlashWrappedBlank.Rejected")]
+        [TestCase("/\u2003/", TestName = "CanonicalPath.SlashWrappedUnicodeBlank.Rejected")]
+        public void BlankCanonicalPathCannotIdentifyAsset(string loadPath)
+        {
+            Assert.That(AbsentAssetSingleton.BuildCanonicalAssetPath(loadPath), Is.Null);
+        }
+
+        [TestCase(
+            "Sub Folder/Settings",
+            "Assets/Resources/Sub Folder/Settings.asset",
+            TestName = "CanonicalPath.EmbeddedSpaces.Preserved"
+        )]
+        [TestCase(
+            "Sub\\Folder/Settings",
+            "Assets/Resources/Sub/Folder/Settings.asset",
+            TestName = "CanonicalPath.Backslashes.Normalized"
+        )]
+        public void NonblankCanonicalPathIdentifiesAsset(string loadPath, string expected)
+        {
+            Assert.AreEqual(expected, AbsentAssetSingleton.BuildCanonicalAssetPath(loadPath));
+        }
+
         [TearDown]
         public void ResetSingletons()
         {

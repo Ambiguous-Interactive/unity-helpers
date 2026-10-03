@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
 {
 #if !SINGLE_THREADED
+    using System;
     using System.Collections;
     using System.Threading;
     using System.Threading.Tasks;
@@ -29,6 +30,213 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
 
         // Bound the gate wait so an assertion failure cannot stall teardown.
         private const int GateTimeoutMilliseconds = 5_000;
+
+        [TestCase(false, 0)]
+        [TestCase(false, 1)]
+        [TestCase(false, 2)]
+        [TestCase(true, 0)]
+        [TestCase(true, 1)]
+        [TestCase(true, 2)]
+        public void DisposalClearsPendingWorkWhileWaitingForRunningItem(
+            bool runInBackground,
+            int delegateKind
+        )
+        {
+            using ManualResetEventSlim entered = new(false);
+            using ManualResetEventSlim release = new(false);
+            using SingleThreadedThreadPool threadPool = new(runInBackground);
+            int queuedRuns = 0;
+            threadPool.Enqueue(() =>
+            {
+                entered.Set();
+                release.Wait(DrainTimeoutMilliseconds);
+            });
+            Task disposal = null;
+            try
+            {
+                Assert.IsTrue(entered.Wait(GateTimeoutMilliseconds));
+                for (int index = 0; index < QueuedItems; ++index)
+                {
+                    switch (delegateKind)
+                    {
+                        case 0:
+                            threadPool.Enqueue(
+                                (Action)(() => Interlocked.Increment(ref queuedRuns))
+                            );
+                            break;
+                        case 1:
+                            threadPool.Enqueue(
+                                (Func<Task>)(
+                                    () =>
+                                    {
+                                        Interlocked.Increment(ref queuedRuns);
+                                        return Task.CompletedTask;
+                                    }
+                                )
+                            );
+                            break;
+                        case 2:
+                            threadPool.Enqueue(
+                                (Func<ValueTask>)(
+                                    () =>
+                                    {
+                                        Interlocked.Increment(ref queuedRuns);
+                                        return default;
+                                    }
+                                )
+                            );
+                            break;
+                    }
+                }
+                Assert.AreEqual(QueuedItems + 1, threadPool.Count);
+                disposal = threadPool.DisposeAsync().AsTask();
+                Assert.IsFalse(threadPool.IsAcceptingWork);
+                Assert.IsFalse(disposal.IsCompleted);
+                Assert.AreEqual(
+                    1,
+                    threadPool.Count,
+                    "Shutdown must release queued delegates before the running item finishes."
+                );
+            }
+            finally
+            {
+                release.Set();
+                if (disposal != null)
+                {
+                    Assert.IsTrue(disposal.Wait(GateTimeoutMilliseconds));
+                }
+            }
+            Assert.AreEqual(0, threadPool.Count);
+            Assert.AreEqual(0, Volatile.Read(ref queuedRuns));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ConcurrentSubmissionsCannotRetainWorkAfterDisposal(bool runInBackground)
+        {
+            using ManualResetEventSlim entered = new(false);
+            using ManualResetEventSlim release = new(false);
+            using ManualResetEventSlim submit = new(false);
+            using SingleThreadedThreadPool threadPool = new(runInBackground);
+            int queuedRuns = 0;
+            Action pending = () => Interlocked.Increment(ref queuedRuns);
+            threadPool.Enqueue(() =>
+            {
+                entered.Set();
+                release.Wait(DrainTimeoutMilliseconds);
+            });
+            Task[] producers = new Task[4];
+            Task disposal = null;
+            try
+            {
+                Assert.IsTrue(entered.Wait(GateTimeoutMilliseconds));
+                threadPool.Enqueue(pending);
+                for (int index = 0; index < producers.Length; ++index)
+                {
+                    producers[index] = Task.Run(() =>
+                    {
+                        submit.Wait(DrainTimeoutMilliseconds);
+                        for (int item = 0; item < 1000; ++item)
+                        {
+                            threadPool.Enqueue(pending);
+                        }
+                    });
+                }
+                submit.Set();
+                disposal = threadPool.DisposeAsync().AsTask();
+                Assert.IsTrue(Task.WaitAll(producers, GateTimeoutMilliseconds));
+                threadPool.Enqueue(pending);
+                Assert.AreEqual(1, threadPool.Count);
+            }
+            finally
+            {
+                submit.Set();
+                release.Set();
+                if (disposal != null)
+                {
+                    Assert.IsTrue(disposal.Wait(GateTimeoutMilliseconds));
+                }
+            }
+            Assert.AreEqual(0, threadPool.Count);
+            Assert.AreEqual(0, Volatile.Read(ref queuedRuns));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DrainRacingDisposalCannotReportDiscardedWorkAsCompleted(bool runInBackground)
+        {
+            for (int attempt = 0; attempt < QueuedItems; ++attempt)
+            {
+                using ManualResetEventSlim entered = new(false);
+                using ManualResetEventSlim release = new(false);
+                using SingleThreadedThreadPool threadPool = new(runInBackground);
+                int queuedRuns = 0;
+                threadPool.Enqueue(() =>
+                {
+                    entered.Set();
+                    release.Wait(DrainTimeoutMilliseconds);
+                });
+                Task<bool> drain = null;
+                Task disposal = null;
+                try
+                {
+                    Assert.IsTrue(entered.Wait(GateTimeoutMilliseconds));
+                    threadPool.Enqueue(() => Interlocked.Increment(ref queuedRuns));
+                    drain = threadPool.DrainAsync().AsTask();
+                    Assert.IsFalse(drain.IsCompleted);
+                    disposal = threadPool.DisposeAsync().AsTask();
+                }
+                finally
+                {
+                    release.Set();
+                    if (disposal != null)
+                    {
+                        Assert.IsTrue(disposal.Wait(GateTimeoutMilliseconds));
+                    }
+                }
+                Assert.IsTrue(drain.Wait(GateTimeoutMilliseconds));
+                Assert.IsFalse(drain.Result, "Disposal discarded accepted work during this drain.");
+                Assert.AreEqual(0, Volatile.Read(ref queuedRuns));
+                Assert.AreEqual(0, threadPool.Count);
+            }
+        }
+
+        [Test]
+        public void AlreadyCanceledDrainOfIdlePoolPreservesCompletedSuccess()
+        {
+            using CancellationTokenSource canceled = new();
+            using SingleThreadedThreadPool threadPool = new();
+            canceled.Cancel();
+            Task<bool> drain = threadPool.DrainAsync(canceled.Token).AsTask();
+            Assert.IsTrue(drain.IsCompleted);
+            Assert.IsTrue(drain.Result);
+        }
+
+        [Test]
+        public void AlreadyCanceledDrainWithRunningWorkReportsFailure()
+        {
+            using ManualResetEventSlim entered = new(false);
+            using ManualResetEventSlim release = new(false);
+            using CancellationTokenSource canceled = new();
+            using SingleThreadedThreadPool threadPool = new();
+            threadPool.Enqueue(() =>
+            {
+                entered.Set();
+                release.Wait(DrainTimeoutMilliseconds);
+            });
+            try
+            {
+                Assert.IsTrue(entered.Wait(GateTimeoutMilliseconds));
+                canceled.Cancel();
+                Task<bool> drain = threadPool.DrainAsync(canceled.Token).AsTask();
+                Assert.IsTrue(drain.IsCompleted);
+                Assert.IsFalse(drain.Result);
+            }
+            finally
+            {
+                release.Set();
+            }
+        }
 
         [UnityTest]
         public IEnumerator DrainRunsEveryQueuedItemBeforeDisposal()

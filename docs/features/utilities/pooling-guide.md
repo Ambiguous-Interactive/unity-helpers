@@ -78,6 +78,13 @@ list.Add(1);
 list.Add(2);
 ```
 
+A failed producer or `onGet` callback does not leave an active rental. If `onGet` fails after
+an item is created or removed from storage, the pool retires that item through `onDisposal`
+and propagates the original failure. Failed prewarming retires every item created before the
+failure, including the item whose initialization failed. Acquisition callbacks run outside the
+storage lock, so they can query pool state from another thread. Rental counters record attempts;
+a failed attempt is removed from the active rental count.
+
 Disposing `PooledResource<T>` runs the configured release callback before parking the item. If that
 callback disposes the pool, the returning item is sent to the disposal callback exactly once and is
 never added back to the disposed pool. The same guarantee holds when a lease return races

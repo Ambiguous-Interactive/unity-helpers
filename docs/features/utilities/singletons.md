@@ -263,7 +263,7 @@ Notes:
 
 - Access via `T.Instance` (lazy‑loads from `Resources/` using either a custom path or the type name; warns if multiple assets found and chooses the first by name).
 - `HasInstance` indicates whether the lazy value exists and is not null.
-- Optional `[ScriptableSingletonPath("Sub/Folder")]` to control the `Resources` subfolder.
+- Optional `[ScriptableSingletonPath("Sub/Folder")]` to control the `Resources` subfolder. Blank subfolders, including whitespace wrapped in slashes, fall back to the type name in the Resources root. Spaces inside a nonblank folder name are preserved.
 - Editor utility auto‑creates and relocates assets: see the “ScriptableObject Singleton Creator” in the Editor Tools Guide.
 
 Example: Settings asset
