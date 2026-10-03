@@ -315,6 +315,11 @@ const CHECKS = [
     run: "npm run test:unity-test-filter"
   },
   {
+    id: "unity-frozen-player-provenance",
+    name: "Unity frozen player provenance",
+    run: "npm run test:unity-frozen-player-provenance"
+  },
+  {
     id: "unity-acceptance-runner",
     name: "Unity native acceptance orchestration",
     run: "npm run test:unity-acceptance-runner"

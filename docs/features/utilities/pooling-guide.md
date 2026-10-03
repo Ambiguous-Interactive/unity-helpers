@@ -693,6 +693,16 @@ counter is compiled out because it can crash those players. These records remain
 binary, corpus and build settings are unverified, and retained-memory accounting is not calibrated.
 Passing clock or managed-byte controls cannot establish campaign eligibility or candidate adoption.
 
+For an executed standalone run, `scripts/unity/run-ci-tests.ps1` accepts an optional
+`-FrozenPlayerDeclarationPath`. The JSON declaration uses `SchemaVersion: 1`, a unique `RunId`, the
+requested `UnityVersion` and `Backend` (`Mono2x` or `IL2CPP`), and nonempty `SourceFiles` and
+`CorpusFiles` arrays. Each file entry contains a repository-relative `Path` and its lowercase SHA256
+in `Sha256`. The runner records declared input hashes and the complete player directory before and
+after launch, rejects changes, and retains a diagnostic report under the run's artifacts directory.
+The report also checks the exact preflight and two Base64 correctness outcomes. Declared file hashes
+do not prove complete source coverage, runtime association or corpus consumption. Effective build
+settings and retained-memory behavior remain unverified; campaign and adoption eligibility stay false.
+
 ---
 
 ### Performance Tips
