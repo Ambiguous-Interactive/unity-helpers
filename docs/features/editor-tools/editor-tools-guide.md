@@ -1000,7 +1000,9 @@ Transparency-based grid detection requires a threshold in `[0, 1)`.
   since. Blank texture paths return before save, load, or automatic config lookup without changing
   entry settings. Nonblank paths, including filenames with spaces, retain their exact text. Saved
   whitespace hashes remain literal data and mark the config stale when they differ from the texture's
-  hash.
+  hash. Automatic lookup logs invalid-path normalization failures and leaves the loaded config,
+  flags, and overrides unchanged. A missing sidecar also leaves that state unchanged; explicit
+  **Load Config** still clears the loaded config and flags when its sidecar is missing.
 - **Preserve Import Settings** (on by default) copies the source's importer settings to each output.
 - Preview and extracted output reuse dynamically sized pixel buffers instead of retaining one
   permanent pool bucket for every sprite size.

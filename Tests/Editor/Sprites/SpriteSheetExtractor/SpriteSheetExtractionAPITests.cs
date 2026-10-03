@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
     using System.Collections.Generic;
     using System.IO;
     using System.Runtime.InteropServices;
+    using System.Text.RegularExpressions;
     using System.Threading;
     using System.Threading.Tasks;
     using NUnit.Framework;
@@ -75,18 +76,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             return result;
         }
 
-        private static void AssertBlankConfigEntryUnchanged(
+        private static void AssertConfigEntryUnchanged(
             SpriteSheetExtractor.SpriteSheetEntry entry,
             string texturePath,
             SpriteSheetConfig config,
             string configJson,
-            Dictionary<string, byte[]> sidecars
+            Dictionary<string, byte[]> sidecars,
+            bool expectedLoaded = true
         )
         {
             Assert.That(entry._assetPath, Is.EqualTo(texturePath));
             Assert.That(entry._loadedConfig, Is.SameAs(config));
             Assert.That(Serializer.JsonStringify(entry._loadedConfig), Is.EqualTo(configJson));
-            Assert.That(entry._configLoaded, Is.True);
+            Assert.That(entry._configLoaded, Is.EqualTo(expectedLoaded));
             Assert.That(entry._configStale, Is.True);
             Assert.That(entry._useGlobalSettings, Is.False);
             Assert.That(entry._pivotModeOverride, Is.EqualTo(PivotMode.Custom));
@@ -504,11 +506,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Dictionary<string, byte[]> sidecars = SnapshotProjectRootConfigSidecars();
 
             Assert.That(window.SaveConfig(entry), Is.False);
-            AssertBlankConfigEntryUnchanged(entry, texturePath, config, configJson, sidecars);
+            AssertConfigEntryUnchanged(entry, texturePath, config, configJson, sidecars);
             Assert.That(window.LoadConfig(entry), Is.False);
-            AssertBlankConfigEntryUnchanged(entry, texturePath, config, configJson, sidecars);
+            AssertConfigEntryUnchanged(entry, texturePath, config, configJson, sidecars);
             Assert.DoesNotThrow(() => window.TryAutoLoadConfig(entry));
-            AssertBlankConfigEntryUnchanged(entry, texturePath, config, configJson, sidecars);
+            AssertConfigEntryUnchanged(entry, texturePath, config, configJson, sidecars);
             LogAssert.NoUnexpectedReceived();
         }
 
@@ -522,6 +524,85 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(window.LoadConfig(null), Is.False);
             Assert.DoesNotThrow(() => window.TryAutoLoadConfig(null));
             LogAssert.NoUnexpectedReceived();
+        }
+
+        [TestCase(false, TestName = "AutoLoad.InvalidRelativePath.PreservesState")]
+        [TestCase(true, TestName = "AutoLoad.InvalidAbsolutePath.PreservesState")]
+        public void AutoLoadInvalidPathLogsAndPreservesState(bool absolutePath)
+        {
+            string texturePath = Root + "/bad\0.png";
+            if (absolutePath)
+            {
+                texturePath = ToFullPath(Root) + "/bad\0.png";
+            }
+            AssertAutoLoadPreservesState(texturePath, true, true);
+        }
+
+        [TestCase(true, TestName = "AutoLoad.MissingSidecar.LoadedStateUnchanged")]
+        [TestCase(false, TestName = "AutoLoad.MissingSidecar.UnloadedStateUnchanged")]
+        public void AutoLoadMissingSidecarPreservesState(bool loaded)
+        {
+            string texturePath = Root + "/missing auto-load.png";
+            Assert.That(
+                File.Exists(ToFullPath(SpriteSheetConfig.GetConfigPath(texturePath))),
+                Is.False
+            );
+            AssertAutoLoadPreservesState(texturePath, loaded, false);
+        }
+
+        [Test]
+        public void AutoLoadExistingSidecarWithSpacesLoadsWithoutChangingBytes()
+        {
+            string folder = Root + "/auto load with spaces";
+            string texturePath = folder + "/source sheet.png";
+            string configPath = ToFullPath(SpriteSheetConfig.GetConfigPath(texturePath));
+            Assert.That(Directory.Exists(ToFullPath(folder)), Is.False);
+            AssetDatabase.CreateFolder(Root, "auto load with spaces");
+            try
+            {
+                File.Copy(ToFullPath(Source), ToFullPath(texturePath));
+                SpriteSheetConfig config = new()
+                {
+                    pivotMode = PivotMode.Custom,
+                    customPivot = new Vector2(0.25f, 0.75f),
+                    algorithm = (int)AutoDetectionAlgorithm.UniformGrid,
+                    expectedSpriteCount = 7,
+                    snapToTextureDivisor = false,
+                    textureContentHash = " ",
+                };
+                string json = Serializer.JsonStringify(config);
+                File.WriteAllText(configPath, json);
+                byte[] configBytes = File.ReadAllBytes(configPath);
+                byte[] textureBytes = File.ReadAllBytes(ToFullPath(texturePath));
+                SpriteSheetExtractor window = Track(
+                    ScriptableObject.CreateInstance<SpriteSheetExtractor>()
+                );
+                SpriteSheetExtractor.SpriteSheetEntry entry = new() { _assetPath = texturePath };
+                Assert.That(entry._loadedConfig, Is.Null);
+                Assert.That(entry._configLoaded, Is.False);
+                window.TryAutoLoadConfig(entry);
+                Assert.That(entry._loadedConfig, Is.Not.Null);
+                Assert.That(Serializer.JsonStringify(entry._loadedConfig), Is.EqualTo(json));
+                Assert.That(entry._assetPath, Is.EqualTo(texturePath));
+                Assert.That(entry._configLoaded, Is.True);
+                Assert.That(entry._configStale, Is.True);
+                Assert.That(entry._useGlobalSettings, Is.False);
+                Assert.That(entry._pivotModeOverride, Is.EqualTo(PivotMode.Custom));
+                Assert.That(entry._customPivotOverride, Is.EqualTo(config.customPivot));
+                Assert.That(
+                    entry._autoDetectionAlgorithmOverride,
+                    Is.EqualTo(AutoDetectionAlgorithm.UniformGrid)
+                );
+                Assert.That(entry._expectedSpriteCountOverride, Is.EqualTo(7));
+                Assert.That(entry._snapToTextureDivisorOverride, Is.False);
+                Assert.That(File.ReadAllBytes(configPath), Is.EqualTo(configBytes));
+                Assert.That(File.ReadAllBytes(ToFullPath(texturePath)), Is.EqualTo(textureBytes));
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(folder);
+            }
         }
 
         [Test]
@@ -795,6 +876,61 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             Assert.That(result.Errors, Is.Not.Empty);
             Assert.That(result.ModifiedAssets, Is.Zero);
+        }
+
+        private void AssertAutoLoadPreservesState(string texturePath, bool loaded, bool expectError)
+        {
+            SpriteSheetExtractor window = Track(
+                ScriptableObject.CreateInstance<SpriteSheetExtractor>()
+            );
+            SpriteSheetConfig config = new()
+            {
+                expectedSpriteCount = 7,
+                textureContentHash = "seeded",
+            };
+            string json = Serializer.JsonStringify(config);
+            SpriteSheetExtractor.SpriteSheetEntry entry = new()
+            {
+                _assetPath = texturePath,
+                _loadedConfig = config,
+                _configLoaded = loaded,
+                _configStale = true,
+                _useGlobalSettings = false,
+                _pivotModeOverride = PivotMode.Custom,
+                _customPivotOverride = new Vector2(0.25f, 0.75f),
+                _autoDetectionAlgorithmOverride = AutoDetectionAlgorithm.UniformGrid,
+                _expectedSpriteCountOverride = 7,
+                _snapToTextureDivisorOverride = false,
+            };
+            string controlPath = ToFullPath(Source + "." + SpriteSheetConfig.FileExtension);
+            Assert.That(File.Exists(controlPath), Is.False);
+            Assert.That(File.Exists(controlPath + ".meta"), Is.False);
+            try
+            {
+                File.WriteAllText(controlPath, json);
+                byte[] controlBytes = File.ReadAllBytes(controlPath);
+                byte[] sourceBytes = File.ReadAllBytes(ToFullPath(Source));
+                int fileCount = CountNonMetaFiles();
+                Dictionary<string, byte[]> sidecars = SnapshotProjectRootConfigSidecars();
+                if (expectError)
+                {
+                    LogAssert.Expect(
+                        LogType.Error,
+                        new Regex("Failed to auto-load config for", RegexOptions.CultureInvariant)
+                    );
+                }
+                Assert.DoesNotThrow(() => window.TryAutoLoadConfig(entry));
+                AssertConfigEntryUnchanged(entry, texturePath, config, json, sidecars, loaded);
+                Assert.That(File.ReadAllBytes(controlPath), Is.EqualTo(controlBytes));
+                Assert.That(File.ReadAllBytes(ToFullPath(Source)), Is.EqualTo(sourceBytes));
+                Assert.That(CountNonMetaFiles(), Is.EqualTo(fileCount));
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally
+            {
+                File.Delete(controlPath);
+                File.Delete(controlPath + ".meta");
+            }
         }
     }
 #endif
