@@ -839,6 +839,309 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             _currentTime = 0f;
         }
 
+        [TestCase(0, 100f)]
+        [TestCase(1, 100f)]
+        [TestCase(2, 100f)]
+        [TestCase(3, 100f)]
+        [TestCase(0, 16777216f)]
+        [TestCase(1, 16777216f)]
+        [TestCase(2, 16777216f)]
+        [TestCase(3, 16777216f)]
+        [TestCase(0, float.MaxValue)]
+        [TestCase(1, float.MaxValue)]
+        [TestCase(2, float.MaxValue)]
+        [TestCase(3, float.MaxValue)]
+        public void PositiveLifetimeSurvivesRepeatedReadsWithoutElapsedTime(
+            int expirationPolicy,
+            float initialTime
+        )
+        {
+            _currentTime = initialTime;
+            CacheOptions<int, int> options = new() { TimeProvider = TimeProvider };
+            if (expirationPolicy == 0)
+                options.ExpireAfterWriteSeconds = 1f;
+            if (expirationPolicy == 1)
+                options.ExpireAfterAccessSeconds = 1f;
+            if (expirationPolicy == 2)
+                options.ExpireAfter = static (_, _) => 1f;
+            using Cache<int, int> cache = new(options);
+            cache.Set(1, 7, expirationPolicy == 3 ? 1f : null);
+            Assert.IsTrue(cache.TryGet(1, out int first));
+            Assert.AreEqual(7, first);
+            Assert.IsTrue(cache.TryGet(1, out int second));
+            Assert.AreEqual(7, second);
+        }
+
+        [TestCase(100f)]
+        [TestCase(16777216f)]
+        [TestCase(float.MaxValue)]
+        [TestCase(float.PositiveInfinity)]
+        public void DisabledExpirationPreservesEntriesAtEveryClock(float currentTime)
+        {
+            _currentTime = currentTime;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int> { TimeProvider = TimeProvider }
+            );
+            cache.Set(1, 7);
+            cache.CleanUp();
+            Assert.AreEqual(1, cache.Count);
+            Assert.IsTrue(cache.ContainsKey(1));
+            Assert.IsTrue(cache.TryGet(1, out int value));
+            Assert.AreEqual(7, value);
+        }
+
+        [TestCase(100f, 3f, 2f, 4f)]
+        [TestCase(33554432f, 5f, 4f, 8f)]
+        public void FiniteExpirationUsesElapsedTimeAcrossReadsEnumerationAndCleanup(
+            float initialTime,
+            float lifetime,
+            float withinLifetime,
+            float afterLifetime
+        )
+        {
+            _currentTime = initialTime;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfterWriteSeconds = lifetime,
+                }
+            );
+            cache.Set(1, 7);
+            _currentTime = initialTime + withinLifetime;
+            Assert.IsTrue(cache.ContainsKey(1));
+            List<int> keys = new();
+            cache.GetKeys(keys);
+            CollectionAssert.AreEqual(new[] { 1 }, keys);
+            CollectionAssert.AreEqual(new[] { 1 }, cache.Keys);
+            cache.CleanUp();
+            Assert.AreEqual(1, cache.Count);
+            _currentTime = initialTime + afterLifetime;
+            cache.GetKeys(keys);
+            Assert.AreEqual(0, keys.Count);
+            CollectionAssert.IsEmpty(cache.Keys);
+            cache.CleanUp();
+            Assert.AreEqual(0, cache.Count);
+            Assert.IsFalse(cache.TryGet(1, out _));
+        }
+
+        [TestCase(100f)]
+        [TestCase(16777216f)]
+        public void ExpirationIncludesExactLifetimeBoundary(float initialTime)
+        {
+            _currentTime = initialTime;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfterWriteSeconds = 2f,
+                }
+            );
+            cache.Set(1, 7);
+            _currentTime = initialTime + 2f;
+            Assert.IsFalse(cache.TryGet(1, out _));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void FiniteLifetimeAndJitterExpireAcrossTheFiniteClockRange(bool useJitter)
+        {
+            _currentTime = -float.MaxValue;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfterWriteSeconds = float.MaxValue,
+                    UseJitter = useJitter,
+                    JitterMaxSeconds = float.MaxValue,
+                }
+            );
+            cache.Set(1, 7);
+            Assert.IsTrue(cache.TryGet(1, out _));
+            _currentTime = float.MaxValue;
+            Assert.IsFalse(cache.TryGet(1, out _));
+        }
+
+        [TestCase(float.NaN, true)]
+        [TestCase(float.PositiveInfinity, true)]
+        [TestCase(float.NegativeInfinity, false)]
+        [TestCase(0f, false)]
+        [TestCase(-1f, false)]
+        public void CustomLifetimePreservesNonfiniteAndNonpositivePolicies(
+            float lifetime,
+            bool expectedPresent
+        )
+        {
+            _currentTime = 100f;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfter = (_, _) => lifetime,
+                }
+            );
+            cache.Set(1, 7);
+            Assert.AreEqual(expectedPresent, cache.TryGet(1, out _));
+        }
+
+        [TestCase(float.NaN, float.NaN, true)]
+        [TestCase(float.PositiveInfinity, float.PositiveInfinity, false)]
+        [TestCase(float.NegativeInfinity, float.NegativeInfinity, false)]
+        [TestCase(100f, float.PositiveInfinity, false)]
+        [TestCase(float.PositiveInfinity, 100f, true)]
+        [TestCase(100f, float.NegativeInfinity, true)]
+        [TestCase(100f, float.NaN, true)]
+        public void ActiveExpirationPreservesNonfiniteClockComparisons(
+            float initialTime,
+            float readTime,
+            bool expectedPresent
+        )
+        {
+            _currentTime = initialTime;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfterWriteSeconds = 1f,
+                }
+            );
+            cache.Set(1, 7);
+            _currentTime = readTime;
+            Assert.AreEqual(expectedPresent, cache.TryGet(1, out _));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void UpdatingEntryReplacesItsExpirationPolicy(bool disableExpiration)
+        {
+            _currentTime = 100f;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int> { TimeProvider = TimeProvider }
+            );
+            cache.Set(1, 7, disableExpiration ? 1f : null);
+            cache.Set(1, 8, disableExpiration ? null : 1f);
+            Assert.IsTrue(cache.TryGet(1, out int value));
+            Assert.AreEqual(8, value);
+            _currentTime = float.MaxValue;
+            Assert.AreEqual(disableExpiration, cache.TryGet(1, out _));
+        }
+
+        [Test]
+        public void NonfiniteClockPreservesRoundedNegativeOverflowExpiration()
+        {
+            _currentTime = -float.MaxValue;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfter = static (_, _) => -float.MaxValue,
+                }
+            );
+            cache.Set(1, 7);
+            _currentTime = float.NegativeInfinity;
+            Assert.IsFalse(cache.TryGet(1, out _));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ThrowingLifetimeFunctionPreservesExistingValueAndExpiration(
+            bool inspectExpiration
+        )
+        {
+            _currentTime = 100f;
+            bool failLifetime = false;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfter = (_, _) =>
+                        failLifetime ? throw new InvalidOperationException() : 2f,
+                }
+            );
+            cache.Set(1, 7);
+            _currentTime = 101f;
+            failLifetime = true;
+            Assert.Throws<InvalidOperationException>(() => cache.Set(1, 8));
+            if (inspectExpiration)
+            {
+                _currentTime = 102f;
+                Assert.IsFalse(cache.TryGet(1, out _));
+            }
+            else
+            {
+                Assert.IsTrue(cache.TryGet(1, out int value));
+                Assert.AreEqual(7, value);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ThrowingLifetimeFunctionDoesNotConsumeStorageOrEvictExistingEntries(
+            bool atCapacity
+        )
+        {
+            _currentTime = 100f;
+            bool failLifetime = false;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    InitialCapacity = 2,
+                    MaximumSize = 2,
+                    TimeProvider = TimeProvider,
+                    ExpireAfter = (_, _) =>
+                        failLifetime ? throw new InvalidOperationException() : 2f,
+                }
+            );
+            cache.Set(1, 7);
+            if (atCapacity)
+            {
+                cache.Set(3, 9);
+            }
+            int originalCount = cache.Count;
+            failLifetime = true;
+            for (int attempt = 0; attempt < 3; ++attempt)
+            {
+                Assert.Throws<InvalidOperationException>(() => cache.Set(2, 8));
+                Assert.AreEqual(originalCount, cache.Count);
+                Assert.IsTrue(cache.TryGet(1, out int originalValue));
+                Assert.AreEqual(7, originalValue);
+                if (atCapacity)
+                {
+                    Assert.IsTrue(cache.TryGet(3, out int otherValue));
+                    Assert.AreEqual(9, otherValue);
+                }
+            }
+            failLifetime = false;
+            cache.Set(2, 8);
+            Assert.AreEqual(2, cache.Count);
+            Assert.IsTrue(cache.TryGet(2, out int value));
+            Assert.AreEqual(8, value);
+        }
+
+        [Test]
+        public void SlidingAccessPreservesExistingPrecedenceAndBackwardClockBehavior()
+        {
+            _currentTime = 100f;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfterWriteSeconds = 10f,
+                    ExpireAfterAccessSeconds = 4f,
+                    ExpireAfter = static (_, _) => 1f,
+                }
+            );
+            cache.Set(1, 7, 2f);
+            _currentTime = 101f;
+            Assert.IsTrue(cache.TryGet(1, out _));
+            _currentTime = 103f;
+            Assert.IsTrue(cache.TryGet(1, out _));
+            _currentTime = 102f;
+            Assert.IsTrue(cache.ContainsKey(1));
+            _currentTime = 107f;
+            Assert.IsFalse(cache.TryGet(1, out _));
+        }
+
         [Test]
         public void ExpireAfterWriteEvictsExpiredEntries()
         {

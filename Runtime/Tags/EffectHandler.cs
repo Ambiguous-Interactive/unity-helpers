@@ -103,7 +103,8 @@ namespace WallstopStudios.UnityHelpers.Tags
         private readonly Dictionary<long, EffectStackKey> _stackKeyByHandleId = new();
 
         // Iterating effect IDs is cheaper than iterating full handles.
-        private readonly Dictionary<long, float> _effectExpirations = new();
+        private readonly Dictionary<long, (float startTime, float duration)> _effectExpirations =
+            new();
         private readonly Dictionary<long, EffectHandle> _effectHandlesById = new();
 
         private readonly List<long> _expiredEffectIds = new();
@@ -383,6 +384,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <param name="handle">The handle to inspect.</param>
         /// <param name="remainingDuration">When this method returns, contains the remaining time in seconds, or zero if unavailable.</param>
         /// <returns><c>true</c> if the handle has a tracked duration; otherwise, <c>false</c>.</returns>
+        /// <remarks>Duration effects retain their authored lifetime at large finite clocks; Infinite effects have no tracked duration.</remarks>
         public bool TryGetRemainingDuration(EffectHandle handle, out float remainingDuration)
         {
             return TryGetRemainingDuration(handle, Time.time, out remainingDuration);
@@ -473,19 +475,27 @@ namespace WallstopStudios.UnityHelpers.Tags
         )
         {
             long handleId = handle.id;
-            if (!_effectExpirations.TryGetValue(handleId, out float expiration))
+            if (
+                !_effectExpirations.TryGetValue(
+                    handleId,
+                    out (float startTime, float duration) timing
+                )
+            )
             {
                 remainingDuration = 0f;
                 return false;
             }
 
-            float timeRemaining = expiration - currentTime;
+            double timeRemaining =
+                float.IsFinite(timing.startTime) && float.IsFinite(currentTime)
+                    ? timing.duration - ((double)currentTime - timing.startTime)
+                    : (float)((double)timing.startTime + timing.duration) - currentTime;
             if (timeRemaining < 0f)
             {
                 timeRemaining = 0f;
             }
 
-            remainingDuration = timeRemaining;
+            remainingDuration = (float)timeRemaining;
             return true;
         }
 
@@ -548,8 +558,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            float newExpiration = currentTime + effect.duration;
-            _effectExpirations[handleId] = newExpiration;
+            _effectExpirations[handleId] = (currentTime, effect.duration);
             _effectHandlesById[handleId] = handle;
             return true;
         }
@@ -562,6 +571,11 @@ namespace WallstopStudios.UnityHelpers.Tags
         internal int ProcessPeriodicEffectsForTesting(float currentTime, float deltaTime)
         {
             return ProcessPeriodicEffects(currentTime, deltaTime);
+        }
+
+        internal void ProcessEffectExpirationsForTesting(float currentTime)
+        {
+            ProcessEffectExpirations(currentTime);
         }
 
         private void Awake()
@@ -1073,7 +1087,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             {
                 if (!exists || effect.resetDurationOnReapplication)
                 {
-                    _effectExpirations[handleId] = currentTime + effect.duration;
+                    _effectExpirations[handleId] = (currentTime, effect.duration);
                 }
             }
 
@@ -1674,16 +1688,27 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private void ProcessEffectExpirations()
         {
+            ProcessEffectExpirations(Time.time);
+        }
+
+        private void ProcessEffectExpirations(float currentTime)
+        {
             if (_effectExpirations.Count <= 0)
             {
                 return;
             }
 
             _expiredEffectIds.Clear();
-            float currentTime = Time.time;
-            foreach (KeyValuePair<long, float> entry in _effectExpirations)
+            foreach (
+                KeyValuePair<long, (float startTime, float duration)> entry in _effectExpirations
+            )
             {
-                if (entry.Value <= currentTime)
+                (float startTime, float duration) timing = entry.Value;
+                bool expired =
+                    float.IsFinite(timing.startTime) && float.IsFinite(currentTime)
+                        ? timing.duration <= (double)currentTime - timing.startTime
+                        : (float)((double)timing.startTime + timing.duration) <= currentTime;
+                if (expired)
                 {
                     _expiredEffectIds.Add(entry.Key);
                 }

@@ -416,6 +416,20 @@ Notes on constants
 - Pros: Multiple eviction strategies; fluent builder API; jitter for thundering herd prevention.
 - Cons: Memory overhead for tracking access patterns; requires configuration for optimal performance.
 
+Cache expiration compares elapsed time with the stored lifetime, including the exact lifetime
+boundary. Positive lifetimes retain entries on repeated reads at the same finite clock value,
+including very large custom clocks. Finite jitter is added in double precision so its sum with a
+finite lifetime cannot become infinite. When no explicit lifetime or custom lifetime function is
+supplied, disabling both write and access expiration leaves entries without a deadline, even at
+`float.MaxValue`.
+
+An explicit positive lifetime overrides the custom lifetime function, which overrides write
+expiration. Access expiration also bounds the first read; a successful read resets the lifetime to
+the sliding access interval. Moving a finite clock backward does not expire an entry with a
+positive lifetime. Custom `NaN` and infinite lifetimes retain their existing comparison behavior.
+If a custom lifetime function throws, its exception propagates before values, expiry schedules,
+storage slots, or capacity evictions change.
+
 ```mermaid
 flowchart LR
     subgraph Cache Operations

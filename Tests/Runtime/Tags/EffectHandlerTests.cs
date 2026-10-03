@@ -1313,6 +1313,240 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             handler.RemoveAllEffects();
         }
 
+        [TestCase(100f, 0.5f, TestName = "EffectDuration.OrdinaryClock")]
+        [TestCase(16777216f, 1f, TestName = "EffectDuration.LargeClock")]
+        [TestCase(33554432f, 2f, TestName = "EffectDuration.CollapsedDeadline")]
+        [TestCase(33554432f, 3f, TestName = "EffectDuration.RoundedDeadline")]
+        [TestCase(float.MaxValue, 1f, TestName = "EffectDuration.ExtremeClock")]
+        [TestCase(float.MaxValue, float.MaxValue, TestName = "EffectDuration.FiniteOverflow")]
+        [TestCase(100f, float.PositiveInfinity, TestName = "EffectDuration.InfinityPolicy")]
+        [TestCase(100f, float.NaN, TestName = "EffectDuration.NaNPolicy")]
+        public void DurationSurvivesApplyRefreshAndEnsureAtSameClock(
+            float currentTime,
+            float duration
+        )
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(DurationSurvivesApplyRefreshAndEnsureAtSameClock),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = duration;
+                    e.resetDurationOnReapplication = true;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, currentTime, out float remaining)
+            );
+            Assert.That(remaining, Is.EqualTo(duration));
+            Assert.IsTrue(handler.RefreshEffect(handle, false, currentTime));
+            Assert.IsTrue(handler.TryGetRemainingDuration(handle, currentTime, out remaining));
+            Assert.That(remaining, Is.EqualTo(duration));
+            EffectHandle ensured = handler.EnsureHandle(effect, true, currentTime).Value;
+            Assert.AreEqual(handle, ensured);
+            Assert.IsTrue(handler.TryGetRemainingDuration(ensured, currentTime, out remaining));
+            Assert.That(remaining, Is.EqualTo(duration));
+        }
+
+        [TestCase(false, TestName = "EffectDuration.Reapply.KeepsStart")]
+        [TestCase(true, TestName = "EffectDuration.Reapply.ResetsStart")]
+        public void ReapplicationRetainsDurationPolicyAtLargeClock(bool reset)
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(ReapplicationRetainsDurationPolicyAtLargeClock),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = 3f;
+                    e.resetDurationOnReapplication = reset;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, 33554432f).Value;
+            EffectHandle reapplied = handler.ApplyEffectForTesting(effect, 33554436f).Value;
+            Assert.AreEqual(handle, reapplied);
+            Assert.IsTrue(handler.TryGetRemainingDuration(handle, 33554436f, out float remaining));
+            Assert.That(remaining, Is.EqualTo(reset ? 3f : 0f));
+        }
+
+        [TestCase(10f, 0.5f, 10.25f, false, TestName = "EffectExpiry.Ordinary.BeforeBoundary")]
+        [TestCase(10f, 0.5f, 10.5f, true, TestName = "EffectExpiry.Ordinary.AtBoundary")]
+        [TestCase(16777216f, 1f, 16777216f, false, TestName = "EffectExpiry.Large.SameClock")]
+        [TestCase(16777216f, 1f, 16777218f, true, TestName = "EffectExpiry.Large.NextClock")]
+        [TestCase(16777216f, 2f, 16777218f, true, TestName = "EffectExpiry.Large.AtBoundary")]
+        [TestCase(
+            float.MaxValue,
+            float.Epsilon,
+            float.MaxValue,
+            false,
+            TestName = "EffectExpiry.TinyDuration"
+        )]
+        [TestCase(
+            float.MaxValue,
+            float.MaxValue,
+            float.MaxValue,
+            false,
+            TestName = "EffectExpiry.FiniteOverflow"
+        )]
+        [TestCase(
+            -float.MaxValue,
+            float.MaxValue,
+            float.MaxValue,
+            true,
+            TestName = "EffectExpiry.OppositeExtremes"
+        )]
+        [TestCase(10f, 2f, 9f, false, TestName = "EffectExpiry.BackwardClock")]
+        [TestCase(10f, 0f, 10f, true, TestName = "EffectExpiry.ZeroDuration")]
+        [TestCase(10f, -1f, 10f, true, TestName = "EffectExpiry.NegativeDuration")]
+        [TestCase(
+            10f,
+            float.PositiveInfinity,
+            float.MaxValue,
+            false,
+            TestName = "EffectExpiry.InfinityDuration"
+        )]
+        [TestCase(10f, float.NaN, float.MaxValue, false, TestName = "EffectExpiry.NaNDuration")]
+        public void ExpirationPassPreservesInclusiveDurationBoundary(
+            float start,
+            float duration,
+            float currentTime,
+            bool expires
+        )
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(ExpirationPassPreservesInclusiveDurationBoundary),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = duration;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, start).Value;
+            int removed = 0;
+            handler.OnEffectRemoved += _ => ++removed;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, currentTime, out float beforeExpiration)
+            );
+            if (expires)
+            {
+                Assert.That(beforeExpiration, Is.EqualTo(0f));
+            }
+            handler.ProcessEffectExpirationsForTesting(currentTime);
+            Assert.AreEqual(expires ? 1 : 0, removed);
+            Assert.AreEqual(expires ? 0 : 1, handler.GetEffectStackCount(effect));
+            Assert.AreEqual(
+                !expires,
+                handler.TryGetRemainingDuration(handle, currentTime, out float remaining)
+            );
+            if (expires)
+            {
+                Assert.That(remaining, Is.EqualTo(0f));
+            }
+            else if (!float.IsNaN(duration))
+            {
+                double expected = (double)duration - ((double)currentTime - start);
+                Assert.That(remaining, Is.EqualTo((float)expected));
+            }
+            else
+            {
+                Assert.IsTrue(float.IsNaN(remaining));
+            }
+            handler.ProcessEffectExpirationsForTesting(currentTime);
+            Assert.AreEqual(expires ? 1 : 0, removed);
+        }
+
+        [Test]
+        public void DurationSnapshotAndInfinitePolicySurviveAssetChanges()
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(DurationSnapshotAndInfinitePolicySurviveAssetChanges),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = 2f;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, 16777216f).Value;
+            effect.duration = 100f;
+            Assert.IsTrue(handler.TryGetRemainingDuration(handle, 16777216f, out float remaining));
+            Assert.That(remaining, Is.EqualTo(2f));
+            handler.ProcessEffectExpirationsForTesting(16777218f);
+            Assert.IsFalse(handler.IsEffectActive(effect));
+            effect.durationType = ModifierDurationType.Infinite;
+            handle = handler.ApplyEffectForTesting(effect, float.MaxValue).Value;
+            handler.ProcessEffectExpirationsForTesting(float.MaxValue);
+            Assert.IsTrue(handler.IsEffectActive(effect));
+            Assert.IsFalse(handler.TryGetRemainingDuration(handle, float.MaxValue, out remaining));
+            Assert.That(remaining, Is.EqualTo(0f));
+            Assert.IsFalse(handler.RefreshEffect(handle, true, float.MaxValue));
+        }
+
+        [TestCase(
+            float.MaxValue,
+            float.MaxValue,
+            float.PositiveInfinity,
+            true,
+            TestName = "EffectClock.Infinity.AfterFiniteOverflow"
+        )]
+        [TestCase(
+            -float.MaxValue,
+            -float.MaxValue,
+            float.NegativeInfinity,
+            true,
+            TestName = "EffectClock.NegativeInfinity.AfterFiniteOverflow"
+        )]
+        [TestCase(10f, 1f, float.NaN, false, TestName = "EffectClock.NaN")]
+        public void NonfiniteClockRetainsExistingQueryAndExpirationPolicy(
+            float start,
+            float duration,
+            float currentTime,
+            bool expires
+        )
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(NonfiniteClockRetainsExistingQueryAndExpirationPolicy),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = duration;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, start).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, currentTime, out float remaining)
+            );
+            Assert.IsTrue(float.IsNaN(remaining));
+            handler.ProcessEffectExpirationsForTesting(currentTime);
+            Assert.AreEqual(!expires, handler.IsEffectActive(effect));
+        }
+
+        [TestCase(false, TestName = "EffectExpiry.Refresh.RespectsPolicy")]
+        [TestCase(true, TestName = "EffectExpiry.Refresh.IgnoresPolicy")]
+        public void RefreshResetsActualExpirationOnlyWhenAllowed(bool ignorePolicy)
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(RefreshResetsActualExpirationOnlyWhenAllowed),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = 4f;
+                    e.resetDurationOnReapplication = false;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, 16777216f).Value;
+            Assert.AreEqual(ignorePolicy, handler.RefreshEffect(handle, ignorePolicy, 16777218f));
+            handler.ProcessEffectExpirationsForTesting(16777220f);
+            Assert.AreEqual(ignorePolicy, handler.IsEffectActive(effect));
+            handler.ProcessEffectExpirationsForTesting(16777222f);
+            Assert.IsFalse(handler.IsEffectActive(effect));
+        }
+
         private CosmeticEffectData CreateCosmeticTemplate(
             string name,
             bool requiresInstance = false
