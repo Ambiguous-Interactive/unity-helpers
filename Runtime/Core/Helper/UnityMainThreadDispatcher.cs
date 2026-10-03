@@ -26,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     {
         private const int DefaultQueueLimit = 4096;
 
-        private readonly ConcurrentQueue<Action> _actions = new();
+        internal readonly ConcurrentQueue<Action> _actions = new();
         private int _pendingActionCount;
         private int _lastOverflowFrame = -1;
 #if UNITY_EDITOR
@@ -88,79 +88,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>().Length;
         }
 
-        internal static int GetPendingActionCountForTesting()
-        {
-            int pendingActionCount = 0;
-            UnityMainThreadDispatcher[] dispatchers =
-                Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
-            foreach (UnityMainThreadDispatcher dispatcher in dispatchers)
-            {
-                if (dispatcher == null)
-                {
-                    continue;
-                }
-
-                pendingActionCount += dispatcher.PendingActionCount;
-            }
-
-            return pendingActionCount;
-        }
-
-        internal static int DrainPendingActionsForTesting(int maxActions = 1024)
-        {
-            int remainingActionBudget = Math.Max(1, maxActions);
-            UnityMainThreadDispatcher[] dispatchers =
-                Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
-            foreach (UnityMainThreadDispatcher dispatcher in dispatchers)
-            {
-                if (dispatcher == null || dispatcher.PendingActionCount <= 0)
-                {
-                    continue;
-                }
-
-                while (
-                    0 < remainingActionBudget && dispatcher._actions.TryDequeue(out Action action)
-                )
-                {
-                    remainingActionBudget--;
-                    dispatcher.ExecuteQueuedAction(action);
-                }
-            }
-
-            return GetPendingActionCountForTesting();
-        }
-
-        internal static string DescribeLiveDispatchersForTesting()
-        {
-            UnityMainThreadDispatcher[] dispatchers =
-                Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
-            if (dispatchers.Length == 0)
-            {
-                return "No dispatchers found.";
-            }
-
-            int dispatchersLength = dispatchers.Length;
-            string[] descriptions = new string[dispatchersLength];
-            for (int i = 0; i < dispatchersLength; ++i)
-            {
-                UnityMainThreadDispatcher dispatcher = dispatchers[i];
-                if (dispatcher == null)
-                {
-                    descriptions[i] = "null";
-                    continue;
-                }
-
-                GameObject dispatcherObject = dispatcher.gameObject;
-                string sceneName = dispatcherObject == null ? "null" : dispatcherObject.scene.name;
-                descriptions[i] =
-                    $"{dispatcher.name}#{dispatcher.GetUnityObjectId()} scene='{sceneName}' "
-                    + $"active={dispatcherObject != null && dispatcherObject.activeInHierarchy} "
-                    + $"pending={dispatcher.PendingActionCount}";
-            }
-
-            return string.Join(", ", descriptions);
-        }
-
 #if UNITY_EDITOR
         private readonly EditorApplication.CallbackFunction _update;
         private bool _attachedEditorUpdate;
@@ -197,41 +124,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if UNITY_EDITOR
             _update = Update;
 #endif
-        }
-
-        /// <summary>
-        /// Creates a dispatcher test scope that follows the recommended pattern: disable auto-creation, destroy lingering instances immediately, re-enable auto-creation for the test body, and clean everything up on dispose.
-        /// </summary>
-        /// <param name="destroyImmediate">When <c>true</c>, uses <see cref="UnityEngine.Object.DestroyImmediate(UnityEngine.Object)"/> for cleanup. Set to <c>false</c> in play mode so Unity can process destruction safely.</param>
-        /// <returns>An <see cref="AutoCreationScope"/> that automatically restores the previous auto-creation state when disposed.</returns>
-        /// <example>
-        /// <code>
-        /// private UnityMainThreadDispatcher.AutoCreationScope _scope;
-        ///
-        /// [SetUp]
-        /// public void SetUp()
-        /// {
-        ///     _scope = UnityMainThreadDispatcher.CreateTestScope(destroyImmediate: true);
-        /// }
-        ///
-        /// [TearDown]
-        /// public void TearDown()
-        /// {
-        ///     _scope?.Dispose();
-        ///     _scope = null;
-        /// }
-        /// </code>
-        /// </example>
-        public static AutoCreationScope CreateTestScope(bool destroyImmediate = true)
-        {
-            AutoCreationScope scope = AutoCreationScope.Disabled(
-                destroyExistingInstanceOnEnter: true,
-                destroyInstancesOnDispose: true,
-                destroyImmediate: destroyImmediate
-            );
-
-            SetAutoCreationEnabled(true);
-            return scope;
         }
 
         internal static void SetAutoCreationEnabled(bool enabled)
@@ -682,6 +574,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             base.OnDestroy();
         }
 
+        internal void ExecuteQueuedAction(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"UnityMainThreadDispatcher action threw an exception: {e}");
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _pendingActionCount);
+            }
+        }
+
         private bool Enqueue(Action action, bool logOverflow)
         {
             if (action == null)
@@ -776,22 +684,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             while (_actions.TryDequeue(out Action action))
             {
                 ExecuteQueuedAction(action);
-            }
-        }
-
-        private void ExecuteQueuedAction(Action action)
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"UnityMainThreadDispatcher action threw an exception: {e}");
-            }
-            finally
-            {
-                Interlocked.Decrement(ref _pendingActionCount);
             }
         }
 

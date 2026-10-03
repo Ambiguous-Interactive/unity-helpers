@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
             // Loop protection would otherwise trip across many texture tests in succession.
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             EnsureFolder(Root);
         }
 

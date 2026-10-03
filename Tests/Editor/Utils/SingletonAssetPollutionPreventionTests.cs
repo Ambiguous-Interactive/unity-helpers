@@ -275,11 +275,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             _previousEditorUiSuppress = EditorUi.Suppress;
             EditorUi.Suppress = true;
-            _previousIncludeTestAssemblies = ScriptableObjectSingletonCreator.IncludeTestAssemblies;
-            _previousTypeFilter = ScriptableObjectSingletonCreator.TypeFilter;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
-            ScriptableObjectSingletonCreator.TypeFilter = null;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = true;
+            _previousIncludeTestAssemblies =
+                ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies;
+            _previousTypeFilter = ScriptableObjectSingletonCreatorTestAccess.TypeFilter;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = false;
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = true;
             yield return CleanupExistingTestSingletonAssets();
         }
 
@@ -295,15 +296,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             _createdAssets.Clear();
             yield return CleanupExistingTestSingletonAssets();
             yield return CleanupTestFolders();
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = _previousIncludeTestAssemblies;
-            ScriptableObjectSingletonCreator.TypeFilter = _previousTypeFilter;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies =
+                _previousIncludeTestAssemblies;
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = _previousTypeFilter;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = false;
             EditorUi.Suppress = _previousEditorUiSuppress;
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
             CleanupAllKnownTestFolders();
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             yield return null;
         }
 
@@ -452,11 +454,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator EnsureSingletonAssetsDoesNotCreateAssetsForExcludedTypes()
         {
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-            ScriptableObjectSingletonCreator.TypeFilter = null;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = true;
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
             // Ensure the metadata folder exists to prevent modal dialogs
             EnsureMetadataFolder();
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = true;
 
             List<string> beforePaths = new();
             foreach (Type type in AllTestSingletonTypesWithExclusion)
@@ -471,7 +473,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 }
             }
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
@@ -507,14 +509,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator EnsureSingletonAssetsRespectsExclusionEvenWithIncludeTestAssembliesTrue()
         {
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-            ScriptableObjectSingletonCreator.TypeFilter = null;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = true;
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
             // Ensure the metadata folder exists to prevent modal dialogs
             EnsureMetadataFolder();
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = true;
             yield return CleanupExistingTestSingletonAssets();
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
@@ -545,14 +547,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator TypeFilterBypassDoesNotOverrideExclusionAttribute()
         {
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-            ScriptableObjectSingletonCreator.TypeFilter = _ => true;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = true;
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = _ => true;
             // Ensure the metadata folder exists to prevent modal dialogs
             EnsureMetadataFolder();
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = true;
             yield return CleanupExistingTestSingletonAssets();
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
@@ -593,10 +595,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             for (int i = 0; i < 3; ++i)
             {
-                ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-                ScriptableObjectSingletonCreator.TypeFilter = null;
-                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = true;
+                ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
+                ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression =
+                    true;
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
                 yield return null;
                 AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
                 yield return null;
@@ -663,14 +666,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator TestTypesWithoutExclusionNotCreatedWhenIncludeTestAssembliesIsFalse()
         {
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
-            ScriptableObjectSingletonCreator.TypeFilter = null;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = false;
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
             // Ensure the metadata folder exists to prevent modal dialogs
             EnsureMetadataFolder();
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = true;
             yield return CleanupExistingTestSingletonAssets();
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;

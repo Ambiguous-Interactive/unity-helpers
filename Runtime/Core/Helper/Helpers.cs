@@ -46,13 +46,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         internal static readonly Dictionary<string, string[]> CachedLabels = new(
             StringComparer.OrdinalIgnoreCase
         );
+
+        internal static string[] CachedLayerNames = Array.Empty<string>();
+        internal static bool LayerCacheInitialized;
         private static readonly Object LogObject = new();
         private static readonly Dictionary<string, Object> ObjectsByTag = new(
             StringComparer.Ordinal
         );
-
-        private static string[] CachedLayerNames = Array.Empty<string>();
-        private static bool LayerCacheInitialized;
 
         /// <summary>Gets the first value following a named process argument.</summary>
         /// <param name="name">The exact, case-sensitive argument name; blank names are ignored.</param>
@@ -67,11 +67,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
-#if UNITY_EDITOR || UNITY_INCLUDE_TESTS
-                return GetCommandLineArgument(CommandLineArgumentProvider(), name);
-#else
                 return GetCommandLineArgument(Environment.GetCommandLineArgs(), name);
-#endif
             }
             catch
             {
@@ -125,66 +121,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             return values;
-        }
-
-#if UNITY_EDITOR || UNITY_INCLUDE_TESTS
-        internal static Func<string[]> CommandLineArgumentProvider
-        {
-            get => _commandLineArgumentProvider ?? Environment.GetCommandLineArgs;
-            set => _commandLineArgumentProvider = value;
-        }
-
-        internal static Func<string[]> LayerNameProvider
-        {
-            get => _layerNameProvider ?? DefaultLayerNameProvider;
-            set => _layerNameProvider = value;
-        }
-
-        private static Func<string[]> _commandLineArgumentProvider;
-        private static Func<string[]> _layerNameProvider;
-
-#if UNITY_EDITOR
-        private static readonly Func<string[]> DefaultLayerNameProvider = () =>
-            InternalEditorUtility.layers;
-#else
-        private static readonly Func<string[]> DefaultLayerNameProvider = () => Array.Empty<string>();
-#endif
-
-        internal static void ResetCommandLineArgumentProvider()
-        {
-            _commandLineArgumentProvider = null;
-        }
-
-        internal static void ResetLayerNameProvider()
-        {
-            _layerNameProvider = null;
-        }
-#else
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("UnusedMember.Local", "")]
-        internal static void ResetLayerNameProvider() { }
-#endif
-
-        internal static Func<float, float> JitterSampler
-        {
-            get => _jitterSampler ?? DefaultJitterSampler;
-            set => _jitterSampler = value;
-        }
-
-        private static Func<float, float> _jitterSampler;
-
-        private static readonly Func<float, float> DefaultJitterSampler = maxDelay =>
-        {
-            if (maxDelay <= 0f)
-            {
-                return 0f;
-            }
-
-            return PRNG.Instance.NextFloat(0f, maxDelay);
-        };
-
-        internal static void ResetJitterSampler()
-        {
-            _jitterSampler = null;
         }
 
         internal static void ResetLayerCache()
@@ -377,10 +313,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return CachedLayerNames;
             }
 
-#if UNITY_EDITOR || UNITY_INCLUDE_TESTS
+#if UNITY_EDITOR
             try
             {
-                string[] editorLayers = LayerNameProvider?.Invoke();
+                string[] editorLayers = InternalEditorUtility.layers;
                 if (editorLayers is { Length: > 0 })
                 {
                     LayerCacheInitialized = true;
@@ -1293,6 +1229,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             AllSpriteLabels = Array.Empty<string>();
         }
 
+        internal static float ClampInitialJitter(float jitter, float interval)
+        {
+            if (float.IsNaN(jitter) || jitter <= 0f)
+            {
+                return 0f;
+            }
+
+            return Mathf.Min(jitter, interval);
+        }
+
         private static IEnumerator FunctionAsCoroutine(
             Object context,
             Action action,
@@ -1394,13 +1340,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return 0f;
             }
 
-            float jitter = JitterSampler(interval);
-            if (float.IsNaN(jitter) || jitter <= 0f)
-            {
-                return 0f;
-            }
-
-            return Mathf.Min(jitter, interval);
+            return ClampInitialJitter(PRNG.Instance.NextFloat(0f, interval), interval);
         }
 
         private static IEnumerator WaitForDelay(float duration)

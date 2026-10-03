@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 {
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
     /// Test handler that triggers reentrant asset change processing.
@@ -41,7 +42,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 && !string.IsNullOrEmpty(_watchedPath)
             )
             {
-                DetectAssetChangeProcessor.ProcessChangesForTesting(
+                DetectAssetChangeProcessorTestAccess.ProcessChanges(
                     new[] { _watchedPath },
                     null,
                     null,

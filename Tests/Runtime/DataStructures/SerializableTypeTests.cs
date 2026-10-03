@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 }
 
                 Assert.LessOrEqual(
-                    SerializableTypeCatalog.CachedFilterResultCountForTesting,
+                    SerializableTypeCatalog.FilterCache.Count,
                     8,
                     "Every prefix of a typed search term must not become a retained entry."
                 );
@@ -80,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableTypeCatalog.MaxCachedFilterResults = 2;
                 _ = SerializableTypeCatalog.GetFilteredDescriptors("eviction-probe-a");
                 _ = SerializableTypeCatalog.GetFilteredDescriptors("eviction-probe-b");
-                Assert.AreEqual(2, SerializableTypeCatalog.CachedFilterResultCountForTesting);
+                Assert.AreEqual(2, SerializableTypeCatalog.FilterCache.Count);
 
                 IReadOnlyList<SerializableTypeCatalog.SerializableTypeDescriptor> afterEvictionResult =
                     SerializableTypeCatalog.GetFilteredDescriptors("SerializableType");
@@ -113,14 +113,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     _ = SerializableTypeCatalog.GetFilteredDescriptors($"retune-{index}");
                 }
                 Assert.Greater(
-                    SerializableTypeCatalog.CachedFilterResultCountForTesting,
+                    SerializableTypeCatalog.FilterCache.Count,
                     2,
                     "The cache must exceed the target bound before it is shrunk."
                 );
 
                 SerializableTypeCatalog.MaxCachedFilterResults = 2;
 
-                Assert.AreEqual(2, SerializableTypeCatalog.CachedFilterResultCountForTesting);
+                Assert.AreEqual(2, SerializableTypeCatalog.FilterCache.Count);
             }
             finally
             {
@@ -376,24 +376,24 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableTypeCatalog.ConfigureTypeNameIgnorePatterns(
                     new[] { "^TypeThatCannotExistForDescriptorCacheTest$" }
                 );
-                Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
+                Assert.IsFalse(SerializableTypeCatalog._descriptorByName != null);
 
                 Type resolved = SerializableTypeCatalog.Resolve(
                     typeof(SerializableType).AssemblyQualifiedName
                 );
 
                 Assert.AreSame(typeof(SerializableType), resolved);
-                Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
+                Assert.IsFalse(SerializableTypeCatalog._descriptorByName != null);
 
                 Type missing = SerializableTypeCatalog.Resolve(MissingTypeName);
                 Assert.IsTrue(missing == null);
-                Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
+                Assert.IsFalse(SerializableTypeCatalog._descriptorByName != null);
 
                 Type moved = SerializableTypeCatalog.Resolve(
                     $"{typeof(SerializableType).FullName}, MissingAssembly"
                 );
                 Assert.AreSame(typeof(SerializableType), moved);
-                Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
+                Assert.IsFalse(SerializableTypeCatalog._descriptorByName != null);
 
                 string movedGeneric = AssemblyQualifiedTypeNameBuilder
                     .Build(typeof(List<SerializableType>))
@@ -402,7 +402,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     typeof(List<SerializableType>),
                     SerializableTypeCatalog.Resolve(movedGeneric)
                 );
-                Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
+                Assert.IsFalse(SerializableTypeCatalog._descriptorByName != null);
             }
             finally
             {

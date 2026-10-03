@@ -137,7 +137,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void SetUp()
         {
             PoolPurgeSettings.ResetToDefaults();
-            _waitInstructionScope = Buffers.BeginWaitInstructionTestScope();
+            _waitInstructionScope = new WaitInstructionCacheScope();
         }
 
         [TearDown]
@@ -663,7 +663,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void WallstopFastArrayPoolLifoOrderingSingleThread()
         {
             // Clear the pool first to ensure test isolation
-            WallstopFastArrayPool<int>.ClearForTesting();
+            WallstopFastArrayPool<int>.Pool.ClearAll();
 
             const int arraySize = 15;
             const int arrayCount = 5;
@@ -731,7 +731,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void WallstopFastArrayPoolLifoOrderingParameterized(int arraySize, int arrayCount)
         {
             // Clear the pool first to ensure test isolation
-            WallstopFastArrayPool<int>.ClearForTesting();
+            WallstopFastArrayPool<int>.Pool.ClearAll();
 
             int[][] allocatedArrays = new int[arrayCount][];
             List<PooledArray<int>> pooledArrays = new();
@@ -787,7 +787,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
-        public void WallstopFastArrayPoolClearForTestingClearsAllBuckets()
+        public void WallstopFastArrayPoolClearAllClearsAllBuckets()
         {
             int[] testSizes = { 5, 10, 20, 50, 100 };
             Dictionary<int, int[]> originalArrays = new();
@@ -800,7 +800,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 pooled.Dispose();
             }
 
-            WallstopFastArrayPool<int>.ClearForTesting();
+            WallstopFastArrayPool<int>.Pool.ClearAll();
 
             foreach (int size in testSizes)
             {
@@ -812,7 +812,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Assert.AreNotSame(
                     originalArrays.ValueFor(size),
                     array,
-                    $"After ClearForTesting, size {size} should return a new array, not the original. "
+                    $"After Pool.ClearAll, size {size} should return a new array, not the original. "
                         + $"Original hash: {RuntimeHelpers.GetHashCode(originalArrays.ValueFor(size))}, "
                         + $"New hash: {RuntimeHelpers.GetHashCode(array)}"
                 );
@@ -826,17 +826,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
-        public void WallstopFastArrayPoolClearForTestingOnEmptyPoolDoesNotThrow()
+        public void WallstopFastArrayPoolClearAllOnEmptyPoolDoesNotThrow()
         {
             // Use a type that hasn't been used before to ensure empty pool
             Assert.DoesNotThrow(
-                () => WallstopFastArrayPool<double>.ClearForTesting(),
-                "ClearForTesting should not throw on an empty pool"
+                () => WallstopFastArrayPool<double>.Pool.ClearAll(),
+                "Pool.ClearAll should not throw on an empty pool"
             );
 
             Assert.DoesNotThrow(
-                () => WallstopFastArrayPool<double>.ClearForTesting(),
-                "ClearForTesting should be idempotent"
+                () => WallstopFastArrayPool<double>.Pool.ClearAll(),
+                "Pool.ClearAll should be idempotent"
             );
         }
 
@@ -2483,11 +2483,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             DisposalLease control = default;
             try
             {
-                int slot = probe.SlotForTests;
+                int slot = probe._slot;
                 Assert.That(probe.TryClaim(), Is.True);
                 long beforeControl = DisposalLeases.CurrentGeneration(slot);
                 control = DisposalLeases.Acquire();
-                Assert.That(control.SlotForTests, Is.EqualTo(slot));
+                Assert.That(control._slot, Is.EqualTo(slot));
                 Assert.That(control.TryClaim(), Is.True);
                 Assert.That(DisposalLeases.CurrentGeneration(slot), Is.EqualTo(beforeControl + 2));
                 long before = DisposalLeases.CurrentGeneration(slot);
@@ -2529,11 +2529,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int[] buffer = null;
             try
             {
-                int slot = probe.SlotForTests;
+                int slot = probe._slot;
                 Assert.That(probe.TryClaim(), Is.True);
                 long beforeControl = DisposalLeases.CurrentGeneration(slot);
                 control = DisposalLeases.Acquire();
-                Assert.That(control.SlotForTests, Is.EqualTo(slot));
+                Assert.That(control._slot, Is.EqualTo(slot));
                 Assert.That(control.TryClaim(), Is.True);
                 Assert.That(DisposalLeases.CurrentGeneration(slot), Is.EqualTo(beforeControl + 2));
                 long before = DisposalLeases.CurrentGeneration(slot);
@@ -2778,7 +2778,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void WallstopFastArrayPoolDoubleDisposeIsNoOp()
         {
-            WallstopFastArrayPool<int>.ClearForTesting();
+            WallstopFastArrayPool<int>.Pool.ClearAll();
 
             const int size = 10;
             PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(size, out int[] firstArray);
@@ -2812,7 +2812,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void WallstopFastArrayPoolLifoWithInterleavedSizes()
         {
-            WallstopFastArrayPool<int>.ClearForTesting();
+            WallstopFastArrayPool<int>.Pool.ClearAll();
 
             const int sizeA = 10;
             const int sizeB = 20;
@@ -2867,9 +2867,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
-        public void WallstopFastArrayPoolClearForTestingDuringActiveRentals()
+        public void WallstopFastArrayPoolClearAllDuringActiveRentals()
         {
-            WallstopFastArrayPool<int>.ClearForTesting();
+            WallstopFastArrayPool<int>.Pool.ClearAll();
 
             const int size = 15;
 
@@ -2884,7 +2884,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             returned1.Dispose();
             returned2.Dispose();
 
-            WallstopFastArrayPool<int>.ClearForTesting();
+            WallstopFastArrayPool<int>.Pool.ClearAll();
 
             Assert.AreEqual(
                 999,
@@ -2896,7 +2896,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreNotSame(
                 arr1,
                 newArray,
-                "After ClearForTesting, should get fresh array, not previously pooled one"
+                "After Pool.ClearAll, should get fresh array, not previously pooled one"
             );
             Assert.AreNotSame(arr2, newArray);
 
@@ -2909,7 +2909,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [TestCase(100, TestName = "WallstopFastArrayPoolLifoSingleElementSize100")]
         public void WallstopFastArrayPoolLifoSingleElement(int arraySize)
         {
-            WallstopFastArrayPool<int>.ClearForTesting();
+            WallstopFastArrayPool<int>.Pool.ClearAll();
 
             PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(arraySize, out int[] original);
             original[0] = 12345;
@@ -2927,8 +2927,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void WallstopFastArrayPoolIsolationBetweenTypes()
         {
-            WallstopFastArrayPool<int>.ClearForTesting();
-            WallstopFastArrayPool<byte>.ClearForTesting();
+            WallstopFastArrayPool<int>.Pool.ClearAll();
+            WallstopFastArrayPool<byte>.Pool.ClearAll();
 
             const int size = 10;
 

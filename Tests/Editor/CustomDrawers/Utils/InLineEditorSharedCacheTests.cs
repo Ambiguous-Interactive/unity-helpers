@@ -101,13 +101,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            InLineEditorShared.ClearCachedStateForTesting();
+            InLineEditorSharedTestAccess.ClearCachedState();
         }
 
         [TearDown]
         public override void TearDown()
         {
-            InLineEditorShared.ClearCachedStateForTesting();
+            InLineEditorSharedTestAccess.ClearCachedState();
             base.TearDown();
         }
 
@@ -121,7 +121,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             }
 
             Assert.That(
-                InLineEditorShared.GetFoldoutStateCacheCountForTesting(),
+                InLineEditorSharedTestAccess.GetFoldoutStateCacheCount(),
                 Is.EqualTo(expectedCount)
             );
 
@@ -129,7 +129,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             {
                 bool expected = i % 2 == 0;
                 Assert.That(
-                    InLineEditorShared.GetFoldoutStateForTesting($"foldout{i}"),
+                    InLineEditorSharedTestAccess.GetFoldoutState($"foldout{i}"),
                     Is.EqualTo(expected),
                     $"Foldout state for foldout{i} should be {expected}"
                 );
@@ -142,40 +142,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             InLineEditorShared.SetFoldoutState("expandedKey", true);
             InLineEditorShared.SetFoldoutState("collapsedKey", false);
 
-            Assert.That(InLineEditorShared.GetFoldoutStateForTesting("expandedKey"), Is.True);
-            Assert.That(InLineEditorShared.GetFoldoutStateForTesting("collapsedKey"), Is.False);
+            Assert.That(InLineEditorSharedTestAccess.GetFoldoutState("expandedKey"), Is.True);
+            Assert.That(InLineEditorSharedTestAccess.GetFoldoutState("collapsedKey"), Is.False);
         }
 
         [Test]
         public void FoldoutStatesUpdateExistingKeyCorrectly()
         {
             InLineEditorShared.SetFoldoutState("toggleKey", true);
-            Assert.That(InLineEditorShared.GetFoldoutStateForTesting("toggleKey"), Is.True);
+            Assert.That(InLineEditorSharedTestAccess.GetFoldoutState("toggleKey"), Is.True);
 
             InLineEditorShared.SetFoldoutState("toggleKey", false);
-            Assert.That(InLineEditorShared.GetFoldoutStateForTesting("toggleKey"), Is.False);
+            Assert.That(InLineEditorSharedTestAccess.GetFoldoutState("toggleKey"), Is.False);
 
             InLineEditorShared.SetFoldoutState("toggleKey", true);
-            Assert.That(InLineEditorShared.GetFoldoutStateForTesting("toggleKey"), Is.True);
+            Assert.That(InLineEditorSharedTestAccess.GetFoldoutState("toggleKey"), Is.True);
         }
 
         [Test]
         public void FoldoutStatesEmptyKeyIsIgnored()
         {
-            int countBefore = InLineEditorShared.GetFoldoutStateCacheCountForTesting();
+            int countBefore = InLineEditorSharedTestAccess.GetFoldoutStateCacheCount();
 
             InLineEditorShared.SetFoldoutState(string.Empty, true);
             InLineEditorShared.SetFoldoutState(null, true);
 
-            int countAfter = InLineEditorShared.GetFoldoutStateCacheCountForTesting();
+            int countAfter = InLineEditorSharedTestAccess.GetFoldoutStateCacheCount();
             Assert.That(countAfter, Is.EqualTo(countBefore));
         }
 
         [Test]
         public void FoldoutStatesGetForEmptyKeyReturnsFalse()
         {
-            Assert.That(InLineEditorShared.GetFoldoutStateForTesting(string.Empty), Is.False);
-            Assert.That(InLineEditorShared.GetFoldoutStateForTesting(null), Is.False);
+            Assert.That(InLineEditorSharedTestAccess.GetFoldoutState(string.Empty), Is.False);
+            Assert.That(InLineEditorSharedTestAccess.GetFoldoutState(null), Is.False);
         }
 
         [Test]
@@ -188,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             }
 
             Assert.That(
-                InLineEditorShared.GetScrollPositionCacheCountForTesting(),
+                InLineEditorSharedTestAccess.GetScrollPositionCacheCount(),
                 Is.EqualTo(numberOfEntries)
             );
 
@@ -225,12 +225,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
         [Test]
         public void ScrollPositionsEmptyKeyIsIgnored()
         {
-            int countBefore = InLineEditorShared.GetScrollPositionCacheCountForTesting();
+            int countBefore = InLineEditorSharedTestAccess.GetScrollPositionCacheCount();
 
             InLineEditorShared.SetScrollPosition(string.Empty, new Vector2(1, 2));
             InLineEditorShared.SetScrollPosition(null, new Vector2(3, 4));
 
-            int countAfter = InLineEditorShared.GetScrollPositionCacheCountForTesting();
+            int countAfter = InLineEditorSharedTestAccess.GetScrollPositionCacheCount();
             Assert.That(countAfter, Is.EqualTo(countBefore));
         }
 
@@ -260,7 +260,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             Track(editor);
 
             Assert.That(editor != null, Is.True, "Editor should be created");
-            Assert.That(InLineEditorShared.GetEditorCacheCountForTesting(), Is.EqualTo(1));
+            Assert.That(InLineEditorSharedTestAccess.GetEditorCacheCount(), Is.EqualTo(1));
         }
 
         [Test]
@@ -273,7 +273,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             Editor secondEditor = InLineEditorShared.GetOrCreateEditor(target);
 
             Assert.That(ReferenceEquals(firstEditor, secondEditor), Is.True);
-            Assert.That(InLineEditorShared.GetEditorCacheCountForTesting(), Is.EqualTo(1));
+            Assert.That(InLineEditorSharedTestAccess.GetEditorCacheCount(), Is.EqualTo(1));
         }
 
         [Test]
@@ -282,7 +282,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             Editor editor = InLineEditorShared.GetOrCreateEditor(null);
 
             Assert.That(editor == null, Is.True);
-            Assert.That(InLineEditorShared.GetEditorCacheCountForTesting(), Is.EqualTo(0));
+            Assert.That(InLineEditorSharedTestAccess.GetEditorCacheCount(), Is.EqualTo(0));
         }
 
         [Test]
@@ -297,7 +297,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             Track(editor2);
 
             Assert.That(ReferenceEquals(editor1, editor2), Is.False);
-            Assert.That(InLineEditorShared.GetEditorCacheCountForTesting(), Is.EqualTo(2));
+            Assert.That(InLineEditorSharedTestAccess.GetEditorCacheCount(), Is.EqualTo(2));
         }
 
         [Test]
@@ -329,20 +329,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             InLineEditorShared.SetScrollPosition("testScroll", new Vector2(10, 20));
 
             Assert.That(
-                InLineEditorShared.GetFoldoutStateCacheCountForTesting(),
+                InLineEditorSharedTestAccess.GetFoldoutStateCacheCount(),
                 Is.GreaterThan(0)
             );
             Assert.That(
-                InLineEditorShared.GetScrollPositionCacheCountForTesting(),
+                InLineEditorSharedTestAccess.GetScrollPositionCacheCount(),
                 Is.GreaterThan(0)
             );
 
             _trackedObjects.Remove(editor);
-            InLineEditorShared.ClearCachedStateForTesting();
+            InLineEditorSharedTestAccess.ClearCachedState();
 
-            Assert.That(InLineEditorShared.GetFoldoutStateCacheCountForTesting(), Is.EqualTo(0));
-            Assert.That(InLineEditorShared.GetScrollPositionCacheCountForTesting(), Is.EqualTo(0));
-            Assert.That(InLineEditorShared.GetEditorCacheCountForTesting(), Is.EqualTo(0));
+            Assert.That(InLineEditorSharedTestAccess.GetFoldoutStateCacheCount(), Is.EqualTo(0));
+            Assert.That(InLineEditorSharedTestAccess.GetScrollPositionCacheCount(), Is.EqualTo(0));
+            Assert.That(InLineEditorSharedTestAccess.GetEditorCacheCount(), Is.EqualTo(0));
         }
 
         [Test]
@@ -404,7 +404,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
         {
             InLineEditorShared.SetFoldoutState(key, value);
 
-            bool result = InLineEditorShared.GetFoldoutStateForTesting(key);
+            bool result = InLineEditorSharedTestAccess.GetFoldoutState(key);
             Assert.That(result, Is.EqualTo(value));
         }
 

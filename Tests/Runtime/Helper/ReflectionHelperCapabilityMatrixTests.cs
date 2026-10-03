@@ -37,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     }
 
                     using (
-                        ReflectionHelpers.OverrideReflectionCapabilities(
+                        new ReflectionCapabilityScope(
                             expressions: true,
                             dynamicIl: ReflectionHelpers.DynamicIlEnabled
                         )
@@ -52,23 +52,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                         Assert.Ignore("Dynamic IL is not available on this platform.");
                     }
 
-                    using (
-                        ReflectionHelpers.OverrideReflectionCapabilities(
-                            expressions: false,
-                            dynamicIl: true
-                        )
-                    )
+                    using (new ReflectionCapabilityScope(expressions: false, dynamicIl: true))
                     {
                         assertion();
                     }
                     break;
                 case CapabilityMode.Reflection:
-                    using (
-                        ReflectionHelpers.OverrideReflectionCapabilities(
-                            expressions: false,
-                            dynamicIl: false
-                        )
-                    )
+                    using (new ReflectionCapabilityScope(expressions: false, dynamicIl: false))
                     {
                         assertion();
                     }
@@ -265,19 +255,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
             Func<object, object> expressionGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionGetter = ReflectionHelpers.GetFieldGetter(field);
             }
 
             Func<object, object> dynamicGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicGetter = ReflectionHelpers.GetFieldGetter(field);
             }
 
             Func<object, object> reflectionGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionGetter = ReflectionHelpers.GetFieldGetter(field);
             }
@@ -323,7 +313,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionGetter, Is.Not.SameAs(reflectionGetter));
             Assert.That(dynamicGetter, Is.Not.SameAs(reflectionGetter));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Func<object, object> expressionGetterSecond = ReflectionHelpers.GetFieldGetter(
                     field
@@ -331,13 +321,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(expressionGetterSecond, Is.SameAs(expressionGetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Func<object, object> dynamicGetterSecond = ReflectionHelpers.GetFieldGetter(field);
                 Assert.That(dynamicGetterSecond, Is.SameAs(dynamicGetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Func<object, object> reflectionGetterSecond = ReflectionHelpers.GetFieldGetter(
                     field
@@ -353,19 +343,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
             Action<object, object> expressionSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionSetter = ReflectionHelpers.GetFieldSetter(field);
             }
 
             Action<object, object> dynamicSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicSetter = ReflectionHelpers.GetFieldSetter(field);
             }
 
             Action<object, object> reflectionSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionSetter = ReflectionHelpers.GetFieldSetter(field);
             }
@@ -411,7 +401,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionSetter, Is.Not.SameAs(reflectionSetter));
             Assert.That(dynamicSetter, Is.Not.SameAs(reflectionSetter));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Action<object, object> expressionSetterSecond = ReflectionHelpers.GetFieldSetter(
                     field
@@ -419,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(expressionSetterSecond, Is.SameAs(expressionSetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Action<object, object> dynamicSetterSecond = ReflectionHelpers.GetFieldSetter(
                     field
@@ -427,7 +417,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(dynamicSetterSecond, Is.SameAs(dynamicSetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Action<object, object> reflectionSetterSecond = ReflectionHelpers.GetFieldSetter(
                     field
@@ -443,19 +433,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
             Func<TestClass, int> expressionGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionGetter = ReflectionHelpers.GetFieldGetter<TestClass, int>(field);
             }
 
             Func<TestClass, int> dynamicGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicGetter = ReflectionHelpers.GetFieldGetter<TestClass, int>(field);
             }
 
             Func<TestClass, int> reflectionGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionGetter = ReflectionHelpers.GetFieldGetter<TestClass, int>(field);
             }
@@ -501,7 +491,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionGetter, Is.Not.SameAs(reflectionGetter));
             Assert.That(dynamicGetter, Is.Not.SameAs(reflectionGetter));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Func<TestClass, int> expressionGetterSecond = ReflectionHelpers.GetFieldGetter<
                     TestClass,
@@ -510,7 +500,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(expressionGetterSecond, Is.SameAs(expressionGetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Func<TestClass, int> dynamicGetterSecond = ReflectionHelpers.GetFieldGetter<
                     TestClass,
@@ -519,7 +509,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(dynamicGetterSecond, Is.SameAs(dynamicGetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Func<TestClass, int> reflectionGetterSecond = ReflectionHelpers.GetFieldGetter<
                     TestClass,
@@ -534,19 +524,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
             FieldSetter<TestClass, int> expressionSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionSetter = ReflectionHelpers.GetFieldSetter<TestClass, int>(field);
             }
 
             FieldSetter<TestClass, int> dynamicSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicSetter = ReflectionHelpers.GetFieldSetter<TestClass, int>(field);
             }
 
             FieldSetter<TestClass, int> reflectionSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionSetter = ReflectionHelpers.GetFieldSetter<TestClass, int>(field);
             }
@@ -592,14 +582,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionSetter, Is.Not.SameAs(reflectionSetter));
             Assert.That(dynamicSetter, Is.Not.SameAs(reflectionSetter));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 FieldSetter<TestClass, int> expressionSetterSecond =
                     ReflectionHelpers.GetFieldSetter<TestClass, int>(field);
                 Assert.That(expressionSetterSecond, Is.SameAs(expressionSetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 FieldSetter<TestClass, int> dynamicSetterSecond = ReflectionHelpers.GetFieldSetter<
                     TestClass,
@@ -608,7 +598,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(dynamicSetterSecond, Is.SameAs(dynamicSetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 FieldSetter<TestClass, int> reflectionSetterSecond =
                     ReflectionHelpers.GetFieldSetter<TestClass, int>(field);
@@ -628,19 +618,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 TestClass.StaticIntValue = 111;
                 Func<object> expressionGetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+                using (new ReflectionCapabilityScope(true, false))
                 {
                     expressionGetter = ReflectionHelpers.GetStaticFieldGetter(field);
                 }
 
                 Func<object> dynamicGetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+                using (new ReflectionCapabilityScope(false, true))
                 {
                     dynamicGetter = ReflectionHelpers.GetStaticFieldGetter(field);
                 }
 
                 Func<object> reflectionGetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+                using (new ReflectionCapabilityScope(false, false))
                 {
                     reflectionGetter = ReflectionHelpers.GetStaticFieldGetter(field);
                 }
@@ -686,7 +676,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(expressionGetter, Is.Not.SameAs(reflectionGetter));
                 Assert.That(dynamicGetter, Is.Not.SameAs(reflectionGetter));
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+                using (new ReflectionCapabilityScope(true, false))
                 {
                     Func<object> expressionGetterSecond = ReflectionHelpers.GetStaticFieldGetter(
                         field
@@ -694,7 +684,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     Assert.That(expressionGetterSecond, Is.SameAs(expressionGetter));
                 }
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+                using (new ReflectionCapabilityScope(false, true))
                 {
                     Func<object> dynamicGetterSecond = ReflectionHelpers.GetStaticFieldGetter(
                         field
@@ -702,7 +692,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     Assert.That(dynamicGetterSecond, Is.SameAs(dynamicGetter));
                 }
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+                using (new ReflectionCapabilityScope(false, false))
                 {
                     Func<object> reflectionGetterSecond = ReflectionHelpers.GetStaticFieldGetter(
                         field
@@ -727,19 +717,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             try
             {
                 Action<object> expressionSetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+                using (new ReflectionCapabilityScope(true, false))
                 {
                     expressionSetter = ReflectionHelpers.GetStaticFieldSetter(field);
                 }
 
                 Action<object> dynamicSetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+                using (new ReflectionCapabilityScope(false, true))
                 {
                     dynamicSetter = ReflectionHelpers.GetStaticFieldSetter(field);
                 }
 
                 Action<object> reflectionSetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+                using (new ReflectionCapabilityScope(false, false))
                 {
                     reflectionSetter = ReflectionHelpers.GetStaticFieldSetter(field);
                 }
@@ -785,7 +775,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(expressionSetter, Is.Not.SameAs(reflectionSetter));
                 Assert.That(dynamicSetter, Is.Not.SameAs(reflectionSetter));
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+                using (new ReflectionCapabilityScope(true, false))
                 {
                     Action<object> expressionSetterSecond = ReflectionHelpers.GetStaticFieldSetter(
                         field
@@ -793,7 +783,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     Assert.That(expressionSetterSecond, Is.SameAs(expressionSetter));
                 }
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+                using (new ReflectionCapabilityScope(false, true))
                 {
                     Action<object> dynamicSetterSecond = ReflectionHelpers.GetStaticFieldSetter(
                         field
@@ -801,7 +791,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     Assert.That(dynamicSetterSecond, Is.SameAs(dynamicSetter));
                 }
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+                using (new ReflectionCapabilityScope(false, false))
                 {
                     Action<object> reflectionSetterSecond = ReflectionHelpers.GetStaticFieldSetter(
                         field
@@ -827,19 +817,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 TestClass.StaticIntValue = 314;
                 Func<int> expressionGetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+                using (new ReflectionCapabilityScope(true, false))
                 {
                     expressionGetter = ReflectionHelpers.GetStaticFieldGetter<int>(field);
                 }
 
                 Func<int> dynamicGetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+                using (new ReflectionCapabilityScope(false, true))
                 {
                     dynamicGetter = ReflectionHelpers.GetStaticFieldGetter<int>(field);
                 }
 
                 Func<int> reflectionGetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+                using (new ReflectionCapabilityScope(false, false))
                 {
                     reflectionGetter = ReflectionHelpers.GetStaticFieldGetter<int>(field);
                 }
@@ -885,7 +875,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(expressionGetter, Is.Not.SameAs(reflectionGetter));
                 Assert.That(dynamicGetter, Is.Not.SameAs(reflectionGetter));
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+                using (new ReflectionCapabilityScope(true, false))
                 {
                     Func<int> expressionGetterSecond = ReflectionHelpers.GetStaticFieldGetter<int>(
                         field
@@ -893,7 +883,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     Assert.That(expressionGetterSecond, Is.SameAs(expressionGetter));
                 }
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+                using (new ReflectionCapabilityScope(false, true))
                 {
                     Func<int> dynamicGetterSecond = ReflectionHelpers.GetStaticFieldGetter<int>(
                         field
@@ -901,7 +891,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     Assert.That(dynamicGetterSecond, Is.SameAs(dynamicGetter));
                 }
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+                using (new ReflectionCapabilityScope(false, false))
                 {
                     Func<int> reflectionGetterSecond = ReflectionHelpers.GetStaticFieldGetter<int>(
                         field
@@ -926,19 +916,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             try
             {
                 Action<int> expressionSetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+                using (new ReflectionCapabilityScope(true, false))
                 {
                     expressionSetter = ReflectionHelpers.GetStaticFieldSetter<int>(field);
                 }
 
                 Action<int> dynamicSetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+                using (new ReflectionCapabilityScope(false, true))
                 {
                     dynamicSetter = ReflectionHelpers.GetStaticFieldSetter<int>(field);
                 }
 
                 Action<int> reflectionSetter;
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+                using (new ReflectionCapabilityScope(false, false))
                 {
                     reflectionSetter = ReflectionHelpers.GetStaticFieldSetter<int>(field);
                 }
@@ -984,14 +974,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(expressionSetter, Is.Not.SameAs(reflectionSetter));
                 Assert.That(dynamicSetter, Is.Not.SameAs(reflectionSetter));
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+                using (new ReflectionCapabilityScope(true, false))
                 {
                     Action<int> expressionSetterSecond =
                         ReflectionHelpers.GetStaticFieldSetter<int>(field);
                     Assert.That(expressionSetterSecond, Is.SameAs(expressionSetter));
                 }
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+                using (new ReflectionCapabilityScope(false, true))
                 {
                     Action<int> dynamicSetterSecond = ReflectionHelpers.GetStaticFieldSetter<int>(
                         field
@@ -999,7 +989,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     Assert.That(dynamicSetterSecond, Is.SameAs(dynamicSetter));
                 }
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+                using (new ReflectionCapabilityScope(false, false))
                 {
                     Action<int> reflectionSetterSecond =
                         ReflectionHelpers.GetStaticFieldSetter<int>(field);
@@ -1075,19 +1065,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 nameof(VariantPropertyClass.ObjectProperty)
             );
             Func<object, object> expressionGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionGetter = ReflectionHelpers.GetPropertyGetter(property);
             }
 
             Func<object, object> dynamicGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicGetter = ReflectionHelpers.GetPropertyGetter(property);
             }
 
             Func<object, object> reflectionGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionGetter = ReflectionHelpers.GetPropertyGetter(property);
             }
@@ -1133,7 +1123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionGetter, Is.Not.SameAs(reflectionGetter));
             Assert.That(dynamicGetter, Is.Not.SameAs(reflectionGetter));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Func<object, object> expressionGetterSecond = ReflectionHelpers.GetPropertyGetter(
                     property
@@ -1141,7 +1131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(expressionGetterSecond, Is.SameAs(expressionGetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Func<object, object> dynamicGetterSecond = ReflectionHelpers.GetPropertyGetter(
                     property
@@ -1149,7 +1139,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(dynamicGetterSecond, Is.SameAs(dynamicGetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Func<object, object> reflectionGetterSecond = ReflectionHelpers.GetPropertyGetter(
                     property
@@ -1166,19 +1156,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 nameof(VariantPropertyClass.ObjectProperty)
             );
             Action<object, object> expressionSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionSetter = ReflectionHelpers.GetPropertySetter(property);
             }
 
             Action<object, object> dynamicSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicSetter = ReflectionHelpers.GetPropertySetter(property);
             }
 
             Action<object, object> reflectionSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionSetter = ReflectionHelpers.GetPropertySetter(property);
             }
@@ -1224,7 +1214,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionSetter, Is.Not.SameAs(reflectionSetter));
             Assert.That(dynamicSetter, Is.Not.SameAs(reflectionSetter));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Action<object, object> expressionSetterSecond = ReflectionHelpers.GetPropertySetter(
                     property
@@ -1232,7 +1222,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(expressionSetterSecond, Is.SameAs(expressionSetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Action<object, object> dynamicSetterSecond = ReflectionHelpers.GetPropertySetter(
                     property
@@ -1240,7 +1230,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(dynamicSetterSecond, Is.SameAs(dynamicSetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Action<object, object> reflectionSetterSecond = ReflectionHelpers.GetPropertySetter(
                     property
@@ -1260,19 +1250,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             IndexerClass instance = new() { [3] = 42 };
             PropertyInfo indexer = typeof(IndexerClass).GetProperty("Item");
             Func<object, object[], object> expressionGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionGetter = ReflectionHelpers.GetIndexerGetter(indexer);
             }
 
             Func<object, object[], object> dynamicGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicGetter = ReflectionHelpers.GetIndexerGetter(indexer);
             }
 
             Func<object, object[], object> reflectionGetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionGetter = ReflectionHelpers.GetIndexerGetter(indexer);
             }
@@ -1318,21 +1308,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionGetter, Is.Not.SameAs(reflectionGetter));
             Assert.That(dynamicGetter, Is.Not.SameAs(reflectionGetter));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Func<object, object[], object> expressionGetterSecond =
                     ReflectionHelpers.GetIndexerGetter(indexer);
                 Assert.That(expressionGetterSecond, Is.SameAs(expressionGetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Func<object, object[], object> dynamicGetterSecond =
                     ReflectionHelpers.GetIndexerGetter(indexer);
                 Assert.That(dynamicGetterSecond, Is.SameAs(dynamicGetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Func<object, object[], object> reflectionGetterSecond =
                     ReflectionHelpers.GetIndexerGetter(indexer);
@@ -1350,19 +1340,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             IndexerClass instance = new();
             PropertyInfo indexer = typeof(IndexerClass).GetProperty("Item");
             Action<object, object, object[]> expressionSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionSetter = ReflectionHelpers.GetIndexerSetter(indexer);
             }
 
             Action<object, object, object[]> dynamicSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicSetter = ReflectionHelpers.GetIndexerSetter(indexer);
             }
 
             Action<object, object, object[]> reflectionSetter;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionSetter = ReflectionHelpers.GetIndexerSetter(indexer);
             }
@@ -1408,21 +1398,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionSetter, Is.Not.SameAs(reflectionSetter));
             Assert.That(dynamicSetter, Is.Not.SameAs(reflectionSetter));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Action<object, object, object[]> expressionSetterSecond =
                     ReflectionHelpers.GetIndexerSetter(indexer);
                 Assert.That(expressionSetterSecond, Is.SameAs(expressionSetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Action<object, object, object[]> dynamicSetterSecond =
                     ReflectionHelpers.GetIndexerSetter(indexer);
                 Assert.That(dynamicSetterSecond, Is.SameAs(dynamicSetter));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Action<object, object, object[]> reflectionSetterSecond =
                     ReflectionHelpers.GetIndexerSetter(indexer);
@@ -1444,19 +1434,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 new[] { typeof(int), typeof(string), typeof(bool) }
             );
             Func<object[], object> expressionInvoker;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionInvoker = ReflectionHelpers.GetConstructor(ctor);
             }
 
             Func<object[], object> dynamicInvoker;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicInvoker = ReflectionHelpers.GetConstructor(ctor);
             }
 
             Func<object[], object> reflectionInvoker;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionInvoker = ReflectionHelpers.GetConstructor(ctor);
             }
@@ -1502,7 +1492,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionInvoker, Is.Not.SameAs(reflectionInvoker));
             Assert.That(dynamicInvoker, Is.Not.SameAs(reflectionInvoker));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Func<object[], object> expressionInvokerSecond = ReflectionHelpers.GetConstructor(
                     ctor
@@ -1510,7 +1500,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(expressionInvokerSecond, Is.SameAs(expressionInvoker));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Func<object[], object> dynamicInvokerSecond = ReflectionHelpers.GetConstructor(
                     ctor
@@ -1518,7 +1508,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(dynamicInvokerSecond, Is.SameAs(dynamicInvoker));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Func<object[], object> reflectionInvokerSecond = ReflectionHelpers.GetConstructor(
                     ctor
@@ -1538,7 +1528,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void ParameterlessConstructorCachesRemainStrategyScoped()
         {
             Func<object> expressionCreator;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionCreator = ReflectionHelpers.GetParameterlessConstructor(
                     typeof(TestConstructorClass)
@@ -1546,7 +1536,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
 
             Func<object> dynamicCreator;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicCreator = ReflectionHelpers.GetParameterlessConstructor(
                     typeof(TestConstructorClass)
@@ -1554,7 +1544,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
 
             Func<object> reflectionCreator;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionCreator = ReflectionHelpers.GetParameterlessConstructor(
                     typeof(TestConstructorClass)
@@ -1602,14 +1592,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionCreator, Is.Not.SameAs(reflectionCreator));
             Assert.That(dynamicCreator, Is.Not.SameAs(reflectionCreator));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Func<object> expressionCreatorSecond =
                     ReflectionHelpers.GetParameterlessConstructor(typeof(TestConstructorClass));
                 Assert.That(expressionCreatorSecond, Is.SameAs(expressionCreator));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Func<object> dynamicCreatorSecond = ReflectionHelpers.GetParameterlessConstructor(
                     typeof(TestConstructorClass)
@@ -1617,7 +1607,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.That(dynamicCreatorSecond, Is.SameAs(dynamicCreator));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Func<object> reflectionCreatorSecond =
                     ReflectionHelpers.GetParameterlessConstructor(typeof(TestConstructorClass));
@@ -1633,21 +1623,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void ParameterlessConstructorTypedCachesRemainStrategyScoped()
         {
             Func<TestConstructorClass> expressionCreator;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionCreator =
                     ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
             }
 
             Func<TestConstructorClass> dynamicCreator;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicCreator =
                     ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
             }
 
             Func<TestConstructorClass> reflectionCreator;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionCreator =
                     ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
@@ -1694,21 +1684,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionCreator, Is.Not.SameAs(reflectionCreator));
             Assert.That(dynamicCreator, Is.Not.SameAs(reflectionCreator));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Func<TestConstructorClass> expressionCreatorSecond =
                     ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
                 Assert.That(expressionCreatorSecond, Is.SameAs(expressionCreator));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Func<TestConstructorClass> dynamicCreatorSecond =
                     ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
                 Assert.That(dynamicCreatorSecond, Is.SameAs(dynamicCreator));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Func<TestConstructorClass> reflectionCreatorSecond =
                     ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
@@ -1727,19 +1717,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 nameof(TestMethodClass.InstanceMethodWithParam)
             );
             Func<object, object[], object> expressionInvoker;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionInvoker = ReflectionHelpers.GetMethodInvoker(method);
             }
 
             Func<object, object[], object> dynamicInvoker;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicInvoker = ReflectionHelpers.GetMethodInvoker(method);
             }
 
             Func<object, object[], object> reflectionInvoker;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionInvoker = ReflectionHelpers.GetMethodInvoker(method);
             }
@@ -1785,21 +1775,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionInvoker, Is.Not.SameAs(reflectionInvoker));
             Assert.That(dynamicInvoker, Is.Not.SameAs(reflectionInvoker));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Func<object, object[], object> expressionInvokerSecond =
                     ReflectionHelpers.GetMethodInvoker(method);
                 Assert.That(expressionInvokerSecond, Is.SameAs(expressionInvoker));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Func<object, object[], object> dynamicInvokerSecond =
                     ReflectionHelpers.GetMethodInvoker(method);
                 Assert.That(dynamicInvokerSecond, Is.SameAs(dynamicInvoker));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Func<object, object[], object> reflectionInvokerSecond =
                     ReflectionHelpers.GetMethodInvoker(method);
@@ -1820,19 +1810,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             TestMethodClass.ResetStatic();
             Func<object[], object> expressionInvoker;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 expressionInvoker = ReflectionHelpers.GetStaticMethodInvoker(method);
             }
 
             Func<object[], object> dynamicInvoker;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 dynamicInvoker = ReflectionHelpers.GetStaticMethodInvoker(method);
             }
 
             Func<object[], object> reflectionInvoker;
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 reflectionInvoker = ReflectionHelpers.GetStaticMethodInvoker(method);
             }
@@ -1878,21 +1868,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(expressionInvoker, Is.Not.SameAs(reflectionInvoker));
             Assert.That(dynamicInvoker, Is.Not.SameAs(reflectionInvoker));
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+            using (new ReflectionCapabilityScope(true, false))
             {
                 Func<object[], object> expressionInvokerSecond =
                     ReflectionHelpers.GetStaticMethodInvoker(method);
                 Assert.That(expressionInvokerSecond, Is.SameAs(expressionInvoker));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+            using (new ReflectionCapabilityScope(false, true))
             {
                 Func<object[], object> dynamicInvokerSecond =
                     ReflectionHelpers.GetStaticMethodInvoker(method);
                 Assert.That(dynamicInvokerSecond, Is.SameAs(dynamicInvoker));
             }
 
-            using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+            using (new ReflectionCapabilityScope(false, false))
             {
                 Func<object[], object> reflectionInvokerSecond =
                     ReflectionHelpers.GetStaticMethodInvoker(method);
@@ -1963,7 +1953,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     BindingFlags.Static | BindingFlags.Public
                 );
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(true, false))
+                using (new ReflectionCapabilityScope(true, false))
                 {
                     Func<object, object> getter = ReflectionHelpers.GetPropertyGetter(property);
                     Assert.That(
@@ -2005,7 +1995,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     BindingFlags.Static | BindingFlags.Public
                 );
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, true))
+                using (new ReflectionCapabilityScope(false, true))
                 {
                     Func<object, object> getter = ReflectionHelpers.GetPropertyGetter(property);
                     Assert.That(
@@ -2042,7 +2032,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     BindingFlags.Static | BindingFlags.Public
                 );
 
-                using (ReflectionHelpers.OverrideReflectionCapabilities(false, false))
+                using (new ReflectionCapabilityScope(false, false))
                 {
                     Func<object, object> getter = ReflectionHelpers.GetPropertyGetter(property);
                     Assert.That(

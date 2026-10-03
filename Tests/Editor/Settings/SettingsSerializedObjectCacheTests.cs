@@ -48,8 +48,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             _originalSortedDictionaryTweenEnabled =
                 UnityHelpersSettings.ShouldTweenSerializableSortedDictionaryFoldouts();
 
-            UnityHelpersSettings.ClearCachedSerializedObjectForTests();
-            SerializableDictionaryPropertyDrawer.ClearMainFoldoutAnimCacheForTests();
+            UnityHelpersSettingsTestAccess.ClearCachedSerializedObject();
+            SerializableDictionaryPropertyDrawerTestAccess.ClearMainFoldoutAnimCache();
         }
 
         [TearDown]
@@ -62,8 +62,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 _originalSortedDictionaryTweenEnabled
             );
 
-            UnityHelpersSettings.ClearCachedSerializedObjectForTests();
-            SerializableDictionaryPropertyDrawer.ClearMainFoldoutAnimCacheForTests();
+            UnityHelpersSettingsTestAccess.ClearCachedSerializedObject();
+            SerializableDictionaryPropertyDrawerTestAccess.ClearMainFoldoutAnimCache();
         }
 
         [Test]
@@ -179,7 +179,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             SerializedObject firstAccess = GetCachedSerializedObject(settings);
             int firstHashCode = firstAccess.GetHashCode();
 
-            UnityHelpersSettings.ClearCachedSerializedObjectForTests();
+            UnityHelpersSettingsTestAccess.ClearCachedSerializedObject();
 
             SerializedObject secondAccess = GetCachedSerializedObject(settings);
             int secondHashCode = secondAccess.GetHashCode();
@@ -194,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         [Test]
         public void CachedSerializedObjectHandlesNullGracefully()
         {
-            UnityHelpersSettings.ClearCachedSerializedObjectForTests();
+            UnityHelpersSettingsTestAccess.ClearCachedSerializedObject();
 
             // Note: using is safe here since result is expected to be null
             SerializedObject result = GetCachedSerializedObjectWithNull();
@@ -423,7 +423,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         public void SettingsProviderPatternSimulation()
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
-            UnityHelpersSettings.ClearCachedSerializedObjectForTests();
+            UnityHelpersSettingsTestAccess.ClearCachedSerializedObject();
 
             SerializedObject cached = GetCachedSerializedObject(settings);
             SerializedProperty wButtonColors = cached.FindProperty(
@@ -564,7 +564,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "Before invalidation, cache should return same reference."
             );
 
-            UnityHelpersSettings.ClearCachedSerializedObjectForTests();
+            UnityHelpersSettingsTestAccess.ClearCachedSerializedObject();
 
             SerializedObject afterInvalidation = GetCachedSerializedObject(settings);
             Assert.IsTrue(
@@ -808,7 +808,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "Target object should have a valid instance ID."
             );
 
-            UnityHelpersSettings.ClearCachedSerializedObjectForTests();
+            UnityHelpersSettingsTestAccess.ClearCachedSerializedObject();
 
             UnityHelpersSettings sameSettings = UnityHelpersSettings.instance;
 

@@ -351,7 +351,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Object.DestroyImmediate(asset); // UNH-SUPPRESS: destroyed cached state is the subject
 
-            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            RuntimeStateTestUtilities.SimulateApplicationQuitting();
             try
             {
                 DestroyedAssetSingleton resolved = DestroyedAssetSingleton.Instance;
@@ -362,7 +362,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             finally
             {
-                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+                RuntimeStateTestUtilities.PrepareForSceneLoad();
             }
         }
 

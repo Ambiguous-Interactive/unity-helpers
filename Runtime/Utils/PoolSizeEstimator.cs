@@ -65,22 +65,22 @@ namespace WallstopStudios.UnityHelpers.Utils
         private const int MinArrayOverhead = MinObjectOverhead + 8;
 
         /// <summary>
-        /// Pointer size in bytes for reference calculations.
-        /// Used as the size for reference type fields and as a fallback for unknown types.
-        /// </summary>
-        private static readonly int PointerSize = IntPtr.Size;
-
-        /// <summary>
         /// Cache for computed type size estimates to avoid repeated reflection.
         /// </summary>
-        private static readonly ConcurrentDictionary<Type, int> SizeCache =
+        internal static readonly ConcurrentDictionary<Type, int> SizeCache =
             new ConcurrentDictionary<Type, int>();
 
         /// <summary>
         /// Cache for LOH classification to avoid repeated size checks.
         /// </summary>
-        private static readonly ConcurrentDictionary<Type, bool> LohCache =
+        internal static readonly ConcurrentDictionary<Type, bool> LohCache =
             new ConcurrentDictionary<Type, bool>();
+
+        /// <summary>
+        /// Pointer size in bytes for reference calculations.
+        /// Used as the size for reference type fields and as a fallback for unknown types.
+        /// </summary>
+        private static readonly int PointerSize = IntPtr.Size;
 
         /// <summary>
         /// Estimates the size in bytes of a single instance of type <typeparamref name="T"/>.
@@ -256,15 +256,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             return availableForElements / elementSize;
-        }
-
-        /// <summary>
-        /// Clears the internal caches. Primarily used for testing.
-        /// </summary>
-        internal static void ClearCaches()
-        {
-            SizeCache.Clear();
-            LohCache.Clear();
         }
 
         private static int ComputeEstimatedSize(Type type)

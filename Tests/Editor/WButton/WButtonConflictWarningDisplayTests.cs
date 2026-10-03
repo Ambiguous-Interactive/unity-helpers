@@ -30,11 +30,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     {
         private static void ClearAllCaches()
         {
-            WButtonGUI.ClearGroupDataForTesting();
-            WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPriorityWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPlacementWarningsForTesting();
-            WButtonGUI.ClearConflictWarningContentCacheForTesting();
+            WButtonGUITestAccess.ClearGroupData();
+            WButtonGUITestAccess.ClearConflictingDrawOrderWarnings();
+            WButtonGUITestAccess.ClearConflictingGroupPriorityWarnings();
+            WButtonGUITestAccess.ClearConflictingGroupPlacementWarnings();
+            WButtonGUITestAccess.ClearConflictWarningContentCache();
             WButtonGUI.ClearContextCache();
         }
 
@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonGUI.GroupPlacementConflictInfo
         > GetPlacementWarnings()
         {
-            return WButtonGUI.GetConflictingGroupPlacementWarnings();
+            return WButtonGUI.ConflictingGroupPlacementWarnings;
         }
 
         private static IReadOnlyDictionary<
@@ -68,7 +68,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonGUI.GroupPriorityConflictInfo
         > GetPriorityWarnings()
         {
-            return WButtonGUI.GetConflictingGroupPriorityWarnings();
+            return WButtonGUI.ConflictingGroupPriorityWarnings;
         }
 
         private static IReadOnlyDictionary<
@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonGUI.DrawOrderConflictInfo
         > GetDrawOrderWarnings()
         {
-            return WButtonGUI.GetConflictingDrawOrderWarnings();
+            return WButtonGUI.ConflictingDrawOrderWarnings;
         }
 
         private static IEnumerable<TestCaseData> PlacementConflictDetectionCases()
@@ -207,17 +207,17 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             switch (warningType)
             {
                 case "placement":
-                    return WButtonGUI.TryGetGroupPlacementWarningTextForTesting(
+                    return WButtonGUITestAccess.TryGetGroupPlacementWarningText(
                         groupName,
                         out warningText
                     );
                 case "priority":
-                    return WButtonGUI.TryGetGroupPriorityWarningTextForTesting(
+                    return WButtonGUITestAccess.TryGetGroupPriorityWarningText(
                         groupName,
                         out warningText
                     );
                 case "drawOrder":
-                    return WButtonGUI.TryGetDrawOrderWarningTextForTesting(
+                    return WButtonGUITestAccess.TryGetDrawOrderWarningText(
                         groupName,
                         out warningText
                     );
@@ -682,8 +682,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             if (shouldClearCache)
             {
-                WButtonGUI.ClearConflictingGroupPlacementWarningsForTesting();
-                WButtonGUI.ClearConflictWarningContentCacheForTesting();
+                WButtonGUITestAccess.ClearConflictingGroupPlacementWarnings();
+                WButtonGUITestAccess.ClearConflictWarningContentCache();
 
                 IReadOnlyDictionary<
                     string,
@@ -846,7 +846,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Expected DrawButtons to render at least one group when the canonical group placement is an invalid enum value."
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             int invalidPlacementGroupCount = 0;
             foreach (KeyValuePair<WButtonGroupKey, int> entry in groupCounts)
             {
@@ -896,7 +896,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Expected conflict values to include the explicit Top placement."
             );
 
-            bool hasCachedWarning = WButtonGUI.TryGetGroupPlacementWarningTextForTesting(
+            bool hasCachedWarning = WButtonGUITestAccess.TryGetGroupPlacementWarningText(
                 "InvalidPlacementGroup",
                 out string warningText
             );

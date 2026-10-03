@@ -426,12 +426,22 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         internal static bool BuiltInDefaultsInitialized =>
             Volatile.Read(ref _builtInDefaultsInitialized) != 0;
+        internal static int _lifecycleHooksRegistered;
 
+        internal static readonly object ConfigLock = new object();
+
+        // Built-in type-aware defaults (lowest priority - applied before user configuration)
+        internal static readonly Dictionary<Type, PoolPurgeTypeOptions> BuiltInTypeConfigurations =
+            new Dictionary<Type, PoolPurgeTypeOptions>();
+        internal static readonly Dictionary<
+            Type,
+            PoolPurgeTypeOptions
+        > BuiltInGenericTypeConfigurations = new Dictionary<Type, PoolPurgeTypeOptions>();
+        internal static int _builtInDefaultsInitialized;
         private static int _globalEnabled = 0;
         private static int _purgeOnLowMemory = 1;
         private static int _purgeOnAppBackground = 1;
         private static int _purgeOnSceneUnload = 1;
-        private static int _lifecycleHooksRegistered;
         private static float _defaultIdleTimeoutSeconds = DefaultIdleTimeoutSeconds;
         private static int _defaultMinRetainCount = DefaultMinRetainCount;
         private static int _defaultWarmRetainCount = DefaultWarmRetainCount;
@@ -446,9 +456,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static float _largeObjectIdleTimeoutMultiplier =
             DefaultLargeObjectIdleTimeoutMultiplier;
         private static int _largeObjectWarmRetainCount = DefaultLargeObjectWarmRetainCount;
-        private static int _sizeAwarePoliciesEnabled = 1;
 
-        private static readonly object ConfigLock = new object();
+        private static int _sizeAwarePoliciesEnabled = 1;
         private static readonly Dictionary<Type, PoolPurgeTypeOptions> TypeConfigurations =
             new Dictionary<Type, PoolPurgeTypeOptions>();
         private static readonly Dictionary<Type, PoolPurgeTypeOptions> GenericTypeConfigurations =
@@ -463,15 +472,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             PoolPurgeTypeOptions
         > SettingsGenericTypeConfigurations = new Dictionary<Type, PoolPurgeTypeOptions>();
         private static readonly HashSet<Type> SettingsDisabledTypes = new HashSet<Type>();
-
-        // Built-in type-aware defaults (lowest priority - applied before user configuration)
-        private static readonly Dictionary<Type, PoolPurgeTypeOptions> BuiltInTypeConfigurations =
-            new Dictionary<Type, PoolPurgeTypeOptions>();
-        private static readonly Dictionary<
-            Type,
-            PoolPurgeTypeOptions
-        > BuiltInGenericTypeConfigurations = new Dictionary<Type, PoolPurgeTypeOptions>();
-        private static int _builtInDefaultsInitialized;
 
         private static readonly Dictionary<
             Type,
@@ -1222,31 +1222,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Clears all built-in type-aware default configurations and resets the initialization flag.
-        /// This is primarily used for testing.
-        /// </summary>
-        internal static void ClearBuiltInTypeConfigurations()
-        {
-            lock (ConfigLock)
-            {
-                BuiltInTypeConfigurations.Clear();
-                BuiltInGenericTypeConfigurations.Clear();
-            }
-
-            Volatile.Write(ref _builtInDefaultsInitialized, 0);
-        }
-
-        /// <summary>
-        /// Forces re-initialization of built-in type-aware defaults.
-        /// This is primarily used for testing.
-        /// </summary>
-        internal static void ReinitializeBuiltInDefaults()
-        {
-            ClearBuiltInTypeConfigurations();
-            EnsureBuiltInDefaultsInitialized();
-        }
-
-        /// <summary>
         /// Registers application lifecycle hooks for automatic pool purging.
         /// This method is automatically called during runtime initialization via <see cref="RuntimeInitializeLoadType.AfterAssembliesLoaded"/>.
         /// </summary>
@@ -1277,21 +1252,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Unregisters application lifecycle hooks. Primarily used for testing.
-        /// </summary>
-        internal static void UnregisterLifecycleHooks()
-        {
-            if (Interlocked.Exchange(ref _lifecycleHooksRegistered, 0) == 0)
-            {
-                return;
-            }
-
-            Application.lowMemory -= OnLowMemory;
-            Application.focusChanged -= OnFocusChanged;
-            SceneManager.sceneUnloaded -= OnSceneUnloaded;
-        }
-
-        /// <summary>
         /// Ensures the built-in type-aware defaults are initialized.
         /// This method is called automatically when getting effective options.
         /// </summary>
@@ -1311,7 +1271,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// These defaults have the lowest priority and are overridden by any user configuration.
         /// </para>
         /// </remarks>
-        private static void EnsureBuiltInDefaultsInitialized()
+        internal static void EnsureBuiltInDefaultsInitialized()
         {
             if (Volatile.Read(ref _builtInDefaultsInitialized) != 0)
             {
@@ -1328,6 +1288,62 @@ namespace WallstopStudios.UnityHelpers.Utils
                 InitializeBuiltInDefaults();
                 Volatile.Write(ref _builtInDefaultsInitialized, 1);
             }
+        }
+
+        internal static void OnLowMemory()
+        {
+            if (!PurgeOnLowMemory)
+            {
+                return;
+            }
+
+            // Memory pressure requires immediate cleanup, bypassing gradual purge limits.
+            GlobalPoolRegistry.ForceFullPurgeAll(
+                respectHysteresis: false,
+                reason: PurgeReason.MemoryPressure
+            );
+        }
+
+        internal static void OnFocusChanged(bool hasFocus)
+        {
+            if (hasFocus || !PurgeOnAppBackground)
+            {
+                return;
+            }
+
+            PurgeAllPools(respectHysteresis: true, reason: PurgeReason.AppBackgrounded);
+        }
+
+        /// <summary>
+        /// Handles scene unloaded events by triggering a purge on all pools.
+        /// </summary>
+        /// <param name="scene">
+        /// The scene that was unloaded. This parameter is unused because purge operations
+        /// are global (affecting all pools) rather than scene-specific. The parameter is
+        /// required by the <see cref="SceneManager.sceneUnloaded"/> delegate signature.
+        /// </param>
+        /// <remarks>
+        /// <para>
+        /// When a scene is unloaded, pooled objects that were primarily used in that scene
+        /// may no longer be needed. This handler triggers a purge check on all pools to
+        /// reclaim memory from items that are no longer actively used.
+        /// </para>
+        /// <para>
+        /// The purge respects hysteresis settings to avoid purge-allocate cycles during
+        /// rapid scene transitions. Set <see cref="PurgeOnSceneUnload"/> to <c>false</c>
+        /// to disable this behavior.
+        /// </para>
+        /// </remarks>
+        internal static void OnSceneUnloaded(Scene scene)
+        {
+            _ = scene;
+
+            if (!PurgeOnSceneUnload)
+            {
+                return;
+            }
+
+            PurgeAllPools(respectHysteresis: true, reason: PurgeReason.SceneUnloaded);
         }
 
         /// <summary>
@@ -1514,62 +1530,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             attributeOptions = options;
             return hasAttribute;
         }
-
-        private static void OnLowMemory()
-        {
-            if (!PurgeOnLowMemory)
-            {
-                return;
-            }
-
-            // Memory pressure requires immediate cleanup, bypassing gradual purge limits.
-            GlobalPoolRegistry.ForceFullPurgeAll(
-                respectHysteresis: false,
-                reason: PurgeReason.MemoryPressure
-            );
-        }
-
-        private static void OnFocusChanged(bool hasFocus)
-        {
-            if (hasFocus || !PurgeOnAppBackground)
-            {
-                return;
-            }
-
-            PurgeAllPools(respectHysteresis: true, reason: PurgeReason.AppBackgrounded);
-        }
-
-        /// <summary>
-        /// Handles scene unloaded events by triggering a purge on all pools.
-        /// </summary>
-        /// <param name="scene">
-        /// The scene that was unloaded. This parameter is unused because purge operations
-        /// are global (affecting all pools) rather than scene-specific. The parameter is
-        /// required by the <see cref="SceneManager.sceneUnloaded"/> delegate signature.
-        /// </param>
-        /// <remarks>
-        /// <para>
-        /// When a scene is unloaded, pooled objects that were primarily used in that scene
-        /// may no longer be needed. This handler triggers a purge check on all pools to
-        /// reclaim memory from items that are no longer actively used.
-        /// </para>
-        /// <para>
-        /// The purge respects hysteresis settings to avoid purge-allocate cycles during
-        /// rapid scene transitions. Set <see cref="PurgeOnSceneUnload"/> to <c>false</c>
-        /// to disable this behavior.
-        /// </para>
-        /// </remarks>
-        private static void OnSceneUnloaded(Scene scene)
-        {
-            _ = scene;
-
-            if (!PurgeOnSceneUnload)
-            {
-                return;
-            }
-
-            PurgeAllPools(respectHysteresis: true, reason: PurgeReason.SceneUnloaded);
-        }
     }
 
     /// <summary>
@@ -1685,9 +1645,10 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        private static readonly object RegistryLock = new object();
-        private static readonly List<WeakReference<IPurgeable>> RegisteredPools =
+        internal static readonly object RegistryLock = new object();
+        internal static readonly List<WeakReference<IPurgeable>> RegisteredPools =
             new List<WeakReference<IPurgeable>>();
+        internal static float _lastBudgetEnforcementTime;
         private static readonly List<IPoolStatistics> BudgetEnforcementPools =
             new List<IPoolStatistics>();
 
@@ -1696,7 +1657,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static int _budgetEnforcementInProgress;
         private static float _budgetEnforcementIntervalSeconds =
             DefaultBudgetEnforcementIntervalSeconds;
-        private static float _lastBudgetEnforcementTime;
 
         private static readonly System.Diagnostics.Stopwatch RegistryStopwatch =
             System.Diagnostics.Stopwatch.StartNew();
@@ -2003,25 +1963,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             BudgetEnforcementEnabled = true;
             BudgetEnforcementIntervalSeconds = DefaultBudgetEnforcementIntervalSeconds;
             Volatile.Write(ref _lastBudgetEnforcementTime, 0f);
-        }
-
-        /// <summary>
-        /// Clears all registered pools from the registry.
-        /// This does not dispose or purge the pools, only removes their registrations.
-        /// Primarily used for testing.
-        /// </summary>
-        internal static void Clear()
-        {
-            lock (RegistryLock)
-            {
-                RegisteredPools.Clear();
-            }
-            Volatile.Write(ref _lastBudgetEnforcementTime, 0f);
-        }
-
-        internal static bool IsRegistryLockHeldByCurrentThread()
-        {
-            return Monitor.IsEntered(RegistryLock);
         }
 
         private static int EnforceBudgetSingleFlight(long maxItems)

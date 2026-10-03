@@ -32,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             _originalIndentLevel = EditorGUI.indentLevel;
             EditorGUI.indentLevel = 0;
             _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         {
             WGroupLayoutBuilder.ClearCache();
             EditorGUI.indentLevel = _originalIndentLevel;
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 _previousConfiguration.Mode,
                 _previousConfiguration.RowCount
             );

@@ -296,7 +296,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             // Check inherited handler pollution before base setup changes its attribution.
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
-            LlmArtifactCleaner.ResetForTesting();
+            LlmArtifactCleanerTestAccess.Reset();
             base.BaseSetUp();
             EnsureFolder(AssetsRoot);
         }
@@ -308,8 +308,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             base.TearDown();
             // Every asset op above scheduled a drain that would otherwise leak forward.
-            AssetPostprocessorDeferral.FlushForTesting();
-            LlmArtifactCleaner.ResetForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
+            LlmArtifactCleanerTestAccess.Reset();
         }
 
         [Test]
@@ -323,7 +323,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             Assert.IsTrue(LlmArtifactCleaner.ShouldDelete(assetPath));
 
             // Manually invoke deletion logic since OnPostprocessAllAssets timing is unreliable in tests
-            LlmArtifactCleaner.DeleteBlockedAssets(new[] { assetPath });
+            LlmArtifactCleanerTestAccess.DeleteBlockedAssets(new[] { assetPath });
             AssetDatabaseBatchHelper.RefreshIfNotBatching(
                 ImportAssetOptions.ForceSynchronousImport
             );
@@ -386,71 +386,50 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         public void DeleteBlockedAssetsHandlesEdgeCasesGracefully(string[] assetPaths)
         {
             Assert.DoesNotThrow(
-                () => LlmArtifactCleaner.DeleteBlockedAssets(assetPaths),
+                () => LlmArtifactCleanerTestAccess.DeleteBlockedAssets(assetPaths),
                 "DeleteBlockedAssets should handle edge cases without throwing"
             );
         }
 
         [Test]
-        public void DeleteBlockedAssetsDeduplicatesQueuedPaths()
+        public void BusyDeletionDeduplicatesPendingPaths()
         {
-            string assetPath = PackagePrefix + "_llm_duplicate.txt";
-            int deleteCount = 0;
-
-            RestorableGlobal<Action<string>> deleteAsset = new(
-                () => LlmArtifactCleaner.DeleteAssetAction,
-                action => LlmArtifactCleaner.DeleteAssetAction = action
-            );
-            using (deleteAsset.Borrow(_ => deleteCount++))
+            LlmArtifactCleaner._isDeleting = true;
+            try
             {
-                LlmArtifactCleaner.DeleteBlockedAssets(new[] { assetPath, assetPath, assetPath });
+                LlmArtifactCleanerTestAccess.DeleteBlockedAssets(
+                    new[] { PackagePrefix + "_llm_first.txt", PackagePrefix + "_llm_first.txt" }
+                );
+                Assert.AreEqual(1, LlmArtifactCleaner.PendingDeletions.Count);
             }
-
-            Assert.AreEqual(1, deleteCount, "Duplicate paths should be deleted only once.");
-            Assert.AreEqual(
-                0,
-                LlmArtifactCleaner.PendingDeletionCountForTesting,
-                "Pending queue should be empty after the deduplicated delete pass."
-            );
+            finally
+            {
+                LlmArtifactCleaner._isDeleting = false;
+            }
+            LlmArtifactCleaner.DrainPendingDeletions();
+            Assert.AreEqual(0, LlmArtifactCleaner.PendingDeletions.Count);
         }
 
         [Test]
-        public void DeleteBlockedAssetsReentrantQueueDrainsBeforeReturning()
+        public void BusyDeletionRetainsNewPathsUntilDrain()
         {
-            string firstPath = PackagePrefix + "_llm_first.txt";
-            string secondPath = PackagePrefix + "_llm_second.txt";
-            List<string> deletedPaths = new();
-            bool queuedSecondPath = false;
-
-            RestorableGlobal<Action<string>> deleteAsset = new(
-                () => LlmArtifactCleaner.DeleteAssetAction,
-                action => LlmArtifactCleaner.DeleteAssetAction = action
-            );
-            using (
-                deleteAsset.Borrow(assetPath =>
-                {
-                    deletedPaths.Add(assetPath);
-                    if (!queuedSecondPath)
-                    {
-                        queuedSecondPath = true;
-                        LlmArtifactCleaner.DeleteBlockedAssets(new[] { secondPath, secondPath });
-                    }
-                })
-            )
+            LlmArtifactCleaner._isDeleting = true;
+            try
             {
-                LlmArtifactCleaner.DeleteBlockedAssets(new[] { firstPath });
+                LlmArtifactCleanerTestAccess.DeleteBlockedAssets(
+                    new[] { PackagePrefix + "_llm_first.txt", PackagePrefix + "_llm_first.txt" }
+                );
+                LlmArtifactCleanerTestAccess.DeleteBlockedAssets(
+                    new[] { PackagePrefix + "_llm_second.txt" }
+                );
+                Assert.AreEqual(2, LlmArtifactCleaner.PendingDeletions.Count);
             }
-
-            CollectionAssert.AreEquivalent(
-                new[] { firstPath, secondPath },
-                deletedPaths,
-                "Reentrant deletes should stay queued and drain before the outer delete pass returns."
-            );
-            Assert.AreEqual(
-                0,
-                LlmArtifactCleaner.PendingDeletionCountForTesting,
-                "Pending queue should be empty after reentrant deletes drain."
-            );
+            finally
+            {
+                LlmArtifactCleaner._isDeleting = false;
+            }
+            LlmArtifactCleaner.DrainPendingDeletions();
+            Assert.AreEqual(0, LlmArtifactCleaner.PendingDeletions.Count);
         }
 
         [Test]

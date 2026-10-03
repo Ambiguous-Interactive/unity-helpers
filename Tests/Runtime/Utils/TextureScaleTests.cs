@@ -4,9 +4,10 @@
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using System;
-    using System.Threading;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -87,7 +88,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [TearDown]
         public override void TearDown()
         {
-            TextureScale.SliceStartedForTesting = null;
             if (_textureHelper != null)
             {
                 _textureHelper.Dispose();
@@ -96,61 +96,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             base.TearDown();
         }
 
-        [TestCase(true, 8, true)]
-        [TestCase(true, 1, false)]
-        [TestCase(false, 8, true)]
-        [TestCase(false, 1, false)]
-        public void ScaleReportsASliceFailureWhicheverBranchRanIt(
-            bool useBilinear,
-            int newHeight,
-            bool parallel
-        )
+        [TestCase(true, 2)]
+        [TestCase(true, 1)]
+        [TestCase(false, 2)]
+        [TestCase(false, 1)]
+        public void ScaleReportsActualSliceFailureWhicheverBranchRanIt(bool useBilinear, int cores)
         {
-            Texture2D texture = _textureHelper.CreateTextureWithFactory(
-                8,
-                8,
-                (x, y) => new Color(x / 8f, y / 8f, 0f, 1f)
-            );
-            InvalidOperationException injected = new("the slice could not run");
-
-            /*
-                Use measured slice counts; single-core execution cannot prove the parallel failure path. Row
-                zero belongs to a worker when multiple slices run.
-            */
-            int sliceStarts = 0;
-            TextureScale.SliceStartedForTesting = start =>
+            Color[] source = new Color[64];
+            Color[] destination = new Color[4];
+            if (1 < cores)
             {
-                Interlocked.Increment(ref sliceStarts);
-                if (start == 0)
-                {
-                    throw injected;
-                }
-            };
-
-            InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
-                InvokeScale(texture, 4, newHeight, useBilinear)
-            );
-
-            int observedSlices = Volatile.Read(ref sliceStarts);
-            if (parallel && observedSlices <= 1)
-            {
-                Assert.Ignore(
-                    "This runner ran one slice, so there is no background slice to fail and a "
-                        + "pass here would be the absence of a measurement."
-                );
+                LogAssert.Expect(LogType.Exception, new Regex(nameof(IndexOutOfRangeException)));
             }
-
-            Assert.AreEqual(
-                parallel,
-                1 < observedSlices,
-                $"Expected the {(parallel ? "parallel" : "single-threaded")} branch, and "
-                    + $"{observedSlices} slice(s) ran."
-            );
-            Assert.AreSame(
-                injected,
-                thrown,
-                "a slice that failed on a worker must reach the caller as the failure it was, not "
-                    + "as a silently partial image"
+            Assert.Throws<IndexOutOfRangeException>(() =>
+                TextureScale.ScalePixels(source, destination, 8, 8, 4, 8, useBilinear, cores)
             );
         }
 

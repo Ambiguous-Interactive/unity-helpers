@@ -33,22 +33,22 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         public void SetUp()
         {
             base.BaseSetUp();
-            WButtonGUI.ClearGroupDataForTesting();
-            WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPriorityWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPlacementWarningsForTesting();
-            WButtonGUI.ClearConflictWarningContentCacheForTesting();
+            WButtonGUITestAccess.ClearGroupData();
+            WButtonGUITestAccess.ClearConflictingDrawOrderWarnings();
+            WButtonGUITestAccess.ClearConflictingGroupPriorityWarnings();
+            WButtonGUITestAccess.ClearConflictingGroupPlacementWarnings();
+            WButtonGUITestAccess.ClearConflictWarningContentCache();
             WButtonGUI.ClearContextCache();
         }
 
         [TearDown]
         public override void TearDown()
         {
-            WButtonGUI.ClearGroupDataForTesting();
-            WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPriorityWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPlacementWarningsForTesting();
-            WButtonGUI.ClearConflictWarningContentCacheForTesting();
+            WButtonGUITestAccess.ClearGroupData();
+            WButtonGUITestAccess.ClearConflictingDrawOrderWarnings();
+            WButtonGUITestAccess.ClearConflictingGroupPriorityWarnings();
+            WButtonGUITestAccess.ClearConflictingGroupPlacementWarnings();
+            WButtonGUITestAccess.ClearConflictWarningContentCache();
             WButtonGUI.ClearContextCache();
             base.TearDown();
         }
@@ -303,7 +303,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> conflictGroups = groupCounts
                 .Keys.Where(k =>
                     string.Equals(k._groupName, "ConflictGroup", System.StringComparison.Ordinal)
@@ -348,7 +348,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.GroupPlacementConflictInfo> warnings =
-                WButtonGUI.GetConflictingGroupPlacementWarnings();
+                WButtonGUI.ConflictingGroupPlacementWarnings;
 
             Assert.That(
                 warnings.ContainsKey("ConflictGroup"),
@@ -392,7 +392,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> conflictGroups = groupCounts
                 .Keys.Where(k =>
                     string.Equals(k._groupName, "ConflictGroup", System.StringComparison.Ordinal)
@@ -431,7 +431,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
 
             List<WButtonGroupKey> topGroups = groupCounts
                 .Keys.Where(k =>
@@ -501,7 +501,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
 
             WButtonGroupKey group0 = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "Group0", System.StringComparison.Ordinal)
@@ -562,7 +562,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> conflictGroups = groupCounts
                 .Keys.Where(k =>
                     string.Equals(k._groupName, "ConflictGroup", System.StringComparison.Ordinal)
@@ -598,7 +598,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.GroupPriorityConflictInfo> warnings =
-                WButtonGUI.GetConflictingGroupPriorityWarnings();
+                WButtonGUI.ConflictingGroupPriorityWarnings;
 
             Assert.That(
                 warnings.ContainsKey("ConflictGroup"),
@@ -642,7 +642,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> ungroupedKeys = groupCounts
                 .Keys.Where(k => string.IsNullOrEmpty(k._groupName))
                 .ToList();
@@ -688,7 +688,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
 
             WButtonGroupKey highPriorityTop = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "HighPriorityTop", System.StringComparison.Ordinal)
@@ -820,7 +820,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.GroupPlacementConflictInfo> warnings =
-                WButtonGUI.GetConflictingGroupPlacementWarnings();
+                WButtonGUI.ConflictingGroupPlacementWarnings;
 
             Assert.That(
                 warnings,

@@ -163,27 +163,28 @@ namespace WallstopStudios.UnityHelpers.Utils
             onRelease: builder => builder.Clear()
         );
 
-        private static readonly Dictionary<
+        internal static readonly Dictionary<
             float,
             WaitInstructionCacheEntry<WaitForSeconds>
         > WaitForSeconds = new();
-        private static readonly Dictionary<
+        internal static readonly Dictionary<
             float,
             WaitInstructionCacheEntry<WaitForSecondsRealtime>
         > WaitForSecondsRealtime = new();
-        private static readonly LinkedList<float> WaitForSecondsOrder = new();
-        private static readonly LinkedList<float> WaitForSecondsRealtimeOrder = new();
+        internal static readonly LinkedList<float> WaitForSecondsOrder = new();
+        internal static readonly LinkedList<float> WaitForSecondsRealtimeOrder = new();
+
+        internal static int _waitForSecondsLimitHits;
+        internal static int _waitForSecondsRealtimeLimitHits;
+        internal static int _waitForSecondsEvictions;
+        internal static int _waitForSecondsRealtimeEvictions;
+        internal static readonly object WaitInstructionCacheLock = new();
 
         private static float _waitInstructionQuantizationStepSeconds;
         private static int _waitInstructionMaxDistinctEntries =
             WaitInstructionDefaultMaxDistinctEntries;
         private static int _waitInstructionUseLruEvictionFlag;
         private static int _comparerPoolMaxDistinctEntries = ComparerPoolDefaultMaxDistinctEntries;
-        private static int _waitForSecondsLimitHits;
-        private static int _waitForSecondsRealtimeLimitHits;
-        private static int _waitForSecondsEvictions;
-        private static int _waitForSecondsRealtimeEvictions;
-        private static readonly object WaitInstructionCacheLock = new();
 
         /// <summary>
         /// Gets a pooled StringBuilder with at least the requested capacity.
@@ -300,33 +301,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     : builder.MaximumSize(maximumSize).Build();
             CacheResizeRegistry.Register(cache.Resize);
             return cache;
-        }
-
-        internal static void ResetWaitInstructionCachesForTesting()
-        {
-#if !SINGLE_THREADED
-            lock (WaitInstructionCacheLock)
-            {
-#endif
-                WaitForSeconds.Clear();
-                WaitForSecondsRealtime.Clear();
-                WaitForSecondsOrder.Clear();
-                WaitForSecondsRealtimeOrder.Clear();
-#if !SINGLE_THREADED
-            }
-#endif
-            WaitInstructionQuantizationStepSeconds = 0f;
-            WaitInstructionMaxDistinctEntries = WaitInstructionDefaultMaxDistinctEntries;
-            WaitInstructionUseLruEviction = false;
-            Volatile.Write(ref _waitForSecondsLimitHits, 0);
-            Volatile.Write(ref _waitForSecondsRealtimeLimitHits, 0);
-            Volatile.Write(ref _waitForSecondsEvictions, 0);
-            Volatile.Write(ref _waitForSecondsRealtimeEvictions, 0);
-        }
-
-        internal static IDisposable BeginWaitInstructionTestScope()
-        {
-            return new WaitInstructionTestScope();
         }
 
         private static WaitForSeconds CreateWaitForSeconds(float seconds)
@@ -499,158 +473,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             );
         }
 
-        private sealed class WaitInstructionTestScope : IDisposable
-        {
-            private readonly WaitInstructionCacheSnapshot<WaitForSeconds> _waitForSecondsSnapshot;
-            private readonly WaitInstructionCacheSnapshot<WaitForSecondsRealtime> _waitForSecondsRealtimeSnapshot;
-            private readonly float _quantizationStepSnapshot;
-            private readonly int _maxDistinctEntriesSnapshot;
-            private readonly bool _useLruSnapshot;
-            private readonly int _waitForSecondsLimitHitsSnapshot;
-            private readonly int _waitForSecondsRealtimeLimitHitsSnapshot;
-            private readonly int _waitForSecondsEvictionsSnapshot;
-            private readonly int _waitForSecondsRealtimeEvictionsSnapshot;
-            private bool _disposed;
-
-            internal WaitInstructionTestScope()
-            {
-                _waitForSecondsSnapshot = SnapshotCache(WaitForSeconds, WaitForSecondsOrder);
-                _waitForSecondsRealtimeSnapshot = SnapshotCache(
-                    WaitForSecondsRealtime,
-                    WaitForSecondsRealtimeOrder
-                );
-                _quantizationStepSnapshot = WaitInstructionQuantizationStepSeconds;
-                _maxDistinctEntriesSnapshot = WaitInstructionMaxDistinctEntries;
-                _useLruSnapshot = WaitInstructionUseLruEviction;
-                _waitForSecondsLimitHitsSnapshot = Volatile.Read(ref _waitForSecondsLimitHits);
-                _waitForSecondsRealtimeLimitHitsSnapshot = Volatile.Read(
-                    ref _waitForSecondsRealtimeLimitHits
-                );
-                _waitForSecondsEvictionsSnapshot = Volatile.Read(ref _waitForSecondsEvictions);
-                _waitForSecondsRealtimeEvictionsSnapshot = Volatile.Read(
-                    ref _waitForSecondsRealtimeEvictions
-                );
-
-                ResetWaitInstructionCachesForTesting();
-            }
-
-            private static WaitInstructionCacheSnapshot<TInstruction> SnapshotCache<TInstruction>(
-                Dictionary<float, WaitInstructionCacheEntry<TInstruction>> cache,
-                LinkedList<float> order
-            )
-                where TInstruction : class
-            {
-#if !SINGLE_THREADED
-                lock (WaitInstructionCacheLock)
-                {
-#endif
-                    Dictionary<float, TInstruction> entries = new(cache.Count);
-                    foreach (
-                        KeyValuePair<float, WaitInstructionCacheEntry<TInstruction>> pair in cache
-                    )
-                    {
-                        entries[pair.Key] = pair.Value._value;
-                    }
-
-                    List<float> ordering = new(order);
-                    return new WaitInstructionCacheSnapshot<TInstruction>(entries, ordering);
-#if !SINGLE_THREADED
-                }
-#endif
-            }
-
-            private static void RestoreCache<TInstruction>(
-                Dictionary<float, WaitInstructionCacheEntry<TInstruction>> cache,
-                LinkedList<float> order,
-                WaitInstructionCacheSnapshot<TInstruction> snapshot
-            )
-                where TInstruction : class
-            {
-#if !SINGLE_THREADED
-                lock (WaitInstructionCacheLock)
-                {
-#endif
-                    cache.Clear();
-                    order.Clear();
-
-                    if (snapshot.Order == null || snapshot.Entries == null)
-                    {
-                        return;
-                    }
-
-                    Dictionary<float, LinkedListNode<float>> nodes = new(snapshot.Order.Count);
-                    foreach (float key in snapshot.Order)
-                    {
-                        LinkedListNode<float> node = order.AddLast(key);
-                        nodes[key] = node;
-                    }
-
-                    foreach (KeyValuePair<float, TInstruction> pair in snapshot.Entries)
-                    {
-                        if (!nodes.TryGetValue(pair.Key, out LinkedListNode<float> node))
-                        {
-                            node = order.AddLast(pair.Key);
-                            nodes[pair.Key] = node;
-                        }
-
-                        cache[pair.Key] = new WaitInstructionCacheEntry<TInstruction>(
-                            pair.Value,
-                            node
-                        );
-                    }
-#if !SINGLE_THREADED
-                }
-#endif
-            }
-
-            public void Dispose()
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-                _disposed = true;
-
-                WaitInstructionQuantizationStepSeconds = _quantizationStepSnapshot;
-                WaitInstructionMaxDistinctEntries = _maxDistinctEntriesSnapshot;
-                WaitInstructionUseLruEviction = _useLruSnapshot;
-                Volatile.Write(ref _waitForSecondsLimitHits, _waitForSecondsLimitHitsSnapshot);
-                Volatile.Write(
-                    ref _waitForSecondsRealtimeLimitHits,
-                    _waitForSecondsRealtimeLimitHitsSnapshot
-                );
-                Volatile.Write(ref _waitForSecondsEvictions, _waitForSecondsEvictionsSnapshot);
-                Volatile.Write(
-                    ref _waitForSecondsRealtimeEvictions,
-                    _waitForSecondsRealtimeEvictionsSnapshot
-                );
-
-                RestoreCache(WaitForSeconds, WaitForSecondsOrder, _waitForSecondsSnapshot);
-                RestoreCache(
-                    WaitForSecondsRealtime,
-                    WaitForSecondsRealtimeOrder,
-                    _waitForSecondsRealtimeSnapshot
-                );
-            }
-
-            private readonly struct WaitInstructionCacheSnapshot<TInstruction>
-                where TInstruction : class
-            {
-                internal Dictionary<float, TInstruction> Entries { get; }
-
-                internal List<float> Order { get; }
-
-                internal WaitInstructionCacheSnapshot(
-                    Dictionary<float, TInstruction> entries,
-                    List<float> order
-                )
-                {
-                    Entries = entries;
-                    Order = order;
-                }
-            }
-        }
-
         /// <summary>
         /// Stores a cached wait instruction alongside its position in the LRU ordering.
         /// </summary>
@@ -664,7 +486,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </list>
         /// This avoids the O(n) traversal that would be required if we only stored keys and had to search for them.
         /// </remarks>
-        private readonly struct WaitInstructionCacheEntry<TInstruction>
+        internal readonly struct WaitInstructionCacheEntry<TInstruction>
         {
             internal readonly TInstruction _value;
             internal readonly LinkedListNode<float> _node;
@@ -852,11 +674,11 @@ namespace WallstopStudios.UnityHelpers.Utils
             onRelease: set => set.Clear()
         );
 
-        private static readonly Cache<
+        internal static readonly Cache<
             IComparer<T>,
             WallstopGenericPool<SortedSet<T>>
         > SortedSetCache = Buffers.CreateCache<IComparer<T>, WallstopGenericPool<SortedSet<T>>>();
-        private static readonly Cache<
+        internal static readonly Cache<
             IEqualityComparer<T>,
             WallstopGenericPool<HashSet<T>>
         > HashSetCache = Buffers.CreateCache<
@@ -977,12 +799,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             pool.Dispose();
             return true;
         }
-
-        internal static void ClearPoolsForTesting()
-        {
-            HashSetCache.Clear();
-            SortedSetCache.Clear();
-        }
     }
 
     /// <summary>
@@ -1032,14 +848,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             onRelease: sortedDictionary => sortedDictionary.Clear()
         );
 
-        private static readonly Cache<
+        internal static readonly Cache<
             IEqualityComparer<TKey>,
             WallstopGenericPool<Dictionary<TKey, TValue>>
         > DictionaryCache = Buffers.CreateCache<
             IEqualityComparer<TKey>,
             WallstopGenericPool<Dictionary<TKey, TValue>>
         >();
-        private static readonly Cache<
+        internal static readonly Cache<
             IComparer<TKey>,
             WallstopGenericPool<SortedDictionary<TKey, TValue>>
         > SortedDictionaryCache = Buffers.CreateCache<
@@ -1173,12 +989,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             pool.Dispose();
             return true;
-        }
-
-        internal static void ClearPoolsForTesting()
-        {
-            DictionaryCache.Clear();
-            SortedDictionaryCache.Clear();
         }
     }
 
@@ -1427,31 +1237,32 @@ namespace WallstopStudios.UnityHelpers.Utils
             _lastPeriodicPurge = _timeProvider();
 
             float warmTime = _timeProvider();
-            for (int i = 0; i < preWarmCount; ++i)
+            try
             {
-                T value = default;
-                bool ownsItem = false;
-                try
+                for (int i = 0; i < preWarmCount; ++i)
                 {
-                    value = _producer();
-                    ownsItem = true;
-                    _onGet?.Invoke(value);
-                    _onRelease?.Invoke(value);
-                    _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
-                }
-                catch
-                {
-                    if (ownsItem)
+                    T value = _producer();
+                    try
+                    {
+                        _onGet?.Invoke(value);
+                        _onRelease?.Invoke(value);
+                        _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
+                    }
+                    catch
                     {
                         InvokeOnDispose(value);
+                        throw;
                     }
-                    foreach (PooledEntry entry in _pool)
-                    {
-                        InvokeOnDispose(entry.Value);
-                    }
-                    _pool.Clear();
-                    throw;
                 }
+            }
+            catch
+            {
+                foreach (PooledEntry entry in _pool)
+                {
+                    InvokeOnDispose(entry.Value);
+                }
+                _pool.Clear();
+                throw;
             }
             int warmCount = _pool.Count;
             if (_peakSize < warmCount)
@@ -1531,23 +1342,18 @@ namespace WallstopStudios.UnityHelpers.Utils
             _lastAccessTime = currentTime;
             _usageTracker.RecordRent(currentTime);
 
-            T rented = default;
-            bool ownsItem = false;
+            T rented;
             try
             {
-                int poolCount = _pool.Count;
-                if (0 < poolCount)
-                {
-                    int lastIndex = poolCount - 1;
-                    rented = _pool[lastIndex].Value;
-                    _pool.RemoveAt(lastIndex);
-                }
-                else
-                {
-                    rented = _producer();
-                }
-                ownsItem = true;
-
+                rented = AcquireValue();
+            }
+            catch
+            {
+                _usageTracker.RecordRetiredReturn();
+                throw;
+            }
+            try
+            {
                 int totalInCirculation = _pool.Count + _usageTracker.CurrentlyRented;
                 if (_peakSize < totalInCirculation)
                 {
@@ -1558,10 +1364,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             catch
             {
                 _usageTracker.RecordRetiredReturn();
-                if (ownsItem)
-                {
-                    InvokeOnDispose(rented);
-                }
+                InvokeOnDispose(rented);
                 throw;
             }
             value = rented;
@@ -2110,6 +1913,19 @@ namespace WallstopStudios.UnityHelpers.Utils
             catch { }
         }
 
+        private T AcquireValue()
+        {
+            int count = _pool.Count;
+            if (0 < count)
+            {
+                int index = count - 1;
+                T value = _pool[index].Value;
+                _pool.RemoveAt(index);
+                return value;
+            }
+            return _producer();
+        }
+
         private void InvokeOnDispose(T value)
         {
             if (_onDispose == null)
@@ -2436,31 +2252,32 @@ namespace WallstopStudios.UnityHelpers.Utils
             _lastPeriodicPurge = _timeProvider();
 
             float warmTime = _timeProvider();
-            for (int i = 0; i < preWarmCount; ++i)
+            try
             {
-                T value = default;
-                bool ownsItem = false;
-                try
+                for (int i = 0; i < preWarmCount; ++i)
                 {
-                    value = _producer();
-                    ownsItem = true;
-                    _onGet?.Invoke(value);
-                    _onRelease?.Invoke(value);
-                    _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
-                }
-                catch
-                {
-                    if (ownsItem)
+                    T value = _producer();
+                    try
+                    {
+                        _onGet?.Invoke(value);
+                        _onRelease?.Invoke(value);
+                        _pool.Add(new PooledEntry { Value = value, ReturnTime = warmTime });
+                    }
+                    catch
                     {
                         InvokeOnDispose(value);
+                        throw;
                     }
-                    foreach (PooledEntry entry in _pool)
-                    {
-                        InvokeOnDispose(entry.Value);
-                    }
-                    _pool.Clear();
-                    throw;
                 }
+            }
+            catch
+            {
+                foreach (PooledEntry entry in _pool)
+                {
+                    InvokeOnDispose(entry.Value);
+                }
+                _pool.Clear();
+                throw;
             }
             int warmCount = _pool.Count;
             if (_peakSize < warmCount)
@@ -2543,29 +2360,18 @@ namespace WallstopStudios.UnityHelpers.Utils
             Volatile.Write(ref _lastAccessTime, currentTime);
             _usageTracker.RecordRent(currentTime);
 
-            T rented = default;
-            bool ownsItem = false;
+            T rented;
             try
             {
-                bool fromPool = false;
-                lock (_lock)
-                {
-                    int poolCount = _pool.Count;
-                    if (0 < poolCount)
-                    {
-                        int lastIndex = poolCount - 1;
-                        rented = _pool[lastIndex].Value;
-                        _pool.RemoveAt(lastIndex);
-                        fromPool = true;
-                        ownsItem = true;
-                    }
-                }
-                if (!fromPool)
-                {
-                    rented = _producer();
-                    ownsItem = true;
-                }
-
+                rented = AcquireValue();
+            }
+            catch
+            {
+                _usageTracker.RecordRetiredReturn();
+                throw;
+            }
+            try
+            {
                 int totalInCirculation = CurrentPooledCount + _usageTracker.CurrentlyRented;
                 int peak = _peakSize;
                 while (peak < totalInCirculation)
@@ -2586,10 +2392,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             catch
             {
                 _usageTracker.RecordRetiredReturn();
-                if (ownsItem)
-                {
-                    InvokeOnDispose(rented);
-                }
+                InvokeOnDispose(rented);
                 throw;
             }
             value = rented;
@@ -3242,6 +3045,22 @@ namespace WallstopStudios.UnityHelpers.Utils
                 OnPurge(value, reason);
             }
             catch { }
+        }
+
+        private T AcquireValue()
+        {
+            lock (_lock)
+            {
+                int count = _pool.Count;
+                if (0 < count)
+                {
+                    int index = count - 1;
+                    T value = _pool[index].Value;
+                    _pool.RemoveAt(index);
+                    return value;
+                }
+            }
+            return _producer();
         }
 
         private void InvokeOnDispose(T value)
@@ -3908,7 +3727,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     public static class WallstopFastArrayPool<T>
         where T : unmanaged
     {
-        private static readonly PoolBucketTable<T[]> Pool = new();
+        internal static readonly PoolBucketTable<T[]> Pool = new();
         private static readonly Action<T[]> OnRelease = Release;
 
         /// <summary>
@@ -3959,15 +3778,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             array = rented;
             return new PooledArray<T>(rented, size, OnRelease);
-        }
-
-        /// <summary>
-        /// Clears all pooled arrays for testing purposes. Internal visibility for test assemblies.
-        /// Thread-safe implementation.
-        /// </summary>
-        internal static void ClearForTesting()
-        {
-            Pool.ClearAll();
         }
 
         private static void Release(T[] resource)

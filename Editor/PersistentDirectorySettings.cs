@@ -453,10 +453,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             EditorApplication.delayCall += () =>
             {
                 // Automatic migration can open modal failure dialogs during tests; require explicit test opt-in.
-                if (
-                    Utils.EditorUi.Suppress
-                    && !Utils.ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
-                )
+                if (Utils.EditorUi.Suppress)
                 {
                     return;
                 }

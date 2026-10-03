@@ -581,8 +581,11 @@ public sealed class CustomSingletonTests
     [SetUp]
     public void SetUp()
     {
-        // Disable auto-creation, destroy any existing instance, then re-enable
-        _scope = UnityMainThreadDispatcher.CreateTestScope(destroyImmediate: true);
+        // Enable scoped auto-creation and clean up instances on entry and exit
+        _scope = UnityMainThreadDispatcher.AutoCreationScope.Enabled(
+            destroyExistingInstanceOnEnter: true,
+            destroyInstancesOnDispose: true,
+            destroyImmediate: true);
     }
 
     [TearDown]
@@ -671,7 +674,7 @@ public void SettingsWithCustomValuesWork()
 
 1. **Inherit from `CommonTestBase`**: This handles most singleton cleanup automatically, including dispatcher scope management.
 
-2. **Use `CreateTestScope` for dispatcher**: The `UnityMainThreadDispatcher.CreateTestScope()` method packages the common test setup pattern: disable auto-creation → destroy existing → re-enable auto-creation.
+2. **Use `AutoCreationScope` for dispatcher**: Configure real scoped auto-creation and instance cleanup with `Enabled` or `Disabled`; keep fixture helpers in the test assembly.
 
 3. **Prefer `destroyImmediate: true` in EditMode**: EditMode tests should use `DestroyImmediate` to ensure synchronous cleanup without Unity's delayed destruction.
 

@@ -168,7 +168,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 new PeriodicEffectDefinition { interval = 1f },
                 0f
             );
-            state.SetExecutedTicksForTesting(int.MaxValue);
+            state.ExecutedTicks = int.MaxValue;
+            state._scheduleOrdinal = int.MaxValue;
             Assert.IsTrue(state.TryConsumeTick(2147483648f));
             Assert.AreEqual(int.MinValue, state.ExecutedTicks);
             Assert.IsTrue(state.TryConsumeTick(2147483648f));
@@ -184,7 +185,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 new PeriodicEffectDefinition { interval = float.MaxValue / 2147483648f },
                 StartTime
             );
-            state.SetExecutedTicksForTesting(int.MaxValue);
+            state.ExecutedTicks = int.MaxValue;
+            state._scheduleOrdinal = int.MaxValue;
             Assert.IsFalse(state.TryConsumeTick(float.MaxValue));
             Assert.AreEqual(int.MaxValue, state.ExecutedTicks);
         }

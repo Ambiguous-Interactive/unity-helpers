@@ -23,20 +23,135 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     [CustomPropertyDrawer(typeof(StringInListAttribute))]
     public sealed class StringInListDrawer : PropertyDrawer
     {
+        internal const float PaginationButtonHeight = DropDownShared.PaginationButtonHeight;
+        internal const float PopupWidth = DropDownShared.PopupWidth;
+        internal const float OptionBottomPadding = DropDownShared.OptionBottomPadding;
+        internal const float EmptySearchHorizontalPadding =
+            DropDownShared.EmptySearchHorizontalPadding;
+        internal const float EmptySearchExtraPadding = DropDownShared.EmptySearchExtraPadding;
+        internal const string EmptyResultsMessage = DropDownShared.EmptyResultsMessage;
+
         private const float ButtonWidth = DropDownShared.ButtonWidth;
         private const float PageLabelWidth = DropDownShared.PageLabelWidth;
-        private const float PaginationButtonHeight = DropDownShared.PaginationButtonHeight;
-        private const float PopupWidth = DropDownShared.PopupWidth;
-        private const float OptionBottomPadding = DropDownShared.OptionBottomPadding;
         private const float OptionRowExtraHeight = DropDownShared.OptionRowExtraHeight;
-        private const float EmptySearchHorizontalPadding =
-            DropDownShared.EmptySearchHorizontalPadding;
-        private const float EmptySearchExtraPadding = DropDownShared.EmptySearchExtraPadding;
-        private const string EmptyResultsMessage = DropDownShared.EmptyResultsMessage;
         private static readonly GUIContent EmptyResultsContent = DropDownShared.EmptyResultsContent;
         private static float s_cachedOptionControlHeight = -1f;
         private static float s_cachedOptionRowHeight = -1f;
         private static readonly GUIContent ReusableDropDownButtonContent = new();
+
+        internal static int CalculateRowsOnPage(int filteredCount, int pageSize, int currentPage)
+        {
+            if (filteredCount <= 0 || pageSize <= 0)
+            {
+                return 1;
+            }
+
+            int maxPageIndex = CalculatePageCount(pageSize, filteredCount) - 1;
+            int clampedPage = Mathf.Clamp(currentPage, 0, Mathf.Max(0, maxPageIndex));
+            int startIndex = clampedPage * pageSize;
+            int remaining = filteredCount - startIndex;
+            if (remaining <= 0)
+            {
+                return 1;
+            }
+
+            return Mathf.Min(pageSize, remaining);
+        }
+
+        internal static float CalculatePopupTargetHeight(int rowsOnPage, bool includePagination)
+        {
+            int clampedRows = Mathf.Max(1, rowsOnPage);
+            float chromeHeight = CalculatePopupChromeHeight(includePagination);
+            float optionListHeight = clampedRows * GetOptionRowHeight();
+            float unclampedHeight = chromeHeight + optionListHeight;
+            return unclampedHeight;
+        }
+
+        internal static float CalculatePopupChromeHeight(bool includePagination)
+        {
+            float searchHeight = EditorGUIUtility.singleLineHeight;
+            float paginationHeight = includePagination
+                ? PopupStyles.PaginationButtonLeft.fixedHeight
+                : EditorGUIUtility.standardVerticalSpacing;
+            float footerHeight = EditorGUIUtility.standardVerticalSpacing + OptionBottomPadding;
+            return searchHeight + paginationHeight + footerHeight;
+        }
+
+        internal static float CalculateEmptySearchHeight(float measuredHelpBoxHeight = -1f)
+        {
+            GUIStyle helpStyle = EditorStyles.helpBox;
+            int helpMargin = helpStyle.margin?.horizontal ?? 0;
+            float availableWidth = PopupWidth - EmptySearchHorizontalPadding - helpMargin;
+            availableWidth = Mathf.Max(32f, availableWidth);
+            float helpBoxHeight;
+            if (0f < measuredHelpBoxHeight)
+            {
+                helpBoxHeight = measuredHelpBoxHeight;
+            }
+            else
+            {
+                float calculated = helpStyle.CalcHeight(EmptyResultsContent, availableWidth);
+                float marginVertical = helpStyle.margin?.vertical ?? 0;
+                helpBoxHeight = calculated + marginVertical;
+            }
+
+            float searchRow =
+                EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
+            float topSpacer = EditorGUIUtility.standardVerticalSpacing;
+            float bottomSpacer = EditorGUIUtility.standardVerticalSpacing;
+            float footer =
+                EditorGUIUtility.standardVerticalSpacing
+                + OptionBottomPadding
+                + EmptySearchExtraPadding;
+
+            float result = searchRow + topSpacer + helpBoxHeight + bottomSpacer + footer;
+            return result;
+        }
+
+        internal static float GetOptionRowHeight()
+        {
+            if (0f < s_cachedOptionRowHeight)
+            {
+                return s_cachedOptionRowHeight;
+            }
+
+            float controlHeight = GetOptionControlHeight();
+            RectOffset margin = PopupStyles.OptionButton.margin;
+            float adjustedMargin = 0f;
+            if (margin != null)
+            {
+                // GUILayout absorbs some margin; subtract standard spacing to match repaint height.
+                adjustedMargin = Mathf.Max(
+                    0f,
+                    margin.vertical - EditorGUIUtility.standardVerticalSpacing
+                );
+            }
+            else
+            {
+                adjustedMargin = EditorGUIUtility.standardVerticalSpacing;
+            }
+
+            s_cachedOptionRowHeight = controlHeight + adjustedMargin;
+            return s_cachedOptionRowHeight;
+        }
+
+        internal static float GetOptionControlHeight()
+        {
+            if (0f < s_cachedOptionControlHeight)
+            {
+                return s_cachedOptionControlHeight;
+            }
+
+            float width = PopupWidth - 32f;
+            float measured = PopupStyles.OptionButton.CalcHeight(GUIContent.none, width);
+            if (measured <= 0f || float.IsNaN(measured))
+            {
+                measured = EditorGUIUtility.singleLineHeight + OptionRowExtraHeight;
+            }
+
+            s_cachedOptionControlHeight = measured;
+            return measured;
+        }
 
         private static string GetPaginationLabel(int page, int totalPages)
         {
@@ -166,25 +281,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return (filteredCount + pageSize - 1) / pageSize;
-        }
-
-        private static int CalculateRowsOnPage(int filteredCount, int pageSize, int currentPage)
-        {
-            if (filteredCount <= 0 || pageSize <= 0)
-            {
-                return 1;
-            }
-
-            int maxPageIndex = CalculatePageCount(pageSize, filteredCount) - 1;
-            int clampedPage = Mathf.Clamp(currentPage, 0, Mathf.Max(0, maxPageIndex));
-            int startIndex = clampedPage * pageSize;
-            int remaining = filteredCount - startIndex;
-            if (remaining <= 0)
-            {
-                return 1;
-            }
-
-            return Mathf.Min(pageSize, remaining);
         }
 
         private static void DrawPopupDropDown(
@@ -379,101 +475,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 );
         }
 
-        private static float CalculatePopupTargetHeight(int rowsOnPage, bool includePagination)
-        {
-            int clampedRows = Mathf.Max(1, rowsOnPage);
-            float chromeHeight = CalculatePopupChromeHeight(includePagination);
-            float optionListHeight = clampedRows * GetOptionRowHeight();
-            float unclampedHeight = chromeHeight + optionListHeight;
-            return unclampedHeight;
-        }
-
-        private static float CalculatePopupChromeHeight(bool includePagination)
-        {
-            float searchHeight = EditorGUIUtility.singleLineHeight;
-            float paginationHeight = includePagination
-                ? PopupStyles.PaginationButtonLeft.fixedHeight
-                : EditorGUIUtility.standardVerticalSpacing;
-            float footerHeight = EditorGUIUtility.standardVerticalSpacing + OptionBottomPadding;
-            return searchHeight + paginationHeight + footerHeight;
-        }
-
-        private static float CalculateEmptySearchHeight(float measuredHelpBoxHeight = -1f)
-        {
-            GUIStyle helpStyle = EditorStyles.helpBox;
-            int helpMargin = helpStyle.margin?.horizontal ?? 0;
-            float availableWidth = PopupWidth - EmptySearchHorizontalPadding - helpMargin;
-            availableWidth = Mathf.Max(32f, availableWidth);
-            float helpBoxHeight;
-            if (0f < measuredHelpBoxHeight)
-            {
-                helpBoxHeight = measuredHelpBoxHeight;
-            }
-            else
-            {
-                float calculated = helpStyle.CalcHeight(EmptyResultsContent, availableWidth);
-                float marginVertical = helpStyle.margin?.vertical ?? 0;
-                helpBoxHeight = calculated + marginVertical;
-            }
-
-            float searchRow =
-                EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-            float topSpacer = EditorGUIUtility.standardVerticalSpacing;
-            float bottomSpacer = EditorGUIUtility.standardVerticalSpacing;
-            float footer =
-                EditorGUIUtility.standardVerticalSpacing
-                + OptionBottomPadding
-                + EmptySearchExtraPadding;
-
-            float result = searchRow + topSpacer + helpBoxHeight + bottomSpacer + footer;
-            return result;
-        }
-
-        private static float GetOptionRowHeight()
-        {
-            if (0f < s_cachedOptionRowHeight)
-            {
-                return s_cachedOptionRowHeight;
-            }
-
-            float controlHeight = GetOptionControlHeight();
-            RectOffset margin = PopupStyles.OptionButton.margin;
-            float adjustedMargin = 0f;
-            if (margin != null)
-            {
-                // GUILayout absorbs some margin; subtract standard spacing to match repaint height.
-                adjustedMargin = Mathf.Max(
-                    0f,
-                    margin.vertical - EditorGUIUtility.standardVerticalSpacing
-                );
-            }
-            else
-            {
-                adjustedMargin = EditorGUIUtility.standardVerticalSpacing;
-            }
-
-            s_cachedOptionRowHeight = controlHeight + adjustedMargin;
-            return s_cachedOptionRowHeight;
-        }
-
-        private static float GetOptionControlHeight()
-        {
-            if (0f < s_cachedOptionControlHeight)
-            {
-                return s_cachedOptionControlHeight;
-            }
-
-            float width = PopupWidth - 32f;
-            float measured = PopupStyles.OptionButton.CalcHeight(GUIContent.none, width);
-            if (measured <= 0f || float.IsNaN(measured))
-            {
-                measured = EditorGUIUtility.singleLineHeight + OptionRowExtraHeight;
-            }
-
-            s_cachedOptionControlHeight = measured;
-            return measured;
-        }
-
         private static string[] GetOptionDisplayArray(
             StringInListAttribute attribute,
             string[] options
@@ -648,7 +649,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return selector;
         }
 
-        private sealed class StringInListPopupSelectorElement : WDropDownPopupSelectorBase<string>
+        internal sealed class StringInListPopupSelectorElement : WDropDownPopupSelectorBase<string>
         {
             protected override int OptionCount => _options.Length;
 
@@ -693,7 +694,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private sealed class StringInListSelector : WDropDownSelectorBase<string>
+        internal sealed class StringInListSelector : WDropDownSelectorBase<string>
         {
             protected override int OptionCount => _options.Length;
 
@@ -1077,61 +1078,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        internal static class TestHooks
-        {
-            public static int OptionButtonMarginVertical =>
-                PopupStyles.OptionButton.margin?.vertical ?? 0;
-
-            public static float OptionFooterPadding => OptionBottomPadding;
-
-            public static float PaginationButtonHeight =>
-                PopupStyles.PaginationButtonLeft.fixedHeight;
-
-            public static float PopupWidthValue => PopupWidth;
-
-            public static float EmptySearchHorizontalPaddingValue => EmptySearchHorizontalPadding;
-
-            public static string EmptyResultsMessageValue => EmptyResultsMessage;
-
-            public static float EmptySearchExtraPaddingValue => EmptySearchExtraPadding;
-
-            public static float CalculatePopupTargetHeight(int rowsOnPage, bool includePagination)
-            {
-                return StringInListDrawer.CalculatePopupTargetHeight(rowsOnPage, includePagination);
-            }
-
-            public static float CalculatePopupChromeHeight(bool includePagination)
-            {
-                return StringInListDrawer.CalculatePopupChromeHeight(includePagination);
-            }
-
-            public static float GetOptionRowHeight()
-            {
-                return StringInListDrawer.GetOptionRowHeight();
-            }
-
-            public static float GetOptionControlHeight()
-            {
-                return StringInListDrawer.GetOptionControlHeight();
-            }
-
-            public static float CalculateEmptySearchHeight()
-            {
-                return StringInListDrawer.CalculateEmptySearchHeight();
-            }
-
-            public static float CalculateEmptySearchHeightWithMeasurement(float measuredHelpHeight)
-            {
-                return StringInListDrawer.CalculateEmptySearchHeight(measuredHelpHeight);
-            }
-
-            public static int CalculateRowsOnPage(int filteredCount, int pageSize, int currentPage)
-            {
-                return StringInListDrawer.CalculateRowsOnPage(filteredCount, pageSize, currentPage);
-            }
-        }
-
-        private static class PopupStyles
+        internal static class PopupStyles
         {
             public static GUIStyle OptionButton =>
                 _optionButton ??= new GUIStyle("Button")

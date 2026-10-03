@@ -369,12 +369,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.Ignore("Dynamic IL is not available on this platform.");
             }
 
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: true
-                )
-            )
+            using (new ReflectionCapabilityScope(expressions: false, dynamicIl: true))
             {
                 assertion();
             }
@@ -2375,12 +2370,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void ParameterlessConstructorFallbackUsesReflectionWhenExpressionsDisabled()
         {
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: false
-                )
-            )
+            using (new ReflectionCapabilityScope(expressions: false, dynamicIl: false))
             {
                 Func<TestConstructorClass> creator =
                     ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
@@ -2408,12 +2398,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             ConstructorInfo ctor = typeof(GenericTestClass<int>).GetConstructor(
                 new[] { typeof(int) }
             );
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: false
-                )
-            )
+            using (new ReflectionCapabilityScope(expressions: false, dynamicIl: false))
             {
                 Func<object[], object> invoker = ReflectionHelpers.GetConstructor(ctor);
                 object result = invoker(new object[] { 64 });
@@ -2435,12 +2420,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void IndexerHelpersFallbackWhenExpressionsDisabled()
         {
             PropertyInfo idxProp = typeof(IndexerClass).GetProperty("Item");
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: false
-                )
-            )
+            using (new ReflectionCapabilityScope(expressions: false, dynamicIl: false))
             {
                 Func<object, object[], object> getter = ReflectionHelpers.GetIndexerGetter(idxProp);
                 Action<object, object, object[]> setter = ReflectionHelpers.GetIndexerSetter(
@@ -2514,12 +2494,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void TypedFieldSetterFallbacksWhenCapabilitiesDisabled()
         {
             FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: false
-                )
-            )
+            using (new ReflectionCapabilityScope(expressions: false, dynamicIl: false))
             {
                 FieldSetter<TestClass, int> setter = ReflectionHelpers.GetFieldSetter<
                     TestClass,
@@ -2537,12 +2512,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             PropertyInfo property = typeof(GenericTestClass<int>).GetProperty(
                 nameof(GenericTestClass<int>.Value)
             );
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: false
-                )
-            )
+            using (new ReflectionCapabilityScope(expressions: false, dynamicIl: false))
             {
                 Action<GenericTestClass<int>, int> setter = ReflectionHelpers.GetPropertySetter<
                     GenericTestClass<int>,
@@ -2561,12 +2531,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 nameof(GenericTestClass<int>.Value)
             );
             GenericTestClass<int> instance = new(45);
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: false
-                )
-            )
+            using (new ReflectionCapabilityScope(expressions: false, dynamicIl: false))
             {
                 Func<GenericTestClass<int>, int> getter = ReflectionHelpers.GetPropertyGetter<
                     GenericTestClass<int>,

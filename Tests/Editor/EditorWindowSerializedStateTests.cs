@@ -35,32 +35,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
         [Test]
         public void EveryWindowReleasesItsSerializedObjectOnTeardown()
         {
-            AssertSerializedStateLifecycle<ImageBlurTool>(window =>
-                window.SerializedStateForTesting
-            );
+            AssertSerializedStateLifecycle<ImageBlurTool>(window => window._serializedObject);
             AssertSerializedStateLifecycle<SpriteSettingsApplierWindow>(window =>
-                window.SerializedStateForTesting
+                window._serializedObject
             );
-            AssertSerializedStateLifecycle<TextureSettingsApplierWindow>(window =>
-                window.SerializedStateForTesting
-            );
+            AssertSerializedStateLifecycle<TextureSettingsApplierWindow>(window => window._so);
             AssertSerializedStateLifecycle<AnimationCopierWindow>(window =>
-                window.SerializedStateForTesting
+                window._serializedObject
             );
-            AssertSerializedStateLifecycle<SpriteCropper>(window =>
-                window.SerializedStateForTesting
-            );
+            AssertSerializedStateLifecycle<SpriteCropper>(window => window._serializedObject);
             AssertSerializedStateLifecycle<AnimationCreatorWindow>(window =>
-                window.SerializedStateForTesting
+                window._serializedObject
             );
-            AssertSerializedStateLifecycle<SpritePivotAdjuster>(window =>
-                window.SerializedStateForTesting
-            );
+            AssertSerializedStateLifecycle<SpritePivotAdjuster>(window => window._serializedObject);
             AssertSerializedStateLifecycle<SpriteSheetExtractor>(window =>
-                window.SerializedStateForTesting
+                window._serializedObject
             );
             AssertSerializedStateLifecycle<FitTextureSizeWindow>(window =>
-                window.SerializedStateForTesting
+                window._serializedObject
             );
         }
 

@@ -53,42 +53,16 @@ namespace WallstopStudios.UnityHelpers.Utils
             get => _slot != 0 && DisposalLeases.CurrentGeneration(_slot) == _generation;
         }
 
-        /// <summary>
-        /// The slot behind this lease, so a test can assert on ownership. Not part of the disposal
-        /// contract.
-        /// </summary>
-        internal int SlotForTests
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _slot;
-        }
-
-        internal int OwnerThreadIdForTests
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _ownerThreadId;
-        }
-
         // Slot 0 is never handed out, so `default` reads as "not held" without a second field.
-        private readonly int _slot;
-        private readonly int _ownerThreadId;
-        private readonly long _generation;
+        internal readonly int _slot;
+        internal readonly int _ownerThreadId;
+        internal readonly long _generation;
 
         internal DisposalLease(int slot, int ownerThreadId, long generation)
         {
             _slot = slot;
             _ownerThreadId = ownerThreadId;
             _generation = generation;
-        }
-
-        /// <summary>
-        /// Claims without recycling the slot, so a test can control exactly when it becomes
-        /// reusable and observe who holds it in between.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool TryClaimWithoutRelease()
-        {
-            return _slot != 0 && DisposalLeases.TryClaim(_slot, _generation);
         }
 
         /// <summary>

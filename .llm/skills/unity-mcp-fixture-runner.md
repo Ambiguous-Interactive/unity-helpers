@@ -37,3 +37,5 @@
 ### [Three things the probe itself gets wrong (session 224)](../references/unity-mcp-fixture-runner-part-3.md#three-things-the-probe-itself-gets-wrong-session-224)
 
 ### [Three the bridge itself gets wrong (session 225)](../references/unity-mcp-fixture-runner-part-3.md#three-the-bridge-itself-gets-wrong-session-225)
+
+### [Native asynchronous runner limits (session 348)](../references/unity-mcp-fixture-runner-part-3.md#native-asynchronous-runner-limits-session-348)

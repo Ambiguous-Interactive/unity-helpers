@@ -119,30 +119,30 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PopupChromeIncludesFooterPadding()
         {
-            float chrome = StringInListDrawer.TestHooks.CalculatePopupChromeHeight(
+            float chrome = StringInListDrawerTestAccess.CalculatePopupChromeHeight(
                 includePagination: true
             );
             float searchHeight = EditorGUIUtility.singleLineHeight;
-            float paginationHeight = StringInListDrawer.TestHooks.PaginationButtonHeight;
+            float paginationHeight = StringInListDrawerTestAccess.PaginationButtonHeight;
             float footerHeight = chrome - (searchHeight + paginationHeight);
             float expectedFooterHeight =
                 EditorGUIUtility.standardVerticalSpacing
-                + StringInListDrawer.TestHooks.OptionFooterPadding;
+                + StringInListDrawerTestAccess.OptionFooterPadding;
             Assert.That(footerHeight, Is.EqualTo(expectedFooterHeight).Within(0.001f));
         }
 
         [Test]
         public void PopupChromeAddsPaginationHeightWhenRequired()
         {
-            float withPagination = StringInListDrawer.TestHooks.CalculatePopupChromeHeight(
+            float withPagination = StringInListDrawerTestAccess.CalculatePopupChromeHeight(
                 includePagination: true
             );
-            float withoutPagination = StringInListDrawer.TestHooks.CalculatePopupChromeHeight(
+            float withoutPagination = StringInListDrawerTestAccess.CalculatePopupChromeHeight(
                 includePagination: false
             );
             float difference = withPagination - withoutPagination;
             float expectedDifference =
-                StringInListDrawer.TestHooks.PaginationButtonHeight
+                StringInListDrawerTestAccess.PaginationButtonHeight
                 - EditorGUIUtility.standardVerticalSpacing;
             Assert.That(difference, Is.EqualTo(expectedDifference).Within(0.001f));
         }
@@ -151,12 +151,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void PopupTargetHeightAggregatesChromeAndRows()
         {
             const int pageSize = 10;
-            float chrome = StringInListDrawer.TestHooks.CalculatePopupChromeHeight(
+            float chrome = StringInListDrawerTestAccess.CalculatePopupChromeHeight(
                 includePagination: false
             );
-            float rowHeight = StringInListDrawer.TestHooks.GetOptionRowHeight();
+            float rowHeight = StringInListDrawerTestAccess.GetOptionRowHeight();
             float expected = chrome + (pageSize * rowHeight);
-            float actual = StringInListDrawer.TestHooks.CalculatePopupTargetHeight(
+            float actual = StringInListDrawerTestAccess.CalculatePopupTargetHeight(
                 pageSize,
                 includePagination: false
             );
@@ -166,12 +166,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PopupTargetHeightFitsSingleRowWithoutMinimumClamp()
         {
-            float chrome = StringInListDrawer.TestHooks.CalculatePopupChromeHeight(
+            float chrome = StringInListDrawerTestAccess.CalculatePopupChromeHeight(
                 includePagination: false
             );
-            float rowHeight = StringInListDrawer.TestHooks.GetOptionRowHeight();
+            float rowHeight = StringInListDrawerTestAccess.GetOptionRowHeight();
             float expected = chrome + rowHeight;
-            float actual = StringInListDrawer.TestHooks.CalculatePopupTargetHeight(
+            float actual = StringInListDrawerTestAccess.CalculatePopupTargetHeight(
                 1,
                 includePagination: false
             );
@@ -181,30 +181,30 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PopupTargetHeightScalesWithLargePageSizes()
         {
-            float twentyFiveRows = StringInListDrawer.TestHooks.CalculatePopupTargetHeight(
+            float twentyFiveRows = StringInListDrawerTestAccess.CalculatePopupTargetHeight(
                 25,
                 includePagination: true
             );
-            float fiftyRows = StringInListDrawer.TestHooks.CalculatePopupTargetHeight(
+            float fiftyRows = StringInListDrawerTestAccess.CalculatePopupTargetHeight(
                 50,
                 includePagination: true
             );
-            float rowHeight = StringInListDrawer.TestHooks.GetOptionRowHeight();
+            float rowHeight = StringInListDrawerTestAccess.GetOptionRowHeight();
             Assert.That(fiftyRows - twentyFiveRows, Is.EqualTo(25 * rowHeight).Within(0.001f));
         }
 
         [Test]
         public void PopupTargetHeightTreatsNonPositivePageSizesAsSingleRow()
         {
-            float baseline = StringInListDrawer.TestHooks.CalculatePopupTargetHeight(
+            float baseline = StringInListDrawerTestAccess.CalculatePopupTargetHeight(
                 1,
                 includePagination: false
             );
-            float zero = StringInListDrawer.TestHooks.CalculatePopupTargetHeight(
+            float zero = StringInListDrawerTestAccess.CalculatePopupTargetHeight(
                 0,
                 includePagination: false
             );
-            float negative = StringInListDrawer.TestHooks.CalculatePopupTargetHeight(
+            float negative = StringInListDrawerTestAccess.CalculatePopupTargetHeight(
                 -5,
                 includePagination: false
             );
@@ -215,28 +215,28 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void OptionRowHeightMatchesControlPlusEffectiveMargin()
         {
-            float control = StringInListDrawer.TestHooks.GetOptionControlHeight();
-            int marginVertical = StringInListDrawer.TestHooks.OptionButtonMarginVertical;
+            float control = StringInListDrawerTestAccess.GetOptionControlHeight();
+            int marginVertical = StringInListDrawerTestAccess.OptionButtonMarginVertical;
             float expected =
                 control + Mathf.Max(0f, marginVertical - EditorGUIUtility.standardVerticalSpacing);
-            float actual = StringInListDrawer.TestHooks.GetOptionRowHeight();
+            float actual = StringInListDrawerTestAccess.GetOptionRowHeight();
             Assert.That(actual, Is.EqualTo(expected).Within(0.001f));
         }
 
         [Test]
         public void EmptySearchHeightLeavesRoomForHelpBox()
         {
-            float emptyHeight = StringInListDrawer.TestHooks.CalculateEmptySearchHeight();
+            float emptyHeight = StringInListDrawerTestAccess.CalculateEmptySearchHeight();
             GUIStyle helpStyle = EditorStyles.helpBox;
             int helpMargin = helpStyle.margin?.horizontal ?? 0;
             float helpWidth =
-                StringInListDrawer.TestHooks.PopupWidthValue
-                - StringInListDrawer.TestHooks.EmptySearchHorizontalPaddingValue
+                StringInListDrawerTestAccess.PopupWidthValue
+                - StringInListDrawerTestAccess.EmptySearchHorizontalPaddingValue
                 - helpMargin;
             helpWidth = Mathf.Max(32f, helpWidth);
             float helpHeight =
                 helpStyle.CalcHeight(
-                    new GUIContent(StringInListDrawer.TestHooks.EmptyResultsMessageValue),
+                    new GUIContent(StringInListDrawerTestAccess.EmptyResultsMessageValue),
                     helpWidth
                 ) + (helpStyle.margin?.vertical ?? 0);
             // The expected height includes spacing around the search row, empty-result help box, and footer.
@@ -244,8 +244,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUIUtility.singleLineHeight
                 + (EditorGUIUtility.standardVerticalSpacing * 4f)
                 + helpHeight
-                + StringInListDrawer.TestHooks.OptionFooterPadding
-                + StringInListDrawer.TestHooks.EmptySearchExtraPaddingValue;
+                + StringInListDrawerTestAccess.OptionFooterPadding
+                + StringInListDrawerTestAccess.EmptySearchExtraPaddingValue;
             Assert.That(emptyHeight, Is.EqualTo(expected).Within(0.001f));
         }
 
@@ -254,7 +254,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             const float measuredHelpHeight = 42f;
             float emptyHeight =
-                StringInListDrawer.TestHooks.CalculateEmptySearchHeightWithMeasurement(
+                StringInListDrawerTestAccess.CalculateEmptySearchHeightWithMeasurement(
                     measuredHelpHeight
                 );
 
@@ -262,8 +262,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUIUtility.singleLineHeight
                 + (EditorGUIUtility.standardVerticalSpacing * 4f)
                 + measuredHelpHeight
-                + StringInListDrawer.TestHooks.OptionFooterPadding
-                + StringInListDrawer.TestHooks.EmptySearchExtraPaddingValue;
+                + StringInListDrawerTestAccess.OptionFooterPadding
+                + StringInListDrawerTestAccess.EmptySearchExtraPaddingValue;
 
             Assert.That(emptyHeight, Is.EqualTo(expected).Within(0.001f));
         }
@@ -291,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int expectedRows
         )
         {
-            int rows = StringInListDrawer.TestHooks.CalculateRowsOnPage(
+            int rows = StringInListDrawerTestAccess.CalculateRowsOnPage(
                 filteredCount: filteredCount,
                 pageSize: pageSize,
                 currentPage: currentPage

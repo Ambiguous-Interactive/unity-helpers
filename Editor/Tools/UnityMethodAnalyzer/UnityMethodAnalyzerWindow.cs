@@ -52,9 +52,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         private static bool _isUpdateSubscribed;
 
         /// <summary>
-        /// Internal reference to the current analysis task for test synchronization.
-        /// Tests can await this task to know when the async analysis work is complete,
-        /// then call FlushMainThreadQueue() to process the completion callback.
+        /// Current analysis operation whose continuation dispatches completion to the editor thread.
         /// </summary>
         internal Task _analysisTask;
 
@@ -79,12 +77,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             "Refresh compiler diagnostics, or recompile scripts to capture them.";
         internal CancellationTokenSource _cancellationTokenSource;
 
-        /// <summary>
-        /// Internal TaskCompletionSource for tests to await analysis completion.
-        /// Set before StartAnalysis() to enable awaiting completion.
-        /// </summary>
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
-        internal TaskCompletionSource<bool> _analysisCompletionSource;
         private IssueSeverity? _severityFilter;
         private IssueCategory? _categoryFilter;
         private string _searchFilter = string.Empty;
@@ -158,8 +150,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
             }
         }
-
-#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
 
         private static string GetProjectRoot()
         {
@@ -335,7 +325,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
         /// <summary>
         /// Initializes the window's analyzer and tree view. Called from OnEnable().
-        /// Also accessible for testing purposes.
         /// </summary>
         internal void Initialize()
         {
@@ -453,10 +442,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             CancellationToken token = _cancellationTokenSource.Token;
 
-            Task analysisTask = _analyzer.AnalyzeAsync(rootPath, directories, progress, token);
-            _analysisTask = analysisTask;
+            _analysisTask = _analyzer.AnalyzeAsync(rootPath, directories, progress, token);
 
-            analysisTask.ContinueWith(
+            _analysisTask.ContinueWith(
                 task =>
                 {
                     EnqueueOnMainThread(() => HandleAnalysisCompletion(task));
@@ -1309,14 +1297,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         }
 
         /// <summary>
-        /// Finalizes the analysis by resetting state and signaling completion.
+        /// Finalizes the analysis by resetting its operation state.
         /// Called after analysis completes, fails, or is cancelled.
         /// </summary>
         private void FinalizeAnalysis()
         {
             ResetAnalysisState();
-
-            _analysisCompletionSource?.TrySetResult(true);
         }
 
         private void UpdateTreeViewGrouping()

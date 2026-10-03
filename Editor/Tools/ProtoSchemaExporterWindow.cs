@@ -36,19 +36,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private const float MinimumContractListHeight = 120f;
         private const float MaximumDiagnosticsHeight = 120f;
 
-        internal static IReadOnlyList<ExportLayout> SelectableLayoutsForTest => SelectableLayouts;
-
-        internal static IReadOnlyList<string> LayoutLabelsForTest => LayoutLabels;
-
-        // A replaceable dialog callback lets tests exercise the real export without opening an OS dialog.
-        internal static bool SuppressUserPrompts;
-
-        private static readonly ExportLayout[] SelectableLayouts = new ExportLayout[]
+        internal static readonly ExportLayout[] SelectableLayouts = new ExportLayout[]
         {
             ExportLayout.SingleFile,
             ExportLayout.OneFilePerAssembly,
             ExportLayout.OneFilePerNamespace,
             ExportLayout.OneFilePerContract,
+        };
+
+        internal static readonly string[] LayoutLabels = new string[]
+        {
+            "Single File",
+            "Per Assembly",
+            "Per Namespace",
+            "Per Type",
         };
 
         // Fixed for the process, and consulted once per character of every group key.
@@ -67,50 +68,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             '*',
         };
 
-        private static readonly string[] LayoutLabels = new string[]
-        {
-            "Single File",
-            "Per Assembly",
-            "Per Namespace",
-            "Per Type",
-        };
-
-        internal string LastStatusForTest => _lastStatus;
-
-        internal bool LastStatusIsFailureForTest => _lastStatusIsFailure;
-
-        internal IReadOnlyList<string> PersistedExclusionsForTest => _excludedContractKeys;
-
-        internal IReadOnlyList<string> LastDiagnosticsForTest => _lastDiagnostics;
-
-        internal IReadOnlyList<Type> SelectedContractsForTest => SelectedContracts();
-
-        internal IReadOnlyList<Type> VisibleContractsForTest =>
-            _contracts.Where(IsVisible).ToList();
-
-        internal ExportLayout ExportLayoutForTest
-        {
-            get => _exportLayout;
-            set => _exportLayout = value;
-        }
-
-        internal string PackageNameForTest
-        {
-            get => _packageName;
-            set => _packageName = value;
-        }
-
-        internal string SearchFilterForTest
-        {
-            get => _searchFilter;
-            set => _searchFilter = value;
-        }
-
-        internal bool HasUsablePackageNameForTest => HasUsablePackageName();
-
         // Store deselections so newly discovered contracts are selected after recompilation.
         [SerializeField]
-        private List<string> _excludedContractKeys = new List<string>();
+        internal List<string> _excludedContractKeys = new List<string>();
+
+        [SerializeField]
+        internal string _packageName = string.Empty;
+
+        [SerializeField]
+        internal string _searchFilter = string.Empty;
+
+        [SerializeField]
+        internal ExportLayout _exportLayout = ExportLayout.SingleFile;
+        internal readonly List<Type> _contracts = new List<Type>();
+        internal readonly List<string> _lastDiagnostics = new List<string>();
+        internal bool _lastStatusIsFailure;
+        internal string _lastStatus;
 
         [SerializeField]
         private List<string> _collapsedAssemblyNames = new List<string>();
@@ -121,35 +94,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         [SerializeField]
         private string _outputDirectory = DefaultOutputDirectory;
 
-        [SerializeField]
-        private string _packageName = string.Empty;
-
-        [SerializeField]
-        private string _searchFilter = string.Empty;
-
-        [SerializeField]
-        private ExportLayout _exportLayout = ExportLayout.SingleFile;
-
         private readonly HashSet<string> _excludedKeys = new HashSet<string>(
             StringComparer.Ordinal
         );
         private readonly HashSet<string> _collapsedAssemblies = new HashSet<string>(
             StringComparer.Ordinal
         );
-        private readonly List<Type> _contracts = new List<Type>();
         private readonly List<string> _assemblyNames = new List<string>();
         private readonly Dictionary<Type, Type> _surrogates = new Dictionary<Type, Type>();
-        private readonly List<string> _lastDiagnostics = new List<string>();
         private string _surrogateDiscoveryError;
         private HelpBox _summary;
         private ScrollView _contractList;
         private HelpBox _packageError;
-        private bool _lastStatusIsFailure;
         private TextField _outputField;
         private Button _exportButton;
         private HelpBox _statusBox;
         private ScrollView _diagnosticsContainer;
-        private string _lastStatus;
 
         /// <summary>
         /// Opens the exporter window and re-scans the project for contracts.
@@ -163,14 +123,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             window.RefreshFromUserInterface();
         }
 
-        internal static string ContractKeyForTest(Type contract)
+        internal static string AssemblyNameOf(Type contract)
         {
-            return ContractKey(contract);
+            return contract.Assembly.GetName().Name;
         }
 
-        internal static string UniqueFileNameForTest(string groupKey, HashSet<string> usedFileNames)
+        // Keep raw nested-type separators so Outer+Inner and Outer.Inner remain distinct keys.
+        internal static string ContractKey(Type contract)
         {
-            return UniqueFileName(groupKey, usedFileNames);
+            return $"{AssemblyNameOf(contract)}::{contract.FullName ?? contract.Name}";
+        }
+
+        // Distinct group keys can sanitize to the same filename; reserve unique names to prevent overwrite.
+        internal static string UniqueFileName(string groupKey, HashSet<string> usedFileNames)
+        {
+            string baseName = PortableFileName(groupKey);
+            if (string.IsNullOrEmpty(baseName))
+            {
+                baseName = GlobalNamespaceGroup;
+            }
+
+            string candidate = baseName + ".proto";
+            int suffix = 2;
+            while (!usedFileNames.Add(candidate))
+            {
+                candidate = $"{baseName}-{suffix}.proto";
+                ++suffix;
+            }
+
+            return candidate;
         }
 
         private static T PinToNaturalHeight<T>(T element)
@@ -185,22 +166,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return character is >= 'a' and <= 'z' || character is >= 'A' and <= 'Z';
         }
 
-        private static string AssemblyNameOf(Type contract)
-        {
-            return contract.Assembly.GetName().Name;
-        }
-
         private static string NamespaceGroupOf(Type contract)
         {
             return string.IsNullOrEmpty(contract.Namespace)
                 ? GlobalNamespaceGroup
                 : contract.Namespace;
-        }
-
-        // Keep raw nested-type separators so Outer+Inner and Outer.Inner remain distinct keys.
-        private static string ContractKey(Type contract)
-        {
-            return $"{AssemblyNameOf(contract)}::{contract.FullName ?? contract.Name}";
         }
 
         private static string ContractDisplayName(Type contract)
@@ -219,26 +189,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             return fullName.Substring(namespaceName.Length + 1);
-        }
-
-        // Distinct group keys can sanitize to the same filename; reserve unique names to prevent overwrite.
-        private static string UniqueFileName(string groupKey, HashSet<string> usedFileNames)
-        {
-            string baseName = PortableFileName(groupKey);
-            if (string.IsNullOrEmpty(baseName))
-            {
-                baseName = GlobalNamespaceGroup;
-            }
-
-            string candidate = baseName + ".proto";
-            int suffix = 2;
-            while (!usedFileNames.Add(candidate))
-            {
-                candidate = $"{baseName}-{suffix}.proto";
-                ++suffix;
-            }
-
-            return candidate;
         }
 
         private static string PortableFileName(string value)
@@ -364,25 +314,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
         }
 
-        internal void SetSelectedAssembliesForTest(IEnumerable<string> assemblyNames)
-        {
-            HashSet<string> selectedAssemblies = new HashSet<string>(
-                assemblyNames ?? Array.Empty<string>(),
-                StringComparer.Ordinal
-            );
-            SetSelection(_contracts, false);
-            SetSelection(
-                _contracts.Where(contract => selectedAssemblies.Contains(AssemblyNameOf(contract))),
-                true
-            );
-        }
-
-        internal void SetSelectedContractsForTest(IEnumerable<Type> contracts)
-        {
-            SetSelection(_contracts, false);
-            SetSelection(contracts ?? Array.Empty<Type>(), true);
-        }
-
         internal void CaptureSelectionState()
         {
             _excludedContractKeys = _excludedKeys.ToList();
@@ -442,6 +373,82 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     _surrogates
                 )
             );
+        }
+
+        // Malformed package names produce invalid proto3, so refuse export before writing.
+        internal bool HasUsablePackageName()
+        {
+            string package = PackageClause();
+            if (package == null)
+            {
+                return true;
+            }
+
+            foreach (string segment in package.Split('.'))
+            {
+                if (segment.Length == 0)
+                {
+                    return false;
+                }
+
+                if (segment[0] != '_' && !IsAsciiLetter(segment[0]))
+                {
+                    return false;
+                }
+
+                int segmentLength = segment.Length;
+                for (int index = 1; index < segmentLength; ++index)
+                {
+                    char character = segment[index];
+                    if (
+                        character != '_'
+                        && !IsAsciiLetter(character)
+                        && !(character is >= '0' and <= '9')
+                    )
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        internal List<Type> SelectedContracts()
+        {
+            return _contracts.Where(IsSelected).ToList();
+        }
+
+        // Persist immediately; bulk selection records once to avoid quadratic work.
+        internal void SetSelection(Type contract, bool selected)
+        {
+            Exclude(contract, selected);
+            CaptureSelectionState();
+        }
+
+        internal void SetSelection(IEnumerable<Type> contracts, bool selected)
+        {
+            foreach (Type contract in contracts)
+            {
+                Exclude(contract, selected);
+            }
+
+            CaptureSelectionState();
+        }
+
+        internal bool IsVisible(Type contract)
+        {
+            if (string.IsNullOrWhiteSpace(_searchFilter))
+            {
+                return true;
+            }
+
+            string filter = _searchFilter.Trim();
+            return 0
+                    <= ContractDisplayName(contract)
+                        .IndexOf(filter, StringComparison.OrdinalIgnoreCase)
+                || 0
+                    <= AssemblyNameOf(contract).IndexOf(filter, StringComparison.OrdinalIgnoreCase);
         }
 
         private bool ApplyExportResult(ProtoSchemaExporter.ExportResult result)
@@ -935,7 +942,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 outputPath = Path.Combine(projectRoot, outputPath);
             }
 
-            if (!SuppressUserPrompts && !ConfirmOverwrite(outputPath, singleFile))
+            if (!ConfirmOverwrite(outputPath, singleFile))
             {
                 return;
             }
@@ -1013,50 +1020,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return string.IsNullOrWhiteSpace(_packageName) ? null : _packageName.Trim();
         }
 
-        // Malformed package names produce invalid proto3, so refuse export before writing.
-        private bool HasUsablePackageName()
-        {
-            string package = PackageClause();
-            if (package == null)
-            {
-                return true;
-            }
-
-            foreach (string segment in package.Split('.'))
-            {
-                if (segment.Length == 0)
-                {
-                    return false;
-                }
-
-                if (segment[0] != '_' && !IsAsciiLetter(segment[0]))
-                {
-                    return false;
-                }
-
-                int segmentLength = segment.Length;
-                for (int index = 1; index < segmentLength; ++index)
-                {
-                    char character = segment[index];
-                    if (
-                        character != '_'
-                        && !IsAsciiLetter(character)
-                        && !(character is >= '0' and <= '9')
-                    )
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return true;
-        }
-
-        private List<Type> SelectedContracts()
-        {
-            return _contracts.Where(IsSelected).ToList();
-        }
-
         private int SelectedContractCount()
         {
             return _contracts.Count(IsSelected);
@@ -1065,23 +1028,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private bool IsSelected(Type contract)
         {
             return !_excludedKeys.Contains(ContractKey(contract));
-        }
-
-        // Persist immediately; bulk selection records once to avoid quadratic work.
-        private void SetSelection(Type contract, bool selected)
-        {
-            Exclude(contract, selected);
-            CaptureSelectionState();
-        }
-
-        private void SetSelection(IEnumerable<Type> contracts, bool selected)
-        {
-            foreach (Type contract in contracts)
-            {
-                Exclude(contract, selected);
-            }
-
-            CaptureSelectionState();
         }
 
         private void Exclude(Type contract, bool selected)
@@ -1099,21 +1045,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private void SetSelectionForVisibleContracts(bool selected)
         {
             SetSelection(_contracts.Where(IsVisible), selected);
-        }
-
-        private bool IsVisible(Type contract)
-        {
-            if (string.IsNullOrWhiteSpace(_searchFilter))
-            {
-                return true;
-            }
-
-            string filter = _searchFilter.Trim();
-            return 0
-                    <= ContractDisplayName(contract)
-                        .IndexOf(filter, StringComparison.OrdinalIgnoreCase)
-                || 0
-                    <= AssemblyNameOf(contract).IndexOf(filter, StringComparison.OrdinalIgnoreCase);
         }
 
         private int CountSelectedAssemblies()

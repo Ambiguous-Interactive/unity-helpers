@@ -304,7 +304,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Resets all monitoring state and settings to defaults.
         /// </summary>
         /// <remarks>
-        /// Primarily used for testing. Clears tracked memory values and resets all configuration.
+        /// Clears tracked memory values and resets all configuration.
         /// </remarks>
         public static void Reset()
         {
@@ -324,16 +324,19 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         /// <summary>
         /// Calculates the pressure level from provided metrics without querying the GC.
-        /// Used for testing pressure calculation logic with controlled inputs.
         /// </summary>
         /// <param name="memoryRatio">Current memory as ratio of threshold (e.g., 0.9 = 90% of threshold).</param>
-        /// <param name="gcRateMultiplier">GC rate as multiple of threshold (e.g., 2.0 = 2x the threshold rate).</param>
-        /// <param name="growthRateMultiplier">Growth rate as multiple of threshold (e.g., 1.5 = 1.5x the threshold rate).</param>
+        /// <param name="gcRateMultiplier">The measured GC collection rate.</param>
+        /// <param name="growthRateMultiplier">The measured memory growth rate.</param>
+        /// <param name="gcRateThreshold">The GC rate threshold.</param>
+        /// <param name="growthRateThreshold">The memory growth threshold.</param>
         /// <returns>The calculated pressure level.</returns>
         internal static MemoryPressureLevel CalculatePressureFromMetrics(
             float memoryRatio,
             float gcRateMultiplier,
-            float growthRateMultiplier
+            float growthRateMultiplier,
+            float gcRateThreshold = 1f,
+            float growthRateThreshold = 1f
         )
         {
             int pressureScore = 0;
@@ -355,20 +358,20 @@ namespace WallstopStudios.UnityHelpers.Utils
                 pressureScore += LowMemoryScoreContribution;
             }
 
-            if (HighGCRateMultiplier <= gcRateMultiplier)
+            if (gcRateThreshold * HighGCRateMultiplier <= gcRateMultiplier)
             {
                 pressureScore += HighGCRateScoreContribution;
             }
-            else if (1f <= gcRateMultiplier)
+            else if (gcRateThreshold <= gcRateMultiplier)
             {
                 pressureScore += MediumGCRateScoreContribution;
             }
 
-            if (HighGrowthRateMultiplier <= growthRateMultiplier)
+            if (growthRateThreshold * HighGrowthRateMultiplier <= growthRateMultiplier)
             {
                 pressureScore += HighGrowthRateScoreContribution;
             }
-            else if (1f <= growthRateMultiplier)
+            else if (growthRateThreshold <= growthRateMultiplier)
             {
                 pressureScore += MediumGrowthRateScoreContribution;
             }
@@ -413,90 +416,20 @@ namespace WallstopStudios.UnityHelpers.Utils
                 elapsed = CheckIntervalSeconds;
             }
 
-            int pressureScore = 0;
-
             long threshold = MemoryPressureThresholdBytes;
-            if (0 < threshold)
-            {
-                float memoryRatio = (float)totalMemory / threshold;
-
-                if (CriticalMemoryRatio <= memoryRatio)
-                {
-                    pressureScore += CriticalMemoryScoreContribution;
-                }
-                else if (HighMemoryRatio <= memoryRatio)
-                {
-                    pressureScore += HighMemoryScoreContribution;
-                }
-                else if (MediumMemoryRatio <= memoryRatio)
-                {
-                    pressureScore += MediumMemoryScoreContribution;
-                }
-                else if (LowMemoryRatio <= memoryRatio)
-                {
-                    pressureScore += LowMemoryScoreContribution;
-                }
-            }
-
-            if (0 < previousGCCount)
-            {
-                int gcDelta = gcCount - previousGCCount;
-                if (0 < gcDelta)
-                {
-                    float gcRate = gcDelta / elapsed;
-                    float gcRateThreshold = GCCollectionRateThreshold;
-
-                    if (gcRateThreshold * HighGCRateMultiplier <= gcRate)
-                    {
-                        pressureScore += HighGCRateScoreContribution;
-                    }
-                    else if (gcRateThreshold <= gcRate)
-                    {
-                        pressureScore += MediumGCRateScoreContribution;
-                    }
-                }
-            }
-
-            if (0 < previousMemory)
-            {
-                long memoryDelta = totalMemory - previousMemory;
-                if (0 < memoryDelta)
-                {
-                    float growthRate = memoryDelta / elapsed;
-                    long growthThreshold = MemoryGrowthRateThreshold;
-
-                    if (growthThreshold * HighGrowthRateMultiplier <= growthRate)
-                    {
-                        pressureScore += HighGrowthRateScoreContribution;
-                    }
-                    else if (growthThreshold <= growthRate)
-                    {
-                        pressureScore += MediumGrowthRateScoreContribution;
-                    }
-                }
-            }
-
-            MemoryPressureLevel level;
-            if (CriticalScoreThreshold <= pressureScore)
-            {
-                level = MemoryPressureLevel.Critical;
-            }
-            else if (HighScoreThreshold <= pressureScore)
-            {
-                level = MemoryPressureLevel.High;
-            }
-            else if (MediumScoreThreshold <= pressureScore)
-            {
-                level = MemoryPressureLevel.Medium;
-            }
-            else if (LowScoreThreshold <= pressureScore)
-            {
-                level = MemoryPressureLevel.Low;
-            }
-            else
-            {
-                level = MemoryPressureLevel.None;
-            }
+            float memoryRatio = 0 < threshold ? (float)totalMemory / threshold : float.NaN;
+            int gcDelta = gcCount - previousGCCount;
+            float gcRate = 0 < previousGCCount && 0 < gcDelta ? gcDelta / elapsed : float.NaN;
+            long memoryDelta = totalMemory - previousMemory;
+            float growthRate =
+                0 < previousMemory && 0 < memoryDelta ? memoryDelta / elapsed : float.NaN;
+            MemoryPressureLevel level = CalculatePressureFromMetrics(
+                memoryRatio,
+                gcRate,
+                growthRate,
+                GCCollectionRateThreshold,
+                MemoryGrowthRateThreshold
+            );
 
             Volatile.Write(ref _currentPressure, (int)level);
         }

@@ -2256,7 +2256,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
                 PoolTypeResolver.MaxCachedTypeNames = 2;
 
-                Assert.AreEqual(2, PoolTypeResolver.CachedTypeNameCountForTesting);
+                Assert.AreEqual(2, PoolTypeResolver.SimplifiedTypeNameCache.Count);
             }
             finally
             {
@@ -2347,7 +2347,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     ) == null
                 );
                 Assert.IsTrue(PoolTypeResolver.ResolveType(moved.Replace("]]", "]")) == null);
-                Assert.AreEqual(0, PoolTypeResolver.CachedTypeNameCountForTesting);
+                Assert.AreEqual(0, PoolTypeResolver.SimplifiedTypeNameCache.Count);
             }
             finally
             {

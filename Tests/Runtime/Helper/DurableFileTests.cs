@@ -238,50 +238,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
-        public void CreateAllBytesRejectsADestinationCreatedAfterStaging()
+        public void PublicationRejectsADestinationCreatedAfterStaging()
         {
             string path = Path.Combine(_testDirectory, "late-collision.bin");
-
+            string staged = WriteDirectly("late-collision-stage.tmp", "staged contents");
+            File.WriteAllText(path, "later writer");
             Assert.IsFalse(
-                DurableFile.TryCreateAllBytes(
+                DurableFile.TryPublishStagedFileWithoutOverwrite(
+                    staged,
                     path,
-                    new byte[] { 1, 2, 3 },
-                    out Exception error,
-                    _ => File.WriteAllText(path, "later writer")
+                    out bool leavesStaged
                 )
             );
-
-            Assert.IsInstanceOf<IOException>(error);
+            Assert.IsTrue(leavesStaged);
             Assert.AreEqual("later writer", File.ReadAllText(path));
-            string stagedPath = (string)error.Data[DurableFile.PreservedStagingPathDataKey];
-            Assert.IsTrue(File.Exists(stagedPath));
-            CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, File.ReadAllBytes(stagedPath));
+            Assert.AreEqual("staged contents", File.ReadAllText(staged));
         }
 
         [Test]
-        public void CreateAllBytesRejectsReplacedStagingContentsAndPreservesDestination()
+        public void PublicationVerificationRejectsReplacedStagingContentsAndPreservesDestination()
         {
             string path = Path.Combine(_testDirectory, "replaced-staging.bin");
+            string staged = Path.Combine(_testDirectory, "replaced-stage.tmp");
+            byte[] original = { 1, 2, 3 };
             byte[] replacement = { 9, 8, 7 };
-
-            Assert.IsFalse(
-                DurableFile.TryCreateAllBytes(
+            File.WriteAllBytes(staged, original);
+            File.Delete(staged);
+            File.WriteAllBytes(staged, replacement);
+            Assert.IsTrue(
+                DurableFile.TryPublishStagedFileWithoutOverwrite(
+                    staged,
                     path,
-                    new byte[] { 1, 2, 3 },
-                    out Exception error,
-                    _ =>
-                    {
-                        string[] stagedPaths = Directory.GetFiles(_testDirectory, "*.create.*.tmp");
-                        Assert.AreEqual(1, stagedPaths.Length);
-                        File.Delete(stagedPaths[0]);
-                        File.WriteAllBytes(stagedPaths[0], replacement);
-                    }
+                    out bool leavesStaged
                 )
             );
-
-            Assert.IsInstanceOf<IOException>(error);
+            IOException error = Assert.Throws<IOException>(() =>
+                DurableFile.VerifyCreatedContents(path, original)
+            );
             StringAssert.Contains("inspect it before retrying", error.Message);
             CollectionAssert.AreEqual(replacement, File.ReadAllBytes(path));
+            if (leavesStaged)
+            {
+                CollectionAssert.AreEqual(replacement, File.ReadAllBytes(staged));
+                File.Delete(staged);
+            }
         }
 
         [Test]
@@ -747,119 +747,96 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             string path = Path.Combine(_testDirectory, "save.json");
             Directory.CreateDirectory(path);
-#if UNITY_EDITOR
-            string scriptPath = Path.Combine(_testDirectory, "probe-failed-write-staging.ps1");
-            WriteStagingOwnershipProbe(scriptPath);
-            int childExitCode = -1;
-            DurableFile.BeforeStagedCleanupForTests = temporaryPath =>
-            {
-                childExitCode = TryOverwriteStagingInAnotherProcess(scriptPath, temporaryPath);
-            };
-#endif
-
-            try
-            {
-                Assert.IsFalse(
-                    DurableFile.TryWriteAllText(path, "the new document", out Exception error)
-                );
-
-                Assert.IsTrue(error != null);
-            }
-            finally
-            {
-#if UNITY_EDITOR
-                DurableFile.BeforeStagedCleanupForTests = null;
-#endif
-            }
-
-#if UNITY_EDITOR
-            Assert.AreEqual(23, childExitCode, "Cleanup must retain staging ownership.");
-#endif
+            Assert.IsFalse(
+                DurableFile.TryWriteAllText(path, "the new document", out Exception error)
+            );
+            Assert.IsTrue(error != null);
             Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
         }
 
 #if UNITY_EDITOR
-        [Test]
-        public void AnotherProcessCannotReplaceStagingBeforeItIsPublished()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void StagingOwnershipRejectsAnotherProcessThroughPublicationAndCleanup(bool cleanup)
         {
             string path = WriteDirectly("cross-process.json", "previous document");
+            string staged = path + DurableFile.TemporarySuffix;
             string scriptPath = Path.Combine(_testDirectory, "overwrite-staging.ps1");
             WriteStagingOwnershipProbe(scriptPath);
-            int childExitCode = -1;
-            DurableFile.BeforeStagedSwapForTests = temporaryPath =>
+            Assert.IsTrue(
+                DurableFile.TryOpenStagingOwnership(
+                    staged,
+                    out FileStream ownership,
+                    out Exception error
+                ),
+                error?.ToString()
+            );
+            using (ownership)
             {
-                childExitCode = TryOverwriteStagingInAnotherProcess(scriptPath, temporaryPath);
-            };
-
-            try
-            {
-                Assert.IsTrue(
-                    DurableFile.TryWriteAllText(path, "writer A document", out Exception error),
-                    error?.ToString()
-                );
+                using (FileStream stream = DurableFile.OpenStagingStream(staged, false))
+                {
+                    byte[] bytes = Encoding.UTF8.GetBytes("writer A document");
+                    stream.Write(bytes, 0, bytes.Length);
+                    stream.Flush(true);
+                }
+                Assert.AreEqual(23, TryOverwriteStagingInAnotherProcess(scriptPath, staged));
+                if (cleanup)
+                {
+                    DurableFile.DiscardStagedFile(staged);
+                    Assert.AreEqual(
+                        23,
+                        TryOverwriteStagingInAnotherProcess(scriptPath, staged),
+                        "Cleanup must retain ownership until release."
+                    );
+                }
+                else
+                {
+                    DurableFile.Swap(staged, path);
+                }
             }
-            finally
-            {
-                DurableFile.BeforeStagedSwapForTests = null;
-            }
-
-            Assert.AreEqual(23, childExitCode, "The second process must not acquire staging.");
-            Assert.AreEqual("writer A document", File.ReadAllText(path));
-            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+            Assert.AreEqual(
+                cleanup ? "previous document" : "writer A document",
+                File.ReadAllText(path)
+            );
+            Assert.IsFalse(File.Exists(staged));
+            Assert.IsTrue(DurableFile.TryWriteAllText(path, "retry", out error), error?.ToString());
         }
 
         [TestCase(false)]
         [TestCase(true)]
-        public void CompareThenReplaceDoesNotProtectAgainstNoncooperatingDestinationEdits(bool text)
+        public void PublicationOwnershipDoesNotPreventNoncooperatingDestinationEdits(bool text)
         {
             string path = WriteDirectly("external-edit.txt", "expected");
-            bool observedExternalEdit = false;
-            DurableFile.BeforeStagedSwapForTests = _ =>
-            {
-                File.WriteAllText(path, "external edit");
-                observedExternalEdit = string.Equals(
-                    File.ReadAllText(path),
-                    "external edit",
-                    StringComparison.Ordinal
-                );
-            };
-            try
+            string staged = path + DurableFile.TemporarySuffix;
+            Assert.IsTrue(
+                DurableFile.TryOpenStagingOwnership(
+                    staged,
+                    out FileStream ownership,
+                    out Exception error
+                ),
+                error?.ToString()
+            );
+            using (ownership)
             {
                 if (text)
                 {
-                    Assert.IsTrue(
-                        DurableFile.TryCompareThenReplaceAllText(
-                            path,
-                            true,
-                            "expected",
-                            "replacement",
-                            out bool exchanged,
-                            out Exception error
-                        ),
-                        error?.ToString()
-                    );
-                    Assert.IsTrue(exchanged);
+                    Assert.AreEqual("expected", File.ReadAllText(path));
+                    File.WriteAllText(staged, "replacement");
                 }
                 else
                 {
-                    Assert.IsTrue(
-                        DurableFile.TryCompareThenReplaceBytes(
-                            path,
-                            Encoding.UTF8.GetBytes("expected"),
-                            Encoding.UTF8.GetBytes("replacement"),
-                            out Exception error
-                        ),
-                        error?.ToString()
+                    CollectionAssert.AreEqual(
+                        Encoding.UTF8.GetBytes("expected"),
+                        File.ReadAllBytes(path)
                     );
+                    File.WriteAllBytes(staged, Encoding.UTF8.GetBytes("replacement"));
                 }
+                File.WriteAllText(path, "external edit");
+                Assert.AreEqual("external edit", File.ReadAllText(path));
+                DurableFile.Swap(staged, path);
             }
-            finally
-            {
-                DurableFile.BeforeStagedSwapForTests = null;
-            }
-            Assert.IsTrue(observedExternalEdit);
             Assert.AreEqual("replacement", File.ReadAllText(path));
-            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+            Assert.IsFalse(File.Exists(staged));
         }
 
         [TestCase(0, false)]
@@ -868,121 +845,104 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [TestCase(1, true)]
         [TestCase(2, false)]
         [TestCase(2, true)]
-        public void AsyncReplacementRefusesCancellationAfterStaging(
+        public void PublicationRefusesCancellationAfterRealAsyncStaging(
             int operation,
             bool destinationExists
         )
         {
             string path = Path.Combine(_testDirectory, "cancel-after-staging.txt");
+            string staged = path + DurableFile.TemporarySuffix;
             if (destinationExists)
             {
                 File.WriteAllText(path, "previous document");
             }
             string source = WriteDirectly("cancel-copy-source.txt", "replacement");
             using CancellationTokenSource cancellation = new();
-            bool reachedPublication = false;
-            DurableFile.BeforeStagedSwapForTests = stagingPath =>
-            {
-                reachedPublication = true;
-                Assert.AreEqual("replacement", File.ReadAllText(stagingPath));
-                cancellation.Cancel();
-            };
-            Exception failure;
-            try
+            Assert.IsTrue(
+                DurableFile.TryOpenStagingOwnership(
+                    staged,
+                    out FileStream ownership,
+                    out Exception error
+                ),
+                error?.ToString()
+            );
+            using (ownership)
             {
                 Task<Exception> write;
                 switch (operation)
                 {
                     case 0:
                         write = DurableFile
-                            .WriteAllTextAsync(path, "replacement", cancellation.Token)
+                            .WriteAllTextAsync(staged, "replacement", cancellation.Token)
                             .AsTask();
                         break;
                     case 1:
                         write = DurableFile
                             .WriteAllBytesAsync(
-                                path,
+                                staged,
                                 Encoding.UTF8.GetBytes("replacement"),
                                 cancellation.Token
                             )
                             .AsTask();
                         break;
                     default:
-                        write = DurableFile.CopyAsync(source, path, cancellation.Token).AsTask();
+                        write = DurableFile.CopyAsync(source, staged, cancellation.Token).AsTask();
                         break;
                 }
                 Assert.IsTrue(
                     write.Wait(TimeSpan.FromSeconds(10)),
-                    "The write must reach a terminal result."
+                    "Staging must reach a terminal result."
                 );
-                failure = write.Result;
-            }
-            finally
-            {
+                Assert.IsTrue(write.Result == null, write.Result?.ToString());
+                Assert.AreEqual("replacement", File.ReadAllText(staged));
                 cancellation.Cancel();
-                DurableFile.BeforeStagedSwapForTests = null;
+                Assert.Throws<OperationCanceledException>(() =>
+                    DurableFile.PublishStagedFile(staged, path, cancellation.Token)
+                );
+                Assert.AreEqual(destinationExists, File.Exists(path));
+                if (destinationExists)
+                {
+                    Assert.AreEqual("previous document", File.ReadAllText(path));
+                }
+                DurableFile.DiscardStagedFile(staged);
+                Assert.IsFalse(File.Exists(staged));
             }
-            Assert.IsTrue(reachedPublication);
-            Assert.IsInstanceOf<OperationCanceledException>(failure);
-            Assert.AreEqual(destinationExists, File.Exists(path));
-            if (destinationExists)
-            {
-                Assert.AreEqual("previous document", File.ReadAllText(path));
-            }
-            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
             Assert.AreEqual("replacement", File.ReadAllText(source));
-            Assert.IsTrue(
-                DurableFile.TryWriteAllText(path, "retry", out Exception retryError),
-                retryError?.ToString()
-            );
+            Assert.IsTrue(DurableFile.TryWriteAllText(path, "retry", out error), error?.ToString());
             Assert.AreEqual("retry", File.ReadAllText(path));
         }
 
         [Test]
-        public void CompareThenReplaceOwnsStagingFromBeforeComparisonThroughSwap()
+        public void StagingOwnershipSpansComparisonAndPublication()
         {
             string path = WriteDirectly("compare-cross-process.bin", "expected");
+            string staged = path + DurableFile.TemporarySuffix;
             string scriptPath = Path.Combine(_testDirectory, "compare-staging-probe.ps1");
             WriteStagingOwnershipProbe(scriptPath);
-            int beforeReadExitCode = -1;
-            int beforeSwapExitCode = -1;
-            DurableFile.BeforeCompareReadForTests = temporaryPath =>
+            Assert.IsTrue(
+                DurableFile.TryOpenStagingOwnership(
+                    staged,
+                    out FileStream ownership,
+                    out Exception error
+                ),
+                error?.ToString()
+            );
+            using (ownership)
             {
-                beforeReadExitCode = TryOverwriteStagingInAnotherProcess(scriptPath, temporaryPath);
-            };
-            DurableFile.BeforeStagedSwapForTests = temporaryPath =>
-            {
-                beforeSwapExitCode = TryOverwriteStagingInAnotherProcess(scriptPath, temporaryPath);
-            };
-
-            try
-            {
-                Assert.IsTrue(
-                    DurableFile.TryCompareThenReplaceBytes(
-                        path,
-                        Encoding.UTF8.GetBytes("expected"),
-                        Encoding.UTF8.GetBytes("replacement"),
-                        out Exception error
-                    ),
-                    error?.ToString()
+                Assert.AreEqual(23, TryOverwriteStagingInAnotherProcess(scriptPath, staged));
+                CollectionAssert.AreEqual(
+                    Encoding.UTF8.GetBytes("expected"),
+                    File.ReadAllBytes(path)
                 );
+                using (FileStream stream = DurableFile.OpenStagingStream(staged, false))
+                {
+                    byte[] replacement = Encoding.UTF8.GetBytes("replacement");
+                    stream.Write(replacement, 0, replacement.Length);
+                    stream.Flush(true);
+                }
+                Assert.AreEqual(23, TryOverwriteStagingInAnotherProcess(scriptPath, staged));
+                DurableFile.Swap(staged, path);
             }
-            finally
-            {
-                DurableFile.BeforeCompareReadForTests = null;
-                DurableFile.BeforeStagedSwapForTests = null;
-            }
-
-            Assert.AreEqual(
-                23,
-                beforeReadExitCode,
-                "A second writer acquired staging before compare."
-            );
-            Assert.AreEqual(
-                23,
-                beforeSwapExitCode,
-                "A second writer acquired staging before swap."
-            );
             Assert.AreEqual("replacement", File.ReadAllText(path));
         }
 #endif
@@ -1130,24 +1090,58 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual("previous document", File.ReadAllText(path));
         }
 
-        [UnityTest]
-        public IEnumerator WriteBytesAsyncReportsCancellationWithoutChangingDestination()
+        [TestCase(0, false)]
+        [TestCase(0, true)]
+        [TestCase(1, false)]
+        [TestCase(1, true)]
+        [TestCase(2, false)]
+        [TestCase(2, true)]
+        public void AsyncReplacementsRejectPreCancellationWithoutChangingDestination(
+            int operation,
+            bool exists
+        )
         {
-            string path = WriteDirectly("save.bin", "previous document");
+            string path = Path.Combine(_testDirectory, "pre-canceled.txt");
+            if (exists)
+            {
+                File.WriteAllText(path, "original");
+            }
+            string source = WriteDirectly("pre-canceled-source.txt", "source");
             using CancellationTokenSource cancellation = new();
             cancellation.Cancel();
-
-            Task<Exception> write = DurableFile
-                .WriteAllBytesAsync(path, new byte[] { 1, 2 }, cancellation.Token)
-                .AsTask();
-            while (!write.IsCompleted)
+            Task<Exception> write;
+            switch (operation)
             {
-                yield return null;
+                case 0:
+                    write = DurableFile
+                        .WriteAllTextAsync(path, "replacement", cancellation.Token)
+                        .AsTask();
+                    break;
+                case 1:
+                    write = DurableFile
+                        .WriteAllBytesAsync(path, new byte[] { 1, 2 }, cancellation.Token)
+                        .AsTask();
+                    break;
+                default:
+                    write = DurableFile.CopyAsync(source, path, cancellation.Token).AsTask();
+                    break;
             }
-
+            Assert.IsTrue(
+                write.Wait(TimeSpan.FromSeconds(10)),
+                "Cancellation must reach a terminal result."
+            );
             Assert.IsInstanceOf<OperationCanceledException>(write.Result);
-            Assert.AreEqual("previous document", File.ReadAllText(path));
+            Assert.AreEqual(exists, File.Exists(path));
+            if (exists)
+            {
+                Assert.AreEqual("original", File.ReadAllText(path));
+            }
+            Assert.AreEqual("source", File.ReadAllText(source));
             Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+            Assert.IsTrue(
+                DurableFile.TryWriteAllText(path, "retry", out Exception error),
+                error?.ToString()
+            );
         }
 
         [UnityTest]

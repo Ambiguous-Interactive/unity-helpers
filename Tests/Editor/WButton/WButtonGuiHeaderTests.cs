@@ -17,21 +17,21 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [SetUp]
         public void SetUp()
         {
-            WButtonGUI.ClearGroupDataForTesting();
+            WButtonGUITestAccess.ClearGroupData();
         }
 
         [TearDown]
         public void TearDown()
         {
-            WButtonGUI.ClearGroupDataForTesting();
+            WButtonGUITestAccess.ClearGroupData();
         }
 
         [Test]
         public void BuildGroupHeaderNoGroupingSuffixWhenSingleGroup()
         {
-            WButtonGUI.ClearGroupDataForTesting();
+            WButtonGUITestAccess.ClearGroupData();
 
-            GUIContent header = WButtonGUI.BuildGroupHeader(-1);
+            GUIContent header = WButtonGUITestAccess.BuildGroupHeader(-1);
             Assert.That(header.text, Is.EqualTo(WButtonStyles.TopGroupLabel.text));
         }
 
@@ -40,10 +40,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         {
             // The legacy API creates UseGlobalSetting keys, so draw order cannot decide the header style.
             Dictionary<int, int> counts = new() { { -1, 3 }, { -5, 2 } };
-            WButtonGUI.SetGroupCountsForTesting(counts);
+            WButtonGUITestAccess.SetGroupCounts(counts);
 
-            GUIContent topHeader = WButtonGUI.BuildGroupHeader(-1);
-            GUIContent bottomHeader = WButtonGUI.BuildGroupHeader(-5);
+            GUIContent topHeader = WButtonGUITestAccess.BuildGroupHeader(-1);
+            GUIContent bottomHeader = WButtonGUITestAccess.BuildGroupHeader(-5);
 
             Assert.That(
                 topHeader.text,
@@ -62,13 +62,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         public void BuildGroupHeaderUsesCustomGroupNameWhenProvided()
         {
             Dictionary<int, int> counts = new() { { -1, 2 }, { -4, 1 } };
-            WButtonGUI.SetGroupCountsForTesting(counts);
+            WButtonGUITestAccess.SetGroupCounts(counts);
 
             Dictionary<int, string> names = new() { { -4, "Networking" } };
-            WButtonGUI.SetGroupNamesForTesting(names);
+            WButtonGUITestAccess.SetGroupNames(names);
 
-            GUIContent custom = WButtonGUI.BuildGroupHeader(-4);
-            GUIContent defaultHeader = WButtonGUI.BuildGroupHeader(-1);
+            GUIContent custom = WButtonGUITestAccess.BuildGroupHeader(-4);
+            GUIContent defaultHeader = WButtonGUITestAccess.BuildGroupHeader(-1);
 
             Assert.That(custom.text, Is.EqualTo("Networking"));
             Assert.That(defaultHeader.text, Is.EqualTo($"{WButtonStyles.TopGroupLabel.text} (-1)"));
@@ -80,12 +80,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonGroupKey topKey = new(0, -1, null, 0, WButtonGroupPlacement.Top);
             WButtonGroupKey bottomKey = new(0, -2, null, 0, WButtonGroupPlacement.Bottom);
 
-            Dictionary<WButtonGroupKey, int> counts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> counts = WButtonGUITestAccess.GetGroupCounts();
             counts[topKey] = 2;
             counts[bottomKey] = 1;
 
-            GUIContent topHeader = WButtonGUI.BuildGroupHeader(topKey);
-            GUIContent bottomHeader = WButtonGUI.BuildGroupHeader(bottomKey);
+            GUIContent topHeader = WButtonGUITestAccess.BuildGroupHeader(topKey);
+            GUIContent bottomHeader = WButtonGUITestAccess.BuildGroupHeader(bottomKey);
 
             Assert.That(
                 topHeader.text,
@@ -120,9 +120,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         )
         {
             Dictionary<int, int> counts = new() { { drawOrder, 1 }, { drawOrder - 10, 1 } };
-            WButtonGUI.SetGroupCountsForTesting(counts);
+            WButtonGUITestAccess.SetGroupCounts(counts);
 
-            GUIContent header = WButtonGUI.BuildGroupHeader(drawOrder);
+            GUIContent header = WButtonGUITestAccess.BuildGroupHeader(drawOrder);
 
             Assert.That(
                 header.text,

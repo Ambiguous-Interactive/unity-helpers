@@ -16,9 +16,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// <remarks>
     /// <para>
     /// The run does not schedule itself. A caller drives <see cref="Step"/> with the time it is
-    /// willing to give up -- from <c>EditorApplication.update</c>, from a progress bar, or from a
-    /// test loop -- which is what makes the engine testable without an editor tick and what keeps a
-    /// project-wide scan from stalling the editor the way an unbounded one did.
+    /// willing to give up, from <c>EditorApplication.update</c> or a progress bar. Bounded slices
+    /// keep a project-wide scan from stalling the editor the way an unbounded one did.
     /// </para>
     /// <para>
     /// Work is ordered asset-major: for each asset, every rule that claims it runs before the next
@@ -89,13 +88,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             : this(rules, targets, LoadMainAsset) { }
 
         /// <summary>
-        /// Initializes a run that loads assets through <paramref name="loader"/>.
+        /// Initializes a run with a resolver for the objects represented by its targets.
         /// </summary>
         /// <param name="rules">The rules to apply. <c>null</c> entries are ignored.</param>
         /// <param name="targets">The assets to consider. Invalid entries are ignored.</param>
         /// <param name="loader">
-        /// How to load an asset a rule claimed. A test supplies its own so the engine can be driven
-        /// without an asset database; <c>null</c> falls back to the asset database.
+        /// Resolves a claimed target to its current object. Automatic object-change validation uses
+        /// this to prefer a live prefab root over its saved asset. A <c>null</c> resolver falls back
+        /// to Unity's asset database. Each claimed target is resolved at most once per run.
         /// </param>
         public ValidationRun(
             IReadOnlyList<IValidationRule> rules,
@@ -106,6 +106,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _rules = Compact(rules);
             _targets = Compact(targets);
             _loader = loader ?? LoadMainAsset;
+        }
+
+        internal static Object LoadMainAsset(ValidationTarget target)
+        {
+            return AssetDatabase.LoadMainAssetAtPath(target.AssetPath);
         }
 
         private static string RuleIdOf(IValidationRule rule)
@@ -120,11 +125,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             {
                 return rule.GetType().FullName;
             }
-        }
-
-        private static Object LoadMainAsset(ValidationTarget target)
-        {
-            return AssetDatabase.LoadMainAssetAtPath(target.AssetPath);
         }
 
         private static IValidationRule[] Compact(IReadOnlyList<IValidationRule> rules)
@@ -202,7 +202,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _cancelled = true;
         }
 
-        private void ProcessOneTarget(ValidationTarget target)
+        internal void ProcessOneTarget(ValidationTarget target)
         {
             bool loaded = false;
             Object asset = null;
@@ -230,6 +230,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
         }
 
+        internal Object Load(ValidationTarget target)
+        {
+            try
+            {
+                return _loader(target);
+            }
+            catch (Exception thrown)
+            {
+                RecordLoadFailure(target, thrown);
+                return null;
+            }
+        }
+
+        internal void RecordLoadFailure(ValidationTarget target, Exception thrown)
+        {
+            _failures.Add(new ValidationRuleFailure(null, target.AssetPath, thrown));
+        }
+
         private bool Claims(IValidationRule rule, ValidationTarget target)
         {
             try
@@ -240,19 +258,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             {
                 _failures.Add(new ValidationRuleFailure(RuleIdOf(rule), target.AssetPath, thrown));
                 return false;
-            }
-        }
-
-        private Object Load(ValidationTarget target)
-        {
-            try
-            {
-                return _loader(target);
-            }
-            catch (Exception thrown)
-            {
-                _failures.Add(new ValidationRuleFailure(null, target.AssetPath, thrown));
-                return null;
             }
         }
 

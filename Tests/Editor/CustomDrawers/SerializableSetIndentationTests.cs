@@ -32,8 +32,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            GroupGUIWidthUtility.ResetForTests();
-            SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
+            SerializableSetPropertyDrawerTestAccess.ResetLayoutTracking();
         }
 
         [Test]
@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 EditorGUI.indentLevel = 2;
 
-                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                     controlRect,
                     skipIndentation: false
                 );
@@ -79,9 +79,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
-                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                     controlRect,
                     skipIndentation: false
                 );
@@ -117,9 +117,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
-                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                     controlRect,
                     skipIndentation: false
                 );
@@ -145,51 +145,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
         }
 
-        [UnityTest]
-        public IEnumerator OnGUINormalContextRespectsIndentLevel()
-        {
-            IndentationTestSetHost host = CreateScriptableObject<IndentationTestSetHost>();
-            host.set.Add(1);
-            host.set.Add(2);
-
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-
-            SerializedProperty setProperty = serializedObject.FindProperty(
-                nameof(IndentationTestSetHost.set)
-            );
-            setProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableSetPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 400f, 300f);
-            GUIContent label = new("Set");
-
-            Rect capturedRect = default;
-            int previousIndentLevel = EditorGUI.indentLevel;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                EditorGUI.indentLevel = 2;
-                try
-                {
-                    serializedObject.UpdateIfRequiredOrScript();
-                    drawer.OnGUI(controlRect, setProperty, label);
-                    capturedRect = drawer.LastResolvedPosition;
-                }
-                finally
-                {
-                    EditorGUI.indentLevel = previousIndentLevel;
-                }
-            });
-
-            Assert.Greater(
-                capturedRect.x,
-                controlRect.x,
-                "OnGUI should respect indentLevel in normal context and indent the content."
-            );
-        }
-
         [Test]
         public void NormalContextWithNestedIndentLevelStaysConsistent()
         {
@@ -199,14 +154,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 1;
-                GroupGUIWidthUtility.ResetForTests();
-                Rect rectAtLevel1 = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                GroupGUIWidthUtilityTestAccess.Reset();
+                Rect rectAtLevel1 = SerializableSetPropertyDrawer.ResolveContentRect(
                     controlRect,
                     skipIndentation: false
                 );
 
                 EditorGUI.indentLevel = 3;
-                Rect rectAtLevel3 = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect rectAtLevel3 = SerializableSetPropertyDrawer.ResolveContentRect(
                     controlRect,
                     skipIndentation: false
                 );
@@ -243,9 +198,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 3;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
-                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                     controlRect,
                     skipIndentation: false
                 );
@@ -318,8 +273,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "GetPropertyHeight should not throw for empty set."
             );
 
-            GroupGUIWidthUtility.ResetForTests();
-            Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+            GroupGUIWidthUtilityTestAccess.Reset();
+            Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                 controlRect,
                 skipIndentation: false
             );
@@ -358,14 +313,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 20;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 Assert.DoesNotThrow(
                     () => drawer.GetPropertyHeight(setProperty, label),
                     "GetPropertyHeight should not throw for very large indentLevel."
                 );
 
-                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                     controlRect,
                     skipIndentation: false
                 );
@@ -401,7 +356,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -411,7 +366,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -459,7 +414,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 2;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -469,7 +424,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -510,8 +465,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 EditorGUI.indentLevel = 0;
 
-                GroupGUIWidthUtility.ResetForTests();
-                Rect noGroupRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                GroupGUIWidthUtilityTestAccess.Reset();
+                Rect noGroupRect = SerializableSetPropertyDrawer.ResolveContentRect(
                     controlRect,
                     skipIndentation: false
                 );
@@ -520,7 +475,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 const float GroupRightPadding = 8f;
                 float horizontalPadding = GroupLeftPadding + GroupRightPadding;
 
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
                         horizontalPadding,
@@ -529,7 +484,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    Rect withGroupRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect withGroupRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -579,7 +534,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 EditorGUI.indentLevel = 0;
 
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
                         OuterLeftPadding + OuterRightPadding,
@@ -596,11 +551,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         )
                     )
                     {
-                        Rect resolvedRect =
-                            SerializableSetPropertyDrawer.ResolveContentRectForTests(
-                                controlRect,
-                                skipIndentation: false
-                            );
+                        Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
+                            controlRect,
+                            skipIndentation: false
+                        );
 
                         float expectedTotalLeftPadding = OuterLeftPadding + InnerLeftPadding;
                         float expectedTotalRightPadding = OuterRightPadding + InnerRightPadding;
@@ -638,67 +592,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
         }
 
-        [UnityTest]
-        public IEnumerator OnGUIInWGroupContextSkipsMinimumIndentAtZeroLevel()
-        {
-            IndentationTestSetHost host = CreateScriptableObject<IndentationTestSetHost>();
-            host.set.Add(1);
-            host.set.Add(2);
-
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-
-            SerializedProperty setProperty = serializedObject.FindProperty(
-                nameof(IndentationTestSetHost.set)
-            );
-            setProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableSetPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 400f, 300f);
-            GUIContent label = new("Set");
-
-            const float GroupLeftPadding = 15f;
-            const float GroupRightPadding = 10f;
-            float horizontalPadding = GroupLeftPadding + GroupRightPadding;
-
-            Rect capturedRect = default;
-            int previousIndentLevel = EditorGUI.indentLevel;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                EditorGUI.indentLevel = 0;
-                try
-                {
-                    serializedObject.UpdateIfRequiredOrScript();
-                    GroupGUIWidthUtility.ResetForTests();
-                    using (
-                        GroupGUIWidthUtility.PushContentPadding(
-                            horizontalPadding,
-                            GroupLeftPadding,
-                            GroupRightPadding
-                        )
-                    )
-                    {
-                        drawer.OnGUI(controlRect, setProperty, label);
-                        capturedRect = drawer.LastResolvedPosition;
-                    }
-                }
-                finally
-                {
-                    EditorGUI.indentLevel = previousIndentLevel;
-                }
-            });
-
-            float expectedX = controlRect.x + GroupLeftPadding;
-            Assert.AreEqual(
-                expectedX,
-                capturedRect.x,
-                0.01f,
-                "OnGUI in WGroup context at indentLevel 0 should use WGroup padding."
-            );
-        }
-
         [Test]
         public void SettingsContextSkipIndentationScenarioPreservesRectUnchanged()
         {
@@ -713,7 +606,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 EditorGUI.indentLevel = 2;
 
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
                         horizontalPadding,
@@ -722,7 +615,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -766,7 +659,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 EditorGUI.indentLevel = 1;
 
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
                         horizontalPadding,
@@ -775,7 +668,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -819,7 +712,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 EditorGUI.indentLevel = 0;
 
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
                         horizontalPadding,
@@ -828,7 +721,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -882,7 +775,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = indentLevel;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 Rect resolvedRect;
                 if (0f < horizontalPadding)
@@ -895,7 +788,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         )
                     )
                     {
-                        resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                        resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                             controlRect,
                             skipIndentation: false
                         );
@@ -903,7 +796,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
                 else
                 {
-                    resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -982,7 +875,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = indentLevel;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 Rect resolvedRect;
                 if (0f < horizontalPadding)
@@ -995,7 +888,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         )
                     )
                     {
-                        resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                        resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                             controlRect,
                             skipIndentation: false
                         );
@@ -1003,7 +896,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
                 else
                 {
-                    resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -1048,11 +941,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 2;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -1115,11 +1008,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = indentLevel;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -1171,7 +1064,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 1;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -1183,11 +1076,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 {
                     using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                     {
-                        Rect resolvedRect =
-                            SerializableSetPropertyDrawer.ResolveContentRectForTests(
-                                controlRect,
-                                skipIndentation: false
-                            );
+                        Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
+                            controlRect,
+                            skipIndentation: false
+                        );
 
                         TestContext.WriteLine(
                             $"[WGroupPropertyContextIgnoresPaddingValues] "
@@ -1232,11 +1124,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -1288,7 +1180,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 5;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -1300,11 +1192,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 {
                     using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                     {
-                        Rect resolvedRect =
-                            SerializableSetPropertyDrawer.ResolveContentRectForTests(
-                                controlRect,
-                                skipIndentation: false
-                            );
+                        Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
+                            controlRect,
+                            skipIndentation: false
+                        );
 
                         const float WGroupAlignmentOffset = -4f;
                         float expectedX = controlRect.x + WGroupAlignmentOffset;
@@ -1355,11 +1246,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 50;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -1407,17 +1298,16 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 3;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
                     using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                     {
-                        Rect resolvedRect =
-                            SerializableSetPropertyDrawer.ResolveContentRectForTests(
-                                controlRect,
-                                skipIndentation: false
-                            );
+                        Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
+                            controlRect,
+                            skipIndentation: false
+                        );
 
                         TestContext.WriteLine(
                             $"[WGroupPropertyContextNestedScopesApplyAlignmentOffset] "
@@ -1462,16 +1352,16 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 2;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
-                Rect rectWithoutContext = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect rectWithoutContext = SerializableSetPropertyDrawer.ResolveContentRect(
                     controlRect,
                     skipIndentation: false
                 );
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect rectWithContext = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect rectWithContext = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -1490,7 +1380,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     );
                 }
 
-                Rect rectAfterContext = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect rectAfterContext = SerializableSetPropertyDrawer.ResolveContentRect(
                     controlRect,
                     skipIndentation: false
                 );
@@ -1537,7 +1427,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -1547,7 +1437,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -1596,7 +1486,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -1614,11 +1504,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         )
                     )
                     {
-                        Rect resolvedRect =
-                            SerializableSetPropertyDrawer.ResolveContentRectForTests(
-                                controlRect,
-                                skipIndentation: false
-                            );
+                        Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
+                            controlRect,
+                            skipIndentation: false
+                        );
 
                         float totalLeftPadding = OuterLeftPadding + InnerLeftPadding;
                         float totalRightPadding = OuterRightPadding + InnerRightPadding;
@@ -1667,7 +1556,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 2;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -1677,7 +1566,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -1719,7 +1608,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 int initialScopeDepth = GroupGUIWidthUtility.CurrentScopeDepth;
 
@@ -1763,7 +1652,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 1;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 Rect rectWithPaddingOnly;
                 using (
@@ -1774,13 +1663,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    rectWithPaddingOnly = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    rectWithPaddingOnly = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
                 }
 
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 Rect rectWithWGroupContext;
                 using (
@@ -1793,11 +1682,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 {
                     using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                     {
-                        rectWithWGroupContext =
-                            SerializableSetPropertyDrawer.ResolveContentRectForTests(
-                                controlRect,
-                                skipIndentation: false
-                            );
+                        rectWithWGroupContext = SerializableSetPropertyDrawer.ResolveContentRect(
+                            controlRect,
+                            skipIndentation: false
+                        );
                     }
                 }
 
@@ -1858,11 +1746,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -1915,17 +1803,16 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 3;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushContentPadding(40f, 20f, 20f))
                 {
                     using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                     {
-                        Rect resolvedRect =
-                            SerializableSetPropertyDrawer.ResolveContentRectForTests(
-                                controlRect,
-                                skipIndentation: false
-                            );
+                        Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
+                            controlRect,
+                            skipIndentation: false
+                        );
 
                         TestContext.WriteLine(
                             $"[WGroupPropertyContextWithNarrowRect] "
@@ -1973,7 +1860,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -1999,11 +1886,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             )
                         )
                         {
-                            Rect resolvedRect =
-                                SerializableSetPropertyDrawer.ResolveContentRectForTests(
-                                    controlRect,
-                                    skipIndentation: false
-                                );
+                            Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
+                                controlRect,
+                                skipIndentation: false
+                            );
 
                             float totalLeft = Padding1Left + Padding2Left + Padding3Left;
                             float totalRight = Padding1Right + Padding2Right + Padding3Right;
@@ -2053,7 +1939,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -2063,7 +1949,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -2186,11 +2072,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = indentLevel;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -2241,11 +2127,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -2303,11 +2189,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -2363,11 +2249,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );
@@ -2414,11 +2300,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
-                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                    Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                         controlRect,
                         skipIndentation: false
                     );

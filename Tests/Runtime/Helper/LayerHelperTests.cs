@@ -3,111 +3,74 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
-    using System;
+    using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
-    [NUnit.Framework.Category("Fast")]
+    [Category("Fast")]
     public sealed class LayerHelperTests : CommonTestBase
     {
         [TearDown]
         public void ClearCaches()
         {
-            InvokeClearLayerNames();
-            Helpers.ResetLayerNameProvider();
+            Helpers.CLearLayerNames();
         }
 
         [Test]
         public void GetAllLayerNamesCachesResultsUntilCleared()
         {
-            int invocation = 0;
-            Helpers.LayerNameProvider = () =>
-            {
-                ++invocation;
-                return new[] { "LayerA", "LayerB" };
-            };
-
             Helpers.ResetLayerCache();
             string[] first = Helpers.GetAllLayerNames();
-            Assert.AreEqual(1, invocation, "Provider should be invoked on first call.");
-
-            Helpers.LayerNameProvider = () =>
-            {
-                ++invocation;
-                return new[] { "LayerChanged" };
-            };
-
-            string[] second = Helpers.GetAllLayerNames();
-            CollectionAssert.AreEqual(new[] { "LayerA", "LayerB" }, second);
-
+            Assert.IsTrue(first != null);
+            Assert.AreSame(first, Helpers.GetAllLayerNames());
             Helpers.ResetLayerCache();
-            string[] third = Helpers.GetAllLayerNames();
-            Assert.AreEqual(2, invocation, "Reset should force provider refresh.");
-            CollectionAssert.AreEqual(new[] { "LayerChanged" }, third);
+            Assert.IsFalse(Helpers.LayerCacheInitialized);
+            CollectionAssert.AreEqual(first, Helpers.GetAllLayerNames());
         }
 
         [Test]
         public void GetAllLayerNamesBufferMatchesArray()
         {
             string[] layers = Helpers.GetAllLayerNames();
-            Assume.That(layers, Is.Not.Null.And.Not.Empty);
-
-            System.Collections.Generic.List<string> buffer = new() { "placeholder" };
+            List<string> buffer = new() { "placeholder" };
             Helpers.GetAllLayerNames(buffer);
-
-            CollectionAssert.AreEquivalent(layers, buffer);
+            CollectionAssert.AreEqual(layers, buffer);
         }
 
         [Test]
-        public void FallingBackToRuntimeLayerProviderStillReturnsLayers()
+        public void GetAllLayerNamesReturnsLiveRuntimeLayers()
         {
-            Helpers.LayerNameProvider = () => Array.Empty<string>();
-            ClearCaches();
-
+            Helpers.ResetLayerCache();
             string[] layers = Helpers.GetAllLayerNames();
             Assert.IsTrue(layers != null);
             Assert.IsNotEmpty(layers);
+            Assert.Contains("Default", layers);
         }
 
         [Test]
-        public void ResetLayerCacheForcesProviderRefresh()
+        public void ResetLayerCacheDiscardsStaleNames()
         {
-            int invocation = 0;
-            Helpers.LayerNameProvider = () =>
-            {
-                ++invocation;
-                return invocation == 1 ? new[] { "LayerZero" } : new[] { "LayerOne", "LayerTwo" };
-            };
-
+            string[] expected = Helpers.GetAllLayerNames();
+            Helpers.CachedLayerNames = new[] { "StaleLayer" };
+            Helpers.LayerCacheInitialized = true;
+            CollectionAssert.AreEqual(new[] { "StaleLayer" }, Helpers.GetAllLayerNames());
             Helpers.ResetLayerCache();
-            _ = Helpers.GetAllLayerNames();
-            Helpers.ResetLayerCache();
-            string[] refreshed = Helpers.GetAllLayerNames();
-
-            CollectionAssert.AreEqual(new[] { "LayerOne", "LayerTwo" }, refreshed);
+            CollectionAssert.AreEqual(expected, Helpers.GetAllLayerNames());
         }
 
 #if UNITY_EDITOR
         [Test]
         public void ProjectChangeResetsLayerCache()
         {
-            Helpers.LayerNameProvider = () => new[] { "LayerInitial" };
-            Helpers.ResetLayerCache();
-            _ = Helpers.GetAllLayerNames();
-
-            Helpers.LayerNameProvider = () => new[] { "LayerUpdated" };
+            string[] expected = Helpers.GetAllLayerNames();
+            Helpers.CachedLayerNames = new[] { "StaleLayer" };
+            Helpers.LayerCacheInitialized = true;
             Helpers.HandleProjectChangedForHelpers();
-
-            string[] updated = Helpers.GetAllLayerNames();
-            CollectionAssert.AreEqual(new[] { "LayerUpdated" }, updated);
+            Assert.IsFalse(Helpers.LayerCacheInitialized);
+            CollectionAssert.AreEqual(expected, Helpers.GetAllLayerNames());
         }
 #endif
-
-        private static void InvokeClearLayerNames()
-        {
-            Helpers.CLearLayerNames();
-        }
     }
 }

@@ -383,8 +383,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     AssetDatabaseBatchHelper.ResetBatchDepth();
                 }
 
-                ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
-                ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
+                EditorStateTestUtilities.ResetSingletonCreationState();
             }
             catch { }
 #endif
@@ -423,8 +422,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     AssetDatabaseBatchHelper.ResetBatchDepth();
                 }
 
-                ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
-                ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
+                EditorStateTestUtilities.ResetSingletonCreationState();
             }
             catch { }
 
@@ -571,8 +569,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     AssetDatabaseBatchHelper.ResetBatchDepth();
                 }
 
-                ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
-                ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
+                EditorStateTestUtilities.ResetSingletonCreationState();
             }
             catch { }
 
@@ -609,11 +606,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
 
                 string singletonLeaksBeforeClear =
-                    RuntimeSingletonRegistry.DescribeLiveInstancesForTesting();
+                    RuntimeStateTestUtilities.DescribeLiveSingletons();
                 RuntimeSingletonRegistry.ClearAllRegisteredInstances();
                 int singletonDestroyFrames = TrackedObjectDestroyMaxFrames;
                 string singletonLeaksAfterClear =
-                    RuntimeSingletonRegistry.DescribeLiveInstancesForTesting();
+                    RuntimeStateTestUtilities.DescribeLiveSingletons();
                 while (
                     !string.IsNullOrWhiteSpace(singletonLeaksAfterClear)
                     && 0 < singletonDestroyFrames
@@ -621,8 +618,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 {
                     singletonDestroyFrames--;
                     yield return null;
-                    singletonLeaksAfterClear =
-                        RuntimeSingletonRegistry.DescribeLiveInstancesForTesting();
+                    singletonLeaksAfterClear = RuntimeStateTestUtilities.DescribeLiveSingletons();
                 }
 
                 if (!string.IsNullOrWhiteSpace(singletonLeaksAfterClear))
@@ -652,7 +648,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                         $"[uh-leak] {residentDispatchers} UnityMainThreadDispatcher object(s) "
                         + "still resident after teardown of "
                         + $"{TestContext.CurrentContext.Test.FullName}. "
-                        + UnityMainThreadDispatcher.DescribeLiveDispatchersForTesting();
+                        + RuntimeStateTestUtilities.DescribeLiveDispatchers();
                 }
             }
 
@@ -1231,18 +1227,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             const int MaxDrainPasses = 8;
             for (int i = 0; i < MaxDrainPasses; ++i)
             {
-                int pendingActionCount =
-                    UnityMainThreadDispatcher.GetPendingActionCountForTesting();
+                int pendingActionCount = RuntimeStateTestUtilities.GetPendingActionCount();
                 if (pendingActionCount <= 0)
                 {
                     return null;
                 }
 
-                UnityMainThreadDispatcher.DrainPendingActionsForTesting();
+                RuntimeStateTestUtilities.DrainPendingActions();
             }
 
-            int remainingPendingActionCount =
-                UnityMainThreadDispatcher.GetPendingActionCountForTesting();
+            int remainingPendingActionCount = RuntimeStateTestUtilities.GetPendingActionCount();
             if (remainingPendingActionCount <= 0)
             {
                 return null;
@@ -1251,7 +1245,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             return $"[uh-leak] {remainingPendingActionCount} UnityMainThreadDispatcher action(s) "
                 + "remained queued after teardown drain of "
                 + $"{TestContext.CurrentContext.Test.FullName}. "
-                + UnityMainThreadDispatcher.DescribeLiveDispatchersForTesting();
+                + RuntimeStateTestUtilities.DescribeLiveDispatchers();
         }
 
         private static async ValueTask UnloadSceneAsync(Scene scene)
@@ -1293,8 +1287,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 AssetDatabaseBatchHelper.ForceResetAssetDatabase();
 
-                ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
-                ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
+                EditorStateTestUtilities.ResetSingletonCreationState();
             }
             catch { }
 
@@ -1313,7 +1306,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             */
             try
             {
-                WallstopStudios.UnityHelpers.Editor.AssetProcessors.AssetPostprocessorDeferral.FlushForTesting();
+                EditorStateTestUtilities.FlushDeferredAssetActions();
             }
             catch (Exception ex)
                 when (ex is not OutOfMemoryException and not StackOverflowException)
@@ -1358,7 +1351,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         private void InitializeDispatcherScope()
         {
             DisposeDispatcherScope();
-            _dispatcherScope = UnityMainThreadDispatcher.CreateTestScope(
+            _dispatcherScope = RuntimeStateTestUtilities.CreateDispatcherScope(
                 destroyImmediate: !Application.isPlaying
             );
         }

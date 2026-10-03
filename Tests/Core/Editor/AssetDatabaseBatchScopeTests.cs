@@ -736,7 +736,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void IncrementBatchDepthReturnsCorrectlyForOutermostScope()
         {
-            bool isOutermost = AssetDatabaseBatchHelper.IncrementBatchDepth();
+            bool isOutermost = AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             Assert.That(
                 isOutermost,
@@ -749,15 +749,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Depth should be 1 after first increment"
             );
 
-            AssetDatabaseBatchHelper.DecrementBatchDepth();
+            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
         }
 
         [Test]
         public void IncrementBatchDepthReturnsCorrectlyForNestedScope()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
-            bool isOutermost = AssetDatabaseBatchHelper.IncrementBatchDepth();
+            bool isOutermost = AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             Assert.That(
                 isOutermost,
@@ -770,8 +770,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Depth should be 2 after second increment"
             );
 
-            AssetDatabaseBatchHelper.DecrementBatchDepth();
-            AssetDatabaseBatchHelper.DecrementBatchDepth();
+            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
+            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
         }
 
         [Test]
@@ -784,7 +784,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             for (int i = 0; i < incrementCount; ++i)
             {
-                results.Add(AssetDatabaseBatchHelper.IncrementBatchDepth());
+                results.Add(AssetDatabaseBatchTestAccess.IncrementBatchDepth());
             }
 
             Assert.That(results[0], Is.True, "First increment should return true");
@@ -808,9 +808,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void DecrementBatchDepthReturnsCorrectlyWhenReturningToZero()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
-            bool wasOutermost = AssetDatabaseBatchHelper.DecrementBatchDepth();
+            bool wasOutermost = AssetDatabaseBatchTestAccess.DecrementBatchDepth();
 
             Assert.That(
                 wasOutermost,
@@ -827,10 +827,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void DecrementBatchDepthReturnsCorrectlyWhenNotReturningToZero()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
-            bool wasOutermost = AssetDatabaseBatchHelper.DecrementBatchDepth();
+            bool wasOutermost = AssetDatabaseBatchTestAccess.DecrementBatchDepth();
 
             Assert.That(
                 wasOutermost,
@@ -843,13 +843,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Depth should be 1 after decrement"
             );
 
-            AssetDatabaseBatchHelper.DecrementBatchDepth();
+            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
         }
 
         [Test]
         public void DecrementBelowZeroResetsToZero()
         {
-            bool wasOutermost = AssetDatabaseBatchHelper.DecrementBatchDepth();
+            bool wasOutermost = AssetDatabaseBatchTestAccess.DecrementBatchDepth();
 
             Assert.That(wasOutermost, Is.False, "Decrement below zero should return false");
             Assert.That(
@@ -872,7 +872,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             for (int i = 0; i < decrementCount; ++i)
             {
-                bool result = AssetDatabaseBatchHelper.DecrementBatchDepth();
+                bool result = AssetDatabaseBatchTestAccess.DecrementBatchDepth();
 
                 Assert.That(result, Is.False, $"Decrement {i} from zero should return false");
                 Assert.That(
@@ -892,9 +892,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ResetBatchDepthResetsToZero()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -924,7 +924,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             for (int i = 0; i < initialDepth; ++i)
             {
-                AssetDatabaseBatchHelper.IncrementBatchDepth();
+                AssetDatabaseBatchTestAccess.IncrementBatchDepth();
             }
 
             Assert.That(
@@ -967,9 +967,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ResetBatchDepthProperlyCleansUpState()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -1018,8 +1018,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void MultipleResetBatchDepthCallsAreIdempotent()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -1068,7 +1068,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ResetBatchDepthInterleavedWithIncrementsWorksCorrectly()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
             AssetDatabaseBatchHelper.ResetBatchDepth();
 
             Assert.That(
@@ -1077,9 +1077,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After first increment+reset: depth should be 0"
             );
 
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
             AssetDatabaseBatchHelper.ResetBatchDepth();
 
             Assert.That(
@@ -1088,7 +1088,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After second increment+reset: depth should be 0"
             );
 
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -1649,9 +1649,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
                         for (int i = 0; i < iterationsPerThread; ++i)
                         {
-                            AssetDatabaseBatchHelper.IncrementBatchDepth();
+                            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
                             Thread.SpinWait(10);
-                            AssetDatabaseBatchHelper.DecrementBatchDepth();
+                            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
                         }
                     }
                     catch (Exception ex)
@@ -2081,9 +2081,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ScopeCreationAfterResetWorksCorrectly()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             AssetDatabaseBatchHelper.ResetBatchDepth();
 
@@ -2111,7 +2111,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void InterleaveIncrementDecrementWithScopes()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(1),
@@ -2126,14 +2126,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     "Depth should be 2 after scope"
                 );
 
-                AssetDatabaseBatchHelper.IncrementBatchDepth();
+                AssetDatabaseBatchTestAccess.IncrementBatchDepth();
                 Assert.That(
                     AssetDatabaseBatchHelper.CurrentBatchDepth,
                     Is.EqualTo(3),
                     "Depth should be 3 after nested increment"
                 );
 
-                AssetDatabaseBatchHelper.DecrementBatchDepth();
+                AssetDatabaseBatchTestAccess.DecrementBatchDepth();
                 Assert.That(
                     AssetDatabaseBatchHelper.CurrentBatchDepth,
                     Is.EqualTo(2),
@@ -2147,7 +2147,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Depth should be 1 after scope exits"
             );
 
-            AssetDatabaseBatchHelper.DecrementBatchDepth();
+            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
@@ -2230,7 +2230,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             for (int i = 0; i < highDepth; ++i)
             {
-                AssetDatabaseBatchHelper.IncrementBatchDepth();
+                AssetDatabaseBatchTestAccess.IncrementBatchDepth();
             }
 
             Assert.That(
@@ -2246,7 +2246,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             for (int i = 0; i < highDepth; ++i)
             {
-                AssetDatabaseBatchHelper.DecrementBatchDepth();
+                AssetDatabaseBatchTestAccess.DecrementBatchDepth();
             }
 
             Assert.That(
@@ -2320,7 +2320,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             int depthBefore = AssetDatabaseBatchHelper.CurrentBatchDepth;
 
-            AssetDatabaseBatchHelper.DecrementBatchDepth();
+            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -2332,16 +2332,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void IncrementAndDecrementReturnValuesAreSymmetric()
         {
-            bool firstIncrement = AssetDatabaseBatchHelper.IncrementBatchDepth();
+            bool firstIncrement = AssetDatabaseBatchTestAccess.IncrementBatchDepth();
             Assert.That(firstIncrement, Is.True, "First increment returns true (outermost)");
 
-            bool secondIncrement = AssetDatabaseBatchHelper.IncrementBatchDepth();
+            bool secondIncrement = AssetDatabaseBatchTestAccess.IncrementBatchDepth();
             Assert.That(secondIncrement, Is.False, "Second increment returns false (nested)");
 
-            bool firstDecrement = AssetDatabaseBatchHelper.DecrementBatchDepth();
+            bool firstDecrement = AssetDatabaseBatchTestAccess.DecrementBatchDepth();
             Assert.That(firstDecrement, Is.False, "First decrement returns false (still nested)");
 
-            bool secondDecrement = AssetDatabaseBatchHelper.DecrementBatchDepth();
+            bool secondDecrement = AssetDatabaseBatchTestAccess.DecrementBatchDepth();
             Assert.That(secondDecrement, Is.True, "Second decrement returns true (now at zero)");
         }
 
@@ -2351,7 +2351,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             bool previouslyBatching = AssetDatabaseBatchHelper.IsCurrentlyBatching;
             Assert.That(previouslyBatching, Is.False, "Should not be batching initially");
 
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             bool nowBatching = AssetDatabaseBatchHelper.IsCurrentlyBatching;
             Assert.That(nowBatching, Is.True, "Should be batching after increment");
@@ -2359,7 +2359,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             int depth = AssetDatabaseBatchHelper.CurrentBatchDepth;
             Assert.That(depth, Is.EqualTo(1), "Depth should be 1");
 
-            AssetDatabaseBatchHelper.DecrementBatchDepth();
+            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
 
             bool afterDecrement = AssetDatabaseBatchHelper.IsCurrentlyBatching;
             Assert.That(afterDecrement, Is.False, "Should not be batching after decrement");
@@ -2378,7 +2378,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             );
 
             // Manual increment doesn't affect ActualUnityBatchDepth
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(1),
@@ -2390,7 +2390,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "ActualUnityBatchDepth should still be 0 after manual increment"
             );
 
-            AssetDatabaseBatchHelper.DecrementBatchDepth();
+            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
         }
 
         /// <summary>
@@ -2399,8 +2399,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ResetCountersOnlyDoesNotCallUnityApis()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -2439,8 +2439,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         public void ResetCountersOnlyFollowedByResetBatchDepthIsSafe()
         {
             // Simulate stale state that might persist after domain reload
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -2482,7 +2482,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void MixedCounterOnlyAndBeginBatchTracksCorrectly()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(1),
@@ -2515,7 +2515,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After BeginBatch dispose: depth should be 1"
             );
 
-            AssetDatabaseBatchHelper.DecrementBatchDepth();
+            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -3212,7 +3212,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ManualIncrementFollowedByBeginBatchWorksCorrectly()
         {
-            AssetDatabaseBatchHelper.IncrementBatchDepth();
+            AssetDatabaseBatchTestAccess.IncrementBatchDepth();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -3245,7 +3245,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After BeginBatch scope: depth should be 1"
             );
 
-            AssetDatabaseBatchHelper.DecrementBatchDepth();
+            AssetDatabaseBatchTestAccess.DecrementBatchDepth();
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,

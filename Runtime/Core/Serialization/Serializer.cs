@@ -303,6 +303,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         // Small payloads use protobuf-net buffer access; larger reads avoid repeated stream allocation.
         private const int ProtobufMemoryStreamThreshold = 4096;
 
+        internal static readonly ConcurrentDictionary<Type, Type> ProtobufRootCache = new();
+        internal static readonly ConcurrentDictionary<Type, Type> ExplicitProtobufRootCache = new();
+
         private static readonly MethodInfo ProtoDeserializeTypeFromROM;
         private static readonly MethodInfo ProtoDeserializeTypeFromROS;
         private static readonly Func<
@@ -315,9 +318,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             ReadOnlySequence<byte>,
             object
         > ProtoDeserializeTypeFromROSFast;
-
-        private static readonly ConcurrentDictionary<Type, Type> ProtobufRootCache = new();
-        private static readonly ConcurrentDictionary<Type, Type> ExplicitProtobufRootCache = new();
         private static readonly Type NoRootMarker = typeof(void);
 
         // Legacy protobuf-net delegates require Mono; WallstopProto supplies the AOT path.
@@ -1334,29 +1334,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
             }
             return result;
-        }
-
-        internal static void ClearProtobufRootCacheForTesting(params Type[] declaredTypes)
-        {
-            if (declaredTypes == null || declaredTypes.Length == 0)
-            {
-                ProtobufRootCache.Clear();
-                ExplicitProtobufRootCache.Clear();
-                WallstopProto.WProtoDeclaredRootProvider.ReleaseAllClaims();
-                return;
-            }
-
-            foreach (Type declaredType in declaredTypes)
-            {
-                if (declaredType == null)
-                {
-                    continue;
-                }
-
-                ProtobufRootCache.TryRemove(declaredType, out _);
-                ExplicitProtobufRootCache.TryRemove(declaredType, out _);
-                WallstopProto.WProtoDeclaredRootProvider.ReleaseClaim(declaredType);
-            }
         }
 
         /// <summary>

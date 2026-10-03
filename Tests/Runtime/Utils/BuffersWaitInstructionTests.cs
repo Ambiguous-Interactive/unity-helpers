@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [SetUp]
         public void SetUp()
         {
-            waitInstructionScope = Buffers.BeginWaitInstructionTestScope();
+            waitInstructionScope = new WaitInstructionCacheScope();
         }
 
         [TearDown]
@@ -1152,7 +1152,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             WaitForSeconds outerInstance = Buffers.GetWaitForSeconds(0.5f);
             Assert.NotNull(outerInstance);
 
-            using (IDisposable innerScope = Buffers.BeginWaitInstructionTestScope())
+            using (IDisposable innerScope = new WaitInstructionCacheScope())
             {
                 Assert.AreEqual(0, Buffers.WaitForSecondsCacheDiagnostics.DistinctEntries);
                 Assert.AreEqual(

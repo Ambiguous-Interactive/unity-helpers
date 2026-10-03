@@ -46,8 +46,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         internal static bool SuppressUserPrompts { get; set; }
 
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
-
         [SerializeField]
         internal List<Object> _directoryPaths = new();
 
@@ -60,10 +58,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         [SerializeField]
         internal bool _forceReimport;
 
+        internal SerializedObject _serializedObject;
+
         [SerializeField]
         private string _spriteNameRegex = ".*";
-
-        private SerializedObject _serializedObject;
         private SerializedProperty _directoryPathsProperty;
         private List<string> _filesToProcess;
         private string _regexError;

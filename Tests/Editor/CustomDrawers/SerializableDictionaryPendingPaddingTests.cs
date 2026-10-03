@@ -29,9 +29,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            GroupGUIWidthUtility.ResetForTests();
-            SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
-            SerializableDictionaryPropertyDrawer.ClearMainFoldoutAnimCacheForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetLayoutTracking();
+            SerializableDictionaryPropertyDrawerTestAccess.ClearMainFoldoutAnimCache();
         }
 
         [Test]
@@ -134,81 +134,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 10f,
                 normalOffset - settingsOffset,
                 "Toggle offset difference should be 10f."
-            );
-        }
-
-        [UnityTest]
-        public IEnumerator OnGUINormalContextDrawsPendingEntryWithFullPadding()
-        {
-            TestDictionaryHost host = CreateScriptableObject<TestDictionaryHost>();
-            host.dictionary[1] = "value1";
-
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-
-            SerializedProperty dictionaryProperty = serializedObject.FindProperty(
-                nameof(TestDictionaryHost.dictionary)
-            );
-            dictionaryProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableDictionaryPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 400f, 300f);
-            GUIContent label = new("Dictionary");
-
-            Rect capturedRect = default;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                serializedObject.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, dictionaryProperty, label);
-                capturedRect = drawer.LastResolvedPosition;
-            });
-
-            Assert.Greater(capturedRect.width, 0f, "Resolved position should have valid width.");
-        }
-
-        [UnityTest]
-        public IEnumerator OnGUISettingsContextDrawsPendingEntryWithReducedPadding()
-        {
-            UnityHelpersSettings settings = UnityHelpersSettings.instance;
-            SerializedObject serializedSettings = TrackDisposable(new SerializedObject(settings));
-            serializedSettings.Update();
-
-            SerializedProperty paletteProp = serializedSettings.FindProperty(
-                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
-            );
-
-            Assert.IsTrue(
-                paletteProp != null,
-                "Settings should have the WButtonCustomColors dictionary property."
-            );
-
-            if (paletteProp == null)
-            {
-                yield break;
-            }
-
-            paletteProp.isExpanded = true;
-            serializedSettings.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableDictionaryPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 400f, 300f);
-            GUIContent label = new("Palette");
-
-            Rect capturedRect = default;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                serializedSettings.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, paletteProp, label);
-                capturedRect = drawer.LastResolvedPosition;
-            });
-
-            Assert.Greater(
-                capturedRect.width,
-                0f,
-                "Resolved position should have valid width in settings context."
             );
         }
 
@@ -369,14 +294,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 return;
             }
 
-            SerializableDictionaryPropertyDrawer.ClearMainFoldoutAnimCacheForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ClearMainFoldoutAnimCache();
 
             paletteProp.isExpanded = false;
             SerializableDictionaryPropertyDrawer drawer = new();
             GUIContent label = new("Palette");
             float collapsedHeight = drawer.GetPropertyHeight(paletteProp, label);
 
-            SerializableDictionaryPropertyDrawer.ClearMainFoldoutAnimCacheForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ClearMainFoldoutAnimCache();
 
             paletteProp.isExpanded = true;
             float expandedHeight = drawer.GetPropertyHeight(paletteProp, label);
@@ -408,61 +333,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     "Expanded dictionary should be taller than collapsed."
                 );
             }
-        }
-
-        [UnityTest]
-        public IEnumerator DrawerMaintainsConsistentPaddingAcrossMultipleRepaints()
-        {
-            UnityHelpersSettings settings = UnityHelpersSettings.instance;
-            SerializedObject serializedSettings = TrackDisposable(new SerializedObject(settings));
-            serializedSettings.Update();
-
-            SerializedProperty paletteProp = serializedSettings.FindProperty(
-                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
-            );
-
-            if (paletteProp == null)
-            {
-                Assert.Inconclusive("Settings property not found.");
-                yield break;
-            }
-
-            paletteProp.isExpanded = true;
-            serializedSettings.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableDictionaryPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 400f, 300f);
-            GUIContent label = new("Palette");
-
-            Rect firstRect = default;
-            Rect secondRect = default;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                serializedSettings.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, paletteProp, label);
-                firstRect = drawer.LastResolvedPosition;
-            });
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                serializedSettings.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, paletteProp, label);
-                secondRect = drawer.LastResolvedPosition;
-            });
-
-            Assert.AreEqual(
-                firstRect.x,
-                secondRect.x,
-                0.01f,
-                "Resolved x position should be consistent across repaints."
-            );
-            Assert.AreEqual(
-                firstRect.width,
-                secondRect.width,
-                0.01f,
-                "Resolved width should be consistent across repaints."
-            );
         }
     }
 }

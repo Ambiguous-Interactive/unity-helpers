@@ -179,8 +179,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             RegexOptions.Compiled | RegexOptions.CultureInvariant
         );
 
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
-
         private Dictionary<
             string,
             Dictionary<string, List<(int index, Sprite sprite)>>
@@ -294,7 +292,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public bool strictNumericOrdering = false;
         internal readonly SpritePreviewCache _previewTextureCache = new();
 
-        private SerializedObject _serializedObject;
+        internal SerializedObject _serializedObject;
         private SerializedProperty _animationDataProp;
         private SerializedProperty _animationSourcesProp;
         private SerializedProperty _spriteNameRegexProp;
@@ -357,37 +355,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             GetWindow<AnimationCreatorWindow>("Animation Creator");
         }
 
-        internal static float GetCurrentFpsForTests(AnimationData data, int frameIndex)
-        {
-            if (data.framerateMode == FramerateMode.Constant)
-            {
-                return 0 < data.framesPerSecond
-                    ? data.framesPerSecond
-                    : AnimationData.DefaultFramesPerSecond;
-            }
-
-            float normalizedPosition =
-                1 < data.frames.Count ? (float)frameIndex / (data.frames.Count - 1) : 0f;
-
-            float fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
-            return 0 < fps ? fps : AnimationData.DefaultFramesPerSecond;
-        }
-
-        internal static AnimationClip CreateAnimationClipForTests(
-            AnimationData data,
-            List<Sprite> validFrames
-        )
-        {
-            return AnimationCreatorAPI.TryCreateClip(
-                data,
-                validFrames,
-                out AnimationClip clip,
-                out _
-            )
-                ? clip
-                : null;
-        }
-
         internal static int CalculateScrubberFrame(float scrubberValue, int frameCount)
         {
             if (frameCount <= 0)
@@ -403,6 +370,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         internal static float CalculateCycleOffsetClamped(float inputOffset)
         {
             return Mathf.Clamp01(inputOffset);
+        }
+
+        internal static float GetCurrentFps(AnimationData data, int frameIndex)
+        {
+            if (data.framerateMode == FramerateMode.Constant)
+            {
+                return 0 < data.framesPerSecond
+                    ? data.framesPerSecond
+                    : AnimationData.DefaultFramesPerSecond;
+            }
+
+            float normalizedPosition =
+                1 < data.frames.Count ? (float)frameIndex / (data.frames.Count - 1) : 0f;
+
+            float fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
+            return 0 < fps ? fps : AnimationData.DefaultFramesPerSecond;
         }
 
         private static string SanitizeName(string inputName)
@@ -1860,22 +1843,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             return preview;
-        }
-
-        private float GetCurrentFps(AnimationData data, int frameIndex)
-        {
-            if (data.framerateMode == FramerateMode.Constant)
-            {
-                return 0 < data.framesPerSecond
-                    ? data.framesPerSecond
-                    : AnimationData.DefaultFramesPerSecond;
-            }
-
-            float normalizedPosition =
-                1 < data.frames.Count ? (float)frameIndex / (data.frames.Count - 1) : 0f;
-
-            float fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
-            return 0 < fps ? fps : AnimationData.DefaultFramesPerSecond;
         }
 
         private void DrawActionButtons()

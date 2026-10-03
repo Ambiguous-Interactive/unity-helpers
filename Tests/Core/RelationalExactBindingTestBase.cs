@@ -108,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
         protected void VerifyExactTypeAssignment(int depth, bool inactive, int capability)
         {
-            using IDisposable scope = ReflectionHelpers.OverrideReflectionCapabilities(
+            using IDisposable scope = new ReflectionCapabilityScope(
                 capability == 0,
                 capability == 1
             );

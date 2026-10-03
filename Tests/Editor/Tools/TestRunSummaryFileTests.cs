@@ -40,7 +40,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [TearDown]
         public override void TearDown()
         {
-            TestRunSummaryFile.AfterBeginClaimForTests = null;
             if (Directory.Exists(_workingDirectory))
             {
                 Directory.Delete(_workingDirectory, true);
@@ -56,9 +55,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [TestCase("\u2003")]
         public void BlankSummaryPathsAreRefusedBeforeClaimingAFile(string path)
         {
-            bool claimed = false;
-            TestRunSummaryFile.AfterBeginClaimForTests = () => claimed = true;
-
             Assert.That(
                 TestRunSummaryFile.TryBeginRun(
                     path,
@@ -69,7 +65,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 Is.False
             );
             Assert.That(owner, Is.Empty);
-            Assert.That(claimed, Is.False);
+            Assert.That(Directory.GetFiles(_workingDirectory), Is.Empty);
             Assert.That(TestRunSummaryFile.IsMarkedRunning(path), Is.False);
             Assert.That(TestRunSummaryFile.TryReadOwner(path, out string readOwner), Is.False);
             Assert.That(readOwner, Is.Empty);
@@ -295,58 +291,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public void ConcurrentCrossModeBeginRunCallsProduceOneOwner()
         {
             string competingPath = Path.Combine(_workingDirectory, "playmode-summary.txt");
-            using ManualResetEventSlim claimAcquired = new(false);
-            using ManualResetEventSlim releaseClaim = new(false);
-            string firstOwner = string.Empty;
-            string secondOwner = string.Empty;
-            TestRunSummaryFile.AfterBeginClaimForTests = () =>
+            using (
+                FileStream claim = TestRunSummaryFile.OpenBeginClaim(_summaryPath, competingPath)
+            )
             {
-                claimAcquired.Set();
-                releaseClaim.Wait(10_000);
-            };
-            Task<bool> first = Task.Run(() =>
-            {
-                return TestRunSummaryFile.TryBeginRun(
+                Assert.IsFalse(
+                    TestRunSummaryFile.TryBeginRun(
+                        competingPath,
+                        TestMode.PlayMode,
+                        StartedUtc,
+                        out string blockedOwner,
+                        _summaryPath
+                    )
+                );
+                Assert.IsEmpty(blockedOwner);
+                Assert.IsFalse(File.Exists(competingPath));
+            }
+            Assert.IsTrue(
+                TestRunSummaryFile.TryBeginRun(
                     _summaryPath,
                     TestMode.EditMode,
                     StartedUtc,
-                    out firstOwner,
+                    out string firstOwner,
                     competingPath
-                );
-            });
-            Assert.IsTrue(
-                claimAcquired.Wait(10_000),
-                "The first caller must hold the shared claim."
+                )
             );
-            Task<bool> second = Task.Run(() =>
-            {
-                return TestRunSummaryFile.TryBeginRun(
+            Assert.IsNotEmpty(firstOwner);
+            Assert.IsFalse(
+                TestRunSummaryFile.TryBeginRun(
                     competingPath,
                     TestMode.PlayMode,
-                    StartedUtc.AddSeconds(1),
-                    out secondOwner,
+                    StartedUtc,
+                    out string secondOwner,
                     _summaryPath
-                );
-            });
-
-            try
-            {
-                Assert.IsTrue(second.Wait(10_000));
-                Assert.IsFalse(second.Result);
-            }
-            finally
-            {
-                releaseClaim.Set();
-                Assert.IsTrue(first.Wait(10_000));
-                TestRunSummaryFile.AfterBeginClaimForTests = null;
-            }
-
-            Assert.IsTrue(first.Result);
-            Assert.IsNotEmpty(firstOwner);
-            Assert.AreEqual(string.Empty, secondOwner);
+                )
+            );
+            Assert.IsEmpty(secondOwner);
             Assert.IsTrue(TestRunSummaryFile.TryReadOwner(_summaryPath, out string storedOwner));
             Assert.AreEqual(firstOwner, storedOwner);
-            Assert.IsFalse(File.Exists(competingPath));
         }
 
         [Test]

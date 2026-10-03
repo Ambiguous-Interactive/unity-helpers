@@ -303,8 +303,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
         }
 
-        private static readonly object Lock = new();
-        private static int _batchDepth;
+        internal static readonly object Lock = new();
+        internal static int _batchDepth;
 
         /// <summary>
         ///     Tracks the number of actual Unity AssetDatabase API calls we've made.
@@ -631,27 +631,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         }
 
         /// <summary>
-        ///     Increments the batch depth counter and returns whether this is the outermost scope.
-        ///     This method ONLY increments the counter - it does NOT call Unity's AssetDatabase APIs.
-        /// </summary>
-        /// <remarks>
-        ///     <strong>Warning:</strong> Using this method directly creates a mismatch between the
-        ///     tracked counter and Unity's actual state. Prefer using <see cref="BeginBatch"/> instead,
-        ///     which properly manages both the counter and Unity's state.
-        ///     This method exists primarily for testing the counter logic in isolation.
-        /// </remarks>
-        /// <returns><c>true</c> if this is the outermost (first) scope; otherwise, <c>false</c>.</returns>
-        internal static bool IncrementBatchDepth()
-        {
-            lock (Lock)
-            {
-                int previousDepth = _batchDepth;
-                ++_batchDepth;
-                return previousDepth == 0;
-            }
-        }
-
-        /// <summary>
         ///     Increments the batch depth counter and tracks that Unity APIs will be called.
         ///     This is used internally by <see cref="AssetDatabaseBatchScope"/> when it will
         ///     call <see cref="AssetDatabase.StartAssetEditing"/> and <see cref="AssetDatabase.DisallowAutoRefresh"/>.
@@ -669,28 +648,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     ++_actualUnityBatchDepth;
                 }
                 return isOutermost;
-            }
-        }
-
-        /// <summary>
-        ///     Decrements the batch depth counter and returns whether this was the outermost scope.
-        ///     This method ONLY decrements the counter - use <see cref="DecrementBatchDepthWithUnityCleanup"/>
-        ///     when Unity cleanup will be performed.
-        /// </summary>
-        /// <returns><c>true</c> if this was the outermost scope (depth is now 0); otherwise, <c>false</c>.</returns>
-        internal static bool DecrementBatchDepth()
-        {
-            lock (Lock)
-            {
-                _batchDepth--;
-
-                if (_batchDepth < 0)
-                {
-                    _batchDepth = 0;
-                    return false;
-                }
-
-                return _batchDepth == 0;
             }
         }
 

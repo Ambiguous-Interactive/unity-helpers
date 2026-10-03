@@ -20,6 +20,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         private const string HostViewTypeName = "UnityEditor.HostView";
         private const double PollIntervalSeconds = 0.25d;
 
+        internal static bool _cachedVisibility;
+
+        internal static double _nextPollTime;
+
         private static readonly Type ProjectBrowserType = Type.GetType(ProjectBrowserTypeName);
         private static readonly FieldInfo EditorWindowParentField = typeof(EditorWindow).GetField(
             "m_Parent",
@@ -33,10 +37,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
         );
 
-        private static bool? _visibilityOverride;
-        private static bool _cachedVisibility;
-        private static double _nextPollTime;
-
         static ProjectBrowserVisibilityUtility()
         {
             _cachedVisibility = EvaluateProjectBrowserVisibility();
@@ -44,37 +44,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             EditorApplication.update += HandleEditorApplicationUpdate;
         }
 
-        internal static void SetProjectBrowserVisibilityForTesting(bool? visible)
-        {
-            _visibilityOverride = visible;
-            if (visible.HasValue)
-            {
-                UpdateCachedVisibility(visible.Value);
-            }
-            else
-            {
-                ForceVisibilityPoll();
-            }
-        }
-
         internal static bool IsProjectBrowserVisible()
         {
-            if (_visibilityOverride.HasValue)
-            {
-                return _visibilityOverride.Value;
-            }
-
             return _cachedVisibility;
         }
 
         private static void HandleEditorApplicationUpdate()
         {
-            if (_visibilityOverride.HasValue)
-            {
-                UpdateCachedVisibility(_visibilityOverride.Value);
-                return;
-            }
-
             double time = EditorApplication.timeSinceStartup;
             if (time < _nextPollTime)
             {
@@ -84,11 +60,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             _nextPollTime = time + PollIntervalSeconds;
             bool visibility = EvaluateProjectBrowserVisibility();
             UpdateCachedVisibility(visibility);
-        }
-
-        private static void ForceVisibilityPoll()
-        {
-            _nextPollTime = 0d;
         }
 
         private static void UpdateCachedVisibility(bool newValue)

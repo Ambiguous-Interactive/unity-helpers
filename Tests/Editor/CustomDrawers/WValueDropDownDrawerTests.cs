@@ -261,30 +261,30 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PopupChromeIncludesFooterPadding()
         {
-            float chrome = WValueDropDownDrawer.TestHooks.CalculatePopupChromeHeight(
+            float chrome = WValueDropDownDrawerTestAccess.CalculatePopupChromeHeight(
                 includePagination: true
             );
             float searchHeight = EditorGUIUtility.singleLineHeight;
-            float paginationHeight = WValueDropDownDrawer.TestHooks.PaginationButtonHeight;
+            float paginationHeight = WValueDropDownDrawerTestAccess.PaginationButtonHeight;
             float footerHeight = chrome - (searchHeight + paginationHeight);
             float expectedFooterHeight =
                 EditorGUIUtility.standardVerticalSpacing
-                + WValueDropDownDrawer.TestHooks.OptionFooterPadding;
+                + WValueDropDownDrawerTestAccess.OptionFooterPadding;
             Assert.That(footerHeight, Is.EqualTo(expectedFooterHeight).Within(0.001f));
         }
 
         [Test]
         public void PopupChromeAddsPaginationHeightWhenRequired()
         {
-            float withPagination = WValueDropDownDrawer.TestHooks.CalculatePopupChromeHeight(
+            float withPagination = WValueDropDownDrawerTestAccess.CalculatePopupChromeHeight(
                 includePagination: true
             );
-            float withoutPagination = WValueDropDownDrawer.TestHooks.CalculatePopupChromeHeight(
+            float withoutPagination = WValueDropDownDrawerTestAccess.CalculatePopupChromeHeight(
                 includePagination: false
             );
             float difference = withPagination - withoutPagination;
             float expectedDifference =
-                WValueDropDownDrawer.TestHooks.PaginationButtonHeight
+                WValueDropDownDrawerTestAccess.PaginationButtonHeight
                 - EditorGUIUtility.standardVerticalSpacing;
             Assert.That(difference, Is.EqualTo(expectedDifference).Within(0.001f));
         }
@@ -293,12 +293,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void PopupTargetHeightAggregatesChromeAndRows()
         {
             const int pageSize = 10;
-            float chrome = WValueDropDownDrawer.TestHooks.CalculatePopupChromeHeight(
+            float chrome = WValueDropDownDrawerTestAccess.CalculatePopupChromeHeight(
                 includePagination: false
             );
-            float rowHeight = WValueDropDownDrawer.TestHooks.GetOptionRowHeight();
+            float rowHeight = WValueDropDownDrawerTestAccess.GetOptionRowHeight();
             float expected = chrome + (pageSize * rowHeight);
-            float actual = WValueDropDownDrawer.TestHooks.CalculatePopupTargetHeight(
+            float actual = WValueDropDownDrawerTestAccess.CalculatePopupTargetHeight(
                 pageSize,
                 includePagination: false
             );
@@ -308,12 +308,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PopupTargetHeightFitsSingleRowWithoutMinimumClamp()
         {
-            float chrome = WValueDropDownDrawer.TestHooks.CalculatePopupChromeHeight(
+            float chrome = WValueDropDownDrawerTestAccess.CalculatePopupChromeHeight(
                 includePagination: false
             );
-            float rowHeight = WValueDropDownDrawer.TestHooks.GetOptionRowHeight();
+            float rowHeight = WValueDropDownDrawerTestAccess.GetOptionRowHeight();
             float expected = chrome + rowHeight;
-            float actual = WValueDropDownDrawer.TestHooks.CalculatePopupTargetHeight(
+            float actual = WValueDropDownDrawerTestAccess.CalculatePopupTargetHeight(
                 1,
                 includePagination: false
             );
@@ -323,30 +323,30 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PopupTargetHeightScalesWithLargePageSizes()
         {
-            float twentyFiveRows = WValueDropDownDrawer.TestHooks.CalculatePopupTargetHeight(
+            float twentyFiveRows = WValueDropDownDrawerTestAccess.CalculatePopupTargetHeight(
                 25,
                 includePagination: true
             );
-            float fiftyRows = WValueDropDownDrawer.TestHooks.CalculatePopupTargetHeight(
+            float fiftyRows = WValueDropDownDrawerTestAccess.CalculatePopupTargetHeight(
                 50,
                 includePagination: true
             );
-            float rowHeight = WValueDropDownDrawer.TestHooks.GetOptionRowHeight();
+            float rowHeight = WValueDropDownDrawerTestAccess.GetOptionRowHeight();
             Assert.That(fiftyRows - twentyFiveRows, Is.EqualTo(25 * rowHeight).Within(0.001f));
         }
 
         [Test]
         public void PopupTargetHeightTreatsNonPositivePageSizesAsSingleRow()
         {
-            float baseline = WValueDropDownDrawer.TestHooks.CalculatePopupTargetHeight(
+            float baseline = WValueDropDownDrawerTestAccess.CalculatePopupTargetHeight(
                 1,
                 includePagination: false
             );
-            float zero = WValueDropDownDrawer.TestHooks.CalculatePopupTargetHeight(
+            float zero = WValueDropDownDrawerTestAccess.CalculatePopupTargetHeight(
                 0,
                 includePagination: false
             );
-            float negative = WValueDropDownDrawer.TestHooks.CalculatePopupTargetHeight(
+            float negative = WValueDropDownDrawerTestAccess.CalculatePopupTargetHeight(
                 -5,
                 includePagination: false
             );
@@ -357,36 +357,36 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void OptionRowHeightMatchesControlPlusEffectiveMargin()
         {
-            float control = WValueDropDownDrawer.TestHooks.GetOptionControlHeight();
-            int marginVertical = WValueDropDownDrawer.TestHooks.OptionButtonMarginVertical;
+            float control = WValueDropDownDrawerTestAccess.GetOptionControlHeight();
+            int marginVertical = WValueDropDownDrawerTestAccess.OptionButtonMarginVertical;
             float expected =
                 control + Mathf.Max(0f, marginVertical - EditorGUIUtility.standardVerticalSpacing);
-            float actual = WValueDropDownDrawer.TestHooks.GetOptionRowHeight();
+            float actual = WValueDropDownDrawerTestAccess.GetOptionRowHeight();
             Assert.That(actual, Is.EqualTo(expected).Within(0.001f));
         }
 
         [Test]
         public void EmptySearchHeightLeavesRoomForHelpBox()
         {
-            float emptyHeight = WValueDropDownDrawer.TestHooks.CalculateEmptySearchHeight();
+            float emptyHeight = WValueDropDownDrawerTestAccess.CalculateEmptySearchHeight();
             GUIStyle helpStyle = EditorStyles.helpBox;
             int helpMargin = helpStyle.margin?.horizontal ?? 0;
             float helpWidth =
-                WValueDropDownDrawer.TestHooks.PopupWidthValue
-                - WValueDropDownDrawer.TestHooks.EmptySearchHorizontalPaddingValue
+                WValueDropDownDrawerTestAccess.PopupWidthValue
+                - WValueDropDownDrawerTestAccess.EmptySearchHorizontalPaddingValue
                 - helpMargin;
             helpWidth = Mathf.Max(32f, helpWidth);
             float helpHeight =
                 helpStyle.CalcHeight(
-                    new GUIContent(WValueDropDownDrawer.TestHooks.EmptyResultsMessageValue),
+                    new GUIContent(WValueDropDownDrawerTestAccess.EmptyResultsMessageValue),
                     helpWidth
                 ) + (helpStyle.margin?.vertical ?? 0);
             float expected =
                 EditorGUIUtility.singleLineHeight
                 + (EditorGUIUtility.standardVerticalSpacing * 4f)
                 + helpHeight
-                + WValueDropDownDrawer.TestHooks.OptionFooterPadding
-                + WValueDropDownDrawer.TestHooks.EmptySearchExtraPaddingValue;
+                + WValueDropDownDrawerTestAccess.OptionFooterPadding
+                + WValueDropDownDrawerTestAccess.EmptySearchExtraPaddingValue;
             Assert.That(emptyHeight, Is.EqualTo(expected).Within(0.001f));
         }
 
@@ -395,7 +395,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             const float measuredHelpHeight = 42f;
             float emptyHeight =
-                WValueDropDownDrawer.TestHooks.CalculateEmptySearchHeightWithMeasurement(
+                WValueDropDownDrawerTestAccess.CalculateEmptySearchHeightWithMeasurement(
                     measuredHelpHeight
                 );
 
@@ -403,8 +403,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUIUtility.singleLineHeight
                 + (EditorGUIUtility.standardVerticalSpacing * 4f)
                 + measuredHelpHeight
-                + WValueDropDownDrawer.TestHooks.OptionFooterPadding
-                + WValueDropDownDrawer.TestHooks.EmptySearchExtraPaddingValue;
+                + WValueDropDownDrawerTestAccess.OptionFooterPadding
+                + WValueDropDownDrawerTestAccess.EmptySearchExtraPaddingValue;
 
             Assert.That(emptyHeight, Is.EqualTo(expected).Within(0.001f));
         }
@@ -432,7 +432,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int expectedRows
         )
         {
-            int rows = WValueDropDownDrawer.TestHooks.CalculateRowsOnPage(
+            int rows = WValueDropDownDrawerTestAccess.CalculateRowsOnPage(
                 filteredCount: filteredCount,
                 pageSize: pageSize,
                 currentPage: currentPage
@@ -608,7 +608,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.IsTrue(property != null, "Failed to locate selection property.");
 
-            int index = WValueDropDownDrawer.TestHooks.ResolveSelectedIndex(
+            int index = WValueDropDownDrawerTestAccess.ResolveSelectedIndex(
                 property,
                 typeof(int),
                 new object[] { 10, 20, 30 }
@@ -630,7 +630,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.IsTrue(property != null, "Failed to locate selection property.");
 
-            int index = WValueDropDownDrawer.TestHooks.ResolveSelectedIndex(
+            int index = WValueDropDownDrawerTestAccess.ResolveSelectedIndex(
                 property,
                 typeof(int),
                 new object[] { 10, 20, 30 }
@@ -701,12 +701,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             string label = useSharedFormatter
                 ? DropDownShared.FormatOption(selected)
-                : WValueDropDownDrawer.TestHooks.FormatOptionCached(selected);
+                : WValueDropDownDrawerTestAccess.FormatOptionCached(selected);
             Assert.IsTrue(asset.selectedObject == selected);
             Assert.IsTrue(property.objectReferenceValue == selected);
             Assert.AreEqual(
                 1,
-                WValueDropDownDrawer.TestHooks.ResolveSelectedIndex(
+                WValueDropDownDrawerTestAccess.ResolveSelectedIndex(
                     property,
                     typeof(UnityEngine.Object),
                     options
@@ -754,13 +754,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             string label = useSharedFormatter
                 ? DropDownShared.FormatOption(option)
-                : WValueDropDownDrawer.TestHooks.FormatOptionCached(option);
+                : WValueDropDownDrawerTestAccess.FormatOptionCached(option);
             Assert.AreEqual(option, label);
             Assert.AreEqual(option, property.stringValue);
             Assert.AreEqual(option, asset.selection);
             Assert.AreEqual(
                 1,
-                WValueDropDownDrawer.TestHooks.ResolveSelectedIndex(
+                WValueDropDownDrawerTestAccess.ResolveSelectedIndex(
                     property,
                     typeof(string),
                     new object[] { "Different", option }
@@ -772,7 +772,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void FormatOptionCachedReturnsTypeNameForEmptyToString()
         {
             EmptyToStringHelper instance = new();
-            string result = WValueDropDownDrawer.TestHooks.FormatOptionCached(instance);
+            string result = WValueDropDownDrawerTestAccess.FormatOptionCached(instance);
             Assert.That(result, Is.Not.Null.And.Not.Empty);
             Assert.That(result, Does.Contain(nameof(EmptyToStringHelper)));
         }
@@ -781,14 +781,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void FormatOptionCachedReturnsNonEmptyForNullToString()
         {
             NullToStringHelper instance = new();
-            string result = WValueDropDownDrawer.TestHooks.FormatOptionCached(instance);
+            string result = WValueDropDownDrawerTestAccess.FormatOptionCached(instance);
             Assert.That(result, Is.Not.Null.And.Not.Empty);
         }
 
         [Test]
         public void FormatOptionCachedHandlesNullOption()
         {
-            string result = WValueDropDownDrawer.TestHooks.FormatOptionCached(null);
+            string result = WValueDropDownDrawerTestAccess.FormatOptionCached(null);
             Assert.That(result, Is.EqualTo("(null)"));
         }
 
@@ -796,7 +796,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [TestCaseSource(nameof(FormatOptionCachedNeverReturnsEmptyStringData))]
         public void FormatOptionCachedNeverReturnsEmptyString(object input)
         {
-            string result = WValueDropDownDrawer.TestHooks.FormatOptionCached(input);
+            string result = WValueDropDownDrawerTestAccess.FormatOptionCached(input);
             Assert.That(result, Is.Not.Null.And.Not.Empty);
         }
 
@@ -804,7 +804,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void BuildDisplayLabelsProducesNoEmptyStrings()
         {
             object[] options = new object[] { 42, null };
-            string[] labels = WValueDropDownDrawer.TestHooks.BuildDisplayLabelsUncached(options);
+            string[] labels = WValueDropDownDrawerTestAccess.BuildDisplayLabelsUncached(options);
             Assert.That(labels.Length, Is.EqualTo(options.Length));
             foreach (string label in labels)
             {
@@ -822,7 +822,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 42,
                 null,
             };
-            string[] labels = WValueDropDownDrawer.TestHooks.BuildDisplayLabelsUncached(options);
+            string[] labels = WValueDropDownDrawerTestAccess.BuildDisplayLabelsUncached(options);
             Assert.That(labels.Length, Is.EqualTo(options.Length));
             foreach (string label in labels)
             {
@@ -844,7 +844,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.IsTrue(property != null, "Failed to locate string selection property.");
 
-            int rawIndex = WValueDropDownDrawer.TestHooks.ResolveSelectedIndex(
+            int rawIndex = WValueDropDownDrawerTestAccess.ResolveSelectedIndex(
                 property,
                 typeof(string),
                 new object[] { "Alpha", "Beta", "Gamma" }

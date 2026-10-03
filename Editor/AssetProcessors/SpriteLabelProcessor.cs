@@ -13,42 +13,26 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
     public sealed class SpriteLabelProcessor : AssetPostprocessor
     {
-        internal static int PendingImportedPathCountForTesting
-        {
-            get { return PendingImportedPaths.Count; }
-        }
-
-        private static readonly HashSet<string> PendingImportedPaths = new(
+        internal static readonly HashSet<string> PendingImportedPaths = new(
             StringComparer.OrdinalIgnoreCase
         );
         private static readonly Action DrainAction = DrainPendingImports;
 
-        internal static string[] SnapshotPendingImportedPathsForTesting()
+        internal static bool IsCandidatePath(string path)
         {
-            string[] snapshot = new string[PendingImportedPaths.Count];
-            PendingImportedPaths.CopyTo(snapshot);
-            return snapshot;
-        }
-
-        internal static void EnqueueImportedPathsForTesting(string[] importedAssets)
-        {
-            if (importedAssets == null || importedAssets.Length == 0)
+            if (string.IsNullOrEmpty(path))
             {
-                return;
+                return false;
             }
 
-            foreach (string path in importedAssets)
+            if (!path.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
             {
-                if (IsCandidatePath(path))
-                {
-                    PendingImportedPaths.Add(path);
-                }
+                return false;
             }
-        }
 
-        internal static void ResetForTesting()
-        {
-            PendingImportedPaths.Clear();
+            return path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void OnPostprocessAllAssets(
@@ -84,23 +68,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
 
             AssetPostprocessorDeferral.Schedule(DrainAction);
-        }
-
-        private static bool IsCandidatePath(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return false;
-            }
-
-            if (!path.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            return path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
-                || path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
-                || path.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void DrainPendingImports()

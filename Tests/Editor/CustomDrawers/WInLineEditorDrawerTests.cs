@@ -39,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         ) PrepareInlineEditorTestContext<THost>(bool propertyExpanded, bool? setInlineExpanded)
             where THost : ScriptableObject
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
             THost host = Track(ScriptableObject.CreateInstance<THost>());
             host.hideFlags = HideFlags.HideAndDontSave;
 
@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             property.isExpanded = propertyExpanded;
             if (setInlineExpanded.HasValue)
             {
-                WInLineEditorDrawer.SetInlineFoldoutStateForTesting(
+                WInLineEditorDrawerTestAccess.SetInlineFoldoutState(
                     property,
                     setInlineExpanded.Value
                 );
@@ -166,14 +166,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                     bool showHeader,
                     bool showBody,
                     float displayHeight
-                ) details = WInLineEditorDrawer.GetHeightCalculationDetailsForTesting(
+                ) details = WInLineEditorDrawerTestAccess.GetHeightCalculationDetails(
                     property,
                     inlineAttribute,
                     target,
                     500f
                 );
 
-                string diagnostics = WInLineEditorDrawer.GetExtensiveDiagnosticsForTesting(
+                string diagnostics = WInLineEditorDrawerTestAccess.GetExtensiveDiagnostics(
                     property,
                     inlineAttribute,
                     target,
@@ -193,8 +193,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             _originalTweenEnabled = settings.InlineEditorFoldoutTweenEnabled;
             _originalTweenSpeed = settings.InlineEditorFoldoutSpeed;
 
-            WInLineEditorDrawer.ClearCachedStateForTesting();
-            WInLineEditorDrawer.ClearAnimationCacheForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
+            WInLineEditorDrawerTestAccess.ClearAnimationCache();
         }
 
         [TearDown]
@@ -204,8 +204,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             settings.InlineEditorFoldoutTweenEnabled = _originalTweenEnabled;
             settings.InlineEditorFoldoutSpeed = _originalTweenSpeed;
 
-            WInLineEditorDrawer.ClearCachedStateForTesting();
-            WInLineEditorDrawer.ClearAnimationCacheForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
+            WInLineEditorDrawerTestAccess.ClearAnimationCache();
             base.TearDown();
         }
 
@@ -562,30 +562,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void PingButtonsDisabledWhenProjectBrowserHidden()
         {
+            bool originalVisibility = ProjectBrowserVisibilityUtility._cachedVisibility;
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
             try
             {
-                ProjectBrowserVisibilityUtility.SetProjectBrowserVisibilityForTesting(false);
+                ProjectBrowserVisibilityUtility._cachedVisibility = false;
                 Assert.That(WInLineEditorDrawer.ShouldShowPingButton(target), Is.False);
             }
             finally
             {
-                ProjectBrowserVisibilityUtility.SetProjectBrowserVisibilityForTesting(null);
+                ProjectBrowserVisibilityUtility._cachedVisibility = originalVisibility;
             }
         }
 
         [Test]
         public void PingButtonsEnabledWhenProjectBrowserVisible()
         {
+            bool originalVisibility = ProjectBrowserVisibilityUtility._cachedVisibility;
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
             try
             {
-                ProjectBrowserVisibilityUtility.SetProjectBrowserVisibilityForTesting(true);
+                ProjectBrowserVisibilityUtility._cachedVisibility = true;
                 Assert.That(WInLineEditorDrawer.ShouldShowPingButton(target), Is.True);
             }
             finally
             {
-                ProjectBrowserVisibilityUtility.SetProjectBrowserVisibilityForTesting(null);
+                ProjectBrowserVisibilityUtility._cachedVisibility = originalVisibility;
             }
         }
 
@@ -594,7 +596,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             SimpleInlineEditorTarget target = CreateHiddenInstance<SimpleInlineEditorTarget>();
             using SerializedObject serializedObject = new(target);
-            bool hasOnlySimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(
+            bool hasOnlySimple = WInLineEditorDrawer.SerializedObjectHasOnlySimpleProperties(
                 serializedObject
             );
             Assert.That(
@@ -609,7 +611,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             ArrayInlineEditorTarget target = CreateHiddenInstance<ArrayInlineEditorTarget>();
             using SerializedObject serializedObject = new(target);
-            bool hasOnlySimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(
+            bool hasOnlySimple = WInLineEditorDrawer.SerializedObjectHasOnlySimpleProperties(
                 serializedObject
             );
             Assert.That(
@@ -664,7 +666,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             target.hideFlags = HideFlags.HideAndDontSave;
 
             using SerializedObject serializedObject = new(target);
-            bool hasOnlySimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(
+            bool hasOnlySimple = WInLineEditorDrawer.SerializedObjectHasOnlySimpleProperties(
                 serializedObject
             );
             Assert.That(
@@ -747,7 +749,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             bool expectedNeedsScroll
         )
         {
-            bool needsScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
+            bool needsScroll = WInLineEditorDrawerTestAccess.RequiresHorizontalScrollbar(
                 enableScrolling,
                 minInspectorWidth,
                 hasExplicitMinInspectorWidth,
@@ -769,12 +771,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             SimpleInlineEditorTarget target = CreateHiddenInstance<SimpleInlineEditorTarget>();
 
             using SerializedObject serializedObject = new(target);
-            bool isSimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(serializedObject);
+            bool isSimple = WInLineEditorDrawer.SerializedObjectHasOnlySimpleProperties(
+                serializedObject
+            );
 
             if (isSimple)
             {
                 WInLineEditorAttribute inlineAttribute = new();
-                bool usesScrollbar = WInLineEditorDrawer.UsesHorizontalScrollbarForTesting(
+                bool usesScrollbar = WInLineEditorDrawerTestAccess.UsesHorizontalScrollbar(
                     target,
                     inlineAttribute,
                     availableWidth: 360f
@@ -788,7 +792,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             else
             {
                 // Detection can fail from editor integration, so check the logic with known-good inputs.
-                bool wouldNeedScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
+                bool wouldNeedScroll = WInLineEditorDrawerTestAccess.RequiresHorizontalScrollbar(
                     enableScrolling: true,
                     minInspectorWidth: 520f,
                     hasExplicitMinInspectorWidth: false,
@@ -813,12 +817,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             ArrayInlineEditorTarget target = CreateHiddenInstance<ArrayInlineEditorTarget>();
 
             using SerializedObject serializedObject = new(target);
-            bool isSimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(serializedObject);
+            bool isSimple = WInLineEditorDrawer.SerializedObjectHasOnlySimpleProperties(
+                serializedObject
+            );
 
             Assert.That(isSimple, Is.False, "Array target should be detected as complex");
 
             WInLineEditorAttribute inlineAttribute = new();
-            bool usesScrollbar = WInLineEditorDrawer.UsesHorizontalScrollbarForTesting(
+            bool usesScrollbar = WInLineEditorDrawerTestAccess.UsesHorizontalScrollbar(
                 target,
                 inlineAttribute,
                 availableWidth: 360f
@@ -833,7 +839,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void ExplicitMinWidthOverridesSimpleTargetHeuristic()
         {
-            bool needsScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
+            bool needsScroll = WInLineEditorDrawerTestAccess.RequiresHorizontalScrollbar(
                 enableScrolling: true,
                 minInspectorWidth: 720f,
                 hasExplicitMinInspectorWidth: true,
@@ -867,7 +873,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         public void InlineInspectorContentRectAppliesPadding()
         {
             Rect outer = new(10f, 20f, 200f, 100f);
-            Rect content = WInLineEditorDrawer.GetInlineContentRectForTesting(outer);
+            Rect content = WInLineEditorDrawer.GetInlineContentRect(outer);
             Assert.That(content.x, Is.EqualTo(outer.x + 2f));
             Assert.That(content.y, Is.EqualTo(outer.y + 2f));
             Assert.That(content.width, Is.EqualTo(outer.width - 4f));
@@ -878,7 +884,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         public void InlineInspectorContentRectClampsHeightToZero()
         {
             Rect outer = new(0f, 0f, 4f, 3f);
-            Rect content = WInLineEditorDrawer.GetInlineContentRectForTesting(outer);
+            Rect content = WInLineEditorDrawer.GetInlineContentRect(outer);
             Assert.That(content.height, Is.EqualTo(0f));
         }
 
@@ -889,7 +895,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void HorizontalScrollbarCalculationHandlesOutsideGUIContext()
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             Assert.DoesNotThrow(
                 () =>
@@ -919,7 +925,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         )
         {
             Rect outer = new(outerX, outerY, outerWidth, outerHeight);
-            Rect content = WInLineEditorDrawer.GetInlineContentRectForTesting(outer);
+            Rect content = WInLineEditorDrawer.GetInlineContentRect(outer);
             Assert.That(content.x, Is.EqualTo(expectedX).Within(0.01f), "Content X mismatch");
             Assert.That(content.y, Is.EqualTo(expectedY).Within(0.01f), "Content Y mismatch");
             Assert.That(
@@ -937,7 +943,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void NullTargetReturnsBaseHeight()
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
             InlineEditorHost host = CreateHiddenInstance<InlineEditorHost>();
 
             using SerializedObject serializedHost = new(host);
@@ -981,7 +987,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void HeightDoesNotDoubleFromRecursion()
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             float collapsedHeight = MeasurePropertyHeight<InlineEditorHost>(
                 propertyExpanded: false,
@@ -1034,7 +1040,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         )]
         public void ExplicitModeInitialFoldoutState(WInLineEditorMode mode, bool expectExpanded)
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             ExplicitModeTestHost host = CreateHiddenInstance<ExplicitModeTestHost>();
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
@@ -1077,7 +1083,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 bool showHeader,
                 bool showBody,
                 float displayHeight
-            ) details = WInLineEditorDrawer.GetHeightCalculationDetailsForTesting(
+            ) details = WInLineEditorDrawerTestAccess.GetHeightCalculationDetails(
                 property,
                 inlineAttribute,
                 target,
@@ -1096,7 +1102,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             // The serialized inspector path is what avoids the 50% width defect.
             Assert.That(
-                WInLineEditorDrawer.ForceSerializedInspectorForTesting,
+                WInLineEditorDrawerTestAccess.ForceSerializedInspector,
                 Is.True,
                 "ForceSerializedInspector should be true by default to avoid width issues"
             );
@@ -1108,7 +1114,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             const float availableWidth = 400f;
             const float expectedLabelWidth = 160f;
 
-            float calculatedLabelWidth = WInLineEditorDrawer.CalculateLabelWidthForTesting(
+            float calculatedLabelWidth = WInLineEditorDrawerTestAccess.CalculateLabelWidth(
                 availableWidth
             );
 
@@ -1125,7 +1131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [TestCase(100f, 40f, TestName = "LabelWidth.100px.Returns40")]
         public void LabelWidthCalculationDataDriven(float availableWidth, float expectedLabelWidth)
         {
-            float calculatedLabelWidth = WInLineEditorDrawer.CalculateLabelWidthForTesting(
+            float calculatedLabelWidth = WInLineEditorDrawerTestAccess.CalculateLabelWidth(
                 availableWidth
             );
 
@@ -1152,7 +1158,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             bool expectedNeedsScroll
         )
         {
-            bool needsScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
+            bool needsScroll = WInLineEditorDrawerTestAccess.RequiresHorizontalScrollbar(
                 enableScrolling: true,
                 minInspectorWidth: 520f,
                 hasExplicitMinInspectorWidth: false,
@@ -1179,11 +1185,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             SimpleInlineEditorTarget target = CreateHiddenInstance<SimpleInlineEditorTarget>();
 
             using SerializedObject serializedObject = new(target);
-            bool isSimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(serializedObject);
+            bool isSimple = WInLineEditorDrawer.SerializedObjectHasOnlySimpleProperties(
+                serializedObject
+            );
             Assert.That(isSimple, Is.True, "SimpleInlineEditorTarget should be detected as simple");
 
             WInLineEditorAttribute inlineAttribute = new();
-            bool usesScrollbar = WInLineEditorDrawer.UsesHorizontalScrollbarForTesting(
+            bool usesScrollbar = WInLineEditorDrawerTestAccess.UsesHorizontalScrollbar(
                 target,
                 inlineAttribute,
                 availableWidth: 150f
@@ -1201,11 +1209,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             SimpleInlineEditorTarget target = CreateHiddenInstance<SimpleInlineEditorTarget>();
             using SerializedObject serializedObject = new(target);
-            bool isSimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(serializedObject);
+            bool isSimple = WInLineEditorDrawer.SerializedObjectHasOnlySimpleProperties(
+                serializedObject
+            );
             Assert.That(isSimple, Is.True, "SimpleInlineEditorTarget should be detected as simple");
 
             WInLineEditorAttribute inlineAttribute = new();
-            bool usesScrollbar = WInLineEditorDrawer.UsesHorizontalScrollbarForTesting(
+            bool usesScrollbar = WInLineEditorDrawerTestAccess.UsesHorizontalScrollbar(
                 target,
                 inlineAttribute,
                 availableWidth: 360f
@@ -1236,7 +1246,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                     + $"manual calc says needsScroll={expectedBasedOnThreshold}, but expectedNeedsScroll={expectedNeedsScroll}"
             );
 
-            bool needsScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
+            bool needsScroll = WInLineEditorDrawerTestAccess.RequiresHorizontalScrollbar(
                 enableScrolling: true,
                 minInspectorWidth: 520f,
                 hasExplicitMinInspectorWidth: false,
@@ -1262,7 +1272,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             float thresholdAvailableWidth =
                 ExpectedMinimumUsableWidth + (ExpectedContentPadding * 2f);
 
-            bool needsScrollAtThreshold = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
+            bool needsScrollAtThreshold = WInLineEditorDrawerTestAccess.RequiresHorizontalScrollbar(
                 enableScrolling: true,
                 minInspectorWidth: 520f,
                 hasExplicitMinInspectorWidth: false,
@@ -1279,7 +1289,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
 
             bool needsScrollBelowThreshold =
-                WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
+                WInLineEditorDrawerTestAccess.RequiresHorizontalScrollbar(
                     enableScrolling: true,
                     minInspectorWidth: 520f,
                     hasExplicitMinInspectorWidth: false,
@@ -1298,7 +1308,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeShowsObjectPickerInsteadOfFullObjectField()
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             CompactInlineEditorHost host = CreateHiddenInstance<CompactInlineEditorHost>();
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
@@ -1413,7 +1423,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeWithNullTargetReturnsBaseHeight()
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             CompactInlineEditorHost host = CreateHiddenInstance<CompactInlineEditorHost>();
             using SerializedObject serializedHost = new(host);
@@ -1469,7 +1479,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             bool expectExpanded
         )
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             CompactModeTestHost host = CreateHiddenInstance<CompactModeTestHost>();
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
@@ -1512,7 +1522,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 bool showHeader,
                 bool showBody,
                 float displayHeight
-            ) details = WInLineEditorDrawer.GetHeightCalculationDetailsForTesting(
+            ) details = WInLineEditorDrawerTestAccess.GetHeightCalculationDetails(
                 property,
                 inlineAttribute,
                 target,
@@ -1529,7 +1539,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeWithCustomHeightRespectsHeight()
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             CompactCustomHeightHost host = CreateHiddenInstance<CompactCustomHeightHost>();
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
@@ -1660,7 +1670,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 bool showHeader,
                 bool showBody,
                 float displayHeight
-            ) details = WInLineEditorDrawer.GetHeightCalculationDetailsForTesting(
+            ) details = WInLineEditorDrawerTestAccess.GetHeightCalculationDetails(
                 property,
                 inlineAttribute,
                 target,
@@ -1721,7 +1731,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeWithPreviewShowsPreview()
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             CompactCustomHeightHost host = CreateHiddenInstance<CompactCustomHeightHost>();
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
@@ -1765,7 +1775,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeNoScrollRespectsScrollSetting()
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             CompactCustomHeightHost host = CreateHiddenInstance<CompactCustomHeightHost>();
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
@@ -1798,7 +1808,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 "DrawObjectField should be false for compact mode"
             );
 
-            bool usesScrollbar = WInLineEditorDrawer.UsesHorizontalScrollbarForTesting(
+            bool usesScrollbar = WInLineEditorDrawerTestAccess.UsesHorizontalScrollbar(
                 target,
                 inlineAttribute,
                 availableWidth: 200f
@@ -1814,7 +1824,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [TestCase(true, false, TestName = "CompactFoldoutToggle.ExpandedToCollapsed")]
         public void CompactModeFoldoutToggleChangesHeight(bool initialState, bool finalState)
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             float initialHeight = MeasurePropertyHeight<CompactInlineEditorHost>(
                 propertyExpanded: false,
@@ -1875,7 +1885,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactAlwaysExpandedWithHeaderShowsHeaderAndBody()
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             CompactModeTestHost host = CreateHiddenInstance<CompactModeTestHost>();
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
@@ -1905,7 +1915,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 bool showHeader,
                 bool showBody,
                 float displayHeight
-            ) details = WInLineEditorDrawer.GetHeightCalculationDetailsForTesting(
+            ) details = WInLineEditorDrawerTestAccess.GetHeightCalculationDetails(
                 property,
                 inlineAttribute,
                 target,
@@ -1923,7 +1933,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void BaseHeightIsConsistentAcrossDrawerCalls()
         {
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             InlineEditorHost host = CreateHiddenInstance<InlineEditorHost>();
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
@@ -1945,7 +1955,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             WInLineEditorAttribute inlineAttribute = (WInLineEditorAttribute)
                 Attribute.GetCustomAttribute(targetField, typeof(WInLineEditorAttribute));
 
-            WInLineEditorDrawer.SetInlineFoldoutStateForTesting(property, false);
+            WInLineEditorDrawerTestAccess.SetInlineFoldoutState(property, false);
 
             GUIContent label = new("Target");
             WInLineEditorDrawer drawer = new();
@@ -1967,15 +1977,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             const string foldoutKey = "TestKey_NewAnimation";
 
             Assert.That(
-                WInLineEditorDrawer.GetAnimationCacheCountForTesting(),
+                WInLineEditorDrawerTestAccess.GetAnimationCacheCount(),
                 Is.EqualTo(0),
                 "Animation cache should be empty at start."
             );
 
-            AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
-                foldoutKey,
-                expanded: true
-            );
+            AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnim(foldoutKey, expanded: true);
 
             Assert.That(
                 anim,
@@ -1983,12 +1990,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 "GetOrCreateFoldoutAnim should return a non-null AnimBool."
             );
             Assert.That(
-                WInLineEditorDrawer.GetAnimationCacheCountForTesting(),
+                WInLineEditorDrawerTestAccess.GetAnimationCacheCount(),
                 Is.EqualTo(1),
                 "Animation cache should contain one entry after creation."
             );
             Assert.That(
-                WInLineEditorDrawer.HasAnimationCacheEntryForTesting(foldoutKey),
+                WInLineEditorDrawerTestAccess.HasAnimationCacheEntry(foldoutKey),
                 Is.True,
                 "Animation cache should have an entry for the specified key."
             );
@@ -1999,11 +2006,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             const string foldoutKey = "TestKey_SameInstance";
 
-            AnimBool first = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
-                foldoutKey,
-                expanded: true
-            );
-            AnimBool second = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
+            AnimBool first = WInLineEditorDrawer.GetOrCreateFoldoutAnim(foldoutKey, expanded: true);
+            AnimBool second = WInLineEditorDrawer.GetOrCreateFoldoutAnim(
                 foldoutKey,
                 expanded: true
             );
@@ -2014,7 +2018,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 "GetOrCreateFoldoutAnim should return the same AnimBool instance for the same key."
             );
             Assert.That(
-                WInLineEditorDrawer.GetAnimationCacheCountForTesting(),
+                WInLineEditorDrawerTestAccess.GetAnimationCacheCount(),
                 Is.EqualTo(1),
                 "Animation cache should still contain only one entry."
             );
@@ -2026,11 +2030,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             const string foldoutKey1 = "TestKey_First";
             const string foldoutKey2 = "TestKey_Second";
 
-            AnimBool first = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
+            AnimBool first = WInLineEditorDrawer.GetOrCreateFoldoutAnim(
                 foldoutKey1,
                 expanded: true
             );
-            AnimBool second = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
+            AnimBool second = WInLineEditorDrawer.GetOrCreateFoldoutAnim(
                 foldoutKey2,
                 expanded: true
             );
@@ -2041,7 +2045,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 "GetOrCreateFoldoutAnim should return different AnimBool instances for different keys."
             );
             Assert.That(
-                WInLineEditorDrawer.GetAnimationCacheCountForTesting(),
+                WInLineEditorDrawerTestAccess.GetAnimationCacheCount(),
                 Is.EqualTo(2),
                 "Animation cache should contain two entries."
             );
@@ -2052,16 +2056,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             const string foldoutKey = "TestKey_TargetUpdate";
 
-            AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
-                foldoutKey,
-                expanded: true
-            );
+            AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnim(foldoutKey, expanded: true);
             Assert.IsTrue(anim.target, "Initial target should be true when expanded is true.");
 
-            WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(foldoutKey, expanded: false);
+            WInLineEditorDrawer.GetOrCreateFoldoutAnim(foldoutKey, expanded: false);
             Assert.IsFalse(anim.target, "Target should update to false when expanded changes.");
 
-            WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(foldoutKey, expanded: true);
+            WInLineEditorDrawer.GetOrCreateFoldoutAnim(foldoutKey, expanded: true);
             Assert.IsTrue(anim.target, "Target should update back to true.");
         }
 
@@ -2072,14 +2073,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             const string foldoutKey = "TestKey_SpeedCheck";
 
             settings.InlineEditorFoldoutSpeed = 8f;
-            AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
-                foldoutKey,
-                expanded: true
-            );
+            AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnim(foldoutKey, expanded: true);
             Assert.That(anim.speed, Is.EqualTo(8f), "AnimBool speed should match settings value.");
 
             settings.InlineEditorFoldoutSpeed = 4f;
-            WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(foldoutKey, expanded: true);
+            WInLineEditorDrawer.GetOrCreateFoldoutAnim(foldoutKey, expanded: true);
             Assert.That(
                 anim.speed,
                 Is.EqualTo(4f),
@@ -2095,7 +2093,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             const string foldoutKey = "TestKey_ImmediateProgress";
 
-            float expandedProgress = WInLineEditorDrawer.GetFadeProgressForTesting(
+            float expandedProgress = WInLineEditorDrawer.GetFadeProgress(
                 foldoutKey,
                 expanded: true
             );
@@ -2105,7 +2103,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 "When tweening disabled, expanded=true should return 1f immediately."
             );
 
-            float collapsedProgress = WInLineEditorDrawer.GetFadeProgressForTesting(
+            float collapsedProgress = WInLineEditorDrawer.GetFadeProgress(
                 foldoutKey,
                 expanded: false
             );
@@ -2125,18 +2123,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             const string foldoutKey = "TestKey_AnimatedProgress";
 
-            AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
-                foldoutKey,
-                expanded: false
-            );
+            AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnim(foldoutKey, expanded: false);
             anim.value = false;
 
             anim.target = true;
 
-            float progress = WInLineEditorDrawer.GetFadeProgressForTesting(
-                foldoutKey,
-                expanded: true
-            );
+            float progress = WInLineEditorDrawer.GetFadeProgress(foldoutKey, expanded: true);
 
             Assert.That(
                 progress,
@@ -2154,18 +2146,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             const string foldoutKey = "TestKey_CreateOnProgress";
 
             Assert.That(
-                WInLineEditorDrawer.HasAnimationCacheEntryForTesting(foldoutKey),
+                WInLineEditorDrawerTestAccess.HasAnimationCacheEntry(foldoutKey),
                 Is.False,
                 "Animation cache should not have entry before GetFadeProgress call."
             );
 
-            float progress = WInLineEditorDrawer.GetFadeProgressForTesting(
-                foldoutKey,
-                expanded: true
-            );
+            float progress = WInLineEditorDrawer.GetFadeProgress(foldoutKey, expanded: true);
 
             Assert.That(
-                WInLineEditorDrawer.HasAnimationCacheEntryForTesting(foldoutKey),
+                WInLineEditorDrawerTestAccess.HasAnimationCacheEntry(foldoutKey),
                 Is.True,
                 "GetFadeProgress should create AnimBool entry when tweening is enabled."
             );
@@ -2181,18 +2170,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             const string foldoutKey = "TestKey_NoCreateOnDisabled";
 
             Assert.That(
-                WInLineEditorDrawer.HasAnimationCacheEntryForTesting(foldoutKey),
+                WInLineEditorDrawerTestAccess.HasAnimationCacheEntry(foldoutKey),
                 Is.False,
                 "Animation cache should not have entry before GetFadeProgress call."
             );
 
-            float progress = WInLineEditorDrawer.GetFadeProgressForTesting(
-                foldoutKey,
-                expanded: true
-            );
+            float progress = WInLineEditorDrawer.GetFadeProgress(foldoutKey, expanded: true);
 
             Assert.That(
-                WInLineEditorDrawer.HasAnimationCacheEntryForTesting(foldoutKey),
+                WInLineEditorDrawerTestAccess.HasAnimationCacheEntry(foldoutKey),
                 Is.False,
                 "GetFadeProgress should not create AnimBool when tweening is disabled."
             );
@@ -2209,34 +2195,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             const string foldoutKey1 = "TestKey_ClearCache1";
             const string foldoutKey2 = "TestKey_ClearCache2";
 
-            AnimBool anim1Before = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
+            AnimBool anim1Before = WInLineEditorDrawer.GetOrCreateFoldoutAnim(
                 foldoutKey1,
                 expanded: true
             );
-            AnimBool anim2Before = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
+            AnimBool anim2Before = WInLineEditorDrawer.GetOrCreateFoldoutAnim(
                 foldoutKey2,
                 expanded: false
             );
 
             Assert.That(
-                WInLineEditorDrawer.GetAnimationCacheCountForTesting(),
+                WInLineEditorDrawerTestAccess.GetAnimationCacheCount(),
                 Is.EqualTo(2),
                 "Should have 2 cache entries before clearing."
             );
 
-            WInLineEditorDrawer.ClearAnimationCacheForTesting();
+            WInLineEditorDrawerTestAccess.ClearAnimationCache();
 
             Assert.That(
-                WInLineEditorDrawer.GetAnimationCacheCountForTesting(),
+                WInLineEditorDrawerTestAccess.GetAnimationCacheCount(),
                 Is.EqualTo(0),
                 "Animation cache should be empty after clearing."
             );
 
-            AnimBool anim1After = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
+            AnimBool anim1After = WInLineEditorDrawer.GetOrCreateFoldoutAnim(
                 foldoutKey1,
                 expanded: true
             );
-            AnimBool anim2After = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
+            AnimBool anim2After = WInLineEditorDrawer.GetOrCreateFoldoutAnim(
                 foldoutKey2,
                 expanded: false
             );
@@ -2256,12 +2242,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void ClearAnimationCacheCanBeCalledMultipleTimes()
         {
-            WInLineEditorDrawer.ClearAnimationCacheForTesting();
-            WInLineEditorDrawer.ClearAnimationCacheForTesting();
-            WInLineEditorDrawer.ClearAnimationCacheForTesting();
+            WInLineEditorDrawerTestAccess.ClearAnimationCache();
+            WInLineEditorDrawerTestAccess.ClearAnimationCache();
+            WInLineEditorDrawerTestAccess.ClearAnimationCache();
 
             Assert.That(
-                WInLineEditorDrawer.GetAnimationCacheCountForTesting(),
+                WInLineEditorDrawerTestAccess.GetAnimationCacheCount(),
                 Is.EqualTo(0),
                 "Clearing an already empty cache should not cause errors."
             );
@@ -2277,10 +2263,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             settings.InlineEditorFoldoutSpeed = expectedSpeed;
 
             string foldoutKey = $"TestKey_Speed_{expectedSpeed}";
-            AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
-                foldoutKey,
-                expanded: true
-            );
+            AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnim(foldoutKey, expanded: true);
 
             Assert.That(
                 anim.speed,
@@ -2333,8 +2316,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             settings.InlineEditorFoldoutTweenEnabled = true;
 
-            WInLineEditorDrawer.ClearAnimationCacheForTesting();
-            WInLineEditorDrawer.ClearCachedStateForTesting();
+            WInLineEditorDrawerTestAccess.ClearAnimationCache();
+            WInLineEditorDrawerTestAccess.ClearCachedState();
 
             float expandedHeightWithTween = MeasurePropertyHeight<InlineEditorHost>(
                 propertyExpanded: false,
@@ -2356,14 +2339,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             const string foldoutKey = "TestKey_ConsistentProgress";
 
-            float progress1 = WInLineEditorDrawer.GetFadeProgressForTesting(
-                foldoutKey,
-                expanded: true
-            );
-            float progress2 = WInLineEditorDrawer.GetFadeProgressForTesting(
-                foldoutKey,
-                expanded: true
-            );
+            float progress1 = WInLineEditorDrawer.GetFadeProgress(foldoutKey, expanded: true);
+            float progress2 = WInLineEditorDrawer.GetFadeProgress(foldoutKey, expanded: true);
 
             // Progress values should be equal or nearly equal (animation may have progressed slightly)
             Assert.That(

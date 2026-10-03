@@ -51,7 +51,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
                 new[] { relationalMetadata },
                 System.Array.Empty<AttributeMetadataCache.AutoLoadSingletonEntry>()
             );
-            cache.ForceRebuildForTests();
+            global::WallstopStudios.UnityHelpers.Tests.Core.AttributeMetadataCacheTestUtilities.Rebuild(
+                cache
+            );
             yield return null;
 #endif
 

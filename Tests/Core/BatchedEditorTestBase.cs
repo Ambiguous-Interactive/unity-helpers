@@ -74,7 +74,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 finally
                 {
                     // Flush deletes before the next fixture can observe stale handler state, even if base teardown throws.
-                    AssetPostprocessorDeferral.FlushForTesting();
+                    EditorStateTestUtilities.FlushDeferredAssetActions();
                 }
             }
         }

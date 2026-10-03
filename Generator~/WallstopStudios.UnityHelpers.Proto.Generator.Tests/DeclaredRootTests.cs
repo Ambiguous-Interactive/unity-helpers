@@ -107,7 +107,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(WProtoFacade.TryDeserialize(bytes, out IIncludeThing restored));
 
             IncludeGamma gamma = restored as IncludeGamma;
-            Assert.IsNotNull(gamma, "the subtype must survive a round trip through the interface");
+            Assert.IsTrue(
+                gamma != null,
+                "the subtype must survive a round trip through the interface"
+            );
             Assert.AreEqual(4, gamma.Id);
             Assert.AreEqual("z", gamma.Label);
             Assert.AreEqual(1.5, gamma.BetaOnly);
@@ -126,7 +129,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 WProtoFacade.TryDeserialize(stream.ToArray(), out IIncludeThing restored)
             );
             IncludeGamma gamma = restored as IncludeGamma;
-            Assert.IsNotNull(gamma);
+            Assert.IsTrue(gamma != null);
             Assert.AreEqual(9, gamma.Id);
             Assert.AreEqual(4.5, gamma.BetaOnly);
         }
@@ -137,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             IIncludeThing foreign = new ForeignThing { Value = 3 };
 
             Assert.IsFalse(WProtoFacade.TrySerialize(foreign, out byte[] bytes));
-            Assert.IsNull(bytes);
+            Assert.IsTrue(bytes == null);
 
             byte[] buffer = new byte[8];
             byte[] original = buffer;
@@ -236,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             finally
             {
-                WProtoDeclaredRootProvider.Unregister<IUnformatted>();
+                WProtoDeclaredRootProvider.Formatters<IUnformatted>.Value = null;
             }
         }
 
@@ -255,7 +258,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             finally
             {
-                WProtoDeclaredRootProvider.Unregister<IUnformatted>();
+                WProtoDeclaredRootProvider.Formatters<IUnformatted>.Value = null;
             }
         }
 
@@ -281,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             finally
             {
-                WProtoDeclaredRootProvider.Unregister<IUnformatted>();
+                WProtoDeclaredRootProvider.Formatters<IUnformatted>.Value = null;
             }
         }
 
@@ -295,7 +298,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             IWProtoPolymorphicFormatter adapter = registered as IWProtoPolymorphicFormatter;
 
-            Assert.IsNotNull(adapter, "the facade asks this question of every non-exact match");
+            Assert.IsTrue(
+                adapter != null,
+                "the facade asks this question of every non-exact match"
+            );
             Assert.IsTrue(adapter.CanWrite(typeof(IncludeBase)));
             Assert.IsTrue(adapter.CanWrite(typeof(IncludeGamma)));
             Assert.IsFalse(adapter.CanWrite(typeof(ForeignThing)));
@@ -329,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     WProtoFacade.TrySerialize(new ConcreteDeclared(), out byte[] bytes),
                     "a value that IS the declared type narrows to nothing and would write zero bytes"
                 );
-                Assert.IsNull(bytes);
+                Assert.IsTrue(bytes == null);
 
                 Assert.IsTrue(
                     WProtoFacade.TrySerialize<ConcreteDerived>(
@@ -341,7 +347,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             finally
             {
-                WProtoDeclaredRootProvider.Unregister<ConcreteDeclared>();
+                WProtoDeclaredRootProvider.Formatters<ConcreteDeclared>.Value = null;
                 WProtoFormatterProvider.Register<ConcreteDerived>(null);
             }
         }
@@ -368,13 +374,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 );
                 IWProtoPolymorphicFormatter adapter = registered as IWProtoPolymorphicFormatter;
 
-                Assert.IsNotNull(adapter);
+                Assert.IsTrue(adapter != null);
                 Assert.IsTrue(adapter.CanWrite(typeof(UnformattedRoot)));
                 Assert.IsFalse(adapter.CanWrite(typeof(OtherUnformatted)));
             }
             finally
             {
-                WProtoDeclaredRootProvider.Unregister<IUnformatted>();
+                WProtoDeclaredRootProvider.Formatters<IUnformatted>.Value = null;
                 WProtoFormatterProvider.Register<UnformattedRoot>(null);
             }
         }

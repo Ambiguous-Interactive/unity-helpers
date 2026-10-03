@@ -190,7 +190,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
                             Thread.SpinWait(1);
                         }
 
-                        if (lease.TryClaimWithoutRelease())
+                        if (DisposalLeases.TryClaim(lease._slot, lease._generation))
                         {
                             Interlocked.Increment(ref winners);
                         }
@@ -203,7 +203,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
                 Task.WaitAll(racers);
 
                 totalWinners += Volatile.Read(ref winners);
-                DisposalLeases.Release(lease.SlotForTests, lease.OwnerThreadIdForTests);
+                DisposalLeases.Release(lease._slot, lease._ownerThreadId);
             }
 
             Assert.That(
@@ -232,7 +232,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
                     for (int i = 0; i < PerThread; ++i)
                     {
                         DisposalLease lease = DisposalLeases.Acquire();
-                        int slot = lease.SlotForTests;
+                        int slot = lease._slot;
 
                         // Claim counts alone cannot detect simultaneous ownership of one slot.
                         if (!liveSlots.TryAdd(slot, id))
@@ -242,17 +242,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
 
                         DisposalLease copy = lease;
                         int wins = 0;
-                        if (lease.TryClaimWithoutRelease())
+                        if (DisposalLeases.TryClaim(lease._slot, lease._generation))
                         {
                             ++wins;
                         }
-                        if (copy.TryClaimWithoutRelease())
+                        if (DisposalLeases.TryClaim(copy._slot, copy._generation))
                         {
                             ++wins;
                         }
 
                         liveSlots.TryRemove(slot, out int _);
-                        DisposalLeases.Release(slot, lease.OwnerThreadIdForTests);
+                        DisposalLeases.Release(slot, lease._ownerThreadId);
 
                         if (wins == 1)
                         {

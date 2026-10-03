@@ -51,7 +51,7 @@ redacted, uploaded, and required by the aggregate gate (#813).
     for. Session 251 shipped a `CS0103` in both and cost the whole eight-leg matrix.
     `typecheck:editor-tests` is the FOURTH tree, `Tests/Editor/**`, and the only gate that compiles it
     ([#616](https://github.com/Ambiguous-Interactive/unity-helpers/issues/616)); two ways, default and
-    `:odin`. It inherits the editor pin and so EditorCheck's exclusions -- 42 of 820 files, one line
+    `:odin`. It inherits the editor pin and so EditorCheck's exclusions -- 45 of 856 files, one line
     with its reason each in the csproj.
     `typecheck:integrations` is the FIFTH tree: `Runtime/Integrations/**`, the 19 Reflex/VContainer/Zenject files EVERY other project named in an `Exclude`, so no `WUH###` rule ever ran there and four `??`-on-a-`ScriptableObject` sites shipped; no DI package is on nuget.org, so it takes the Odin route -- three shims declaring only what those 19 name -- and builds default, `:legacy-reflex` and `:player` ([#687](https://github.com/Ambiguous-Interactive/unity-helpers/issues/687)).
   - `dotnet test -c Release -p:ProtobufNetOracle=v3` and then

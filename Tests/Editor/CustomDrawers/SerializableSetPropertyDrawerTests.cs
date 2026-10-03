@@ -131,9 +131,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             _sharedHost = CreateScriptableObject<StringSetHost>();
             _sharedSerializedObject = new SerializedObject(_sharedHost);
-            GroupGUIWidthUtility.ResetForTests();
-            SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-            SerializableSetPropertyDrawer.ClearMainFoldoutAnimCacheForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
+            SerializableSetPropertyDrawerTestAccess.ResetLayoutTracking();
+            SerializableSetPropertyDrawerTestAccess.ClearMainFoldoutAnimCache();
             ResetHostState();
             base.BaseSetUp();
         }
@@ -2813,633 +2813,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         }
 
         [UnityTest]
-        public IEnumerator HonorsGroupPaddingWithinGroups()
-        {
-            HashSetHost host = CreateScriptableObject<HashSetHost>();
-            host.set.Add(10);
-            host.set.Add(20);
-
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-            SerializedProperty setProperty = serializedObject.FindProperty(nameof(HashSetHost.set));
-            setProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableSetPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 360f, 400f);
-            GUIContent label = new("Set");
-            const int IndentDepth = 1;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                setProperty.isExpanded = true;
-                int previousIndent = EditorGUI.indentLevel;
-                EditorGUI.indentLevel = IndentDepth;
-                try
-                {
-                    drawer.OnGUI(controlRect, setProperty, label);
-                }
-                finally
-                {
-                    EditorGUI.indentLevel = previousIndent;
-                }
-            });
-
-            Assert.IsTrue(
-                drawer.HasItemsContainerRect,
-                "Baseline draw should capture the rendered container."
-            );
-
-            int snapshotIndent = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = IndentDepth;
-            Rect expectedBaselineRect = EditorGUI.IndentedRect(controlRect);
-            EditorGUI.indentLevel = snapshotIndent;
-
-            const float UnityListAlignmentOffset = -1.25f;
-            float expectedXMin = Mathf.Max(
-                0f,
-                expectedBaselineRect.xMin + UnityListAlignmentOffset
-            );
-
-            Assert.That(
-                drawer.LastResolvedPosition.xMin,
-                Is.EqualTo(expectedXMin).Within(0.0001f),
-                $"Indentation should influence the resolved content rectangle. "
-                    + $"IndentedRect.xMin={expectedBaselineRect.xMin}, "
-                    + $"AlignmentOffset={UnityListAlignmentOffset}, "
-                    + $"ExpectedXMin={expectedXMin}, "
-                    + $"ActualXMin={drawer.LastResolvedPosition.xMin}"
-            );
-
-            const float LeftPadding = 16f;
-            const float RightPadding = 8f;
-            const float HorizontalPadding = LeftPadding + RightPadding;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                setProperty.isExpanded = true;
-                using (
-                    GroupGUIWidthUtility.PushContentPadding(
-                        HorizontalPadding,
-                        LeftPadding,
-                        RightPadding
-                    )
-                )
-                {
-                    int previousIndent = EditorGUI.indentLevel;
-                    EditorGUI.indentLevel = IndentDepth;
-                    try
-                    {
-                        drawer.OnGUI(controlRect, setProperty, label);
-                    }
-                    finally
-                    {
-                        EditorGUI.indentLevel = previousIndent;
-                    }
-                }
-            });
-
-            Rect paddedRect = drawer.LastResolvedPosition;
-            Assert.That(
-                paddedRect.xMin,
-                Is.EqualTo(expectedBaselineRect.xMin + LeftPadding).Within(0.0001f),
-                "Group padding should offset the rendered content."
-            );
-            Assert.That(
-                paddedRect.width,
-                Is.EqualTo(Mathf.Max(0f, expectedBaselineRect.width - HorizontalPadding))
-                    .Within(0.0001f),
-                "Group padding should reduce usable width."
-            );
-            Assert.IsTrue(drawer.HasItemsContainerRect, "Container rect should be recorded.");
-            Assert.That(
-                drawer.LastItemsContainerRect.xMin,
-                Is.EqualTo(paddedRect.xMin).Within(0.0001f),
-                "Container rect should align with the padded content."
-            );
-        }
-
-        [UnityTest]
-        public IEnumerator ManualEntryHeaderHonorsGroupPadding()
-        {
-            StringSetHost host = CreateScriptableObject<StringSetHost>();
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-            SerializedProperty setProperty = serializedObject.FindProperty(
-                nameof(StringSetHost.set)
-            );
-            setProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableSetPropertyDrawer drawer = new();
-            SerializableSetPropertyDrawer.PendingEntry pending = drawer.GetOrCreatePendingEntry(
-                setProperty,
-                setProperty.propertyPath,
-                typeof(string),
-                isSortedSet: false
-            );
-            pending.isExpanded = true;
-
-            Rect controlRect = new(0f, 0f, 360f, 420f);
-            GUIContent label = new("Set");
-
-            SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-            bool baselineSetExpandedBeforeDraw = setProperty.isExpanded;
-            bool baselinePendingExpandedBeforeDraw = pending.isExpanded;
-
-            int baselineIndentBefore = 0;
-            int baselineIndentAfter = 0;
-            Rect baselineResolvedPosition = default;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                pending.isExpanded = true;
-                baselineIndentBefore = EditorGUI.indentLevel;
-                int previousIndent = EditorGUI.indentLevel;
-                EditorGUI.indentLevel = 0;
-                try
-                {
-                    drawer.OnGUI(controlRect, setProperty, label);
-                }
-                finally
-                {
-                    EditorGUI.indentLevel = previousIndent;
-                }
-                baselineIndentAfter = EditorGUI.indentLevel;
-                baselineResolvedPosition = drawer.LastResolvedPosition;
-            });
-
-            serializedObject.Update();
-            bool baselineSetExpandedAfterDraw = setProperty.isExpanded;
-            TestContext.WriteLine(
-                $"ManualEntryHeader baseline foldout states -> set: {baselineSetExpandedBeforeDraw}->{baselineSetExpandedAfterDraw}, pending: {baselinePendingExpandedBeforeDraw}->{pending.isExpanded}"
-            );
-            TestContext.WriteLine(
-                $"ManualEntryHeader baseline context -> indentLevel: {baselineIndentBefore}->{baselineIndentAfter}, "
-                    + $"resolvedPosition: ({baselineResolvedPosition.x:F2}, {baselineResolvedPosition.y:F2}, {baselineResolvedPosition.width:F2}, {baselineResolvedPosition.height:F2})"
-            );
-
-            Assert.IsTrue(
-                SerializableSetPropertyDrawer.HasLastManualEntryHeaderRect,
-                "Baseline draw should capture the manual entry header layout."
-            );
-
-            Rect baselineHeader = SerializableSetPropertyDrawer.LastManualEntryHeaderRect;
-
-            const float LeftPadding = 20f;
-            const float RightPadding = 12f;
-            float horizontalPadding = LeftPadding + RightPadding;
-
-            GroupGUIWidthUtility.ResetForTests();
-
-            bool groupedSetExpandedBeforeDraw = setProperty.isExpanded;
-            bool groupedPendingExpandedBeforeDraw = pending.isExpanded;
-
-            int groupedIndentBefore = 0;
-            int groupedIndentAfter = 0;
-            Rect groupedResolvedPosition = default;
-            float groupedCurrentLeftPadding = 0f;
-            float groupedCurrentRightPadding = 0f;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                using (
-                    GroupGUIWidthUtility.PushContentPadding(
-                        horizontalPadding,
-                        LeftPadding,
-                        RightPadding
-                    )
-                )
-                {
-                    groupedCurrentLeftPadding = GroupGUIWidthUtility.CurrentLeftPadding;
-                    groupedCurrentRightPadding = GroupGUIWidthUtility.CurrentRightPadding;
-                    SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-                    pending.isExpanded = true;
-                    groupedIndentBefore = EditorGUI.indentLevel;
-                    int previousIndent = EditorGUI.indentLevel;
-                    EditorGUI.indentLevel = 0;
-                    try
-                    {
-                        drawer.OnGUI(controlRect, setProperty, label);
-                    }
-                    finally
-                    {
-                        EditorGUI.indentLevel = previousIndent;
-                    }
-                    groupedIndentAfter = EditorGUI.indentLevel;
-                    groupedResolvedPosition = drawer.LastResolvedPosition;
-                }
-            });
-
-            serializedObject.Update();
-            bool groupedSetExpandedAfterDraw = setProperty.isExpanded;
-            TestContext.WriteLine(
-                $"ManualEntryHeader grouped foldout states -> set: {groupedSetExpandedBeforeDraw}->{groupedSetExpandedAfterDraw}, pending: {groupedPendingExpandedBeforeDraw}->{pending.isExpanded}"
-            );
-            TestContext.WriteLine(
-                $"ManualEntryHeader grouped context -> indentLevel: {groupedIndentBefore}->{groupedIndentAfter}, "
-                    + $"resolvedPosition: ({groupedResolvedPosition.x:F2}, {groupedResolvedPosition.y:F2}, {groupedResolvedPosition.width:F2}, {groupedResolvedPosition.height:F2}), "
-                    + $"currentPadding: left={groupedCurrentLeftPadding:F2}, right={groupedCurrentRightPadding:F2}"
-            );
-
-            Assert.IsTrue(
-                SerializableSetPropertyDrawer.HasLastManualEntryHeaderRect,
-                "Grouped draw should capture the manual entry header layout."
-            );
-
-            Rect groupedHeader = SerializableSetPropertyDrawer.LastManualEntryHeaderRect;
-
-            float contentDeltaX = groupedResolvedPosition.x - baselineResolvedPosition.x;
-            float contentDeltaWidth =
-                baselineResolvedPosition.width - groupedResolvedPosition.width;
-
-            TestContext.WriteLine(
-                $"ManualEntryHeader diagnostics -> baseline.xMin={baselineHeader.xMin:F2}, baseline.width={baselineHeader.width:F2}, "
-                    + $"grouped.xMin={groupedHeader.xMin:F2}, grouped.width={groupedHeader.width:F2}, "
-                    + $"LeftPadding={LeftPadding:F2}, RightPadding={RightPadding:F2}, "
-                    + $"contentDeltaX={contentDeltaX:F2}, contentDeltaWidth={contentDeltaWidth:F2}, "
-                    + $"expected.xMin={baselineHeader.xMin + contentDeltaX:F2}, "
-                    + $"expected.width={Mathf.Max(0f, baselineHeader.width - contentDeltaWidth):F2}"
-            );
-
-            Assert.That(
-                groupedHeader.xMin,
-                Is.EqualTo(baselineHeader.xMin + contentDeltaX).Within(0.5f),
-                "Manual entry header should shift by the content rect's x delta."
-            );
-            Assert.That(
-                groupedHeader.width,
-                Is.EqualTo(Mathf.Max(0f, baselineHeader.width - contentDeltaWidth)).Within(0.5f),
-                "Manual entry header width should shrink by the content rect's width delta."
-            );
-        }
-
-        [UnityTest]
-        public IEnumerator ManualEntryValueFieldHonorsGroupPadding()
-        {
-            StringSetHost host = CreateScriptableObject<StringSetHost>();
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-            SerializedProperty setProperty = serializedObject.FindProperty(
-                nameof(StringSetHost.set)
-            );
-            setProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableSetPropertyDrawer drawer = new();
-            SerializableSetPropertyDrawer.PendingEntry pending = drawer.GetOrCreatePendingEntry(
-                setProperty,
-                setProperty.propertyPath,
-                typeof(string),
-                isSortedSet: false
-            );
-            pending.isExpanded = true;
-
-            Rect controlRect = new(0f, 0f, 360f, 420f);
-            GUIContent label = new("Set");
-
-            SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-            bool baselineSetExpandedBeforeDraw = setProperty.isExpanded;
-            bool baselinePendingExpandedBeforeDraw = pending.isExpanded;
-            Rect baselineResolvedPosition = default;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                pending.isExpanded = true;
-                int previousIndent = EditorGUI.indentLevel;
-                EditorGUI.indentLevel = 0;
-                try
-                {
-                    drawer.OnGUI(controlRect, setProperty, label);
-                }
-                finally
-                {
-                    EditorGUI.indentLevel = previousIndent;
-                }
-                baselineResolvedPosition = drawer.LastResolvedPosition;
-            });
-
-            serializedObject.Update();
-            bool baselineSetExpandedAfterDraw = setProperty.isExpanded;
-            TestContext.WriteLine(
-                $"ManualEntryValue baseline foldout states -> set: {baselineSetExpandedBeforeDraw}->{baselineSetExpandedAfterDraw}, pending: {baselinePendingExpandedBeforeDraw}->{pending.isExpanded}"
-            );
-
-            Assert.IsTrue(
-                SerializableSetPropertyDrawer.HasLastManualEntryValueRect,
-                "Baseline draw should capture the manual entry value layout."
-            );
-
-            Rect baselineValue = SerializableSetPropertyDrawer.LastManualEntryValueRect;
-
-            const float LeftPadding = 18f;
-            const float RightPadding = 14f;
-            float horizontalPadding = LeftPadding + RightPadding;
-
-            GroupGUIWidthUtility.ResetForTests();
-
-            bool groupedSetExpandedBeforeDraw = setProperty.isExpanded;
-            bool groupedPendingExpandedBeforeDraw = pending.isExpanded;
-            Rect groupedResolvedPosition = default;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                using (
-                    GroupGUIWidthUtility.PushContentPadding(
-                        horizontalPadding,
-                        LeftPadding,
-                        RightPadding
-                    )
-                )
-                {
-                    SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-                    pending.isExpanded = true;
-                    int previousIndent = EditorGUI.indentLevel;
-                    EditorGUI.indentLevel = 0;
-                    try
-                    {
-                        drawer.OnGUI(controlRect, setProperty, label);
-                    }
-                    finally
-                    {
-                        EditorGUI.indentLevel = previousIndent;
-                    }
-                    groupedResolvedPosition = drawer.LastResolvedPosition;
-                }
-            });
-
-            serializedObject.Update();
-            bool groupedSetExpandedAfterDraw = setProperty.isExpanded;
-            TestContext.WriteLine(
-                $"ManualEntryValue grouped foldout states -> set: {groupedSetExpandedBeforeDraw}->{groupedSetExpandedAfterDraw}, pending: {groupedPendingExpandedBeforeDraw}->{pending.isExpanded}"
-            );
-
-            Assert.IsTrue(
-                SerializableSetPropertyDrawer.HasLastManualEntryValueRect,
-                "Grouped draw should capture the manual entry value layout."
-            );
-
-            Rect groupedValue = SerializableSetPropertyDrawer.LastManualEntryValueRect;
-
-            float contentDeltaX = groupedResolvedPosition.x - baselineResolvedPosition.x;
-            float contentDeltaWidth =
-                baselineResolvedPosition.width - groupedResolvedPosition.width;
-
-            Assert.That(
-                groupedValue.xMin,
-                Is.EqualTo(baselineValue.xMin + contentDeltaX).Within(0.5f),
-                "Manual entry value field should shift by the content rect's x delta."
-            );
-            Assert.That(
-                groupedValue.width,
-                Is.EqualTo(Mathf.Max(0f, baselineValue.width - contentDeltaWidth)).Within(0.5f),
-                "Manual entry value width should shrink by the content rect's width delta."
-            );
-        }
-
-        [UnityTest]
-        public IEnumerator ManualEntryFoldoutRespectsExplicitExpansionBeforeInitialization()
-        {
-            StringSetHost host = CreateScriptableObject<StringSetHost>();
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-            SerializedProperty setProperty = serializedObject.FindProperty(
-                nameof(StringSetHost.set)
-            );
-            setProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-            serializedObject.Update();
-
-            SerializableSetPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 360f, 420f);
-            GUIContent label = new("Set");
-
-            SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-            bool setExpandedBeforeDraw = setProperty.isExpanded;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, setProperty, label);
-            });
-
-            serializedObject.Update();
-            bool setExpandedAfterDraw = setProperty.isExpanded;
-            TestContext.WriteLine(
-                $"ManualEntry explicit expansion state -> {setExpandedBeforeDraw}->{setExpandedAfterDraw}"
-            );
-
-            Assert.IsTrue(
-                setExpandedAfterDraw,
-                "Set foldout should remain expanded when explicitly set before the first draw."
-            );
-            Assert.IsTrue(
-                SerializableSetPropertyDrawer.HasLastManualEntryHeaderRect,
-                "Manual entry header should render when the foldout remains expanded."
-            );
-        }
-
-        [UnityTest]
-        public IEnumerator ManualEntryAnimBoolSynchronizesWithExpandedState()
-        {
-            StringSetHost host = CreateScriptableObject<StringSetHost>();
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-            SerializedProperty setProperty = serializedObject.FindProperty(
-                nameof(StringSetHost.set)
-            );
-            setProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableSetPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 360f, 420f);
-            GUIContent label = new("Set");
-
-            SerializableSetPropertyDrawer.PendingEntry pending = drawer.GetOrCreatePendingEntry(
-                setProperty,
-                setProperty.propertyPath,
-                typeof(string),
-                isSortedSet: false
-            );
-            pending.isExpanded = false;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, setProperty, label);
-            });
-
-            bool rectsAfterCollapsed = SerializableSetPropertyDrawer.HasLastManualEntryValueRect;
-            TestContext.WriteLine(
-                $"[ManualEntryAnimBoolSynchronizesWithExpandedState] after collapsed draw: "
-                    + $"hasValueRect={rectsAfterCollapsed}"
-            );
-
-            pending.isExpanded = true;
-
-            // Assigning value rather than target skips the animation instead of starting it.
-            if (pending.foldoutAnim != null)
-            {
-                pending.foldoutAnim.value = pending.isExpanded;
-            }
-
-            SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, setProperty, label);
-            });
-
-            bool rectsAfterExpanded = SerializableSetPropertyDrawer.HasLastManualEntryValueRect;
-            TestContext.WriteLine(
-                $"[ManualEntryAnimBoolSynchronizesWithExpandedState] after expanded draw: "
-                    + $"hasValueRect={rectsAfterExpanded}, isExpanded={pending.isExpanded}"
-            );
-
-            Assert.IsTrue(
-                rectsAfterExpanded,
-                "Manual entry value rect should be captured after expansion when animation completes."
-            );
-        }
-
-        [UnityTest]
-        public IEnumerator RowContentHonorsGroupPadding()
-        {
-            ComplexSetHost host = CreateScriptableObject<ComplexSetHost>();
-            ISerializableSetInspector inspector = host.set;
-            Array snapshot = new ComplexSetElement[1];
-            snapshot.SetValue(
-                new ComplexSetElement
-                {
-                    primary = Color.yellow,
-                    nested = new NestedComplexElement
-                    {
-                        intensity = 2.5f,
-                        offset = new Vector2(3f, 1f),
-                    },
-                },
-                0
-            );
-            inspector.SetSerializedItemsSnapshot(snapshot, preserveSerializedEntries: true);
-            inspector.SynchronizeSerializedState();
-
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-            SerializedProperty setProperty = serializedObject.FindProperty(
-                nameof(ComplexSetHost.set)
-            );
-            setProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableSetPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 420f, 520f);
-            GUIContent label = new("Set");
-
-            SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-            bool baselineSetExpandedBeforeDraw = setProperty.isExpanded;
-            Rect baselineResolvedPosition = default;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                int previousIndent = EditorGUI.indentLevel;
-                EditorGUI.indentLevel = 0;
-                try
-                {
-                    drawer.OnGUI(controlRect, setProperty, label);
-                }
-                finally
-                {
-                    EditorGUI.indentLevel = previousIndent;
-                }
-                baselineResolvedPosition = drawer.LastResolvedPosition;
-            });
-
-            serializedObject.Update();
-            bool baselineSetExpandedAfterDraw = setProperty.isExpanded;
-            TestContext.WriteLine(
-                $"RowContent baseline set foldout state -> {baselineSetExpandedBeforeDraw}->{baselineSetExpandedAfterDraw}"
-            );
-
-            Assert.IsTrue(
-                SerializableSetPropertyDrawer.HasLastRowContentRect,
-                "Baseline draw should capture the row content layout."
-            );
-
-            Rect baselineRow = SerializableSetPropertyDrawer.LastRowContentRect;
-
-            const float LeftPadding = 24f;
-            const float RightPadding = 10f;
-            float horizontalPadding = LeftPadding + RightPadding;
-
-            GroupGUIWidthUtility.ResetForTests();
-
-            bool groupedSetExpandedBeforeDraw = setProperty.isExpanded;
-            Rect groupedResolvedPosition = default;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                setProperty.serializedObject.UpdateIfRequiredOrScript();
-                using (
-                    GroupGUIWidthUtility.PushContentPadding(
-                        horizontalPadding,
-                        LeftPadding,
-                        RightPadding
-                    )
-                )
-                {
-                    SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-                    int previousIndent = EditorGUI.indentLevel;
-                    EditorGUI.indentLevel = 0;
-                    try
-                    {
-                        drawer.OnGUI(controlRect, setProperty, label);
-                    }
-                    finally
-                    {
-                        EditorGUI.indentLevel = previousIndent;
-                    }
-                    groupedResolvedPosition = drawer.LastResolvedPosition;
-                }
-            });
-
-            serializedObject.Update();
-            bool groupedSetExpandedAfterDraw = setProperty.isExpanded;
-            TestContext.WriteLine(
-                $"RowContent grouped set foldout state -> {groupedSetExpandedBeforeDraw}->{groupedSetExpandedAfterDraw}"
-            );
-
-            Assert.IsTrue(
-                SerializableSetPropertyDrawer.HasLastRowContentRect,
-                "Grouped draw should capture the row content layout."
-            );
-
-            Rect groupedRow = SerializableSetPropertyDrawer.LastRowContentRect;
-
-            float contentDeltaX = groupedResolvedPosition.x - baselineResolvedPosition.x;
-            float contentDeltaWidth =
-                baselineResolvedPosition.width - groupedResolvedPosition.width;
-
-            Assert.That(
-                groupedRow.xMin,
-                Is.EqualTo(baselineRow.xMin + contentDeltaX).Within(0.5f),
-                "Row content should shift by the content rect's x delta."
-            );
-            Assert.That(
-                groupedRow.width,
-                Is.EqualTo(Mathf.Max(0f, baselineRow.width - contentDeltaWidth)).Within(0.5f),
-                "Row content width should shrink by the content rect's width delta."
-            );
-        }
-
-        [UnityTest]
         public IEnumerator SetDrawerDoesNotResetUnappliedScalarChanges()
         {
             MixedFieldsSetHost host = Track(ScriptableObject.CreateInstance<MixedFieldsSetHost>());
@@ -3554,7 +2927,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             using (new SetTweenDisabledScope())
             {
-                bool tweenEnabled = SerializableSetPropertyDrawer.IsTweeningEnabledForTests(
+                bool tweenEnabled = SerializableSetPropertyDrawer.ShouldTweenManualEntryFoldout(
                     isSortedSet: false
                 );
                 Assert.IsFalse(
@@ -3602,7 +2975,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             using (new SetTweenDisabledScope())
             {
-                bool tweenEnabled = SerializableSetPropertyDrawer.IsTweeningEnabledForTests(
+                bool tweenEnabled = SerializableSetPropertyDrawer.ShouldTweenManualEntryFoldout(
                     isSortedSet: false
                 );
                 Assert.IsFalse(
@@ -3650,7 +3023,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             using (new SetTweenDisabledScope())
             {
-                bool tweenEnabled = SerializableSetPropertyDrawer.IsTweeningEnabledForTests(
+                bool tweenEnabled = SerializableSetPropertyDrawer.ShouldTweenManualEntryFoldout(
                     isSortedSet: false
                 );
                 Assert.IsFalse(
@@ -3743,7 +3116,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             using (new SetTweenDisabledScope())
             {
-                bool tweenEnabled = SerializableSetPropertyDrawer.IsTweeningEnabledForTests(
+                bool tweenEnabled = SerializableSetPropertyDrawer.ShouldTweenManualEntryFoldout(
                     isSortedSet: false
                 );
                 Assert.IsFalse(
@@ -3793,7 +3166,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             using (new SetTweenDisabledScope())
             {
-                bool tweenEnabled = SerializableSetPropertyDrawer.IsTweeningEnabledForTests(
+                bool tweenEnabled = SerializableSetPropertyDrawer.ShouldTweenManualEntryFoldout(
                     isSortedSet: false
                 );
                 Assert.IsFalse(
@@ -3845,7 +3218,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             using (new SetTweenDisabledScope())
             {
-                bool tweenEnabled = SerializableSetPropertyDrawer.IsTweeningEnabledForTests(
+                bool tweenEnabled = SerializableSetPropertyDrawer.ShouldTweenManualEntryFoldout(
                     isSortedSet: false
                 );
                 Assert.IsFalse(
@@ -3912,7 +3285,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             using (new SortedSetTweenDisabledScope())
             {
-                bool tweenEnabled = SerializableSetPropertyDrawer.IsTweeningEnabledForTests(
+                bool tweenEnabled = SerializableSetPropertyDrawer.ShouldTweenManualEntryFoldout(
                     isSortedSet: true
                 );
                 Assert.IsFalse(
@@ -3960,7 +3333,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             using (new SetTweenDisabledScope())
             {
-                bool tweenEnabled = SerializableSetPropertyDrawer.IsTweeningEnabledForTests(
+                bool tweenEnabled = SerializableSetPropertyDrawer.ShouldTweenManualEntryFoldout(
                     isSortedSet: false
                 );
                 Assert.IsFalse(

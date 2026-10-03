@@ -35,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             ).SetName("Cache.DropDownShared");
 
             yield return new TestCaseData(
-                (Func<object, string>)WValueDropDownDrawer.TestHooks.FormatOptionCached
+                (Func<object, string>)WValueDropDownDrawerTestAccess.FormatOptionCached
             ).SetName("Cache.WValueDropDown");
         }
 
@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 _ = DropDownShared.FormatOption(option);
             }
 
-            int controlCount = DropDownShared.TestHooks.FormattedOptionCacheCount;
+            int controlCount = DropDownSharedTestAccess.FormattedOptionCacheCount;
             Assert.AreEqual(
                 ControlOptionCount,
                 controlCount,
@@ -84,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 _ = DropDownShared.FormatOption(option);
             }
 
-            int churnedCount = DropDownShared.TestHooks.FormattedOptionCacheCount;
+            int churnedCount = DropDownSharedTestAccess.FormattedOptionCacheCount;
             Assert.That(
                 churnedCount,
                 Is.GreaterThan(0),
@@ -182,7 +182,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.AreEqual(
                 DestroyedOptionCount,
-                DropDownShared.TestHooks.FormattedOptionCacheCount,
+                DropDownSharedTestAccess.FormattedOptionCacheCount,
                 "Every option must be cached before it is destroyed, or this fixture measures an "
                     + "empty cache."
             );
@@ -198,7 +198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 _ = DropDownShared.FormatOption(option);
             }
 
-            int churnedCount = DropDownShared.TestHooks.FormattedOptionCacheCount;
+            int churnedCount = DropDownSharedTestAccess.FormattedOptionCacheCount;
             Assert.That(
                 churnedCount,
                 Is.GreaterThan(0),

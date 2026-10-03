@@ -228,24 +228,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         }
 
         [Test, Timeout(BenchmarkTimeoutMilliseconds)]
-        public void CompareGeneratedRegistrationAndFirstApiUse()
+        public void CompareFirstApiUse()
         {
             Assert.AreEqual(28, StartupContractClosures.Length);
-            Assert.IsTrue(
-                global::WallstopStudios
-                    .UnityHelpers
-                    .Generated
-                    .WProtoGeneratedRegistrar
-                    .HasRecordedFirstRegistration
-            );
-            Assert.Greater(
-                global::WallstopStudios
-                    .UnityHelpers
-                    .Generated
-                    .WProtoGeneratedRegistrar
-                    .FirstRegistrationElapsedTimestampTicks,
-                0
-            );
             PrimeSharedStartupPaths<StartupWarmupMarker>();
 
             double[] wallstopProtoSerialize = new double[StartupRounds];
@@ -353,25 +338,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 protobufNetDeserialize
             );
 
-            double registrationMicroseconds = TimestampTicksToMicroseconds(
-                global::WallstopStudios
-                    .UnityHelpers
-                    .Generated
-                    .WProtoGeneratedRegistrar
-                    .FirstRegistrationElapsedTimestampTicks
-            );
             double wallstopProtoSerializeApiMedian = Median(wallstopProtoSerialize);
             double protobufNetSerializeMedian = Median(protobufNetSerialize);
             double wallstopProtoDeserializeApiMedian = Median(wallstopProtoDeserialize);
             double protobufNetDeserializeMedian = Median(protobufNetDeserialize);
-            double registrationAndSerializeMedian =
-                registrationMicroseconds + wallstopProtoSerializeApiMedian;
-            double registrationAndDeserializeMedian =
-                registrationMicroseconds + wallstopProtoDeserializeApiMedian;
-
             UnityEngine.Debug.Log(
-                $"One-time generated assembly registration: {registrationMicroseconds:0.00} us. "
-                    + $"API values are medians of {StartupRounds} fresh generic contract closures; "
+                $"API values are medians of {StartupRounds} fresh generic contract closures; "
                     + "process startup and shared JIT warmup are excluded."
             );
             UnityEngine.Debug.Log(
@@ -385,10 +357,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 "| --------- | ------------------:| ----------------:| -------:|"
             );
             UnityEngine.Debug.Log(
-                $"| One-time assembly registration + median first serialize | {registrationAndSerializeMedian, 18:0.00} | {protobufNetSerializeMedian, 16:0.00} | {protobufNetSerializeMedian / registrationAndSerializeMedian, 7:0.00}x |"
+                $"| Median first serialize API call | {wallstopProtoSerializeApiMedian, 18:0.00} | {protobufNetSerializeMedian, 16:0.00} | {protobufNetSerializeMedian / wallstopProtoSerializeApiMedian, 7:0.00}x |"
             );
             UnityEngine.Debug.Log(
-                $"| One-time assembly registration + median first deserialize | {registrationAndDeserializeMedian, 18:0.00} | {protobufNetDeserializeMedian, 16:0.00} | {protobufNetDeserializeMedian / registrationAndDeserializeMedian, 7:0.00}x |"
+                $"| Median first deserialize API call | {wallstopProtoDeserializeApiMedian, 18:0.00} | {protobufNetDeserializeMedian, 16:0.00} | {protobufNetDeserializeMedian / wallstopProtoDeserializeApiMedian, 7:0.00}x |"
             );
         }
 

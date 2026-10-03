@@ -55,7 +55,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Color expectedHdrColor = new Color(0.2f, 0.4f, 0.6f, 0.8f);
             image.HdrColor = expectedHdrColor;
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void HdrColorAboveSdrOverridesMaterialColor()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color hdr = new(2f, 0.5f, 0.25f, 1f);
             image.HdrColor = hdr;
@@ -88,7 +88,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             image._shapeMask = mask;
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             /*
                 The support shader may be stripped in players; assert shape-mask writes only when its property
@@ -107,14 +107,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void OnDestroyReleasesCachedMaterialInstance()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cachedBefore = image.CachedMaterialInstanceForTests;
+            Material cachedBefore = image._cachedMaterialInstance;
             Assert.IsTrue(cachedBefore != null);
 
-            image.InvokeOnDestroyForTests();
+            image.CleanupMaterialInstance();
 
-            Material cachedAfter = image.CachedMaterialInstanceForTests;
+            Material cachedAfter = image._cachedMaterialInstance;
             Assert.IsTrue(cachedAfter == null);
             Assert.That(cachedBefore == null, Is.True);
         }
@@ -125,9 +125,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image = CreateEnhancedImage(out _);
             image.material = null;
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cached = image.CachedMaterialInstanceForTests;
+            Material cached = image._cachedMaterialInstance;
             Assert.IsTrue(
                 cached == null,
                 "Expected no instance to be created when material is null."
@@ -142,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Color sdrHdrColor = new Color(0.4f, 0.4f, 0.4f, 0.4f);
             image.HdrColor = sdrHdrColor;
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -157,7 +157,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void MaterialInstanceIsReusedAcrossUpdates()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
             Material first = image.material;
             Assert.IsTrue(first != null);
 
@@ -174,11 +174,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void StartDoesNotDuplicateExistingInstance()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
             Material first = image.material;
             Assert.IsTrue(first != null);
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
             Material second = image.material;
             Assert.That(
                 second,
@@ -191,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void HdrColorUpdateAfterStartActuallyUpdatesTheMaterialColor()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color initialHdr = new(1.5f, 0.8f, 0.4f, 1f);
             image.HdrColor = initialHdr;
@@ -218,7 +218,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void MultipleConsecutiveHdrColorChangesAllReflectInMaterial()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color[] hdrColors = new Color[]
             {
@@ -250,7 +250,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         {
             EnhancedImage image = CreateEnhancedImage(out _);
             image.color = new Color(0.3f, 0.4f, 0.5f, 1f);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color hdrColor = new(2.0f, 1.5f, 1.2f, 1f);
             image.HdrColor = hdrColor;
@@ -279,7 +279,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             image.color = new Color(0.2f, 0.3f, 0.4f, 1f);
             Color initialSdrColor = new Color(0.5f, 0.5f, 0.5f, 1f);
             image.HdrColor = initialSdrColor;
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -305,7 +305,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             image.color = new Color(0.1f, 0.2f, 0.3f, 1f);
             Color hdrColorExactlyOne = new Color(1f, 1f, 1f, 1f);
             image.HdrColor = hdrColorExactlyOne;
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -324,7 +324,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             image.color = new Color(0.1f, 0.2f, 0.3f, 1f);
             Color hdrColor = new(1.001f, 0.5f, 0.5f, 1f);
             image.HdrColor = hdrColor;
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -340,7 +340,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void HdrColorWithZeroAlphaStillUpdatesCorrectly()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color hdrWithZeroAlpha = new(2f, 1.5f, 1f, 0f);
             image.HdrColor = hdrWithZeroAlpha;
@@ -359,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void HdrColorWithVeryHighIntensityUpdatesCorrectly()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color extremeHdr = new(100f, 50f, 25f, 1f);
             image.HdrColor = extremeHdr;
@@ -379,7 +379,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         {
             EnhancedImage image = CreateEnhancedImage(out _);
             image.color = new Color(0.5f, 0.5f, 0.5f, 1f);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color negativeColor = new(-0.5f, -0.2f, 0.1f, 1f);
 
@@ -426,7 +426,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void SettingSameHdrColorDoesNotTriggerUpdate()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color hdrColor = new(2f, 1.5f, 1f, 1f);
             image.HdrColor = hdrColor;
@@ -448,9 +448,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void MaterialInstancePreservedAcrossManyRapidHdrColorChanges()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material originalInstance = image.CachedMaterialInstanceForTests;
+            Material originalInstance = image._cachedMaterialInstance;
             Assert.IsTrue(originalInstance != null);
 
             for (int i = 0; i < 100; ++i)
@@ -459,7 +459,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 image.HdrColor = new Color(intensity, 0.5f, 0.3f, 1f);
             }
 
-            Material finalInstance = image.CachedMaterialInstanceForTests;
+            Material finalInstance = image._cachedMaterialInstance;
             Assert.That(
                 finalInstance,
                 Is.SameAs(originalInstance),
@@ -471,7 +471,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void HdrColorPropertyGetReturnsCurrentValue()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color expected = new(3f, 2f, 1f, 0.8f);
             image.HdrColor = expected;
@@ -501,7 +501,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Color hdrColor = new(2.5f, 1.8f, 0.9f, 1f);
             image.HdrColor = hdrColor;
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -517,7 +517,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void GraphicColorChangeDoesNotAffectMaterialWhenHdrIsActive()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color hdrColor = new(2f, 1.5f, 1f, 1f);
             image.HdrColor = hdrColor;
@@ -540,11 +540,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image1 = CreateEnhancedImage(out Material baseMaterial1);
             EnhancedImage image2 = CreateEnhancedImageWithMaterial(baseMaterial1);
 
-            image1.InvokeStartForTests();
-            image2.InvokeStartForTests();
+            image1.UpdateMaterialInstance();
+            image2.UpdateMaterialInstance();
 
-            Material cached1 = image1.CachedMaterialInstanceForTests;
-            Material cached2 = image2.CachedMaterialInstanceForTests;
+            Material cached1 = image1._cachedMaterialInstance;
+            Material cached2 = image2._cachedMaterialInstance;
 
             Assert.IsTrue(cached1 != null);
             Assert.IsTrue(cached2 != null);
@@ -575,7 +575,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image = CreateEnhancedImage(out Material baseMaterial);
             Color originalBaseColor = baseMaterial.GetColor("_Color");
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             image.HdrColor = new Color(5f, 3f, 2f, 1f);
 
@@ -592,7 +592,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         {
             EnhancedImage image = CreateEnhancedImage(out _);
             image.color = new Color(0.2f, 0.3f, 0.4f, 1f);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -621,7 +621,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image = CreateEnhancedImage(out _);
             Color hdrAlphaOnly = new(0.5f, 0.5f, 0.5f, 1.5f);
             image.HdrColor = hdrAlphaOnly;
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -637,7 +637,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void ShapeMaskCanBeChangedAfterStart()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Texture2D mask1 = Track(new Texture2D(4, 4, TextureFormat.RGBA32, false, false));
             image._shapeMask = mask1;
@@ -661,27 +661,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void OnDestroyCleansMaterialAndBaseMaterial()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color hdrColor = new(2f, 1.5f, 1f, 1f);
             image.HdrColor = hdrColor;
 
-            Material cachedBefore = image.CachedMaterialInstanceForTests;
-            Material baseBefore = image.BaseMaterialForTests;
+            Material cachedBefore = image._cachedMaterialInstance;
+            Material baseBefore = image._baseMaterial;
             Assert.IsTrue(
                 cachedBefore != null,
                 "Cached material instance should exist before destroy"
             );
             Assert.IsTrue(baseBefore != null, "Base material should exist before destroy");
 
-            image.InvokeOnDestroyForTests();
+            image.CleanupMaterialInstance();
 
             Assert.IsTrue(
-                image.CachedMaterialInstanceForTests == null,
+                image._cachedMaterialInstance == null,
                 "Cached material should be null after destroy"
             );
             Assert.IsTrue(
-                image.BaseMaterialForTests == null,
+                image._baseMaterial == null,
                 "Base material should be null after destroy"
             );
 
@@ -695,18 +695,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void ReassigningMaterialAfterDestroyCreatesNewInstance()
         {
             EnhancedImage image = CreateEnhancedImage(out Material originalBase);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color hdrColor = new(2f, 1.5f, 1f, 1f);
             image.HdrColor = hdrColor;
 
-            Material cachedBefore = image.CachedMaterialInstanceForTests;
+            Material cachedBefore = image._cachedMaterialInstance;
             Assert.IsTrue(cachedBefore != null, "Cached material should exist before destroy");
 
-            image.InvokeOnDestroyForTests();
+            image.CleanupMaterialInstance();
 
             Assert.IsTrue(
-                image.CachedMaterialInstanceForTests == null,
+                image._cachedMaterialInstance == null,
                 "Cached material should be null after destroy"
             );
 
@@ -715,9 +715,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Material newBase = Track(new Material(shader));
             image.material = newBase;
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cachedAfter = image.CachedMaterialInstanceForTests;
+            Material cachedAfter = image._cachedMaterialInstance;
             Assert.IsTrue(
                 cachedAfter != null,
                 "New material instance should be created after reassigning material and calling Start"
@@ -739,7 +739,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void MaterialColorPropertyExistsAndIsAccessible()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -753,7 +753,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void HdrColorChangesAreImmediatelyReflectedInMaterial()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -782,9 +782,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             GameObject owner = Track(new GameObject("Default Material Test"));
             EnhancedImage image = owner.AddComponent<EnhancedImage>();
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cached = image.CachedMaterialInstanceForTests;
+            Material cached = image._cachedMaterialInstance;
             Assert.IsTrue(
                 cached == null,
                 "Should not create material instance when using default UI material"
@@ -795,19 +795,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void MaterialInstanceCreatedOnlyOnce()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material instance1 = image.CachedMaterialInstanceForTests;
+            Material instance1 = image._cachedMaterialInstance;
             Assert.IsTrue(instance1 != null);
 
             image.HdrColor = new Color(1.5f, 0.5f, 0.3f, 1f);
-            Material instance2 = image.CachedMaterialInstanceForTests;
+            Material instance2 = image._cachedMaterialInstance;
 
             image.HdrColor = new Color(2.5f, 1.5f, 0.8f, 1f);
-            Material instance3 = image.CachedMaterialInstanceForTests;
+            Material instance3 = image._cachedMaterialInstance;
 
             image.HdrColor = new Color(0.5f, 0.5f, 0.5f, 1f);
-            Material instance4 = image.CachedMaterialInstanceForTests;
+            Material instance4 = image._cachedMaterialInstance;
 
             Assert.That(instance2, Is.SameAs(instance1));
             Assert.That(instance3, Is.SameAs(instance1));
@@ -818,7 +818,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void ColorChannelsUpdateIndependently()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -849,7 +849,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void AlphaChannelPreservedInHdrColor()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -874,7 +874,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         {
             EnhancedImage image = CreateEnhancedImage(out _);
             image.color = new Color(0.1f, 0.1f, 0.1f, 1f);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -895,7 +895,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image = CreateEnhancedImage(out _);
             Color graphicColor = new(0.3f, 0.4f, 0.5f, 1f);
             image.color = graphicColor;
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -914,9 +914,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void MaterialInstanceHasHideAndDontSaveFlags()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cached = image.CachedMaterialInstanceForTests;
+            Material cached = image._cachedMaterialInstance;
             Assert.IsTrue(cached != null);
             Assert.AreEqual(
                 HideFlags.HideAndDontSave,
@@ -929,9 +929,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void BaseMaterialReferencePreservedAfterStart()
         {
             EnhancedImage image = CreateEnhancedImage(out Material baseMaterial);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material storedBaseMaterial = image.BaseMaterialForTests;
+            Material storedBaseMaterial = image._baseMaterial;
             Assert.IsTrue(storedBaseMaterial != null);
             Assert.That(
                 storedBaseMaterial,
@@ -944,9 +944,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void ChangingBaseMaterialDestroysOldInstance()
         {
             EnhancedImage image = CreateEnhancedImage(out Material baseMaterial1);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cachedInstance1 = image.CachedMaterialInstanceForTests;
+            Material cachedInstance1 = image._cachedMaterialInstance;
             Assert.IsTrue(cachedInstance1 != null);
 
             Shader shader = Shader.Find("UI/Default");
@@ -954,7 +954,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             image.material = baseMaterial2;
             image.HdrColor = new Color(1.5f, 0.5f, 0.3f, 1f);
 
-            Material cachedInstance2 = image.CachedMaterialInstanceForTests;
+            Material cachedInstance2 = image._cachedMaterialInstance;
             Assert.IsTrue(cachedInstance2 != null);
             Assert.AreNotSame(
                 cachedInstance1,
@@ -976,9 +976,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 Sprite.Create(texture, new Rect(0, 0, 16, 16), new Vector2(0.5f, 0.5f))
             );
             image.sprite = sprite;
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cached = image.CachedMaterialInstanceForTests;
+            Material cached = image._cachedMaterialInstance;
             Assert.IsTrue(cached != null);
 
             if (cached.HasProperty("_MainTex"))
@@ -999,11 +999,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image = owner.AddComponent<EnhancedImage>();
 
             Assert.DoesNotThrow(
-                () => image.InvokeStartForTests(),
+                () => image.UpdateMaterialInstance(),
                 "Start with null material should not throw"
             );
 
-            Material cached = image.CachedMaterialInstanceForTests;
+            Material cached = image._cachedMaterialInstance;
             Assert.IsTrue(cached == null, "Should not create instance when material is null");
         }
 
@@ -1011,17 +1011,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void SettingMaterialToNullClearsBaseMaterial()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cachedBefore = image.CachedMaterialInstanceForTests;
+            Material cachedBefore = image._cachedMaterialInstance;
             Assert.IsTrue(cachedBefore != null);
-            Assert.IsTrue(image.BaseMaterialForTests != null);
+            Assert.IsTrue(image._baseMaterial != null);
 
             image.material = null;
-            image.InvokeOnDestroyForTests();
+            image.CleanupMaterialInstance();
 
             Assert.IsTrue(
-                image.BaseMaterialForTests == null,
+                image._baseMaterial == null,
                 "Base material should be cleared when material is set to null and destroyed"
             );
         }
@@ -1031,14 +1031,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         {
             EnhancedImage image = CreateEnhancedImage(out _);
 
-            image.InvokeStartForTests();
-            Material instance1 = image.CachedMaterialInstanceForTests;
+            image.UpdateMaterialInstance();
+            Material instance1 = image._cachedMaterialInstance;
 
-            image.InvokeStartForTests();
-            Material instance2 = image.CachedMaterialInstanceForTests;
+            image.UpdateMaterialInstance();
+            Material instance2 = image._cachedMaterialInstance;
 
-            image.InvokeStartForTests();
-            Material instance3 = image.CachedMaterialInstanceForTests;
+            image.UpdateMaterialInstance();
+            Material instance3 = image._cachedMaterialInstance;
 
             Assert.That(instance2, Is.SameAs(instance1));
             Assert.That(instance3, Is.SameAs(instance1));
@@ -1050,7 +1050,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image = CreateEnhancedImage(out _);
             Color hdrColor = new(1.5f, 0.8f, 0.4f, 1f);
             image.HdrColor = hdrColor;
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Material cached = image.material;
             Assert.IsTrue(cached != null);
@@ -1070,16 +1070,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image = CreateEnhancedImage(out Material baseMaterial);
             Color hdrColor = new(2f, 1.5f, 1f, 1f);
             image.HdrColor = hdrColor;
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cachedInstance = image.CachedMaterialInstanceForTests;
+            Material cachedInstance = image._cachedMaterialInstance;
             Assert.IsTrue(cachedInstance != null);
 
             Object.DestroyImmediate(cachedInstance); // UNH-SUPPRESS: Test verifies material recreation after destruction
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material newCachedInstance = image.CachedMaterialInstanceForTests;
+            Material newCachedInstance = image._cachedMaterialInstance;
             Assert.IsTrue(
                 newCachedInstance != null,
                 "Should recreate material instance when cached instance is destroyed but base material is valid"
@@ -1094,9 +1094,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void DestroyedMaterialInstanceIsRecreatedOnUpdate()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cachedInstance = image.CachedMaterialInstanceForTests;
+            Material cachedInstance = image._cachedMaterialInstance;
             Assert.IsTrue(cachedInstance != null);
 
             Object.DestroyImmediate(cachedInstance); // UNH-SUPPRESS: Test verifies material recreation on update
@@ -1104,7 +1104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Color newHdr = new(3f, 2f, 1f, 1f);
             image.HdrColor = newHdr;
 
-            Material newInstance = image.CachedMaterialInstanceForTests;
+            Material newInstance = image._cachedMaterialInstance;
             Assert.IsTrue(
                 newInstance != null,
                 "Should recreate material instance when it was destroyed externally"
@@ -1140,7 +1140,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             image.material = baseMaterial;
 
             Assert.DoesNotThrow(
-                () => image.InvokeStartForTests(),
+                () => image.UpdateMaterialInstance(),
                 "Start should not throw even if material doesn't have _Color property"
             );
 
@@ -1154,9 +1154,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void RapidMaterialAssignmentsDoNotLeak()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material originalInstance = image.CachedMaterialInstanceForTests;
+            Material originalInstance = image._cachedMaterialInstance;
             Assert.IsTrue(originalInstance != null);
 
             Shader shader = Shader.Find("UI/Default");
@@ -1167,7 +1167,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 image.HdrColor = new Color(1f + (i * 0.1f), 0.5f, 0.3f, 1f);
             }
 
-            Material finalInstance = image.CachedMaterialInstanceForTests;
+            Material finalInstance = image._cachedMaterialInstance;
             Assert.IsTrue(finalInstance != null);
             Assert.AreNotSame(
                 originalInstance,
@@ -1182,7 +1182,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void HdrColorIsPreservedInMaterial(Color hdrColor, string description)
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             image.HdrColor = hdrColor;
 
@@ -1192,7 +1192,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 $"HdrColor property should store {description} exactly as set"
             );
 
-            Material cached = image.CachedMaterialInstanceForTests;
+            Material cached = image._cachedMaterialInstance;
             Assert.IsTrue(cached != null, $"Material instance should exist for {description}");
 
             Color materialColor = cached.GetColor("_Color");
@@ -1211,7 +1211,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         )
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Assert.DoesNotThrow(
                 () => image.HdrColor = inputColor,
@@ -1224,7 +1224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 $"HdrColor property should store {description} exactly as set"
             );
 
-            Material cached = image.CachedMaterialInstanceForTests;
+            Material cached = image._cachedMaterialInstance;
             Assert.IsTrue(cached != null, $"Material instance should exist for {description}");
 
             // Shader readback differs by Unity version; exact HdrColor storage is the package contract.
@@ -1242,17 +1242,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image = CreateEnhancedImage(out Material baseMaterial);
 
             Assert.IsTrue(
-                image.CachedMaterialInstanceForTests == null,
+                image._cachedMaterialInstance == null,
                 "Cached material should be null before Start"
             );
             Assert.IsTrue(
-                image.BaseMaterialForTests == null,
+                image._baseMaterial == null,
                 "Base material reference should be null before Start"
             );
 
-            image.InvokeStartForTests();
-            Material firstInstance = image.CachedMaterialInstanceForTests;
-            Material firstBase = image.BaseMaterialForTests;
+            image.UpdateMaterialInstance();
+            Material firstInstance = image._cachedMaterialInstance;
+            Material firstBase = image._baseMaterial;
 
             Assert.IsTrue(firstInstance != null, "Cached material should be created after Start");
             Assert.AreNotSame(
@@ -1266,27 +1266,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 "Base material reference should point to original material"
             );
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
             Assert.AreSame(
                 firstInstance,
-                image.CachedMaterialInstanceForTests,
+                image._cachedMaterialInstance,
                 "Repeated Start should reuse the same instance"
             );
 
             image.HdrColor = new Color(2f, 1f, 0.5f, 1f);
             Assert.AreSame(
                 firstInstance,
-                image.CachedMaterialInstanceForTests,
+                image._cachedMaterialInstance,
                 "HdrColor change should reuse the same instance"
             );
 
-            image.InvokeOnDestroyForTests();
+            image.CleanupMaterialInstance();
             Assert.IsTrue(
-                image.CachedMaterialInstanceForTests == null,
+                image._cachedMaterialInstance == null,
                 "Cached material should be null after OnDestroy"
             );
             Assert.IsTrue(
-                image.BaseMaterialForTests == null,
+                image._baseMaterial == null,
                 "Base material should be null after OnDestroy"
             );
             Assert.IsTrue(firstInstance == null, "Destroyed material instance should be fake-null");
@@ -1296,7 +1296,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void HdrColorPropertyStoresExactValueRegardlessOfMaterialBehavior()
         {
             EnhancedImage image = CreateEnhancedImage(out _);
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
             Color[] testColors =
             {
@@ -1332,9 +1332,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 "HdrColor should be stored before Start"
             );
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cached = image.CachedMaterialInstanceForTests;
+            Material cached = image._cachedMaterialInstance;
             Assert.IsTrue(cached != null, "Material should be created after Start");
 
             Color materialColor = cached.GetColor("_Color");
@@ -1355,9 +1355,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 $"Base material has _Color: {baseMaterial.HasProperty("_Color")}"
             );
 
-            image.InvokeStartForTests();
+            image.UpdateMaterialInstance();
 
-            Material cached = image.CachedMaterialInstanceForTests;
+            Material cached = image._cachedMaterialInstance;
             Material fromProperty = image.material;
 
             TestContext.WriteLine($"Cached instance: {(cached != null ? cached.name : "null")}");

@@ -25,30 +25,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     /// </remarks>
     public sealed class WInLineEditorOdinDrawer : OdinAttributeDrawer<WInLineEditorAttribute>
     {
-        /// <summary>
-        /// Clears cached editors and state. Primarily for testing purposes.
-        /// </summary>
-        internal static void ClearCachedStateForTesting()
-        {
-            InLineEditorShared.ClearCachedStateForTesting();
-        }
-
-        /// <summary>
-        /// Test hook to set the foldout state for a given key.
-        /// </summary>
-        internal static void SetFoldoutStateForTesting(string key, bool expanded)
-        {
-            InLineEditorShared.SetFoldoutStateForTesting(key, expanded);
-        }
-
-        /// <summary>
-        /// Test hook to get the foldout state for a given key.
-        /// </summary>
-        internal static bool GetFoldoutStateForTesting(string key)
-        {
-            return InLineEditorShared.GetFoldoutStateForTesting(key);
-        }
-
         private static bool DrawHeader(
             Object value,
             GUIContent label,

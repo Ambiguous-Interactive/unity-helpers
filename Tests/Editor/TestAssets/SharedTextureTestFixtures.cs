@@ -477,7 +477,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
 
         /// <summary>
         /// All commonly used texture dimensions combined for comprehensive test coverage.
-        /// Suitable for use with <see cref="PrecreateDimensionsForTests"/>.
+        /// Suitable for use with <see cref="PrecreateDimensions"/>.
         /// </summary>
         public static readonly IReadOnlyList<(int width, int height)> AllCommonDimensions = new[]
         {
@@ -812,9 +812,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         /// Call this from OneTimeSetUp to batch texture creation.
         /// </summary>
         /// <param name="dimensions">The collection of (width, height) tuples to pre-create.</param>
-        public static void PrecreateDimensionsForTests(
-            IEnumerable<(int width, int height)> dimensions
-        )
+        public static void PrecreateDimensions(IEnumerable<(int width, int height)> dimensions)
         {
             using (AssetDatabaseBatchHelper.BeginBatch())
             {

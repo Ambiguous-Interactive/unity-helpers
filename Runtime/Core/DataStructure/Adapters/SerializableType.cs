@@ -419,25 +419,21 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
             }
         }
+        internal static Dictionary<string, SerializableTypeDescriptor> _descriptorByName;
 
-        internal static int CachedFilterResultCountForTesting => FilterCache.Count;
-        internal static bool IsDescriptorCacheInitializedForTesting =>
-            Volatile.Read(ref _descriptorByName) != null;
-
-        private static readonly object SyncRoot = new();
-        private static SerializableTypeDescriptor[] _descriptors;
-        private static Dictionary<string, SerializableTypeDescriptor> _descriptorByName;
-        private static string[] _assemblyQualifiedNames;
-        private static string[] _displayNames;
-        private static string[] _tooltips;
-
-        private static readonly Cache<string, SerializableTypeDescriptor[]> FilterCache =
+        internal static readonly Cache<string, SerializableTypeDescriptor[]> FilterCache =
             CacheBuilder<string, SerializableTypeDescriptor[]>
                 .NewBuilder()
                 .MaximumSize(DefaultMaxCachedFilterResults)
                 .InitialCapacity(16)
                 .KeyComparer(StringComparer.OrdinalIgnoreCase)
                 .Build();
+
+        private static readonly object SyncRoot = new();
+        private static SerializableTypeDescriptor[] _descriptors;
+        private static string[] _assemblyQualifiedNames;
+        private static string[] _displayNames;
+        private static string[] _tooltips;
 
         private static int _maxCachedFilterResults = DefaultMaxCachedFilterResults;
         private static readonly object FilterCacheResizeLock = new();

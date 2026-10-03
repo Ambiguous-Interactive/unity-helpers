@@ -18,7 +18,6 @@ namespace WallstopStudios.UnityHelpers.Editor
     public sealed class FitTextureSizeWindow : EditorWindow
     {
         private static bool SuppressUserPrompts { get; set; }
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
 
         internal FitMode _fitMode = FitMode.GrowAndShrink;
 
@@ -65,8 +64,8 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         [SerializeField]
         internal string _labelFilterCsv = string.Empty;
+        internal SerializedObject _serializedObject;
         private Vector2 _scrollPosition = Vector2.zero;
-        private SerializedObject _serializedObject;
         private SerializedProperty _textureSourcePathsProperty;
         private int _potentialChangeCount = -1;
         private int _potentialGrowCount;

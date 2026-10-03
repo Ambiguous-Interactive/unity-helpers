@@ -175,9 +175,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             dispatcher.RunOnMainThread(() => executionCount++);
 
-            Assert.AreEqual(1, UnityMainThreadDispatcher.GetPendingActionCountForTesting());
+            Assert.AreEqual(1, RuntimeStateTestUtilities.GetPendingActionCount());
 
-            int remainingPendingActions = UnityMainThreadDispatcher.DrainPendingActionsForTesting();
+            int remainingPendingActions = RuntimeStateTestUtilities.DrainPendingActions();
 
             Assert.AreEqual(0, remainingPendingActions);
             Assert.AreEqual(1, executionCount);
@@ -431,7 +431,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [UnityTest]
-        public IEnumerator CreateTestScopeReEnablesAutoCreationAndCleansUp()
+        public IEnumerator AutoCreationScopeReEnablesAutoCreationAndCleansUp()
         {
             UnityMainThreadDispatcherTestHelper.DestroyDispatcherIfExists(
                 immediate: !Application.isPlaying
@@ -441,7 +441,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(UnityMainThreadDispatcher.AutoCreationEnabled);
 
             UnityMainThreadDispatcher.AutoCreationScope scope =
-                UnityMainThreadDispatcher.CreateTestScope(destroyImmediate: !Application.isPlaying);
+                RuntimeStateTestUtilities.CreateDispatcherScope(
+                    destroyImmediate: !Application.isPlaying
+                );
             Assert.IsTrue(scope != null, "Test scope should not be null");
             Assert.IsTrue(UnityMainThreadDispatcher.AutoCreationEnabled);
 
@@ -878,7 +880,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     _ => delegateWork.Task,
                     testCase.passCallerToken ? callerSource.Token : CancellationToken.None
                 );
-                UnityMainThreadDispatcher.DrainPendingActionsForTesting();
+                RuntimeStateTestUtilities.DrainPendingActions();
 
                 if (testCase.cancelCallerAfterStart)
                 {

@@ -28,7 +28,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     {
         private const string TestRoot = "Assets/Resources/CreatorTests";
         private bool _previousEditorUiSuppress;
-        private bool _previousIgnoreCompilationState;
 
         private static IEnumerable<string> AssetImportWorkerEnvironmentScenarios()
         {
@@ -287,14 +286,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             yield return null;
 
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = true;
 
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = true;
             // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
-            _previousIgnoreCompilationState =
-                ScriptableObjectSingletonCreator.IgnoreCompilationState;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
-            ScriptableObjectSingletonCreator.TypeFilter = static type =>
+
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
                 type == typeof(CaseMismatch)
                 || type == typeof(Duplicate)
                 || type == typeof(A.NameCollision)
@@ -312,8 +309,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 EnsureFolder("Assets/Resources/Wallstop Studios/Unity Helpers");
             }
 
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
         }
 
         [UnityTearDown]
@@ -359,18 +356,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 AssetDatabase.SaveAssets();
             }
 
-            ScriptableObjectSingletonCreator.TypeFilter = null;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState =
-                _previousIgnoreCompilationState;
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = false;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = false;
+
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
             EditorUi.Suppress = _previousEditorUiSuppress;
 
             // CleanupAllKnownTestFolders already batches its operations internally.
             CleanupAllKnownTestFolders();
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
         }
 
         public override void OneTimeTearDown()
@@ -402,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     + $"Subfolders of Assets/Resources: [{subFolderList}]"
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching(
@@ -488,7 +484,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
 
             LogAssert.Expect(LogType.Warning, new Regex("target path already occupied"));
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
 
             Assert.IsTrue(
@@ -502,7 +498,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             EnsureFolder("Assets/Resources/CreatorTests/Collision");
 
             LogAssert.Expect(LogType.Warning, new Regex("Type name collision"));
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
 
             Assert.IsTrue(
@@ -519,13 +515,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
 
             string firstGuid = AssetDatabase.AssetPathToGUID(targetPath);
             Assert.IsFalse(string.IsNullOrEmpty(firstGuid));
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
 
             string secondGuid = AssetDatabase.AssetPathToGUID(targetPath);
@@ -540,20 +536,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             Func<bool> originalDetector =
-                ScriptableObjectSingletonCreator.AssetImportWorkerProcessCheck;
-            ScriptableObjectSingletonCreator.AssetImportWorkerProcessCheck = static () => true;
+                ScriptableObjectSingletonCreator._defaultAssetImportWorkerDetector;
+            ScriptableObjectSingletonCreator._defaultAssetImportWorkerDetector = static () => true;
             try
             {
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
                 yield return null;
                 Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(targetPath) == null);
             }
             finally
             {
-                ScriptableObjectSingletonCreator.AssetImportWorkerProcessCheck = originalDetector;
+                ScriptableObjectSingletonCreator._defaultAssetImportWorkerDetector =
+                    originalDetector;
             }
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(targetPath) != null);
         }
@@ -569,14 +566,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             string originalValue = Environment.GetEnvironmentVariable(environmentVariable);
             Func<bool> originalDetector =
-                ScriptableObjectSingletonCreator.AssetImportWorkerProcessCheck;
+                ScriptableObjectSingletonCreator._defaultAssetImportWorkerDetector;
             try
             {
                 Environment.SetEnvironmentVariable(environmentVariable, "1");
-                ScriptableObjectSingletonCreator.ResetAssetImportWorkerDetectionStateForTests();
-                ScriptableObjectSingletonCreator.AssetImportWorkerProcessCheck = null;
+                ScriptableObjectSingletonCreatorTestAccess.ResetAssetImportWorkerDetectionState();
+                ScriptableObjectSingletonCreator._defaultAssetImportWorkerDetector = null;
 
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
                 yield return null;
 
                 Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(targetPath) == null);
@@ -584,11 +581,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             finally
             {
                 Environment.SetEnvironmentVariable(environmentVariable, originalValue);
-                ScriptableObjectSingletonCreator.AssetImportWorkerProcessCheck = originalDetector;
-                ScriptableObjectSingletonCreator.ResetAssetImportWorkerDetectionStateForTests();
+                ScriptableObjectSingletonCreator._defaultAssetImportWorkerDetector =
+                    originalDetector;
+                ScriptableObjectSingletonCreatorTestAccess.ResetAssetImportWorkerDetectionState();
             }
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(targetPath) != null);
         }
@@ -601,19 +599,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             Func<bool> originalDetector =
-                ScriptableObjectSingletonCreator.AssetImportWorkerProcessCheck;
-            ScriptableObjectSingletonCreator.AssetImportWorkerProcessCheck = static () =>
+                ScriptableObjectSingletonCreator._defaultAssetImportWorkerDetector;
+            ScriptableObjectSingletonCreator._defaultAssetImportWorkerDetector = static () =>
                 throw new InvalidOperationException("detector failure");
 
             try
             {
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
                 yield return null;
                 Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(targetPath) != null);
             }
             finally
             {
-                ScriptableObjectSingletonCreator.AssetImportWorkerProcessCheck = originalDetector;
+                ScriptableObjectSingletonCreator._defaultAssetImportWorkerDetector =
+                    originalDetector;
             }
         }
 
@@ -625,7 +624,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string blockerMeta = retryFolder + ".meta";
             string retryFolderVariant = retryFolder + " 1";
 
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
 
             AssetDatabase.DeleteAsset(retryAsset);
             AssetDatabase.DeleteAsset(retryFolder);
@@ -651,11 +650,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Unity versions differ in blocked-folder error wording and counts; assert the observable asset
                 and folder results.
             */
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
             LogAssert.ignoreFailingMessages = true;
             try
             {
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             }
             finally
             {
@@ -678,7 +677,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             // Via AssetDatabase first, so its internal state is cleared properly.
             AssetDatabase.DeleteAsset(retryFolder);
             CleanupRetryTestState(retryFolder, retryAsset, blockerMeta, retryFolderVariant);
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
@@ -711,7 +710,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             bool preRetryDirExists = Directory.Exists(GetAbsolutePath(retryFolder));
             bool preRetryMetaExists = File.Exists(blockerMetaAbsolute);
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
@@ -772,16 +771,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Unity versions differ in blocked-folder error wording and counts; assert the observable asset
                 and folder results.
             */
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = true;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = true;
             LogAssert.ignoreFailingMessages = true;
             try
             {
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             }
             finally
             {
                 LogAssert.ignoreFailingMessages = false;
-                ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
+                ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
             }
             yield return null;
 
@@ -806,7 +805,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string noRetryVariant = noRetryFolder + " 1";
             string blockerMeta = noRetryFolder + ".meta";
 
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
 
             AssetDatabase.DeleteAsset(noRetryAsset);
             AssetDatabase.DeleteAsset(noRetryFolder);
@@ -839,18 +838,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Unity versions differ in blocked-folder error wording and counts; assert the observable asset
                 and folder results.
             */
-            bool originalRetrySetting = ScriptableObjectSingletonCreator.DisableAutomaticRetries;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = true;
+            bool originalRetrySetting =
+                ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = true;
             LogAssert.ignoreFailingMessages = true;
             try
             {
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
                 yield return null;
             }
             finally
             {
                 LogAssert.ignoreFailingMessages = false;
-                ScriptableObjectSingletonCreator.DisableAutomaticRetries = originalRetrySetting;
+                ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries =
+                    originalRetrySetting;
             }
 
             Assert.IsTrue(
@@ -881,10 +882,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Asset should not be created automatically while retries are disabled"
             );
 
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
@@ -892,7 +893,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             bool assetExists = AssetDatabase.LoadAssetAtPath<Object>(noRetryAsset) != null;
             bool variantExists = AssetDatabase.IsValidFolder(noRetryVariant);
 
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = originalRetrySetting;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries =
+                originalRetrySetting;
 
             string absoluteAssetPath = GetAbsolutePath(noRetryAsset);
             bool assetFileOnDisk = File.Exists(absoluteAssetPath);
@@ -921,7 +923,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string caseTestFolder = "Assets/Resources/CaseTest";
             string caseTestAsset = caseTestFolder + "/CaseMismatch.asset";
 
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
 
             AssetDatabase.DeleteAsset(retryAsset);
             if (AssetDatabase.IsValidFolder(retryFolder))
@@ -948,7 +950,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             LogAssert.ignoreFailingMessages = true;
             try
             {
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
                 AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             }
             finally
@@ -957,7 +959,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     Cancel the queued retry before suppression ends; otherwise the next frame logs its expected
                     folder failure again.
                 */
-                ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+                ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
                 LogAssert.ignoreFailingMessages = false;
             }
             yield return null;
@@ -986,7 +988,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
@@ -1011,7 +1013,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string raceFolder = TestRoot + "/Race";
             string raceAsset = raceFolder + "/AssetDatabaseRaceSingleton.asset";
 
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
 
             AssetDatabase.DeleteAsset(raceAsset);
             if (AssetDatabase.IsValidFolder(raceFolder))
@@ -1034,7 +1036,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Race asset should not exist before test"
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
@@ -1081,7 +1083,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Setup: Folder '{existingFolder}' should exist"
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
@@ -1220,7 +1222,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
             yield return null;
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -1278,7 +1280,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             // EditorApplication.isCompiling cannot be set, so only the not-compiling path is exercised.
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching(
                 ImportAssetOptions.ForceSynchronousImport
@@ -1286,44 +1288,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Object asset = AssetDatabase.LoadAssetAtPath<Object>(targetPath);
             Assert.IsTrue(asset != null, "Asset should be created when not compiling or updating");
-        }
-
-        /// <summary>
-        /// Verifies that IgnoreCompilationState property allows bypassing the isCompiling/isUpdating check.
-        /// This is essential for tests that need to explicitly call EnsureSingletonAssets.
-        /// </summary>
-        [UnityTest]
-        public IEnumerator IgnoreCompilationStateAllowsBypassingCompilationCheck()
-        {
-            string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
-            AssetDatabase.DeleteAsset(targetPath);
-            yield return null;
-
-            bool previousIgnoreCompilationState =
-                ScriptableObjectSingletonCreator.IgnoreCompilationState;
-
-            try
-            {
-                ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
-                yield return null;
-                AssetDatabaseBatchHelper.RefreshIfNotBatching(
-                    ImportAssetOptions.ForceSynchronousImport
-                );
-
-                Object asset = AssetDatabase.LoadAssetAtPath<Object>(targetPath);
-                Assert.IsTrue(
-                    asset != null,
-                    "Asset should be created when IgnoreCompilationState is true. "
-                        + $"isCompiling={EditorApplication.isCompiling}, "
-                        + $"isUpdating={EditorApplication.isUpdating}"
-                );
-            }
-            finally
-            {
-                ScriptableObjectSingletonCreator.IgnoreCompilationState =
-                    previousIgnoreCompilationState;
-            }
         }
 
         /// <summary>
@@ -1497,7 +1461,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Assert.DoesNotThrow(
                     () =>
                     {
-                        ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                        ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
                     },
                     $"Ensure call {i + 1} should not throw"
                 );

@@ -39,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             _currentTime = 1f;
             TestPoolItem.ResetIdCounter();
             PoolPurgeSettings.ResetToDefaults();
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
             // Disable memory pressure monitoring to ensure deterministic test behavior
             _wasMemoryPressureEnabled = MemoryPressureMonitor.Enabled;
             MemoryPressureMonitor.Enabled = false;
@@ -49,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         public void TearDown()
         {
             PoolPurgeSettings.ResetToDefaults();
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
             MemoryPressureMonitor.Enabled = _wasMemoryPressureEnabled;
         }
 
@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void PurgeAllPoolsWithSceneUnloadedReasonPurgesAllPools()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             PoolOptions<TestPoolItem> options = new()
             {
@@ -114,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void PurgeAllPoolsWithSceneUnloadedReasonTracksCorrectReason()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             List<PurgeReason> reasons = new();
             PoolOptions<TestPoolItem> options = new()
@@ -147,7 +147,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void SceneUnloadedPurgeRespectsMinRetainCount()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             PoolOptions<TestPoolItem> options = new()
             {
@@ -174,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void SceneUnloadedPurgeRespectsHysteresis()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
@@ -216,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void SceneUnloadedPurgeCanBypassHysteresisWhenIgnored()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
@@ -255,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void SceneUnloadedPurgeAfterHysteresisExpiresPurgesNormally()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
@@ -292,7 +292,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void SceneUnloadedPurgeHandlesEmptyPools()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             using WallstopGenericPool<TestPoolItem> emptyPool = new(
                 () => new TestPoolItem(),
@@ -316,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void SceneUnloadedPurgeHandlesMixedPoolSizes()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             PoolOptions<TestPoolItem> options = new()
             {
@@ -358,7 +358,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void SceneUnloadedPurgeReturnsZeroWhenNoPoolsRegistered()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             int purged = PoolPurgeSettings.PurgeAllPools(
                 respectHysteresis: true,
@@ -448,7 +448,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void SceneUnloadedPurgeWithWarmRetainCount()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             PoolOptions<TestPoolItem> options = new()
             {
@@ -482,7 +482,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void SceneUnloadedPurgeIdlePoolIgnoresWarmRetain()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             PoolOptions<TestPoolItem> options = new()
             {
@@ -519,7 +519,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void ConcurrentSceneUnloadPurgesAreThreadSafe()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
             List<WallstopGenericPool<TestPoolItem>> pools = new();
 
             PoolOptions<TestPoolItem> options = new()
@@ -608,7 +608,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void MultiplePurgeReasonsCanBeMixed()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             List<PurgeReason> reasons = new();
             PoolOptions<TestPoolItem> options = new()
@@ -753,7 +753,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void ForceFullPurgeAllWithSceneUnloadedReason()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             const int preWarmCount = 25;
             const int maxPurgesPerOp = 5;

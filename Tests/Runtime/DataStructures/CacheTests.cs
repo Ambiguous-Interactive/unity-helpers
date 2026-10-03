@@ -747,15 +747,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             cache.Resize(8);
 
-            Assert.AreEqual(6, cache.ProtectedCapacityForTesting);
-            Assert.AreEqual(6, cache.ProtectedCountForTesting);
-            Assert.AreEqual(2, cache.ProbationCountForTesting);
+            Assert.AreEqual(6, cache._protectedCapacity);
+            Assert.AreEqual(6, cache._protectedCount);
+            Assert.AreEqual(2, cache._probationCount);
 
             cache.Clear();
 
-            Assert.AreEqual(6, cache.ProtectedCapacityForTesting);
-            Assert.AreEqual(0, cache.ProtectedCountForTesting);
-            Assert.AreEqual(0, cache.ProbationCountForTesting);
+            Assert.AreEqual(6, cache._protectedCapacity);
+            Assert.AreEqual(0, cache._protectedCount);
+            Assert.AreEqual(0, cache._probationCount);
         }
 
         [Test]
@@ -781,7 +781,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             cache.Set(11, 11);
 
             Assert.AreEqual(15, cache.Capacity);
-            Assert.AreEqual(12, cache.ProtectedCapacityForTesting);
+            Assert.AreEqual(12, cache._protectedCapacity);
         }
 
         private float TimeProvider()
@@ -858,7 +858,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     JitterMaxSeconds = 2f,
                 }
             );
-            cache.SetRandomForTesting(new EdgeCaseRandom(floatFallback: 0.5f));
+            cache._random = new EdgeCaseRandom(floatFallback: 0.5f);
             cache.Set(1, 7);
             _currentTime = float.MaxValue;
             Assert.AreEqual(expectedPresent, cache.TryGet(1, out _));
@@ -878,7 +878,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     JitterMaxSeconds = 2f,
                 }
             );
-            cache.SetRandomForTesting(new EdgeCaseRandom(floatFallback: 0.5f));
+            cache._random = new EdgeCaseRandom(floatFallback: 0.5f);
             cache.Set(1, 7);
             Assert.IsTrue(cache.TryGet(1, out _));
             _currentTime = float.MaxValue;
@@ -900,7 +900,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     JitterMaxSeconds = 2f,
                 }
             );
-            cache.SetRandomForTesting(new EdgeCaseRandom(floatFallback: 0.5f));
+            cache._random = new EdgeCaseRandom(floatFallback: 0.5f);
             cache.Set(1, 7);
             _currentTime = 1f;
             failLifetime = true;

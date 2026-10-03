@@ -31,11 +31,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         {
             base.BaseSetUp();
             WGroupLayoutBuilder.ClearCache();
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
             _originalIndentLevel = EditorGUI.indentLevel;
             EditorGUI.indentLevel = 0;
             _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -45,9 +45,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         public override void TearDown()
         {
             WGroupLayoutBuilder.ClearCache();
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
             EditorGUI.indentLevel = _originalIndentLevel;
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 _previousConfiguration.Mode,
                 _previousConfiguration.RowCount
             );
@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ScopeDepthIncreasesWithNonZeroPadding()
         {
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
             int originalDepth = GroupGUIWidthUtility.CurrentScopeDepth;
 
             using (GroupGUIWidthUtility.PushContentPadding(10f, 5f, 5f))
@@ -190,7 +190,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ScopeDepthDoesNotIncreaseWithZeroPadding()
         {
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
             int originalDepth = GroupGUIWidthUtility.CurrentScopeDepth;
 
             using (GroupGUIWidthUtility.PushContentPadding(0f, 0f, 0f))
@@ -206,7 +206,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void NestedPaddingScopesAccumulateDepth()
         {
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
             int originalDepth = GroupGUIWidthUtility.CurrentScopeDepth;
 
             using (GroupGUIWidthUtility.PushContentPadding(10f, 5f, 5f))
@@ -243,7 +243,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void LeftAndRightPaddingAccumulateSeparately()
         {
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
 
             using (GroupGUIWidthUtility.PushContentPadding(12f, 8f, 4f))
             {
@@ -289,7 +289,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ApplyCurrentPaddingAdjustsRectCorrectly()
         {
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
             Rect original = new(0f, 0f, 400f, 100f);
 
             using (GroupGUIWidthUtility.PushContentPadding(30f, 20f, 10f))
@@ -305,7 +305,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ApplyCurrentPaddingWithNoPaddingReturnsOriginal()
         {
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
             Rect original = new(50f, 25f, 300f, 50f);
 
             Rect adjusted = GroupGUIWidthUtility.ApplyCurrentPadding(original);
@@ -316,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void MixedZeroAndNonZeroPaddingScopesTrackCorrectly()
         {
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
             int originalDepth = GroupGUIWidthUtility.CurrentScopeDepth;
 
             using (GroupGUIWidthUtility.PushContentPadding(10f, 5f, 5f))
@@ -349,7 +349,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void HorizontalPaddingEqualsLeftPlusRight()
         {
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
 
             float leftPadding = 12f;
             float rightPadding = 8f;
@@ -495,7 +495,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void PaddingScopeDisposalOrderMatters()
         {
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
 
             IDisposable outer = GroupGUIWidthUtility.PushContentPadding(10f, 5f, 5f);
             IDisposable inner = GroupGUIWidthUtility.PushContentPadding(8f, 4f, 4f);

@@ -74,16 +74,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         internal static bool IsActive => _enabled && ValidationPreferences.Enabled;
 
-        private static readonly Action DrainAction = Drain;
-        private static readonly EditorApplication.CallbackFunction RetryAction = Retry;
-        private static readonly HashSet<string> Pending = new HashSet<string>(
+        internal static readonly HashSet<string> Pending = new HashSet<string>(
             StringComparer.Ordinal
         );
 
-        private static readonly Dictionary<string, int> TriggerSources = new Dictionary<
+        internal static readonly Dictionary<string, int> TriggerSources = new Dictionary<
             string,
             int
         >(StringComparer.Ordinal);
+
+        private static readonly Action DrainAction = Drain;
+        private static readonly EditorApplication.CallbackFunction RetryAction = Retry;
 
         private static bool _enabled = EditorPrefs.GetBool(EnabledPreferenceKey, false);
         private static bool _pruneDeleted;
@@ -142,15 +143,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             AssetPostprocessorDeferral.Schedule(DrainAction);
         }
 
-        internal static void CompleteRunForTesting(ValidationRun run)
+        internal static void CompleteRun(ValidationRun run)
         {
-            CompleteRun(run);
-        }
+            if (!ValidationPreferences.Enabled)
+                return;
+            if (ValidationResults.TryMergeScopedRun(run))
+            {
+                return;
+            }
 
-        internal static void ClearPendingForTesting()
-        {
-            Pending.Clear();
-            TriggerSources.Clear();
+            if (_enabled && run != null)
+            {
+                IReadOnlyList<ValidationTarget> targets = run.Targets;
+                for (int index = 0; index < targets.Count; ++index)
+                {
+                    Pending.Add(targets[index].AssetGuid);
+                }
+            }
+
+            string reason =
+                run == null ? "no run result"
+                : run.IsCancelled ? "the run was cancelled"
+                : !run.IsComplete ? "the run was incomplete"
+                : run.Failures.Count == 0 ? "the run returned an invalid result"
+                : run.Failures.Count + " rule or load failure(s)";
+            string queueStatus = _enabled
+                ? " The affected assets remain queued for the next import."
+                : " Automatic validation is disabled, so the affected assets were not requeued.";
+            UnityEngine.Debug.LogWarning(
+                "[Asset Validation] Incremental validation retained previous results because "
+                    + reason
+                    + "."
+                    + queueStatus
+            );
         }
 
         private static void Retry()
@@ -247,41 +272,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             EditorApplication.delayCall -= RetryAction;
             EditorApplication.delayCall += RetryAction;
-        }
-
-        private static void CompleteRun(ValidationRun run)
-        {
-            if (!ValidationPreferences.Enabled)
-                return;
-            if (ValidationResults.TryMergeScopedRun(run))
-            {
-                return;
-            }
-
-            if (_enabled && run != null)
-            {
-                IReadOnlyList<ValidationTarget> targets = run.Targets;
-                for (int index = 0; index < targets.Count; ++index)
-                {
-                    Pending.Add(targets[index].AssetGuid);
-                }
-            }
-
-            string reason =
-                run == null ? "no run result"
-                : run.IsCancelled ? "the run was cancelled"
-                : !run.IsComplete ? "the run was incomplete"
-                : run.Failures.Count == 0 ? "the run returned an invalid result"
-                : run.Failures.Count + " rule or load failure(s)";
-            string queueStatus = _enabled
-                ? " The affected assets remain queued for the next import."
-                : " Automatic validation is disabled, so the affected assets were not requeued.";
-            UnityEngine.Debug.LogWarning(
-                "[Asset Validation] Incremental validation retained previous results because "
-                    + reason
-                    + "."
-                    + queueStatus
-            );
         }
 
         private static void Prune()

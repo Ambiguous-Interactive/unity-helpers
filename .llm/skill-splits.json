@@ -29,7 +29,7 @@
     },
     {
       "name": "avoid-reflection",
-      "sha256": "8b083202f8331761e9159f7f317f087a9a6ce8aef1860d43b4282230dcf2358d",
+      "sha256": "3a8ce96749ecfefdf8864388b691fe1b39a496e32d14af5df21b226ce28bf4ce",
       "parts": ["avoid-reflection-part-1.md", "avoid-reflection-part-2.md"],
       "routerSha256": "d9d0748a7f8782677f897b396994d260daea9240daff339b3c6588c46e59da3e"
     },
@@ -428,13 +428,13 @@
     },
     {
       "name": "unity-mcp-fixture-runner",
-      "sha256": "c870473c8d0b849846ad569b11e1bca1824782bab93b62ad6184a38136789392",
+      "sha256": "a4e69aad560a6e06836d3640c8f0b20f712badfdfe0b69a271e961cbd449c10e",
       "parts": [
         "unity-mcp-fixture-runner-part-1.md",
         "unity-mcp-fixture-runner-part-2.md",
         "unity-mcp-fixture-runner-part-3.md"
       ],
-      "routerSha256": "eb5d855ae47ea6901443ccbdb70a53c16825d013834996ae6291718855a2b12f"
+      "routerSha256": "0aabdfc757a7a062cb60843685662b97e513d94104bdfd8d53beedaa8668b1ca"
     },
     {
       "name": "unity-performance-patterns",

@@ -164,7 +164,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             EnsureTestFolder();
             TrackFolder(TestRoot);
             // Folder creation can queue drains that would pollute the first test.
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
         }
 
         [SetUp]
@@ -179,12 +179,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 state during the test.
             */
             AssetPostprocessorTestHandlers.FlushAndClearAll();
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             // Force the watcher on because CI runs this fixture in batch mode.
             _watcherScope = AssetChangeDetectionUtility.EnabledScope(true);
-            DetectAssetChangeProcessor.IncludeTestAssets = true;
-            // Restrict observed paths so other fixtures’ assets cannot invoke this handler.
-            DetectAssetChangeProcessor.TestAssetFolderAllowlist = new[] { TestRoot + "/" };
+
             TestOnValidateCountingComponent.Clear();
         }
 
@@ -192,14 +190,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         public override void TearDown()
         {
             TestOnValidateCountingComponent.Clear();
-            DetectAssetChangeProcessor.TestAssetFolderAllowlist = null;
-            DetectAssetChangeProcessor.ResetForTesting();
+
+            DetectAssetChangeProcessorTestAccess.Reset();
             _watcherScope?.Dispose();
             _watcherScope = null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             base.TearDown();
             // Flush after base teardown because tracked-asset destruction can enqueue additional drains.
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             AssetPostprocessorTestHandlers.FlushAndClearAll();
         }
 
@@ -221,9 +219,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 $"Prefab '{prefabPath}' should report GameObject as its main asset type"
             );
 
-            DetectAssetChangeProcessor.EnsureInitializedForTesting();
+            DetectAssetChangeProcessorTestAccess.EnsureInitialized();
             Dictionary<Type, DetectAssetChangeProcessor.AssetWatcher> watchers =
-                DetectAssetChangeProcessor.GetSettingsForTesting().WatchersByAssetType;
+                DetectAssetChangeProcessorTestAccess.GetSettings().WatchersByAssetType;
             Assert.IsTrue(
                 watchers.ContainsKey(typeof(TestDetectableAsset)),
                 "Expected a registered watcher on a non-GameObject type, otherwise no watcher "
@@ -234,16 +232,16 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 Prefab import legitimately invokes OnValidate; reset its counter after draining to isolate
                 watcher matching.
             */
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             TestOnValidateCountingComponent.Clear();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { prefabPath },
                 null,
                 null,
                 null
             );
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.AreEqual(
                 0,
@@ -266,20 +264,20 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             string prefabPath = TestRoot + "/SendMessageProbe.prefab";
             CreateProbePrefab(prefabPath);
 
-            DetectAssetChangeProcessor.EnsureInitializedForTesting();
-            AssetPostprocessorDeferral.FlushForTesting();
+            DetectAssetChangeProcessorTestAccess.EnsureInitialized();
+            AssetPostprocessorDeferralTestAccess.Flush();
             TestOnValidateCountingComponent.Clear();
             TestOnValidateCountingComponent.EmitSendMessageDuringValidate = true;
 
             using EditorLogScope logScope = new();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { prefabPath },
                 null,
                 null,
                 null
             );
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             logScope.AssertNoSendMessageWarnings();
             AssertNoSendMessageErrors(logScope);
@@ -332,16 +330,16 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 $"'{containerPath}' should carry a nested {nameof(TestDetectableAsset)} sub-asset"
             );
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             AssetPostprocessorTestHandlers.FlushAndClearAll();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { containerPath },
                 null,
                 null,
                 null
             );
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.IsTrue(
                 RecordedCreatedPathsContain(
@@ -374,11 +372,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 AssetDatabase.ImportAsset(containerPath, ImportAssetOptions.ForceSynchronousImport);
             });
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             AssetPostprocessorTestHandlers.FlushAndClearAll();
-            DetectAssetChangeProcessor.EnsureInitializedForTesting();
-            DetectAssetChangeProcessor.AssetWatcherSettings settings =
-                DetectAssetChangeProcessor.GetSettingsForTesting();
+            DetectAssetChangeProcessorTestAccess.EnsureInitialized();
+            DetectAssetChangeProcessorTestAccess.AssetWatcherSettings settings =
+                DetectAssetChangeProcessorTestAccess.GetSettings();
             Assert.IsTrue(
                 settings.WatchersByAssetType.TryGetValue(
                     typeof(TestDetectableAsset),
@@ -395,19 +393,19 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             }
             Assert.AreEqual(1, watcher.Subscriptions.Count);
-            DetectAssetChangeProcessor.ResetForTesting(settings);
+            DetectAssetChangeProcessorTestAccess.Reset(settings);
 
             Resources.UnloadAsset(container);
             Resources.UnloadAsset(nested);
             TestSubAssetContainerAsset.ResetOnValidateCount();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { containerPath },
                 null,
                 null,
                 null
             );
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.AreEqual(0, TestSubAssetContainerAsset.OnValidateCount);
             Assert.IsTrue(
@@ -436,16 +434,16 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 AssetDatabase.CreateAsset(container, containerPath);
             });
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             AssetPostprocessorTestHandlers.FlushAndClearAll();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { containerPath },
                 null,
                 null,
                 null
             );
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.IsFalse(
                 RecordedCreatedPathsContain(
@@ -507,16 +505,16 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     + "Sprite watcher would match on the main type and never reach the sub-asset probe"
             );
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             AssetPostprocessorTestHandlers.FlushAndClearAll();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { texturePath },
                 null,
                 null,
                 null
             );
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.IsTrue(
                 RecordedCreatedPathsContain(

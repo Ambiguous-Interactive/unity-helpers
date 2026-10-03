@@ -53,13 +53,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const float ThrashWindowSeconds = 1f;
         private IRandom Random => _random ??= PRNG.Instance;
 
+        // Delay PRNG initialization to avoid static-initializer deadlocks while Unity opens a scene.
+        internal IRandom _random;
+
         private readonly CacheOptions<TKey, TValue> _options;
         private readonly Func<float> _timeProvider;
 
         private readonly Queue<EvictionNotification> _pendingEvictions;
-
-        // Delay PRNG initialization to avoid static-initializer deadlocks while Unity opens a scene.
-        private IRandom _random;
         private ReaderWriterLockSlim _lock;
 
 #if SINGLE_THREADED
@@ -114,12 +114,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
         }
+        internal int _probationCount;
+        internal int _protectedCount;
+        internal int _protectedCapacity;
 
-        internal int ProtectedCapacityForTesting => _protectedCapacity;
-
-        internal int ProtectedCountForTesting => _protectedCount;
-
-        internal int ProbationCountForTesting => _probationCount;
         private CacheEntry[] _entries;
         private int _count;
         private int _capacity;
@@ -135,9 +133,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private int _probationTail;
         private int _protectedHead;
         private int _protectedTail;
-        private int _probationCount;
-        private int _protectedCount;
-        private int _protectedCapacity;
 
         private int _freeListHead;
 
@@ -776,14 +771,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 ExitWriteLockAndInvokeEvictions();
             }
-        }
-
-        /// <summary>
-        /// Overrides the random source for deterministic cache tests.
-        /// </summary>
-        internal void SetRandomForTesting(IRandom random)
-        {
-            _random = random;
         }
 
         private void InitializeFreeList()

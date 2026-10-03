@@ -1,5 +1,6 @@
 Param(
-    [switch]$VerboseOutput
+    [switch]$VerboseOutput,
+    [switch]$LicensePipeOnly
 )
 
 Set-StrictMode -Version Latest
@@ -429,6 +430,80 @@ exit 0
 '@
     Set-Content -Path $scriptPath -Value $script -Encoding UTF8
     return $scriptPath
+}
+
+function Test-LicensePipeDrain {
+    $repoPath = New-TestRepo -ConfigurePushDefaults
+    $process = $null
+    try {
+        $fileCount = 512
+        $directoryName = 'PipeDrain-' + ('p' * 90)
+        $directory = Join-Path $repoPath $directoryName
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+        $paths = [System.Collections.Generic.List[string]]::new()
+        $currentYear = (Get-Date).Year
+        for ($index = 0; $index -lt $fileCount; ++$index) {
+            $className = 'PipeDrain' + $index
+            $fileName = ('x' * 60) + $index.ToString('D4') + '.cs'
+            $relativePath = $directoryName + '/' + $fileName
+            $paths.Add($relativePath)
+            $year = if ($index -eq $fileCount - 1) { $currentYear - 1 } else { $currentYear }
+            [System.IO.File]::WriteAllText(
+                (Join-Path $repoPath $relativePath),
+                "// MIT License - Copyright (c) $year wallstop`n// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE`n`npublic sealed class $className {}`n"
+            )
+            [System.IO.File]::WriteAllText(
+                (Join-Path $repoPath ($relativePath + '.meta')),
+                "fileFormatVersion: 2`nguid: $([Guid]::NewGuid().ToString('N'))`n"
+            )
+        }
+        $pathList = Join-Path $repoPath 'license-pipe-paths.txt'
+        [System.IO.File]::WriteAllLines($pathList, $paths)
+        $inputBytes = [System.Text.Encoding]::UTF8.GetByteCount(($paths -join "`0") + "`0")
+        Write-TestResult 'LicensePipeDrain_ExceedsPipeCapacity' ($inputBytes -gt 65536) "Expected more than 64 KiB of real path input; got $inputBytes bytes."
+
+        $info = [System.Diagnostics.ProcessStartInfo]::new()
+        $info.FileName = (Get-Command pwsh -ErrorAction Stop).Source
+        foreach ($argument in @('-NoProfile', '-File', (Join-Path $repoPath 'scripts/agent-preflight.ps1'), '-PathList', $pathList)) {
+            [void]$info.ArgumentList.Add($argument)
+        }
+        $info.WorkingDirectory = $repoPath
+        $info.UseShellExecute = $false
+        $info.RedirectStandardOutput = $true
+        $info.RedirectStandardError = $true
+        $process = [System.Diagnostics.Process]::Start($info)
+        $outputTask = $process.StandardOutput.ReadToEndAsync()
+        $errorTask = $process.StandardError.ReadToEndAsync()
+        $completed = $process.WaitForExit(30000)
+        if (-not $completed) {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
+        $output = $outputTask.GetAwaiter().GetResult() + $errorTask.GetAwaiter().GetResult()
+        Write-TestResult 'LicensePipeDrain_CompletesWithinTimeout' $completed "Actual preflight did not complete within 30 seconds. Output: $output"
+        if ($completed) {
+            Write-TestResult 'LicensePipeDrain_LastFileChecked' ($process.ExitCode -eq 1 -and $output.Contains($paths[$fileCount - 1]) -and $output.Contains('License year header issues detected')) "Expected the last file's license mismatch, got exit $($process.ExitCode). Output: $output"
+            Write-TestResult 'LicensePipeDrain_LibraryNotSkipped' (-not $output.Contains('Skipped the license year check')) "The actual license library must execute. Output: $output"
+        }
+    }
+    finally {
+        if ($null -ne $process) {
+            if (-not $process.HasExited) {
+                $process.Kill($true)
+                $process.WaitForExit()
+            }
+            $process.Dispose()
+        }
+        Remove-Item -LiteralPath $repoPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Test-LicensePipeDrain
+if ($LicensePipeOnly) {
+    if ($script:TestsFailed -gt 0) {
+        exit 1
+    }
+    exit 0
 }
 
 Write-Host 'Testing agent-preflight.ps1...' -ForegroundColor White

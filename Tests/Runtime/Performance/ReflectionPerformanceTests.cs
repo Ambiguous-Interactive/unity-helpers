@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using System.Runtime.InteropServices;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [Category("Performance")]
@@ -38,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             {
                 if (config.RequiresOverride)
                 {
-                    capabilityOverride = ReflectionHelpers.OverrideReflectionCapabilities(
+                    capabilityOverride = new ReflectionCapabilityScope(
                         config.ExpressionsOverride,
                         config.DynamicIlOverride
                     );

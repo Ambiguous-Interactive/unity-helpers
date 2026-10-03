@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// Unity's import phase has crashed a headless editor natively. The play-mode guard covered one
     /// door into that scan; batch mode went through the other. These tests pin the resulting
     /// policy and the consumer opt-out, including that the package's own suite -- which runs under
-    /// batch mode in CI -- still drives the processor through its explicit test entry point.
+    /// batch mode in CI -- still drives the processor through fixture-owned watcher setup.
     /// </remarks>
     [TestFixture]
     public sealed class AssetChangeDetectionEnablementTests : BatchedEditorTestBase
@@ -39,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         public override void TearDown()
         {
             // These tests drive initialization directly, so hand the next fixture a clean slate.
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             _watcherScope?.Dispose();
             _watcherScope = null;
             base.TearDown();
@@ -83,38 +83,38 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void DisablingPreventsInitialization()
         {
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             AssetChangeDetectionUtility.Enabled = false;
 
-            DetectAssetChangeProcessor.EnsureInitializedForTesting();
+            DetectAssetChangeProcessor.EnsureInitialized();
 
-            Assert.IsFalse(DetectAssetChangeProcessor.GetSettingsForTesting().Initialized);
+            Assert.IsFalse(DetectAssetChangeProcessorTestAccess.GetSettings().Initialized);
         }
 
         [Test]
         public void EnablingAllowsInitialization()
         {
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             AssetChangeDetectionUtility.Enabled = true;
 
-            DetectAssetChangeProcessor.EnsureInitializedForTesting();
+            DetectAssetChangeProcessor.EnsureInitialized();
 
-            Assert.IsTrue(DetectAssetChangeProcessor.GetSettingsForTesting().Initialized);
+            Assert.IsTrue(DetectAssetChangeProcessorTestAccess.GetSettings().Initialized);
         }
 
         /*
-            The explicit test entry point must initialize in batch mode or watcher fixtures would pass without
+            Fixture-owned watcher setup must build handlers in batch mode or watcher fixtures would pass without
             exercising any handlers.
         */
         [Test]
-        public void TheTestEntryPointInitializesEvenWhenTheWatcherIsDisabled()
+        public void FixtureWatcherSetupBuildsHandlersWhenAutomaticWatcherIsDisabled()
         {
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             AssetChangeDetectionUtility.Enabled = false;
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(null, null, null, null);
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(null, null, null, null);
 
-            Assert.IsTrue(DetectAssetChangeProcessor.GetSettingsForTesting().Initialized);
+            Assert.IsTrue(DetectAssetChangeProcessorTestAccess.GetSettings().Initialized);
         }
     }
 }

@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [SetUp]
         public void SetUp()
         {
-            Serializer.ClearProtobufRootCacheForTesting(
+            ProtoRootTestUtilities.ClearRootCaches(
                 typeof(IAnimal),
                 typeof(IInferredAnimal),
                 typeof(IPlainAbstractAnimal)

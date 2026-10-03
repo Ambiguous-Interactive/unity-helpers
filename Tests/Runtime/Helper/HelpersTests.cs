@@ -115,21 +115,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(Helpers.GetCommandLineArgument(arguments, name) == null);
             Assert.IsEmpty(Helpers.GetCommandLineArguments(arguments, name));
 
-            int providerCalls = 0;
-            try
-            {
-                Helpers.CommandLineArgumentProvider = () =>
-                {
-                    ++providerCalls;
-                    return arguments;
-                };
-                Assert.IsTrue(Helpers.GetCommandLineArgument(name) == null);
-                Assert.AreEqual(0, providerCalls);
-            }
-            finally
-            {
-                Helpers.ResetCommandLineArgumentProvider();
-            }
+            Assert.IsTrue(Helpers.GetCommandLineArgument(name) == null);
         }
 
         [TestCase(" -scene ", " ", TestName = "CommandLine.Literal.PaddedName")]
@@ -159,17 +145,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Helpers.GetCommandLineArgument("-wallstop-missing-session-279-argument") == null
             );
             Assert.IsTrue(Helpers.GetCommandLineArgument(string.Empty) == null);
-
-            try
-            {
-                Helpers.CommandLineArgumentProvider = () =>
-                    throw new InvalidOperationException("arguments unavailable");
-                Assert.IsTrue(Helpers.GetCommandLineArgument("-scene") == null);
-            }
-            finally
-            {
-                Helpers.ResetCommandLineArgumentProvider();
-            }
         }
 
         [Test]
@@ -477,28 +452,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [UnityTest]
-        public IEnumerator StartFunctionAsCoroutineAppliesJitterBeforeFirstInvocation()
+        public IEnumerator StartFunctionAsCoroutineWaitBeforeHonorsIntervalWithJitterEnabled()
         {
             CoroutineHost host = CreateHost();
             host.ResetState();
 
             /*
-                Jitter is clamped to the interval; both must exceed slow batchmode frames to avoid timing-
-                dependent first-frame assertions.
+                The required initial interval exceeds slow batchmode frames so the waitBefore
+                assertion remains independent of the sampled jitter.
             */
             const float interval = 0.25f;
-            Helpers.JitterSampler = _ => interval;
             float start = Time.time;
 
             Coroutine coroutine = host.StartFunctionAsCoroutine(
                 host.Increment,
                 interval,
-                useJitter: true
+                useJitter: true,
+                waitBefore: true
             );
 
             try
             {
-                Assert.AreEqual(0, host.InvocationCount, "Jitter must not invoke synchronously.");
+                Assert.AreEqual(
+                    0,
+                    host.InvocationCount,
+                    "waitBefore must not invoke synchronously with jitter enabled."
+                );
 
                 float timeout = Time.time + interval + 5f;
                 while (host.InvocationCount == 0 && Time.time < timeout)
@@ -509,18 +488,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.Greater(
                     host.InvocationCount,
                     0,
-                    "Invocation never occurred after jitter delay elapsed."
+                    "Invocation never occurred after the waitBefore delay elapsed."
                 );
                 Assert.GreaterOrEqual(
                     Time.time - start,
-                    interval * 0.5f,
-                    "Jitter should delay the first invocation."
+                    interval,
+                    "waitBefore should delay the first invocation by at least the interval."
                 );
             }
             finally
             {
                 host.StopCoroutine(coroutine);
-                Helpers.ResetJitterSampler();
             }
         }
 
@@ -529,7 +507,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             CoroutineHost host = CreateHost();
             host.ResetState();
-            Helpers.JitterSampler = _ => 0f;
 
             Coroutine coroutine = host.StartFunctionAsCoroutine(
                 host.Increment,
@@ -549,50 +526,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             finally
             {
                 host.StopCoroutine(coroutine);
-                Helpers.ResetJitterSampler();
             }
         }
 
-        [UnityTest]
-        public IEnumerator StartFunctionAsCoroutineIgnoresInvalidJitterValues()
+        [TestCase(float.NaN, 0f)]
+        [TestCase(-5f, 0f)]
+        [TestCase(0f, 0f)]
+        [TestCase(0.025f, 0.025f)]
+        [TestCase(0.2f, 0.05f)]
+        [TestCase(float.PositiveInfinity, 0.05f)]
+        public void InitialJitterClampsSampleToInterval(float sample, float expected)
         {
-            CoroutineHost host = CreateHost();
-            host.ResetState();
-
-            Helpers.JitterSampler = _ => float.NaN;
-            Coroutine coroutine = host.StartFunctionAsCoroutine(
-                host.Increment,
-                0.01f,
-                useJitter: true
-            );
-
-            try
-            {
-                yield return null;
-                Assert.Greater(host.InvocationCount, 0, "NaN jitter should be treated as zero.");
-            }
-            finally
-            {
-                host.StopCoroutine(coroutine);
-            }
-
-            Helpers.JitterSampler = _ => -5f;
-            coroutine = host.StartFunctionAsCoroutine(host.Increment, 0.01f, useJitter: true);
-
-            try
-            {
-                yield return null;
-                Assert.Greater(
-                    host.InvocationCount,
-                    0,
-                    "Negative jitter should be clamped to zero."
-                );
-            }
-            finally
-            {
-                host.StopCoroutine(coroutine);
-                Helpers.ResetJitterSampler();
-            }
+            Assert.AreEqual(expected, Helpers.ClampInitialJitter(sample, 0.05f));
         }
 
         [UnityTest]
@@ -671,41 +616,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             });
 
             yield break;
-        }
-
-        [UnityTest]
-        public IEnumerator StartFunctionAsCoroutineClampsExcessiveJitter()
-        {
-            CoroutineHost host = CreateHost();
-            host.ResetState();
-            Helpers.JitterSampler = delay => delay * 4f;
-
-            Coroutine coroutine = host.StartFunctionAsCoroutine(
-                host.Increment,
-                0.05f,
-                useJitter: true
-            );
-
-            try
-            {
-                float start = Time.time;
-                while (host.InvocationCount == 0 && Time.time - start < 0.2f)
-                {
-                    yield return null;
-                }
-
-                Assert.Greater(host.InvocationCount, 0, "Invocation never occurred.");
-                Assert.Less(
-                    Time.time - start,
-                    0.15f,
-                    "Jitter should have been clamped to the base interval."
-                );
-            }
-            finally
-            {
-                host.StopCoroutine(coroutine);
-                Helpers.ResetJitterSampler();
-            }
         }
 
         [UnityTest]

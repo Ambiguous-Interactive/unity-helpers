@@ -648,7 +648,7 @@ using (var buffer = Buffers<Transform>.List.Get())
 
 **Problem it solves:** Unity APIs can only be called from the main thread. Background Tasks/threads can't directly manipulate GameObjects. This marshals callbacks back to the main thread.
 
-See the dedicated [Unity Main Thread Dispatcher guide](../logging/unity-main-thread-dispatcher.md) for details about auto-creation, queue limits, the `AutoCreationScope` helper, and the `CreateTestScope(...)` convenience method that packages can use in their own test fixtures.
+See the dedicated [Unity Main Thread Dispatcher guide](../logging/unity-main-thread-dispatcher.md) for details about auto-creation, queue limits, the `AutoCreationScope` helper, and instance cleanup through the public `AutoCreationScope.Enabled(...)` and `Disabled(...)` operations.
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;

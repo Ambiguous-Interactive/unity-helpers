@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         internal static void Sum(double left, double right, out double high, out double low)
         {
             double total = left + right;
-            if (double.IsNaN(total) || double.IsInfinity(total))
+            if (!double.IsFinite(total))
             {
                 high = total;
                 low = 0d;
@@ -58,7 +58,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         internal static float RemainingDuration(float startedAt, float duration, float currentTime)
         {
-            if (float.IsNaN(duration) || float.IsInfinity(duration))
+            if (!float.IsFinite(duration))
             {
                 return duration < 0f ? 0f : duration;
             }
@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             int roundedBits = BitConverter.SingleToInt32Bits((float)high);
             float rounded = BitConverter.Int32BitsToSingle(roundedBits);
-            if (low == 0d || double.IsNaN(high) || double.IsInfinity(high))
+            if (low == 0d || !double.IsFinite(high))
             {
                 return rounded;
             }

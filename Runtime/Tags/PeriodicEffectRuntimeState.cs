@@ -34,16 +34,17 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <summary>
         /// The number of ticks that have successfully executed so far.
         /// </summary>
-        internal int ExecutedTicks { get; private set; }
+        internal int ExecutedTicks { get; set; }
 
         internal readonly PeriodicEffectDefinition definition;
         internal readonly float interval;
+
+        internal long _scheduleOrdinal;
 
         private readonly double _origin;
         private readonly double _originRemainder;
         private readonly bool _usesNonfiniteTiming;
         private float _legacyNextTickTime;
-        private long _scheduleOrdinal;
 
         /// <summary>
         /// Creates runtime tracking for a periodic definition, clamping invalid authoring values.
@@ -59,12 +60,9 @@ namespace WallstopStudios.UnityHelpers.Tags
             float initialDelay = Mathf.Max(0f, definition.initialDelay);
             _legacyNextTickTime = (float)((double)startTime + initialDelay);
             _usesNonfiniteTiming =
-                float.IsNaN(startTime)
-                || float.IsInfinity(startTime)
-                || float.IsNaN(initialDelay)
-                || float.IsInfinity(initialDelay)
-                || float.IsNaN(interval)
-                || float.IsInfinity(interval);
+                !float.IsFinite(startTime)
+                || !float.IsFinite(initialDelay)
+                || !float.IsFinite(interval);
             TwoSum(startTime, initialDelay, out _origin, out _originRemainder);
         }
 
@@ -75,18 +73,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             double error = (left - (total - roundedRight)) + (right - roundedRight);
             sum = total;
             remainder = error;
-        }
-
-        /// <summary>
-        /// Seeds execution and schedule counters for bounded wraparound regression tests.
-        /// </summary>
-        internal void SetExecutedTicksForTesting(int executedTicks)
-        {
-            ExecutedTicks = executedTicks;
-            _scheduleOrdinal = executedTicks;
-            _legacyNextTickTime = (float)(
-                _origin + _originRemainder + (double)executedTicks * interval
-            );
         }
 
         /// <summary>
@@ -101,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            if (_usesNonfiniteTiming || float.IsNaN(currentTime) || float.IsInfinity(currentTime))
+            if (_usesNonfiniteTiming || !float.IsFinite(currentTime))
             {
                 if (currentTime < _legacyNextTickTime)
                 {

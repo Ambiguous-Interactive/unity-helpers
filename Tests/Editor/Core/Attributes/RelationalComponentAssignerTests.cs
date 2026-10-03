@@ -259,7 +259,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Attributes
                 new[] { relationalMetadata },
                 Array.Empty<AttributeMetadataCache.AutoLoadSingletonEntry>()
             );
-            cache.ForceRebuildForTests();
+            global::WallstopStudios.UnityHelpers.Tests.Core.AttributeMetadataCacheTestUtilities.Rebuild(
+                cache
+            );
             return cache;
         }
     }

@@ -140,9 +140,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return TryEnsureRegistered();
         }
 
-        internal static void ClearRunSessionForTests()
+        internal static void ClearActiveOwner()
         {
-            ClearActiveOwner();
+            _owner = string.Empty;
+            _runStarted = false;
+            SessionState.EraseString(OwnerSessionKey);
+            SessionState.EraseBool(RunStartedSessionKey);
         }
 
         // Re-register synchronously after reload so early RunFinished events are captured even when delayCall never runs.
@@ -238,14 +241,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             _runStarted = false;
             SessionState.SetString(OwnerSessionKey, owner);
             SessionState.SetBool(RunStartedSessionKey, value: false);
-        }
-
-        private static void ClearActiveOwner()
-        {
-            _owner = string.Empty;
-            _runStarted = false;
-            SessionState.EraseString(OwnerSessionKey);
-            SessionState.EraseBool(RunStartedSessionKey);
         }
 
         private static TestRunResultNode BuildNode(ITestResultAdaptor result, int depth)

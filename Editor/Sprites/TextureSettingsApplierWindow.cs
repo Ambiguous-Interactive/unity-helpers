@@ -19,8 +19,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
     public sealed class TextureSettingsApplierWindow : EditorWindow
     {
-        internal SerializedObject SerializedStateForTesting => _so;
-
         public bool applyReadOnly;
         public bool isReadOnly;
         public bool applyMipMaps;
@@ -47,10 +45,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public List<PlatformOverrideEntry> platformOverrides = new();
 
         public bool requireChangesBeforeApply = true;
+
+        internal SerializedObject _so;
         private int _addPlatformIndex;
         private readonly Dictionary<int, int> _replaceSelectionByIndex = new();
-
-        private SerializedObject _so;
         private SerializedProperty _texturesProp;
         private SerializedProperty _directoriesProp;
         private SerializedProperty _extensionsProp;

@@ -28,28 +28,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         internal static bool VerboseLogging { get; set; }
 
-        internal static bool IncludeTestAssemblies { get; set; }
-        internal static bool DisableAutomaticRetries { get; set; }
-        internal static Func<bool> AssetImportWorkerProcessCheck { get; set; }
-
-        internal static Func<Type, bool> TypeFilter { get; set; }
-
-        internal static bool IgnoreExclusionAttribute { get; set; }
-
-        internal static bool AllowAssetCreationDuringSuppression { get; set; }
-
-        // Tests can explicitly bypass compilation-state signals that lag asset operations.
-        internal static bool IgnoreCompilationState { get; set; }
-
-        private static bool _isEnsuring;
+        internal static bool _isEnsuring;
+        internal static int _retryAttempts;
+        internal static int _consecutiveZeroProgressRetries;
+        internal static bool? _assetImportWorkerEnvCachedValue;
+        internal static Func<bool> _defaultAssetImportWorkerDetector;
+        internal static bool _mainThreadConfirmed;
+        internal static bool _mainThreadConfirmationPending;
+        internal static int _capturedMainThreadId;
         private static bool _ensureScheduled;
-        private static int _retryAttempts;
-        private static int _consecutiveZeroProgressRetries;
-        private static bool? _assetImportWorkerEnvCachedValue;
-        private static Func<bool> _defaultAssetImportWorkerDetector;
-        private static bool _mainThreadConfirmed;
-        private static bool _mainThreadConfirmationPending;
-        private static int _capturedMainThreadId;
 
         static ScriptableObjectSingletonCreator()
         {
@@ -61,11 +48,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             CancelScheduledEnsureInvocation();
 
-            // Automatic asset creation can open modal dialogs during tests; fixtures must explicitly opt in.
-            if (EditorUi.Suppress && !AllowAssetCreationDuringSuppression)
+            // Suppressed editor sessions do not create assets automatically.
+            if (EditorUi.Suppress)
             {
                 LogVerbose(
-                    "ScriptableObjectSingletonCreator: Skipping ensure because EditorUi.Suppress is true (test mode)."
+                    "ScriptableObjectSingletonCreator: Skipping ensure because EditorUi.Suppress is true."
                 );
                 return;
             }
@@ -92,11 +79,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return;
             }
 
-            // Wait until import and compilation finish before creating assets; tests may explicitly bypass this guard.
-            if (
-                !IgnoreCompilationState
-                && (EditorApplication.isCompiling || EditorApplication.isUpdating)
-            )
+            // Wait until import and compilation finish before creating assets.
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
             {
                 LogVerbose(
                     "ScriptableObjectSingletonCreator: Deferring ensure during compilation/updating."
@@ -105,6 +89,41 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return;
             }
 
+            EnsureSingletonAssets(DiscoverSingletonTypes());
+        }
+
+        internal static List<Type> DiscoverSingletonTypes()
+        {
+            List<Type> candidates = new();
+            foreach (
+                Type candidate in ReflectionHelpers.GetTypesDerivedFrom(
+                    typeof(UnityHelpers.Utils.ScriptableObjectSingleton<>),
+                    includeAbstract: false
+                )
+            )
+            {
+                if (
+                    !candidate.IsGenericType
+                    && !TestAssemblyHelper.IsTestType(candidate)
+                    && !ReflectionHelpers.TryGetAttributeSafe<ExcludeFromSingletonCreationAttribute>(
+                        candidate,
+                        out _,
+                        inherit: false
+                    )
+                )
+                {
+                    candidates.Add(candidate);
+                }
+            }
+            return candidates;
+        }
+
+        internal static void EnsureSingletonAssets(IReadOnlyList<Type> allCandidates)
+        {
+            if (_isEnsuring || allCandidates == null)
+            {
+                return;
+            }
             _isEnsuring = true;
             bool anyChanges = false;
             bool retryRequested = false;
@@ -123,32 +142,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             $"ScriptableObjectSingletonCreator: Removed {staleCount} stale metadata entries."
                         );
                         anyChanges = true;
-                    }
-
-                    List<Type> allCandidates = new();
-                    foreach (
-                        Type t in ReflectionHelpers.GetTypesDerivedFrom(
-                            typeof(UnityHelpers.Utils.ScriptableObjectSingleton<>),
-                            includeAbstract: false
-                        )
-                    )
-                    {
-                        if (
-                            !t.IsGenericType
-                            && (IncludeTestAssemblies || !TestAssemblyHelper.IsTestType(t))
-                            && (TypeFilter == null || TypeFilter(t))
-                            && (
-                                IgnoreExclusionAttribute
-                                || !ReflectionHelpers.TryGetAttributeSafe<ExcludeFromSingletonCreationAttribute>(
-                                    t,
-                                    out _,
-                                    inherit: false
-                                )
-                            )
-                        )
-                        {
-                            allCandidates.Add(t);
-                        }
                     }
 
                     Dictionary<string, List<Type>> byName = new(StringComparer.OrdinalIgnoreCase);
@@ -392,7 +385,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             bool madeProgress = 0 < singletonsSucceeded || anyChanges;
 
-            if (retryRequested && !DisableAutomaticRetries)
+            if (retryRequested)
             {
                 ScheduleEnsureSingletonAssets(madeProgress);
             }
@@ -447,41 +440,42 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             return int.TryParse(suffix, out int number) && 0 < number;
         }
 
-        [Conditional("UNITY_INCLUDE_TESTS")]
-        internal static void ResetAssetImportWorkerDetectionStateForTests()
+        internal static void CancelScheduledEnsureInvocation()
         {
-            _assetImportWorkerEnvCachedValue = null;
-            _defaultAssetImportWorkerDetector = null;
-            _mainThreadConfirmed = false;
+            if (!_ensureScheduled)
+            {
+                return;
+            }
+
+            EditorApplication.delayCall -= RunScheduledEnsure;
+            _ensureScheduled = false;
+
+            if (0 < _retryAttempts)
+            {
+                _retryAttempts--;
+            }
+        }
+
+        internal static bool IsRunningInsideAssetImportWorkerProcess()
+        {
+            if (IsAssetImportWorkerProcessViaEnvironment())
+            {
+                _mainThreadConfirmationPending = false;
+                return true;
+            }
+
+            if (!TryConfirmEditorMainThread())
+            {
+                LogVerbose(
+                    "ScriptableObjectSingletonCreator: Main thread not yet confirmed; deferring singleton ensure."
+                );
+                _mainThreadConfirmationPending = true;
+                return true;
+            }
+
             _mainThreadConfirmationPending = false;
-            _capturedMainThreadId = 0;
-        }
-
-        [Conditional("UNITY_INCLUDE_TESTS")]
-        internal static void ResetRetryStateForTests()
-        {
-            _retryAttempts = 0;
-            _consecutiveZeroProgressRetries = 0;
-            CancelScheduledEnsureInvocation();
-        }
-
-        [Conditional("UNITY_INCLUDE_TESTS")]
-        internal static void ResetInitialEnsureStateForTests()
-        {
-            UnityHelpers.Utils.ScriptableObjectSingletonInitState.InitialEnsureCompleted = false;
-        }
-
-        /// <summary>
-        /// Resets state for testing. Cleanup of AssetDatabase batch state is now handled
-        /// by the unified <see cref="AssetDatabaseBatchHelper"/>.
-        /// </summary>
-        internal static void ResetAssetEditingScopeDepthForTesting()
-        {
-            _isEnsuring = false;
-
-            CancelScheduledEnsureInvocation();
-            _retryAttempts = 0;
-            _consecutiveZeroProgressRetries = 0;
+            _defaultAssetImportWorkerDetector ??= AssetDatabase.IsAssetImportWorkerProcess;
+            return InvokeDetector(_defaultAssetImportWorkerDetector, assumeWorkerOnFailure: false);
         }
 
         private static void MarkInitialEnsureCompleted()
@@ -537,24 +531,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             EnsureSingletonAssets();
         }
 
-        private static void CancelScheduledEnsureInvocation()
-        {
-            if (!_ensureScheduled)
-            {
-                return;
-            }
-
-            EditorApplication.delayCall -= RunScheduledEnsure;
-            _ensureScheduled = false;
-
-            if (0 < _retryAttempts)
-            {
-                _retryAttempts--;
-            }
-        }
-
         private static int CleanupDuplicateSingletonAssets(
-            List<Type> candidateTypes,
+            IReadOnlyList<Type> candidateTypes,
             out List<string> emptyFolderCandidates
         )
         {
@@ -1658,35 +1636,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
 
             return current;
-        }
-
-        private static bool IsRunningInsideAssetImportWorkerProcess()
-        {
-            Func<bool> detectorOverride = AssetImportWorkerProcessCheck;
-            if (detectorOverride != null)
-            {
-                _mainThreadConfirmationPending = false;
-                return InvokeDetector(detectorOverride, assumeWorkerOnFailure: false);
-            }
-
-            if (IsAssetImportWorkerProcessViaEnvironment())
-            {
-                _mainThreadConfirmationPending = false;
-                return true;
-            }
-
-            if (!TryConfirmEditorMainThread())
-            {
-                LogVerbose(
-                    "ScriptableObjectSingletonCreator: Main thread not yet confirmed; deferring singleton ensure."
-                );
-                _mainThreadConfirmationPending = true;
-                return true;
-            }
-
-            _mainThreadConfirmationPending = false;
-            _defaultAssetImportWorkerDetector ??= AssetDatabase.IsAssetImportWorkerProcess;
-            return InvokeDetector(_defaultAssetImportWorkerDetector, assumeWorkerOnFailure: false);
         }
 
         private static bool InvokeDetector(Func<bool> detector, bool assumeWorkerOnFailure)
