@@ -2522,6 +2522,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
+        public void SystemArrayPoolPrivateOwnerRentAndReturnDoNotAcquireDisposalLeases()
+        {
+            DisposalLease probe = DisposalLeases.Acquire();
+            DisposalLease control = default;
+            int[] buffer = null;
+            try
+            {
+                int slot = probe.SlotForTests;
+                Assert.That(probe.TryClaim(), Is.True);
+                long beforeControl = DisposalLeases.CurrentGeneration(slot);
+                control = DisposalLeases.Acquire();
+                Assert.That(control.SlotForTests, Is.EqualTo(slot));
+                Assert.That(control.TryClaim(), Is.True);
+                Assert.That(DisposalLeases.CurrentGeneration(slot), Is.EqualTo(beforeControl + 2));
+                long before = DisposalLeases.CurrentGeneration(slot);
+                buffer = SystemArrayPool<int>.RentForPrivateOwner(3);
+                Assert.That(buffer.Length, Is.GreaterThanOrEqualTo(3));
+                buffer[0] = 2;
+                buffer[1] = 3;
+                buffer[2] = 5;
+                Assert.That(buffer[0] + buffer[1] + buffer[2], Is.EqualTo(10));
+                SystemArrayPool<int>.ReturnForPrivateOwner(buffer, clearArray: false);
+                buffer = null;
+                Assert.That(DisposalLeases.CurrentGeneration(slot), Is.EqualTo(before));
+            }
+            finally
+            {
+                if (buffer != null)
+                {
+                    SystemArrayPool<int>.ReturnForPrivateOwner(buffer, clearArray: false);
+                }
+                control.TryClaim();
+                probe.TryClaim();
+            }
+        }
+
+        [Test]
         public void SystemArrayPoolGetNegativeSizeThrowsArgumentOutOfRangeException()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => SystemArrayPool<int>.Get(-1, out _));

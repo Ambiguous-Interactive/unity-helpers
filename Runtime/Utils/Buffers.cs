@@ -3387,6 +3387,18 @@ namespace WallstopStudios.UnityHelpers.Utils
             );
         }
 
+        /// <summary>Rents an array whose complete lifetime is managed by a private owner.</summary>
+        internal static T[] RentForPrivateOwner(int minimumLength)
+        {
+            return System.Buffers.ArrayPool<T>.Shared.Rent(minimumLength);
+        }
+
+        /// <summary>Returns a privately owned array without issuing a disposal handle.</summary>
+        internal static void ReturnForPrivateOwner(T[] array, bool clearArray)
+        {
+            System.Buffers.ArrayPool<T>.Shared.Return(array, clearArray);
+        }
+
         internal static bool TryWithBufferActionCore<TState>(
             System.Buffers.ArrayPool<T> pool,
             int length,

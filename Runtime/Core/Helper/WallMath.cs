@@ -1670,7 +1670,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (values is List<float> list)
             {
-                float[] copy = System.Buffers.ArrayPool<float>.Shared.Rent(count);
+                float[] copy = SystemArrayPool<float>.RentForPrivateOwner(count);
                 try
                 {
                     list.CopyTo(copy, 0);
@@ -1684,7 +1684,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 finally
                 {
-                    System.Buffers.ArrayPool<float>.Shared.Return(copy, clearArray: false);
+                    SystemArrayPool<float>.ReturnForPrivateOwner(copy, clearArray: false);
                 }
             }
 
@@ -1712,7 +1712,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (values is List<double> list)
             {
-                double[] copy = System.Buffers.ArrayPool<double>.Shared.Rent(count);
+                double[] copy = SystemArrayPool<double>.RentForPrivateOwner(count);
                 try
                 {
                     list.CopyTo(copy, 0);
@@ -1726,7 +1726,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 finally
                 {
-                    System.Buffers.ArrayPool<double>.Shared.Return(copy, clearArray: false);
+                    SystemArrayPool<double>.ReturnForPrivateOwner(copy, clearArray: false);
                 }
             }
 
@@ -1754,7 +1754,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (values is List<int> list)
             {
-                int[] copy = System.Buffers.ArrayPool<int>.Shared.Rent(count);
+                int[] copy = SystemArrayPool<int>.RentForPrivateOwner(count);
                 try
                 {
                     list.CopyTo(copy, 0);
@@ -1768,7 +1768,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 finally
                 {
-                    System.Buffers.ArrayPool<int>.Shared.Return(copy, clearArray: false);
+                    SystemArrayPool<int>.ReturnForPrivateOwner(copy, clearArray: false);
                 }
             }
 
@@ -1796,7 +1796,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (values is List<long> list)
             {
-                long[] copy = System.Buffers.ArrayPool<long>.Shared.Rent(count);
+                long[] copy = SystemArrayPool<long>.RentForPrivateOwner(count);
                 try
                 {
                     list.CopyTo(copy, 0);
@@ -1810,7 +1810,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 finally
                 {
-                    System.Buffers.ArrayPool<long>.Shared.Return(copy, clearArray: false);
+                    SystemArrayPool<long>.ReturnForPrivateOwner(copy, clearArray: false);
                 }
             }
 

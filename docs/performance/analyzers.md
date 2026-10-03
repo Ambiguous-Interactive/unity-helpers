@@ -1079,9 +1079,14 @@ warmed acquisition behavior, and safe copies. This investigation reports compile
 evidence and ownership behavior, without claiming measured player allocation or timing improvements.
 
 A private operation can instead keep the entire lifetime inside its own body without issuing a
-handle. The four numeric `WallMath.Mean` list paths rent their scratch arrays directly from the same
-`ArrayPool<T>.Shared` and return them in `finally`. Only the initialized logical prefix is read;
+handle. The four numeric `WallMath.Mean` list paths use internal `SystemArrayPool<T>`
+private-owner rent/return helpers, backed by the same `ArrayPool<T>.Shared`, and return in `finally`.
+Only the initialized logical prefix is read;
 accumulation order, validation, source contents, and numeric clearing behavior stay unchanged.
 Tests that observe slot generations verify that these paths do not acquire or claim disposal leases. This boundary does not rely on an analyzer and does not weaken public lease guarantees.
 It demonstrates removal of lease work, not a measured timing improvement; it does not extend to
 buffers that escape or whose disposal is shared with consumers.
+
+The same internal helpers centralize existing private cache and serializer array rentals without
+changing their lifetimes, clearing flags, or failure behavior. Serializer owner leases still use
+their existing runtime checks; storing an array in its private owner does not issue another lease.
