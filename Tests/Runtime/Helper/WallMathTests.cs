@@ -46,6 +46,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             -0.1f,
         };
 
+        private static void AssertRectClampMatchesBoundaryContract(
+            Rect rect,
+            Vector2 originalOutside,
+            Vector2 outside,
+            Vector2 clamped,
+            int iteration = -1
+        )
+        {
+            bool strictlyOutside =
+                originalOutside.x < rect.xMin
+                || rect.xMax < originalOutside.x
+                || originalOutside.y < rect.yMin
+                || rect.yMax < originalOutside.y;
+            Assert.AreEqual(
+                strictlyOutside,
+                !originalOutside.Equals(clamped),
+                $"Iteration {iteration}: Clamp from ({originalOutside.x:R}, {originalOutside.y:R}) "
+                    + $"to ({clamped.x:R}, {clamped.y:R}) must change exactly those points beyond the inclusive rectangle edges."
+            );
+            float expectedX =
+                originalOutside.x < rect.xMin ? rect.xMin
+                : rect.xMax < originalOutside.x ? rect.xMax
+                : originalOutside.x;
+            float expectedY =
+                originalOutside.y < rect.yMin ? rect.yMin
+                : rect.yMax < originalOutside.y ? rect.yMax
+                : originalOutside.y;
+            Assert.IsTrue(
+                expectedX.Equals(clamped.x) && expectedY.Equals(clamped.y),
+                $"Iteration {iteration}: Expected nearest point ({expectedX:R}, {expectedY:R}), "
+                    + $"got ({clamped.x:R}, {clamped.y:R})."
+            );
+            Assert.IsTrue(
+                clamped.Equals(outside),
+                $"Iteration {iteration}: Clamp must modify the ref parameter to exactly match the returned value."
+            );
+
+            const float shrinkScaleToAccountForPrecision = 0.99f;
+            Vector2 delta = rect.center - clamped;
+            delta *= shrinkScaleToAccountForPrecision;
+            clamped = rect.center + delta;
+            Assert.IsTrue(
+                rect.Contains(clamped),
+                $"Expected rect {rect} to contain {clamped}, but it did not."
+            );
+        }
+
         [Test]
         public void BoundedDoubleAtMaxReturnsTheNextRepresentableValueDown()
         {
@@ -982,6 +1029,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        [TestCase(2f, 1.84f, TestName = "ClampRect.MaximumXBoundary.PreservesPoint")]
+        [TestCase(1.84f, 2f, TestName = "ClampRect.MaximumYBoundary.PreservesPoint")]
+        [TestCase(2f, 2f, TestName = "ClampRect.MaximumCorner.PreservesPoint")]
+        public void ClampRectMaximumBoundaryPointsRemainUnchanged(float x, float y)
+        {
+            Rect rect = new(Vector2.one, Vector2.one);
+            Vector2 point = new(x, y);
+            Assert.IsFalse(rect.Contains(point));
+            Vector2 original = point;
+            Vector2 clamped = rect.Clamp(ref point);
+            AssertRectClampMatchesBoundaryContract(rect, original, point, clamped);
+            Assert.IsTrue(original.Equals(clamped));
+        }
+
+        [TestCase(true, false, TestName = "ClampRect.AboveMaximumX.ClampsOneRepresentableStep")]
+        [TestCase(false, false, TestName = "ClampRect.AboveMaximumY.ClampsOneRepresentableStep")]
+        [TestCase(true, true, TestName = "ClampRect.BelowMinimumX.ClampsOneRepresentableStep")]
+        [TestCase(false, true, TestName = "ClampRect.BelowMinimumY.ClampsOneRepresentableStep")]
+        public void ClampRectAdjacentOutsidePointsChangeExactly(bool xAxis, bool minimumEdge)
+        {
+            Rect rect = new(Vector2.one, Vector2.one);
+            float edge = minimumEdge ? 1f : 2f;
+            int edgeBits = BitConverter.SingleToInt32Bits(edge);
+            float adjacentOutside = BitConverter.Int32BitsToSingle(
+                minimumEdge ? edgeBits - 1 : edgeBits + 1
+            );
+            Vector2 point = xAxis
+                ? new Vector2(adjacentOutside, 1.84f)
+                : new Vector2(1.84f, adjacentOutside);
+            Vector2 expected = xAxis ? new Vector2(edge, 1.84f) : new Vector2(1.84f, edge);
+            Assert.IsFalse(rect.Contains(point));
+            Assert.IsFalse(expected.Equals(point));
+            Assert.IsTrue(expected == point);
+            Vector2 original = point;
+            Vector2 clamped = rect.Clamp(ref point);
+            AssertRectClampMatchesBoundaryContract(rect, original, point, clamped);
+            Assert.IsTrue(expected.Equals(clamped));
+        }
+
         [Test]
         public void ClampRectOutsideRandom()
         {
@@ -996,25 +1082,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
                 Vector2 originalOutside = outside;
                 Vector2 clamped = rect.Clamp(ref outside);
-                Assert.AreNotEqual(
-                    originalOutside,
-                    clamped,
-                    $"Iteration {i}: Clamped value {clamped} should differ from original outside value {originalOutside} for rect {rect}."
-                );
-                Assert.AreEqual(
-                    clamped,
-                    outside,
-                    $"Iteration {i}: Clamp should modify the ref parameter to match the returned value. Expected {clamped}, got {outside}."
-                );
-
-                const float shrinkScaleToAccountForPrecision = 0.99f;
-                Vector2 delta = rect.center - clamped;
-                delta *= shrinkScaleToAccountForPrecision;
-                clamped = rect.center + delta;
-                Assert.IsTrue(
-                    rect.Contains(clamped),
-                    $"Expected rect {rect} to contain {clamped}, but it did not."
-                );
+                AssertRectClampMatchesBoundaryContract(rect, originalOutside, outside, clamped, i);
             }
         }
 

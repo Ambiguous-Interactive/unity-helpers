@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `SystemArrayPool<T>.TryWithBuffer` for synchronous borrowed spans with explicit state, optional results, and reported callback or cleanup errors ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Add `WUH022` to report boxing disposable structs and suggest concrete or constrained generic disposal ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Add opt-in `WUH021` to flag repeated size observations, including interface `Count`, known `Length`/`LongLength` properties, and non-predicate LINQ `Count()`/`LongCount()`, when one snapshot is intended.
 - Add `WUH020` to suggest non-throwing queue and stack reads when compatible `Try` methods are available ([#912](https://github.com/Ambiguous-Interactive/unity-helpers/issues/912)).
@@ -26,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix blank prefixes in inline editor headers when a field label contains only whitespace ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
+- Fix dropdowns showing invisible labels for Unity objects with whitespace-only names; object names, references, and literal string options stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
+- Fix IntMap lookups for keys sharing low bits and keep small live windows at their starting capacity during add/remove churn ([#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926)).
+- Fix main-thread guard diagnostics to omit blank context labels and use the source filename for blank member names; nonblank labels retain their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank serialized member names creating synthetic backing fields, and reject backing-field names with blank property names ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix newly constructed serialization failure diagnostics with blank reasons so they show `operation failed`; nonblank reasons and literal input descriptors keep their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix async durable writes and copies publishing after cancellation during staging; the previous file stays intact when cancellation is observed before publication ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).

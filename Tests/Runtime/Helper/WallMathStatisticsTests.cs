@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Utils;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -188,6 +189,114 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             yield return new TestCaseData(new double[] { 0.5, 0.25 }, 0.375).SetName(
                 "Mean.Double.Exact"
             );
+        }
+
+        private static IEnumerable<TestCaseData> MeanListScratchCases()
+        {
+            yield return new TestCaseData(new List<float> { 2f, 3f }, 2.5).SetName(
+                "Mean.ListScratch.Float.NoDisposalLease"
+            );
+            yield return new TestCaseData(new List<double> { 0.5, 0.25 }, 0.375).SetName(
+                "Mean.ListScratch.Double.NoDisposalLease"
+            );
+            yield return new TestCaseData(new List<int> { -3, 4 }, 0.5).SetName(
+                "Mean.ListScratch.Int.NoDisposalLease"
+            );
+            yield return new TestCaseData(new List<long> { -3L, 4L }, 0.5).SetName(
+                "Mean.ListScratch.Long.NoDisposalLease"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> MeanListNumericCases()
+        {
+            yield return new TestCaseData(
+                new List<float> { float.MaxValue, float.MaxValue },
+                (double)float.MaxValue
+            ).SetName("Mean.ListNumeric.Float.ExtremePair");
+            yield return new TestCaseData(
+                new List<float> { 16777216f, 1f, -16777216f },
+                (double)(1f / 3f)
+            ).SetName("Mean.ListNumeric.Float.DoubleAccumulation");
+            yield return new TestCaseData(new List<float> { float.NaN, 1f }, double.NaN).SetName(
+                "Mean.ListNumeric.Float.NaN"
+            );
+            yield return new TestCaseData(
+                new List<float> { float.PositiveInfinity, float.NegativeInfinity },
+                double.NaN
+            ).SetName("Mean.ListNumeric.Float.OppositeInfinities");
+            yield return new TestCaseData(
+                new List<double> { double.MaxValue, double.MaxValue },
+                double.PositiveInfinity
+            ).SetName("Mean.ListNumeric.Double.OverflowUnchanged");
+            yield return new TestCaseData(new List<double> { 1e16, 1.0, -1e16 }, 0.0).SetName(
+                "Mean.ListNumeric.Double.AccumulationOrder"
+            );
+            yield return new TestCaseData(new List<double> { double.NaN, 1.0 }, double.NaN).SetName(
+                "Mean.ListNumeric.Double.NaN"
+            );
+            yield return new TestCaseData(
+                new List<double> { double.PositiveInfinity, double.NegativeInfinity },
+                double.NaN
+            ).SetName("Mean.ListNumeric.Double.OppositeInfinities");
+            yield return new TestCaseData(
+                new List<int> { int.MaxValue, int.MaxValue },
+                (double)int.MaxValue
+            ).SetName("Mean.ListNumeric.Int.ExtremePair");
+            yield return new TestCaseData(
+                new List<int> { int.MinValue, int.MaxValue },
+                -0.5
+            ).SetName("Mean.ListNumeric.Int.OppositeExtremes");
+            yield return new TestCaseData(
+                new List<long> { long.MaxValue, long.MaxValue },
+                (double)long.MaxValue
+            ).SetName("Mean.ListNumeric.Long.ExtremePair");
+            yield return new TestCaseData(
+                new List<long> { 9007199254740993L, -9007199254740992L },
+                0.0
+            ).SetName("Mean.ListNumeric.Long.Binary64RoundingUnchanged");
+        }
+
+        private static double MeanOfList(IList values)
+        {
+            if (values is List<float> floats)
+            {
+                return floats.Mean();
+            }
+            if (values is List<double> doubles)
+            {
+                return doubles.Mean();
+            }
+            if (values is List<int> ints)
+            {
+                return ints.Mean();
+            }
+            return ((List<long>)values).Mean();
+        }
+
+        private static void AssertMeanListScratchSizes<T>(T positive, T negative)
+        {
+            /* Nearby lengths share an ArrayPool bucket while their logical tails differ. */
+            int[] sizes = { 17, 19, 3, 32, 1, 17 };
+            for (int repeat = 0; repeat < 3; ++repeat)
+            {
+                for (int index = 0; index < sizes.Length; ++index)
+                {
+                    bool positiveInput = index % 2 == 0;
+                    T value = positiveInput ? positive : negative;
+                    List<T> values = new List<T>(sizes[index]);
+                    for (int item = 0; item < sizes[index]; ++item)
+                    {
+                        values.Add(value);
+                    }
+                    double actual = MeanOfList(values);
+                    Assert.That(actual, Is.EqualTo(positiveInput ? 11.0 : -3.0));
+                    Assert.That(values.Count, Is.EqualTo(sizes[index]));
+                    foreach (T item in values)
+                    {
+                        Assert.That(item, Is.EqualTo(value));
+                    }
+                }
+            }
         }
 
         private static IEnumerable<TestCaseData> StandardDeviationCases()
@@ -1068,6 +1177,142 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             else
             {
                 Assert.AreEqual(expected, ((long[])values).Mean(), 1e-6);
+            }
+        }
+
+        [TestCaseSource(nameof(MeanListScratchCases))]
+        public void MeanListScratchDoesNotAcquireADisposalLease(IList values, double expected)
+        {
+            DisposalLease probe = DisposalLeases.Acquire();
+            try
+            {
+                int slot = probe.SlotForTests;
+                bool released = probe.TryClaim();
+                long before = DisposalLeases.CurrentGeneration(slot);
+                /*
+                 * A balanced acquire reuses this thread's free-list head; assertions follow the
+                 * snapshot so test framework work cannot affect the observed generation.
+                 */
+                double actual = MeanOfList(values);
+                long after = DisposalLeases.CurrentGeneration(slot);
+
+                Assert.That(released, Is.True);
+                Assert.That(actual, Is.EqualTo(expected));
+                Assert.That(
+                    after,
+                    Is.EqualTo(before),
+                    "A private numeric scratch buffer acquired and claimed a disposal lease."
+                );
+            }
+            finally
+            {
+                probe.TryClaim();
+            }
+        }
+
+        [Test]
+        public void MeanListScratchGenerationObservationDetectsBalancedLeaseWork()
+        {
+            DisposalLease probe = DisposalLeases.Acquire();
+            DisposalLease balanced = default;
+            try
+            {
+                int slot = probe.SlotForTests;
+                bool released = probe.TryClaim();
+                long before = DisposalLeases.CurrentGeneration(slot);
+                balanced = DisposalLeases.Acquire();
+                int reusedSlot = balanced.SlotForTests;
+                bool balancedReleased = balanced.TryClaim();
+                long after = DisposalLeases.CurrentGeneration(slot);
+
+                Assert.That(released, Is.True);
+                Assert.That(balancedReleased, Is.True);
+                Assert.That(reusedSlot, Is.EqualTo(slot));
+                Assert.That(
+                    after,
+                    Is.EqualTo(before + 2),
+                    "The observation must detect both acquire and claim generation advances."
+                );
+            }
+            finally
+            {
+                balanced.TryClaim();
+                probe.TryClaim();
+            }
+        }
+
+        [TestCaseSource(nameof(MeanListNumericCases))]
+        public void MeanListNumericBehaviorAndSourceContentsArePreserved(
+            IList values,
+            double expected
+        )
+        {
+            object[] snapshot = new object[values.Count];
+            values.CopyTo(snapshot, 0);
+            for (int repeat = 0; repeat < 3; ++repeat)
+            {
+                double actual = MeanOfList(values);
+                if (double.IsNaN(expected))
+                {
+                    Assert.That(double.IsNaN(actual), Is.True);
+                }
+                else
+                {
+                    Assert.That(actual, Is.EqualTo(expected));
+                }
+                CollectionAssert.AreEqual(snapshot, values);
+            }
+        }
+
+        [TestCase(typeof(float), TestName = "Mean.ListScratch.Float.AlternatingSizes")]
+        [TestCase(typeof(double), TestName = "Mean.ListScratch.Double.AlternatingSizes")]
+        [TestCase(typeof(int), TestName = "Mean.ListScratch.Int.AlternatingSizes")]
+        [TestCase(typeof(long), TestName = "Mean.ListScratch.Long.AlternatingSizes")]
+        public void MeanListScratchHandlesRepeatedGrowingAndShrinkingInputs(Type elementType)
+        {
+            if (elementType == typeof(float))
+            {
+                AssertMeanListScratchSizes(11f, -3f);
+            }
+            else if (elementType == typeof(double))
+            {
+                AssertMeanListScratchSizes(11.0, -3.0);
+            }
+            else if (elementType == typeof(int))
+            {
+                AssertMeanListScratchSizes(11, -3);
+            }
+            else
+            {
+                AssertMeanListScratchSizes(11L, -3L);
+            }
+        }
+
+        [TestCase(typeof(float), TestName = "Mean.ListValidation.Float.NullAndEmpty")]
+        [TestCase(typeof(double), TestName = "Mean.ListValidation.Double.NullAndEmpty")]
+        [TestCase(typeof(int), TestName = "Mean.ListValidation.Int.NullAndEmpty")]
+        [TestCase(typeof(long), TestName = "Mean.ListValidation.Long.NullAndEmpty")]
+        public void MeanListRejectsNullAndEmptyBeforeRenting(Type elementType)
+        {
+            if (elementType == typeof(float))
+            {
+                Assert.Throws<ArgumentNullException>(() => ((List<float>)null).Mean());
+                Assert.Throws<ArgumentException>(() => new List<float>().Mean());
+            }
+            else if (elementType == typeof(double))
+            {
+                Assert.Throws<ArgumentNullException>(() => ((List<double>)null).Mean());
+                Assert.Throws<ArgumentException>(() => new List<double>().Mean());
+            }
+            else if (elementType == typeof(int))
+            {
+                Assert.Throws<ArgumentNullException>(() => ((List<int>)null).Mean());
+                Assert.Throws<ArgumentException>(() => new List<int>().Mean());
+            }
+            else
+            {
+                Assert.Throws<ArgumentNullException>(() => ((List<long>)null).Mean());
+                Assert.Throws<ArgumentException>(() => new List<long>().Mean());
             }
         }
 

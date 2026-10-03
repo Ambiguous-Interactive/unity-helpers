@@ -45,6 +45,8 @@ function Write-TestResult {
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path
 $verifyScript = Join-Path $repoRoot 'scripts' 'ci' 'verify-release-tag.ps1'
 
+. (Join-Path $PSScriptRoot 'isolated-fixture-runspace.ps1')
+
 function New-PackageJson {
   param([string]$Name = "com.wallstop-studios.unity-helpers", [string]$Version = "3.5.2")
   $directory = Join-Path ([System.IO.Path]::GetTempPath()) ("verify-release-tag-" + [System.Guid]::NewGuid().ToString('N'))
@@ -60,7 +62,9 @@ function Invoke-VerifyReleaseTag {
     [string]$Tag = "3.5.2",
     [string]$SourceRef = "main",
     [string]$PackageJsonPath,
-    [switch]$WithGithubOutput
+    [switch]$WithGithubOutput,
+    [switch]$UseCli,
+    [string]$UnexpectedArgument
   )
   $githubOutputPath = ''
   if ($WithGithubOutput) {
@@ -80,8 +84,19 @@ function Invoke-VerifyReleaseTag {
       Remove-Item Env:GITHUB_OUTPUT -ErrorAction SilentlyContinue
     }
     try {
-      $out = & pwsh -NoProfile -File @arguments 2>&1
-      $exitCode = $LASTEXITCODE
+      if ($UseCli) {
+        if ($UnexpectedArgument) { $arguments += $UnexpectedArgument }
+        $out = & pwsh -NoProfile -File @arguments 2>&1
+        $exitCode = $LASTEXITCODE
+      } else {
+        $result = Invoke-IsolatedFixture -ScriptPath $verifyScript -Parameters @{
+          Tag = $Tag
+          SourceRef = $SourceRef
+          PackageJsonPath = $PackageJsonPath
+        }
+        $out = $result.Output
+        $exitCode = $result.ExitCode
+      }
     } finally {
       if ($null -ne $previousGithubOutput) {
         $env:GITHUB_OUTPUT = $previousGithubOutput
@@ -106,6 +121,8 @@ function Invoke-VerifyReleaseTag {
 }
 
 Write-Host "Testing verify-release-tag.ps1..." -ForegroundColor White
+
+Test-IsolatedFixtureHarness
 
 $packageJson = New-PackageJson
 
@@ -136,16 +153,18 @@ $r3Prefixed = Invoke-VerifyReleaseTag -Tag 'v3.5.2' -PackageJsonPath $packageJso
 Write-TestResult "Verify.PrefixedTagMessage" ($r3Prefixed.Output -match '::error::Release tags must use unprefixed X\.Y\.Z semver\.') "output: $($r3Prefixed.Output)"
 
 # Newlines and carriage returns in the tag fail.
-$r4Lf = Invoke-VerifyReleaseTag -Tag "3.5.2`nrm -rf /" -PackageJsonPath $packageJson
+$lineFeed = [char]10
+$carriageReturn = [char]13
+$r4Lf = Invoke-VerifyReleaseTag -Tag "3.5.2${lineFeed}rm -rf /" -PackageJsonPath $packageJson
 Write-TestResult "Verify.NewlineTagFails" ($r4Lf.ExitCode -eq 1) "exit $($r4Lf.ExitCode)"
 Write-TestResult "Verify.NewlineTagMessage" ($r4Lf.Output -match '::error::Release version must be a single line\.') "output: $($r4Lf.Output)"
-$r4Cr = Invoke-VerifyReleaseTag -Tag "3.5.2`rcode-injection" -PackageJsonPath $packageJson
+$r4Cr = Invoke-VerifyReleaseTag -Tag "3.5.2${carriageReturn}code-injection" -PackageJsonPath $packageJson
 Write-TestResult "Verify.CarriageReturnTagFails" ($r4Cr.ExitCode -eq 1 -and $r4Cr.Output -match '::error::Release version must be a single line\.') "exit $($r4Cr.ExitCode); output: $($r4Cr.Output)"
 
 # Source ref validation.
 $r5Empty = Invoke-VerifyReleaseTag -SourceRef '' -PackageJsonPath $packageJson
 Write-TestResult "Verify.EmptySourceRefFails" ($r5Empty.ExitCode -eq 1 -and $r5Empty.Output -match '::error::Release source ref is required\.') "exit $($r5Empty.ExitCode); output: $($r5Empty.Output)"
-$r5Newline = Invoke-VerifyReleaseTag -SourceRef "main`nsecond" -PackageJsonPath $packageJson
+$r5Newline = Invoke-VerifyReleaseTag -SourceRef "main${lineFeed}second" -PackageJsonPath $packageJson
 Write-TestResult "Verify.NewlineSourceRefFails" ($r5Newline.ExitCode -eq 1 -and $r5Newline.Output -match '::error::Release source ref must be a single line\.') "exit $($r5Newline.ExitCode); output: $($r5Newline.Output)"
 
 # package.json with missing name or version fails.
@@ -164,6 +183,20 @@ Write-TestResult "Verify.TagCheckedBeforeSourceRef" (
   $r7.Output -match '::error::Release version is required\.' -and
   $r7.Output -notmatch 'Release source ref is required\.'
 ) "exit $($r7.ExitCode); output: $($r7.Output)"
+
+$cliMatching = Invoke-VerifyReleaseTag -PackageJsonPath $packageJson -WithGithubOutput -UseCli
+Write-TestResult 'CLI.MatchingTagAndOutputsMatchRunspace' (
+  $cliMatching.ExitCode -eq 0 -and
+  $cliMatching.ExitCode -eq $r1.ExitCode -and
+  $cliMatching.Output -ceq $r1.Output -and
+  $cliMatching.GithubOutput -ceq $r1.GithubOutput
+) "exit $($cliMatching.ExitCode); output: $($cliMatching.Output)"
+$cliEmptyTag = Invoke-VerifyReleaseTag -Tag '' -PackageJsonPath $packageJson -UseCli
+Write-TestResult 'CLI.EmptyTagMatchesRunspace' ($cliEmptyTag.ExitCode -eq 1 -and $cliEmptyTag.Output -ceq $r3Empty.Output)
+$cliEmptySource = Invoke-VerifyReleaseTag -SourceRef '' -PackageJsonPath $packageJson -UseCli
+Write-TestResult 'CLI.EmptySourceRefMatchesRunspace' ($cliEmptySource.ExitCode -eq 1 -and $cliEmptySource.Output -ceq $r5Empty.Output)
+$cliUnexpected = Invoke-VerifyReleaseTag -PackageJsonPath $packageJson -UseCli -UnexpectedArgument 'unexpected-value'
+Write-TestResult 'CLI.UnexpectedArgumentExits64' ($cliUnexpected.ExitCode -eq 64 -and $cliUnexpected.Output -match 'Unbound arguments: unexpected-value')
 
 Remove-Item -LiteralPath $packageJson -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath (Split-Path -Parent $packageJson) -Force -ErrorAction SilentlyContinue

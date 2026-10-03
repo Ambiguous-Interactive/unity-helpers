@@ -14,23 +14,21 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// <typeparam name="TValue">The value type.</typeparam>
     /// <remarks>
     /// <para>
-    /// Measured against <c>Dictionary&lt;int,int&gt;</c> on Unity 6000.4.6f1 editor Mono,
-    /// counterbalanced ABBABAAB with a settled heap per slot and both sides calling TryGetValue:
-    /// hit-heavy lookups ran 1.97x-2.19x faster depending on entry count, easing toward 1.26x as
-    /// the miss rate climbed toward fifty percent. A miss walks occupied slots until it reaches an
-    /// untouched slot, so linear probing spends on every miss whatever it saved on the hits.
+    /// Benchmark this map against <c>Dictionary&lt;int,int&gt;</c> for the caller's key distribution
+    /// and miss rate. Earlier editor Mono measurements used the previous low-bit slot selection
+    /// and do not establish a margin for this implementation. A miss walks occupied slots until
+    /// it reaches an untouched slot; shared-low-bit keys therefore need their own controls.
     /// </para>
     /// <para>
-    /// Two structural choices carry the win, so neither is negotiable inside this type. Keys are
-    /// compared as raw integers rather than routed through <see cref="IEqualityComparer{T}"/> --
-    /// Unity's Mono does not devirtualize that interface call away, and removing it is part of what
-    /// is being beaten. Table length stays a power of two, so slot position is one multiply and one
-    /// AND instead of a division, and doubling is the only size change there is.
+    /// Keys are
+    /// compared as raw integers rather than routed through <see cref="IEqualityComparer{T}"/>.
+    /// Table length stays a power of two, so slot position is one multiply and one
+    /// shift instead of a division. Growth doubles the table; tombstone cleanup retains its size.
     /// </para>
     /// <para>
     /// The table stores keys verbatim beside their values, and the two lowest key values name the
-    /// slot states instead of callers' data; see <see cref="MinimumAllowedKey"/>. A workload whose
-    /// misses outnumber its hits should stay on <see cref="Dictionary{TKey, TValue}"/>.
+    /// slot states instead of callers' data; see <see cref="MinimumAllowedKey"/>. Include miss-heavy
+    /// workloads when benchmarking against <see cref="Dictionary{TKey, TValue}"/>.
     /// </para>
     /// </remarks>
     public sealed class IntMap<TValue>
@@ -44,7 +42,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const int MinimumTablePower = 3;
         private const int MaximumTablePower = 30;
 
-        // The golden-ratio multiplier disperses consecutive IDs before masking.
+        // Fibonacci hashing uses the high product bits so shared low key bits do not form a cluster.
         private const uint KeyMultiplier = 0x9E37_79B9u;
 
         // Slot states rather than caller data. Stored keys are live iff MinimumAllowedKey <= them.
@@ -107,6 +105,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private int[] _keys;
         private TValue[] _values;
         private int _mask;
+        private int _shift;
         private int _count;
         private int _tombstones;
         private ulong _version;
@@ -124,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="initialCapacity">How many live entries to make room for.</param>
         /// <remarks>
         /// Powers of two are honored directly; anything else rounds up, because a non-power-of-two
-        /// table would hand the mask's job back to division -- the cost this map exists to shed.
+        /// table would require division instead of a shift to choose the starting slot.
         /// </remarks>
         public IntMap(int initialCapacity)
         {
@@ -235,7 +234,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// A probe chain reads slots until an empty one proves the key absent, so removal marks the
         /// slot as a tombstone rather than releasing it: closing the gap would sever the tail of its
         /// own chain. Tombstones join live entries against the load factor, so a workload dominated
-        /// by removals keeps probing pay for its churn -- and periodic growth compacts them away.
+        /// by removals periodically rebuilds at the same size to reclaim deleted slots.
         /// </remarks>
         public bool Remove(int key, out TValue value)
         {
@@ -376,13 +375,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void Resize()
         {
-            // Grow rather than repeatedly rehashing at the same size as tombstones accumulate.
-            int nextPower = SmallestSufficientPower(_count);
             int currentPower = PowerOf(_keys.Length);
-            if (nextPower <= currentPower)
-            {
-                nextPower = currentPower + 1;
-            }
+            int nextPower = _count <= _tombstones ? currentPower : currentPower + 1;
 
             if (MaximumTablePower < nextPower)
             {
@@ -401,6 +395,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _keys = new int[capacity];
             _values = new TValue[capacity];
             _mask = capacity - 1;
+            _shift = 32 - power;
             _count = 0;
             _tombstones = 0;
             ++_version;
@@ -448,7 +443,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private int SlotFor(uint hash)
         {
-            return (int)(hash & _mask);
+            return (int)(hash >> _shift);
         }
 
         private int NextSlot(int slot)

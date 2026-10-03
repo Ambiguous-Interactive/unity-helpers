@@ -258,6 +258,109 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(8)]
+        [TestCase(16)]
+        [TestCase(256)]
+        public void SlidingLiveWindowRetainsItsStartingCapacity(int liveWindow)
+        {
+            IntMap<int> map = new(liveWindow);
+            int startingCapacity = map.Capacity;
+            const int totalKeys = 20_000;
+            for (int key = 0; key < totalKeys; ++key)
+            {
+                Assert.IsTrue(map.TrySet(key, key));
+                if (liveWindow <= key)
+                {
+                    Assert.IsTrue(map.Remove(key - liveWindow, out int removed));
+                    Assert.AreEqual(key - liveWindow, removed);
+                }
+            }
+
+            Assert.AreEqual(liveWindow, map.Count);
+            Assert.AreEqual(startingCapacity, map.Capacity);
+            Assert.AreEqual(liveWindow, CountByEnumeration(map));
+            for (int key = totalKeys - liveWindow; key < totalKeys; ++key)
+            {
+                Assert.IsTrue(map.TryGet(key, out int value));
+                Assert.AreEqual(key, value);
+            }
+            Assert.IsFalse(map.TryGet(totalKeys - liveWindow - 1, out _));
+        }
+
+        [Test]
+        public void TombstoneCleanupPreservesSurvivorsAndStillGrowsForLiveEntries()
+        {
+            IntMap<int> map = new();
+            int startingCapacity = map.Capacity;
+            int halfCapacity = startingCapacity / 2;
+            for (int key = 0; key < halfCapacity; ++key)
+            {
+                map.TrySet(key, key);
+            }
+            for (int key = 8; key < halfCapacity; ++key)
+            {
+                Assert.IsTrue(map.Remove(key, out _));
+            }
+
+            Assert.IsTrue(map.TrySet(halfCapacity, halfCapacity));
+            Assert.AreEqual(startingCapacity, map.Capacity);
+            Assert.AreEqual(9, map.Count);
+            for (int key = 0; key < 8; ++key)
+            {
+                Assert.IsTrue(map.TryGet(key, out int value));
+                Assert.AreEqual(key, value);
+            }
+            for (int key = 8; key < halfCapacity; ++key)
+            {
+                Assert.IsFalse(map.TryGet(key, out _));
+                Assert.IsTrue(map.TrySet(key, key));
+            }
+
+            Assert.AreEqual(halfCapacity + 1, map.Count);
+            Assert.AreEqual(startingCapacity * 2, map.Capacity);
+            for (int key = 0; key <= halfCapacity; ++key)
+            {
+                Assert.IsTrue(map.TryGet(key, out int value));
+                Assert.AreEqual(key, value);
+            }
+        }
+
+        [TestCase(64, 1024)]
+        [TestCase(1024, 1024)]
+        [TestCase(1024, -1024)]
+        [TestCase(1024, 65_536)]
+        public void SharedLowBitsRoundTripAcrossGrowthRemovalAndReinsertion(int count, int stride)
+        {
+            IntMap<int> map = new();
+            for (int index = 0; index < count; ++index)
+            {
+                Assert.IsTrue(map.TrySet(index * stride, index));
+            }
+            for (int index = 0; index < count; index += 2)
+            {
+                Assert.IsTrue(map.Remove(index * stride, out int removed));
+                Assert.AreEqual(index, removed);
+            }
+            for (int index = 0; index < count; ++index)
+            {
+                Assert.AreEqual(index % 2 != 0, map.TryGet(index * stride, out int value));
+                Assert.AreEqual(index % 2 == 0 ? 0 : index, value);
+                Assert.IsFalse(map.TryGet((index + count) * stride, out _));
+            }
+            for (int index = 0; index < count; index += 2)
+            {
+                Assert.IsTrue(map.TrySet(index * stride, -index));
+            }
+            for (int index = 0; index < count; ++index)
+            {
+                Assert.IsTrue(map.TryGet(index * stride, out int value));
+                Assert.AreEqual(index % 2 == 0 ? -index : index, value);
+            }
+            Assert.AreEqual(count, map.Count);
+        }
+
         [Test]
         public void ReservedMarkerKeysAreRefusedWithoutThrowing()
         {

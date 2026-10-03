@@ -4,13 +4,13 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
-    using System.Buffers;
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using System.Runtime.InteropServices;
     using System.Threading;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Utils;
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
 #endif
@@ -1688,7 +1688,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 int pendingCount = _pendingEvictions == null ? 0 : _pendingEvictions.Count;
                 if (0 < pendingCount)
                 {
-                    notifications = ArrayPool<EvictionNotification>.Shared.Rent(pendingCount);
+                    notifications = SystemArrayPool<EvictionNotification>.RentForPrivateOwner(
+                        pendingCount
+                    );
                     while (_pendingEvictions.TryDequeue(out EvictionNotification notification))
                     {
                         notifications[notificationCount++] = notification;
@@ -1717,7 +1719,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             finally
             {
                 Array.Clear(notifications, 0, notificationCount);
-                ArrayPool<EvictionNotification>.Shared.Return(notifications);
+                SystemArrayPool<EvictionNotification>.ReturnForPrivateOwner(
+                    notifications,
+                    clearArray: false
+                );
             }
         }
 

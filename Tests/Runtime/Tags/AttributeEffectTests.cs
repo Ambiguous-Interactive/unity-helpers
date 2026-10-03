@@ -172,6 +172,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsEmpty(effect.HumanReadableDescription);
         }
 
+        [TestCase(" ", TestName = "SerializedTag.Space.RemainsQueryable")]
+        [TestCase("\t\r\n", TestName = "SerializedTag.ControlWhitespace.RemainsQueryable")]
+        [TestCase("\u2003\u00a0", TestName = "SerializedTag.UnicodeWhitespace.RemainsQueryable")]
+        [TestCase(" Buff ", TestName = "SerializedTag.PaddedName.RemainsExact")]
+        public void SerializedTagsPreserveLiteralWhitespace(string tag)
+        {
+            AttributeEffect original = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            original.effectTags.Add(tag);
+            AttributeEffect restored = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(original), restored);
+
+            CollectionAssert.AreEqual(new[] { tag }, restored.effectTags);
+            Assert.IsTrue(restored.HasTag(tag));
+            Assert.IsTrue(restored.HasAnyTag((IReadOnlyList<string>)new[] { tag }));
+            Assert.IsTrue(restored.HasAnyTag((IEnumerable<string>)new HashSet<string> { tag }));
+            Assert.IsFalse(restored.HasTag(tag + "different"));
+        }
+
         [Test]
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ToStringSerializesSummaryAndCollections()

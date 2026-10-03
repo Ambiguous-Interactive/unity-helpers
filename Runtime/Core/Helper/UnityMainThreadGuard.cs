@@ -117,9 +117,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </para>
         /// </summary>
         /// <param name="context">
-        /// Optional label describing why the guard is required, appended to the error message.
+        /// Optional nonblank label describing why the guard is required, preserved exactly in the error message.
         /// </param>
-        /// <param name="memberName">Populated automatically with <see cref="CallerMemberNameAttribute"/>.</param>
+        /// <param name="memberName">Populated automatically; blank names fall back to the source filename.</param>
         /// <param name="callerFilePath">Populated automatically with <see cref="CallerFilePathAttribute"/>.</param>
         /// <param name="callerLineNumber">Populated automatically with <see cref="CallerLineNumberAttribute"/>.</param>
         internal static void EnsureMainThread(
@@ -141,11 +141,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ? "UnknownFile"
                 : Path.GetFileName(callerFilePath);
 
-            string location = string.IsNullOrEmpty(memberName)
+            string location = string.IsNullOrWhiteSpace(memberName)
                 ? fileBaseName
                 : $"{fileBaseName}.{memberName}";
 
-            if (!string.IsNullOrEmpty(context))
+            if (!string.IsNullOrWhiteSpace(context))
             {
                 location = $"{location} ({context})";
             }

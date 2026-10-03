@@ -113,6 +113,12 @@ The `UnityMainThreadGuard` is a **guard/assertion** that throws an exception if 
 >
 > 📦 **Internal API:** `UnityMainThreadGuard` is an `internal` class, accessible only within the Unity Helpers assembly or via `[InternalsVisibleTo]`. For most use cases, prefer using `UnityMainThreadDispatcher` directly which is `public`.
 
+Diagnostic labels treat null, empty, and whitespace-only text as absent, including control and
+Unicode whitespace. A blank member name uses the source filename; a blank context adds no
+parenthesized label. Nonblank labels keep their exact text, including surrounding spaces. This
+formatting rule does not normalize serialized values or gameplay keys: effect tags remain exact
+ordinal strings, including whitespace-only tags.
+
 ### Basic Usage
 
 ```csharp

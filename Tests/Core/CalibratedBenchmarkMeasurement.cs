@@ -65,18 +65,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         public bool HasSufficientTiming { get; }
 
         /// <summary>Whether timing alone meets the five-percent runtime improvement rule.</summary>
-        /// <remarks>Controls, semantics, allocation, retention, and size remain separate required evidence.</remarks>
+        /// <remarks>Diagnostic runs are excluded; controls, semantics, allocation, retention, and size remain separate evidence.</remarks>
         public bool HasTimingImprovement =>
-            HasSufficientTiming
+            SlotDiagnostics == null
+            && HasSufficientTiming
             && Comparison.IsStable(BenchmarkProtocol.DefaultSpreadLimit)
             && 1.0 / 0.95 <= Comparison.Ratio
             && 1 < RatioLower95;
 
         /// <summary>Whether the full interval is within the five-percent runtime non-inferiority margin.</summary>
         public bool HasTimingNonInferiority =>
-            HasSufficientTiming
+            SlotDiagnostics == null
+            && HasSufficientTiming
             && Comparison.IsStable(BenchmarkProtocol.DefaultSpreadLimit)
             && 1.0 / 1.05 <= RatioLower95;
+
+        internal BenchmarkSlotDiagnostics SlotDiagnostics { get; }
 
         internal CalibratedBenchmarkMeasurement(
             double[] referenceMilliseconds,
@@ -88,7 +92,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             int referenceWarmupExecutions,
             int subjectWarmupExecutions
         )
+            : this(
+                referenceMilliseconds,
+                subjectMilliseconds,
+                iterations,
+                seed,
+                referenceWarmupMilliseconds,
+                subjectWarmupMilliseconds,
+                referenceWarmupExecutions,
+                subjectWarmupExecutions,
+                null
+            ) { }
+
+        internal CalibratedBenchmarkMeasurement(
+            double[] referenceMilliseconds,
+            double[] subjectMilliseconds,
+            int iterations,
+            int seed,
+            double referenceWarmupMilliseconds,
+            double subjectWarmupMilliseconds,
+            int referenceWarmupExecutions,
+            int subjectWarmupExecutions,
+            BenchmarkSlotDiagnostics slotDiagnostics
+        )
         {
+            SlotDiagnostics = slotDiagnostics;
             ReferenceMilliseconds = Array.AsReadOnly((double[])referenceMilliseconds.Clone());
             SubjectMilliseconds = Array.AsReadOnly((double[])subjectMilliseconds.Clone());
             Iterations = iterations;
@@ -286,6 +314,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     writer.WriteString(entry.Key, entry.Value);
                 }
                 writer.WriteEndObject();
+                if (SlotDiagnostics != null)
+                {
+                    writer.WritePropertyName(nameof(SlotDiagnostics));
+                    SlotDiagnostics.WriteTo(writer);
+                }
                 writer.WriteEndObject();
             }
             finally

@@ -271,6 +271,11 @@ Null, empty, and whitespace-only method names produce a warning and no options b
 discovery. Method names are exact identifiers; surrounding whitespace is not trimmed. String option
 values remain literal data, including whitespace-only values and spaces inside labels.
 
+Unity object options with empty or whitespace-only names display their type name, including names
+containing only control or Unicode whitespace. The object name and selected reference remain
+unchanged. Nonblank object names keep their exact spacing, and whitespace-only string options
+keep their literal labels and serialized values.
+
 <!-- doc-sample: compiles -->
 
 ```csharp

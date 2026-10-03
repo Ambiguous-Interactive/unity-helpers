@@ -79,13 +79,36 @@ function predicate(step) {
 }
 
 const run = identified("run_acceptance");
+const diagnostics = workflow.match(/^      intmap-diagnostics:\n((?:        [^\n]*\n|\n)+)/m)?.[1];
+assert.ok(diagnostics, "Manual diagnostic input must exist");
+assert.match(diagnostics, /^        default: false$/m);
+assert.match(diagnostics, /^        type: boolean$/m);
+const diagnosticEnvironment = run.match(/^          UH_PERF_DIAGNOSTICS: (.+)$/m)?.[1];
+assert.ok(diagnosticEnvironment, "Diagnostic mode must be scoped to the additional player");
+assert.equal((workflow.match(/UH_PERF_DIAGNOSTICS:/g) || []).length, 1);
+const diagnosticMode = expression(diagnosticEnvironment);
+let diagnosticControls = 0;
+for (const event of ["pull_request", "push", "workflow_dispatch"]) {
+  for (const acceptance of ["none", "sentinel", "intmap", "serialization", "all"]) {
+    for (const requested of [undefined, false, true]) {
+      assert.equal(
+        diagnosticMode({
+          github: { event_name: event },
+          inputs: { acceptance, "intmap-diagnostics": requested }
+        }),
+        event === "workflow_dispatch" && acceptance === "intmap" && requested === true ? "1" : ""
+      );
+      diagnosticControls++;
+    }
+  }
+}
 const verify = identified("verify_acceptance");
 const redact = identified("redact_acceptance");
 const upload = identified("upload_acceptance");
 const gate = named("Require requested native acceptance");
 const selectedSteps = [run, verify, redact, upload, gate];
 const predicates = selectedSteps.map(predicate);
-let controls = 0;
+let controls = diagnosticControls;
 for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
   for (const acceptance of ["", "none", "sentinel", "intmap", "serialization", "all"]) {
     for (const cancelled of [false, true]) {

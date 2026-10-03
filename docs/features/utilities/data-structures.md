@@ -323,11 +323,11 @@ Tips
 
 ## IntMap (Int-Keyed Open-Addressing Map)
 
-- What it is: `IntMap<TValue>`, a hash table with linear probing, a power-of-two table and keys compared as raw integers, with no `IEqualityComparer` indirection anywhere on the lookup path.
+- What it is: `IntMap<TValue>`, a hash table with linear probing, Fibonacci hashing from the high product bits, a power-of-two table and keys compared as raw integers, with no `IEqualityComparer` indirection anywhere on the lookup path.
 - Use for: read-mostly lookups keyed by entity ids, network ids, slot indices or any dense/sparse int id.
-- Operations: `TryGet`, `TrySet`, indexer, `Remove`, `Clear`, enumeration; growth at a 0.5 load factor.
-- Pros: measured 1.97x–2.19x faster than `Dictionary<int,int>` hit-heavy lookups on Unity 6000.4 editor Mono; 1.26x–1.65x at a 50% miss rate.
-- Cons: misses are where probing loses; a miss-dominated workload should stay on `Dictionary<int,int>`; the two lowest key values (`int.MinValue` and one above) are internal slot markers, refused by `TrySet` without throwing.
+- Operations: `TryGet`, `TrySet`, indexer, `Remove`, `Clear`, enumeration; growth at a 0.5 occupancy factor; rebuild at the same capacity when tombstones dominate.
+- Pros: direct integer comparison and value enumerators avoid comparer dispatch and typed enumeration boxing. Measure lookup speed for your own key distribution and miss rate.
+- Cons: misses probe until an empty slot, so measure the intended miss rate; the two lowest key values (`int.MinValue` and one above) are internal slot markers, refused by `TrySet` without throwing.
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
@@ -336,14 +336,15 @@ var map = new IntMap<HealthState>();
 map.TrySet(entityId, HealthState.Poisoned);
 if (map.TryGet(entityId, out HealthState state)) { /* ... */ }
 map.TrySet(entityId, HealthState.Healthy);   // overwrite in place
-map.Remove(entityId);                        // leaves a tombstone, compacted at next resize
+map.Remove(entityId, out _);                 // leaves a tombstone, compacted at the next rebuild
 ```
 
 Tips and pitfalls
 
-- The published margins come from `IntMapPerformanceTests` in `Tests/Runtime/Performance`: counterbalanced orderings with a settled heap per slot, so the numbers describe the code rather than the machine. Run it yourself before shipping a claim of your own; a run whose spread exceeds 3% is ignored rather than reported.
-- **Those numbers are editor Mono only.** IL2CPP has not been measured, and part of the margin is Mono not devirtualizing `EqualityComparer<int>.Default` — which an AOT compiler may do. See [#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578).
-- Removed entries become tombstones that still occupy slots until growth compacts them away. Churning removals pays for its own churn.
+- Earlier editor Mono measurements reported 1.97x–2.19x hit-heavy and 1.26x–1.65x at a 50% miss rate using the previous low-bit slot selection. Those margins do not describe the corrected implementation. `IntMapPerformanceTests` retains calibrated counterbalanced comparisons; measurements whose spread exceeds 3% cannot establish acceptance.
+- **Those historical numbers are editor Mono only.** IL2CPP has not been measured, and part of the margin is Mono not devirtualizing `EqualityComparer<int>.Default` — which an AOT compiler may do. See [#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578).
+- Removed entries become tombstones until a rebuild compacts them away. When tombstones are at least as numerous as live entries, the rebuild keeps the current capacity; an eight-entry sliding window stays at the default 64 slots even after one million insertions. Live entries still trigger doubling when more space is needed.
+- Keys sharing low bits, such as `i * 1024`, use the high bits of the hash product for their starting slots. The performance fixture compares hits and misses against dense keys at 64 and 1,024 entries; stable sparse-key measurements must stay within twice the dense lookup time.
 - Keys below `IntMap<TValue>.MinimumAllowedKey` name slot states and are refused by `TrySet`; the indexer throws for them.
 
 ## String Wrapper (Interned Flyweight)
@@ -381,7 +382,7 @@ Tips and pitfalls
 - Need compact boolean set: Bitset
 - Need dynamic connectivity: Disjoint Set
 - Need auto-evicting key-value store: Cache
-- Need the fastest int-keyed lookups for a hit-heavy workload: IntMap
+- Need direct integer-key comparison for read-mostly lookups: benchmark IntMap
 
 Common pitfalls
 

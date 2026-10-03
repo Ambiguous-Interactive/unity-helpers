@@ -13,13 +13,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     /// The committed measurement behind the published <see cref="IntMap{TValue}"/> margins.
     /// </summary>
     /// <remarks>
-    /// The numbers in the data-structures guide were quoted from a session's ad-hoc run, and the
-    /// guide said they "come from the protocol in the repository's benchmarks" while no such
-    /// benchmark was committed -- so nobody could reproduce them, and no CI leg produced them on
-    /// any other runtime. This fixture is that benchmark. It reports rather than gates: the ratio
-    /// on an IL2CPP player is the input to issue #578's ship-or-retire decision, not a build
-    /// result. Only a workload whose spread is inside the protocol's limit reaches the table,
-    /// because a wider one is a reading of the machine.
+    /// The Dictionary comparison reports the input to issue #578's ship-or-retire decision.
+    /// The shared-low-bit comparison gates issue #926's limit of twice the dense lookup time.
+    /// Both comparisons require calibrated, stable measurements before publishing a ratio.
     /// </remarks>
     [TestFixture]
     [Category("Performance")]
@@ -248,6 +244,99 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             state = (state * Multiplier) + Increment;
             return state;
+        }
+
+        [Test]
+        public void MillionInsertionsWithEightLiveKeysRetainTheDefaultCapacity()
+        {
+            IntMap<int> map = new();
+            int startingCapacity = map.Capacity;
+            for (int key = 0; key < 1_000_000; ++key)
+            {
+                map[key] = key;
+                if (8 <= key)
+                {
+                    if (!map.Remove(key - 8, out int removed) || removed != key - 8)
+                    {
+                        Assert.Fail($"The sliding window lost key {key - 8}.");
+                    }
+                }
+            }
+
+            Assert.AreEqual(64, startingCapacity);
+            Assert.AreEqual(startingCapacity, map.Capacity);
+            Assert.AreEqual(8, map.Count);
+            foreach (KeyValuePair<int, int> entry in map)
+            {
+                Assert.AreEqual(entry.Key, entry.Value);
+                Assert.IsTrue(999_992 <= entry.Key && entry.Key < 1_000_000);
+            }
+        }
+
+        [TestCase(64, false)]
+        [TestCase(64, true)]
+        [TestCase(1024, false)]
+        [TestCase(1024, true)]
+        [Timeout(BenchmarkTimeoutMilliseconds)]
+        public void SharedLowBitLookupsStayWithinTwiceDenseLookupTime(int entries, bool misses)
+        {
+            IntMap<int> dense = new();
+            IntMap<int> sparse = new();
+            for (int key = 0; key < entries; ++key)
+            {
+                dense.TrySet(key, key);
+                sparse.TrySet(key * 1024, key);
+            }
+
+            int[] denseProbes = new int[ProbeCount];
+            int[] sparseProbes = new int[ProbeCount];
+            for (int index = 0; index < ProbeCount; ++index)
+            {
+                int ordinal = index % entries;
+                int key = misses ? ordinal + entries : ordinal;
+                denseProbes[index] = key;
+                sparseProbes[index] = key * 1024;
+            }
+
+            CalibratedBenchmarkMeasurement samples = BenchmarkProtocol.MeasureCalibrated(
+                iterations => RunIntMap(dense, denseProbes, iterations),
+                iterations => RunIntMap(sparse, sparseProbes, iterations),
+                () =>
+                {
+                    Assert.AreEqual(entries, dense.Count);
+                    Assert.AreEqual(entries, sparse.Count);
+                    foreach (int ordinal in denseProbes)
+                    {
+                        bool denseFound = dense.TryGet(ordinal, out int denseValue);
+                        bool sparseFound = sparse.TryGet(ordinal * 1024, out int sparseValue);
+                        Assert.AreEqual(!misses, denseFound);
+                        Assert.AreEqual(denseFound, sparseFound);
+                        Assert.AreEqual(denseValue, sparseValue);
+                    }
+                },
+                unchecked((int)ProbeSeed)
+            );
+            if (samples == null)
+            {
+                Assert.Ignore("The dense/strided lookup comparison could not calibrate.");
+                return;
+            }
+
+            UnityEngine.Debug.Log($"INTMAP_SHARED_LOW_BITS {entries} {misses} {samples.ToJson()}");
+            if (
+                !samples.HasSufficientTiming
+                || !samples.Comparison.IsStable(BenchmarkProtocol.DefaultSpreadLimit)
+            )
+            {
+                Assert.Ignore("The dense/strided lookup comparison has unstable timings.");
+                return;
+            }
+
+            Assert.LessOrEqual(
+                0.5,
+                samples.Comparison.Ratio,
+                "Keys sharing low bits must cost at most twice the equivalent dense lookups."
+            );
         }
 
         [Test]

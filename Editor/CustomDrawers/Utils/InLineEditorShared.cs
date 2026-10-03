@@ -432,10 +432,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         }
 
         /// <summary>
-        /// Prepares header content for display, combining label and object name.
+        /// Prepares an object header with an optional nonblank label prefix, preserving labels for null objects.
         /// </summary>
         /// <param name="value">The object being displayed.</param>
-        /// <param name="label">Optional label to prepend.</param>
+        /// <param name="label">Optional label to prepend when its text is not blank.</param>
         /// <returns>The prepared header content.</returns>
         public static GUIContent PrepareHeaderContent(Object value, GUIContent label)
         {
@@ -458,7 +458,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 headerContent = ReusableHeaderContent;
             }
 
-            if (label != null && !string.IsNullOrEmpty(label.text))
+            if (label != null && !string.IsNullOrWhiteSpace(label.text))
             {
                 ReusableHeaderContent.text = label.text + " (" + headerContent.text + ")";
 

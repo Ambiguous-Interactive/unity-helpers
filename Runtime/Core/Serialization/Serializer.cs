@@ -3811,7 +3811,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 initialCapacity = DefaultInitialCapacity;
             }
 
-            _buffer = ArrayPool<byte>.Shared.Rent(initialCapacity);
+            _buffer = SystemArrayPool<byte>.RentForPrivateOwner(initialCapacity);
             _length = 0;
             _position = 0;
         }
@@ -3928,7 +3928,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 if (_buffer != null)
                 {
-                    ArrayPool<byte>.Shared.Return(_buffer);
+                    SystemArrayPool<byte>.ReturnForPrivateOwner(_buffer, clearArray: false);
                     _buffer = Array.Empty<byte>();
                 }
                 _length = 0;
@@ -3967,12 +3967,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 newSize = newSize < 1024 ? newSize * 2 : newSize + (newSize >> 1);
             }
-            byte[] newBuf = ArrayPool<byte>.Shared.Rent(newSize);
+            byte[] newBuf = SystemArrayPool<byte>.RentForPrivateOwner(newSize);
             if (0 < _length)
             {
                 Array.Copy(_buffer, newBuf, _length);
             }
-            ArrayPool<byte>.Shared.Return(_buffer);
+            SystemArrayPool<byte>.ReturnForPrivateOwner(_buffer, clearArray: false);
             _buffer = newBuf;
         }
     }
@@ -4016,7 +4016,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         private PooledArrayBufferWriter(int initialCapacity = DefaultInitialCapacity)
         {
-            _buffer = ArrayPool<byte>.Shared.Rent(initialCapacity);
+            _buffer = SystemArrayPool<byte>.RentForPrivateOwner(initialCapacity);
             _written = 0;
         }
 
@@ -4077,7 +4077,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 if (_buffer != null)
                 {
-                    ArrayPool<byte>.Shared.Return(_buffer);
+                    SystemArrayPool<byte>.ReturnForPrivateOwner(_buffer, clearArray: false);
                 }
                 _buffer = Array.Empty<byte>();
                 _written = 0;
@@ -4117,12 +4117,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 newSize += growth;
             }
 
-            byte[] newBuf = ArrayPool<byte>.Shared.Rent(newSize);
+            byte[] newBuf = SystemArrayPool<byte>.RentForPrivateOwner(newSize);
             if (0 < _written)
             {
                 Buffer.BlockCopy(_buffer, 0, newBuf, 0, _written);
             }
-            ArrayPool<byte>.Shared.Return(_buffer);
+            SystemArrayPool<byte>.ReturnForPrivateOwner(_buffer, clearArray: false);
             _buffer = newBuf;
         }
 
@@ -4131,7 +4131,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             // Keep the rented buffer to avoid churn; just reset write cursor.
             if (_buffer == null || _buffer.Length == 0)
             {
-                _buffer = ArrayPool<byte>.Shared.Rent(DefaultInitialCapacity);
+                _buffer = SystemArrayPool<byte>.RentForPrivateOwner(DefaultInitialCapacity);
             }
             _written = 0;
             _disposed = false;
