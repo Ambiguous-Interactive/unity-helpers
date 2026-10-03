@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Tests.TestDoubles;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -837,6 +838,103 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SetUp()
         {
             _currentTime = 0f;
+        }
+
+        [TestCase(0f, true)]
+        [TestCase(1f, true)]
+        [TestCase(-1f, false)]
+        public void DeterministicJitterRetainsStoredLifetimeResidual(
+            float startTime,
+            bool expectedPresent
+        )
+        {
+            _currentTime = startTime;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfterWriteSeconds = float.MaxValue,
+                    UseJitter = true,
+                    JitterMaxSeconds = 2f,
+                }
+            );
+            cache.SetRandomForTesting(new EdgeCaseRandom(floatFallback: 0.5f));
+            cache.Set(1, 7);
+            _currentTime = float.MaxValue;
+            Assert.AreEqual(expectedPresent, cache.TryGet(1, out _));
+        }
+
+        [Test]
+        public void SlidingAccessDiscardsStoredJitterResidual()
+        {
+            _currentTime = 0f;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfterWriteSeconds = float.MaxValue,
+                    ExpireAfterAccessSeconds = float.MaxValue,
+                    UseJitter = true,
+                    JitterMaxSeconds = 2f,
+                }
+            );
+            cache.SetRandomForTesting(new EdgeCaseRandom(floatFallback: 0.5f));
+            cache.Set(1, 7);
+            Assert.IsTrue(cache.TryGet(1, out _));
+            _currentTime = float.MaxValue;
+            Assert.IsFalse(cache.TryGet(1, out _));
+        }
+
+        [Test]
+        public void ThrowingLifetimeFunctionPreservesStoredJitterResidual()
+        {
+            _currentTime = 0f;
+            bool failLifetime = false;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfter = (_, _) =>
+                        failLifetime ? throw new InvalidOperationException() : float.MaxValue,
+                    UseJitter = true,
+                    JitterMaxSeconds = 2f,
+                }
+            );
+            cache.SetRandomForTesting(new EdgeCaseRandom(floatFallback: 0.5f));
+            cache.Set(1, 7);
+            _currentTime = 1f;
+            failLifetime = true;
+            Assert.Throws<InvalidOperationException>(() => cache.Set(1, 8));
+            _currentTime = float.MaxValue;
+            Assert.IsTrue(cache.TryGet(1, out int value));
+            Assert.AreEqual(7, value);
+        }
+
+        [TestCase(1f, true)]
+        [TestCase(0f, false)]
+        [TestCase(-1f, false)]
+        public void LargeLifetimeRetainsSmallElapsedResidualAcrossAllReaders(
+            float startTime,
+            bool expectedPresent
+        )
+        {
+            _currentTime = startTime;
+            using Cache<int, int> cache = new(
+                new CacheOptions<int, int>
+                {
+                    TimeProvider = TimeProvider,
+                    ExpireAfterWriteSeconds = float.MaxValue,
+                }
+            );
+            cache.Set(1, 7);
+            _currentTime = float.MaxValue;
+            Assert.AreEqual(expectedPresent, cache.ContainsKey(1));
+            List<int> keys = new();
+            cache.GetKeys(keys);
+            Assert.AreEqual(expectedPresent ? 1 : 0, keys.Count);
+            cache.CleanUp();
+            Assert.AreEqual(expectedPresent ? 1 : 0, cache.Count);
+            Assert.AreEqual(expectedPresent, cache.TryGet(1, out _));
         }
 
         [TestCase(0, 100f)]

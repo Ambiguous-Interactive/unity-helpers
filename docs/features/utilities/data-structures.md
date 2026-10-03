@@ -418,8 +418,8 @@ Notes on constants
 
 Cache expiration compares elapsed time with the stored lifetime, including the exact lifetime
 boundary. Positive lifetimes retain entries on repeated reads at the same finite clock value,
-including very large custom clocks. Finite jitter is added in double precision so its sum with a
-finite lifetime cannot become infinite. When no explicit lifetime or custom lifetime function is
+including very large custom clocks. Small clock offsets and jitter remain significant beside very
+large lifetimes, and finite jitter cannot make a finite lifetime infinite. When no explicit lifetime or custom lifetime function is
 supplied, disabling both write and access expiration leaves entries without a deadline, even at
 `float.MaxValue`.
 

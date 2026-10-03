@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
+    using Helper;
     using Random;
     using UnityEngine;
 
@@ -21,6 +22,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// Use for expensive computations that can be reused for a short period (e.g., path costs, counts, queries).
     /// Optionally introduces a one-time jitter to spread refreshes across frames when many caches exist.
     /// Failed factories or time providers preserve the cached value, timer, and initial jitter.
+    /// Finite clock offsets and jitter remain significant beside very large lifetimes.
     /// </remarks>
     public sealed class TimedCache<T>
     {
@@ -37,10 +39,25 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
                 else
                 {
-                    double expiration =
-                        (double)_cacheTtl + (_shouldUseJitter && !_usedJitter ? _jitterAmount : 0f);
-                    double elapsed = (double)CurrentTime - _lastRead.Value;
-                    if (expiration < elapsed)
+                    float jitter = _shouldUseJitter && !_usedJitter ? _jitterAmount : 0f;
+                    CompensatedTime.Sum(
+                        _cacheTtl,
+                        jitter,
+                        out double expiration,
+                        out double remainder
+                    );
+                    float currentTime = CurrentTime;
+                    bool expired =
+                        float.IsFinite(_lastRead.Value) && float.IsFinite(currentTime)
+                            ? CompensatedTime.HasElapsed(
+                                _lastRead.Value,
+                                currentTime,
+                                expiration,
+                                remainder,
+                                inclusive: false
+                            )
+                            : expiration < (double)currentTime - _lastRead.Value;
+                    if (expired)
                     {
                         ResetInternal(consumeJitter: true);
                     }

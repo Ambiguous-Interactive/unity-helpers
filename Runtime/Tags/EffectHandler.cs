@@ -384,7 +384,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <param name="handle">The handle to inspect.</param>
         /// <param name="remainingDuration">When this method returns, contains the remaining time in seconds, or zero if unavailable.</param>
         /// <returns><c>true</c> if the handle has a tracked duration; otherwise, <c>false</c>.</returns>
-        /// <remarks>Duration effects retain their authored lifetime at large finite clocks; Infinite effects have no tracked duration.</remarks>
+        /// <remarks>Finite clock offsets remain significant beside large lifetimes; remaining time rounds to the nearest float. Infinite effects have no tracked duration.</remarks>
         public bool TryGetRemainingDuration(EffectHandle handle, out float remainingDuration)
         {
             return TryGetRemainingDuration(handle, Time.time, out remainingDuration);
@@ -488,7 +488,11 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             double timeRemaining =
                 float.IsFinite(timing.startTime) && float.IsFinite(currentTime)
-                    ? timing.duration - ((double)currentTime - timing.startTime)
+                    ? CompensatedTime.RemainingDuration(
+                        timing.startTime,
+                        timing.duration,
+                        currentTime
+                    )
                     : (float)((double)timing.startTime + timing.duration) - currentTime;
             if (timeRemaining < 0f)
             {
@@ -1706,7 +1710,13 @@ namespace WallstopStudios.UnityHelpers.Tags
                 (float startTime, float duration) timing = entry.Value;
                 bool expired =
                     float.IsFinite(timing.startTime) && float.IsFinite(currentTime)
-                        ? timing.duration <= (double)currentTime - timing.startTime
+                        ? CompensatedTime.HasElapsed(
+                            timing.startTime,
+                            currentTime,
+                            timing.duration,
+                            0d,
+                            inclusive: true
+                        )
                         : (float)((double)timing.startTime + timing.duration) <= currentTime;
                 if (expired)
                 {

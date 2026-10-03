@@ -1372,8 +1372,10 @@ if (effectHandler.TryGetRemainingDuration(effectHandle, out float remaining))
 
 Duration effects retain the authored duration when they are applied or refreshed. They expire
 when elapsed time reaches that duration, including at large finite clock values. Reapplication
-keeps the original start unless its reset policy allows a refresh. Remaining-duration queries
-report zero once the duration has elapsed; `Infinite` effects have no tracked countdown. Clock sampling
+keeps the original start unless its reset policy allows a refresh. Small clock offsets remain
+significant beside very large lifetimes. Remaining-duration queries retain small positive
+countdowns, round to the nearest float, and report zero once the duration has elapsed; `Infinite`
+effects have no tracked countdown. Clock sampling
 still follows Unity's `Time.time`, so expiry occurs on the first sampled frame at or after the
 lifetime, and a clock moving backward extends the countdown.
 

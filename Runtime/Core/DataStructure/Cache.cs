@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Runtime.InteropServices;
     using System.Threading;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Utils;
 #if !SINGLE_THREADED
@@ -43,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     /// <typeparam name="TKey">The type of keys in the cache.</typeparam>
     /// <typeparam name="TValue">The type of values in the cache.</typeparam>
-    /// <remarks>Finite clock values expire entries when elapsed time reaches their lifetime; disabled expiration has no deadline.</remarks>
+    /// <remarks>Finite clock offsets and jitter remain significant beside large lifetimes; expiration includes the exact lifetime boundary. Disabled expiration has no deadline.</remarks>
     public sealed class Cache<TKey, TValue> : IDisposable
     {
         private const int InvalidIndex = -1;
@@ -228,14 +229,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsLifetimeExpired(float startedAt, double duration, float currentTime)
+        private static bool IsLifetimeExpired(
+            float startedAt,
+            double duration,
+            double remainder,
+            float currentTime
+        )
         {
             if (!float.IsFinite(startedAt) || !float.IsFinite(currentTime))
             {
-                float deadline = (float)((double)startedAt + (float)duration);
+                float roundedDuration = (float)(duration + remainder);
+                float deadline = (float)((double)startedAt + roundedDuration);
                 return deadline <= currentTime;
             }
-            return duration <= (double)currentTime - startedAt;
+            return CompensatedTime.HasElapsed(
+                startedAt,
+                currentTime,
+                duration,
+                remainder,
+                inclusive: true
+            );
         }
 
         private static float DefaultTimeProvider()
@@ -765,6 +778,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
+        /// <summary>
+        /// Overrides the random source for deterministic cache tests.
+        /// </summary>
+        internal void SetRandomForTesting(IRandom random)
+        {
+            _random = random;
+        }
+
         private void InitializeFreeList()
         {
             _freeListHead = 0;
@@ -840,6 +861,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 key,
                 value,
                 ttlSeconds,
+                out double expirationRemainder,
                 out bool hasExpiration
             );
 
@@ -852,6 +874,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _entries[existingIndex].ExpirationStartedAt = currentTime;
                 _entries[existingIndex].AccessTime = currentTime;
                 _entries[existingIndex].ExpirationDuration = expirationDuration;
+                _entries[existingIndex].ExpirationRemainder = expirationRemainder;
                 _entries[existingIndex].HasExpiration = hasExpiration;
 
                 if (_options.Weigher != null)
@@ -905,6 +928,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 ExpirationStartedAt = currentTime,
                 AccessTime = currentTime,
                 ExpirationDuration = expirationDuration,
+                ExpirationRemainder = expirationRemainder,
                 HasExpiration = hasExpiration,
                 Frequency = 1,
                 PrevIndex = InvalidIndex,
@@ -958,6 +982,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             TKey key,
             TValue value,
             float? explicitTtl,
+            out double remainder,
             out bool hasExpiration
         )
         {
@@ -977,19 +1002,23 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             else
             {
+                remainder = 0d;
                 hasExpiration = false;
                 return 0d;
             }
 
+            float jitter = 0f;
             if (_options.UseJitter && 0d < ttl)
             {
                 float maxJitter =
                     0f < _options.JitterMaxSeconds ? _options.JitterMaxSeconds : (float)ttl * 0.1f;
-                ttl += Random.NextFloat(0f, maxJitter);
+                jitter = Random.NextFloat(0f, maxJitter);
             }
 
+            CompensatedTime.Sum(ttl, jitter, out double duration, out double durationRemainder);
+            remainder = durationRemainder;
             hasExpiration = true;
-            return ttl;
+            return duration;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1000,6 +1029,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 && IsLifetimeExpired(
                     _entries[index].ExpirationStartedAt,
                     _entries[index].ExpirationDuration,
+                    _entries[index].ExpirationRemainder,
                     currentTime
                 )
             )
@@ -1013,6 +1043,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     IsLifetimeExpired(
                         _entries[index].AccessTime,
                         _options.ExpireAfterAccessSeconds,
+                        0d,
                         currentTime
                     )
                 )
@@ -1032,6 +1063,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 _entries[index].ExpirationStartedAt = currentTime;
                 _entries[index].ExpirationDuration = _options.ExpireAfterAccessSeconds;
+                _entries[index].ExpirationRemainder = 0d;
                 _entries[index].HasExpiration = true;
             }
 
@@ -1807,6 +1839,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             public float ExpirationStartedAt;
             public float AccessTime;
             public double ExpirationDuration;
+            public double ExpirationRemainder;
             public int Frequency;
             public int PrevIndex;
             public int NextIndex;

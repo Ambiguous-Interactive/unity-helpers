@@ -359,9 +359,9 @@ For cached computations, `TimedCache<T>` requires a finite nonnegative lifetime 
 act as zero jitter. Zero lifetime supports jitter without requesting an empty random range;
 an explicit finite positive jitter override still delays the initial expiry. Expiry arithmetic
 preserves finite lifetimes and jitter when their sum would overflow a float. The supplied float
-clock expires the cache only when elapsed time exceeds the lifetime plus initial jitter, summed
-in double precision. A factory or time
-provider exception leaves the cached value, refresh timer, and initial jitter unchanged; retrying
+clock expires the cache only when elapsed time exceeds the lifetime plus initial jitter. Small
+clock offsets and jitter remain significant beside very large lifetimes. A factory or time provider
+exception leaves the cached value, refresh timer, and initial jitter unchanged; retrying
 uses the original expiry schedule. A successful refresh consumes the initial jitter.
 
 ---

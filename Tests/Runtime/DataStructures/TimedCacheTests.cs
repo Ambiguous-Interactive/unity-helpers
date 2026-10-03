@@ -15,6 +15,51 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class TimedCacheTests
     {
+        [TestCase(1f, 0f, 1)]
+        [TestCase(0f, 0f, 1)]
+        [TestCase(-1f, 0f, 2)]
+        [TestCase(0f, 1f, 1)]
+        [TestCase(-1f, 1f, 1)]
+        [TestCase(-2f, 1f, 2)]
+        public void LargeLifetimeAndJitterRetainSmallElapsedResidual(
+            float startTime,
+            float jitter,
+            int expectedValue
+        )
+        {
+            float now = startTime;
+            int calls = 0;
+            TimedCache<int> cache = new(
+                () => ++calls,
+                float.MaxValue,
+                useJitter: true,
+                timeProvider: () => now,
+                jitterOverride: jitter
+            );
+            Assert.AreEqual(1, cache.Value);
+            now = float.MaxValue;
+            Assert.AreEqual(expectedValue, cache.Value);
+        }
+
+        [Test]
+        public void ResetDiscardsLargeLifetimeJitterResidual()
+        {
+            float now = -1f;
+            int calls = 0;
+            TimedCache<int> cache = new(
+                () => ++calls,
+                float.MaxValue,
+                useJitter: true,
+                timeProvider: () => now,
+                jitterOverride: 1f
+            );
+            Assert.AreEqual(1, cache.Value);
+            cache.Reset();
+            Assert.AreEqual(2, cache.Value);
+            now = float.MaxValue;
+            Assert.AreEqual(3, cache.Value);
+        }
+
         [TestCase(16777216f, 3f, 0f, 16777220f)]
         [TestCase(-33554432f, 3f, 0f, -33554428f)]
         [TestCase(-float.MaxValue, float.MaxValue * 0.75f, float.MaxValue * 0.75f, float.MaxValue)]

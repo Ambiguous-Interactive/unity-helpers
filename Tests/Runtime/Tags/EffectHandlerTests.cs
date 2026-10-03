@@ -1477,6 +1477,94 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.That(remaining, Is.EqualTo(reset ? 3f : 0f));
         }
 
+        [TestCase(float.Epsilon, 1f, -0.000000059604644775390625f, 1.00000011920928955078125f)]
+        [TestCase(
+            -7.888609052210118e-31f,
+            1f,
+            0.0000000298023223876953125f,
+            0.999999940395355224609375f
+        )]
+        [TestCase(7.888609052210118e-31f, 1f, 0.0000000298023223876953125f, 1f)]
+        [TestCase(1.0141204801825835e31f, float.MaxValue, float.Epsilon, float.MaxValue)]
+        [TestCase(1.0141204801825835e31f, float.MaxValue, -float.Epsilon, float.PositiveInfinity)]
+        [TestCase(1.0141204801825835e31f, float.MaxValue, 0f, float.PositiveInfinity)]
+        public void RemainingDurationRoundsExactFloatMidpointsAndOverflow(
+            float startTime,
+            float duration,
+            float currentTime,
+            float expectedRemaining
+        )
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(RemainingDurationRoundsExactFloatMidpointsAndOverflow),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = duration;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, startTime).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, currentTime, out float remaining)
+            );
+            Assert.AreEqual(expectedRemaining, remaining);
+        }
+
+        [TestCase(1f, 1f, false)]
+        [TestCase(0f, 0f, true)]
+        [TestCase(-1f, 0f, true)]
+        public void LargeDurationRetainsSmallRemainingTimeAndExpiryResidual(
+            float startTime,
+            float expectedRemaining,
+            bool expired
+        )
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(LargeDurationRetainsSmallRemainingTimeAndExpiryResidual),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = float.MaxValue;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, startTime).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, float.MaxValue, out float remaining)
+            );
+            Assert.AreEqual(expectedRemaining, remaining);
+            handler.ProcessEffectExpirationsForTesting(float.MaxValue);
+            Assert.AreEqual(
+                !expired,
+                handler.TryGetRemainingDuration(handle, float.MaxValue, out _)
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DurationRefreshPreservesOrReplacesSmallElapsedResidual(bool reset)
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(DurationRefreshPreservesOrReplacesSmallElapsedResidual),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = float.MaxValue;
+                    e.resetDurationOnReapplication = reset;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, 1f).Value;
+            Assert.AreEqual(reset, handler.RefreshEffect(handle, false, -1f));
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, float.MaxValue, out float remaining)
+            );
+            Assert.AreEqual(reset ? 0f : 1f, remaining);
+            handler.ProcessEffectExpirationsForTesting(float.MaxValue);
+            Assert.AreEqual(!reset, handler.TryGetRemainingDuration(handle, float.MaxValue, out _));
+        }
+
         [TestCase(10f, 0.5f, 10.25f, false, TestName = "EffectExpiry.Ordinary.BeforeBoundary")]
         [TestCase(10f, 0.5f, 10.5f, true, TestName = "EffectExpiry.Ordinary.AtBoundary")]
         [TestCase(16777216f, 1f, 16777216f, false, TestName = "EffectExpiry.Large.SameClock")]

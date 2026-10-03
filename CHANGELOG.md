@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix periodic effects repeating ticks before their cadence at large clocks; initial delays, tick limits, refresh phase, and catch-up limits are preserved ([#934](https://github.com/Ambiguous-Interactive/unity-helpers/issues/934)).
-- Fix cache and effect lifetimes at large clocks, preserve disabled cache expiry, and keep finite jitter from overflowing ([#932](https://github.com/Ambiguous-Interactive/unity-helpers/issues/932)).
+- Fix cache and effect lifetimes at large clocks, including small timing offsets and jitter; preserve remaining effect time and disabled cache expiry ([#932](https://github.com/Ambiguous-Interactive/unity-helpers/issues/932)).
 - Fix discarded worker jobs retaining captured references after shutdown, including submissions racing disposal ([#844](https://github.com/Ambiguous-Interactive/unity-helpers/issues/844)).
 - Fix pool acquisition and warm-up failures leaking items or leaving phantom active rentals; acquisition callbacks can query pool state across threads ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix timed cache refresh failures changing cached values or consuming initial jitter, and preserve expiry when finite lifetime plus jitter exceeds float range ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).
