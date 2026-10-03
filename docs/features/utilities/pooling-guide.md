@@ -678,6 +678,15 @@ contract; disabling unsafe blocks alone does not exclude those tools.
 Reference clearing and callback invocation still perform runtime work. Removing disposal-lease work
 does not establish a timing or allocation improvement for a particular workload.
 
+The Base64 comparison in `BorrowedBufferPerformanceTests` measures complete calls against the shipped
+`FromBase64` lease path. The borrowed candidate retains the same Base64 and strict UTF-8 decoder,
+uses a cached callback and the same BCL pool, and checks results before and after measurement.
+Correctness controls cover pool boundaries, malformed input and invalid UTF-8, with a lease-generation
+positive control. Timing cases retain 32 observations per arm and require calibrated, stable timings
+before checking non-inferiority. Diagnostic runs cannot satisfy that acceptance gate. Unqualified
+timings reject adoption while leaving the shipped decoder intact. The candidate
+stays in test code until player timing, allocation and retained-memory evidence supports adoption.
+
 ---
 
 ### Performance Tips

@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
+    using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes;
     using WallstopStudios.UnityHelpers.Tests.EditorFramework;
@@ -28,6 +29,113 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             base.BaseSetUp();
             ValidateAssignmentPropertyDrawer.ClearHeightCache();
+        }
+
+        [TestCase(null, true, TestName = "ValidateAssignment.Message.Null.UsesDefault")]
+        [TestCase("", true, TestName = "ValidateAssignment.Message.Empty.UsesDefault")]
+        [TestCase("   ", true, TestName = "ValidateAssignment.Message.Spaces.UsesDefault")]
+        [TestCase(
+            "\t\r\n",
+            true,
+            TestName = "ValidateAssignment.Message.ControlWhitespace.UsesDefault"
+        )]
+        [TestCase(
+            "\u00a0\u2003",
+            true,
+            TestName = "ValidateAssignment.Message.UnicodeWhitespace.UsesDefault"
+        )]
+        [TestCase(
+            "Required reference",
+            false,
+            TestName = "ValidateAssignment.Message.Text.StaysExact"
+        )]
+        [TestCase(
+            "  Required reference  ",
+            false,
+            TestName = "ValidateAssignment.Message.PaddedText.StaysExact"
+        )]
+        public void CustomMessageUsesReadableFallbackWithoutChangingAttribute(
+            string customMessage,
+            bool usesDefault
+        )
+        {
+            ValidateAssignmentObjectReferenceTestAsset asset =
+                CreateScriptableObject<ValidateAssignmentObjectReferenceTestAsset>();
+            using SerializedObject serializedObject = new(asset);
+            serializedObject.Update();
+            SerializedProperty property = serializedObject.FindProperty(
+                nameof(ValidateAssignmentObjectReferenceTestAsset.requiredGameObject)
+            );
+            Assert.IsTrue(property != null);
+            ValidateAssignmentAttribute validationAttribute = new(customMessage);
+            string expected = usesDefault
+                ? string.Format(
+                    ValidationShared.ValidateAssignmentMessageFormat,
+                    property.displayName
+                )
+                : customMessage;
+            Assert.That(
+                ValidationShared.GetValidateAssignmentMessage(property, validationAttribute),
+                Is.EqualTo(expected)
+            );
+            string paddedFieldName = "  Required Reference  ";
+            Assert.That(
+                ValidationShared.GetValidateAssignmentMessage(paddedFieldName, validationAttribute),
+                Is.EqualTo(
+                    usesDefault
+                        ? string.Format(
+                            ValidationShared.ValidateAssignmentMessageFormat,
+                            paddedFieldName
+                        )
+                        : customMessage
+                )
+            );
+            ValidateAssignmentPropertyDrawer drawer = new();
+            PropertyDrawerTestHelper.AssignAttribute(drawer, validationAttribute);
+            VisualElement element = drawer.CreatePropertyGUI(property);
+            HelpBox helpBox = element.Q<HelpBox>();
+            Assert.IsTrue(helpBox != null);
+            Assert.That(helpBox.text, Is.EqualTo(expected));
+            Assert.That(helpBox.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(validationAttribute.CustomMessage, Is.EqualTo(customMessage));
+            Assert.IsFalse(serializedObject.hasModifiedProperties);
+        }
+
+        [TestCase("   ", TestName = "ValidateAssignment.SerializedString.Spaces.Preserved")]
+        [TestCase(
+            "\t\r\n",
+            TestName = "ValidateAssignment.SerializedString.ControlWhitespace.Preserved"
+        )]
+        [TestCase(
+            "\u00a0\u2003",
+            TestName = "ValidateAssignment.SerializedString.UnicodeWhitespace.Preserved"
+        )]
+        public void ValidationPreservesLiteralWhitespaceStringValues(string value)
+        {
+            ValidateAssignmentStringTestAsset asset =
+                CreateScriptableObject<ValidateAssignmentStringTestAsset>();
+            asset.requiredString = value;
+            using SerializedObject serializedObject = new(asset);
+            serializedObject.Update();
+            SerializedProperty property = serializedObject.FindProperty(
+                nameof(ValidateAssignmentStringTestAsset.requiredString)
+            );
+            Assert.IsTrue(property != null);
+            Assert.That(
+                ValidateAssignmentPropertyDrawer.IsPropertyInvalid(property),
+                Is.EqualTo(true)
+            );
+            ValidateAssignmentPropertyDrawer drawer = new();
+            PropertyDrawerTestHelper.AssignAttribute(drawer, new ValidateAssignmentAttribute());
+            drawer.CreatePropertyGUI(property);
+            Assert.IsFalse(serializedObject.hasModifiedProperties);
+            Assert.That(property.stringValue, Is.EqualTo(value));
+            Assert.That(asset.requiredString, Is.EqualTo(value));
+            string serialized = JsonUtility.ToJson(asset);
+            ValidateAssignmentStringTestAsset restored =
+                CreateScriptableObject<ValidateAssignmentStringTestAsset>();
+            JsonUtility.FromJsonOverwrite(serialized, restored);
+            Assert.That(restored.requiredString, Is.EqualTo(value));
         }
 
         [Test]

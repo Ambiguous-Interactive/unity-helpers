@@ -1,7 +1,7 @@
 # Contract fixture PowerShell launch audit
 
 This reference tracks the remaining work for [#869](https://github.com/Ambiguous-Interactive/unity-helpers/issues/869).
-The audit was inspected on 2026-10-02. It does not certify that the issue is complete.
+The audit was inspected on 2026-10-03. It does not certify that the issue is complete.
 
 ## Scope and method
 
@@ -26,7 +26,7 @@ All paths in this table are under `scripts/tests/`. Counts are executable source
 
 | File                                                                                                   | Sites | Classification and reason                                                                                                                                                                                                                                                               |
 | ------------------------------------------------------------------------------------------------------ | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1)                     |     1 | CLI: native implicit-success observation, exercised by the four migrated suites; the strict runspace harness rejects the same script without an explicit terminal exit.                                                                                                                 |
+| [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1)                     |     1 | CLI: native implicit-success observation, exercised by the five migrated suites; the strict runspace harness rejects the same script without an explicit terminal exit.                                                                                                                 |
 | [test-agent-preflight.ps1](../../scripts/tests/test-agent-preflight.ps1)                               |     4 | CLI: helper's explicit CLI branch; loaded-function isolation probe; repository and non-repository push configuration entrypoints. Content cases already use runspaces.                                                                                                                  |
 | [test-check-eol.ps1](../../scripts/tests/test-check-eol.ps1)                                           |     1 | CLI: explicit CLI branch preserves verbose and multiple-path binding. Content cases already use runspaces.                                                                                                                                                                              |
 | [test-empty-corpus-gates.ps1](../../scripts/tests/test-empty-corpus-gates.ps1)                         |     1 | CLI: retained smoke and native implicit-status parity controls. Content cases already use runspaces.                                                                                                                                                                                    |
@@ -51,10 +51,9 @@ All paths in this table are under `scripts/tests/`. Counts are executable source
 
 The additional `ProcessStartInfo` launcher in
 [test-validate-lint-error-codes.ps1](../../scripts/tests/test-validate-lint-error-codes.ps1)
-runs content fixtures concurrently. Classify the fixture executions as candidates, retaining
-one real verbose CLI check. A migration must preserve concurrent isolation, drain output,
-and keep the real repository control; replacing parallel children with serial runspaces
-requires measurement rather than an assumed speed gain.
+retains three CLI executions: the real repository control and spaced-path success/failure
+parity with verbose binding. Eight synthetic content fixtures now use overlapping fresh
+runspaces. Node/cspell still run natively; every original scenario and diagnostic assertion remains.
 
 The helper in [test-process-watchdog.ps1](../../scripts/tests/test-process-watchdog.ps1)
 requires real child processes: timeout, sentinel detection, grace termination, and descendant
@@ -137,7 +136,7 @@ boundaries require a containing loop or switch within that same function or scri
 parent loops outside the boundary cannot justify the escape. Labeled escapes are rejected.
 Six negative controls cover unscoped function/block break and continue plus labeled escapes;
 four positive controls preserve function returns and scoped function/block loops and switches. This is a bounded structural
-contract for the three selected scripts, not a universal PowerShell control-flow proof.
+contract for the selected scripts, not a universal PowerShell control-flow proof.
 `LASTEXITCODE` supplies the exact observed status only after this structural check succeeds.
 The native-only control exits 0 under real CLI execution and fails the runspace harness,
 so native success cannot substitute for the required explicit terminal exit.
@@ -175,6 +174,14 @@ missing status is never inferred as success. The fixture restores `GITHUB_OUTPUT
 Sequential same-host devcontainer runs passed **24/24 in 3.888 seconds** before and **51/51 in 1.918 seconds** after, including every added control.
 These are local single-sample observations, not hosted acceptance. The retained CLI helper remains one source launch site;
 the inventory stays **37 sites in 22 PowerShell test files**, with fewer executions of that site.
+
+## Error-code validator migration evidence
+
+All nine original scenarios remain; failures require exact exit 1, success requires 0, and JavaScript harvesting now requires its prefix diagnostic.
+The complete suite passes **44/44 in 11.236 seconds**: nine original scenarios, 23 shared controls, ten async isolation/error/disposal controls, and two spaced-path CLI parity checks.
+Source-line and JSON-patch assertions distinguish prefix failures from unrelated process errors. Overlapping controls prove independent globals, locations, script paths, and parent-location preservation; completed, failed, and cancelled runspaces close.
+Sequential same-host local observations were **9/9 in 9.164 seconds** before and **9/9 in 8.495 seconds** after, omitting only added controls and parity probes from a temporary revised copy.
+The initial complete revision passed 44/44 in 10.692 seconds. These samples do not establish a hosted or total-suite speed improvement. Remaining candidates and hosted acceptance stay open.
 
 ## Remaining acceptance work
 

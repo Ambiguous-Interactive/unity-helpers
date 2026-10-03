@@ -74,8 +74,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         public ValidateAssignmentMessageType MessageType { get; }
 
         /// <summary>
-        /// An optional custom message to display in the inspector when the field is invalid.
-        /// If null or empty, a default message will be generated based on the field name.
+        /// An optional inspector message; null, empty, or whitespace-only messages use the field default.
         /// </summary>
         public string CustomMessage { get; }
 

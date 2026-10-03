@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
+    using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes;
     using WallstopStudios.UnityHelpers.Tests.EditorFramework;
@@ -28,6 +29,93 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             base.BaseSetUp();
             WNotNullPropertyDrawer.ClearHeightCache();
+        }
+
+        [TestCase(null, true, TestName = "WNotNull.Message.Null.UsesDefault")]
+        [TestCase("", true, TestName = "WNotNull.Message.Empty.UsesDefault")]
+        [TestCase("   ", true, TestName = "WNotNull.Message.Spaces.UsesDefault")]
+        [TestCase("\t\r\n", true, TestName = "WNotNull.Message.ControlWhitespace.UsesDefault")]
+        [TestCase(
+            "\u00a0\u2003",
+            true,
+            TestName = "WNotNull.Message.UnicodeWhitespace.UsesDefault"
+        )]
+        [TestCase("Required reference", false, TestName = "WNotNull.Message.Text.StaysExact")]
+        [TestCase(
+            "  Required reference  ",
+            false,
+            TestName = "WNotNull.Message.PaddedText.StaysExact"
+        )]
+        public void CustomMessageUsesReadableFallbackWithoutChangingAttribute(
+            string customMessage,
+            bool usesDefault
+        )
+        {
+            WNotNullObjectReferenceTestAsset asset =
+                CreateScriptableObject<WNotNullObjectReferenceTestAsset>();
+            using SerializedObject serializedObject = new(asset);
+            serializedObject.Update();
+            SerializedProperty property = serializedObject.FindProperty(
+                nameof(WNotNullObjectReferenceTestAsset.requiredGameObject)
+            );
+            Assert.IsTrue(property != null);
+            WNotNullAttribute validationAttribute = new(customMessage);
+            string expected = usesDefault
+                ? string.Format(ValidationShared.NotNullMessageFormat, property.displayName)
+                : customMessage;
+            Assert.That(
+                ValidationShared.GetNotNullMessage(property, validationAttribute),
+                Is.EqualTo(expected)
+            );
+            string paddedFieldName = "  Required Reference  ";
+            Assert.That(
+                ValidationShared.GetNotNullMessage(paddedFieldName, validationAttribute),
+                Is.EqualTo(
+                    usesDefault
+                        ? string.Format(ValidationShared.NotNullMessageFormat, paddedFieldName)
+                        : customMessage
+                )
+            );
+            WNotNullPropertyDrawer drawer = new();
+            PropertyDrawerTestHelper.AssignAttribute(drawer, validationAttribute);
+            VisualElement element = drawer.CreatePropertyGUI(property);
+            HelpBox helpBox = element.Q<HelpBox>();
+            Assert.IsTrue(helpBox != null);
+            Assert.That(helpBox.text, Is.EqualTo(expected));
+            Assert.That(helpBox.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(validationAttribute.CustomMessage, Is.EqualTo(customMessage));
+            Assert.IsFalse(serializedObject.hasModifiedProperties);
+        }
+
+        [TestCase("   ", TestName = "WNotNull.SerializedString.Spaces.Preserved")]
+        [TestCase("\t\r\n", TestName = "WNotNull.SerializedString.ControlWhitespace.Preserved")]
+        [TestCase(
+            "\u00a0\u2003",
+            TestName = "WNotNull.SerializedString.UnicodeWhitespace.Preserved"
+        )]
+        public void ValidationPreservesLiteralWhitespaceStringValues(string value)
+        {
+            WNotNullMixedFieldsTestAsset asset =
+                CreateScriptableObject<WNotNullMixedFieldsTestAsset>();
+            asset.nullableString = value;
+            using SerializedObject serializedObject = new(asset);
+            serializedObject.Update();
+            SerializedProperty property = serializedObject.FindProperty(
+                nameof(WNotNullMixedFieldsTestAsset.nullableString)
+            );
+            Assert.IsTrue(property != null);
+            Assert.That(WNotNullPropertyDrawer.IsPropertyNull(property), Is.EqualTo(false));
+            WNotNullPropertyDrawer drawer = new();
+            PropertyDrawerTestHelper.AssignAttribute(drawer, new WNotNullAttribute());
+            drawer.CreatePropertyGUI(property);
+            Assert.IsFalse(serializedObject.hasModifiedProperties);
+            Assert.That(property.stringValue, Is.EqualTo(value));
+            Assert.That(asset.nullableString, Is.EqualTo(value));
+            string serialized = JsonUtility.ToJson(asset);
+            WNotNullMixedFieldsTestAsset restored =
+                CreateScriptableObject<WNotNullMixedFieldsTestAsset>();
+            JsonUtility.FromJsonOverwrite(serialized, restored);
+            Assert.That(restored.nullableString, Is.EqualTo(value));
         }
 
         [Test]
