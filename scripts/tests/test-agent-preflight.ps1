@@ -1,6 +1,7 @@
 Param(
     [switch]$VerboseOutput,
-    [switch]$LicensePipeOnly
+    [switch]$LicensePipeOnly,
+    [switch]$PipePressureOnly
 )
 
 Set-StrictMode -Version Latest
@@ -432,6 +433,102 @@ exit 0
     return $scriptPath
 }
 
+function Invoke-BoundedPipeProcess {
+    param(
+        [string]$FileName,
+        [string[]]$Arguments,
+        [string]$WorkingDirectory
+    )
+
+    $process = $null
+    try {
+        $info = [System.Diagnostics.ProcessStartInfo]::new()
+        $info.FileName = $FileName
+        foreach ($argument in $Arguments) {
+            [void]$info.ArgumentList.Add($argument)
+        }
+        $info.WorkingDirectory = $WorkingDirectory
+        $info.UseShellExecute = $false
+        $info.RedirectStandardOutput = $true
+        $info.RedirectStandardError = $true
+        $process = [System.Diagnostics.Process]::Start($info)
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $completed = $process.WaitForExit(10000)
+        if (-not $completed) {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
+        return [pscustomobject]@{
+            Completed = $completed
+            ExitCode  = $process.ExitCode
+            Stdout    = $stdoutTask.GetAwaiter().GetResult()
+            Stderr    = $stderrTask.GetAwaiter().GetResult()
+        }
+    }
+    finally {
+        if ($null -ne $process) {
+            if (-not $process.HasExited) {
+                $process.Kill($true)
+                $process.WaitForExit()
+            }
+            $process.Dispose()
+        }
+    }
+}
+
+function Test-GitStderrPipeDrain {
+    $repoPath = New-TestRepo -ConfigurePushDefaults
+    try {
+        $arguments = @('-c', "alias.pressure=!printf '%100000s' x >&2; exit 37", 'pressure')
+        $control = Invoke-BoundedPipeProcess -FileName (Get-Command git -ErrorAction Stop).Source -Arguments $arguments -WorkingDirectory $repoPath
+        $stderrBytes = [System.Text.Encoding]::UTF8.GetByteCount($control.Stderr)
+        Write-TestResult 'GitStderrPipeDrain_ActualPressure' ($control.Completed -and $control.ExitCode -eq 37 -and $control.Stdout -eq '' -and $stderrBytes -eq 100000) "Expected real Git to emit 100000 stderr bytes and exit 37 within 10 seconds; completed=$($control.Completed), exit=$($control.ExitCode), stderrBytes=$stderrBytes."
+
+        $sourceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        $errors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'scripts/agent-preflight.ps1'), [ref]$null, [ref]$errors)
+        if ($errors.Count -gt 0) {
+            throw "Preflight source parse failed: $($errors -join '; ')"
+        }
+        $runner = [System.Collections.Generic.List[string]]::new()
+        $runner.Add('param([string]$Helper, [string]$RepoRoot)')
+        $runner.Add("Set-StrictMode -Version Latest`n`$ErrorActionPreference = 'Stop'")
+        foreach ($name in @('Split-NulPathText', 'Invoke-GitPathList', 'Invoke-GitRawText')) {
+            $functions = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $false))
+            if ($functions.Count -ne 1) {
+                throw "Expected exactly one actual preflight function named $name."
+            }
+            $runner.Add($functions[0].Extent.Text)
+        }
+        $runner.Add(@'
+$result = & $Helper -RepoRoot $RepoRoot -Arguments @('-c', "alias.pressure=!printf '%100000s' x >&2; exit 37", 'pressure')
+if ($Helper -eq 'Invoke-GitPathList') {
+    if (@($result).Count -ne 0) {
+        throw 'A failed Git command must return no paths.'
+    }
+}
+else {
+    if ($result.ExitCode -ne 37 -or $result.Stdout -ne '') {
+        throw 'Raw Git failure exit code or stdout changed.'
+    }
+}
+Write-Output 'PIPE_RETURN_OK'
+exit 0
+'@)
+        $runnerPath = Join-Path $repoPath 'scripts/pipe-pressure-helper.ps1'
+        [System.IO.File]::WriteAllText($runnerPath, ($runner -join "`n"))
+        foreach ($helper in @('Invoke-GitPathList', 'Invoke-GitRawText')) {
+            $result = Invoke-BoundedPipeProcess -FileName (Get-Command pwsh -ErrorAction Stop).Source -Arguments @('-NoProfile', '-File', $runnerPath, '-Helper', $helper, '-RepoRoot', $repoPath) -WorkingDirectory $repoPath
+            Write-TestResult "GitStderrPipeDrain.$helper.CompletesWithinTimeout" $result.Completed "The actual helper did not complete within 10 seconds. Stderr: $($result.Stderr)"
+            Write-TestResult "GitStderrPipeDrain.$helper.PreservesReturnSemantics" ($result.Completed -and $result.ExitCode -eq 0 -and $result.Stdout.Contains('PIPE_RETURN_OK')) "The actual helper's return semantics failed. Exit=$($result.ExitCode); stderr=$($result.Stderr)"
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $repoPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Test-LicensePipeDrain {
     $repoPath = New-TestRepo -ConfigurePushDefaults
     $process = $null
@@ -498,6 +595,14 @@ function Test-LicensePipeDrain {
     }
 }
 
+if ($PipePressureOnly) {
+    Test-GitStderrPipeDrain
+    if ($script:TestsFailed -gt 0) {
+        exit 1
+    }
+    exit 0
+}
+
 Test-LicensePipeDrain
 if ($LicensePipeOnly) {
     if ($script:TestsFailed -gt 0) {
@@ -505,6 +610,8 @@ if ($LicensePipeOnly) {
     }
     exit 0
 }
+
+Test-GitStderrPipeDrain
 
 Write-Host 'Testing agent-preflight.ps1...' -ForegroundColor White
 
