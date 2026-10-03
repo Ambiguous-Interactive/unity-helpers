@@ -1071,9 +1071,17 @@ protect nested and out-of-order restoration. `PartitionPooled` deliberately keep
 consumer's lease so enumeration cleanup returns outstanding partitions without returning a live
 renter's reused buffer. These are existing runtime behaviors that a blanket copy ban would forbid.
 
-Removing a generation check would require a separate ownership contract enforced across every
-caller, including repeated disposal and all escapes. A suppressible allocation analyzer cannot
-supply that contract. WUH022 instead removes an observable, avoidable allocation at the source
+Removing a generation check from a shared disposal handle would require a separate ownership
+contract enforced across every caller, including repeated disposal and all escapes. A suppressible
+allocation analyzer cannot supply that contract. WUH022 instead removes an observable, avoidable allocation at the source
 boundary while retaining stale-generation rejection, exactly one concurrent disposal winner,
 warmed acquisition behavior, and safe copies. This investigation reports compiler conversion
 evidence and ownership behavior, without claiming measured player allocation or timing improvements.
+
+A private operation can instead keep the entire lifetime inside its own body without issuing a
+handle. The four numeric `WallMath.Mean` list paths rent their scratch arrays directly from the same
+`ArrayPool<T>.Shared` and return them in `finally`. Only the initialized logical prefix is read;
+accumulation order, validation, source contents, and numeric clearing behavior stay unchanged.
+Tests that observe slot generations verify that these paths do not acquire or claim disposal leases. This boundary does not rely on an analyzer and does not weaken public lease guarantees.
+It demonstrates removal of lease work, not a measured timing improvement; it does not extend to
+buffers that escape or whose disposal is shared with consumers.

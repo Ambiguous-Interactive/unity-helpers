@@ -1670,18 +1670,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (values is List<float> list)
             {
-                using PooledArray<float> lease = SystemArrayPool<float>.Get(
-                    count,
-                    out float[] copy
-                );
-                list.CopyTo(copy, 0);
-                double pooledSum = 0.0;
-                for (int i = 0; i < count; ++i)
+                float[] copy = System.Buffers.ArrayPool<float>.Shared.Rent(count);
+                try
                 {
-                    pooledSum += copy[i];
-                }
+                    list.CopyTo(copy, 0);
+                    double pooledSum = 0.0;
+                    for (int i = 0; i < count; ++i)
+                    {
+                        pooledSum += copy[i];
+                    }
 
-                return pooledSum;
+                    return pooledSum;
+                }
+                finally
+                {
+                    System.Buffers.ArrayPool<float>.Shared.Return(copy, clearArray: false);
+                }
             }
 
             double interfaceSum = 0.0;
@@ -1708,18 +1712,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (values is List<double> list)
             {
-                using PooledArray<double> lease = SystemArrayPool<double>.Get(
-                    count,
-                    out double[] copy
-                );
-                list.CopyTo(copy, 0);
-                double pooledSum = 0.0;
-                for (int i = 0; i < count; ++i)
+                double[] copy = System.Buffers.ArrayPool<double>.Shared.Rent(count);
+                try
                 {
-                    pooledSum += copy[i];
-                }
+                    list.CopyTo(copy, 0);
+                    double pooledSum = 0.0;
+                    for (int i = 0; i < count; ++i)
+                    {
+                        pooledSum += copy[i];
+                    }
 
-                return pooledSum;
+                    return pooledSum;
+                }
+                finally
+                {
+                    System.Buffers.ArrayPool<double>.Shared.Return(copy, clearArray: false);
+                }
             }
 
             double interfaceSum = 0.0;
@@ -1746,15 +1754,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (values is List<int> list)
             {
-                using PooledArray<int> lease = SystemArrayPool<int>.Get(count, out int[] copy);
-                list.CopyTo(copy, 0);
-                double pooledSum = 0.0;
-                for (int i = 0; i < count; ++i)
+                int[] copy = System.Buffers.ArrayPool<int>.Shared.Rent(count);
+                try
                 {
-                    pooledSum += copy[i];
-                }
+                    list.CopyTo(copy, 0);
+                    double pooledSum = 0.0;
+                    for (int i = 0; i < count; ++i)
+                    {
+                        pooledSum += copy[i];
+                    }
 
-                return pooledSum;
+                    return pooledSum;
+                }
+                finally
+                {
+                    System.Buffers.ArrayPool<int>.Shared.Return(copy, clearArray: false);
+                }
             }
 
             double interfaceSum = 0.0;
@@ -1781,15 +1796,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (values is List<long> list)
             {
-                using PooledArray<long> lease = SystemArrayPool<long>.Get(count, out long[] copy);
-                list.CopyTo(copy, 0);
-                double pooledSum = 0.0;
-                for (int i = 0; i < count; ++i)
+                long[] copy = System.Buffers.ArrayPool<long>.Shared.Rent(count);
+                try
                 {
-                    pooledSum += copy[i];
-                }
+                    list.CopyTo(copy, 0);
+                    double pooledSum = 0.0;
+                    for (int i = 0; i < count; ++i)
+                    {
+                        pooledSum += copy[i];
+                    }
 
-                return pooledSum;
+                    return pooledSum;
+                }
+                finally
+                {
+                    System.Buffers.ArrayPool<long>.Shared.Return(copy, clearArray: false);
+                }
             }
 
             double interfaceSum = 0.0;
