@@ -699,9 +699,17 @@ requested `UnityVersion` and `Backend` (`Mono2x` or `IL2CPP`), and nonempty `Sou
 `CorpusFiles` arrays. Each file entry contains a repository-relative `Path` and its lowercase SHA256
 in `Sha256`. The runner records declared input hashes and the complete player directory before and
 after launch, rejects changes, and retains a diagnostic report under the run's artifacts directory.
-The report also checks the exact preflight and two Base64 correctness outcomes. Declared file hashes
-do not prove complete source coverage, runtime association or corpus consumption. Effective build
-settings and retained-memory behavior remain unverified; campaign and adoption eligibility stay false.
+The report also checks the exact preflight and two Base64 correctness outcomes. To join the compiled
+player to actual test inputs, export `BorrowedBase64Tests.CreateCanonicalCorpusBytes()` and include
+that file in `CorpusFiles`. Set the optional `CanonicalCorpusPath` to its exact declared path. The
+runner compiles the run and declaration hashes into the performance test assembly and checks both
+runtime markers against the frozen corpus. The shared corpus contains 35 correctness rows and 12
+whole-call declarations. The correctness marker reports 70 decoder comparisons; those comparisons
+do not execute the 12 timing cases. Missing or conflicting markers reject the join.
+
+Declared hashes do not prove complete source coverage. Effective build settings, timing-case
+consumption and retained-memory behavior remain unverified; campaign and adoption eligibility stay
+false.
 
 ---
 

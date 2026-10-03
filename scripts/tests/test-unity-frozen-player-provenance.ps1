@@ -10,7 +10,7 @@ $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($source, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count -ne 0) { throw 'Unity runner must parse.' }
 foreach ($name in @('Assert-FrozenPlayerRegularPath', 'Get-FrozenPlayerFileInventory', 'Read-FrozenPlayerDeclaration', 'Start-FrozenPlayerProvenance',
-        'Add-FrozenPlayerProvenanceSnapshot', 'Get-FrozenPlayerJointCorrectness', 'Complete-FrozenPlayerProvenance')) {
+        'New-FrozenPlayerAnchor', 'Get-FrozenPlayerRuntimeJoin', 'Add-FrozenPlayerProvenanceSnapshot', 'Get-FrozenPlayerJointCorrectness', 'Complete-FrozenPlayerProvenance')) {
     $function = $ast.Find({ param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
         }, $true)
@@ -58,6 +58,7 @@ function Start-ControlContext {
     param($Fixture)
     $declaration = Read-ControlDeclaration $Fixture
     $context = Start-FrozenPlayerProvenance -Declaration $declaration -RepoRoot $Fixture.Root -PayloadRoot $Fixture.Payload
+    if ($null -ne $declaration.CanonicalCorpus) { New-FrozenPlayerAnchor -Context $context -ProjectPath (Join-Path $Fixture.Root 'generated project') }
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'before-configure'
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'after-configure'
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'after-build' -IncludePayload
@@ -72,6 +73,37 @@ function Write-ControlResults {
     param([string]$Path, [string[]]$Names = $requiredNames, [string]$LeafResult = 'Passed', [string]$RootResult = 'Passed', [int]$RootPassed = 3, [string]$Extra = '')
     $leaves = ($Names | ForEach-Object { "<test-case fullname=`"$_`" result=`"$LeafResult`"/>" }) -join ''
     [IO.File]::WriteAllText($Path, "<test-run result=`"$RootResult`" testcasecount=`"3`" total=`"3`" passed=`"$RootPassed`" failed=`"0`" skipped=`"0`" inconclusive=`"0`">$leaves$Extra</test-run>")
+}
+function New-CanonicalFixture {
+    param([string]$RunId)
+    $fixture = New-DeclarationFixture $RunId
+    $fixture.Manifest.CanonicalCorpusPath = 'corpus.json'
+    [IO.File]::WriteAllText($fixture.Path, (ConvertTo-Json -InputObject $fixture.Manifest -Depth 5))
+    $metaDirectory = Join-Path $fixture.Root 'Tests/Runtime/Performance'
+    New-Item -ItemType Directory -Path $metaDirectory -Force | Out-Null
+    [IO.File]::Copy((Join-Path $PSScriptRoot '../../Tests/Runtime/Performance/WallstopStudios.UnityHelpers.Tests.Runtime.Performance.asmdef.meta'),
+        (Join-Path $metaDirectory 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.asmdef.meta'))
+    New-Item -ItemType Directory -Path (Join-Path $fixture.Root 'generated project/Assets') -Force | Out-Null
+    return $fixture
+}
+function New-RuntimeRecords {
+    param($Context)
+    $preflight = [ordered]@{
+        SchemaVersion = 1; FrozenRunId = $Context.Declaration.Value.RunId
+        FrozenDeclarationSha256 = $Context.Declaration.Sha256
+        FrozenCorpusSha256 = $Context.Declaration.CanonicalCorpus.Sha256
+        ActualCorpusSha256 = $Context.Declaration.CanonicalCorpus.Sha256
+        RuntimeIdentity = [ordered]@{ UnityVersion = '6000.6.0f1'; Backend = 'Mono'; Platform = 'WindowsPlayer'; ProcessBits = 64; IsEditor = $false; DevelopmentBuild = $false }
+    }
+    $correctness = [ordered]@{ SchemaVersion = 1; CorpusSha256 = $Context.Declaration.CanonicalCorpus.Sha256; VerifiedRows = 35; DecoderAssertions = 70; DeclaredCampaignRows = 12 }
+    return [pscustomobject]@{ Preflight = $preflight; Correctness = $correctness }
+}
+function Write-RuntimeRecords {
+    param([string]$Path, $Records, [switch]$CorrectnessFirst)
+    $preflight = 'BORROWED_PREFLIGHT ' + (ConvertTo-Json -InputObject $Records.Preflight -Depth 5 -Compress)
+    $correctness = 'BORROWED_BASE64_CORPUS ' + (ConvertTo-Json -InputObject $Records.Correctness -Compress)
+    $lines = if ($CorrectnessFirst) { @($correctness, $preflight) } else { @($preflight, $correctness) }
+    [IO.File]::WriteAllText($Path, ($lines -join "`n") + "`n")
 }
 try {
     $fixture = New-DeclarationFixture 'positive'
@@ -223,11 +255,114 @@ try {
     $oversized = [IO.File]::Create($results)
     try { $oversized.SetLength(33554433) } finally { $oversized.Dispose() }
     Assert-Control ((Get-FrozenPlayerJointCorrectness -ResultsPath $results).State -eq 'rejected') 'reject oversized XML before parsing'
+    foreach ($path in @('', 'CORPUS.JSON', 'source with spaces.cs', '../corpus.json')) {
+        $fixture = New-CanonicalFixture ('canonical-invalid-' + [Guid]::NewGuid().ToString('N'))
+        $fixture.Manifest.CanonicalCorpusPath = $path
+        [IO.File]::WriteAllText($fixture.Path, (ConvertTo-Json -InputObject $fixture.Manifest -Depth 5))
+        Assert-Rejected { Read-ControlDeclaration $fixture } "reject unlisted or nonexact canonical path '$path'" 'exactly identify'
+    }
+    foreach ($order in @('preflight-first', 'correctness-first')) {
+        $fixture = New-CanonicalFixture "canonical-$order"
+        $context = Start-ControlContext $fixture
+        $anchorSource = Join-Path $context.GeneratedRoot 'Assets/FrozenPlayerAnchor/BorrowedBufferPreflightTests.Anchor.cs'
+        $anchorReference = Join-Path $context.GeneratedRoot 'Assets/FrozenPlayerAnchor/FrozenPlayerAnchor.asmref'
+        Assert-Control (([IO.File]::ReadAllText($anchorSource)).Contains('static partial void ReadFrozenAnchor(') -and
+            ([IO.File]::ReadAllText($anchorSource)).Contains($context.Declaration.Sha256) -and
+            ([IO.File]::ReadAllText($anchorSource)).Contains($context.Declaration.CanonicalCorpus.Sha256) -and
+            ((Get-Content -LiteralPath $anchorReference -Raw | ConvertFrom-Json).reference -ceq 'GUID:e8f3b866a545477f99bc5729d9d6a7f7')) 'compiled literals and exact assembly reference are generated'
+        Assert-Control ($context.Snapshots[0].GeneratedAnchorFiles.Count -eq 5) 'anchor source and metadata hashes are frozen before configure'
+        Assert-Rejected { New-FrozenPlayerAnchor -Context $context -ProjectPath $context.GeneratedRoot } 'existing implementation cannot be overwritten' 'fresh project scope'
+        $context.LaunchAttempted = $true
+        $context.InvocationObserved = $true
+        $context.ResultsValidated = $true
+        $context.PlayerOutcome = @{ ExitCode = 0; TimedOut = $false }
+        $results = Join-Path $fixture.Root 'results.xml'
+        $log = Join-Path $fixture.Root 'player.log'
+        Write-ControlResults $results
+        $records = New-RuntimeRecords $context
+        Write-RuntimeRecords $log $records -CorrectnessFirst:($order -eq 'correctness-first')
+        Complete-FrozenPlayerProvenance -Context $context -ResultsPath $results -EvidencePaths @($results, $log) -PlayerLogPath $log
+        $report = Get-Content -LiteralPath $context.ReportPath -Raw | ConvertFrom-Json
+        Assert-Control ($report.RuntimeRecordJoinState -eq 'passed' -and $report.CorrectnessCorpusConsumptionState -eq 'passed' -and
+            $report.RuntimeJoin.VerifiedCorrectnessRows -eq 35 -and $report.RuntimeJoin.DeclaredCampaignRows -eq 12 -and
+            $report.CampaignCorpusConsumptionState -eq 'unverified' -and -not $report.CampaignEligible -and
+            $report.RuntimeJoin.RawRecords.Count -eq 2) "host-derived runtime/correctness join is order independent: $order"
+    }
+    $fixture = New-CanonicalFixture 'runtime-rejections'
+    $context = Start-ControlContext $fixture
+    $records = New-RuntimeRecords $context
+    $log = Join-Path $fixture.Root 'player.log'
+    foreach ($kind in @('missing-log', 'missing-preflight', 'missing-correctness', 'duplicate-preflight', 'duplicate-correctness',
+            'conflicting-preflight', 'malformed', 'truncated', 'duplicate-key', 'wrong-run', 'wrong-declaration', 'wrong-anchor-corpus',
+            'wrong-actual-corpus', 'wrong-version', 'wrong-backend', 'wrong-platform', 'editor', 'development', 'process32',
+            'string-editor', 'string-schema', 'float-schema', 'bool-schema', 'string-count', 'float-count', 'bool-count',
+            'string-process-bits', 'float-process-bits', 'bool-process-bits', 'missing-identity', 'array-run-id', 'array-runtime-version',
+            'array-anchor-digest', 'array-correctness-digest', 'escaped-duplicate-key', 'embedded-prefix', 'deep-json', 'wrong-correctness-digest', 'wrong-row-count', 'wrong-assertion-count', 'wrong-campaign-count')) {
+        $changed = New-RuntimeRecords $context
+        switch ($kind) {
+            'wrong-run' { $changed.Preflight.FrozenRunId = 'another-run' }
+            'wrong-declaration' { $changed.Preflight.FrozenDeclarationSha256 = '0' * 64 }
+            'wrong-anchor-corpus' { $changed.Preflight.FrozenCorpusSha256 = '0' * 64 }
+            'wrong-actual-corpus' { $changed.Preflight.ActualCorpusSha256 = '0' * 64 }
+            'wrong-version' { $changed.Preflight.RuntimeIdentity.UnityVersion = '6000.4.6f1' }
+            'wrong-backend' { $changed.Preflight.RuntimeIdentity.Backend = 'Mono2x' }
+            'wrong-platform' { $changed.Preflight.RuntimeIdentity.Platform = 'WindowsEditor' }
+            'editor' { $changed.Preflight.RuntimeIdentity.IsEditor = $true }
+            'development' { $changed.Preflight.RuntimeIdentity.DevelopmentBuild = $true }
+            'process32' { $changed.Preflight.RuntimeIdentity.ProcessBits = 32 }
+            'string-editor' { $changed.Preflight.RuntimeIdentity.IsEditor = 'false' }
+            'string-schema' { $changed.Preflight.SchemaVersion = '1' }
+            'float-schema' { $changed.Preflight.SchemaVersion = [double]1.0 }
+            'bool-schema' { $changed.Preflight.SchemaVersion = $true }
+            'string-count' { $changed.Correctness.VerifiedRows = '35' }
+            'float-count' { $changed.Correctness.VerifiedRows = [double]35.0 }
+            'bool-count' { $changed.Correctness.VerifiedRows = $true }
+            'string-process-bits' { $changed.Preflight.RuntimeIdentity.ProcessBits = '64' }
+            'float-process-bits' { $changed.Preflight.RuntimeIdentity.ProcessBits = [double]64.0 }
+            'bool-process-bits' { $changed.Preflight.RuntimeIdentity.ProcessBits = $true }
+            'missing-identity' { $changed.Preflight.Remove('RuntimeIdentity') }
+            'array-run-id' { $changed.Preflight.FrozenRunId = @($context.Declaration.Value.RunId) }
+            'array-runtime-version' { $changed.Preflight.RuntimeIdentity.UnityVersion = @('6000.6.0f1') }
+            'array-anchor-digest' { $changed.Preflight.FrozenCorpusSha256 = @($context.Declaration.CanonicalCorpus.Sha256) }
+            'array-correctness-digest' { $changed.Correctness.CorpusSha256 = @($context.Declaration.CanonicalCorpus.Sha256) }
+            'wrong-correctness-digest' { $changed.Correctness.CorpusSha256 = '0' * 64 }
+            'wrong-row-count' { $changed.Correctness.VerifiedRows = 34 }
+            'wrong-assertion-count' { $changed.Correctness.DecoderAssertions = 69 }
+            'wrong-campaign-count' { $changed.Correctness.DeclaredCampaignRows = 11 }
+        }
+        Write-RuntimeRecords $log $changed
+        $lines = [IO.File]::ReadAllLines($log)
+        switch ($kind) {
+            'missing-log' { Remove-Item -LiteralPath $log }
+            'missing-preflight' { [IO.File]::WriteAllText($log, $lines[1]) }
+            'missing-correctness' { [IO.File]::WriteAllText($log, $lines[0]) }
+            'duplicate-preflight' { [IO.File]::AppendAllText($log, $lines[0] + "`n") }
+            'duplicate-correctness' { [IO.File]::AppendAllText($log, $lines[1] + "`n") }
+            'conflicting-preflight' { [IO.File]::AppendAllText($log, $lines[0].Replace($context.Declaration.Value.RunId, 'conflicting-run') + "`n") }
+            'malformed' { [IO.File]::WriteAllText($log, "BORROWED_PREFLIGHT {invalid`n" + $lines[1]) }
+            'truncated' { [IO.File]::WriteAllText($log, $lines[0].Substring(0, $lines[0].Length - 1) + "`n" + $lines[1]) }
+            'escaped-duplicate-key' { [IO.File]::WriteAllText($log, ([regex]::new('\{')).Replace($lines[0], '{"\u0053chemaVersion":1,', 1) + "`n" + $lines[1]) }
+            'embedded-prefix' { [IO.File]::WriteAllText($log, 'quoted message "' + $lines[0] + '"' + "`n" + $lines[1]) }
+            'deep-json' { [IO.File]::WriteAllText($log, 'BORROWED_PREFLIGHT {"nested":' + ('[' * 65) + '0' + (']' * 65) + '}' + "`n" + $lines[1]) }
+            'duplicate-key' { [IO.File]::WriteAllText($log, ([regex]::new('\{')).Replace($lines[0], '{"FrozenRunId":"injected",', 1) + "`n" + $lines[1]) }
+        }
+        $join = Get-FrozenPlayerRuntimeJoin -Context $context -PlayerLogPath $log -PrerequisitesPassed $true
+        Assert-Control ($join.State -eq 'rejected' -and $join.Errors.Count -ne 0) "reject $kind runtime join"
+    }
+    Write-RuntimeRecords $log $records
+    Assert-Control ((Get-FrozenPlayerRuntimeJoin -Context $context -PlayerLogPath $log -PrerequisitesPassed $false).State -eq 'rejected') 'valid records cannot bypass current invocation/exact correctness/payload prerequisites'
+    foreach ($relative in @('Assets/FrozenPlayerAnchor/BorrowedBufferPreflightTests.Anchor.cs', 'Assets/FrozenPlayerAnchor/FrozenPlayerAnchor.asmref')) {
+        $fixture = New-CanonicalFixture ('anchor-mutation-' + [Guid]::NewGuid().ToString('N'))
+        $context = Start-ControlContext $fixture
+        [IO.File]::AppendAllText((Join-Path $context.GeneratedRoot $relative), 'mutated')
+        Assert-Rejected { Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'after-configure' } "detect changed generated $relative" 'hash does not match'
+    }
     # Exercise the real runner catch/finally path without launching any native process.
     $fixture = New-DeclarationFixture 'invocation-throws'
     $frozenPlayerDeclaration = Read-ControlDeclaration $fixture
     $frozenPlayerProvenance = $null
     $RepoRoot = $fixture.Root
+    $ProjectPath = $fixture.Root
     $standaloneExe = Join-Path $fixture.Payload 'player.exe'
     $resultsPath = Join-Path $fixture.Root 'stale.xml'
     Write-ControlResults $resultsPath

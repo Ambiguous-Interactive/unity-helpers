@@ -11,10 +11,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using System.Text.Json;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Tests.Extensions;
 
     [TestFixture]
     [Category("Performance")]
-    public sealed class BorrowedBufferPreflightTests
+    public sealed partial class BorrowedBufferPreflightTests
     {
         private const int ClockBrackets = 4096;
         private const int AllocationRepetitions = 3;
@@ -272,12 +273,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             string counterError
         )
         {
+            string frozenRunId = null;
+            string frozenDeclarationSha256 = null;
+            string frozenCorpusSha256 = null;
+            ReadFrozenAnchor(ref frozenRunId, ref frozenDeclarationSha256, ref frozenCorpusSha256);
+            string actualCorpusSha256 = BorrowedBase64Tests.GetCanonicalCorpusSha256();
             using MemoryStream stream = new MemoryStream();
             Utf8JsonWriter writer = new Utf8JsonWriter(stream);
             try
             {
                 writer.WriteStartObject();
                 writer.WriteNumber("SchemaVersion", 1);
+                writer.WriteString("FrozenRunId", frozenRunId);
+                writer.WriteString("FrozenDeclarationSha256", frozenDeclarationSha256);
+                writer.WriteString("FrozenCorpusSha256", frozenCorpusSha256);
+                writer.WriteString("ActualCorpusSha256", actualCorpusSha256);
                 writer.WriteBoolean("IsDiagnosticOnly", true);
                 writer.WriteBoolean("CampaignEligible", false);
                 writer.WriteBoolean("AdoptionEligible", false);
@@ -437,6 +447,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             }
             return Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length);
         }
+
+        static partial void ReadFrozenAnchor(
+            ref string runId,
+            ref string declarationSha256,
+            ref string corpusSha256
+        );
 
         [TestCase(0, true, TestName = "Clock.Qualified.Passed")]
         [TestCase(1, false, TestName = "Clock.ZeroFrequency.Rejected")]

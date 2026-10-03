@@ -2889,6 +2889,7 @@ function Get-FrozenPlayerFileInventory {
             throw 'Frozen input lists require between 1 and 4096 files.'
         }
         foreach ($entry in $DeclaredFiles) {
+            if ($entry.Path -isnot [string] -or $entry.Sha256 -isnot [string]) { throw 'Frozen input paths and hashes must be scalar strings.' }
             $relative = [string]$entry.Path
             $sha = [string]$entry.Sha256
             if ([string]::IsNullOrWhiteSpace($relative) -or $relative.Length -gt 1024 -or
@@ -2973,7 +2974,8 @@ function Read-FrozenPlayerDeclaration {
     try { $hash = ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant() }
     finally { $sha.Dispose() }
     $declaration = (New-Object Text.UTF8Encoding($false, $true)).GetString($bytes).TrimStart([char]0xfeff) | ConvertFrom-Json -ErrorAction Stop
-    if ($declaration.SchemaVersion -ne 1 -or [string]$declaration.RunId -cnotmatch '^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9_-])?$' -or
+    if ($declaration.RunId -isnot [string] -or $declaration.UnityVersion -isnot [string] -or $declaration.Backend -isnot [string] -or
+        $declaration.SchemaVersion -ne 1 -or [string]$declaration.RunId -cnotmatch '^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9_-])?$' -or
         $declaration.UnityVersion -cne $UnityVersion -or $declaration.Backend -cne $Backend) {
         throw 'Frozen declaration schema, RunId, Unity version, or backend does not match this request.'
     }
@@ -2982,9 +2984,16 @@ function Read-FrozenPlayerDeclaration {
         if ($entries.Count -lt 1 -or $entries.Count -gt 4096) { throw "Frozen declaration requires nonempty bounded $name." }
         Get-FrozenPlayerFileInventory -Root $RepoRoot -DeclaredFiles $entries | Out-Null
     }
+    $canonicalCorpus = $null
+    if ($declaration.PSObject.Properties.Name -contains 'CanonicalCorpusPath') {
+        if ($declaration.CanonicalCorpusPath -isnot [string]) { throw 'CanonicalCorpusPath must be a scalar string.' }
+        $matching = @($declaration.CorpusFiles | Where-Object { $_.Path -ceq $declaration.CanonicalCorpusPath })
+        if ($matching.Count -ne 1) { throw 'CanonicalCorpusPath must exactly identify one validated CorpusFiles entry.' }
+        $canonicalCorpus = $matching[0]
+    }
     $reportDirectory = Join-Path $ArtifactsPath "frozen-player-$($declaration.RunId)"
     if (Test-Path -LiteralPath $reportDirectory) { throw "Frozen RunId already has an output directory: $reportDirectory" }
-    return [pscustomobject]@{ Path = $fullPath; Bytes = $bytes; Sha256 = $hash; Value = $declaration; ReportDirectory = $reportDirectory }
+    return [pscustomobject]@{ Path = $fullPath; Bytes = $bytes; Sha256 = $hash; Value = $declaration; ReportDirectory = $reportDirectory; CanonicalCorpus = $canonicalCorpus }
 }
 
 function Start-FrozenPlayerProvenance {
@@ -3008,7 +3017,215 @@ function Start-FrozenPlayerProvenance {
     return [pscustomobject]@{
         Declaration = $Declaration; RepoRoot = $RepoRoot; PayloadRoot = $PayloadRoot; ReportPath = $reportPath
         Snapshots = (New-Object 'System.Collections.Generic.List[object]'); PayloadBaseline = $null
+        GeneratedRoot = $null; GeneratedFiles = @()
         LaunchAttempted = $false; InvocationObserved = $false; ResultsValidated = $false; PlayerOutcome = $null; ExecutionError = $null
+    }
+}
+
+function New-FrozenPlayerAnchor {
+    param([Parameter(Mandatory = $true)]$Context, [Parameter(Mandatory = $true)][string]$ProjectPath)
+    if ($null -eq $Context.Declaration.CanonicalCorpus) { return }
+    $assets = Join-Path $ProjectPath 'Assets'
+    Assert-FrozenPlayerRegularPath -Path $assets -Directory
+    $anchorDirectory = Join-Path $assets 'FrozenPlayerAnchor'
+    if (Test-Path -LiteralPath $anchorDirectory) { throw 'Frozen anchor directory already exists; use a fresh project scope.' }
+    $assemblyMeta = Join-Path $Context.RepoRoot 'Tests/Runtime/Performance/WallstopStudios.UnityHelpers.Tests.Runtime.Performance.asmdef.meta'
+    Assert-FrozenPlayerRegularPath -Path $assemblyMeta
+    $guidMatch = [regex]::Matches((Get-Content -LiteralPath $assemblyMeta -Raw), '(?m)^guid: ([a-f0-9]{32})\r?$')
+    if ($guidMatch.Count -ne 1) { throw 'Performance assembly GUID metadata is invalid.' }
+    $assemblyGuid = $guidMatch[0].Groups[1].Value
+    $runId = $Context.Declaration.Value.RunId
+    $declarationHash = $Context.Declaration.Sha256
+    $corpusHash = $Context.Declaration.CanonicalCorpus.Sha256
+    $year = (Get-Date).Year
+    $anchorSource = @"
+// MIT License - Copyright (c) $year wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
+{
+    public sealed partial class BorrowedBufferPreflightTests
+    {
+        static partial void ReadFrozenAnchor(
+            ref string runId,
+            ref string declarationSha256,
+            ref string corpusSha256
+        )
+        {
+            runId = "$runId";
+            declarationSha256 = "$declarationHash";
+            corpusSha256 = "$corpusHash";
+        }
+    }
+}
+"@
+    New-Item -ItemType Directory -Path $anchorDirectory -ErrorAction Stop | Out-Null
+    $generated = [ordered]@{
+        'Assets/FrozenPlayerAnchor/BorrowedBufferPreflightTests.Anchor.cs' = $anchorSource
+        'Assets/FrozenPlayerAnchor/FrozenPlayerAnchor.asmref' = "{`"reference`":`"GUID:$assemblyGuid`"}"
+        'Assets/FrozenPlayerAnchor.meta' = @'
+fileFormatVersion: 2
+guid: 47f97962fd75e896636f669ca65a248a
+folderAsset: yes
+DefaultImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+'@
+        'Assets/FrozenPlayerAnchor/BorrowedBufferPreflightTests.Anchor.cs.meta' = @'
+fileFormatVersion: 2
+guid: d60d7181d309022b7d213e8407fcccc6
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+'@
+        'Assets/FrozenPlayerAnchor/FrozenPlayerAnchor.asmref.meta' = @'
+fileFormatVersion: 2
+guid: e32aa25f3b7b7cd8ab24fdabbfe7bc9a
+AssemblyDefinitionReferenceImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+'@
+    }
+    foreach ($relative in $generated.Keys) {
+        $path = Join-Path $ProjectPath $relative
+        if (Test-Path -LiteralPath $path) { throw "Frozen anchor output already exists: $relative" }
+        $bytes = [Text.Encoding]::UTF8.GetBytes($generated[$relative].Replace("`r`n", "`n").Replace("`n", "`r`n") + "`r`n")
+        $output = [IO.File]::Open($path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try { $output.Write($bytes, 0, $bytes.Length) } finally { $output.Dispose() }
+    }
+    $Context.GeneratedRoot = $ProjectPath
+    $Context.GeneratedFiles = @(
+        foreach ($relative in $generated.Keys) {
+            [pscustomobject]@{ Path = $relative; Sha256 = (Get-FileHash -LiteralPath (Join-Path $ProjectPath $relative) -Algorithm SHA256).Hash.ToLowerInvariant() }
+        }
+    )
+}
+
+function Get-FrozenPlayerRuntimeJoin {
+    param(
+        [Parameter(Mandatory = $true)]$Context,
+        [string]$PlayerLogPath,
+        [Parameter(Mandatory = $true)][bool]$PrerequisitesPassed
+    )
+    $raw = New-Object 'System.Collections.Generic.List[object]'
+    $errors = New-Object 'System.Collections.Generic.List[string]'
+    $state = 'unverified'
+    $corpusState = 'unverified'
+    if ($null -ne $Context.Declaration.CanonicalCorpus) {
+        $state = 'rejected'
+        $corpusState = 'rejected'
+        try {
+            Assert-FrozenPlayerRegularPath -Path $PlayerLogPath
+            $logFile = Get-Item -LiteralPath $PlayerLogPath -Force -ErrorAction Stop
+            if ($logFile.Length -gt 67108864) { throw 'Frozen player stdout exceeds the 64 MiB parsing bound.' }
+            $reader = New-Object IO.StreamReader($PlayerLogPath, (New-Object Text.UTF8Encoding($false, $true)))
+            try {
+                $lineNumber = 0
+                while ($null -ne ($line = $reader.ReadLine())) {
+                    $lineNumber++
+                    $markers = [regex]::Matches($line, '^\s*(BORROWED_PREFLIGHT|BORROWED_BASE64_CORPUS)(?=\s|$)')
+                    if ($markers.Count -eq 0) { continue }
+                    $observation = [pscustomobject]@{ LineNumber = $lineNumber; Marker = $markers[0].Groups[1].Value; RawLine = $line; Record = $null; Error = $null }
+                    $raw.Add($observation)
+                    try {
+                        if ($markers.Count -ne 1 -or $line.Length -gt 4194304) { throw 'Marker line is duplicated or exceeds the 4 MiB record bound.' }
+                        $json = $line.Substring($markers[0].Index + $markers[0].Length).Trim()
+                        $stringPattern = '"(?:[^"\\]|\\.)*"'
+                        $depth = 0
+                        foreach ($character in ([regex]::Replace($json, $stringPattern, '""')).ToCharArray()) {
+                            if ($character -eq '{' -or $character -eq '[') {
+                                $depth++
+                                if ($depth -gt 64) { throw 'Marker JSON exceeds the 64-level nesting bound.' }
+                            } elseif ($character -eq '}' -or $character -eq ']') { $depth-- }
+                        }
+                        foreach ($token in [regex]::Matches($json, $stringPattern)) {
+                            $next = $token.Index + $token.Length
+                            while ($next -lt $json.Length -and [char]::IsWhiteSpace($json[$next])) { $next++ }
+                            if ($next -lt $json.Length -and $json[$next] -eq ':' -and $token.Value.Contains('\')) {
+                                throw 'Marker property names must be literal; escaped names cannot establish an unambiguous schema.'
+                            }
+                        }
+                        $record = ConvertFrom-Json -InputObject $json -ErrorAction Stop
+                        if ($record -isnot [pscustomobject]) { throw 'Marker JSON must be an object.' }
+                        $observation.Record = $record
+                        $requiredKeys = if ($observation.Marker -ceq 'BORROWED_PREFLIGHT') {
+                            @('SchemaVersion', 'FrozenRunId', 'FrozenDeclarationSha256', 'FrozenCorpusSha256', 'ActualCorpusSha256',
+                                'RuntimeIdentity', 'UnityVersion', 'Backend', 'Platform', 'ProcessBits', 'IsEditor', 'DevelopmentBuild')
+                        } else { @('SchemaVersion', 'CorpusSha256', 'VerifiedRows', 'DecoderAssertions', 'DeclaredCampaignRows') }
+                        foreach ($key in $requiredKeys) {
+                            if ([regex]::Matches($json, '(?<!\\)"' + [regex]::Escape($key) + '"\s*:').Count -ne 1) {
+                                throw "Marker must contain exactly one literal $key field."
+                            }
+                        }
+                    } catch { $observation.Error = $_.ToString(); $errors.Add($observation.Error) }
+                }
+            } finally { $reader.Dispose() }
+            $preflight = @($raw | Where-Object { $_.Marker -ceq 'BORROWED_PREFLIGHT' })
+            $correctness = @($raw | Where-Object { $_.Marker -ceq 'BORROWED_BASE64_CORPUS' })
+            if ($preflight.Count -ne 1 -or $correctness.Count -ne 1 -or $errors.Count -ne 0) {
+                throw 'One complete unambiguous preflight marker and one correctness-corpus marker are required.'
+            }
+            if (-not $PrerequisitesPassed -or $Context.GeneratedFiles.Count -ne 5) {
+                throw 'Frozen generated anchor, current invocation, exact correctness cases, and stable payload are required before joining runtime records.'
+            }
+            $runtime = $preflight[0].Record
+            $corpus = $correctness[0].Record
+            foreach ($name in @('FrozenRunId', 'FrozenDeclarationSha256', 'FrozenCorpusSha256', 'ActualCorpusSha256')) {
+                if ($runtime.$name -isnot [string]) { throw "Runtime $name must be a scalar string." }
+            }
+            if ($corpus.CorpusSha256 -isnot [string]) { throw 'Correctness CorpusSha256 must be a scalar string.' }
+            foreach ($record in @($runtime, $corpus)) {
+                if (($record.SchemaVersion -isnot [int] -and $record.SchemaVersion -isnot [long]) -or $record.SchemaVersion -ne 1) {
+                    throw 'Runtime and correctness schema versions must be JSON integers equal to one.'
+                }
+            }
+            if ($runtime.RuntimeIdentity -isnot [pscustomobject] -or
+                ($runtime.RuntimeIdentity.ProcessBits -isnot [int] -and $runtime.RuntimeIdentity.ProcessBits -isnot [long])) {
+                throw 'Runtime identity must be an object with an integer ProcessBits value.'
+            }
+            foreach ($name in @('UnityVersion', 'Backend', 'Platform')) {
+                if ($runtime.RuntimeIdentity.$name -isnot [string]) { throw "Runtime identity $name must be a scalar string." }
+            }
+            foreach ($name in @('VerifiedRows', 'DecoderAssertions', 'DeclaredCampaignRows')) {
+                if ($corpus.$name -isnot [int] -and $corpus.$name -isnot [long]) {
+                    throw "Correctness $name must be a JSON integer."
+                }
+            }
+            $expectedCorpus = $Context.Declaration.CanonicalCorpus.Sha256
+            $expectedBackend = if ($Context.Declaration.Value.Backend -ceq 'Mono2x') { 'Mono' } else { 'IL2CPP' }
+            if ($runtime.SchemaVersion -ne 1 -or $runtime.FrozenRunId -cne $Context.Declaration.Value.RunId -or
+                $runtime.FrozenDeclarationSha256 -cne $Context.Declaration.Sha256 -or
+                $runtime.FrozenCorpusSha256 -cne $expectedCorpus -or $runtime.ActualCorpusSha256 -cne $expectedCorpus -or
+                $runtime.RuntimeIdentity.UnityVersion -cne $Context.Declaration.Value.UnityVersion -or
+                $runtime.RuntimeIdentity.Backend -cne $expectedBackend -or $runtime.RuntimeIdentity.Platform -cne 'WindowsPlayer' -or
+                $runtime.RuntimeIdentity.ProcessBits -ne 64 -or $runtime.RuntimeIdentity.IsEditor -isnot [bool] -or
+                $runtime.RuntimeIdentity.IsEditor -or $runtime.RuntimeIdentity.DevelopmentBuild -isnot [bool] -or
+                $runtime.RuntimeIdentity.DevelopmentBuild) {
+                throw 'Runtime compiled anchor, actual corpus, or Release Windows x64 identity does not match the frozen declaration.'
+            }
+            if ($corpus.SchemaVersion -ne 1 -or $corpus.CorpusSha256 -cne $expectedCorpus -or
+                $corpus.VerifiedRows -ne 35 -or $corpus.DecoderAssertions -ne 70 -or $corpus.DeclaredCampaignRows -ne 12) {
+                throw 'Correctness-corpus record must consume exactly 35 rows with 70 assertions and declare 12 campaign rows under the frozen digest.'
+            }
+            $state = 'passed'
+            $corpusState = 'passed'
+        } catch { $errors.Add($_.ToString()) }
+    }
+    return [pscustomobject]@{
+        State = $state; CorrectnessCorpusConsumptionState = $corpusState; CampaignCorpusConsumptionState = 'unverified'
+        VerifiedCorrectnessRows = $(if ($corpusState -eq 'passed') { 35 } else { 0 })
+        DeclaredCampaignRows = $(if ($corpusState -eq 'passed') { 12 } else { 0 })
+        RawRecords = $raw.ToArray(); Errors = $errors.ToArray()
     }
 }
 
@@ -3019,7 +3236,7 @@ function Add-FrozenPlayerProvenanceSnapshot {
         [switch]$IncludePayload,
         [switch]$AllowRejected
     )
-    $snapshot = [ordered]@{ Stage = $Stage; DeclarationSha256 = $null; SourceFiles = @(); CorpusFiles = @(); PayloadFiles = @(); State = 'passed'; Errors = @() }
+    $snapshot = [ordered]@{ Stage = $Stage; DeclarationSha256 = $null; SourceFiles = @(); CorpusFiles = @(); GeneratedAnchorFiles = @(); PayloadFiles = @(); State = 'passed'; Errors = @() }
     try {
         Assert-FrozenPlayerRegularPath -Path $Context.Declaration.Path
         $snapshot.DeclarationSha256 = (Get-FileHash -LiteralPath $Context.Declaration.Path -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
@@ -3032,6 +3249,15 @@ function Add-FrozenPlayerProvenanceSnapshot {
                 ForEach-Object { $observed.Add($_) }
         } catch { $snapshot.Errors += $_.ToString() }
         $snapshot[$name] = $observed.ToArray()
+    }
+    if ($null -ne $Context.Declaration.CanonicalCorpus) {
+        $observed = New-Object 'System.Collections.Generic.List[object]'
+        try {
+            if ($Context.GeneratedFiles.Count -ne 5) { throw 'Frozen compiled anchor files are missing.' }
+            Get-FrozenPlayerFileInventory -Root $Context.GeneratedRoot -DeclaredFiles $Context.GeneratedFiles |
+                ForEach-Object { $observed.Add($_) }
+        } catch { $snapshot.Errors += $_.ToString() }
+        $snapshot.GeneratedAnchorFiles = $observed.ToArray()
     }
     if ($IncludePayload) {
         $observed = New-Object 'System.Collections.Generic.List[object]'
@@ -3097,7 +3323,8 @@ function Complete-FrozenPlayerProvenance {
     param(
         [Parameter(Mandatory = $true)]$Context,
         [Parameter(Mandatory = $true)][string]$ResultsPath,
-        [Parameter(Mandatory = $true)][string[]]$EvidencePaths
+        [Parameter(Mandatory = $true)][string[]]$EvidencePaths,
+        [string]$PlayerLogPath
     )
     Add-FrozenPlayerProvenanceSnapshot -Context $Context -Stage 'final' -IncludePayload:($Context.LaunchAttempted -or $null -ne $Context.PayloadBaseline) -AllowRejected
     $correctness = Get-FrozenPlayerJointCorrectness -ResultsPath $ResultsPath
@@ -3114,17 +3341,20 @@ function Complete-FrozenPlayerProvenance {
         }
     )
     $stable = $null -ne $Context.PayloadBaseline -and @($Context.Snapshots | Where-Object { $_.State -ne 'passed' }).Count -eq 0
+    $runtimeJoin = Get-FrozenPlayerRuntimeJoin -Context $Context -PlayerLogPath $PlayerLogPath `
+        -PrerequisitesPassed:($stable -and $Context.InvocationObserved -and $Context.ResultsValidated -and $correctness.State -eq 'passed')
     $report = [ordered]@{
         SchemaVersion = 1; RunId = $Context.Declaration.Value.RunId; IsDiagnosticOnly = $true
         CampaignEligible = $false; AdoptionEligible = $false
-        CorpusConsumptionState = 'unverified'; RuntimeRecordJoinState = 'unverified'; SourceCoverageState = 'unverified'
+        CorpusConsumptionState = 'unverified'; RuntimeRecordJoinState = $runtimeJoin.State; SourceCoverageState = 'unverified'
+        CorrectnessCorpusConsumptionState = $runtimeJoin.CorrectnessCorpusConsumptionState; CampaignCorpusConsumptionState = 'unverified'
         RetainedMemoryState = 'unverified'; EffectiveBuildSettingsState = 'unverified'; CodeSizeState = 'unverified'
         ProvenanceStableState = $(if ($stable) { 'passed' } else { 'rejected' })
         DeclarationSha256 = $Context.Declaration.Sha256; DeclarationPath = $Context.Declaration.Path
         RequestedUnityVersion = $Context.Declaration.Value.UnityVersion; RequestedBackend = $Context.Declaration.Value.Backend
         LaunchAttempted = $Context.LaunchAttempted; InvocationObserved = $Context.InvocationObserved; ResultsValidated = $Context.ResultsValidated
         PlayerOutcome = $Context.PlayerOutcome; ExecutionError = $Context.ExecutionError
-        Snapshots = $Context.Snapshots.ToArray(); JointCorrectness = $correctness; EvidenceFiles = $evidence
+        Snapshots = $Context.Snapshots.ToArray(); JointCorrectness = $correctness; EvidenceFiles = $evidence; RuntimeJoin = $runtimeJoin
     }
     Assert-FrozenPlayerRegularPath -Path $Context.ReportPath
     $output = [IO.File]::Open($Context.ReportPath, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::None)
@@ -3134,7 +3364,8 @@ function Complete-FrozenPlayerProvenance {
         $output.Write($bytes, 0, $bytes.Length)
         $output.Flush()
     } finally { $output.Dispose() }
-    if ($null -eq $Context.ExecutionError -and (-not $stable -or $correctness.State -ne 'passed')) {
+    if ($null -eq $Context.ExecutionError -and (-not $stable -or $correctness.State -ne 'passed' -or
+        ($null -ne $Context.Declaration.CanonicalCorpus -and $runtimeJoin.State -ne 'passed'))) {
         throw "Frozen player provenance or joint correctness rejected; retained report: $($Context.ReportPath)"
     }
 }
@@ -4474,6 +4705,7 @@ try {
     if ($null -ne $frozenPlayerDeclaration) {
         $frozenPlayerProvenance = Start-FrozenPlayerProvenance -Declaration $frozenPlayerDeclaration `
             -RepoRoot $RepoRoot -PayloadRoot (Split-Path -Parent $standaloneExe)
+        New-FrozenPlayerAnchor -Context $frozenPlayerProvenance -ProjectPath $ProjectPath
         Add-FrozenPlayerProvenanceSnapshot -Context $frozenPlayerProvenance -Stage 'before-configure'
     }
     Invoke-UnityNativeStartupProbe -EditorPath $UnityEditorPath -LogPath $startupProbeLogPath
@@ -4758,7 +4990,7 @@ try {
         if ($null -ne $frozenPlayerProvenance) {
             try {
                 Complete-FrozenPlayerProvenance -Context $frozenPlayerProvenance -ResultsPath $resultsPath `
-                    -EvidencePaths @($resultsPath, $playerLogPath, $logPath, $configureLogPath)
+                    -EvidencePaths @($resultsPath, $playerLogPath, $logPath, $configureLogPath) -PlayerLogPath $playerLogPath
             } catch {
                 if ($null -eq $frozenPlayerProvenance.ExecutionError) { throw }
                 Write-Warning "Frozen provenance finalization failed while preserving the original failure: $_"
