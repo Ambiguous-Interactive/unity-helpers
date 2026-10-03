@@ -436,6 +436,65 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             Assert.That(result, Is.EqualTo(GUIContent.none));
         }
 
+        [TestCase(null, TestName = "InlineHeader.BlankLabel.NullText")]
+        [TestCase("", TestName = "InlineHeader.BlankLabel.Empty")]
+        [TestCase(" ", TestName = "InlineHeader.BlankLabel.Space")]
+        [TestCase("\t\r\n", TestName = "InlineHeader.BlankLabel.Control")]
+        [TestCase("\u2003\u00a0", TestName = "InlineHeader.BlankLabel.Unicode")]
+        public void PrepareHeaderContentWithBlankLabelUsesObjectHeaderWithoutChangingInputs(
+            string text
+        )
+        {
+            const string targetName = " Padded Target Name ";
+            GameObject target = Track(new GameObject(targetName));
+            GUIContent label = new GUIContent(text);
+            string originalLabelText = label.text;
+            string baseline = InLineEditorShared.PrepareHeaderContent(target, null).text;
+
+            GUIContent result = InLineEditorShared.PrepareHeaderContent(target, label);
+
+            Assert.That(result.text, Is.EqualTo(baseline));
+            Assert.That(target.name, Is.EqualTo(targetName));
+            Assert.That(label.text, Is.EqualTo(originalLabelText));
+        }
+
+        [TestCase(" Padded Label ", TestName = "InlineHeader.NonblankLabel.Padded")]
+        [TestCase(
+            "\u2003Visible Label\u00a0",
+            TestName = "InlineHeader.NonblankLabel.UnicodePadding"
+        )]
+        public void PrepareHeaderContentPreservesTheExactNonblankLabelPrefix(string text)
+        {
+            const string targetName = " Padded Target Name ";
+            GameObject target = Track(new GameObject(targetName));
+            GUIContent label = new GUIContent(text);
+            string baseline = InLineEditorShared.PrepareHeaderContent(target, null).text;
+
+            GUIContent result = InLineEditorShared.PrepareHeaderContent(target, label);
+
+            Assert.That(result.text, Is.EqualTo(text + " (" + baseline + ")"));
+            Assert.That(target.name, Is.EqualTo(targetName));
+            Assert.That(label.text, Is.EqualTo(text));
+        }
+
+        [TestCase(null, TestName = "InlineHeader.NullValue.NullLabelTextIdentity")]
+        [TestCase("", TestName = "InlineHeader.NullValue.EmptyLabelIdentity")]
+        [TestCase(" ", TestName = "InlineHeader.NullValue.SpaceLabelIdentity")]
+        [TestCase("\t\r\n", TestName = "InlineHeader.NullValue.ControlLabelIdentity")]
+        [TestCase("\u2003\u00a0", TestName = "InlineHeader.NullValue.UnicodeLabelIdentity")]
+        [TestCase(" Padded Label ", TestName = "InlineHeader.NullValue.PaddedLabelIdentity")]
+        public void PrepareHeaderContentWithNullValueReturnsTheSameUnchangedLabel(string text)
+        {
+            GUIContent label = new GUIContent(text);
+            string originalLabelText = label.text;
+
+            GUIContent result = InLineEditorShared.PrepareHeaderContent(null, label);
+
+            Assert.That(result, Is.SameAs(label));
+            Assert.That(result.text, Is.EqualTo(originalLabelText));
+            Assert.That(label.text, Is.EqualTo(originalLabelText));
+        }
+
         [Test]
         public void PrepareHeaderContentWithValidObjectReturnsContent()
         {

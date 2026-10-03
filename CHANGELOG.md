@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix blank prefixes in inline editor headers when a field label contains only whitespace ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix dropdowns showing invisible labels for Unity objects with whitespace-only names; object names, references, and literal string options stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix IntMap lookups for keys sharing low bits and keep small live windows at their starting capacity during add/remove churn ([#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926)).
 - Fix main-thread guard diagnostics to omit blank context labels and use the source filename for blank member names; nonblank labels retain their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).

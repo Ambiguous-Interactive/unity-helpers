@@ -127,6 +127,11 @@ public AbilityConfig detailedConfig;
 | `enableScrolling`   | true    | Wrap inspector body in scroll view                      |
 | `minInspectorWidth` | 520     | Width threshold for horizontal scrollbar (0 = disabled) |
 
+When an object is assigned, the header omits a field label that is empty or contains only
+whitespace, including control characters and Unicode spaces. Nonblank labels keep their exact
+spacing, and object names stay unchanged. When no object is assigned, the original field label is
+preserved.
+
 ### Examples with Options
 
 <!-- doc-sample: compiles -->
