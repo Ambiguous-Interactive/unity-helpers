@@ -8,10 +8,10 @@ The audit was inspected on 2026-10-03. It does not certify that the issue is com
 Parse `scripts/tests/*.ps1` and inspect executable `CommandAst` nodes named `pwsh` or `powershell`, including `.exe` forms.
 Also search variable executable paths, `ProcessStartInfo`, and process runner helpers. Comments and here-strings are fixture input, not launches.
 
-After the template, git configuration, and npm package fixture migrations, the direct-command
-scan found **37 launch sites in 22 PowerShell test files**. A site inside a helper can execute several times, so this is
-not a process count. The scan also found one `ProcessStartInfo` launcher in the error-code
-suite and one process-runner helper in the watchdog suite. The path-binding function in
+After the skills-generator fixture migration, the direct-command
+scan found **35 launch sites in 22 PowerShell test files**. A site inside a helper can execute several times, so this is
+not a process count. The scan also found `ProcessStartInfo` launchers in the error-code
+and skills-generator suites, plus one process-runner helper in the watchdog suite. The path-binding function in
 `test-sync-script-contracts.ps1` is a source inspection, not a child launch.
 
 Classify a retained launch by its actual assertion. `CLI` means real `-File` argument
@@ -26,7 +26,7 @@ All paths in this table are under `scripts/tests/`. Counts are executable source
 
 | File                                                                                                   | Sites | Classification and reason                                                                                                                                                                                                                                                               |
 | ------------------------------------------------------------------------------------------------------ | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1)                     |     1 | CLI: native implicit-success observation, exercised by the five migrated suites; the strict runspace harness rejects the same script without an explicit terminal exit.                                                                                                                 |
+| [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1)                     |     1 | CLI: native implicit-success observation, exercised by the six migrated suites; the strict runspace harness rejects the same script without an explicit terminal exit.                                                                                                                  |
 | [test-agent-preflight.ps1](../../scripts/tests/test-agent-preflight.ps1)                               |     4 | CLI: helper's explicit CLI branch; loaded-function isolation probe; repository and non-repository push configuration entrypoints. Content cases already use runspaces.                                                                                                                  |
 | [test-check-eol.ps1](../../scripts/tests/test-check-eol.ps1)                                           |     1 | CLI: explicit CLI branch preserves verbose and multiple-path binding. Content cases already use runspaces.                                                                                                                                                                              |
 | [test-empty-corpus-gates.ps1](../../scripts/tests/test-empty-corpus-gates.ps1)                         |     1 | CLI: retained smoke and native implicit-status parity controls. Content cases already use runspaces.                                                                                                                                                                                    |
@@ -37,7 +37,7 @@ All paths in this table are under `scripts/tests/`. Counts are executable source
 | [test-lint-doc-links.ps1](../../scripts/tests/test-lint-doc-links.ps1)                                 |     1 | CLI: subdirectory invocation, multiple `-Paths`, and `-Mode` binding. Content cases already use runspaces.                                                                                                                                                                              |
 | [test-lint-skill-sizes.ps1](../../scripts/tests/test-lint-skill-sizes.ps1)                             |     1 | CLI: additional-argument branch tests CLI rejection and verbose binding. Content cases already use runspaces.                                                                                                                                                                           |
 | [test-lint-unity-test-modules.ps1](../../scripts/tests/test-lint-unity-test-modules.ps1)               |     1 | CLI: real manifest `-Path` binding smoke. Content cases already use runspaces.                                                                                                                                                                                                          |
-| [test-llm-instructions-lint.ps1](../../scripts/tests/test-llm-instructions-lint.ps1)                   |     3 | One CLI linter smoke; two generator output/determinism candidates. Generator status semantics must be inspected before changing those two launches.                                                                                                                                     |
+| [test-llm-instructions-lint.ps1](../../scripts/tests/test-llm-instructions-lint.ps1)                   |     1 | CLI: real linter smoke. Two generator calls now use fresh runspaces; the separate ProcessStartInfo helper preserves real CLI file/stdout bytes and missing-skills failure.                                                                                                              |
 | [test-npm-package-changelog.ps1](../../scripts/tests/test-npm-package-changelog.ps1)                   |     1 | CLI: retained real `-Check` integration smoke. The repeated package-validator helpers use fresh runspaces, preserve npm/git subprocesses, package canaries and cleanup, and require exact exit 1 plus the existing diagnostics.                                                         |
 | [test-release-tools.ps1](../../scripts/tests/test-release-tools.ps1)                                   |     1 | CLI: empty explicit `-Version ''` binding from the workflow is the assertion.                                                                                                                                                                                                           |
 | [test-report-slow-tests.ps1](../../scripts/tests/test-report-slow-tests.ps1)                           |     1 | CLI: real results-path and `-Top` binding plus native-status parity. Six content invocations migrated to fresh runspaces.                                                                                                                                                               |
@@ -63,7 +63,7 @@ cleanup are process-boundary assertions. Keep these launches.
 
 The direct-command inventory above covers PowerShell fixtures. Searches of JavaScript and
 shell tests additionally identify the following launch families. These need separate migration
-measurements and are not counted in the 37 PowerShell command sites.
+measurements and are not counted in the 35 PowerShell command sites.
 
 - [test-unity-grouped-modes.js](../../scripts/tests/test-unity-grouped-modes.js): generated
   PowerShell function harnesses are candidates for a batched PowerShell host with isolated
@@ -140,8 +140,8 @@ contract for the selected scripts, not a universal PowerShell control-flow proof
 `LASTEXITCODE` supplies the exact observed status only after this structural check succeeds.
 The native-only control exits 0 under real CLI execution and fails the runspace harness,
 so native success cannot substitute for the required explicit terminal exit.
-The skills generator ends successfully without an explicit exit, so it still requires an honest
-implicit-success contract before migration. The tag verifier now ends with explicit exit 0.
+The skills generator and tag verifier now end with explicit exit 0. Real CLI controls preserve
+file output, Console.Out bytes and failure status; missing status is never inferred as success.
 
 A sequential comparison on the same devcontainer host measured all original assertions
 before and after, then the initial complete revised suites before the stricter exit-contract controls:
@@ -184,6 +184,27 @@ Sequential same-host local observations were **9/9 in 9.164 seconds** before and
 Hosted CI then exposed an asynchronous `AddStatement` batch-worker cancellation crash (exit 134), reproduced locally before the fix.
 Setup now completes synchronously before the single asynchronous fixture command; 100 active cancellations passed after the fix. The final suite has 46 controls, including 20 active and 32 immediate cancellations, plus setup rejection before fixture side effects.
 The initial complete revision passed 44/44 in 10.692 seconds. These samples do not establish a hosted or total-suite speed improvement. Remaining candidates and hosted acceptance stay open.
+
+## Skills-generator migration evidence
+
+All 60 original assertions remain. The revised suite passes 95/95: 23 shared status controls and
+12 generator isolation, overlap, disposal and CLI controls supplement the original cases.
+Two generator file invocations start in fresh runspaces before either is completed. A separate
+barrier control observes both invocations running before release and checks independent globals,
+locations and script paths. Owned runspaces close after completion and during cleanup.
+
+The generator now explicitly exits 0 on success; the unchanged CI status and drift gates remain.
+CLI file output and Console.Out are compared byte-for-byte with runspace output using the actual
+stdout stream. Both CLI and runspace missing-skills cases require exit 1, the specific diagnostic,
+and no output file. Spaced paths and the real linter, Node/cspell and offline feedback boundaries remain.
+
+Sequential devcontainer observations passed **60/60 in 33.445 seconds** before and **60/60 in
+30.967 seconds** after, with only added controls omitted from the revised timing copy. Exact original
+case identities match. The full revised suite passed **95/95 in 36.150 seconds**. PowerShell 7.6.4 on Windows
+also passed **95/95**, with empty stderr and all owned processes absent afterward.
+These are local single-sample observations, not hosted speed acceptance. The full suite retains
+three generator CLI executions plus the shared implicit-status CLI control, so removing two
+original launches does not establish a lower total process count for the expanded suite.
 
 ## Remaining acceptance work
 

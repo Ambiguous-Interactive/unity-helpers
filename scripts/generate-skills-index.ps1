@@ -176,3 +176,4 @@ else {
     [System.IO.File]::WriteAllText($OutputPath, $content, $utf8NoBom)
     Write-Info "Wrote $OutputPath"
 }
+exit 0

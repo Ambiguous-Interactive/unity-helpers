@@ -53,6 +53,7 @@ function Write-TestResult {
 
 $markdownHelpersPath = Join-Path -Path $PSScriptRoot -ChildPath '..' -AdditionalChildPath 'markdown-helpers.ps1'
 . $markdownHelpersPath
+. (Join-Path $PSScriptRoot 'isolated-fixture-runspace.ps1')
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path
 $generateScript = Join-Path $repoRoot 'scripts' 'generate-skills-index.ps1'
@@ -101,15 +102,132 @@ function Invoke-Lint {
   }
 }
 
-# Generate to a temp file once and reuse the "expected" content/bytes.
-$expectedTemp = [System.IO.Path]::GetTempFileName()
-$determinismTemp = [System.IO.Path]::GetTempFileName()
+function Invoke-GeneratorCli {
+  param([string]$ScriptPath, [string]$OutputPath, [switch]$Stdout)
+
+  $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+  $startInfo.FileName = 'pwsh'
+  foreach ($argument in @('-NoProfile', '-File', $ScriptPath)) { [void]$startInfo.ArgumentList.Add($argument) }
+  if ($Stdout) { [void]$startInfo.ArgumentList.Add('-Stdout') }
+  else {
+    [void]$startInfo.ArgumentList.Add('-OutputPath')
+    [void]$startInfo.ArgumentList.Add($OutputPath)
+  }
+  $startInfo.WorkingDirectory = $repoRoot
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $startInfo.UseShellExecute = $false
+  $bytes = [System.IO.MemoryStream]::new()
+  $process = $null
+  $stdoutTask = $null
+  $stderrTask = $null
+  try {
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    $stdoutTask = $process.StandardOutput.BaseStream.CopyToAsync($bytes)
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+    $process.WaitForExit()
+    $null = $stdoutTask.GetAwaiter().GetResult()
+    return @{ ExitCode = $process.ExitCode; OutputBytes = $bytes.ToArray(); ErrorOutput = $stderrTask.GetAwaiter().GetResult() }
+  }
+  finally {
+    try {
+      if ($null -ne $process) {
+        try {
+          if (-not $process.HasExited) { $process.Kill($true) }
+          $process.WaitForExit()
+        }
+        finally {
+          try {
+            if ($null -ne $stdoutTask) { $null = $stdoutTask.GetAwaiter().GetResult() }
+          }
+          finally {
+            try {
+              if ($null -ne $stderrTask) { $null = $stderrTask.GetAwaiter().GetResult() }
+            }
+            finally { $process.Dispose() }
+          }
+        }
+      }
+    }
+    finally { $bytes.Dispose() }
+  }
+}
+
+function Test-GeneratorRunspaceOverlap {
+  $parentLocation = (Get-Location).Path
+  $releasePath = Join-Path $generatorFixtureRoot 'release-controls'
+  $controls = @()
+  try {
+    foreach ($label in @('first', 'second')) {
+      $directory = Join-Path $generatorFixtureRoot $label
+      [void][System.IO.Directory]::CreateDirectory($directory)
+      $path = Join-Path $directory 'overlap-control.ps1'
+      $readyPath = Join-Path $directory 'ready'
+      Set-Content -LiteralPath $path -Value @'
+param($Label, $ReadyPath, $ReleasePath)
+if (Get-Variable SkillsGeneratorFixtureState -Scope Global -ErrorAction SilentlyContinue) { exit 7 }
+$global:SkillsGeneratorFixtureState = $Label
+Set-Content -LiteralPath $ReadyPath -Value $Label
+$deadline = [DateTime]::UtcNow.AddSeconds(20)
+while (-not (Test-Path -LiteralPath $ReleasePath)) {
+  if ([DateTime]::UtcNow -gt $deadline) { throw 'overlap control timed out' }
+  Start-Sleep -Milliseconds 10
+}
+if ($global:SkillsGeneratorFixtureState -cne $Label) { exit 7 }
+Write-Host "label:$Label"
+Write-Host "working:$((Get-Location).Path)"
+Write-Host "script:$PSScriptRoot"
+Write-Host "command:$PSCommandPath"
+exit 0
+'@
+      $fixture = Start-IsolatedFixture -ScriptPath $path -WorkingDirectory $directory -Parameters @{
+        Label = $label; ReadyPath = $readyPath; ReleasePath = $releasePath
+      }
+      $controls += @{ Label = $label; Directory = $directory; Path = $path; ReadyPath = $readyPath; Fixture = $fixture }
+    }
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    while (@($controls | Where-Object { -not (Test-Path -LiteralPath $_.ReadyPath) }).Count -gt 0 -and [DateTime]::UtcNow -lt $deadline) {
+      Start-Sleep -Milliseconds 10
+    }
+    Write-TestResult 'GeneratorRunspace.ObservedExecutionOverlap' (@($controls | Where-Object {
+      (Test-Path -LiteralPath $_.ReadyPath) -and $_.Fixture.Runner.InvocationStateInfo.State -eq 'Running'
+    }).Count -eq 2)
+    Set-Content -LiteralPath $releasePath -Value 'release'
+    foreach ($control in $controls) {
+      $result = Complete-IsolatedFixture -Fixture $control.Fixture
+      $expectedOutput = @(
+        "label:$($control.Label)", "working:$($control.Directory)",
+        "script:$(Split-Path -Parent $control.Path)", "command:$($control.Path)"
+      ) -join [Environment]::NewLine
+      Write-TestResult "GeneratorRunspace.IsolatedGlobalLocationAndScript[$($control.Label)]" ($result.ExitCode -eq 0 -and $result.Output -ceq $expectedOutput)
+      Write-TestResult "GeneratorRunspace.DisposedAfterCompletion[$($control.Label)]" ($control.Fixture.Disposed -and $control.Fixture.Runspace.RunspaceStateInfo.State -eq 'Closed')
+    }
+    Write-TestResult 'GeneratorRunspace.ParentLocationPreserved' ((Get-Location).Path -ceq $parentLocation)
+  }
+  finally {
+    $cleanupErrors = @()
+    foreach ($control in $controls) {
+      try { Stop-IsolatedFixture -Fixture $control.Fixture }
+      catch { $cleanupErrors += $_.Exception.Message }
+    }
+    if ($cleanupErrors.Count -gt 0) { throw ($cleanupErrors -join '; ') }
+  }
+}
+
+# Independent spaced outputs preserve the original byte and determinism oracles.
+$generatorFixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('llm generator fixtures ' + [guid]::NewGuid().ToString('N'))
+[void][System.IO.Directory]::CreateDirectory($generatorFixtureRoot)
+$expectedTemp = Join-Path $generatorFixtureRoot 'expected index.md'
+$determinismTemp = Join-Path $generatorFixtureRoot 'determinism index.md'
+$generatorInvocations = @()
 $harnessScript = Join-Path ([System.IO.Path]::GetTempPath()) ("llm-lint-harness-$([System.Guid]::NewGuid().ToString('N')).ps1")
 try {
-  & pwsh -NoProfile -File $generateScript -OutputPath $expectedTemp | Out-Null
-  $genExit1 = $LASTEXITCODE
-  & pwsh -NoProfile -File $generateScript -OutputPath $determinismTemp | Out-Null
-  $genExit2 = $LASTEXITCODE
+  $generatorInvocations += Start-IsolatedFixture -ScriptPath $generateScript -WorkingDirectory $repoRoot -Parameters @{ OutputPath = $expectedTemp }
+  $generatorInvocations += Start-IsolatedFixture -ScriptPath $generateScript -WorkingDirectory $repoRoot -Parameters @{ OutputPath = $determinismTemp }
+  $firstGenerator = Complete-IsolatedFixture -Fixture $generatorInvocations[0]
+  $secondGenerator = Complete-IsolatedFixture -Fixture $generatorInvocations[1]
+  $genExit1 = $firstGenerator.ExitCode
+  $genExit2 = $secondGenerator.ExitCode
 
   # ===========================================================================
   Write-Host "`n  Section: Generator determinism + encoding" -ForegroundColor White
@@ -125,6 +243,29 @@ try {
   }
   Write-TestResult "Generator.Deterministic" $identical `
     "Two generator runs produced different bytes ($($bytesA.Length) vs $($bytesB.Length))."
+
+  foreach ($index in @(0, 1)) {
+    Write-TestResult "GeneratorRunspace.ActualGeneratorDisposed[$index]" ($generatorInvocations[$index].Disposed -and $generatorInvocations[$index].Runspace.RunspaceStateInfo.State -eq 'Closed')
+  }
+  Test-IsolatedFixtureHarness
+  Test-GeneratorRunspaceOverlap
+  $cliOutputPath = Join-Path $generatorFixtureRoot 'CLI spaced index.md'
+  $cliFile = Invoke-GeneratorCli -ScriptPath $generateScript -OutputPath $cliOutputPath
+  $cliBytes = [System.IO.File]::ReadAllBytes($cliOutputPath)
+  Write-TestResult 'CLI.GeneratorSpacedOutputPathStatusAndBytesParity' ($cliFile.ExitCode -eq 0 -and $cliFile.ErrorOutput.Length -eq 0 -and [Convert]::ToBase64String($cliBytes) -ceq [Convert]::ToBase64String($bytesA))
+  $cliStdout = Invoke-GeneratorCli -ScriptPath $generateScript -Stdout
+  Write-TestResult 'CLI.GeneratorConsoleStdoutStatusAndExactBytesParity' ($cliStdout.ExitCode -eq 0 -and $cliStdout.ErrorOutput.Length -eq 0 -and $cliStdout.OutputBytes.Length -gt 0 -and [Convert]::ToBase64String($cliStdout.OutputBytes) -ceq [Convert]::ToBase64String($bytesA))
+  $missingRoot = Join-Path $generatorFixtureRoot 'missing skills'
+  $missingScripts = Join-Path $missingRoot 'scripts'
+  [void][System.IO.Directory]::CreateDirectory($missingScripts)
+  $missingGenerator = Join-Path $missingScripts 'generate-skills-index.ps1'
+  Copy-Item -LiteralPath $generateScript -Destination $missingGenerator
+  $missingOutput = Join-Path $missingRoot 'unexpected index.md'
+  $missing = Invoke-IsolatedFixture -ScriptPath $missingGenerator -WorkingDirectory $missingRoot -Parameters @{ OutputPath = $missingOutput }
+  Write-TestResult 'GeneratorRunspace.MissingSkillsExactFailureAndDiagnostic' ($missing.ExitCode -eq 1 -and $missing.Output.Contains('Skills directory not found') -and -not [System.IO.File]::Exists($missingOutput))
+  $missingCli = Invoke-GeneratorCli -ScriptPath $missingGenerator -OutputPath $missingOutput
+  $missingCliText = [System.Text.Encoding]::UTF8.GetString($missingCli.OutputBytes)
+  Write-TestResult 'CLI.GeneratorMissingSkillsExactFailureAndDiagnostic' ($missingCli.ExitCode -eq 1 -and $missingCli.ErrorOutput.Length -eq 0 -and $missingCliText.Contains('Skills directory not found') -and -not [System.IO.File]::Exists($missingOutput))
 
   # ===========================================================================
   Write-Host "`n  Section: index.md presence, match, encoding" -ForegroundColor White
@@ -492,7 +633,18 @@ try {
   Write-TestResult "Lint.GreenAfterRestore" ($lintExit -eq 0) "Lint should pass again after restoring mutated files; got $lintExit"
 }
 finally {
-  Remove-Item -LiteralPath $expectedTemp, $determinismTemp, $harnessScript -Force -ErrorAction SilentlyContinue
+  try {
+    $cleanupErrors = @()
+    foreach ($invocation in $generatorInvocations) {
+      try { Stop-IsolatedFixture -Fixture $invocation }
+      catch { $cleanupErrors += $_.Exception.Message }
+    }
+    if ($cleanupErrors.Count -gt 0) { throw ($cleanupErrors -join '; ') }
+  }
+  finally {
+    Remove-Item -LiteralPath $harnessScript -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $generatorFixtureRoot -Recurse -Force -ErrorAction SilentlyContinue
+  }
 }
 
 # =============================================================================
