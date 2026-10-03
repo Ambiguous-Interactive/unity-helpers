@@ -13,7 +13,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     internal sealed class BenchmarkCpuSetTopology
     {
         internal const int ScratchBufferBytes = 64 * 1024;
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
         private const string NativeLibrary = "kernel32.dll";
+#endif
         private const int InsufficientBufferError = 122;
         private const int HeaderBytes = 8;
         private const int CpuSetRecordBytes = 32;
@@ -337,6 +339,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 | (uint)buffer[offset + 3] << 24;
         }
 
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
         [DllImport(NativeLibrary, ExactSpelling = true, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetSystemCpuSetInformation(
@@ -349,6 +352,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
         [DllImport(NativeLibrary, ExactSpelling = true)]
         private static extern ushort GetActiveProcessorGroupCount();
+#endif
 
         internal void WriteTo(Utf8JsonWriter writer)
         {
