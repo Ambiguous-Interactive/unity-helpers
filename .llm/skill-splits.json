@@ -137,7 +137,7 @@
     },
     {
       "name": "formatting",
-      "sha256": "acc5526732a97487982d82328109f3ee54df93b160b99cf1198985eb86d7985e",
+      "sha256": "e847bc44b7c38f467e0ab364b0da3cde34f0610837400792c453e73fd16a27d1",
       "parts": ["formatting-part-1.md", "formatting-part-2.md"],
       "routerSha256": "b0630668a19f5417e169caac274bea181fd12a9f1e42a0a162cc32bf70ce72ce"
     },
@@ -586,7 +586,7 @@
     },
     {
       "name": "validate-before-commit",
-      "sha256": "499c898a3b7ab036d9ceb61cd17aff9919061171adf1885f2df3d50cf30c0952",
+      "sha256": "6f66d820bd971fcee25e85a87f2746c1e1e05258f0cc1883e82750b2455e36a3",
       "parts": [
         "validate-before-commit-part-1.md",
         "validate-before-commit-part-2.md",
