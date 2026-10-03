@@ -3495,12 +3495,30 @@ try {
     }
 }
 
+. (Join-Path $PSScriptRoot 'isolated-fixture-runspace.ps1')
+function Write-TestResult {
+    param([string]$Name, [bool]$Passed)
+    if (-not $Passed) {
+        Write-Host "::error file=scripts/tests/isolated-fixture-runspace.ps1::Shared fixture control failed: $Name"
+        $script:failed = $true
+    } else {
+        Write-Info "Checked workflow matrix shared fixture control $Name."
+    }
+}
+Test-IsolatedFixtureHarness
+
 $sparseRegistryScriptPath = ''
-$sparseRegistryOutput = @()
-$sparseRegistryExitCode = 1
+$sparseRegistryFixture = $null
+$sparseRegistryCommandNames = @('Test-Path', 'Get-ChildItem', 'Get-ItemProperty', 'Test-RunnerUninstallDisplayName')
+$sparseRegistryParentCommands = @($sparseRegistryCommandNames | ForEach-Object {
+    @(Get-Command -Name $_ -All -ErrorAction SilentlyContinue | Select-Object Name, CommandType, Definition, Source)
+}) | ConvertTo-Json -Depth 4 -Compress
+$sparseRegistryParentEnvironment = [Environment]::GetEnvironmentVariables() | ConvertTo-Json -Compress
+$sparseRegistryParentLocation = (Get-Location).Path
 try {
     $sparseRegistryScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-sparse-registry-$PID-$(Get-Random).ps1"
     @"
+param([switch]`$OmitMatchingDisplayName)
 Set-StrictMode -Version Latest
 `$ErrorActionPreference = 'Stop'
 . '$($windowsRunnerBootstrapPath.Replace("'", "''"))'
@@ -3535,7 +3553,7 @@ function Get-ItemProperty {
         throw 'Unreadable uninstall registry entry'
     }
 
-    if (`$LiteralPath -eq 'registry-entry-with-display-name') {
+    if (`$LiteralPath -eq 'registry-entry-with-display-name' -and -not `$OmitMatchingDisplayName) {
         return [pscustomobject]@{ DisplayName = 'Microsoft Visual C++ 2022 Redistributable (x64)' }
     }
 
@@ -3546,18 +3564,55 @@ if (-not (Test-RunnerUninstallDisplayName -Pattern 'Microsoft Visual C\+\+ 2022.
     Write-Host 'Expected sparse registry probe to find the later matching DisplayName.'
     exit 7
 }
+Write-Host 'sparse registry matching DisplayName observed'
+exit 0
 "@ | Set-Content -LiteralPath $sparseRegistryScriptPath -Encoding UTF8
-    $sparseRegistryOutput = & pwsh -NoProfile -File $sparseRegistryScriptPath 2>&1
-    $sparseRegistryExitCode = $LASTEXITCODE
+    foreach ($control in @(
+        @{ Name = 'Match'; OmitMatchingDisplayName = $false; ExitCode = 0; Marker = 'sparse registry matching DisplayName observed' },
+        @{ Name = 'MissingMatch'; OmitMatchingDisplayName = $true; ExitCode = 7; Marker = 'Expected sparse registry probe to find the later matching DisplayName.' }
+    )) {
+        $sparseRegistryFixture = $null
+        try {
+            $sparseRegistryFixture = Start-IsolatedFixture -ScriptPath $sparseRegistryScriptPath -Parameters @{ OmitMatchingDisplayName = $control.OmitMatchingDisplayName }
+            $result = Complete-IsolatedFixture -Fixture $sparseRegistryFixture
+            if ($result.ExitCode -ne $control.ExitCode -or -not $result.Output.Contains($control.Marker)) {
+                throw "Sparse registry $($control.Name) expected exit $($control.ExitCode) and marker '$($control.Marker)'; actual exit $($result.ExitCode). Output: $($result.Output)"
+            }
+            if (-not $sparseRegistryFixture.Disposed -or $sparseRegistryFixture.Runspace.RunspaceStateInfo.State -ne 'Closed') {
+                throw "Sparse registry $($control.Name) runspace was not closed and disposed."
+            }
+            Write-Info "Checked sparse registry $($control.Name) exact status, diagnostic, closure and disposal."
+        } finally {
+            if ($null -ne $sparseRegistryFixture) { Stop-IsolatedFixture -Fixture $sparseRegistryFixture }
+        }
+    }
+} catch {
+    Write-Host "::error file=scripts/unity/bootstrap-windows-runner.ps1::Sparse registry runspace regression failed: $($_.Exception.Message)"
+    $failed = $true
 } finally {
-    if ($sparseRegistryScriptPath -and (Test-Path -LiteralPath $sparseRegistryScriptPath -PathType Leaf)) {
-        Remove-Item -LiteralPath $sparseRegistryScriptPath -Force -ErrorAction SilentlyContinue
+    try {
+        if ($null -ne $sparseRegistryFixture) { Stop-IsolatedFixture -Fixture $sparseRegistryFixture }
+    } finally {
+        if ($sparseRegistryScriptPath -and (Microsoft.PowerShell.Management\Test-Path -LiteralPath $sparseRegistryScriptPath -PathType Leaf)) {
+            Microsoft.PowerShell.Management\Remove-Item -LiteralPath $sparseRegistryScriptPath -Force
+        }
     }
 }
-if ($sparseRegistryExitCode -ne 0) {
-    Write-Host "::error file=scripts/unity/bootstrap-windows-runner.ps1::Windows runner bootstrap must tolerate uninstall registry entries without DisplayName under StrictMode. Exit $sparseRegistryExitCode. Output: $($sparseRegistryOutput -join ' ')"
+$sparseRegistryCurrentCommands = @($sparseRegistryCommandNames | ForEach-Object {
+    @(Get-Command -Name $_ -All -ErrorAction SilentlyContinue | Select-Object Name, CommandType, Definition, Source)
+}) | ConvertTo-Json -Depth 4 -Compress
+if (
+    ($sparseRegistryScriptPath -and (Microsoft.PowerShell.Management\Test-Path -LiteralPath $sparseRegistryScriptPath)) -or
+    $sparseRegistryCurrentCommands -cne $sparseRegistryParentCommands -or
+    ([Environment]::GetEnvironmentVariables() | ConvertTo-Json -Compress) -cne $sparseRegistryParentEnvironment -or
+    (Get-Location).Path -cne $sparseRegistryParentLocation
+) {
+    Write-Host '::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Sparse registry fixture leaked commands, environment, location, or its owned script file.'
     $failed = $true
-} elseif ($VerboseOutput) {
+} elseif (-not $failed) {
+    Write-Info 'Checked sparse registry fixture preserves parent state and removes its owned script.'
+}
+if (-not $failed) {
     Write-Info "Checked Windows runner bootstrap sparse uninstall registry entries."
 }
 
