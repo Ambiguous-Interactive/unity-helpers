@@ -68,7 +68,11 @@ function Start-IsolatedFixture {
   try {
     $runspace.Open()
     $runner.Runspace = $runspace
-    $null = $runner.AddScript('param($path) Set-Location -LiteralPath $path').AddArgument($WorkingDirectory).AddStatement()
+    # Complete setup before starting the single asynchronous pipeline. AddStatement batching
+    # can leave a worker accessing session state after Stop returns and disposal closes it.
+    $null = $runner.AddCommand('Set-Location').AddParameter('LiteralPath', $WorkingDirectory).AddParameter('ErrorAction', 'Stop').Invoke()
+    if ($runner.HadErrors) { throw "Fixture working-directory setup failed: $($runner.Streams.Error)" }
+    $runner.Commands.Clear()
     $null = $runner.AddCommand($ScriptPath)
     foreach ($name in $Parameters.Keys) { $null = $runner.AddParameter($name, $Parameters[$name]) }
     $fixture.Invocation = $runner.BeginInvoke()

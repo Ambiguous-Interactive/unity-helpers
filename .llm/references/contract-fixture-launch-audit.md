@@ -181,6 +181,8 @@ All nine original scenarios remain; failures require exact exit 1, success requi
 The complete suite passes **44/44 in 11.236 seconds**: nine original scenarios, 23 shared controls, ten async isolation/error/disposal controls, and two spaced-path CLI parity checks.
 Source-line and JSON-patch assertions distinguish prefix failures from unrelated process errors. Overlapping controls prove independent globals, locations, script paths, and parent-location preservation; completed, failed, and cancelled runspaces close.
 Sequential same-host local observations were **9/9 in 9.164 seconds** before and **9/9 in 8.495 seconds** after, omitting only added controls and parity probes from a temporary revised copy.
+Hosted CI then exposed an asynchronous `AddStatement` batch-worker cancellation crash (exit 134), reproduced locally before the fix.
+Setup now completes synchronously before the single asynchronous fixture command; 100 active cancellations passed after the fix. The final suite has 46 controls, including 20 active and 32 immediate cancellations, plus setup rejection before fixture side effects.
 The initial complete revision passed 44/44 in 10.692 seconds. These samples do not establish a hosted or total-suite speed improvement. Remaining candidates and hosted acceptance stay open.
 
 ## Remaining acceptance work

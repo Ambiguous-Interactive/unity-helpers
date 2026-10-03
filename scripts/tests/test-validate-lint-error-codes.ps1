@@ -396,17 +396,45 @@ Set-Content -LiteralPath $ReadyPath -Value 'ready'
 Start-Sleep -Seconds 20
 exit 0
 '@
-    $fixture = Start-IsolatedFixture -ScriptPath $path -Parameters @{ ReadyPath = $readyPath }
-    try {
-        $deadline = [DateTime]::UtcNow.AddSeconds(10)
-        while (-not (Test-Path -LiteralPath $readyPath) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 10 }
-        $wasRunning = (Test-Path -LiteralPath $readyPath) -and $fixture.Runner.InvocationStateInfo.State -eq 'Running'
-        Stop-IsolatedFixture -Fixture $fixture
-        Write-TestResult 'Runspace.CancelsAndDisposesActiveFixture' (
-            $wasRunning -and $fixture.Disposed -and $fixture.Runspace.RunspaceStateInfo.State -eq 'Closed'
-        )
+    $activeCancellationSafe = $true
+    for ($iteration = 0; $iteration -lt 20; $iteration++) {
+        Remove-Item -LiteralPath $readyPath -Force -ErrorAction SilentlyContinue
+        $fixture = Start-IsolatedFixture -ScriptPath $path -Parameters @{ ReadyPath = $readyPath }
+        try {
+            $deadline = [DateTime]::UtcNow.AddSeconds(10)
+            while (-not (Test-Path -LiteralPath $readyPath) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 10 }
+            $wasRunning = (Test-Path -LiteralPath $readyPath) -and $fixture.Runner.InvocationStateInfo.State -eq 'Running'
+            Stop-IsolatedFixture -Fixture $fixture
+            $activeCancellationSafe = $activeCancellationSafe -and $wasRunning -and $fixture.Disposed -and
+                $fixture.Invocation.IsCompleted -and $fixture.Runspace.RunspaceStateInfo.State -eq 'Closed'
+        }
+        finally { Stop-IsolatedFixture -Fixture $fixture }
     }
-    finally { Stop-IsolatedFixture -Fixture $fixture }
+    Write-TestResult 'Runspace.CancelsAndDisposesActiveFixture' $activeCancellationSafe
+
+    $immediateCancellationSafe = $true
+    for ($iteration = 0; $iteration -lt 32; $iteration++) {
+        $fixture = Start-IsolatedFixture -ScriptPath $path -Parameters @{ ReadyPath = $readyPath }
+        try {
+            Stop-IsolatedFixture -Fixture $fixture
+            $immediateCancellationSafe = $immediateCancellationSafe -and $fixture.Disposed -and
+                $fixture.Invocation.IsCompleted -and $fixture.Runspace.RunspaceStateInfo.State -eq 'Closed'
+        }
+        finally { Stop-IsolatedFixture -Fixture $fixture }
+    }
+    Write-TestResult 'Runspace.ImmediateCancellationCompletesBeforeDisposal' $immediateCancellationSafe
+
+    Remove-Item -LiteralPath $readyPath -Force -ErrorAction SilentlyContinue
+    $locationBefore = (Get-Location).Path
+    $setupRejected = $false
+    try {
+        $fixture = Start-IsolatedFixture -ScriptPath $path -Parameters @{ ReadyPath = $readyPath } -WorkingDirectory (Join-Path $tempRoot 'missing-directory')
+        Stop-IsolatedFixture -Fixture $fixture
+    }
+    catch { $setupRejected = $_.Exception.Message.Contains('does not exist') }
+    Write-TestResult 'Runspace.RejectsMissingWorkingDirectory' (
+        $setupRejected -and -not (Test-Path -LiteralPath $readyPath) -and (Get-Location).Path -eq $locationBefore
+    )
 }
 
 $running = @()
