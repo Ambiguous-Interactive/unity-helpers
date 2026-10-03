@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix invisible whitespace-only toggle captions by showing `(Unnamed)`; literal string values and padded captions stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix sprite sheet automatic config lookup throwing for invalid paths; invalid paths and missing sidecars preserve loaded settings ([#929](https://github.com/Ambiguous-Interactive/unity-helpers/issues/929)).
 - Fix sprite sheet configuration save/load accepting blank texture paths; valid filenames containing spaces and serialized hashes keep their exact values ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank custom validation messages hiding the default warning in standard and Odin inspectors; nonblank messages and serialized string values retain their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).

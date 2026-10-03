@@ -229,6 +229,8 @@ public int frameRate = 60;  // Shows as toggle buttons instead of dropdown
 
 The drawer intentionally filters out composite flag values (e.g., `ReadWrite = Read | Write`). This keeps the UI focused on atomic toggles and avoids ambiguous interactions. Use the "Select All" and "Select None" buttons for bulk operations.
 
+Whitespace-only toggle captions display `(Unnamed)`. Nonblank padded captions and option values retain their exact text, including literal whitespace string choices.
+
 ### Best Practices for WEnumToggleButtons
 
 - Keep option counts manageable: toggle groups work best for short lists where designers can see everything without scrolling
