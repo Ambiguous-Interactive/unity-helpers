@@ -85,10 +85,7 @@ measurements and are not counted in the 35 PowerShell command sites.
   hook execution and changed-file integration checks require real entrypoints.
 - [test-git-staging-helpers.sh](../../scripts/tests/test-git-staging-helpers.sh): staging
   integration boundaries require real shell/PowerShell entrypoints.
-- PowerShell mentions in `test-lint-meta-exclusions.sh`, `test-validate-devcontainer-urls.sh`,
-  `test-lint-comment-block-form.js`, `test-unity-artifact-redaction.js`,
-  `test-unity-acceptance-workflow.js`, and `test-shell-portability.sh` are source checks, fixture
-  text, or tool discovery. They do not add repeated content launches to this inventory.
+- PowerShell mentions in source checks, fixture text or tool discovery do not add executable launch sites.
 
 ## Slow-test reporter migration evidence
 
@@ -98,9 +95,9 @@ runspaces; the ranking call retains real `pwsh -File` binding. Ten controls prov
 rejection, warning capture, global-state isolation, and native implicit-status parity with CLI.
 Missing-file and malformed-XML tests require exit 1 and their specific diagnostic.
 
-Sequential same-host devcontainer runs measured original **12/12 at 1.978 seconds** and revised **22/22 at 1.846 seconds**.
-The baseline came from `HEAD`; its temporary copy resolved the repository from the working directory to reach the unchanged reporter.
-These are local observations. An initial revised run took 7.466 seconds; variation prevents a broad speed or hosted timing claim.
+Sequential devcontainer observations passed **12/12 at 1.978 seconds** before and **22/22 at 1.846 seconds** after.
+The baseline copy resolved the repository from the working directory. An earlier revised sample took 7.466 seconds;
+variation leaves broad speed and hosted timing acceptance open.
 
 `HadErrors` alone is not an error-stream check: PowerShell sets it for an intentional nonzero
 script exit without an error record. The harness rejects actual error records and thrown
@@ -143,27 +140,18 @@ so native success cannot substitute for the required explicit terminal exit.
 The skills generator and tag verifier now end with explicit exit 0. Real CLI controls preserve
 file output, Console.Out bytes and failure status; missing status is never inferred as success.
 
-A sequential comparison on the same devcontainer host measured all original assertions
-before and after, then the initial complete revised suites before the stricter exit-contract controls:
+Sequential same-host devcontainer measurements preserved every original assertion:
 
-| Suite                  | Original assertions before | Original assertions after | Revised suite with controls |
-| ---------------------- | -------------------------- | ------------------------- | --------------------------- |
-| Template versions      | 24/24, 1.504 s             | 24/24, 1.576 s            | 34/34, 1.972 s              |
-| Git push configuration | 14/14, 3.513 s             | 14/14, 1.173 s            | 24/24, 2.211 s              |
-| Npm package changelog  | 18/18, 25.968 s            | 18/18, 19.849 s           | 27/27, 22.181 s             |
+| Suite                  | Original before | Original after  | Final suite with controls |
+| ---------------------- | --------------- | --------------- | ------------------------- |
+| Template versions      | 24/24, 1.504 s  | 24/24, 1.576 s  | 48/48, 1.641 s            |
+| Git push configuration | 14/14, 3.513 s  | 14/14, 1.173 s  | 38/38, 1.720 s            |
+| Npm package changelog  | 18/18, 25.968 s | 18/18, 19.849 s | 41/41, 19.294 s           |
 
-Temporary original-case copies resolved the repository from the original test directory. Revised original-case measurements omitted only new harness
-and CLI parity assertions; the complete revised suites include them. Local results show git/npm improvement, not a template or hosted speed gain.
-Earlier runs varied (1.776/3.579/19.742 s before; 2.735/3.356/23.973 s after with controls); npm packing and the shared tree limit a single sample.
-
-The explicit-terminal-exit refinement passed **38/38 template in 6.314 seconds**, **28/28 git configuration in 2.696 seconds**,
-and **31/31 npm changelog in 27.042 seconds**. Four added controls rejected native status without exit, return before unreachable exit,
-missing conditional exit, and unscoped break before exit. Sample variation leaves hosted performance acceptance open.
-
-A follow-up rejected unscoped function/block `break`/`continue` that could bypass terminal exit after a successful native command.
-With all 23 controls, final suites passed **48/48 template in 1.641 seconds**, **38/38 git configuration in 1.720 seconds**,
-and **41/41 npm changelog in 19.294 seconds**. Independent review reproduced and confirmed rejection of all four escape cases,
-then passed the shared harness at 23/23. These results supersede earlier totals; every original fixture assertion remains.
+Temporary revised timing copies omitted only new controls and adjusted test-directory resolution.
+Final suites include all 23 shared controls; independent review reproduced rejection of all four
+unscoped function/block escapes. Earlier partial-control totals are superseded. Local sample
+variation, npm packing and the shared tree leave hosted performance acceptance open.
 
 ## Release tag verifier migration evidence
 
@@ -172,39 +160,33 @@ CLI controls prove matching tag/source/path binding and GitHub outputs, empty ta
 Original negative cases retain exact exit 1 and their diagnostics. Explicit terminal `exit 0` preserves CLI success while satisfying the shared contract;
 missing status is never inferred as success. The fixture restores `GITHUB_OUTPUT` in `finally` and removes temporary output files.
 Sequential same-host devcontainer runs passed **24/24 in 3.888 seconds** before and **51/51 in 1.918 seconds** after, including every added control.
-These are local single-sample observations, not hosted acceptance. The retained CLI helper remains one source launch site;
-the inventory stays **37 sites in 22 PowerShell test files**, with fewer executions of that site.
+These are local single-sample observations, not hosted acceptance. The retained CLI helper remains one source launch site; fewer executions do not change that source count.
 
 ## Error-code validator migration evidence
 
-All nine original scenarios remain; failures require exact exit 1, success requires 0, and JavaScript harvesting now requires its prefix diagnostic.
-The complete suite passes **44/44 in 11.236 seconds**: nine original scenarios, 23 shared controls, ten async isolation/error/disposal controls, and two spaced-path CLI parity checks.
-Source-line and JSON-patch assertions distinguish prefix failures from unrelated process errors. Overlapping controls prove independent globals, locations, script paths, and parent-location preservation; completed, failed, and cancelled runspaces close.
-Sequential same-host local observations were **9/9 in 9.164 seconds** before and **9/9 in 8.495 seconds** after, omitting only added controls and parity probes from a temporary revised copy.
-Hosted CI then exposed an asynchronous `AddStatement` batch-worker cancellation crash (exit 134), reproduced locally before the fix.
-Setup now completes synchronously before the single asynchronous fixture command; 100 active cancellations passed after the fix. The final suite has 46 controls, including 20 active and 32 immediate cancellations, plus setup rejection before fixture side effects.
-The initial complete revision passed 44/44 in 10.692 seconds. These samples do not establish a hosted or total-suite speed improvement. Remaining candidates and hosted acceptance stay open.
+All nine original scenarios remain with exact 0/1 status and specific prefix/source-line/JSON-patch diagnostics.
+Overlapping controls preserve globals, locations, script paths and cleanup. Hosted cancellation exit 134 was
+reproduced and fixed by synchronous setup before one async fixture command. The final suite has 46 controls,
+including 20 active and 32 immediate cancellations and setup rejection; 100 active cancellations also passed.
+Same-host original-only observations passed **9/9 in 9.164 seconds** before and **9/9 in 8.495 seconds** after.
+These local samples do not prove hosted or total-suite speed gains.
 
 ## Skills-generator migration evidence
 
-All 60 original assertions remain. The revised suite passes 95/95: 23 shared status controls and
-12 generator isolation, overlap, disposal and CLI controls supplement the original cases.
-Two generator file invocations start in fresh runspaces before either is completed. A separate
-barrier control observes both invocations running before release and checks independent globals,
-locations and script paths. Owned runspaces close after completion and during cleanup.
+All 60 original assertions remain; the revised suite passes 95/95 with 23 shared and 12 generator controls.
+Both file generators start in fresh runspaces before completion. A separate barrier observes both controls
+running before release and checks independent globals, locations and script paths; cleanup closes owned runspaces.
 
-The generator now explicitly exits 0 on success; the unchanged CI status and drift gates remain.
-CLI file output and Console.Out are compared byte-for-byte with runspace output using the actual
-stdout stream. Both CLI and runspace missing-skills cases require exit 1, the specific diagnostic,
-and no output file. Spaced paths and the real linter, Node/cspell and offline feedback boundaries remain.
+Explicit success exit 0 preserves the CI status/drift gates. Actual CLI stdout bytes and spaced-path file output
+match the runspace-generated file. Missing-skills controls require exit 1, the diagnostic and no output file.
+The real linter, Node/cspell and offline feedback boundaries remain.
 
-Sequential devcontainer observations passed **60/60 in 33.445 seconds** before and **60/60 in
-30.967 seconds** after, with only added controls omitted from the revised timing copy. Exact original
-case identities match. The full revised suite passed **95/95 in 36.150 seconds**. PowerShell 7.6.4 on Windows
-also passed **95/95**, with empty stderr and all owned processes absent afterward.
-These are local single-sample observations, not hosted speed acceptance. The full suite retains
-three generator CLI executions plus the shared implicit-status CLI control, so removing two
-original launches does not establish a lower total process count for the expanded suite.
+Sequential devcontainer observations passed **60/60 in 33.445 seconds** before and **60/60 in 30.967 seconds** after,
+with only added controls omitted from the revised timing copy and exact original case identities retained.
+The full revision passed **95/95 in 36.150 seconds**; PowerShell 7.6.4 on Windows passed **95/95**,
+with empty stderr and all owned processes absent. These local single samples do not prove hosted speed gains.
+Three generator CLI calls plus the shared implicit-status CLI control remain in the expanded suite;
+removing two original launches does not prove a lower total process count.
 
 ## Remaining acceptance work
 

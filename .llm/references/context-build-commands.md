@@ -20,7 +20,7 @@ npm run lint:markdown                                   # Markdownlint rules
 npm run lint:yaml                                       # YAML style
 npm run lint:dependabot                                 # Dependabot config schema
 pwsh -NoProfile -File scripts/lint-tests.ps1            # Lint test lifecycle
-pwsh -NoProfile -File scripts/lint-skill-sizes.ps1      # Skill file sizes
+pwsh -NoProfile -File scripts/lint-skill-sizes.ps1      # Skill, reference and context sizes
 pwsh -NoProfile -File scripts/lint-gitignore-docs.ps1   # Validate gitignore safety
 pwsh -NoProfile -File scripts/lint-doc-counts.ps1       # Validate doc counts match codebase
 pwsh -NoProfile -File scripts/sync-doc-counts.ps1       # Sync doc counts to all files

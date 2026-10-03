@@ -87,10 +87,22 @@ foreach ($root in $sourceRoots) {
 
     Write-Info "Checking: $relativePath"
 
-    # Read first N lines of the file. ReadLines is lazy, so this still stops after
-    # $linesToCheck lines, and it does not pay Get-Content's per-file pipeline cost -- which
-    # dominates on a devcontainer's 9p mount, where the reads are the whole runtime.
-    $content = @([System.IO.File]::ReadLines($file) | Select-Object -First $linesToCheck)
+    # Bound reads to the first N lines, including blanks, and release the reader before
+    # classification can continue early or another caller rewrites the file.
+    $headerLines = [System.Collections.Generic.List[string]]::new()
+    $reader = $null
+    try {
+      $reader = [System.IO.StreamReader]::new($file, [System.Text.Encoding]::UTF8, $true)
+      for ($lineIndex = 0; $lineIndex -lt $linesToCheck; $lineIndex++) {
+        $line = $reader.ReadLine()
+        if ($null -eq $line) { break }
+        $headerLines.Add($line)
+      }
+    }
+    finally {
+      if ($null -ne $reader) { $reader.Dispose() }
+    }
+    $content = $headerLines.ToArray()
     if (-not $content) {
       Write-Info "  Empty or unreadable file, skipping"
       $skippedCount++

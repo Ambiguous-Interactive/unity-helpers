@@ -1204,6 +1204,86 @@ finally {
     Remove-Item -Path $repo10c -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# Test group: bounded license readers release files before any GC or process exit.
+$licenseReaderControls = {
+    param([string]$SourceRoot)
+    $tokens = $null
+    $errors = $null
+    $preflightAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $SourceRoot 'scripts/agent-preflight.ps1'), [ref]$tokens, [ref]$errors)
+    if ($errors.Count -ne 0) { throw 'License reader preflight source must parse.' }
+    $yearFunctions = @($preflightAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Get-LicenseHeaderYear' }, $false))
+    if ($yearFunctions.Count -ne 1) { throw 'Expected one production license-year reader.' }
+    . ([scriptblock]::Create($yearFunctions[0].Extent.Text))
+
+    $linterAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $SourceRoot 'scripts/lint-license-headers.ps1'), [ref]$tokens, [ref]$errors)
+    if ($errors.Count -ne 0) { throw 'License header linter source must parse.' }
+    foreach ($function in @($linterAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false))) {
+        . ([scriptblock]::Create($function.Extent.Text))
+    }
+    $fileLoops = @($linterAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.ForEachStatementAst] -and $node.Variable.VariablePath.UserPath -eq 'file' -and $node.Condition.Extent.Text -eq '$csFiles' }, $true))
+    if ($fileLoops.Count -ne 1) { throw 'Expected one production license-header file loop.' }
+    # Execute the real complete loop body, including classification and early continues.
+    $linterLoop = [scriptblock]::Create('foreach ($file in @($readerPath)) ' + $fileLoops[0].Body.Extent.Text)
+    $readerRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('license-reader-controls-' + [guid]::NewGuid().ToString('N'))
+    [void][System.IO.Directory]::CreateDirectory($readerRoot)
+    try {
+        $readerCases = @(
+            @{ Name = 'Year.FirstLine'; Reader = 'Year'; Text = "// Copyright (c) 2025`r`n// second`r`n// third`r`n"; Expected = '2025'; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Year.SecondLineIgnored'; Reader = 'Year'; Text = "// first`n// Copyright (c) 2025`n// third`n"; Expected = ''; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Year.BlankFirstLine'; Reader = 'Year'; Text = "`n// Copyright (c) 2025`n"; Expected = ''; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Year.Empty'; Reader = 'Year'; Text = ''; Expected = ''; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Year.Utf8Bom'; Reader = 'Year'; Text = "// Copyright (c) 2025`n// second`n"; Expected = '2025'; Encoding = [System.Text.UTF8Encoding]::new($true) },
+            @{ Name = 'Year.Utf16Bom'; Reader = 'Year'; Text = "// Copyright (c) 2025`n// second`n"; Expected = '2025'; Encoding = [System.Text.Encoding]::Unicode },
+            @{ Name = 'Linter.MitAt20'; Reader = 'Linter'; Text = ((@('') * 19 + @('// MIT License', '// tail')) -join "`n"); Expected = 'Accepted'; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Linter.MitAt21'; Reader = 'Linter'; Text = ((@('') * 20 + @('// MIT License', '// tail')) -join "`n"); Expected = 'Violation'; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Linter.OptOut'; Reader = 'Linter'; Text = "// No license header required`n// tail`n"; Expected = 'Skipped'; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Linter.Empty'; Reader = 'Linter'; Text = ''; Expected = 'Skipped'; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Linter.Utf8Bom'; Reader = 'Linter'; Text = "// MIT License`n// tail`n"; Expected = 'Accepted'; Encoding = [System.Text.UTF8Encoding]::new($true) },
+            @{ Name = 'Linter.Utf16Bom'; Reader = 'Linter'; Text = "// MIT License`n// tail`n"; Expected = 'Accepted'; Encoding = [System.Text.Encoding]::Unicode }
+        )
+        foreach ($readerCase in $readerCases) {
+            $readerPath = Join-Path $readerRoot ($readerCase.Name + '.cs')
+            [System.IO.File]::WriteAllText($readerPath, $readerCase.Text, $readerCase.Encoding)
+            $originalBytes = [System.IO.File]::ReadAllBytes($readerPath)
+            if ($readerCase.Reader -eq 'Year') {
+                $actual = Get-LicenseHeaderYear -Path $readerPath
+            } else {
+                $repoRoot = $readerRoot
+                $VerboseOutput = $false
+                $linesToCheck = 20
+                $optOutMarker = 'No license header required'
+                $checkedCount = 0
+                $skippedCount = 0
+                $violations = @()
+                . $linterLoop
+                $actual = if ($skippedCount -eq 1) { 'Skipped' } elseif ($violations.Count -eq 1) { 'Violation' } else { 'Accepted' }
+            }
+            Write-TestResult "LicenseReader.$($readerCase.Name).Classification" ($actual -ceq $readerCase.Expected) "Expected '$($readerCase.Expected)', got '$actual'."
+            $exclusive = $null
+            $releaseError = ''
+            try {
+                $exclusive = [System.IO.File]::Open($readerPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+                $exclusive.Dispose()
+                $exclusive = $null
+                [System.IO.File]::WriteAllBytes($readerPath, $originalBytes)
+                [System.IO.File]::Delete($readerPath)
+            } catch { $releaseError = $_.Exception.Message }
+            finally { if ($null -ne $exclusive) { $exclusive.Dispose() } }
+            Write-TestResult "LicenseReader.$($readerCase.Name).ReleasedBeforeGC" ($releaseError -eq '' -and -not [System.IO.File]::Exists($readerPath)) "Immediate exclusive open/rewrite/delete failed: $releaseError"
+        }
+        $missingPath = Join-Path $readerRoot 'missing.cs'
+        Write-TestResult 'LicenseReader.Year.MissingReturnsEmpty' ((Get-LicenseHeaderYear -Path $missingPath) -ceq '') 'Expected preflight read errors to return empty.'
+        $readerPath = $missingPath
+        $linterThrew = $false
+        try { . $linterLoop } catch { $linterThrew = $true }
+        Write-TestResult 'LicenseReader.Linter.MissingPropagates' $linterThrew 'Expected linter read errors to propagate.'
+    }
+    finally {
+        Remove-Item -LiteralPath $readerRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+& $licenseReaderControls -SourceRoot (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+
 # Test 10d: Changed C# license year drift should fail, and -Fix should repair/stage
 Write-Host "`nTest group: license header auto-fix" -ForegroundColor Magenta
 $repo10cLicense = New-TestRepo -ConfigurePushDefaults
@@ -1572,6 +1652,61 @@ exit 0
 }
 finally {
     Remove-Item -Path $repo10cPartialLlm -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "`nTest group: changed LLM reference size routing" -ForegroundColor Magenta
+$llmSizeCases = @(
+    @{ Name = 'Reference.Direct.198'; Path = '.llm/references/size-fixture.md'; Lines = 198; ExpectedExit = 0 },
+    @{ Name = 'Reference.Direct.200'; Path = '.llm/references/size-fixture.md'; Lines = 200; ExpectedExit = 1 },
+    @{ Name = 'Reference.Direct.215'; Path = '.llm/references/size-fixture.md'; Lines = 215; ExpectedExit = 1 },
+    @{ Name = 'Reference.Nested.198'; Path = '.llm/references/nested/size-fixture.md'; Lines = 198; ExpectedExit = 0 },
+    @{ Name = 'Reference.Nested.200'; Path = '.llm/references/nested/size-fixture.md'; Lines = 200; ExpectedExit = 1 },
+    @{ Name = 'Reference.Nested.215'; Path = '.llm/references/nested/size-fixture.md'; Lines = 215; ExpectedExit = 1 },
+    @{ Name = 'Skill.198'; Path = '.llm/skills/size-fixture.md'; Lines = 198; ExpectedExit = 0 },
+    @{ Name = 'Skill.200'; Path = '.llm/skills/size-fixture.md'; Lines = 200; ExpectedExit = 1 },
+    @{ Name = 'Context.198'; Path = '.llm/context.md'; Lines = 198; ExpectedExit = 0 },
+    @{ Name = 'Context.200'; Path = '.llm/context.md'; Lines = 200; ExpectedExit = 1 }
+)
+foreach ($sizeCase in $llmSizeCases) {
+    $sizeRepo = New-TestRepo -ConfigurePushDefaults
+    try {
+        Add-FakePrettierPackage -RepoPath $sizeRepo
+        Add-FakeMarkdownlintPackage -RepoPath $sizeRepo
+        [void][System.IO.Directory]::CreateDirectory((Join-Path $sizeRepo '.llm/skills'))
+        $sizePath = Join-Path $sizeRepo $sizeCase.Path
+        [void][System.IO.Directory]::CreateDirectory((Split-Path -Parent $sizePath))
+        $lines = @('# Size routing fixture')
+        for ($line = 1; $line -lt $sizeCase.Lines; $line++) { $lines += "- Fixture line $line" }
+        [System.IO.File]::WriteAllText($sizePath, ($lines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
+        $sourceRepo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        Copy-Item -LiteralPath (Join-Path $sourceRepo 'scripts/lint-skill-sizes.ps1') -Destination (Join-Path $sizeRepo 'scripts/lint-skill-sizes.ps1')
+        Set-Content -LiteralPath (Join-Path $sizeRepo 'scripts/lint-llm-instructions.ps1') -Value @'
+Param([switch]$Fix, [switch]$VerboseOutput)
+exit 0
+'@ -Encoding UTF8
+
+        $sizeResult = Invoke-Preflight -RepoPath $sizeRepo -Arguments @('-Paths', $sizeCase.Path)
+        Write-TestResult "LlmSizeRouting.$($sizeCase.Name).ExactExit" ($sizeResult.ExitCode -eq $sizeCase.ExpectedExit) "Expected exit $($sizeCase.ExpectedExit), got $($sizeResult.ExitCode). Output: $($sizeResult.Output)"
+        if ($sizeCase.ExpectedExit -eq 1) {
+            $diagnostic = if ($sizeCase.Path -eq '.llm/context.md') {
+                "[context-size] ERROR: context.md: $($sizeCase.Lines) lines (max: 199) - MUST reduce"
+            } else {
+                "[skill-sizes] ERROR: $($sizeCase.Path): $($sizeCase.Lines) lines (max: 199) - MUST split"
+            }
+            $observedOracle = $sizeResult.Output.Contains($diagnostic)
+        } else {
+            $diagnostic = if ($sizeCase.Path -eq '.llm/context.md') {
+                '[context-size] Summary: context.md checked (198 lines)'
+            } else {
+                '[skill-sizes] Summary: 1 files checked'
+            }
+            $observedOracle = $sizeResult.Output.Contains($diagnostic) -and $sizeResult.Output.Contains('All files within size limits')
+        }
+        Write-TestResult "LlmSizeRouting.$($sizeCase.Name).RealSizeOracleObserved" $observedOracle "Expected real size-linter diagnostic '$diagnostic'. Output: $($sizeResult.Output)"
+    }
+    finally {
+        Remove-Item -LiteralPath $sizeRepo -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # Test 10g: PathList recovery should work even when the worktree starts clean

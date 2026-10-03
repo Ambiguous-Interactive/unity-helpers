@@ -112,7 +112,7 @@ Run formatters/linters **immediately after each file change**, not batched at ta
 - **YAML**: `pwsh -NoProfile -File scripts/lint-yaml.ps1 -Paths <changed files>` (then `actionlint <changed workflows>`)
 - **Spelling**: `npm run lint:spelling` (add valid terms to `cspell.json`). Run it manually before completion; `npm run agent:preflight` and CI provide the final safety net
 - **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`. Passing more than one path only works because every `-Paths` script declares BOTH a `ValueFromRemainingArguments` sibling and `[CmdletBinding(PositionalBinding = $false)]` -- `pwsh -File` binds the first token and offers the rest to the other named parameters positionally, so the sibling alone only works when every neighbor happens to be a `[switch]`. Measured: `ensure-editor.ps1 -RequiredEditorPayloadRelativePath a b` put `b` in `-InstallRoot`. `PWS005` enforces both halves
-- **Skill files and [context](./context.md)**: `pwsh -NoProfile -File scripts/lint-skill-sizes.ps1` (500-line limit)
+- **Skills, references and [context](./context.md)**: `pwsh -NoProfile -File scripts/lint-skill-sizes.ps1` after edits; files of 200 or more lines fail, and default preflight also rejects the critical 199-line boundary
 - **Commit prep**: stage files, then run `npm run agent:preflight:fix` (includes changed spell-checkable file checks) before any commit attempt
 - **Pre-push validation**: run `npm run validate:prepush` before push; it is a roughly one-second
   last-resort Git/config safety check. Run relevant changed-file checks through
