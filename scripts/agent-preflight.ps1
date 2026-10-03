@@ -1529,12 +1529,19 @@ function Get-LicenseHeaderYear {
     )
 
     $firstLine = ''
+    $reader = $null
     try {
-        $firstLine = [System.IO.File]::ReadLines($Path) | Select-Object -First 1
+        $reader = [System.IO.StreamReader]::new($Path, [System.Text.Encoding]::UTF8, $true)
+        $firstLine = $reader.ReadLine()
     }
     catch {
         return ''
     }
+    finally {
+        if ($null -ne $reader) { $reader.Dispose() }
+    }
+
+    if ([string]::IsNullOrEmpty($firstLine)) { return '' }
 
     $match = [regex]::Match([string]$firstLine, 'Copyright \(c\) (?<year>\d{4})')
     if (-not $match.Success) {
@@ -1765,7 +1772,7 @@ $initiallyUnstagedPaths = Get-GitUnstagedOrUntrackedPaths -RepoRoot $repoRoot
 $llmFiles = @($relativePaths | Where-Object { $_ -like '.llm/*' })
 $llmSizeTargets = @(
     $relativePaths | Where-Object {
-        $_ -eq '.llm/context.md' -or $_ -like '.llm/skills/*.md'
+        $_ -eq '.llm/context.md' -or $_ -like '.llm/skills/*.md' -or $_ -like '.llm/references/*.md'
     }
 )
 $prettierTargets = @(
@@ -1851,7 +1858,7 @@ if ($metaRelevantPaths.Count -gt 0 -and -not (Invoke-EnsureNoIndexLock)) {
 }
 
 if ($llmSizeTargets.Count -gt 0) {
-    Write-Host '[agent-preflight] Checking changed skill/context file sizes...' -ForegroundColor Blue
+    Write-Host '[agent-preflight] Checking changed skill/reference/context file sizes...' -ForegroundColor Blue
     $failOnCritical = -not $AllowCriticalSkillSize
     & (Join-Path $repoRoot 'scripts/lint-skill-sizes.ps1') -Paths $llmSizeTargets -FailOnCritical:$failOnCritical -VerboseOutput:$VerboseOutput
     if ($LASTEXITCODE -ne 0) {

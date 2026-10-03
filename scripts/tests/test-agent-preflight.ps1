@@ -5,6 +5,8 @@ Param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'isolated-fixture-runspace.ps1')
+
 $script:TestsPassed = 0
 $script:TestsFailed = 0
 $script:FailedTests = @()
@@ -1204,6 +1206,86 @@ finally {
     Remove-Item -Path $repo10c -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# Test group: bounded license readers release files before any GC or process exit.
+$licenseReaderControls = {
+    param([string]$SourceRoot)
+    $tokens = $null
+    $errors = $null
+    $preflightAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $SourceRoot 'scripts/agent-preflight.ps1'), [ref]$tokens, [ref]$errors)
+    if ($errors.Count -ne 0) { throw 'License reader preflight source must parse.' }
+    $yearFunctions = @($preflightAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Get-LicenseHeaderYear' }, $false))
+    if ($yearFunctions.Count -ne 1) { throw 'Expected one production license-year reader.' }
+    . ([scriptblock]::Create($yearFunctions[0].Extent.Text))
+
+    $linterAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $SourceRoot 'scripts/lint-license-headers.ps1'), [ref]$tokens, [ref]$errors)
+    if ($errors.Count -ne 0) { throw 'License header linter source must parse.' }
+    foreach ($function in @($linterAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false))) {
+        . ([scriptblock]::Create($function.Extent.Text))
+    }
+    $fileLoops = @($linterAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.ForEachStatementAst] -and $node.Variable.VariablePath.UserPath -eq 'file' -and $node.Condition.Extent.Text -eq '$csFiles' }, $true))
+    if ($fileLoops.Count -ne 1) { throw 'Expected one production license-header file loop.' }
+    # Execute the real complete loop body, including classification and early continues.
+    $linterLoop = [scriptblock]::Create('foreach ($file in @($readerPath)) ' + $fileLoops[0].Body.Extent.Text)
+    $readerRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('license-reader-controls-' + [guid]::NewGuid().ToString('N'))
+    [void][System.IO.Directory]::CreateDirectory($readerRoot)
+    try {
+        $readerCases = @(
+            @{ Name = 'Year.FirstLine'; Reader = 'Year'; Text = "// Copyright (c) 2025`r`n// second`r`n// third`r`n"; Expected = '2025'; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Year.SecondLineIgnored'; Reader = 'Year'; Text = "// first`n// Copyright (c) 2025`n// third`n"; Expected = ''; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Year.BlankFirstLine'; Reader = 'Year'; Text = "`n// Copyright (c) 2025`n"; Expected = ''; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Year.Empty'; Reader = 'Year'; Text = ''; Expected = ''; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Year.Utf8Bom'; Reader = 'Year'; Text = "// Copyright (c) 2025`n// second`n"; Expected = '2025'; Encoding = [System.Text.UTF8Encoding]::new($true) },
+            @{ Name = 'Year.Utf16Bom'; Reader = 'Year'; Text = "// Copyright (c) 2025`n// second`n"; Expected = '2025'; Encoding = [System.Text.Encoding]::Unicode },
+            @{ Name = 'Linter.MitAt20'; Reader = 'Linter'; Text = ((@('') * 19 + @('// MIT License', '// tail')) -join "`n"); Expected = 'Accepted'; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Linter.MitAt21'; Reader = 'Linter'; Text = ((@('') * 20 + @('// MIT License', '// tail')) -join "`n"); Expected = 'Violation'; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Linter.OptOut'; Reader = 'Linter'; Text = "// No license header required`n// tail`n"; Expected = 'Skipped'; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Linter.Empty'; Reader = 'Linter'; Text = ''; Expected = 'Skipped'; Encoding = [System.Text.UTF8Encoding]::new($false) },
+            @{ Name = 'Linter.Utf8Bom'; Reader = 'Linter'; Text = "// MIT License`n// tail`n"; Expected = 'Accepted'; Encoding = [System.Text.UTF8Encoding]::new($true) },
+            @{ Name = 'Linter.Utf16Bom'; Reader = 'Linter'; Text = "// MIT License`n// tail`n"; Expected = 'Accepted'; Encoding = [System.Text.Encoding]::Unicode }
+        )
+        foreach ($readerCase in $readerCases) {
+            $readerPath = Join-Path $readerRoot ($readerCase.Name + '.cs')
+            [System.IO.File]::WriteAllText($readerPath, $readerCase.Text, $readerCase.Encoding)
+            $originalBytes = [System.IO.File]::ReadAllBytes($readerPath)
+            if ($readerCase.Reader -eq 'Year') {
+                $actual = Get-LicenseHeaderYear -Path $readerPath
+            } else {
+                $repoRoot = $readerRoot
+                $VerboseOutput = $false
+                $linesToCheck = 20
+                $optOutMarker = 'No license header required'
+                $checkedCount = 0
+                $skippedCount = 0
+                $violations = @()
+                . $linterLoop
+                $actual = if ($skippedCount -eq 1) { 'Skipped' } elseif ($violations.Count -eq 1) { 'Violation' } else { 'Accepted' }
+            }
+            Write-TestResult "LicenseReader.$($readerCase.Name).Classification" ($actual -ceq $readerCase.Expected) "Expected '$($readerCase.Expected)', got '$actual'."
+            $exclusive = $null
+            $releaseError = ''
+            try {
+                $exclusive = [System.IO.File]::Open($readerPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+                $exclusive.Dispose()
+                $exclusive = $null
+                [System.IO.File]::WriteAllBytes($readerPath, $originalBytes)
+                [System.IO.File]::Delete($readerPath)
+            } catch { $releaseError = $_.Exception.Message }
+            finally { if ($null -ne $exclusive) { $exclusive.Dispose() } }
+            Write-TestResult "LicenseReader.$($readerCase.Name).ReleasedBeforeGC" ($releaseError -eq '' -and -not [System.IO.File]::Exists($readerPath)) "Immediate exclusive open/rewrite/delete failed: $releaseError"
+        }
+        $missingPath = Join-Path $readerRoot 'missing.cs'
+        Write-TestResult 'LicenseReader.Year.MissingReturnsEmpty' ((Get-LicenseHeaderYear -Path $missingPath) -ceq '') 'Expected preflight read errors to return empty.'
+        $readerPath = $missingPath
+        $linterThrew = $false
+        try { . $linterLoop } catch { $linterThrew = $true }
+        Write-TestResult 'LicenseReader.Linter.MissingPropagates' $linterThrew 'Expected linter read errors to propagate.'
+    }
+    finally {
+        Remove-Item -LiteralPath $readerRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+& $licenseReaderControls -SourceRoot (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+
 # Test 10d: Changed C# license year drift should fail, and -Fix should repair/stage
 Write-Host "`nTest group: license header auto-fix" -ForegroundColor Magenta
 $repo10cLicense = New-TestRepo -ConfigurePushDefaults
@@ -1572,6 +1654,61 @@ exit 0
 }
 finally {
     Remove-Item -Path $repo10cPartialLlm -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "`nTest group: changed LLM reference size routing" -ForegroundColor Magenta
+$llmSizeCases = @(
+    @{ Name = 'Reference.Direct.198'; Path = '.llm/references/size-fixture.md'; Lines = 198; ExpectedExit = 0 },
+    @{ Name = 'Reference.Direct.200'; Path = '.llm/references/size-fixture.md'; Lines = 200; ExpectedExit = 1 },
+    @{ Name = 'Reference.Direct.215'; Path = '.llm/references/size-fixture.md'; Lines = 215; ExpectedExit = 1 },
+    @{ Name = 'Reference.Nested.198'; Path = '.llm/references/nested/size-fixture.md'; Lines = 198; ExpectedExit = 0 },
+    @{ Name = 'Reference.Nested.200'; Path = '.llm/references/nested/size-fixture.md'; Lines = 200; ExpectedExit = 1 },
+    @{ Name = 'Reference.Nested.215'; Path = '.llm/references/nested/size-fixture.md'; Lines = 215; ExpectedExit = 1 },
+    @{ Name = 'Skill.198'; Path = '.llm/skills/size-fixture.md'; Lines = 198; ExpectedExit = 0 },
+    @{ Name = 'Skill.200'; Path = '.llm/skills/size-fixture.md'; Lines = 200; ExpectedExit = 1 },
+    @{ Name = 'Context.198'; Path = '.llm/context.md'; Lines = 198; ExpectedExit = 0 },
+    @{ Name = 'Context.200'; Path = '.llm/context.md'; Lines = 200; ExpectedExit = 1 }
+)
+foreach ($sizeCase in $llmSizeCases) {
+    $sizeRepo = New-TestRepo -ConfigurePushDefaults
+    try {
+        Add-FakePrettierPackage -RepoPath $sizeRepo
+        Add-FakeMarkdownlintPackage -RepoPath $sizeRepo
+        [void][System.IO.Directory]::CreateDirectory((Join-Path $sizeRepo '.llm/skills'))
+        $sizePath = Join-Path $sizeRepo $sizeCase.Path
+        [void][System.IO.Directory]::CreateDirectory((Split-Path -Parent $sizePath))
+        $lines = @('# Size routing fixture')
+        for ($line = 1; $line -lt $sizeCase.Lines; $line++) { $lines += "- Fixture line $line" }
+        [System.IO.File]::WriteAllText($sizePath, ($lines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
+        $sourceRepo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        Copy-Item -LiteralPath (Join-Path $sourceRepo 'scripts/lint-skill-sizes.ps1') -Destination (Join-Path $sizeRepo 'scripts/lint-skill-sizes.ps1')
+        Set-Content -LiteralPath (Join-Path $sizeRepo 'scripts/lint-llm-instructions.ps1') -Value @'
+Param([switch]$Fix, [switch]$VerboseOutput)
+exit 0
+'@ -Encoding UTF8
+
+        $sizeResult = Invoke-Preflight -RepoPath $sizeRepo -Arguments @('-Paths', $sizeCase.Path)
+        Write-TestResult "LlmSizeRouting.$($sizeCase.Name).ExactExit" ($sizeResult.ExitCode -eq $sizeCase.ExpectedExit) "Expected exit $($sizeCase.ExpectedExit), got $($sizeResult.ExitCode). Output: $($sizeResult.Output)"
+        if ($sizeCase.ExpectedExit -eq 1) {
+            $diagnostic = if ($sizeCase.Path -eq '.llm/context.md') {
+                "[context-size] ERROR: context.md: $($sizeCase.Lines) lines (max: 199) - MUST reduce"
+            } else {
+                "[skill-sizes] ERROR: $($sizeCase.Path): $($sizeCase.Lines) lines (max: 199) - MUST split"
+            }
+            $observedOracle = $sizeResult.Output.Contains($diagnostic)
+        } else {
+            $diagnostic = if ($sizeCase.Path -eq '.llm/context.md') {
+                '[context-size] Summary: context.md checked (198 lines)'
+            } else {
+                '[skill-sizes] Summary: 1 files checked'
+            }
+            $observedOracle = $sizeResult.Output.Contains($diagnostic) -and $sizeResult.Output.Contains('All files within size limits')
+        }
+        Write-TestResult "LlmSizeRouting.$($sizeCase.Name).RealSizeOracleObserved" $observedOracle "Expected real size-linter diagnostic '$diagnostic'. Output: $($sizeResult.Output)"
+    }
+    finally {
+        Remove-Item -LiteralPath $sizeRepo -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # Test 10g: PathList recovery should work even when the worktree starts clean
@@ -1959,17 +2096,39 @@ finally {
 Write-Host "`nTest group: Set-RepoGitPushDefaults dot-source" -ForegroundColor Magenta
 $repo18 = New-TestRepo  # Intentionally NOT -ConfigurePushDefaults — we want
                         # the helper to actually apply the config.
+$probeFixture = $null
+$probeSentinelsOwned = $false
 try {
     $helperScript = Join-Path (Join-Path $repo18 'scripts') 'git-push-defaults-helpers.ps1'
     Write-TestResult 'DotSource_HelperExists' (Test-Path -LiteralPath $helperScript) "Expected helper at $helperScript"
 
-    # Dot-source into a child pwsh process so we don't pollute the test's
-    # current function table. Using `& pwsh` here is the correct production
-    # invocation path for this isolated test — we're explicitly verifying
-    # the dot-source contract from a fresh host.
+    # A fresh runspace isolates the loaded functions while retaining native git.
+    # The separate configure-git-defaults cases retain the real CLI boundary.
+    $parentLocation = (Get-Location).Path
+    $parentExit = $LASTEXITCODE
+    $inheritedEnvironment = @{}
+    foreach ($name in @('PATH', 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_SYSTEM', 'GIT_CONFIG_NOSYSTEM')) {
+        $inheritedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
+    }
+    if (Get-Variable PushDefaultsProbeState -Scope Global -ErrorAction SilentlyContinue) { throw 'Probe sentinel already exists' }
+    if (Get-Command PushDefaultsProbeParent -CommandType Function -ErrorAction SilentlyContinue) { throw 'Probe function sentinel already exists' }
+    $probeSentinelsOwned = $true
+    $global:PushDefaultsProbeState = 'parent'
+    function global:PushDefaultsProbeParent { 'parent' }
     $probe = @"
+param([hashtable]`$ExpectedEnvironment)
 Set-StrictMode -Version Latest
 `$ErrorActionPreference = 'Stop'
+if (Get-Variable PushDefaultsProbeState -Scope Global -ErrorAction SilentlyContinue) { exit 5 }
+if (Get-Command PushDefaultsProbeParent -CommandType Function -ErrorAction SilentlyContinue) { exit 5 }
+`$global:PushDefaultsProbeState = 'child'
+function global:PushDefaultsProbeParent { 'child' }
+if (`$PSScriptRoot -cne '$($repo18 -replace "'", "''")' -or (Get-Location).Path -cne '$($repo18 -replace "'", "''")') { exit 6 }
+if ((Get-Command git).CommandType -ne 'Application') { exit 7 }
+foreach (`$name in `$ExpectedEnvironment.Keys) {
+    if ([Environment]::GetEnvironmentVariable(`$name) -cne `$ExpectedEnvironment[`$name]) { exit 8 }
+}
+Write-Host 'ISOLATION-OK'
 . '$($helperScript -replace "'", "''")'
 `$result = Set-RepoGitPushDefaults -RepoRoot '$($repo18 -replace "'", "''")'
 if (-not `$result.Success) {
@@ -1993,15 +2152,37 @@ exit 0
 
     $probeFile = Join-Path $repo18 'probe-set-git-push-defaults.ps1'
     Set-Content -Path $probeFile -Value $probe -Encoding UTF8
-    $probeOutput = & pwsh -NoProfile -File $probeFile 2>&1
-    $probeExit = $LASTEXITCODE
-    $probeJoined = ($probeOutput -join "`n")
+    $probeFixture = Start-IsolatedFixture -ScriptPath $probeFile -WorkingDirectory $repo18 -Parameters @{ ExpectedEnvironment = $inheritedEnvironment }
+    $probeResult = Complete-IsolatedFixture -Fixture $probeFixture
+    $probeExit = $probeResult.ExitCode
+    $probeJoined = $probeResult.Output
     Write-TestResult 'DotSource_Succeeded' ($probeExit -eq 0) "Expected exit 0 from probe; got $probeExit. Output: $probeJoined"
     Write-TestResult 'DotSource_ReportsOK' ($probeJoined -match '^OK$|\nOK$|\nOK\r?$|^OK\r?$') "Expected probe to print 'OK' on success. Output: $probeJoined"
+    Write-TestResult 'DotSource.FreshFunctionsGlobalsPathsAndNativeGitEnvironment' ($probeExit -eq 0 -and $probeJoined.Contains('ISOLATION-OK')) 'Expected fresh function/global state, exact script/location and inherited environment with native git'
+    Write-TestResult 'DotSource.ParentFunctionAndGlobalPreserved' ($global:PushDefaultsProbeState -ceq 'parent' -and (PushDefaultsProbeParent) -ceq 'parent' -and -not (Get-Command Set-RepoGitPushDefaults -CommandType Function -ErrorAction SilentlyContinue)) 'Expected probe functions and globals to remain isolated'
+    Write-TestResult 'DotSource.ParentLocationAndExitPreserved' ((Get-Location).Path -ceq $parentLocation -and $LASTEXITCODE -eq $parentExit) 'Expected parent location and native status unchanged'
+    $environmentPreserved = $true
+    foreach ($name in $inheritedEnvironment.Keys) {
+        if ([Environment]::GetEnvironmentVariable($name) -cne $inheritedEnvironment[$name]) { $environmentPreserved = $false }
+    }
+    Write-TestResult 'DotSource.ParentEnvironmentPreserved' $environmentPreserved 'Expected shared process environment to remain unchanged'
+    Write-TestResult 'DotSource.FixtureDisposedAndClosed' ($probeFixture.Disposed -and $probeFixture.Runspace.RunspaceStateInfo.State -eq 'Closed') 'Expected completed fixture disposal'
+    Test-IsolatedFixtureHarness
 }
 finally {
-    Remove-Item -Path $repo18 -Recurse -Force -ErrorAction SilentlyContinue
+    try {
+        if ($null -ne $probeFixture) { Stop-IsolatedFixture -Fixture $probeFixture }
+    }
+    finally {
+        if ($probeSentinelsOwned) {
+            Remove-Variable PushDefaultsProbeState -Scope Global -ErrorAction SilentlyContinue
+            Remove-Item Function:\PushDefaultsProbeParent -ErrorAction SilentlyContinue
+        }
+        Remove-Item -Path $repo18 -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
+
+Write-TestResult 'DotSource.OwnedSentinelsRemoved' (-not (Get-Variable PushDefaultsProbeState -Scope Global -ErrorAction SilentlyContinue) -and -not (Get-Command PushDefaultsProbeParent -CommandType Function -ErrorAction SilentlyContinue)) 'Expected owned global variable and function cleanup before later cases'
 
 # Test 19: configure-git-defaults.ps1 CLI exit-code contract. The helper-based
 # tests above cover the in-process dot-source path; this test exercises the

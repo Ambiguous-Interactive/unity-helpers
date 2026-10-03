@@ -154,14 +154,14 @@ The repository's `.editorconfig` defines all formatting rules. CSharpier reads t
 
 ## Skill File and Context Additional Requirements
 
-Skill files (`.llm/skills/*.md`) and [context](../context.md) have additional size constraints beyond formatting:
+Skills, references (including nested files) and [context](../context.md) have additional size constraints beyond formatting:
 
 ```bash
-# After editing ANY skill file or .llm/context.md, also run:
+# After editing ANY skill, reference or .llm/context.md, also run:
 pwsh -NoProfile -File scripts/lint-skill-sizes.ps1
 ```
 
-Files exceeding 500 lines will be rejected by the pre-commit hook. See [manage-skills](../skills/manage-skills.md) for the complete skill editing workflow.
+Files of 200 or more lines fail the size gate. The pre-commit hook warns at 199 lines; default changed-file preflight rejects that critical boundary. See [manage-skills](../skills/manage-skills.md) for the complete skill editing workflow.
 
 ---
 

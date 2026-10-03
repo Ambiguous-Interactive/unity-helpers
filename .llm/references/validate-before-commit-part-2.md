@@ -133,7 +133,7 @@ node scripts/run-prettier.js --write -- <file>
 ### Skill File and Context Changes (`.llm/skills/*.md`, [context](../context.md))
 
 ```bash
-# 🚨 MANDATORY: After EVERY skill file or context.md modification:
+# 🚨 MANDATORY: After EVERY skill, reference or context.md modification:
 npm run lint:spelling
 pwsh -NoProfile -File scripts/lint-skill-sizes.ps1
 
@@ -145,15 +145,15 @@ node scripts/run-prettier.js --write -- <file>
 npm run lint:markdown
 ```
 
-**CRITICAL**: Skill files and [context](../context.md) have a **500-line hard limit** enforced by the pre-commit hook. Files exceeding this limit **CANNOT be committed** and require human judgment to split or reduce.
+**CRITICAL**: Skills, references and [context](../context.md) must stay below **200 lines**. Both the pre-commit hook and changed-file preflight check direct and nested references. Split or reduce files before they reach the limit.
 
 `agent:preflight` treats critical near-limit sizes as failures for changed files, so growth pressure is addressed before the pre-commit hook becomes the final stop.
 
-| Lines   | Action Required                                          |
-| ------- | -------------------------------------------------------- |
-| <300    | No action needed                                         |
-| 300-500 | Consider splitting preemptively to avoid future blockers |
-| >500    | **MUST split before commit** — hook will reject the file |
+| Lines | Gate behavior                                               |
+| ----- | ----------------------------------------------------------- |
+| ≤198  | Passes the size limit; near-limit warnings may still apply  |
+| 199   | Hook warns; default preflight rejects the critical boundary |
+| ≥200  | Hook and preflight reject; split or reduce before commit    |
 
 **Why this matters**: Splitting large skill files requires human judgment (deciding topic boundaries, updating cross-references). Catching size issues early prevents blocking commits when you've completed all other work.
 

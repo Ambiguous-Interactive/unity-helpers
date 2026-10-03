@@ -226,13 +226,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         /// <param name="property">The serialized property being validated.</param>
         /// <param name="validateAttribute">The attribute, or null for default behavior.</param>
-        /// <returns>The message to display in the help box.</returns>
+        /// <returns>The custom message, or the field default when the custom message is blank.</returns>
         public static string GetValidateAssignmentMessage(
             SerializedProperty property,
             ValidateAssignmentAttribute validateAttribute
         )
         {
-            if (validateAttribute != null && !string.IsNullOrEmpty(validateAttribute.CustomMessage))
+            if (
+                validateAttribute != null
+                && !string.IsNullOrWhiteSpace(validateAttribute.CustomMessage)
+            )
             {
                 return validateAttribute.CustomMessage;
             }
@@ -247,13 +250,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         /// <param name="fieldName">The display name of the field.</param>
         /// <param name="validateAttribute">The attribute, or null for default behavior.</param>
-        /// <returns>The message to display in the help box.</returns>
+        /// <returns>The custom message, or the field default when the custom message is blank.</returns>
         public static string GetValidateAssignmentMessage(
             string fieldName,
             ValidateAssignmentAttribute validateAttribute
         )
         {
-            if (validateAttribute != null && !string.IsNullOrEmpty(validateAttribute.CustomMessage))
+            if (
+                validateAttribute != null
+                && !string.IsNullOrWhiteSpace(validateAttribute.CustomMessage)
+            )
             {
                 return validateAttribute.CustomMessage;
             }
@@ -267,13 +273,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         /// <param name="property">The serialized property being validated.</param>
         /// <param name="notNullAttribute">The attribute, or null for default behavior.</param>
-        /// <returns>The message to display in the help box.</returns>
+        /// <returns>The custom message, or the field default when the custom message is blank.</returns>
         public static string GetNotNullMessage(
             SerializedProperty property,
             WNotNullAttribute notNullAttribute
         )
         {
-            if (notNullAttribute != null && !string.IsNullOrEmpty(notNullAttribute.CustomMessage))
+            if (
+                notNullAttribute != null
+                && !string.IsNullOrWhiteSpace(notNullAttribute.CustomMessage)
+            )
             {
                 return notNullAttribute.CustomMessage;
             }
@@ -288,10 +297,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         /// <param name="fieldName">The display name of the field.</param>
         /// <param name="notNullAttribute">The attribute, or null for default behavior.</param>
-        /// <returns>The message to display in the help box.</returns>
+        /// <returns>The custom message, or the field default when the custom message is blank.</returns>
         public static string GetNotNullMessage(string fieldName, WNotNullAttribute notNullAttribute)
         {
-            if (notNullAttribute != null && !string.IsNullOrEmpty(notNullAttribute.CustomMessage))
+            if (
+                notNullAttribute != null
+                && !string.IsNullOrWhiteSpace(notNullAttribute.CustomMessage)
+            )
             {
                 return notNullAttribute.CustomMessage;
             }

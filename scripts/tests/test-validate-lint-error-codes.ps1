@@ -60,6 +60,7 @@ function Write-TestResult {
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path
 $validatorPath = Join-Path $repoRoot 'scripts/validate-lint-error-codes.ps1'
+. (Join-Path $PSScriptRoot 'isolated-fixture-runspace.ps1')
 
 $tempBase = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { '/tmp' }
 # The space is deliberate and load-bearing. `Start-Process -ArgumentList <array>` joins the array
@@ -123,16 +124,7 @@ function New-FixtureRoot {
 
     return $root
 }
-# ── Scenarios ────────────────────────────────────────────────────────────────
-# Every scenario is the same shape -- seed a fixture, run the validator in it,
-# assert on the exit code and the output -- so they are declared as data and
-# executed by one loop rather than written out nine times.
-#
-# The validator's cost is almost entirely cspell's start-up: measured on this
-# devcontainer, `cspell --version` is 7.9 s against 8.5 s for real work, and the
-# nine runs were 81.3 s of the contract suite's wall clock. They are independent
-# processes over independent fixtures, so they are started together and waited
-# for afterwards ([#540](https://github.com/Ambiguous-Interactive/unity-helpers/issues/540)).
+# Independent fixtures overlap while retaining native Node/cspell execution.
 $scenarios = @(
     @{
         # The single most important guard: the checked-in cspell.json already
@@ -141,7 +133,7 @@ $scenarios = @(
         # a pre-push hook.
         Name           = 'RealRepo.ValidatorPasses'
         UseRealRepo    = $true
-        ExpectExitZero = $true
+        ExpectedExit   = 0
     },
     @{
         Name           = 'Fixture.OnlyKnownPrefix.Passes'
@@ -152,7 +144,7 @@ $scenarios = @(
 Write-Host "UNH001: something"
 "@
         }
-        ExpectExitZero = $true
+        ExpectedExit   = 0
     },
     @{
         # Explicitly flag the probe token in this fixture's cspell config. This
@@ -165,15 +157,16 @@ Write-Host "XYZ001: unregistered prefix should fail the validator"
 "@
         }
         FlagWords      = @('XYZ001')
-        ExpectExitZero = $false
-        MustMatch      = @('\bXYZ\b', 'add_to_root_words', 'lint-fake-novel\.ps1:')
+        ExpectedExit   = 1
+        MustMatch      = @('\bXYZ\b', '"add_to_root_words":\s*\[\s*"XYZ"\s*\]', 'scripts/lint-fake-novel\.ps1:2\b')
     },
     @{
         # An empty lint-*.{ps1,js} glob is a repo-layout error, not a silent
         # pass: renaming the whole family must not disable the check.
         Name           = 'Fixture.NoLintScripts.FailsLoudly'
         Files          = [ordered]@{}
-        ExpectExitZero = $false
+        ExpectedExit   = 1
+        MustMatch      = @('No lint/test/hook files found', 'Repository layout may have changed')
     },
     @{
         Name           = 'Fixture.LintScriptWithNoCodes.Passes'
@@ -183,12 +176,12 @@ Write-Host "XYZ001: unregistered prefix should fail the validator"
 Write-Host "All good."
 "@
         }
-        ExpectExitZero = $true
+        ExpectedExit   = 0
     },
     @{
         # ABC is in cspell's default dictionary, so ABC001 splits and is
         # accepted. This is a positive control for reading .js at all, and its
-        # exit code is deliberately not asserted.
+        # exit code is asserted along with the harvested prefix.
         Name           = 'Fixture.JsLintScriptIsScanned'
         Files          = [ordered]@{
             'scripts/lint-fake-js.js' = @"
@@ -196,7 +189,8 @@ Write-Host "All good."
 console.log('ABC001: unregistered prefix should fail the validator');
 "@
         }
-        IgnoreExitCode = $true
+        ExpectedExit   = 0
+        MustMatch      = @('Harvested 1 unique prefix\(es\): ABC')
         MustNotMatch   = @('FullyQualifiedErrorId')
     },
     @{
@@ -215,8 +209,8 @@ Write-Host 'All good.'
 echo 'HOK001: hook-emitted code that must be harvested'
 "@
         }
-        ExpectExitZero = $false
-        MustMatch      = @('\bHOK\b', '\.githooks/pre-commit:')
+        ExpectedExit   = 1
+        MustMatch      = @('\bHOK\b', '\.githooks/pre-commit:2\b', '\.githooks/pre-commit:3\b')
     },
     @{
         # Test assertions reference error codes, so a code used only in tests
@@ -233,8 +227,8 @@ Write-Host 'silent'
 Write-Host 'TST001: test-only prefix'
 "@
         }
-        ExpectExitZero = $false
-        MustMatch      = @('\bTST\b', 'test-lint-novel\.ps1:')
+        ExpectedExit   = 1
+        MustMatch      = @('\bTST\b', 'scripts/tests/test-lint-novel\.ps1:1\b', 'scripts/tests/test-lint-novel\.ps1:3\b')
     },
     @{
         # `# shellcheck disable=SC2016` is a legitimate reference in our scripts.
@@ -251,96 +245,285 @@ Write-Host 'TST001: test-only prefix'
 Write-Host 'nothing emitted'
 "@
         }
-        ExpectExitZero = $true
+        ExpectedExit   = 0
         MustNotMatch   = @('(?m)^\s+SC\b', '(?m)^\s+MD\b')
     }
 )
 
-# ── Phase 1: seed every fixture and start every validator ────────────────────
-$running = @()
-foreach ($scenario in $scenarios) {
-    $useRealRepo = $scenario.Contains('UseRealRepo') -and $scenario.UseRealRepo
-    if ($useRealRepo) {
-        $workingDirectory = $repoRoot
-        $scriptPath = $validatorPath
-        $argumentList = @('-NoProfile', '-File', $scriptPath)
-    }
-    else {
-        $workingDirectory = New-FixtureRoot
-        if ($scenario.Contains('FlagWords')) {
-            $fixtureCspellPath = Join-Path $workingDirectory 'cspell.json'
-            $fixtureCspell = Get-Content -LiteralPath $fixtureCspellPath -Raw | ConvertFrom-Json
-            $fixtureCspell.flagWords = @($scenario.FlagWords)
-            $fixtureCspell | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $fixtureCspellPath -NoNewline
-        }
-        foreach ($relativePath in $scenario.Files.Keys) {
-            $destination = Join-Path $workingDirectory $relativePath
-            Set-Content -LiteralPath $destination -Value $scenario.Files[$relativePath]
-        }
-        $scriptPath = Join-Path $workingDirectory 'scripts/validate-lint-error-codes.ps1'
-        $argumentList = @('-NoProfile', '-File', $scriptPath, '-VerboseOutput')
-    }
+function Start-ValidatorCli {
+    param([string]$ScriptPath, [string]$WorkingDirectory, [switch]$VerboseValidator)
 
-    Write-Info "Starting $($scenario.Name) in $workingDirectory"
-    # ProcessStartInfo.ArgumentList escapes each argument individually; Start-Process's -ArgumentList
-    # does not. Both streams are drained asynchronously from the moment the process starts, so a
-    # scenario that fills a pipe cannot deadlock against the WaitForExit below.
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = 'pwsh'
-    foreach ($argument in $argumentList) { [void]$startInfo.ArgumentList.Add($argument) }
-    $startInfo.WorkingDirectory = $workingDirectory
+    foreach ($argument in @('-NoProfile', '-File', $ScriptPath)) { [void]$startInfo.ArgumentList.Add($argument) }
+    if ($VerboseValidator) { [void]$startInfo.ArgumentList.Add('-VerboseOutput') }
+    $startInfo.WorkingDirectory = $WorkingDirectory
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
     $startInfo.UseShellExecute = $false
     $process = [System.Diagnostics.Process]::Start($startInfo)
-    $running += @{
-        Scenario       = $scenario
-        Process        = $process
-        StandardOutput = $process.StandardOutput.ReadToEndAsync()
-        StandardError  = $process.StandardError.ReadToEndAsync()
-    }
-}
-
-# ── Phase 2: wait, then assert in declaration order ──────────────────────────
-foreach ($entry in $running) {
-    $scenario = $entry.Scenario
-    Write-Host "`n  Section: $($scenario.Name)" -ForegroundColor White
     try {
-        $entry.Process.WaitForExit()
-        $exitCode = $entry.Process.ExitCode
-        $output = $entry.StandardOutput.GetAwaiter().GetResult() +
-            $entry.StandardError.GetAwaiter().GetResult()
-
-        $reasons = @()
-        if (-not ($scenario.Contains('IgnoreExitCode') -and $scenario.IgnoreExitCode)) {
-            $exitOk = if ($scenario.ExpectExitZero) { $exitCode -eq 0 } else { $exitCode -ne 0 }
-            if (-not $exitOk) {
-                $expectation = if ($scenario.ExpectExitZero) { 'zero' } else { 'non-zero' }
-                $reasons += "expected $expectation exit, got $exitCode"
-            }
+        return @{
+            Process = $process
+            StandardOutput = $process.StandardOutput.ReadToEndAsync()
+            StandardError = $process.StandardError.ReadToEndAsync()
+            Disposed = $false
         }
-        if ($scenario.Contains('MustMatch')) {
-            foreach ($pattern in $scenario.MustMatch) {
-                if ($output -notmatch $pattern) { $reasons += "output did not match /$pattern/" }
-            }
-        }
-        if ($scenario.Contains('MustNotMatch')) {
-            foreach ($pattern in $scenario.MustNotMatch) {
-                if ($output -match $pattern) { $reasons += "output unexpectedly matched /$pattern/" }
-            }
-        }
-
-        Write-TestResult $scenario.Name ($reasons.Count -eq 0) "$($reasons -join '; '). Exit: $exitCode. Output: $output"
     }
     catch {
-        Write-TestResult $scenario.Name $false "Exception: $_"
+        try {
+            if (-not $process.HasExited) { $process.Kill($true) }
+            $process.WaitForExit()
+        }
+        finally { $process.Dispose() }
+        throw
     }
 }
 
+function Stop-ValidatorCli {
+    param([hashtable]$Fixture)
 
-# ── Cleanup ──────────────────────────────────────────────────────────────────
-if (Test-Path -LiteralPath $tempRoot) {
-    Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    if ($Fixture.Disposed) { return }
+    try {
+        if (-not $Fixture.Process.HasExited) { $Fixture.Process.Kill($true) }
+        $Fixture.Process.WaitForExit()
+    }
+    finally {
+        $Fixture.Process.Dispose()
+        $Fixture.Disposed = $true
+    }
+}
+
+function Complete-ValidatorCli {
+    param([hashtable]$Fixture)
+
+    try {
+        $Fixture.Process.WaitForExit()
+        return @{
+            ExitCode = $Fixture.Process.ExitCode
+            Output = $Fixture.StandardOutput.GetAwaiter().GetResult() + $Fixture.StandardError.GetAwaiter().GetResult()
+        }
+    }
+    finally { Stop-ValidatorCli -Fixture $Fixture }
+}
+
+function Test-OverlappingFixtures {
+    $parentLocation = (Get-Location).Path
+    $releasePath = Join-Path $tempRoot 'release-controls'
+    $controls = @()
+    try {
+        foreach ($label in @('first', 'second')) {
+            $directory = New-FixtureRoot
+            $path = Join-Path $directory 'scripts/overlap-control.ps1'
+            $readyPath = Join-Path $directory 'ready'
+            Set-Content -LiteralPath $path -Value @'
+param($Label, $ReadyPath, $ReleasePath)
+if (Get-Variable OverlapFixtureState -Scope Global -ErrorAction SilentlyContinue) { exit 7 }
+$global:OverlapFixtureState = $Label
+Set-Content -LiteralPath $ReadyPath -Value $Label
+$deadline = [DateTime]::UtcNow.AddSeconds(20)
+while (-not (Test-Path -LiteralPath $ReleasePath)) {
+    if ([DateTime]::UtcNow -gt $deadline) { throw 'overlap control timed out' }
+    Start-Sleep -Milliseconds 10
+}
+if ($global:OverlapFixtureState -cne $Label) { exit 7 }
+Write-Host "label:$Label"
+Write-Host "working:$((Get-Location).Path)"
+Write-Host "script:$PSScriptRoot"
+Write-Host "command:$PSCommandPath"
+exit 0
+'@
+            $fixture = Start-IsolatedFixture -ScriptPath $path -WorkingDirectory $directory -Parameters @{
+                Label = $label; ReadyPath = $readyPath; ReleasePath = $releasePath
+            }
+            $controls += @{ Label = $label; Directory = $directory; Path = $path; ReadyPath = $readyPath; Fixture = $fixture }
+        }
+        $deadline = [DateTime]::UtcNow.AddSeconds(10)
+        while (@($controls | Where-Object { -not (Test-Path -LiteralPath $_.ReadyPath) }).Count -gt 0 -and [DateTime]::UtcNow -lt $deadline) {
+            Start-Sleep -Milliseconds 10
+        }
+        $overlap = @($controls | Where-Object {
+            (Test-Path -LiteralPath $_.ReadyPath) -and $_.Fixture.Runner.InvocationStateInfo.State -eq 'Running'
+        }).Count -eq 2
+        Write-TestResult 'Runspace.IndependentFixturesOverlap' $overlap
+        Set-Content -LiteralPath $releasePath -Value 'release'
+        foreach ($control in $controls) {
+            $result = Complete-IsolatedFixture -Fixture $control.Fixture
+            $expectedOutput = @(
+                "label:$($control.Label)", "working:$($control.Directory)",
+                "script:$(Split-Path -Parent $control.Path)", "command:$($control.Path)"
+            ) -join [Environment]::NewLine
+            Write-TestResult "Runspace.OverlappingGlobalLocationAndScriptPath[$($control.Label)]" (
+                $result.ExitCode -eq 0 -and $result.Output -ceq $expectedOutput
+            ) "exit $($result.ExitCode); output: $($result.Output)"
+            Write-TestResult "Runspace.DisposedAfterCompletion[$($control.Label)]" (
+                $control.Fixture.Disposed -and $control.Fixture.Runspace.RunspaceStateInfo.State -eq 'Closed'
+            )
+        }
+        Write-TestResult 'Runspace.ParentLocationPreserved' ((Get-Location).Path -ceq $parentLocation)
+    }
+    finally {
+        $cleanupErrors = @()
+        foreach ($control in $controls) {
+            try { Stop-IsolatedFixture -Fixture $control.Fixture }
+            catch { $cleanupErrors += $_.Exception.Message }
+        }
+        if ($cleanupErrors.Count -gt 0) { throw ($cleanupErrors -join '; ') }
+    }
+
+    foreach ($control in @(
+        @{ Name = 'ErrorExitZero'; Content = "Write-Error 'async-error' -ErrorAction Continue; exit 0"; Diagnostic = 'PowerShell error' },
+        @{ Name = 'ErrorExitOne'; Content = "Write-Error 'async-error' -ErrorAction Continue; exit 1"; Diagnostic = 'PowerShell error' },
+        @{ Name = 'Throw'; Content = "throw 'async-throw'; exit 0"; Diagnostic = 'async-throw' }
+    )) {
+        $path = Join-Path $tempRoot 'async-error-control.ps1'
+        Set-Content -LiteralPath $path -Value $control.Content
+        $fixture = Start-IsolatedFixture -ScriptPath $path -WorkingDirectory $tempRoot
+        $rejected = $false
+        try { $null = Complete-IsolatedFixture -Fixture $fixture }
+        catch { $rejected = $_.Exception.Message.Contains($control.Diagnostic) }
+        finally { Stop-IsolatedFixture -Fixture $fixture }
+        Write-TestResult "Runspace.AsyncRejects$($control.Name)AndDisposes" (
+            $rejected -and $fixture.Disposed -and $fixture.Runspace.RunspaceStateInfo.State -eq 'Closed'
+        )
+    }
+
+    $path = Join-Path $tempRoot 'async-cancel-control.ps1'
+    $readyPath = Join-Path $tempRoot 'cancel-ready'
+    Set-Content -LiteralPath $path -Value @'
+param($ReadyPath)
+Set-Content -LiteralPath $ReadyPath -Value 'ready'
+Start-Sleep -Seconds 20
+exit 0
+'@
+    $activeCancellationSafe = $true
+    for ($iteration = 0; $iteration -lt 20; $iteration++) {
+        Remove-Item -LiteralPath $readyPath -Force -ErrorAction SilentlyContinue
+        $fixture = Start-IsolatedFixture -ScriptPath $path -Parameters @{ ReadyPath = $readyPath }
+        try {
+            $deadline = [DateTime]::UtcNow.AddSeconds(10)
+            while (-not (Test-Path -LiteralPath $readyPath) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 10 }
+            $wasRunning = (Test-Path -LiteralPath $readyPath) -and $fixture.Runner.InvocationStateInfo.State -eq 'Running'
+            Stop-IsolatedFixture -Fixture $fixture
+            $activeCancellationSafe = $activeCancellationSafe -and $wasRunning -and $fixture.Disposed -and
+                $fixture.Invocation.IsCompleted -and $fixture.Runspace.RunspaceStateInfo.State -eq 'Closed'
+        }
+        finally { Stop-IsolatedFixture -Fixture $fixture }
+    }
+    Write-TestResult 'Runspace.CancelsAndDisposesActiveFixture' $activeCancellationSafe
+
+    $immediateCancellationSafe = $true
+    for ($iteration = 0; $iteration -lt 32; $iteration++) {
+        $fixture = Start-IsolatedFixture -ScriptPath $path -Parameters @{ ReadyPath = $readyPath }
+        try {
+            Stop-IsolatedFixture -Fixture $fixture
+            $immediateCancellationSafe = $immediateCancellationSafe -and $fixture.Disposed -and
+                $fixture.Invocation.IsCompleted -and $fixture.Runspace.RunspaceStateInfo.State -eq 'Closed'
+        }
+        finally { Stop-IsolatedFixture -Fixture $fixture }
+    }
+    Write-TestResult 'Runspace.ImmediateCancellationCompletesBeforeDisposal' $immediateCancellationSafe
+
+    Remove-Item -LiteralPath $readyPath -Force -ErrorAction SilentlyContinue
+    $locationBefore = (Get-Location).Path
+    $setupRejected = $false
+    try {
+        $fixture = Start-IsolatedFixture -ScriptPath $path -Parameters @{ ReadyPath = $readyPath } -WorkingDirectory (Join-Path $tempRoot 'missing-directory')
+        Stop-IsolatedFixture -Fixture $fixture
+    }
+    catch { $setupRejected = $_.Exception.Message.Contains('does not exist') }
+    Write-TestResult 'Runspace.RejectsMissingWorkingDirectory' (
+        $setupRejected -and -not (Test-Path -LiteralPath $readyPath) -and (Get-Location).Path -eq $locationBefore
+    )
+}
+
+$running = @()
+$results = @{}
+try {
+    Test-IsolatedFixtureHarness
+    Test-OverlappingFixtures
+
+    foreach ($scenario in $scenarios) {
+        $useRealRepo = $scenario.Contains('UseRealRepo') -and $scenario.UseRealRepo
+        if ($useRealRepo) {
+            $workingDirectory = $repoRoot
+            $scriptPath = $validatorPath
+        }
+        else {
+            $workingDirectory = New-FixtureRoot
+            if ($scenario.Contains('FlagWords')) {
+                $fixtureCspellPath = Join-Path $workingDirectory 'cspell.json'
+                $fixtureCspell = Get-Content -LiteralPath $fixtureCspellPath -Raw | ConvertFrom-Json
+                $fixtureCspell.flagWords = @($scenario.FlagWords)
+                $fixtureCspell | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $fixtureCspellPath -NoNewline
+            }
+            foreach ($relativePath in $scenario.Files.Keys) {
+                $destination = Join-Path $workingDirectory $relativePath
+                Set-Content -LiteralPath $destination -Value $scenario.Files[$relativePath]
+            }
+            $scriptPath = Join-Path $workingDirectory 'scripts/validate-lint-error-codes.ps1'
+        }
+
+        Write-Info "Starting $($scenario.Name) in $workingDirectory"
+        $fixture = if ($useRealRepo) {
+            Start-ValidatorCli -ScriptPath $scriptPath -WorkingDirectory $workingDirectory
+        } else {
+            Start-IsolatedFixture -ScriptPath $scriptPath -WorkingDirectory $workingDirectory -Parameters @{ VerboseOutput = $true }
+        }
+        $running += @{ Scenario = $scenario; Fixture = $fixture; UseCli = $useRealRepo; CompareWith = '' }
+
+        if ($scenario.Name -in @('Fixture.OnlyKnownPrefix.Passes', 'Fixture.UnregisteredPrefix.Fails')) {
+            $cliFixture = Start-ValidatorCli -ScriptPath $scriptPath -WorkingDirectory $workingDirectory -VerboseValidator
+            $running += @{
+                Scenario = @{ Name = "CLI.SpacedPathVerboseParity[$($scenario.Name)]"; ExpectedExit = $scenario.ExpectedExit }
+                Fixture = $cliFixture; UseCli = $true; CompareWith = $scenario.Name
+            }
+        }
+    }
+
+    foreach ($entry in $running) {
+        $scenario = $entry.Scenario
+        Write-Host "`n  Section: $($scenario.Name)" -ForegroundColor White
+        try {
+            $result = if ($entry.UseCli) { Complete-ValidatorCli -Fixture $entry.Fixture }
+                else { Complete-IsolatedFixture -Fixture $entry.Fixture }
+            $results[$scenario.Name] = $result
+            $reasons = @()
+            if ($result.ExitCode -ne $scenario.ExpectedExit) { $reasons += "expected exit $($scenario.ExpectedExit), got $($result.ExitCode)" }
+            if ($scenario.Contains('MustMatch')) {
+                foreach ($pattern in $scenario.MustMatch) {
+                    if ($result.Output -notmatch $pattern) { $reasons += "output did not match /$pattern/" }
+                }
+            }
+            if ($scenario.Contains('MustNotMatch')) {
+                foreach ($pattern in $scenario.MustNotMatch) {
+                    if ($result.Output -match $pattern) { $reasons += "output unexpectedly matched /$pattern/" }
+                }
+            }
+            if ($entry.CompareWith) {
+                if (-not $results.ContainsKey($entry.CompareWith)) { $reasons += 'runspace parity result is absent' }
+                else {
+                    $runspaceResult = $results[$entry.CompareWith]
+                    if ($runspaceResult.ExitCode -ne $result.ExitCode -or $runspaceResult.Output.TrimEnd() -cne $result.Output.TrimEnd()) {
+                        $reasons += 'CLI exit or complete output differs from runspace'
+                    }
+                }
+            }
+            Write-TestResult $scenario.Name ($reasons.Count -eq 0) "$($reasons -join '; '). Exit: $($result.ExitCode). Output: $($result.Output)"
+        }
+        catch { Write-TestResult $scenario.Name $false "Exception: $_" }
+    }
+}
+catch { Write-TestResult 'Harness.SetupOrControlFailure' $false "Exception: $_" }
+finally {
+    foreach ($entry in $running) {
+        try {
+            if ($entry.UseCli) { Stop-ValidatorCli -Fixture $entry.Fixture }
+            else { Stop-IsolatedFixture -Fixture $entry.Fixture }
+        }
+        catch { Write-TestResult "Harness.Cleanup[$($entry.Scenario.Name)]" $false "Exception: $_" }
+    }
+    if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
 }
 
 # ── Summary ──────────────────────────────────────────────────────────────────

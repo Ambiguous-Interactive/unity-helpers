@@ -678,6 +678,48 @@ contract; disabling unsafe blocks alone does not exclude those tools.
 Reference clearing and callback invocation still perform runtime work. Removing disposal-lease work
 does not establish a timing or allocation improvement for a particular workload.
 
+The Base64 comparison in `BorrowedBufferPerformanceTests` measures complete calls against the shipped
+`FromBase64` lease path. The borrowed candidate retains the same Base64 and strict UTF-8 decoder,
+uses a cached callback and the same BCL pool, and checks results before and after measurement.
+Correctness controls cover pool boundaries, malformed input and invalid UTF-8, with a lease-generation
+positive control. Timing cases retain 32 observations per arm and require calibrated, stable timings
+before checking non-inferiority. Diagnostic runs cannot satisfy that acceptance gate. Unqualified
+timings reject adoption while leaving the shipped decoder intact. The candidate
+stays in test code until player timing, allocation and retained-memory evidence supports adoption.
+
+`BorrowedBufferPreflightTests` records runtime identity, all empty clock brackets, and retained-boxing
+allocation controls before reporting an unqualified channel. The IL2CPP thread allocation counter
+is compiled out unless `UNITY_6000_2_OR_NEWER` is defined. Unity documents the
+`GetAllocatedBytesForCurrentThread` crash fix (UUM-100690) in
+[6000.1.4f1](https://unity.com/releases/editor/whats-new/6000.1.4f1) and
+[6000.2.0f1](https://unity.com/releases/editor/whats-new/6000.2.0f1). The conservative Unity 6.2 cutoff
+also excludes fixed Unity 6.1 patches because the minor-version symbol cannot distinguish them from
+earlier Unity 6.1 releases. Before any IL2CPP counter call, a runtime check also requires an exact
+`6000.minor.patch` version with minor at least 2 and a final (`f`) or patch (`p`) release suffix with a
+positive build number. Alpha, beta, malformed, and unknown major versions report an unsupported
+channel with no counter calls. A permitted counter still needs positive calibration in the exact player;
+this guard does not establish native AOT safety or allocation eligibility. These records remain diagnostic:
+binary, corpus and build settings are unverified, and retained-memory accounting is not calibrated.
+Passing clock or managed-byte controls cannot establish campaign eligibility or candidate adoption.
+
+For an executed standalone run, `scripts/unity/run-ci-tests.ps1` accepts an optional
+`-FrozenPlayerDeclarationPath`. The JSON declaration uses `SchemaVersion: 1`, a unique `RunId`, the
+requested `UnityVersion` and `Backend` (`Mono2x` or `IL2CPP`), and nonempty `SourceFiles` and
+`CorpusFiles` arrays. Each file entry contains a repository-relative `Path` and its lowercase SHA256
+in `Sha256`. The runner records declared input hashes and the complete player directory before and
+after launch, rejects changes, and retains a diagnostic report under the run's artifacts directory.
+The report also checks the exact preflight and two Base64 correctness outcomes. To join the compiled
+player to actual test inputs, export `BorrowedBase64Tests.CreateCanonicalCorpusBytes()` and include
+that file in `CorpusFiles`. Set the optional `CanonicalCorpusPath` to its exact declared path. The
+runner compiles the run and declaration hashes into the performance test assembly and checks both
+runtime markers against the frozen corpus. The shared corpus contains 35 correctness rows and 12
+whole-call declarations. The correctness marker reports 70 decoder comparisons; those comparisons
+do not execute the 12 timing cases. Missing or conflicting markers reject the join.
+
+Declared hashes do not prove complete source coverage. Effective build settings, timing-case
+consumption and retained-memory behavior remain unverified; campaign and adoption eligibility stay
+false.
+
 ---
 
 ### Performance Tips

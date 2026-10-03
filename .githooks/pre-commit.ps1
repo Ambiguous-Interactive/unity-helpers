@@ -492,9 +492,9 @@ function Invoke-LlmChecks {
         Invoke-HookPowerShellScript -ScriptRelativePath 'scripts/lint-llm-instructions.ps1'
     }
 
-    $sizeTargets = @($StagedPaths | Where-Object { $_ -eq '.llm/context.md' -or $_ -like '.llm/skills/*.md' })
+    $sizeTargets = @($StagedPaths | Where-Object { $_ -eq '.llm/context.md' -or $_ -like '.llm/skills/*.md' -or $_ -like '.llm/references/*.md' })
     if ($sizeTargets.Count -gt 0) {
-        Write-HookInfo 'Checking changed skill/context file sizes.'
+        Write-HookInfo 'Checking changed skill/reference/context file sizes.'
         Invoke-HookPowerShellScript -ScriptRelativePath 'scripts/lint-skill-sizes.ps1' -Arguments (@('-Paths') + $sizeTargets)
     }
 }

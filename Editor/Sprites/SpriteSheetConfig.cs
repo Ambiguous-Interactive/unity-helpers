@@ -76,10 +76,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// Gets the config file path for a given texture path.
         /// </summary>
         /// <param name="texturePath">The path to the source texture.</param>
-        /// <returns>The config file path with .spritesheet.json extension.</returns>
+        /// <returns>The config file path, or an empty string for a blank texture path.</returns>
         public static string GetConfigPath(string texturePath)
         {
-            if (string.IsNullOrEmpty(texturePath))
+            if (string.IsNullOrWhiteSpace(texturePath))
             {
                 return string.Empty;
             }

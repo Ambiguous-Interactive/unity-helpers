@@ -54,7 +54,7 @@ function Assert-FixtureExplicitExitContract {
   }
 }
 
-function Invoke-IsolatedFixture {
+function Start-IsolatedFixture {
   param(
     [Parameter(Mandatory = $true)][string]$ScriptPath,
     [hashtable]$Parameters = @{},
@@ -62,12 +62,52 @@ function Invoke-IsolatedFixture {
   )
 
   Assert-FixtureExplicitExitContract -ScriptPath $ScriptPath
+  $runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
   $runner = [System.Management.Automation.PowerShell]::Create()
+  $fixture = @{ Runner = $runner; Runspace = $runspace; Invocation = $null; Disposed = $false }
   try {
-    $null = $runner.AddScript('param($path) Set-Location -LiteralPath $path').AddArgument($WorkingDirectory).AddStatement()
+    $runspace.Open()
+    $runner.Runspace = $runspace
+    # Complete setup before starting the single asynchronous pipeline. AddStatement batching
+    # can leave a worker accessing session state after Stop returns and disposal closes it.
+    $null = $runner.AddCommand('Set-Location').AddParameter('LiteralPath', $WorkingDirectory).AddParameter('ErrorAction', 'Stop').Invoke()
+    if ($runner.HadErrors) { throw "Fixture working-directory setup failed: $($runner.Streams.Error)" }
+    $runner.Commands.Clear()
     $null = $runner.AddCommand($ScriptPath)
     foreach ($name in $Parameters.Keys) { $null = $runner.AddParameter($name, $Parameters[$name]) }
-    $result = $runner.Invoke()
+    $fixture.Invocation = $runner.BeginInvoke()
+    return $fixture
+  }
+  catch {
+    Stop-IsolatedFixture -Fixture $fixture
+    throw
+  }
+}
+
+function Stop-IsolatedFixture {
+  param([Parameter(Mandatory = $true)][hashtable]$Fixture)
+
+  if ($Fixture.Disposed) { return }
+  try {
+    if ($Fixture.Runner.InvocationStateInfo.State -in @('Running', 'Stopping')) {
+      $Fixture.Runner.Stop()
+    }
+  }
+  finally {
+    try { $Fixture.Runner.Dispose() }
+    finally {
+      $Fixture.Runspace.Dispose()
+      $Fixture.Disposed = $true
+    }
+  }
+}
+
+function Complete-IsolatedFixture {
+  param([Parameter(Mandatory = $true)][hashtable]$Fixture)
+
+  try {
+    $runner = $Fixture.Runner
+    $result = $runner.EndInvoke($Fixture.Invocation)
     $output = [System.Collections.Generic.List[string]]::new()
     foreach ($item in $result) { $output.Add($item.ToString()) }
     foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
@@ -76,15 +116,26 @@ function Invoke-IsolatedFixture {
     if ($runner.Streams.Error.Count -gt 0) {
       throw "Fixture emitted a PowerShell error: $($output -join [Environment]::NewLine)"
     }
-    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    $exitCode = $Fixture.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
     if ($null -eq $exitCode) {
       throw "Fixture returned without an exit status. $($output -join [Environment]::NewLine)"
     }
     return @{ ExitCode = [int]$exitCode; Output = ($output -join [Environment]::NewLine) }
   }
   finally {
-    $runner.Dispose()
+    Stop-IsolatedFixture -Fixture $Fixture
   }
+}
+
+function Invoke-IsolatedFixture {
+  param(
+    [Parameter(Mandatory = $true)][string]$ScriptPath,
+    [hashtable]$Parameters = @{},
+    [string]$WorkingDirectory = (Get-Location).Path
+  )
+
+  $fixture = Start-IsolatedFixture -ScriptPath $ScriptPath -Parameters $Parameters -WorkingDirectory $WorkingDirectory
+  return Complete-IsolatedFixture -Fixture $fixture
 }
 
 function Test-IsolatedFixtureHarness {

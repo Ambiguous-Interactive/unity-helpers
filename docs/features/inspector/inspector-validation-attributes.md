@@ -182,6 +182,11 @@ public AudioSource criticalAudioSource;
 
 #### Custom Message
 
+Null, empty, and whitespace-only custom messages use the default field warning in both standard
+and Odin inspectors. Control and Unicode whitespace also count as blank. Nonblank messages keep
+their exact spacing. Validation does not trim or rewrite serialized string fields; `WNotNull`
+accepts a nonnull whitespace string, while `ValidateAssignment` reports it as invalid.
+
 <!-- doc-sample: compiles -->
 
 ```csharp
@@ -432,6 +437,11 @@ public AudioSource criticalAudioSource;
 ```
 
 #### Custom Message
+
+Null, empty, and whitespace-only custom messages use the default field warning in both standard
+and Odin inspectors. Control and Unicode whitespace also count as blank. Nonblank messages keep
+their exact spacing. Validation does not trim or rewrite serialized string fields; `WNotNull`
+accepts a nonnull whitespace string, while `ValidateAssignment` reports it as invalid.
 
 <!-- doc-sample: compiles -->
 

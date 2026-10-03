@@ -133,6 +133,8 @@ try {
         if ($script:ExportFails) { throw 'injected export failure' }
     }
     function Write-UnityCompilationSourceInventoryMarker { throw 'Export changed the test compilation inventory.' }
+    function Start-FrozenPlayerProvenance { throw 'Default export entered frozen-player provenance.' }
+    function Complete-FrozenPlayerProvenance { throw 'Default export finalized frozen-player provenance.' }
     $UnityEditorPath = 'fake editor'
     $RepoRoot = $temporary
     $startupProbeLogPath = $logPath
@@ -141,6 +143,8 @@ try {
     $hasLicenseCreds = $true
     $TestMode = 'export'
     $acceleratorArgs = @()
+    $frozenPlayerDeclaration = $null
+    $frozenPlayerProvenance = $null
     foreach ($centralReturnOwnsLicense in @($false, $true)) {
         foreach ($script:ExportFails in @($false, $true)) {
             $script:Events = [Collections.Generic.List[string]]::new()

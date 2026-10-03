@@ -726,6 +726,63 @@ test_precommit_meta_scope() {
     done
 }
 
+# Real hook routing must send reference files to the actual size checker.
+test_precommit_llm_size_routing() {
+    local kind lines relative expected name sandbox output exit_code diagnostic before after line
+    while read -r kind lines relative expected; do
+        name="pre-commit LLM size routing $kind $lines"
+        sandbox="$TEMPDIR/llm-size-$kind-$lines"
+        mkdir -p "$sandbox/.githooks" "$sandbox/scripts" "$sandbox/.llm/skills" "$(dirname "$sandbox/$relative")"
+        cp "$REPO_ROOT/.githooks/pre-commit.ps1" "$sandbox/.githooks/pre-commit.ps1"
+        cp "$REPO_ROOT/scripts/git-staging-helpers.ps1" "$sandbox/scripts/git-staging-helpers.ps1"
+        cp "$REPO_ROOT/scripts/lint-skill-sizes.ps1" "$sandbox/scripts/lint-skill-sizes.ps1"
+        cp "$REPO_ROOT/scripts/git-path-helpers.ps1" "$sandbox/scripts/git-path-helpers.ps1"
+        # Only unrelated consistency/version tools are neutralized; the size oracle is real.
+        printf 'Param([switch]$Fix)\nexit 0\n' > "$sandbox/scripts/lint-llm-instructions.ps1"
+        printf 'exit 0\n' > "$sandbox/scripts/sync-banner-version.ps1"
+        for ((line = 1; line <= lines; line++)); do
+            printf 'Fixture line %s\n' "$line"
+        done > "$sandbox/$relative"
+        git -C "$sandbox" init -q
+        (cd "$sandbox" && source "$REPO_ROOT/scripts/git-staging-helpers.sh" && git_add_with_retry "$relative")
+        before=$(git -C "$sandbox" hash-object -- "$relative")
+        exit_code=0
+        output=$(cd "$sandbox" && pwsh -NoProfile -File .githooks/pre-commit.ps1 2>&1) || exit_code=$?
+        after=$(git -C "$sandbox" hash-object -- "$relative")
+        if [[ "$kind" == Context ]]; then
+            diagnostic="[context-size] ERROR: context.md: $lines lines (max: 199) - MUST reduce"
+        else
+            diagnostic="[skill-sizes] ERROR: $relative: $lines lines (max: 199) - MUST split"
+        fi
+        if [[ "$exit_code" -ne "$expected" ]]; then
+            fail "$name" "expected exit $expected, got $exit_code: $output"
+        elif [[ "$expected" -eq 1 ]] && [[ "$output" != *"$diagnostic"* ]]; then
+            fail "$name" "missing actual size-oracle error '$diagnostic': $output"
+        elif [[ "$lines" -eq 198 ]] && [[ "$output" != *'All files within size limits'* ]]; then
+            fail "$name" "size oracle was not observed: $output"
+        elif [[ "$lines" -eq 199 ]] && [[ "$output" != *'[skill-sizes] CRITICAL:'* ]]; then
+            fail "$name" "hook must observe but accept its existing critical warning: $output"
+        elif [[ "$before" != "$after" ]] || [[ "$(git -C "$sandbox" rev-parse ":$relative")" != "$before" ]]; then
+            fail "$name" 'size validation changed the owned target worktree or staged blob'
+        else
+            pass "$name"
+        fi
+    done <<'CASES'
+ReferenceDirect 198 .llm/references/size-fixture.md 0
+ReferenceDirect 199 .llm/references/size-fixture.md 0
+ReferenceDirect 200 .llm/references/size-fixture.md 1
+ReferenceDirect 215 .llm/references/size-fixture.md 1
+ReferenceNested 198 .llm/references/nested/size-fixture.md 0
+ReferenceNested 199 .llm/references/nested/size-fixture.md 0
+ReferenceNested 200 .llm/references/nested/size-fixture.md 1
+ReferenceNested 215 .llm/references/nested/size-fixture.md 1
+Skill 198 .llm/skills/size-fixture.md 0
+Skill 200 .llm/skills/size-fixture.md 1
+Context 198 .llm/context.md 0
+Context 200 .llm/context.md 1
+CASES
+}
+
 echo "=== Pre-commit integration tests ==="
 echo "Repo root: $REPO_ROOT"
 echo "Tempdir:   $TEMPDIR"
@@ -735,6 +792,7 @@ test_dependabot_branch
 test_original_failing_command
 test_yaml_lint_invocation
 test_skill_sizes_branch
+test_precommit_llm_size_routing
 test_lint_tests_branch
 test_format_staged_csharp_branch
 test_drawer_branch

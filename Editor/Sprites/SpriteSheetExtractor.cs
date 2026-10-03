@@ -2770,7 +2770,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <returns>True if the config was saved successfully, false otherwise.</returns>
         internal bool SaveConfig(SpriteSheetEntry entry)
         {
-            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
+            if (entry == null || string.IsNullOrWhiteSpace(entry._assetPath))
             {
                 return false;
             }
@@ -2840,7 +2840,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <returns>True if the config was loaded successfully, false otherwise.</returns>
         internal bool LoadConfig(SpriteSheetEntry entry)
         {
-            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
+            if (entry == null || string.IsNullOrWhiteSpace(entry._assetPath))
             {
                 return false;
             }
@@ -2914,18 +2914,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>
-        /// Attempts to auto-load config for an entry if the config file exists.
+        /// Auto-loads an existing config, preserving entry state when its path cannot be resolved.
         /// </summary>
         /// <param name="entry">The entry to auto-load config for.</param>
         internal void TryAutoLoadConfig(SpriteSheetEntry entry)
         {
-            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
+            if (entry == null || string.IsNullOrWhiteSpace(entry._assetPath))
             {
                 return;
             }
 
-            string configPath = SpriteSheetConfig.GetConfigPath(entry._assetPath);
-            string fullConfigPath = Path.GetFullPath(configPath);
+            string fullConfigPath;
+            try
+            {
+                string configPath = SpriteSheetConfig.GetConfigPath(entry._assetPath);
+                fullConfigPath = Path.GetFullPath(configPath);
+            }
+            catch (Exception exception)
+                when (exception
+                        is ArgumentException
+                            or NotSupportedException
+                            or PathTooLongException
+                            or System.Security.SecurityException
+                )
+            {
+                this.LogError($"Failed to auto-load config for '{entry._assetPath}'", exception);
+                return;
+            }
 
             if (File.Exists(fullConfigPath))
             {
