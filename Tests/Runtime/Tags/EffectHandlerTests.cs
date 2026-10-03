@@ -516,6 +516,112 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             handler.RemoveEffect(second);
         }
 
+        [TestCase(100f, 0f, 1)]
+        [TestCase(100f, 1f, 0)]
+        [TestCase(16777216f, 0f, 1)]
+        [TestCase(16777216f, 1f, 0)]
+        [TestCase(float.MaxValue, 0f, 1)]
+        [TestCase(float.MaxValue, 1f, 0)]
+        public void PeriodicCadenceDoesNotRepeatAtUnchangedClock(
+            float startTime,
+            float initialDelay,
+            int expectedTicks
+        )
+        {
+            (_, EffectHandler handler, TestAttributesComponent attributes, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(PeriodicCadenceDoesNotRepeatAtUnchangedClock),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    PeriodicEffectDefinition definition = new()
+                    {
+                        initialDelay = initialDelay,
+                        interval = 1f,
+                    };
+                    definition.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.health),
+                            action = ModificationAction.Addition,
+                            value = -1f,
+                        }
+                    );
+                    e.periodicEffects.Add(definition);
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, startTime).Value;
+            Assert.AreEqual(expectedTicks, handler.ProcessPeriodicEffectsForTesting(startTime, 0f));
+            Assert.AreEqual(0, handler.ProcessPeriodicEffectsForTesting(startTime, 0f));
+            Assert.AreEqual(
+                100f - expectedTicks,
+                attributes.health.CurrentValue,
+                RemainingDurationEpsilon
+            );
+            handler.RemoveEffect(handle);
+        }
+
+        [Test]
+        public void PeriodicCancellationOriginCatchUpRetainsThePerPassCap()
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(PeriodicCancellationOriginCatchUpRetainsThePerPassCap),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    e.periodicEffects.Add(
+                        new PeriodicEffectDefinition
+                        {
+                            initialDelay = float.MaxValue,
+                            interval = 0.25f,
+                        }
+                    );
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, -float.MaxValue).Value;
+            Assert.AreEqual(32, handler.ProcessPeriodicEffectsForTesting(10f, 0f));
+            Assert.AreEqual(9, handler.ProcessPeriodicEffectsForTesting(10f, 0f));
+            Assert.AreEqual(0, handler.ProcessPeriodicEffectsForTesting(10f, 0f));
+            handler.RemoveEffect(handle);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void PeriodicPhaseSurvivesDurationRefreshAndReapplication(bool reapply)
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(PeriodicPhaseSurvivesDurationRefreshAndReapplication),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = 10f;
+                    e.stackingMode = EffectStackingMode.Refresh;
+                    e.resetDurationOnReapplication = true;
+                    e.periodicEffects.Add(new PeriodicEffectDefinition { interval = 1f });
+                }
+            );
+            EffectHandle handle = handler.ApplyEffectForTesting(effect, 100f).Value;
+            Assert.AreEqual(1, handler.ProcessPeriodicEffectsForTesting(100f, 0f));
+            if (reapply)
+            {
+                Assert.AreEqual(handle, handler.ApplyEffectForTesting(effect, 100.5f).Value);
+            }
+            else
+            {
+                Assert.IsTrue(handler.RefreshEffect(handle, false, 100.5f));
+            }
+            Assert.AreEqual(0, handler.ProcessPeriodicEffectsForTesting(100.5f, 0f));
+            Assert.AreEqual(1, handler.ProcessPeriodicEffectsForTesting(101f, 0f));
+            handler.RemoveEffect(handle);
+            EffectHandle fresh = handler.ApplyEffectForTesting(effect, 101f).Value;
+            Assert.AreNotEqual(handle, fresh);
+            Assert.AreEqual(1, handler.ProcessPeriodicEffectsForTesting(101f, 0f));
+            Assert.AreEqual(0, handler.ProcessPeriodicEffectsForTesting(101f, 0f));
+            handler.RemoveEffect(fresh);
+        }
+
         [UnityTest]
         public IEnumerator PeriodicEffectHonorsInitialDelayAndMaxTicks()
         {

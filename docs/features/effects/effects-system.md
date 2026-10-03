@@ -976,6 +976,17 @@ public sealed class PlayerHealth : AttributesComponent
 - Periodic payloads run only for Duration/Infinite effects; they automatically stop after `maxTicks` or when the effect handle is removed.
 - Combine multiple definitions for mixed cadences (e.g., fast minor regen + slower burst heals).
 
+Periodic schedules preserve their initial delay and cadence at large finite clocks. Repeated
+processing at an unchanged clock does not create new due ticks; an overdue schedule can still
+consume its backlog, bounded to 32 ticks per definition per pass. Ticks include the exact scheduled
+boundary, and moving the finite clock backward leaves the phase unchanged. Intervals below 0.01
+seconds use that minimum; negative initial delays use zero.
+
+Refreshing or reapplying an existing handle preserves its periodic phase and tick count. Removing
+it and applying a fresh handle starts a new schedule. Initial delay and interval are captured when
+the handle is created; changes to `maxTicks` remain live. Nonfinite timing retains its existing
+comparison behavior.
+
 ### Effect Behaviours
 
 - Attach `EffectBehavior` ScriptableObjects to the `behaviors` list for per-handle runtime logic.
