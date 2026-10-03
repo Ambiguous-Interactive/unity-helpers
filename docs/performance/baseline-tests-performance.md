@@ -224,6 +224,13 @@ thread CPU accounting, raw thread cycle counts and the processor observed at eac
 Unavailable APIs remain explicit. The player verifier rejects any record containing diagnostics
 as acceptance evidence, even when its timings appear stable.
 
+Before correctness checks, warmup and calibration, diagnostics query the host's Windows CPU sets
+once using a fixed 64 KiB buffer. `CpuSetTopology` retains the machine name, processor group,
+logical processor index, core index, efficiency class and flags. Unsupported APIs, malformed data
+and insufficient buffer space remain explicit; the query does not retry or change scheduling.
+Endpoint mapping requires one active group, unique logical indices and no unknown record types.
+Efficiency classes are reported OS metadata, not inferred processor labels.
+
 Thread CPU accounting brackets the timed work and includes diagnostic-call overhead and checksum
 publication; its resolution limits comparisons with elapsed time. Processor numbers are relative
 to the current processor group. Endpoints reveal some migrations but cannot exclude movement during

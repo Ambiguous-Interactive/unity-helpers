@@ -13,13 +13,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         internal long CounterFrequency { get; }
         internal bool CounterIsHighResolution { get; }
         internal ReadOnlyCollection<BenchmarkSlotObservation> Slots { get; }
+        internal BenchmarkCpuSetTopology CpuSetTopology { get; }
 
         internal BenchmarkSlotDiagnostics(
             BenchmarkSlotObservation[] slots,
             long counterFrequency,
             bool counterIsHighResolution
         )
+            : this(slots, counterFrequency, counterIsHighResolution, null) { }
+
+        internal BenchmarkSlotDiagnostics(
+            BenchmarkSlotObservation[] slots,
+            long counterFrequency,
+            bool counterIsHighResolution,
+            BenchmarkCpuSetTopology cpuSetTopology
+        )
         {
+            CpuSetTopology = cpuSetTopology;
             Slots = Array.AsReadOnly(
                 slots == null
                     ? Array.Empty<BenchmarkSlotObservation>()
@@ -35,6 +45,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             writer.WriteBoolean(nameof(IsDiagnosticOnly), IsDiagnosticOnly);
             writer.WriteNumber(nameof(CounterFrequency), CounterFrequency);
             writer.WriteBoolean(nameof(CounterIsHighResolution), CounterIsHighResolution);
+            if (CpuSetTopology != null)
+            {
+                writer.WritePropertyName(nameof(CpuSetTopology));
+                CpuSetTopology.WriteTo(writer);
+            }
             writer.WriteStartArray(nameof(Slots));
             foreach (BenchmarkSlotObservation slot in Slots)
             {

@@ -25,6 +25,389 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             return new CalibratedBenchmarkMeasurement(reference, subject, 1, 12345, 100, 100, 3, 3);
         }
 
+        private static BenchmarkCpuSetTopology ParseCpuSetTopology(
+            byte[] buffer,
+            uint reportedBytes,
+            ushort groups
+        )
+        {
+            return BenchmarkCpuSetTopology.FromNativeResult(
+                buffer,
+                true,
+                0,
+                reportedBytes,
+                groups,
+                100,
+                200,
+                "control-host"
+            );
+        }
+
+        private static byte[] CreateCpuSetRecord(
+            int recordSize,
+            ushort group,
+            byte logicalIndex,
+            byte efficiencyClass,
+            byte flags
+        )
+        {
+            byte[] buffer = new byte[recordSize];
+            WriteCpuSetUInt32(buffer, 0, (uint)recordSize);
+            WriteCpuSetUInt32(buffer, 8, uint.MaxValue);
+            buffer[12] = (byte)group;
+            buffer[13] = (byte)(group >> 8);
+            buffer[14] = logicalIndex;
+            buffer[15] = 7;
+            buffer[18] = efficiencyClass;
+            buffer[19] = flags;
+            return buffer;
+        }
+
+        private static void WriteCpuSetUInt32(byte[] buffer, int offset, uint value)
+        {
+            for (int index = 0; index < 4; ++index)
+            {
+                buffer[offset + index] = (byte)(value >> (index * 8));
+            }
+        }
+
+        [TestCase(0u, "InvalidRecordSize")]
+        [TestCase(7u, "InvalidRecordSize")]
+        [TestCase(8u, "TruncatedCpuSetRecord")]
+        [TestCase(20u, "TruncatedCpuSetRecord")]
+        [TestCase(31u, "TruncatedCpuSetRecord")]
+        [TestCase(33u, "InvalidRecordSize")]
+        [TestCase(uint.MaxValue, "InvalidRecordSize")]
+        public void CpuSetTopologyRejectsMalformedRecordSizes(uint recordSize, string expected)
+        {
+            byte[] buffer = CreateCpuSetRecord(32, 0, 4, 1, 0);
+            WriteCpuSetUInt32(buffer, 0, recordSize);
+            BenchmarkCpuSetTopology topology = ParseCpuSetTopology(buffer, 32, 1);
+            Assert.AreEqual(expected, topology.Availability);
+            Assert.IsEmpty(topology.CpuSets);
+            Assert.IsFalse(topology.CanMapProcessorNumberEndpoints);
+        }
+
+        [TestCase(0, 1u)]
+        [TestCase(32, 33u)]
+        [TestCase(32, 65_537u)]
+        [TestCase(65_537, 32u)]
+        public void CpuSetTopologyRejectsUndeliveredOrOversizedBuffers(
+            int bufferLength,
+            uint reportedBytes
+        )
+        {
+            BenchmarkCpuSetTopology topology = ParseCpuSetTopology(
+                new byte[bufferLength],
+                reportedBytes,
+                1
+            );
+            Assert.AreEqual("InvalidReturnedLength", topology.Availability);
+            Assert.IsEmpty(topology.CpuSets);
+            Assert.AreEqual(reportedBytes, topology.ReportedBytes);
+        }
+
+        [Test]
+        public void CpuSetTopologyRejectsNullBuffersAndTrailingPartialHeaders()
+        {
+            Assert.AreEqual("InvalidReturnedLength", ParseCpuSetTopology(null, 0, 1).Availability);
+            byte[] buffer = new byte[36];
+            Array.Copy(CreateCpuSetRecord(32, 0, 4, 1, 0), buffer, 32);
+            BenchmarkCpuSetTopology topology = ParseCpuSetTopology(buffer, 36, 1);
+            Assert.AreEqual("TruncatedRecordHeader", topology.Availability);
+            Assert.IsEmpty(
+                topology.CpuSets,
+                "A partial response never presents a complete topology."
+            );
+        }
+
+        [TestCase(122, 65_537u, true, "BufferTooSmall")]
+        [TestCase(5, 123u, false, "NativeApiFailed")]
+        [TestCase(0, 123u, false, "NativeApiFailed")]
+        public void CpuSetTopologyPreservesApiFailureWithoutParsingUndeliveredBytes(
+            int error,
+            uint reportedBytes,
+            bool lengthDefined,
+            string expected
+        )
+        {
+            BenchmarkCpuSetTopology topology = BenchmarkCpuSetTopology.FromNativeResult(
+                null,
+                false,
+                error,
+                reportedBytes,
+                1,
+                100,
+                200,
+                "control-host"
+            );
+            Assert.AreEqual(expected, topology.Availability);
+            Assert.AreEqual(error, topology.NativeError);
+            Assert.AreEqual(lengthDefined ? reportedBytes : (uint?)null, topology.ReportedBytes);
+            Assert.IsEmpty(topology.CpuSets);
+            Assert.IsFalse(topology.CanMapProcessorNumberEndpoints);
+        }
+
+        [Test]
+        public void CpuSetTopologyCountsUnknownTypesAndAdvancesActualExtendedRecordSize()
+        {
+            byte[] buffer = new byte[80];
+            WriteCpuSetUInt32(buffer, 0, 8);
+            WriteCpuSetUInt32(buffer, 4, 99);
+            Array.Copy(CreateCpuSetRecord(40, 0, 4, 0, 0x81), 0, buffer, 8, 40);
+            Array.Copy(CreateCpuSetRecord(32, 0, 5, 1, 2), 0, buffer, 48, 32);
+            BenchmarkCpuSetTopology topology = ParseCpuSetTopology(buffer, 80, 1);
+            Array.Clear(buffer, 0, buffer.Length);
+            Assert.AreEqual("Available", topology.Availability);
+            Assert.AreEqual(1, topology.UnknownRecordTypeCount);
+            Assert.AreEqual(2, topology.CpuSets.Count);
+            Assert.AreEqual(40u, topology.CpuSets[0].RecordSize);
+            Assert.AreEqual(32u, topology.CpuSets[1].RecordSize);
+            Assert.AreEqual(0, topology.CpuSets[0].EfficiencyClass);
+            Assert.AreEqual(1, topology.CpuSets[1].EfficiencyClass);
+            Assert.AreEqual(0x81, topology.CpuSets[0].AllFlags);
+            Assert.IsFalse(
+                topology.CanMapProcessorNumberEndpoints,
+                "Unknown records make complete endpoint mapping unavailable."
+            );
+        }
+
+        [Test]
+        public void CpuSetTopologyReportsEmptyAndUnknownOnlyResponsesExplicitly()
+        {
+            BenchmarkCpuSetTopology empty = ParseCpuSetTopology(Array.Empty<byte>(), 0, 1);
+            Assert.AreEqual("NoCpuSets", empty.Availability);
+            Assert.IsFalse(empty.CanMapProcessorNumberEndpoints);
+            byte[] unknown = new byte[8];
+            WriteCpuSetUInt32(unknown, 0, 8);
+            WriteCpuSetUInt32(unknown, 4, 7);
+            BenchmarkCpuSetTopology topology = ParseCpuSetTopology(unknown, 8, 1);
+            Assert.AreEqual("NoKnownCpuSets", topology.Availability);
+            Assert.AreEqual(1, topology.UnknownRecordTypeCount);
+            Assert.IsEmpty(topology.CpuSets);
+            Assert.IsFalse(topology.CanMapProcessorNumberEndpoints);
+        }
+
+        [TestCase(1, 0, 4, true, "Available")]
+        [TestCase(2, 0, 4, false, "Available")]
+        [TestCase(2, 1, 4, false, "Available")]
+        [TestCase(1, 1, 4, false, "InvalidProcessorIndex")]
+        [TestCase(1, 0, 64, false, "InvalidProcessorIndex")]
+        [TestCase(0, 0, 4, false, "ActiveGroupCountUnavailable")]
+        public void CpuSetTopologyMapsOnlyReportedUnambiguousSingleGroupEndpoints(
+            int activeGroups,
+            int recordGroup,
+            int logicalIndex,
+            bool canMap,
+            string expected
+        )
+        {
+            BenchmarkCpuSetTopology topology = ParseCpuSetTopology(
+                CreateCpuSetRecord(32, (ushort)recordGroup, (byte)logicalIndex, 1, 0),
+                32,
+                (ushort)activeGroups
+            );
+            Assert.AreEqual(expected, topology.Availability);
+            Assert.AreEqual(canMap, topology.CanMapProcessorNumberEndpoints);
+            Assert.AreEqual(
+                canMap ? (ushort)recordGroup : (ushort?)null,
+                topology.ProcessorNumberEndpointGroup
+            );
+        }
+
+        [Test]
+        public void CpuSetTopologyPreservesDuplicateIndicesButRefusesAmbiguousMapping()
+        {
+            byte[] buffer = new byte[64];
+            Array.Copy(CreateCpuSetRecord(32, 0, 4, 0, 1), 0, buffer, 0, 32);
+            Array.Copy(CreateCpuSetRecord(32, 0, 4, 1, 2), 0, buffer, 32, 32);
+            BenchmarkCpuSetTopology topology = ParseCpuSetTopology(buffer, 64, 1);
+            Assert.AreEqual("Available", topology.Availability);
+            Assert.AreEqual(2, topology.CpuSets.Count);
+            Assert.IsFalse(topology.CanMapProcessorNumberEndpoints);
+            Assert.IsFalse(topology.ProcessorNumberEndpointGroup.HasValue);
+        }
+
+        [Test]
+        public void DiagnosticTopologyJsonPreservesExactHostMetadataAndCannotPassTimingPredicates()
+        {
+            byte[] buffer = new byte[64];
+            Array.Copy(CreateCpuSetRecord(32, 0, 4, 0, 0x81), 0, buffer, 0, 32);
+            Array.Copy(CreateCpuSetRecord(32, 0, 5, 1, 2), 0, buffer, 32, 32);
+            BenchmarkCpuSetTopology topology = ParseCpuSetTopology(buffer, 64, 1);
+            double[] reference = new double[32];
+            double[] subject = new double[32];
+            for (int index = 0; index < reference.Length; ++index)
+            {
+                reference[index] = 100;
+                subject[index] = 50;
+            }
+            BenchmarkSlotDiagnostics diagnostics = new(
+                new BenchmarkSlotObservation[64],
+                1000,
+                true,
+                topology
+            );
+            CalibratedBenchmarkMeasurement measurement = new(
+                reference,
+                subject,
+                1,
+                12345,
+                100,
+                100,
+                3,
+                3,
+                diagnostics
+            );
+            Assert.IsTrue(measurement.HasSufficientTiming);
+            Assert.IsFalse(measurement.HasTimingImprovement);
+            Assert.IsFalse(measurement.HasTimingNonInferiority);
+            using JsonDocument document = JsonDocument.Parse(measurement.ToJson());
+            JsonElement serialized = document
+                .RootElement.GetProperty(nameof(CalibratedBenchmarkMeasurement.SlotDiagnostics))
+                .GetProperty(nameof(BenchmarkSlotDiagnostics.CpuSetTopology));
+            Assert.AreEqual(
+                1,
+                serialized.GetProperty(nameof(BenchmarkCpuSetTopology.SchemaVersion)).GetInt32()
+            );
+            Assert.IsTrue(
+                serialized
+                    .GetProperty(nameof(BenchmarkCpuSetTopology.IsDiagnosticOnly))
+                    .GetBoolean()
+            );
+            Assert.AreEqual(
+                "control-host",
+                serialized.GetProperty(nameof(BenchmarkCpuSetTopology.MachineName)).GetString()
+            );
+            Assert.AreEqual(
+                100,
+                serialized
+                    .GetProperty(nameof(BenchmarkCpuSetTopology.CaptureStartTimestamp))
+                    .GetInt64()
+            );
+            Assert.AreEqual(
+                200,
+                serialized
+                    .GetProperty(nameof(BenchmarkCpuSetTopology.CaptureEndTimestamp))
+                    .GetInt64()
+            );
+            Assert.AreEqual(
+                64u,
+                serialized.GetProperty(nameof(BenchmarkCpuSetTopology.ReportedBytes)).GetUInt32()
+            );
+            Assert.AreEqual(
+                1,
+                serialized
+                    .GetProperty(nameof(BenchmarkCpuSetTopology.ActiveProcessorGroupCount))
+                    .GetInt32()
+            );
+            Assert.AreEqual(
+                JsonValueKind.Null,
+                serialized.GetProperty(nameof(BenchmarkCpuSetTopology.NativeError)).ValueKind
+            );
+            Assert.IsTrue(
+                serialized
+                    .GetProperty(nameof(BenchmarkCpuSetTopology.CanMapProcessorNumberEndpoints))
+                    .GetBoolean()
+            );
+            Assert.AreEqual(
+                0,
+                serialized
+                    .GetProperty(nameof(BenchmarkCpuSetTopology.ProcessorNumberEndpointGroup))
+                    .GetInt32()
+            );
+            JsonElement sets = serialized.GetProperty(nameof(BenchmarkCpuSetTopology.CpuSets));
+            Assert.AreEqual(2, sets.GetArrayLength());
+            Assert.AreEqual(
+                uint.MaxValue,
+                sets[0].GetProperty(nameof(BenchmarkCpuSetRecord.Id)).GetUInt32()
+            );
+            Assert.AreEqual(
+                4,
+                sets[0].GetProperty(nameof(BenchmarkCpuSetRecord.LogicalProcessorIndex)).GetInt32()
+            );
+            Assert.AreEqual(
+                7,
+                sets[0].GetProperty(nameof(BenchmarkCpuSetRecord.CoreIndex)).GetInt32()
+            );
+            Assert.AreEqual(
+                0,
+                sets[0].GetProperty(nameof(BenchmarkCpuSetRecord.EfficiencyClass)).GetInt32()
+            );
+            Assert.AreEqual(
+                1,
+                sets[1].GetProperty(nameof(BenchmarkCpuSetRecord.EfficiencyClass)).GetInt32()
+            );
+            Assert.AreEqual(
+                0x81,
+                sets[0].GetProperty(nameof(BenchmarkCpuSetRecord.AllFlags)).GetInt32()
+            );
+            CalibratedBenchmarkMeasurement normal = CreateSamples(reference, subject);
+            Assert.IsTrue(normal.HasTimingImprovement);
+            using JsonDocument normalJson = JsonDocument.Parse(normal.ToJson());
+            Assert.IsFalse(
+                normalJson.RootElement.TryGetProperty(
+                    nameof(CalibratedBenchmarkMeasurement.SlotDiagnostics),
+                    out _
+                )
+            );
+        }
+
+        [Test]
+        public void CpuSetTopologyRetainsEveryDeliveredRecordAtTheFixedBufferBoundary()
+        {
+            byte[] buffer = new byte[BenchmarkCpuSetTopology.ScratchBufferBytes];
+            const int recordSize = 32;
+            int expected = buffer.Length / recordSize;
+            for (int index = 0; index < expected; ++index)
+            {
+                Array.Copy(
+                    CreateCpuSetRecord(recordSize, 0, (byte)(index % 64), (byte)(index % 2), 0),
+                    0,
+                    buffer,
+                    index * recordSize,
+                    recordSize
+                );
+            }
+            BenchmarkCpuSetTopology topology = ParseCpuSetTopology(buffer, (uint)buffer.Length, 1);
+            Assert.AreEqual("Available", topology.Availability);
+            Assert.AreEqual(expected, topology.CpuSets.Count);
+            Assert.AreEqual(63, topology.CpuSets[expected - 1].LogicalProcessorIndex);
+            Assert.AreEqual(1, topology.CpuSets[expected - 1].EfficiencyClass);
+            Assert.IsFalse(topology.CanMapProcessorNumberEndpoints);
+        }
+
+        [Test]
+        public void CpuSetTopologyCaptureReportsActualHostOrExplicitUnavailable()
+        {
+            BenchmarkCpuSetTopology topology = BenchmarkCpuSetTopology.Capture();
+            Assert.IsTrue(topology.IsDiagnosticOnly);
+            Assert.LessOrEqual(topology.CaptureStartTimestamp, topology.CaptureEndTimestamp);
+            Assert.IsFalse(string.IsNullOrEmpty(topology.Availability));
+            if (string.Equals(topology.Availability, "Available", StringComparison.Ordinal))
+            {
+                Assert.IsFalse(string.IsNullOrEmpty(topology.MachineName));
+                Assert.IsNotEmpty(topology.CpuSets);
+                Assert.IsTrue(topology.ActiveProcessorGroupCount.HasValue);
+                Assert.LessOrEqual(1, topology.ActiveProcessorGroupCount.Value);
+                Assert.IsTrue(topology.ReportedBytes.HasValue);
+                Assert.LessOrEqual(
+                    topology.ReportedBytes.Value,
+                    BenchmarkCpuSetTopology.ScratchBufferBytes
+                );
+                Assert.IsFalse(topology.NativeError.HasValue);
+            }
+            else
+            {
+                Assert.IsEmpty(topology.CpuSets);
+                Assert.IsFalse(topology.CanMapProcessorNumberEndpoints);
+                Assert.IsFalse(topology.ProcessorNumberEndpointGroup.HasValue);
+            }
+#if !UNITY_EDITOR_WIN && !UNITY_STANDALONE_WIN
+            Assert.AreEqual("UnsupportedPlatform", topology.Availability);
+#endif
+        }
+
         [TestCase(null, false)]
         [TestCase("", false)]
         [TestCase("0", false)]

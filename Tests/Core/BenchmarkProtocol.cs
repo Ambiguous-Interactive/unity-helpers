@@ -92,6 +92,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             BenchmarkSlotObservation[] observations = captureDiagnostics
                 ? new BenchmarkSlotObservation[CalibratedBatches * CyclesPerBatch * 2]
                 : null;
+            BenchmarkCpuSetTopology cpuSetTopology = captureDiagnostics
+                ? BenchmarkCpuSetTopology.Capture()
+                : null;
             verifyCorrectness();
             double referenceWarmup = Warmup(reference, out int referenceWarmupExecutions);
             double subjectWarmup = Warmup(subject, out int subjectWarmupExecutions);
@@ -175,7 +178,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     ? new BenchmarkSlotDiagnostics(
                         observations,
                         Stopwatch.Frequency,
-                        Stopwatch.IsHighResolution
+                        Stopwatch.IsHighResolution,
+                        cpuSetTopology
                     )
                     : null
             );
