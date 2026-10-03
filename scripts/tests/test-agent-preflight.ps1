@@ -5,6 +5,8 @@ Param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'isolated-fixture-runspace.ps1')
+
 $script:TestsPassed = 0
 $script:TestsFailed = 0
 $script:FailedTests = @()
@@ -2094,17 +2096,39 @@ finally {
 Write-Host "`nTest group: Set-RepoGitPushDefaults dot-source" -ForegroundColor Magenta
 $repo18 = New-TestRepo  # Intentionally NOT -ConfigurePushDefaults — we want
                         # the helper to actually apply the config.
+$probeFixture = $null
+$probeSentinelsOwned = $false
 try {
     $helperScript = Join-Path (Join-Path $repo18 'scripts') 'git-push-defaults-helpers.ps1'
     Write-TestResult 'DotSource_HelperExists' (Test-Path -LiteralPath $helperScript) "Expected helper at $helperScript"
 
-    # Dot-source into a child pwsh process so we don't pollute the test's
-    # current function table. Using `& pwsh` here is the correct production
-    # invocation path for this isolated test — we're explicitly verifying
-    # the dot-source contract from a fresh host.
+    # A fresh runspace isolates the loaded functions while retaining native git.
+    # The separate configure-git-defaults cases retain the real CLI boundary.
+    $parentLocation = (Get-Location).Path
+    $parentExit = $LASTEXITCODE
+    $inheritedEnvironment = @{}
+    foreach ($name in @('PATH', 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_SYSTEM', 'GIT_CONFIG_NOSYSTEM')) {
+        $inheritedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
+    }
+    if (Get-Variable PushDefaultsProbeState -Scope Global -ErrorAction SilentlyContinue) { throw 'Probe sentinel already exists' }
+    if (Get-Command PushDefaultsProbeParent -CommandType Function -ErrorAction SilentlyContinue) { throw 'Probe function sentinel already exists' }
+    $probeSentinelsOwned = $true
+    $global:PushDefaultsProbeState = 'parent'
+    function global:PushDefaultsProbeParent { 'parent' }
     $probe = @"
+param([hashtable]`$ExpectedEnvironment)
 Set-StrictMode -Version Latest
 `$ErrorActionPreference = 'Stop'
+if (Get-Variable PushDefaultsProbeState -Scope Global -ErrorAction SilentlyContinue) { exit 5 }
+if (Get-Command PushDefaultsProbeParent -CommandType Function -ErrorAction SilentlyContinue) { exit 5 }
+`$global:PushDefaultsProbeState = 'child'
+function global:PushDefaultsProbeParent { 'child' }
+if (`$PSScriptRoot -cne '$($repo18 -replace "'", "''")' -or (Get-Location).Path -cne '$($repo18 -replace "'", "''")') { exit 6 }
+if ((Get-Command git).CommandType -ne 'Application') { exit 7 }
+foreach (`$name in `$ExpectedEnvironment.Keys) {
+    if ([Environment]::GetEnvironmentVariable(`$name) -cne `$ExpectedEnvironment[`$name]) { exit 8 }
+}
+Write-Host 'ISOLATION-OK'
 . '$($helperScript -replace "'", "''")'
 `$result = Set-RepoGitPushDefaults -RepoRoot '$($repo18 -replace "'", "''")'
 if (-not `$result.Success) {
@@ -2128,15 +2152,37 @@ exit 0
 
     $probeFile = Join-Path $repo18 'probe-set-git-push-defaults.ps1'
     Set-Content -Path $probeFile -Value $probe -Encoding UTF8
-    $probeOutput = & pwsh -NoProfile -File $probeFile 2>&1
-    $probeExit = $LASTEXITCODE
-    $probeJoined = ($probeOutput -join "`n")
+    $probeFixture = Start-IsolatedFixture -ScriptPath $probeFile -WorkingDirectory $repo18 -Parameters @{ ExpectedEnvironment = $inheritedEnvironment }
+    $probeResult = Complete-IsolatedFixture -Fixture $probeFixture
+    $probeExit = $probeResult.ExitCode
+    $probeJoined = $probeResult.Output
     Write-TestResult 'DotSource_Succeeded' ($probeExit -eq 0) "Expected exit 0 from probe; got $probeExit. Output: $probeJoined"
     Write-TestResult 'DotSource_ReportsOK' ($probeJoined -match '^OK$|\nOK$|\nOK\r?$|^OK\r?$') "Expected probe to print 'OK' on success. Output: $probeJoined"
+    Write-TestResult 'DotSource.FreshFunctionsGlobalsPathsAndNativeGitEnvironment' ($probeExit -eq 0 -and $probeJoined.Contains('ISOLATION-OK')) 'Expected fresh function/global state, exact script/location and inherited environment with native git'
+    Write-TestResult 'DotSource.ParentFunctionAndGlobalPreserved' ($global:PushDefaultsProbeState -ceq 'parent' -and (PushDefaultsProbeParent) -ceq 'parent' -and -not (Get-Command Set-RepoGitPushDefaults -CommandType Function -ErrorAction SilentlyContinue)) 'Expected probe functions and globals to remain isolated'
+    Write-TestResult 'DotSource.ParentLocationAndExitPreserved' ((Get-Location).Path -ceq $parentLocation -and $LASTEXITCODE -eq $parentExit) 'Expected parent location and native status unchanged'
+    $environmentPreserved = $true
+    foreach ($name in $inheritedEnvironment.Keys) {
+        if ([Environment]::GetEnvironmentVariable($name) -cne $inheritedEnvironment[$name]) { $environmentPreserved = $false }
+    }
+    Write-TestResult 'DotSource.ParentEnvironmentPreserved' $environmentPreserved 'Expected shared process environment to remain unchanged'
+    Write-TestResult 'DotSource.FixtureDisposedAndClosed' ($probeFixture.Disposed -and $probeFixture.Runspace.RunspaceStateInfo.State -eq 'Closed') 'Expected completed fixture disposal'
+    Test-IsolatedFixtureHarness
 }
 finally {
-    Remove-Item -Path $repo18 -Recurse -Force -ErrorAction SilentlyContinue
+    try {
+        if ($null -ne $probeFixture) { Stop-IsolatedFixture -Fixture $probeFixture }
+    }
+    finally {
+        if ($probeSentinelsOwned) {
+            Remove-Variable PushDefaultsProbeState -Scope Global -ErrorAction SilentlyContinue
+            Remove-Item Function:\PushDefaultsProbeParent -ErrorAction SilentlyContinue
+        }
+        Remove-Item -Path $repo18 -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
+
+Write-TestResult 'DotSource.OwnedSentinelsRemoved' (-not (Get-Variable PushDefaultsProbeState -Scope Global -ErrorAction SilentlyContinue) -and -not (Get-Command PushDefaultsProbeParent -CommandType Function -ErrorAction SilentlyContinue)) 'Expected owned global variable and function cleanup before later cases'
 
 # Test 19: configure-git-defaults.ps1 CLI exit-code contract. The helper-based
 # tests above cover the in-process dot-source path; this test exercises the

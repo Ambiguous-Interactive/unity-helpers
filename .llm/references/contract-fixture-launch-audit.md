@@ -8,8 +8,8 @@ The audit was inspected on 2026-10-03. It does not certify that the issue is com
 Parse `scripts/tests/*.ps1` and inspect executable `CommandAst` nodes named `pwsh` or `powershell`, including `.exe` forms.
 Also search variable executable paths, `ProcessStartInfo`, and process runner helpers. Comments and here-strings are fixture input, not launches.
 
-After the skills-generator fixture migration, the direct-command
-scan found **35 launch sites in 22 PowerShell test files**. A site inside a helper can execute several times, so this is
+After the loaded-function probe migration, the direct-command
+scan found **34 launch sites in 22 PowerShell test files**. A site inside a helper can execute several times, so this is
 not a process count. The scan also found `ProcessStartInfo` launchers in the error-code
 and skills-generator suites, plus one process-runner helper in the watchdog suite. The path-binding function in
 `test-sync-script-contracts.ps1` is a source inspection, not a child launch.
@@ -26,8 +26,8 @@ All paths in this table are under `scripts/tests/`. Counts are executable source
 
 | File                                                                                                   | Sites | Classification and reason                                                                                                                                                                                                                                                               |
 | ------------------------------------------------------------------------------------------------------ | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1)                     |     1 | CLI: native implicit-success observation, exercised by the six migrated suites; the strict runspace harness rejects the same script without an explicit terminal exit.                                                                                                                  |
-| [test-agent-preflight.ps1](../../scripts/tests/test-agent-preflight.ps1)                               |     4 | CLI: helper's explicit CLI branch; loaded-function isolation probe; repository and non-repository push configuration entrypoints. Content cases already use runspaces.                                                                                                                  |
+| [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1)                     |     1 | CLI: native implicit-success observation, exercised by migrated suites; the strict runspace harness rejects the same script without an explicit terminal exit.                                                                                                                          |
+| [test-agent-preflight.ps1](../../scripts/tests/test-agent-preflight.ps1)                               |     3 | CLI: helper's explicit CLI branch and repository/non-repository push configuration entrypoints. The loaded-function isolation probe now uses a fresh runspace; content cases already use runspaces.                                                                                     |
 | [test-check-eol.ps1](../../scripts/tests/test-check-eol.ps1)                                           |     1 | CLI: explicit CLI branch preserves verbose and multiple-path binding. Content cases already use runspaces.                                                                                                                                                                              |
 | [test-empty-corpus-gates.ps1](../../scripts/tests/test-empty-corpus-gates.ps1)                         |     1 | CLI: retained smoke and native implicit-status parity controls. Content cases already use runspaces.                                                                                                                                                                                    |
 | [test-gitignore-docs.ps1](../../scripts/tests/test-gitignore-docs.ps1)                                 |     1 | CLI: explicit CLI branch preserves verbose binding and host behavior. Content cases already use runspaces.                                                                                                                                                                              |
@@ -49,21 +49,15 @@ All paths in this table are under `scripts/tests/`. Counts are executable source
 | [test-validate-mcp-config.ps1](../../scripts/tests/test-validate-mcp-config.ps1)                       |     1 | CLI: retained real `-RepoRoot` binding. Content cases already use runspaces.                                                                                                                                                                                                            |
 | [test-verify-release-tag.ps1](../../scripts/tests/test-verify-release-tag.ps1)                         |     1 | CLI: retained real tag/source/path binding, empty tag/source ref, and unexpected argument controls. Repeated package/version content checks use fresh runspaces with exact exit codes and preserve GitHub output-file environment and diagnostics.                                      |
 
-The additional `ProcessStartInfo` launcher in
-[test-validate-lint-error-codes.ps1](../../scripts/tests/test-validate-lint-error-codes.ps1)
-retains three CLI executions: the real repository control and spaced-path success/failure
-parity with verbose binding. Eight synthetic content fixtures now use overlapping fresh
-runspaces. Node/cspell still run natively; every original scenario and diagnostic assertion remains.
+The additional `ProcessStartInfo` launcher in [test-validate-lint-error-codes.ps1](../../scripts/tests/test-validate-lint-error-codes.ps1) retains three CLI executions: the real repository control and spaced-path success/failure parity with verbose binding. Eight synthetic content fixtures now use overlapping fresh runspaces. Node/cspell still run natively; every original scenario and diagnostic assertion remains.
 
-The helper in [test-process-watchdog.ps1](../../scripts/tests/test-process-watchdog.ps1)
-requires real child processes: timeout, sentinel detection, grace termination, and descendant
-cleanup are process-boundary assertions. Keep these launches.
+The helper in [test-process-watchdog.ps1](../../scripts/tests/test-process-watchdog.ps1) requires real child processes: timeout, sentinel detection, grace termination, and descendant cleanup are process-boundary assertions. Keep these launches.
 
 ## Other test languages
 
 The direct-command inventory above covers PowerShell fixtures. Searches of JavaScript and
 shell tests additionally identify the following launch families. These need separate migration
-measurements and are not counted in the 35 PowerShell command sites.
+measurements and are not counted in the 34 PowerShell command sites.
 
 - [test-unity-grouped-modes.js](../../scripts/tests/test-unity-grouped-modes.js): generated
   PowerShell function harnesses are candidates for a batched PowerShell host with isolated
@@ -89,35 +83,17 @@ measurements and are not counted in the 35 PowerShell command sites.
 
 ## Slow-test reporter migration evidence
 
-All 12 original assertions remain. Six of the original seven reporter calls now use fresh
-runspaces; the ranking call retains real `pwsh -File` binding. Ten controls prove exact
-0/1/7 statuses, absent-status rejection, error-stream rejection with exits 0 and 1, throw
-rejection, warning capture, global-state isolation, and native implicit-status parity with CLI.
-Missing-file and malformed-XML tests require exit 1 and their specific diagnostic.
+All 12 original assertions remain. Six of the original seven reporter calls now use fresh runspaces; the ranking call retains real `pwsh -File` binding. Ten controls prove exact 0/1/7 statuses, absent-status rejection, error-stream rejection with exits 0 and 1, throw rejection, warning capture, global-state isolation, and native implicit-status parity with CLI. Missing-file and malformed-XML tests require exit 1 and their specific diagnostic.
 
 Sequential devcontainer observations passed **12/12 at 1.978 seconds** before and **22/22 at 1.846 seconds** after.
 The baseline copy resolved the repository from the working directory. An earlier revised sample took 7.466 seconds;
 variation leaves broad speed and hosted timing acceptance open.
 
-`HadErrors` alone is not an error-stream check: PowerShell sets it for an intentional nonzero
-script exit without an error record. The harness rejects actual error records and thrown
-invocations, then reads the exact returned status. `LASTEXITCODE` may come from native git;
-it does **not** prove an explicit script `exit` statement. The native-status parity control
-keeps that limit visible. Preserve `PSScriptRoot` by using `AddCommand(script path)` instead
-of evaluating raw script content.
+`HadErrors` alone is not an error-stream check: PowerShell sets it for an intentional nonzero script exit without an error record. The harness rejects actual error records and thrown invocations, then reads the exact returned status. `LASTEXITCODE` may come from native git; it does **not** prove an explicit script `exit` statement. The native-status parity control keeps that limit visible. Preserve `PSScriptRoot` by using `AddCommand(script path)` instead of evaluating raw script content.
 
 ## Template, git configuration, and npm package migration evidence
 
-The three suites share [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1).
-Each suite runs twenty-three controls for exact 0/1/7 status and host/warning output capture,
-missing-status rejection, error-stream rejection for exits 0 and 1, throw rejection,
-fresh global state, native-success-without-exit rejection, unreachable exits after script returns,
-conditional missing exits, unscoped loop escapes, and a CLI observation of native implicit success. Each invocation owns and
-disposes a fresh runspace, sets its location before loading the script by path, and rejects
-actual PowerShell error records. Git configuration and npm package negative cases now
-require exact exit 1 while preserving their existing diagnostic assertions. Environment
-configuration, native npm/git execution, package-canary cleanup, and alternate working
-directory coverage remain in the original fixtures.
+The three suites share [isolated-fixture-runspace.ps1](../../scripts/tests/isolated-fixture-runspace.ps1). Each suite runs twenty-three controls for exact 0/1/7 status and host/warning output capture, missing-status rejection, error-stream rejection for exits 0 and 1, throw rejection, fresh global state, native-success-without-exit rejection, unreachable exits after script returns, conditional missing exits, unscoped loop escapes, and a CLI observation of native implicit success. Each invocation owns and disposes a fresh runspace, sets its location before loading the script by path, and rejects actual PowerShell error records. Git configuration and npm package negative cases now require exact exit 1 while preserving their existing diagnostic assertions. Environment configuration, native npm/git execution, package-canary cleanup, and alternate working directory coverage remain in the original fixtures.
 
 The template suite preserves 24 original assertions and adds twenty-three harness controls plus
 one CLI parity assertion (48 total). The git configuration suite preserves 14 original
@@ -187,6 +163,20 @@ The full revision passed **95/95 in 36.150 seconds**; PowerShell 7.6.4 on Window
 with empty stderr and all owned processes absent. These local single samples do not prove hosted speed gains.
 Three generator CLI calls plus the shared implicit-status CLI control remain in the expanded suite;
 removing two original launches does not prove a lower total process count.
+
+## Preflight loaded-function probe migration evidence
+
+The loaded `Set-RepoGitPushDefaults` probe now uses an owned fresh runspace; all 246 original assertions remain.
+It retains native git persistence, idempotency and original exits 0–4. Three real CLI source sites remain unchanged.
+The final 275 assertions add 23 shared controls and six probe controls for fresh functions/globals, exact script/location,
+native git resolution, unchanged inherited environment, parent state, disposal and observable sentinel cleanup.
+Environment is process-wide and read-only here; no concurrent environment isolation is claimed.
+Owned contamination returns exact exit 5; omission of sentinel removal fails cleanup. The cleanup guard exposed and
+fixed a silent function-provider removal error. PowerShell 7.6.4 on Windows passed the final focused 32 assertions;
+all 22 copied source hashes matched and all three owned processes exited. This is not a full Windows suite result.
+Sequential same-host full-suite observations passed **246/246 in 39.784 seconds** before and **275/275 in 40.222 seconds** after.
+All original case identities matched. These expanded-workload samples show no speed gain; hosted timing remains open.
+One selected source launch was removed; the shared native implicit-status CLI control prevents a total-process reduction claim.
 
 ## Remaining acceptance work
 
