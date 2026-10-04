@@ -126,7 +126,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer
                 new(typeof(BaseWithSibling).AssemblyQualifiedName, fields),
             };
             cache._relationalTypeMetadata = relational;
-            cache.ForceRebuildForTests();
+            global::WallstopStudios.UnityHelpers.Tests.Core.AttributeMetadataCacheTestUtilities.Rebuild(
+                cache
+            );
 
             ContainerBuilder builder = new();
             builder.RegisterInstance(cache).AsSelf();

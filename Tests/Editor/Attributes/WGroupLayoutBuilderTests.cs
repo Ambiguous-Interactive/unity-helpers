@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         public override void TearDown()
         {
             WGroupLayoutBuilder.ClearCache();
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 _previousConfiguration.Mode,
                 _previousConfiguration.RowCount
             );
@@ -63,7 +63,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         [Test]
         public void GroupingWorksThroughABackingFieldAttribute()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         [Test]
         public void FiniteAutoIncludeCapturesConfiguredCount()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 2
             );
@@ -137,7 +137,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         [Test]
         public void InfiniteAutoIncludeTerminatesAtEndAttribute()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         [Test]
         public void NamedGroupEndStopsSpecifiedGroup()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -211,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         [Test]
         public void MultipleDeclarationsAnchorToFirstOccurrence()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -255,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         [Test]
         public void CollapsibleMetadataIsPreserved()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );

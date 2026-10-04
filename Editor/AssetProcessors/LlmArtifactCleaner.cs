@@ -12,33 +12,15 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         private const string PackagePathPrefix = "Packages/com.wallstop-studios.unity-helpers/";
         private const string LlmPrefix = "_llm_";
 
-        internal static int PendingDeletionCountForTesting
-        {
-            get { return PendingDeletions.Count; }
-        }
-
-        internal static Action<string> DeleteAssetAction = DeleteAssetThroughDatabase;
-
-        private static readonly string[] BlockedSegments = { LlmPrefix };
-        private static readonly HashSet<string> PendingDeletions = new(
+        internal static readonly HashSet<string> PendingDeletions = new(
             StringComparer.OrdinalIgnoreCase
         );
+
+        internal static bool _isDeleting;
+
+        private static readonly string[] BlockedSegments = { LlmPrefix };
+
         private static readonly Action DrainAction = DrainPendingDeletions;
-
-        private static bool _isDeleting;
-
-        internal static void DeleteBlockedAssets(string[] assetPaths)
-        {
-            EnqueueBlockedAssets(assetPaths);
-            DrainPendingDeletions();
-        }
-
-        internal static void ResetForTesting()
-        {
-            PendingDeletions.Clear();
-            DeleteAssetAction = DeleteAssetThroughDatabase;
-            _isDeleting = false;
-        }
 
         internal static bool ShouldDelete(string assetPath)
         {
@@ -75,29 +57,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             return false;
         }
 
-        private static void DeleteAssetThroughDatabase(string assetPath)
-        {
-            AssetDatabase.DeleteAsset(assetPath);
-        }
-
-        private static void OnPostprocessAllAssets(
-            string[] importedAssets,
-            string[] deletedAssets,
-            string[] movedAssets,
-            string[] movedFromAssetPaths
-        )
-        {
-            EnqueueBlockedAssets(importedAssets);
-            EnqueueBlockedAssets(movedAssets);
-            if (PendingDeletions.Count == 0)
-            {
-                return;
-            }
-
-            AssetPostprocessorDeferral.Schedule(DrainAction);
-        }
-
-        private static void EnqueueBlockedAssets(string[] assetPaths)
+        internal static void EnqueueBlockedAssets(string[] assetPaths)
         {
             if (assetPaths == null || assetPaths.Length == 0)
             {
@@ -113,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
         }
 
-        private static void DrainPendingDeletions()
+        internal static void DrainPendingDeletions()
         {
             if (PendingDeletions.Count == 0 || _isDeleting)
             {
@@ -141,6 +101,23 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
         }
 
+        private static void OnPostprocessAllAssets(
+            string[] importedAssets,
+            string[] deletedAssets,
+            string[] movedAssets,
+            string[] movedFromAssetPaths
+        )
+        {
+            EnqueueBlockedAssets(importedAssets);
+            EnqueueBlockedAssets(movedAssets);
+            if (PendingDeletions.Count == 0)
+            {
+                return;
+            }
+
+            AssetPostprocessorDeferral.Schedule(DrainAction);
+        }
+
         private static void DeleteAsset(string assetPath)
         {
             if (string.IsNullOrEmpty(assetPath))
@@ -148,7 +125,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return;
             }
 
-            DeleteAssetAction(assetPath);
+            AssetDatabase.DeleteAsset(assetPath);
         }
     }
 }

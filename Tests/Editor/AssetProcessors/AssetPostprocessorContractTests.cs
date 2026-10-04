@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     {
         private const string DeferralCallExpression = "AssetPostprocessorDeferral.Schedule(";
 
-        private const string FlushCallExpression = "AssetPostprocessorDeferral.FlushForTesting(";
+        private const string FlushCallExpression = "AssetPostprocessorDeferralTestAccess.Flush(";
 
         private static readonly string[] EditorAssemblyNames =
         {
@@ -189,7 +189,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// flush-equivalents in <see cref="FlushEquivalentExpressions"/> must
         /// themselves actually flush. If a future author refactors one of these
         /// helpers so its body no longer reaches
-        /// <c>AssetPostprocessorDeferral.FlushForTesting()</c> (directly or via
+        /// <c>AssetPostprocessorDeferralTestAccess.Flush()</c> (directly or via
         /// another audited helper), the whole teardown-flush contract silently
         /// degrades to a no-op for every caller of that helper.
         ///
@@ -198,7 +198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// <list type="bullet">
         /// <item><description><b>Terminal helpers</b>
         /// (<c>FlushAndClearAll</c>, <c>AssertCleanAndClearAll</c>) must
-        /// contain a DIRECT <c>FlushForTesting()</c> call — they may not
+        /// contain a DIRECT <c>Flush()</c> call — they may not
         /// delegate. If these are mutated to delegate elsewhere, the contract
         /// root is lost.</description></item>
         /// <item><description><b>Delegating helpers</b>
@@ -1222,7 +1222,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// <c>FlushEquivalentExpressions</c>):
         /// <list type="bullet">
         /// <item><description>A direct
-        /// <c>AssetPostprocessorDeferral.FlushForTesting()</c> call.</description></item>
+        /// <c>AssetPostprocessorDeferralTestAccess.Flush()</c> call.</description></item>
         /// <item><description>A call to one of the centralized helpers known to
         /// flush internally before clearing:
         /// <c>AssetPostprocessorTestHandlers.FlushAndClearAll</c>,
@@ -1331,7 +1331,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// that performs an asset mutation (CreateAsset, DeleteAsset, Refresh,
         /// ImportAsset, CreateFolder, SaveAndRefreshIfNotBatching,
         /// RefreshIfNotBatching) must end with a DIRECT
-        /// <c>AssetPostprocessorDeferral.FlushForTesting()</c> call so drains
+        /// <c>AssetPostprocessorDeferralTestAccess.Flush()</c> call so drains
         /// scheduled by those mutations do not leak into the next fixture.
         /// Chaining to <c>base.&lt;method&gt;(</c> is NOT sufficient — the base
         /// may or may not flush, and the indirection produces false negatives

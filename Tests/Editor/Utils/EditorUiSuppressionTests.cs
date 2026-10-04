@@ -37,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             base.TearDown();
             // Loop protection would otherwise trip as cleanup deletes several assets.
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             CleanupTrackedFoldersAndAssets();
         }
 

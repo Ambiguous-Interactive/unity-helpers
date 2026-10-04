@@ -263,7 +263,7 @@ Notes:
 
 - Access via `T.Instance` (lazy‑loads from `Resources/` using either a custom path or the type name; warns if multiple assets found and chooses the first by name).
 - `HasInstance` indicates whether the lazy value exists and is not null.
-- Optional `[ScriptableSingletonPath("Sub/Folder")]` to control the `Resources` subfolder.
+- Optional `[ScriptableSingletonPath("Sub/Folder")]` to control the `Resources` subfolder. Blank subfolders, including whitespace wrapped in slashes, fall back to the type name in the Resources root. Spaces inside a nonblank folder name are preserved.
 - Editor utility auto‑creates and relocates assets: see the “ScriptableObject Singleton Creator” in the Editor Tools Guide.
 
 Example: Settings asset
@@ -309,7 +309,13 @@ not apply to this cache-only reset.
 Asset management tips:
 
 - Place the asset under `Assets/Resources/` (or under the path from `[ScriptableSingletonPath]`).
-- The Editor’s “ScriptableObject Singleton Creator” runs on load to create missing assets and move misplaced ones. It also supports a test‑assembly toggle used by our test suite.
+- The Editor’s “ScriptableObject Singleton Creator” runs on load to create missing assets and move misplaced ones. Automatic creation respects editor suppression, asset-import workers, and compilation or import activity.
+
+An unexpected error releases the creation guard so a later attempt can run. The active asset batch
+still disposes before the guard releases. Created or moved assets remain in place after a failure.
+When an asset body is missing but its GUID remains, stale-artifact cleanup requests a synchronous
+import before replacement creation. Creation and synchronous import run with batching temporarily
+paused before the created asset is checked; the surrounding batch resumes afterward.
 
 Lookup order diagram:
 
@@ -581,8 +587,11 @@ public sealed class CustomSingletonTests
     [SetUp]
     public void SetUp()
     {
-        // Disable auto-creation, destroy any existing instance, then re-enable
-        _scope = UnityMainThreadDispatcher.CreateTestScope(destroyImmediate: true);
+        // Enable scoped auto-creation and clean up instances on entry and exit
+        _scope = UnityMainThreadDispatcher.AutoCreationScope.Enabled(
+            destroyExistingInstanceOnEnter: true,
+            destroyInstancesOnDispose: true,
+            destroyImmediate: true);
     }
 
     [TearDown]
@@ -671,7 +680,7 @@ public void SettingsWithCustomValuesWork()
 
 1. **Inherit from `CommonTestBase`**: This handles most singleton cleanup automatically, including dispatcher scope management.
 
-2. **Use `CreateTestScope` for dispatcher**: The `UnityMainThreadDispatcher.CreateTestScope()` method packages the common test setup pattern: disable auto-creation → destroy existing → re-enable auto-creation.
+2. **Use `AutoCreationScope` for dispatcher**: Configure real scoped auto-creation and instance cleanup with `Enabled` or `Disabled`; keep fixture helpers in the test assembly.
 
 3. **Prefer `destroyImmediate: true` in EditMode**: EditMode tests should use `DestroyImmediate` to ensure synchronous cleanup without Unity's delayed destruction.
 

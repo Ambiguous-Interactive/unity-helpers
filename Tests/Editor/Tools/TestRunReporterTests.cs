@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            TestRunReporter.ClearRunSessionForTests();
+            TestRunReporterTestAccess.ClearRunSession();
             _hadSavedContent = false;
             _savedContent = string.Empty;
             if (!TestRunSummaryFile.TryGetSummaryPath(TestMode.PlayMode, out _playModePath))
@@ -45,7 +45,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [TearDown]
         public override void TearDown()
         {
-            TestRunReporter.ClearRunSessionForTests();
+            TestRunReporterTestAccess.ClearRunSession();
             if (!string.IsNullOrEmpty(_playModePath))
             {
                 if (_hadSavedContent)

@@ -25,11 +25,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
     {
         private static void ClearWButtonCaches()
         {
-            WButtonGUI.ClearGroupDataForTesting();
-            WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPriorityWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPlacementWarningsForTesting();
-            WButtonGUI.ClearConflictWarningContentCacheForTesting();
+            WButtonGUITestAccess.ClearGroupData();
+            WButtonGUITestAccess.ClearConflictingDrawOrderWarnings();
+            WButtonGUITestAccess.ClearConflictingGroupPriorityWarnings();
+            WButtonGUITestAccess.ClearConflictingGroupPlacementWarnings();
+            WButtonGUITestAccess.ClearConflictWarningContentCache();
             WButtonGUI.ClearContextCache();
         }
 
@@ -239,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> sharedGroupKeys = groupCounts
                 .Keys.Where(k =>
                     string.Equals(k._groupName, "SharedGroup", System.StringComparison.Ordinal)
@@ -702,7 +702,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             int totalButtons = groupCounts.Values.Sum();
 
             Assert.That(totalButtons, Is.GreaterThan(0), "Should have buttons rendered");

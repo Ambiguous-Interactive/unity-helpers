@@ -20,7 +20,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// scalar rules rather than always carrying both halves. <c>{"a": 0}</c> encodes as
     /// <c>0A 03 0A 01 61</c> -- tag, length 3, key only -- because the value equals its default and
     /// is omitted exactly as a member would be. An empty-string key is still written (<c>0A 00</c>),
-    /// only null is absent, and a null value is dropped the same way. An empty dictionary writes
+    /// only null is absent. Enum keys retain zero while numeric keys omit it. A null value is dropped
+    /// the same way. An empty dictionary writes
     /// nothing at all, so it reads back as whatever the constructor left behind.
     /// </para>
     /// <para>
@@ -88,6 +89,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly bool _overwrite;
         private readonly bool _mapIsValueType;
         private readonly bool _keyIsString;
+        private readonly bool _keyIsEnum;
         private readonly bool _valueIsString;
 
         private MapMember(
@@ -104,6 +106,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             bool overwrite,
             bool mapIsValueType,
             bool keyIsString,
+            bool keyIsEnum,
             bool valueIsString
         )
             : base(name, tag)
@@ -119,6 +122,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _overwrite = overwrite;
             _mapIsValueType = mapIsValueType;
             _keyIsString = keyIsString;
+            _keyIsEnum = keyIsEnum;
             _valueIsString = valueIsString;
         }
 
@@ -241,6 +245,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 overwriteList,
                 named.IsValueType,
                 keyIsString,
+                keyType.TypeKind == TypeKind.Enum,
                 valueType.SpecialType == SpecialType.System_String
             );
         }
@@ -355,30 +360,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 Close(writer);
             }
-        }
-
-        private static string MapPresence(Shape shape, string access, bool isKey)
-        {
-            /*
-             * The shipped v3 oracle writes fixed-width zero keys but omits zero values; both forms remain
-             * readable across majors.
-             */
-            return
-                isKey
-                && (
-                    string.Equals(
-                        shape.WireType,
-                        Proto + ".WProtoWireType.Fixed32",
-                        System.StringComparison.Ordinal
-                    )
-                    || string.Equals(
-                        shape.WireType,
-                        Proto + ".WProtoWireType.Fixed64",
-                        System.StringComparison.Ordinal
-                    )
-                )
-                ? "true"
-                : Shape.Fill(shape.PresenceTest, access);
         }
 
         /// <inheritdoc />
@@ -652,6 +633,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             Close(writer);
             writer.Blank();
+        }
+
+        private string MapPresence(Shape shape, string access, bool isKey)
+        {
+            // protobuf-net 3.2.56 retains default enum keys but omits default numeric keys.
+            return isKey && _keyIsEnum ? "true" : Shape.Fill(shape.PresenceTest, access);
         }
 
         private void EmitHalfWrite(Writer writer, Shape shape, string access, int tag, bool isKey)

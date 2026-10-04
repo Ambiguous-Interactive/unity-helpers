@@ -26,19 +26,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         /// needs the bound's worth of distinct keys touched inside one tween to reach, because the
         /// least recently used entry is by definition not the foldout being drawn.
         /// </remarks>
-        private const int MaxFoldoutAnimations = 256;
+        internal const int MaxFoldoutAnimations = 256;
 
-        /// <summary>
-        /// The number of foldout animations currently retained, for testing.
-        /// </summary>
-        internal static int CachedAnimationCount => FoldoutAnimations.Count;
-
-        /// <summary>
-        /// The bound this cache evicts at, for testing.
-        /// </summary>
-        internal static int MaxCachedAnimations => MaxFoldoutAnimations;
-
-        private static readonly Cache<int, AnimBool> FoldoutAnimations = CacheBuilder<int, AnimBool>
+        internal static readonly Cache<int, AnimBool> FoldoutAnimations = CacheBuilder<
+            int,
+            AnimBool
+        >
             .NewBuilder()
             .MaximumSize(MaxFoldoutAnimations)
             .InitialCapacity(16)
@@ -98,15 +91,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 
             AnimBool anim = GetOrCreateAnim(definition, expanded, targetInstanceId);
             return anim.faded;
-        }
-
-        /// <summary>
-        /// Clears all cached animation states.
-        /// Useful for testing and when settings change.
-        /// </summary>
-        internal static void ClearCache()
-        {
-            FoldoutAnimations.Clear();
         }
 
         private static void Unsubscribe(AnimBool anim)

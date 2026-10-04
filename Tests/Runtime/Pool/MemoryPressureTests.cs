@@ -1187,6 +1187,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.IsEmpty(exceptions, "Concurrent property reads and writes should not throw");
         }
 
+        [TestCase(12f, 0f, MemoryPressureLevel.Medium)]
+        [TestCase(0f, 2000f, MemoryPressureLevel.Medium)]
+        [TestCase(12f, 2000f, MemoryPressureLevel.High)]
+        [TestCase(4f, 0f, MemoryPressureLevel.Low)]
+        [TestCase(0f, 1000f, MemoryPressureLevel.Low)]
+        [TestCase(float.NaN, float.NaN, MemoryPressureLevel.None)]
+        public void PressureScoringUsesActualRateThresholds(
+            float gcRate,
+            float growthRate,
+            MemoryPressureLevel expected
+        )
+        {
+            Assert.AreEqual(
+                expected,
+                MemoryPressureMonitor.CalculatePressureFromMetrics(
+                    0f,
+                    gcRate,
+                    growthRate,
+                    gcRateThreshold: 4f,
+                    growthRateThreshold: 1000f
+                )
+            );
+        }
+
         private float TestTimeProvider()
         {
             return _currentTime;

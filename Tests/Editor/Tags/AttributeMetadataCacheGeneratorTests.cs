@@ -36,7 +36,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         private bool _assetExistedBefore;
         private bool _assetBackedUp;
         private bool _setUpComplete;
-        private bool _suppressionCaptured;
         private bool _cacheFolderExistedBefore;
         private bool _cacheFolderRemovedForTest;
         private bool _cacheParentFolderExistedBefore;
@@ -46,7 +45,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         private byte[] _assetMetaBackup;
         private byte[] _cacheFolderMetaBackup;
         private string _setUpTestId;
-        private bool _previousAllowAssetCreationDuringSuppression;
 
         private static void ImportAssetIfExists(string assetPath)
         {
@@ -74,18 +72,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
         private static IEnumerable<TestCaseData> SuppressionFlagTestCases()
         {
-            yield return new TestCaseData(true, false)
+            yield return new TestCaseData(true)
                 .Returns(null)
-                .SetName("Suppression.Enabled.AllowFalse");
-            yield return new TestCaseData(true, true)
+                .SetName("Suppression.ExplicitlyEnabled");
+            yield return new TestCaseData(false)
                 .Returns(null)
-                .SetName("Suppression.Enabled.AllowTrue");
-            yield return new TestCaseData(false, false)
-                .Returns(null)
-                .SetName("Suppression.Disabled.AllowFalse");
-            yield return new TestCaseData(false, true)
-                .Returns(null)
-                .SetName("Suppression.Disabled.AllowTrue");
+                .SetName("Suppression.AutomaticPolicy");
         }
 
         private static bool FileExistsOnDisk(string assetPath)
@@ -147,14 +139,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             _setUpTestId = TestContext.CurrentContext.Test.ID;
             _setUpComplete = false;
-            _suppressionCaptured = false;
             _assetBackedUp = false;
             _assetBackup = null;
             _assetMetaBackup = null;
             _cacheFolderMetaBackup = null;
             _cacheFolderRemovedForTest = false;
 
-            ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
+            ScriptableObjectSingletonMetadataUtilityTestAccess.ResetAssetEditingDepth();
             ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
 
             _assetExistedBefore =
@@ -183,11 +174,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 _assetBackedUp = true;
             }
 
-            _previousAllowAssetCreationDuringSuppression =
-                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression;
-            _suppressionCaptured = true;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
-
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
             _setUpComplete = true;
@@ -211,11 +197,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 yield break;
             }
 
-            if (_suppressionCaptured)
-            {
-                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression =
-                    _previousAllowAssetCreationDuringSuppression;
-            }
             ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
 
             if (!_setUpComplete)
@@ -269,14 +250,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [UnityTest]
-        public IEnumerator GenerateCacheCreatesAssetWhenMissing()
+        public IEnumerator GenerateCacheContentsCreatesAssetWhenMissing()
         {
             bool folderExistedBefore = AssetDatabase.IsValidFolder(CacheFolder);
             TestContext.WriteLine(
                 $"Initial state: AssetExistedBefore={_assetExistedBefore}, "
                     + $"FolderExistedBefore={folderExistedBefore}, "
                     + $"EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
 
             if (_assetExistedBefore)
@@ -298,7 +279,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     + $"Path: '{CacheAssetPath}', FolderExists: {AssetDatabase.IsValidFolder(CacheFolder)}"
             );
 
-            AttributeMetadataCacheGenerator.GenerateCache();
+            AttributeMetadataCacheGenerator.GenerateCacheContents();
             yield return null;
 
             AssetDatabase.SaveAssets();
@@ -321,19 +302,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 $"GenerateCache should create the cache asset when missing. "
                     + $"Path: '{CacheAssetPath}', FolderExists={folderExists}, "
                     + $"FileExistsOnDisk={fileExistsOnDisk}, EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
         }
 
         [UnityTest]
-        public IEnumerator GenerateCacheCreatesFolderHierarchyWhenMissing()
+        public IEnumerator GenerateCacheContentsCreatesFolderHierarchyWhenMissing()
         {
             bool folderExistedBefore = AssetDatabase.IsValidFolder(CacheFolder);
             TestContext.WriteLine(
                 $"Initial state: AssetExistedBefore={_assetExistedBefore}, "
                     + $"FolderExistedBefore={folderExistedBefore}, "
                     + $"EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
 
             if (_assetExistedBefore)
@@ -378,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             AssetDatabase.SaveAssets();
             yield return null;
 
-            AttributeMetadataCacheGenerator.GenerateCache();
+            AttributeMetadataCacheGenerator.GenerateCacheContents();
             yield return null;
 
             AssetDatabase.SaveAssets();
@@ -400,7 +381,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 AssetDatabase.IsValidFolder(CacheFolder),
                 $"GenerateCache should create the folder hierarchy. "
                     + $"FileExistsOnDisk={fileExistsOnDisk}, EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
 
             Assert.IsTrue(
@@ -408,22 +389,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 $"GenerateCache should create the cache asset. "
                     + $"Path: '{CacheAssetPath}', FolderExists: {AssetDatabase.IsValidFolder(CacheFolder)}, "
                     + $"FileExistsOnDisk={fileExistsOnDisk}, EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
         }
 
         [UnityTest]
-        public IEnumerator GenerateCacheDoesNotThrowWhenAssetAlreadyExists()
+        public IEnumerator GenerateCacheContentsDoesNotThrowWhenAssetAlreadyExists()
         {
             bool folderExistedBefore = AssetDatabase.IsValidFolder(CacheFolder);
             TestContext.WriteLine(
                 $"Initial state: AssetExistedBefore={_assetExistedBefore}, "
                     + $"FolderExistedBefore={folderExistedBefore}, "
                     + $"EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
 
-            AttributeMetadataCacheGenerator.GenerateCache();
+            AttributeMetadataCacheGenerator.GenerateCacheContents();
             yield return null;
 
             AssetDatabase.SaveAssets();
@@ -446,11 +427,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 $"First GenerateCache should create the asset. "
                     + $"FolderExists={AssetDatabase.IsValidFolder(CacheFolder)}, "
                     + $"FileExistsOnDisk={firstFileExistsOnDisk}, EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
 
             Assert.DoesNotThrow(
-                () => AttributeMetadataCacheGenerator.GenerateCache(),
+                () => AttributeMetadataCacheGenerator.GenerateCacheContents(),
                 "GenerateCache should not throw when cache already exists"
             );
             yield return null;
@@ -476,18 +457,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [UnityTest]
-        public IEnumerator GenerateCacheIsIdempotent()
+        public IEnumerator GenerateCacheContentsIsIdempotent()
         {
             TestContext.WriteLine(
                 $"Initial state: AssetExistedBefore={_assetExistedBefore}, "
                     + $"FolderExists={AssetDatabase.IsValidFolder(CacheFolder)}, "
                     + $"EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
 
             for (int i = 0; i < 3; ++i)
             {
-                AttributeMetadataCacheGenerator.GenerateCache();
+                AttributeMetadataCacheGenerator.GenerateCacheContents();
                 yield return null;
 
                 AssetDatabase.SaveAssets();
@@ -509,13 +490,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     $"Cache should exist after iteration {i + 1}. "
                         + $"Path: '{CacheAssetPath}', FolderExists={folderExists}, "
                         + $"FileExistsOnDisk={fileExistsOnDisk}, EditorUiSuppress={EditorUi.Suppress}, "
-                        + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                        + "OperationPhase=GenerateCacheContents"
                 );
             }
         }
 
         [UnityTest]
-        public IEnumerator GenerateCachePreservesWallstopStudiosFolder()
+        public IEnumerator GenerateCacheContentsPreservesWallstopStudiosFolder()
         {
             bool folderExistedBefore = AssetDatabase.IsValidFolder(CacheFolder);
             bool cacheExistedBefore =
@@ -524,10 +505,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 $"Initial state: AssetExistedBefore={_assetExistedBefore}, "
                     + $"CacheExistedBefore={cacheExistedBefore}, FolderExistedBefore={folderExistedBefore}, "
                     + $"EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
 
-            AttributeMetadataCacheGenerator.GenerateCache();
+            AttributeMetadataCacheGenerator.GenerateCacheContents();
             yield return null;
 
             AssetDatabase.SaveAssets();
@@ -548,12 +529,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 AssetDatabase.IsValidFolder(CacheFolder),
                 $"Wallstop Studios folder should be preserved after cache generation. "
                     + $"FileExistsOnDisk={fileExistsOnDisk}, EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
         }
 
         [UnityTest]
-        public IEnumerator GenerateCacheCreatesAtCorrectPathWhenStaleInstanceExists()
+        public IEnumerator GenerateCacheContentsCreatesAtCorrectPathWhenStaleInstanceExists()
         {
             const string decoyPath = "Assets/Temp/DecoyCache.asset";
 
@@ -562,7 +543,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 $"Initial state: AssetExistedBefore={_assetExistedBefore}, "
                     + $"FolderExistedBefore={folderExistedBefore}, "
                     + $"EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
 
             if (!AssetDatabase.IsValidFolder("Assets/Temp"))
@@ -604,7 +585,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
             yield return null;
 
-            AttributeMetadataCacheGenerator.GenerateCache();
+            AttributeMetadataCacheGenerator.GenerateCacheContents();
             yield return null;
 
             AssetDatabase.SaveAssets();
@@ -628,7 +609,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     + $"ExpectedPath: '{CacheAssetPath}', DecoyPath: '{decoyPath}', "
                     + $"FolderExists={folderExists}, FileExistsOnDisk={fileExistsOnDisk}, "
                     + $"EditorUiSuppress={EditorUi.Suppress}, "
-                    + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
+                    + "OperationPhase=GenerateCacheContents"
             );
 
             string cachePath = AssetDatabase.GetAssetPath(cache);
@@ -677,107 +658,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
         [UnityTest]
         [TestCaseSource(nameof(SuppressionFlagTestCases))]
-        public IEnumerator GenerateCacheRespectsSuppressionFlags(
-            bool suppressEditorUi,
-            bool allowDuringSuppression
-        )
+        public IEnumerator GenerateCacheRespectsEffectiveSuppression(bool suppressEditorUi)
         {
-            TestContext.WriteLine(
-                $"Test parameters: SuppressEditorUi={suppressEditorUi}, "
-                    + $"AllowDuringSuppression={allowDuringSuppression}"
-            );
-
-            bool cacheExistedAtStart =
-                AssetDatabase.LoadAssetAtPath<AttributeMetadataCache>(CacheAssetPath) != null;
-            bool folderExistedAtStart = AssetDatabase.IsValidFolder(CacheFolder);
-            TestContext.WriteLine(
-                $"Initial state: CacheExistedAtStart={cacheExistedAtStart}, "
-                    + $"FolderExistedAtStart={folderExistedAtStart}, "
-                    + $"AssetExistedBefore={_assetExistedBefore}"
-            );
-
             if (AssetDatabase.LoadAssetAtPath<AttributeMetadataCache>(CacheAssetPath) != null)
             {
                 AssetDatabase.DeleteAsset(CacheAssetPath);
                 AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
                 yield return null;
             }
-
-            AttributeMetadataCache cacheCheck =
-                AssetDatabase.LoadAssetAtPath<AttributeMetadataCache>(CacheAssetPath);
-            bool folderExistsBeforeTest = AssetDatabase.IsValidFolder(CacheFolder);
-            TestContext.WriteLine(
-                $"After cleanup: CacheExists={cacheCheck != null}, FolderExists={folderExistsBeforeTest}"
-            );
-
             Assert.IsTrue(
-                cacheCheck == null,
-                $"Setup: Cache asset should not exist before test. Path: '{CacheAssetPath}', "
-                    + $"Exists: {cacheCheck != null}, AssetExistedBefore: {_assetExistedBefore}, "
-                    + $"FolderExists: {folderExistsBeforeTest}"
+                AssetDatabase.LoadAssetAtPath<AttributeMetadataCache>(CacheAssetPath) == null
             );
-
             bool originalSuppress = EditorUi.Suppress;
-            bool originalAllow =
-                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression;
-            TestContext.WriteLine(
-                $"Original flag values: EditorUi.Suppress={originalSuppress}, "
-                    + $"AllowAssetCreationDuringSuppression={originalAllow}"
-            );
-
             try
             {
                 EditorUi.Suppress = suppressEditorUi;
-                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression =
-                    allowDuringSuppression;
-                ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
-
-                // Automatic UI suppression also depends on batch mode, CI, and the test runner.
                 bool effectiveSuppress = EditorUi.Suppress;
-                bool expectCacheCreated = !effectiveSuppress || allowDuringSuppression;
-
-                TestContext.WriteLine(
-                    $"Flags set for test: EditorUi.Suppress={EditorUi.Suppress}, "
-                        + $"EffectiveSuppress={effectiveSuppress}, "
-                        + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}, "
-                        + $"ExpectCacheCreated={expectCacheCreated}"
-                );
-
+                ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
                 AttributeMetadataCacheGenerator.GenerateCache();
                 yield return null;
-
                 AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
                 ImportAssetIfExists(CacheAssetPath);
                 yield return null;
-
-                bool folderExistsAfterGenerate = AssetDatabase.IsValidFolder(CacheFolder);
-                AttributeMetadataCache cache =
-                    AssetDatabase.LoadAssetAtPath<AttributeMetadataCache>(CacheAssetPath);
-                bool cacheExists = cache != null;
-                TestContext.WriteLine(
-                    $"After GenerateCache: CacheExists={cacheExists}, "
-                        + $"FolderExists={folderExistsAfterGenerate}, "
-                        + $"ExpectedCacheCreated={expectCacheCreated}"
-                );
-
+                bool cacheExists =
+                    AssetDatabase.LoadAssetAtPath<AttributeMetadataCache>(CacheAssetPath) != null;
                 Assert.AreEqual(
-                    expectCacheCreated,
+                    !effectiveSuppress,
                     cacheExists,
-                    $"GenerateCache with Suppress={suppressEditorUi}, AllowDuringSuppression={allowDuringSuppression} "
-                        + $"should {(expectCacheCreated ? "" : "NOT ")}create cache. "
-                        + $"Path: '{CacheAssetPath}', FolderExists: {folderExistsAfterGenerate}"
+                    $"Automatic generation must respect actual suppression: requested={suppressEditorUi}, effective={effectiveSuppress}."
                 );
             }
             finally
             {
                 EditorUi.Suppress = originalSuppress;
-                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression =
-                    originalAllow;
-                TestContext.WriteLine(
-                    $"Flags restored: EditorUi.Suppress={EditorUi.Suppress}, "
-                        + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
-                );
             }
         }
     }

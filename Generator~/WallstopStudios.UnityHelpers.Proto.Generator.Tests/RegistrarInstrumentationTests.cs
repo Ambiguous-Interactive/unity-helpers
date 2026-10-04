@@ -6,23 +6,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System;
     using System.Collections.Generic;
     using System.Collections.Immutable;
-    using System.IO;
     using System.Linq;
-    using System.Reflection;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
-    using Microsoft.CodeAnalysis.Emit;
     using NUnit.Framework;
 
     /// <summary>
-    /// Pins the generated registrar's compile-time name and test-only first-invocation latch.
+    /// Pins generated registration without test-only instrumentation.
     /// </summary>
     [TestFixture]
     public sealed class RegistrarInstrumentationTests
     {
-        private const string RegistrarName =
-            "WallstopStudios.UnityHelpers.Generated.WProtoGeneratedRegistrar";
-
         private const string ContractSource =
             "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; "
             + "namespace Consumer { "
@@ -91,78 +85,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        private static Assembly EmitAndLoad(Compilation generated)
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RegistrarOmitsTestOnlyTimingSurface(bool includeTests)
         {
-            using MemoryStream assemblyBytes = new MemoryStream();
-            EmitResult emitted = generated.Emit(assemblyBytes);
-            Assert.IsTrue(
-                emitted.Success,
-                string.Join(
-                    Environment.NewLine,
-                    emitted.Diagnostics.Select(diagnostic => diagnostic.ToString())
-                )
-            );
-            return Assembly.Load(assemblyBytes.ToArray());
-        }
-
-        [Test]
-        public void ProductionRegistrarOmitsTestOnlyTimingSurface()
-        {
-            Compilation generated = Generate(includeTests: false, out string registrarSource);
-
-            StringAssert.Contains("#if UNITY_INCLUDE_TESTS", registrarSource);
+            Compilation generated = Generate(includeTests, out string registrarSource);
             AssertGeneratedCompilationSucceeded(generated);
-
-            // REFLECTION REQUIRED: the registrar exists only in the synthetic assembly emitted by this test.
-            Assembly assembly = EmitAndLoad(generated);
-            Type registrar = assembly.GetType(RegistrarName, throwOnError: true);
-            const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;
-            Assert.IsTrue(
-                registrar.GetProperty("FirstRegistrationElapsedTimestampTicks", StaticInternal)
-                    == null
-            );
-            Assert.IsTrue(
-                registrar.GetProperty("HasRecordedFirstRegistration", StaticInternal) == null
-            );
-        }
-
-        [Test]
-        public void TestRegistrarRecordsOnlyItsFirstInvocation()
-        {
-            Compilation generated = Generate(includeTests: true, out string registrarSource);
-
             StringAssert.Contains(
                 "internal static class WProtoGeneratedRegistrar",
                 registrarSource
             );
-            StringAssert.Contains("FirstRegistrationElapsedTimestampTicks", registrarSource);
-            StringAssert.Contains("HasRecordedFirstRegistration", registrarSource);
-
-            // REFLECTION REQUIRED: the registrar exists only in the synthetic assembly emitted by this test.
-            Assembly assembly = EmitAndLoad(generated);
-            Type registrar = assembly.GetType(RegistrarName, throwOnError: true);
-            const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;
-            MethodInfo register = registrar.GetMethod("Register", StaticInternal);
-            PropertyInfo hasRecorded = registrar.GetProperty(
-                "HasRecordedFirstRegistration",
-                StaticInternal
-            );
-            PropertyInfo elapsedTicks = registrar.GetProperty(
-                "FirstRegistrationElapsedTimestampTicks",
-                StaticInternal
-            );
-
-            Assert.IsTrue((bool)hasRecorded.GetValue(null));
-            long firstElapsed = (long)elapsedTicks.GetValue(null);
-            Assert.GreaterOrEqual(firstElapsed, 0);
-
-            register.Invoke(null, null);
-            long afterSecondInvocation = (long)elapsedTicks.GetValue(null);
-            register.Invoke(null, null);
-            long afterThirdInvocation = (long)elapsedTicks.GetValue(null);
-
-            Assert.AreEqual(firstElapsed, afterSecondInvocation);
-            Assert.AreEqual(firstElapsed, afterThirdInvocation);
+            StringAssert.DoesNotContain("UNITY_INCLUDE_TESTS", registrarSource);
+            StringAssert.DoesNotContain("FirstRegistrationElapsedTimestampTicks", registrarSource);
+            StringAssert.DoesNotContain("HasRecordedFirstRegistration", registrarSource);
+            StringAssert.DoesNotContain("Stopwatch", registrarSource);
         }
     }
 }

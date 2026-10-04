@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2025-2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
@@ -23,7 +23,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     public sealed class SpatialTree2DPerformanceTests
     {
         private const float PointBoundsSize = 0.001f;
-        private const int BenchmarkTimeoutMilliseconds = 180_000;
+
+        // Query timers require 236 seconds before construction, warmup, validation, and reporting.
+        private const int BenchmarkTimeoutMilliseconds = 600_000;
         private const int WarmupIterations = 3;
 
         private static (string Label, float Radius)[] BuildRangeBenchmarks(DatasetSpec dataset)

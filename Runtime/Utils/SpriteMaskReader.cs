@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 #if UNITY_EDITOR
                 string assetPath = AssetDatabase.GetAssetPath(sprite);
                 if (
-                    !string.IsNullOrEmpty(assetPath)
+                    !string.IsNullOrWhiteSpace(assetPath)
                     && string.Equals(
                         Path.GetExtension(assetPath),
                         ".png",

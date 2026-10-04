@@ -56,6 +56,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool IsRequired { get; set; }
 
+        /// <summary>Indicates whether a repeated scalar member is written as a packed run.</summary>
+        /// <remarks>
+        /// Defaults to <c>true</c>. Set to <c>false</c> to write one field key per element,
+        /// matching protobuf-net's default repeated encoding. Packable elements remain readable in
+        /// either form regardless of this setting. Non-packable elements, including strings, messages and chars, remain
+        /// unpacked; this setting has no effect on scalar members, maps or nested wrapper contents.
+        /// </remarks>
+        public bool IsPacked { get; set; } = true;
+
         /// <summary>
         /// Selects the encoding a signed integer member uses.
         /// </summary>

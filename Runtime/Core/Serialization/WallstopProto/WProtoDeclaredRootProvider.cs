@@ -91,17 +91,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
-        /// Clears the adapter registered for <typeparamref name="T"/>.
-        /// </summary>
-        /// <typeparam name="T">The declared type.</typeparam>
-        /// <remarks>Exists for tests; a declaration is otherwise registered once and kept.</remarks>
-        public static void Unregister<T>()
-            where T : class
-        {
-            Formatters<T>.Value = null;
-        }
-
-        /// <summary>
         /// Records that <paramref name="root"/> owns <paramref name="declared"/> for this program.
         /// </summary>
         /// <param name="declared">The declared type.</param>
@@ -180,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return false;
         }
 
-        private static class Formatters<T>
+        internal static class Formatters<T>
         {
             internal static IWProtoFormatter<T> Value;
         }

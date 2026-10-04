@@ -39,8 +39,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// process can never use. It would also be wrong: an assembly loaded afterwards can make a
         /// name resolvable, and a cached failure would outlive it.
         /// </remarks>
-        internal static int ResolvedTypeCacheCountForTesting => TypeResolutionCache.Count;
-
         private static readonly Func<AssemblyName, Assembly> PlaceholderAssemblyResolver =
             ResolvePlaceholderAssembly;
 

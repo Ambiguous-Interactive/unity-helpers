@@ -194,6 +194,11 @@ const CHECKS = [
     run: "npm run test:lint-typecheck-asmdef-references"
   },
   {
+    id: "lint-production-test-hooks",
+    name: "Production test-hook policy controls",
+    run: "npm run test:lint-production-test-hooks"
+  },
+  {
     id: "lint-xml-doc-summaries",
     name: "XML doc summary linter self-test",
     run: "npm run test:lint-xml-doc-summaries"

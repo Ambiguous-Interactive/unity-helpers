@@ -26,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             TestPoolItem.ResetIdCounter();
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
             GlobalPoolRegistry.ResetBudgetSettings();
             PoolPurgeSettings.ResetToDefaults();
             _wasMemoryPressureEnabled = MemoryPressureMonitor.Enabled;
@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [TearDown]
         public void TearDown()
         {
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
             GlobalPoolRegistry.ResetBudgetSettings();
             PoolPurgeSettings.ResetToDefaults();
             MemoryPressureMonitor.Reset();
@@ -368,8 +368,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Triggers = PurgeTrigger.Explicit,
                 OnPurge = (_, _) =>
                 {
-                    purgeCallbackHeldRegistryLock =
-                        GlobalPoolRegistry.IsRegistryLockHeldByCurrentThread();
+                    purgeCallbackHeldRegistryLock = System.Threading.Monitor.IsEntered(
+                        GlobalPoolRegistry.RegistryLock
+                    );
                 },
             };
 
@@ -378,8 +379,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 preWarmCount: 2,
                 onDisposal: _ =>
                 {
-                    disposalCallbackHeldRegistryLock =
-                        GlobalPoolRegistry.IsRegistryLockHeldByCurrentThread();
+                    disposalCallbackHeldRegistryLock = System.Threading.Monitor.IsEntered(
+                        GlobalPoolRegistry.RegistryLock
+                    );
                 },
                 options: options
             );
@@ -497,7 +499,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.AreEqual(2, GlobalPoolRegistry.RegisteredCount);
 
-            GlobalPoolRegistry.Clear();
+            PoolStateTestUtilities.ClearRegistry();
 
             Assert.AreEqual(0, GlobalPoolRegistry.RegisteredCount);
         }

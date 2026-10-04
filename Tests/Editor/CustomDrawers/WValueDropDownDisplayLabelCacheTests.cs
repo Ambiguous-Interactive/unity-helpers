@@ -31,30 +31,30 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [SetUp]
         public void SetUp()
         {
-            WValueDropDownDrawer.TestHooks.ClearCaches();
+            WValueDropDownDrawerTestAccess.ClearCaches();
         }
 
         [TearDown]
         public void TearDown()
         {
-            WValueDropDownDrawer.TestHooks.ClearCaches();
+            WValueDropDownDrawerTestAccess.ClearCaches();
         }
 
         [Test]
         public void TheDisplayLabelCacheStopsAtItsBound()
         {
-            int bound = WValueDropDownDrawer.TestHooks.MaxDisplayLabelsCacheCount;
+            int bound = WValueDropDownDrawerTestAccess.MaxDisplayLabelsCacheCount;
             Assert.Greater(bound, 0, "the bound must be positive for this to measure anything");
 
             for (int index = 0; index < bound * 2; ++index)
             {
-                _ = WValueDropDownDrawer.TestHooks.GetOrCreateDisplayLabels(
+                _ = WValueDropDownDrawerTestAccess.GetOrCreateDisplayLabels(
                     PropertyPath(index),
                     new object[] { index }
                 );
             }
 
-            Assert.AreEqual(bound, WValueDropDownDrawer.TestHooks.DisplayLabelsCacheCount);
+            Assert.AreEqual(bound, WValueDropDownDrawerTestAccess.DisplayLabelsCacheCount);
         }
 
         /// <summary>
@@ -66,16 +66,16 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void AnEvictedPathStillAnswersWithItsOwnLabels()
         {
             object[] options = { "alpha", "beta" };
-            string[] before = WValueDropDownDrawer.TestHooks.GetOrCreateDisplayLabels(
+            string[] before = WValueDropDownDrawerTestAccess.GetOrCreateDisplayLabels(
                 PropertyPath(-1),
                 options
             );
             Assert.IsNotEmpty(before, "the probe must have produced labels to compare against");
 
-            int bound = WValueDropDownDrawer.TestHooks.MaxDisplayLabelsCacheCount;
+            int bound = WValueDropDownDrawerTestAccess.MaxDisplayLabelsCacheCount;
             for (int index = 0; index < bound + 1; ++index)
             {
-                _ = WValueDropDownDrawer.TestHooks.GetOrCreateDisplayLabels(
+                _ = WValueDropDownDrawerTestAccess.GetOrCreateDisplayLabels(
                     PropertyPath(index),
                     new object[] { index }
                 );
@@ -83,11 +83,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.AreEqual(
                 bound,
-                WValueDropDownDrawer.TestHooks.DisplayLabelsCacheCount,
+                WValueDropDownDrawerTestAccess.DisplayLabelsCacheCount,
                 "the churn never reached the bound, so nothing was evicted"
             );
 
-            string[] after = WValueDropDownDrawer.TestHooks.GetOrCreateDisplayLabels(
+            string[] after = WValueDropDownDrawerTestAccess.GetOrCreateDisplayLabels(
                 PropertyPath(-1),
                 options
             );

@@ -69,9 +69,9 @@ namespace WallstopStudios.UnityHelpers.Tests
         private static void SaveAndRefreshFixtureAssets()
         {
             AssetDatabase.SaveAssets();
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
         }
 
         private static void EnsureFolderExists(string folderPath)
@@ -415,7 +415,7 @@ namespace WallstopStudios.UnityHelpers.Tests
             }
             _createdFolders.Clear();
             EditorUi.Suppress = _previousEditorUiSuppress;
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             yield return null;
         }
 

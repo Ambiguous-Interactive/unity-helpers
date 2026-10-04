@@ -45,8 +45,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 new[]
                 {
                     new ValidationTarget("guid", "Assets/Test.asset", typeof(ScriptableObject)),
-                },
-                _ => null
+                }
             );
             while (!run.Step(double.MaxValue)) { }
             return run;

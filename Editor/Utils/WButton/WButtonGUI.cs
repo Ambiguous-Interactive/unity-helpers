@@ -115,8 +115,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private const float ClearHistoryMinWidth = 96f;
         private const float ClearHistorySpacing = 6f;
 
-        private static readonly Dictionary<WButtonGroupKey, int> GroupCounts = new();
-        private static readonly Dictionary<WButtonGroupKey, string> GroupNames = new();
+        internal static readonly Dictionary<WButtonGroupKey, int> GroupCounts = new();
+        internal static readonly Dictionary<WButtonGroupKey, string> GroupNames = new();
+
+        /// <summary>
+        /// Warnings about groups with conflicting draw orders. Populated during grouping.
+        /// </summary>
+        internal static readonly Dictionary<
+            string,
+            DrawOrderConflictInfo
+        > ConflictingDrawOrderWarnings = new();
+
+        /// <summary>
+        /// Warnings about groups with conflicting group priorities. Populated during grouping.
+        /// </summary>
+        internal static readonly Dictionary<
+            string,
+            GroupPriorityConflictInfo
+        > ConflictingGroupPriorityWarnings = new();
+
+        /// <summary>
+        /// Warnings about groups with conflicting group placements. Populated during grouping.
+        /// </summary>
+        internal static readonly Dictionary<
+            string,
+            GroupPlacementConflictInfo
+        > ConflictingGroupPlacementWarnings = new();
+
+        internal static readonly Dictionary<string, string> ConflictWarningTextCache = new();
+
+        internal static readonly Dictionary<string, string> GroupPriorityWarningTextCache = new();
+
+        internal static readonly Dictionary<string, string> GroupPlacementWarningTextCache = new();
 
         private static readonly Cache<WButtonGroupKey, AnimBool> FoldoutAnimations = CacheBuilder<
             WButtonGroupKey,
@@ -128,6 +158,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             .OnEviction(static (_, anim, _) => Unsubscribe(anim))
             .TransferOwnershipOnRemoval()
             .Build();
+
         private static readonly Dictionary<WButtonGroupKey, GUIContent> GroupHeaderCache = new();
         private static readonly Dictionary<(string, int), string> GroupHeaderTextCache = new();
         private static readonly GUIContent ClearHistoryContent = new("Clear History");
@@ -149,34 +180,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
         private static readonly Dictionary<ContextCacheKey, WButtonMethodContext> ContextCache =
             new();
-
-        /// <summary>
-        /// Warnings about groups with conflicting draw orders. Populated during grouping.
-        /// </summary>
-        private static readonly Dictionary<
-            string,
-            DrawOrderConflictInfo
-        > ConflictingDrawOrderWarnings = new();
-
-        /// <summary>
-        /// Warnings about groups with conflicting group priorities. Populated during grouping.
-        /// </summary>
-        private static readonly Dictionary<
-            string,
-            GroupPriorityConflictInfo
-        > ConflictingGroupPriorityWarnings = new();
-
-        /// <summary>
-        /// Warnings about groups with conflicting group placements. Populated during grouping.
-        /// </summary>
-        private static readonly Dictionary<
-            string,
-            GroupPlacementConflictInfo
-        > ConflictingGroupPlacementWarnings = new();
-
-        private static readonly Dictionary<string, string> ConflictWarningTextCache = new();
-        private static readonly Dictionary<string, string> GroupPriorityWarningTextCache = new();
-        private static readonly Dictionary<string, string> GroupPlacementWarningTextCache = new();
 
         internal static bool DrawButtons(
             Editor editor,
@@ -288,192 +291,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
         }
 
-        internal static Dictionary<WButtonGroupKey, int> GetGroupCountsForTesting()
-        {
-            return GroupCounts;
-        }
-
-        internal static Dictionary<WButtonGroupKey, string> GetGroupNamesForTesting()
-        {
-            return GroupNames;
-        }
-
-        /// <summary>
-        /// For testing: sets group counts with simple int keys (legacy compatibility).
-        /// Creates group keys with the given draw order and empty group name.
-        /// </summary>
-        internal static void SetGroupCountsForTesting(Dictionary<int, int> counts)
-        {
-            GroupCounts.Clear();
-            foreach (KeyValuePair<int, int> entry in counts)
-            {
-                WButtonGroupKey key = new(
-                    WButtonAttribute.NoGroupPriority,
-                    entry.Key,
-                    null,
-                    0,
-                    WButtonGroupPlacement.UseGlobalSetting
-                );
-                GroupCounts[key] = entry.Value;
-            }
-        }
-
-        /// <summary>
-        /// For testing: sets group names with simple int keys (legacy compatibility).
-        /// Creates group keys with the given draw order and empty group name.
-        /// </summary>
-        internal static void SetGroupNamesForTesting(Dictionary<int, string> names)
-        {
-            GroupNames.Clear();
-            foreach (KeyValuePair<int, string> entry in names)
-            {
-                WButtonGroupKey key = new(
-                    WButtonAttribute.NoGroupPriority,
-                    entry.Key,
-                    null,
-                    0,
-                    WButtonGroupPlacement.UseGlobalSetting
-                );
-                GroupNames[key] = entry.Value;
-            }
-        }
-
-        /// <summary>
-        /// For testing: clears all group counts and names.
-        /// </summary>
-        internal static void ClearGroupDataForTesting()
-        {
-            GroupCounts.Clear();
-            GroupNames.Clear();
-        }
-
         internal static void ClearContextCache()
         {
             ContextCache.Clear();
-        }
-
-        /// <summary>
-        /// Gets the current conflicting draw order warnings. Used for testing and UI display.
-        /// </summary>
-        internal static IReadOnlyDictionary<
-            string,
-            DrawOrderConflictInfo
-        > GetConflictingDrawOrderWarnings()
-        {
-            return ConflictingDrawOrderWarnings;
-        }
-
-        /// <summary>
-        /// Gets the current conflicting group priority warnings. Used for testing and UI display.
-        /// </summary>
-        internal static IReadOnlyDictionary<
-            string,
-            GroupPriorityConflictInfo
-        > GetConflictingGroupPriorityWarnings()
-        {
-            return ConflictingGroupPriorityWarnings;
-        }
-
-        /// <summary>
-        /// Gets the current conflicting group placement warnings. Used for testing and UI display.
-        /// </summary>
-        internal static IReadOnlyDictionary<
-            string,
-            GroupPlacementConflictInfo
-        > GetConflictingGroupPlacementWarnings()
-        {
-            return ConflictingGroupPlacementWarnings;
-        }
-
-        /// <summary>
-        /// Clears conflicting draw order warnings. Used for testing.
-        /// </summary>
-        internal static void ClearConflictingDrawOrderWarningsForTesting()
-        {
-            ConflictingDrawOrderWarnings.Clear();
-        }
-
-        /// <summary>
-        /// Clears conflicting group priority warnings. Used for testing.
-        /// </summary>
-        internal static void ClearConflictingGroupPriorityWarningsForTesting()
-        {
-            ConflictingGroupPriorityWarnings.Clear();
-        }
-
-        /// <summary>
-        /// Clears conflicting group placement warnings. Used for testing.
-        /// </summary>
-        internal static void ClearConflictingGroupPlacementWarningsForTesting()
-        {
-            ConflictingGroupPlacementWarnings.Clear();
-        }
-
-        /// <summary>
-        /// Clears the conflict warning content cache. Used for testing.
-        /// </summary>
-        internal static void ClearConflictWarningContentCacheForTesting()
-        {
-            ConflictWarningTextCache.Clear();
-            GroupPriorityWarningTextCache.Clear();
-            GroupPlacementWarningTextCache.Clear();
-        }
-
-        /// <summary>
-        /// Gets cached group placement warning text by group name. Used for testing.
-        /// </summary>
-        internal static bool TryGetGroupPlacementWarningTextForTesting(
-            string groupName,
-            out string warningText
-        )
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                warningText = null;
-                return false;
-            }
-
-            return GroupPlacementWarningTextCache.TryGetValue(
-                "placement_" + groupName,
-                out warningText
-            );
-        }
-
-        /// <summary>
-        /// Gets cached group priority warning text by group name. Used for testing.
-        /// </summary>
-        internal static bool TryGetGroupPriorityWarningTextForTesting(
-            string groupName,
-            out string warningText
-        )
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                warningText = null;
-                return false;
-            }
-
-            return GroupPriorityWarningTextCache.TryGetValue(
-                "priority_" + groupName,
-                out warningText
-            );
-        }
-
-        /// <summary>
-        /// Gets cached draw order warning text by group name. Used for testing.
-        /// </summary>
-        internal static bool TryGetDrawOrderWarningTextForTesting(
-            string groupName,
-            out string warningText
-        )
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                warningText = null;
-                return false;
-            }
-
-            return ConflictWarningTextCache.TryGetValue(groupName, out warningText);
         }
 
         internal static GUIContent BuildGroupHeader(WButtonGroupKey groupKey)
@@ -532,21 +352,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 cachedWithOrder.tooltip = baseLabel.tooltip;
             }
             return cachedWithOrder;
-        }
-
-        /// <summary>
-        /// Legacy overload for testing compatibility.
-        /// </summary>
-        internal static GUIContent BuildGroupHeader(int drawOrder)
-        {
-            WButtonGroupKey key = new(
-                WButtonAttribute.NoGroupPriority,
-                drawOrder,
-                null,
-                0,
-                WButtonGroupPlacement.UseGlobalSetting
-            );
-            return BuildGroupHeader(key);
         }
 
         internal static void GetInvocationStatus(

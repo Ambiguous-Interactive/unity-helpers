@@ -22,43 +22,10 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         internal const int MaxPendingChangeSetsPerCycle = 32;
         internal const int MaxConsecutiveChangeSetsWithinWindow = 128;
 
-        private const string TestAssetFolderMarker = "__DetectAssetChangedTests__";
         private const string SupportedSignatureDescription =
             "Supported signatures: () with no parameters; (AssetChangeContext context); or (TAsset[] createdAssets, string[] deletedAssetPaths) where TAsset derives from UnityEngine.Object.";
         private const string InfiniteLoopWarning =
             "[DetectAssetChanged] Detected a potentially infinite asset change loop triggered by DetectAssetChanged handlers. Additional change batches will be skipped to prevent recursion until the editor domain reloads. Please fix the offending callbacks.";
-
-        internal static Func<double> TimeProvider
-        {
-            get => _timeProvider;
-            set => _timeProvider = value ?? DefaultTimeProvider;
-        }
-
-        internal static double? LoopWindowSecondsOverride
-        {
-            get => _loopWindowSecondsOverride;
-            set => _loopWindowSecondsOverride = value;
-        }
-
-        internal static bool IncludeTestAssets
-        {
-            get => _includeTestAssets;
-            set => _includeTestAssets = value;
-        }
-
-        /// <summary>
-        /// Test-only: when non-null AND <see cref="IncludeTestAssets"/> is <see langword="true"/>,
-        /// asset paths not starting with any of the listed prefixes are skipped. Lets each
-        /// test fixture declare its own folder so cross-fixture pollution is structurally
-        /// impossible even if <c>Clear()</c> is forgotten. Production code never sets this,
-        /// and <see cref="ShouldSkipPath"/> treats <see langword="null"/> as "no allowlist —
-        /// preserve legacy include-all-test-assets behavior."
-        /// </summary>
-        internal static IReadOnlyList<string> TestAssetFolderAllowlist
-        {
-            get => _testAssetFolderAllowlist;
-            set => _testAssetFolderAllowlist = value == null ? null : new List<string>(value);
-        }
 
         /// <summary>
         /// Enables diagnostic logging for debugging asset change detection behavior.
@@ -97,107 +64,21 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         /// </remarks>
         internal static bool IsEnabled => _enabledOverride ?? !Application.isBatchMode;
 
-        private static readonly Func<double> DefaultTimeProvider = () =>
-            EditorApplication.timeSinceStartup;
-
-        private static readonly Dictionary<Type, AssetWatcher> WatchersByAssetType = new();
-        private static readonly Queue<PendingAssetChangeSet> PendingAssetChanges = new();
-        private static bool _initialized;
-        private static bool _includeTestAssets;
-        private static List<string> _testAssetFolderAllowlist;
-        private static bool _processingAssetChanges;
-        private static bool _loopProtectionActive;
-        private static int _consecutiveChangeBatches;
-        private static double _lastChangeProcessTimestamp;
-        private static Func<double> _timeProvider = DefaultTimeProvider;
-        private static double? _loopWindowSecondsOverride;
-        private static bool _diagnosticsEnabled;
-        private static bool? _enabledOverride;
+        internal static readonly Dictionary<Type, AssetWatcher> WatchersByAssetType = new();
+        internal static readonly Queue<PendingAssetChangeSet> PendingAssetChanges = new();
+        internal static bool _initialized;
+        internal static bool _processingAssetChanges;
+        internal static bool _loopProtectionActive;
+        internal static int _consecutiveChangeBatches;
+        internal static double _lastChangeProcessTimestamp;
+        internal static bool _diagnosticsEnabled;
+        internal static bool? _enabledOverride;
 
         private static readonly Action DrainPendingChangesAction = ProcessPendingAssetChangesCore;
 
         static DetectAssetChangeProcessor()
         {
             EditorApplication.delayCall += EnsureInitialized;
-        }
-
-        internal static void ProcessChangesForTesting(
-            string[] imported,
-            string[] deleted,
-            string[] moved,
-            string[] movedFrom
-        )
-        {
-            EnsureInitialized(force: true);
-            EnqueueAssetChanges(
-                imported ?? Array.Empty<string>(),
-                deleted ?? Array.Empty<string>(),
-                moved ?? Array.Empty<string>(),
-                movedFrom ?? Array.Empty<string>(),
-                deferProcessing: false
-            );
-        }
-
-        internal static AssetWatcherSettings GetSettingsForTesting()
-        {
-            return new AssetWatcherSettings
-            {
-                Initialized = _initialized,
-                IncludeTestAssets = _includeTestAssets,
-                TestAssetFolderAllowlist =
-                    _testAssetFolderAllowlist == null
-                        ? null
-                        : new List<string>(_testAssetFolderAllowlist),
-                WatchersByAssetType = CloneWatchers(WatchersByAssetType),
-                PendingAssetChanges = ClonePendingChanges(PendingAssetChanges),
-                ProcessingAssetChanges = _processingAssetChanges,
-                LoopProtectionActive = _loopProtectionActive,
-                ConsecutiveChangeBatches = _consecutiveChangeBatches,
-                LastChangeProcessTimestamp = _lastChangeProcessTimestamp,
-                TimeProvider = _timeProvider,
-                LoopWindowSecondsOverride = _loopWindowSecondsOverride,
-                DiagnosticsEnabled = _diagnosticsEnabled,
-                EnabledOverride = _enabledOverride,
-            };
-        }
-
-        internal static void ResetForTesting(AssetWatcherSettings settings = null)
-        {
-            _initialized = settings?.Initialized ?? false;
-            IncludeTestAssets = settings?.IncludeTestAssets ?? false;
-            _testAssetFolderAllowlist =
-                settings?.TestAssetFolderAllowlist == null
-                    ? null
-                    : new List<string>(settings.TestAssetFolderAllowlist);
-            WatchersByAssetType.Clear();
-            if (settings?.WatchersByAssetType != null)
-            {
-                foreach (KeyValuePair<Type, AssetWatcher> pair in settings.WatchersByAssetType)
-                {
-                    WatchersByAssetType.Add(pair.Key, CloneWatcher(pair.Value));
-                }
-            }
-            PendingAssetChanges.Clear();
-            if (settings?.PendingAssetChanges != null)
-            {
-                foreach (PendingAssetChangeSet pendingChange in settings.PendingAssetChanges)
-                {
-                    PendingAssetChanges.Enqueue(ClonePendingChange(pendingChange));
-                }
-            }
-            _processingAssetChanges = settings?.ProcessingAssetChanges ?? false;
-            _loopProtectionActive = settings?.LoopProtectionActive ?? false;
-            _consecutiveChangeBatches = settings?.ConsecutiveChangeBatches ?? 0;
-            _lastChangeProcessTimestamp = settings?.LastChangeProcessTimestamp ?? 0;
-            TimeProvider = settings?.TimeProvider ?? DefaultTimeProvider;
-            LoopWindowSecondsOverride = settings?.LoopWindowSecondsOverride;
-            DiagnosticsEnabled = settings?.DiagnosticsEnabled ?? false;
-            _enabledOverride = settings?.EnabledOverride;
-        }
-
-        internal static void EnsureInitializedForTesting()
-        {
-            EnsureInitialized();
         }
 
         internal static void ResetLoopProtection()
@@ -208,77 +89,11 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             PendingAssetChanges.Clear();
         }
 
-        internal static bool ValidateMethodSignatureForTesting(
-            Type declaringType,
-            string methodName
-        )
-        {
-            if (declaringType == null)
-            {
-                throw new ArgumentNullException(nameof(declaringType));
-            }
-
-            if (string.IsNullOrWhiteSpace(methodName))
-            {
-                throw new ArgumentException(nameof(methodName));
-            }
-
-            BindingFlags flags =
-                BindingFlags.Instance
-                | BindingFlags.Static
-                | BindingFlags.Public
-                | BindingFlags.NonPublic;
-            MethodInfo method = declaringType.GetMethod(methodName, flags);
-            if (method == null)
-            {
-                throw new ArgumentException(
-                    string.Format(
-                        CultureInfo.InvariantCulture,
-                        "Method {0}.{1} was not found.",
-                        declaringType.FullName,
-                        methodName
-                    ),
-                    nameof(methodName)
-                );
-            }
-
-            return TryResolveParameterMode(declaringType, method, out _, out _);
-        }
-
-        private static void OnPostprocessAllAssets(
-            string[] importedAssets,
-            string[] deletedAssets,
-            string[] movedAssets,
-            string[] movedFromAssetPaths
-        )
-        {
-            // Play-mode asset changes must not trigger a reflection scan recursively inside Unity import.
-            if (EditorApplication.isPlayingOrWillChangePlaymode)
-            {
-                return;
-            }
-
-            EnsureInitialized();
-            if (WatchersByAssetType.Count == 0)
-            {
-                return;
-            }
-
-            EnqueueAssetChanges(
-                importedAssets,
-                deletedAssets,
-                movedAssets,
-                movedFromAssetPaths,
-                deferProcessing: true
-            );
-        }
-
-        private static void EnqueueAssetChanges(
+        internal static void EnqueueAssetChanges(
             IReadOnlyList<string> importedAssets,
             IReadOnlyList<string> deletedAssets,
             IReadOnlyList<string> movedAssets,
-            IReadOnlyList<string> movedFromAssetPaths,
-            bool deferProcessing
+            IReadOnlyList<string> movedFromAssetPaths
         )
         {
             if (_loopProtectionActive)
@@ -296,17 +111,11 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 )
             );
 
-            if (deferProcessing)
-            {
-                // Defer beyond import guards; type-only questions must still use metadata because loading invokes consumer OnValidate.
-                AssetPostprocessorDeferral.Schedule(DrainPendingChangesAction);
-                return;
-            }
-
-            ProcessPendingAssetChangesCore();
+            // Defer beyond import guards; type-only questions must still use metadata.
+            AssetPostprocessorDeferral.Schedule(DrainPendingChangesAction);
         }
 
-        private static void ProcessPendingAssetChangesCore()
+        internal static void ProcessPendingAssetChangesCore()
         {
             if (_loopProtectionActive)
             {
@@ -348,9 +157,304 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 _processingAssetChanges = false;
                 if (!_loopProtectionActive && 0 < processedBatches)
                 {
-                    UpdateLoopWindow(processedBatches);
+                    UpdateLoopWindow(
+                        processedBatches,
+                        EditorApplication.timeSinceStartup,
+                        ResolveLoopWindowSeconds()
+                    );
                 }
             }
+        }
+
+        internal static void EnsureInitialized()
+        {
+            if (_initialized || !IsEnabled)
+            {
+                return;
+            }
+            _initialized = true;
+            BuildWatchers();
+        }
+
+        internal static void BuildWatchers()
+        {
+            WatchersByAssetType.Clear();
+
+            List<Type> loadedTypes = new();
+            IEnumerable<Type> discoveredTypes = ReflectionHelpers.GetAllLoadedTypes();
+            if (discoveredTypes != null)
+            {
+                foreach (Type discoveredType in discoveredTypes)
+                {
+                    if (discoveredType != null)
+                    {
+                        loadedTypes.Add(discoveredType);
+                    }
+                }
+            }
+            List<MethodInfo> attributedMethods = new();
+            HashSet<MethodInfo> discoveredMethods = new();
+            HashSet<Type> inheritedHandlerBases = new();
+            foreach (
+                MethodInfo method in TypeCache.GetMethodsWithAttribute<DetectAssetChangedAttribute>()
+            )
+            {
+                if (discoveredMethods.Add(method))
+                {
+                    attributedMethods.Add(method);
+                }
+                if (method.IsVirtual && method.DeclaringType != null)
+                {
+                    inheritedHandlerBases.Add(method.DeclaringType);
+                }
+            }
+
+            if (0 < inheritedHandlerBases.Count)
+            {
+                BindingFlags inheritedFlags =
+                    BindingFlags.Instance
+                    | BindingFlags.Static
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+                    | BindingFlags.DeclaredOnly;
+                foreach (Type type in loadedTypes)
+                {
+                    if (type.IsAbstract && !type.IsSealed)
+                    {
+                        continue;
+                    }
+                    bool inheritsHandler = false;
+                    for (
+                        Type ancestor = type.BaseType;
+                        ancestor != null;
+                        ancestor = ancestor.BaseType
+                    )
+                    {
+                        if (
+                            inheritedHandlerBases.Contains(ancestor)
+                            || (
+                                ancestor.IsGenericType
+                                && inheritedHandlerBases.Contains(
+                                    ancestor.GetGenericTypeDefinition()
+                                )
+                            )
+                        )
+                        {
+                            inheritsHandler = true;
+                            break;
+                        }
+                    }
+                    if (!inheritsHandler)
+                    {
+                        continue;
+                    }
+                    foreach (MethodInfo method in type.GetMethods(inheritedFlags))
+                    {
+                        if (
+                            method.IsVirtual
+                            && discoveredMethods.Add(method)
+                            && method.GetAllAttributesSafe<DetectAssetChangedAttribute>().Length
+                                != 0
+                        )
+                        {
+                            attributedMethods.Add(method);
+                        }
+                    }
+                }
+            }
+
+            foreach (MethodInfo method in attributedMethods)
+            {
+                Type type = method.DeclaringType;
+                // Static classes are abstract sealed and can still declare handlers.
+                if (type == null || (type.IsAbstract && !type.IsSealed))
+                {
+                    continue;
+                }
+
+                DetectAssetChangedAttribute[] attributes =
+                    method.GetAllAttributesSafe<DetectAssetChangedAttribute>();
+                if (attributes.Length == 0)
+                {
+                    continue;
+                }
+
+                if (
+                    !TryResolveParameterMode(
+                        type,
+                        method,
+                        out SubscriptionParameterMode parameterMode,
+                        out Type createdElementType
+                    )
+                )
+                {
+                    continue;
+                }
+
+                foreach (DetectAssetChangedAttribute attribute in attributes)
+                {
+                    if (
+                        parameterMode == SubscriptionParameterMode.CreatedAndDeleted
+                        && !ResolutionSupportsAssetType(createdElementType, attribute.AssetType)
+                    )
+                    {
+                        Debug.LogWarning(
+                            $"[DetectAssetChanged] {type.FullName}.{method.Name} expects created asset parameter type {createdElementType.FullName}, which is not compatible with watched asset type {attribute.AssetType.FullName}."
+                        );
+                        continue;
+                    }
+
+                    bool includeAssignableTypes = attribute.IncludeAssignableTypes;
+                    if (
+                        !WatchersByAssetType.TryGetValue(
+                            attribute.AssetType,
+                            out AssetWatcher watcher
+                        )
+                    )
+                    {
+                        watcher = new AssetWatcher(attribute.AssetType, includeAssignableTypes);
+                        PopulateKnownAssetPaths(watcher, loadedTypes);
+                        WatchersByAssetType.Add(attribute.AssetType, watcher);
+                    }
+                    else if (includeAssignableTypes && !watcher.IncludeAssignableTypes)
+                    {
+                        watcher.EnableAssignableMatching();
+                        PopulateKnownAssetPaths(watcher, loadedTypes);
+                    }
+
+                    MethodSubscription subscription = new()
+                    {
+                        _declaringType = type,
+                        _method = method,
+                        _flags = attribute.Flags,
+                        _parameterMode = parameterMode,
+                        _createdParameterElementType = createdElementType,
+                        _searchPrefabs = attribute.SearchPrefabs,
+                        _searchSceneObjects = attribute.SearchSceneObjects,
+                    };
+
+                    if (attribute.SearchPrefabs && !watcher.SearchPrefabs)
+                    {
+                        watcher.EnablePrefabSearch();
+                    }
+
+                    if (attribute.SearchSceneObjects && !watcher.SearchSceneObjects)
+                    {
+                        watcher.EnableSceneObjectSearch();
+                    }
+
+                    bool alreadyExists = false;
+                    foreach (MethodSubscription existing in watcher.Subscriptions)
+                    {
+                        if (existing._declaringType == type && existing._method == method)
+                        {
+                            alreadyExists = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyExists)
+                    {
+                        watcher.Subscriptions.Add(subscription);
+                    }
+                }
+            }
+        }
+
+        internal static bool TryResolveParameterMode(
+            Type declaringType,
+            MethodInfo method,
+            out SubscriptionParameterMode mode,
+            out Type createdElementType
+        )
+        {
+            if (method.ReturnType != typeof(void))
+            {
+                LogUnsupportedSignature(
+                    declaringType,
+                    method,
+                    "must return void to receive DetectAssetChanged notifications."
+                );
+                mode = SubscriptionParameterMode.None;
+                createdElementType = null;
+                return false;
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            if (parameters.Length == 0)
+            {
+                mode = SubscriptionParameterMode.None;
+                createdElementType = null;
+                return true;
+            }
+
+            if (parameters.Length == 1 && parameters[0].ParameterType == typeof(AssetChangeContext))
+            {
+                mode = SubscriptionParameterMode.Context;
+                createdElementType = null;
+                return true;
+            }
+
+            if (
+                parameters.Length == 2
+                && TryResolveCreatedParameterType(parameters[0].ParameterType, out Type elementType)
+                && parameters[1].ParameterType == typeof(string[])
+            )
+            {
+                mode = SubscriptionParameterMode.CreatedAndDeleted;
+                createdElementType = elementType;
+                return true;
+            }
+
+            LogUnsupportedSignature(
+                declaringType,
+                method,
+                "has an unsupported parameter signature for DetectAssetChanged."
+            );
+            mode = SubscriptionParameterMode.None;
+            createdElementType = null;
+            return false;
+        }
+
+        internal static void UpdateLoopWindow(int processedBatches, double now, double loopWindow)
+        {
+            if (loopWindow <= 0d)
+            {
+                loopWindow = UnityHelpersSettings.DefaultDetectAssetChangeLoopWindowSeconds;
+            }
+
+            if (loopWindow < now - _lastChangeProcessTimestamp)
+            {
+                _consecutiveChangeBatches = 0;
+            }
+
+            _lastChangeProcessTimestamp = now;
+            _consecutiveChangeBatches += processedBatches;
+            if (MaxConsecutiveChangeSetsWithinWindow <= _consecutiveChangeBatches)
+            {
+                EnterLoopProtection();
+            }
+        }
+
+        private static void OnPostprocessAllAssets(
+            string[] importedAssets,
+            string[] deletedAssets,
+            string[] movedAssets,
+            string[] movedFromAssetPaths
+        )
+        {
+            // Play-mode asset changes must not trigger a reflection scan recursively inside Unity import.
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
+
+            EnsureInitialized();
+            if (WatchersByAssetType.Count == 0)
+            {
+                return;
+            }
+
+            EnqueueAssetChanges(importedAssets, deletedAssets, movedAssets, movedFromAssetPaths);
         }
 
         private static bool HandleAssetChanges(
@@ -739,59 +843,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                         yield return instance;
                     }
                 }
-
-                // Test types without matching filenames can evade Unity type filters; scan only fixture folders as fallback.
-                if (_includeTestAssets)
-                {
-                    string testFolder = "Assets/" + TestAssetFolderMarker;
-                    if (!AssetDatabase.IsValidFolder(testFolder))
-                    {
-                        yield break;
-                    }
-
-                    // Check the filesystem too because Unity can log before throwing for a deleted folder.
-                    string fullTestFolderPath = Path.Combine(
-                        Path.GetDirectoryName(Application.dataPath) ?? string.Empty,
-                        testFolder
-                    );
-                    if (!Directory.Exists(fullTestFolderPath))
-                    {
-                        yield break;
-                    }
-
-                    // The folder may disappear between validation and search.
-                    string[] testGuids;
-                    try
-                    {
-                        testGuids = AssetDatabase.FindAssets(
-                            "t:ScriptableObject",
-                            new[] { testFolder }
-                        );
-                    }
-                    catch (Exception ex)
-                        when (ex is not OutOfMemoryException and not StackOverflowException)
-                    {
-                        // Fixture cleanup can delete the folder between validation and search.
-                        testGuids = Array.Empty<string>();
-                    }
-
-                    foreach (string testGuidsElement in testGuids)
-                    {
-                        string path = AssetDatabase.GUIDToAssetPath(testGuidsElement);
-                        if (yieldedPaths.Contains(path))
-                        {
-                            continue;
-                        }
-
-                        UnityEngine.Object asset =
-                            AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                        if (asset != null && declaringType.IsInstanceOfType(asset))
-                        {
-                            yieldedPaths.Add(path);
-                            yield return asset;
-                        }
-                    }
-                }
             }
 
             if (searchPrefabs && isComponentType)
@@ -990,22 +1041,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     }
 
                     // Only fixture-scoped test assets may be loaded to resolve missing metadata; production queries must use metadata.
-                    if (
-                        _includeTestAssets
-                        && 0
-                            <= path.IndexOf(
-                                TestAssetFolderMarker,
-                                StringComparison.OrdinalIgnoreCase
-                            )
-                    )
-                    {
-                        UnityEngine.Object loadedAsset =
-                            AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                        if (loadedAsset != null && watcher.AssetType.IsInstanceOfType(loadedAsset))
-                        {
-                            buffer.Add(path);
-                        }
-                    }
                 }
             }
             finally
@@ -1136,297 +1171,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
         }
 
-        private static void EnsureInitialized()
-        {
-            EnsureInitialized(force: false);
-        }
-
-        // Guard every entry to watcher construction; only explicit test requests bypass batch-mode suppression.
-        private static void EnsureInitialized(bool force)
-        {
-            if (_initialized)
-            {
-                return;
-            }
-
-            if (!force && !IsEnabled)
-            {
-                return;
-            }
-
-            _initialized = true;
-            BuildWatchers();
-        }
-
-        private static void BuildWatchers()
-        {
-            WatchersByAssetType.Clear();
-
-            List<Type> loadedTypes = new();
-            IEnumerable<Type> discoveredTypes = ReflectionHelpers.GetAllLoadedTypes();
-            if (discoveredTypes != null)
-            {
-                foreach (Type discoveredType in discoveredTypes)
-                {
-                    if (discoveredType != null)
-                    {
-                        loadedTypes.Add(discoveredType);
-                    }
-                }
-            }
-            List<MethodInfo> attributedMethods = new();
-            HashSet<MethodInfo> discoveredMethods = new();
-            HashSet<Type> inheritedHandlerBases = new();
-            foreach (
-                MethodInfo method in TypeCache.GetMethodsWithAttribute<DetectAssetChangedAttribute>()
-            )
-            {
-                if (discoveredMethods.Add(method))
-                {
-                    attributedMethods.Add(method);
-                }
-                if (method.IsVirtual && method.DeclaringType != null)
-                {
-                    inheritedHandlerBases.Add(method.DeclaringType);
-                }
-            }
-
-            if (0 < inheritedHandlerBases.Count)
-            {
-                BindingFlags inheritedFlags =
-                    BindingFlags.Instance
-                    | BindingFlags.Static
-                    | BindingFlags.Public
-                    | BindingFlags.NonPublic
-                    | BindingFlags.DeclaredOnly;
-                foreach (Type type in loadedTypes)
-                {
-                    if (type.IsAbstract && !type.IsSealed)
-                    {
-                        continue;
-                    }
-                    bool inheritsHandler = false;
-                    for (
-                        Type ancestor = type.BaseType;
-                        ancestor != null;
-                        ancestor = ancestor.BaseType
-                    )
-                    {
-                        if (
-                            inheritedHandlerBases.Contains(ancestor)
-                            || (
-                                ancestor.IsGenericType
-                                && inheritedHandlerBases.Contains(
-                                    ancestor.GetGenericTypeDefinition()
-                                )
-                            )
-                        )
-                        {
-                            inheritsHandler = true;
-                            break;
-                        }
-                    }
-                    if (!inheritsHandler)
-                    {
-                        continue;
-                    }
-                    foreach (MethodInfo method in type.GetMethods(inheritedFlags))
-                    {
-                        if (
-                            method.IsVirtual
-                            && discoveredMethods.Add(method)
-                            && method.GetAllAttributesSafe<DetectAssetChangedAttribute>().Length
-                                != 0
-                        )
-                        {
-                            attributedMethods.Add(method);
-                        }
-                    }
-                }
-            }
-
-            foreach (MethodInfo method in attributedMethods)
-            {
-                Type type = method.DeclaringType;
-                // Static classes are abstract sealed and can still declare handlers.
-                if (type == null || (type.IsAbstract && !type.IsSealed))
-                {
-                    continue;
-                }
-
-                DetectAssetChangedAttribute[] attributes =
-                    method.GetAllAttributesSafe<DetectAssetChangedAttribute>();
-                if (attributes.Length == 0)
-                {
-                    continue;
-                }
-
-                if (
-                    !TryResolveParameterMode(
-                        type,
-                        method,
-                        out SubscriptionParameterMode parameterMode,
-                        out Type createdElementType
-                    )
-                )
-                {
-                    continue;
-                }
-
-                foreach (DetectAssetChangedAttribute attribute in attributes)
-                {
-                    if (
-                        parameterMode == SubscriptionParameterMode.CreatedAndDeleted
-                        && !ResolutionSupportsAssetType(createdElementType, attribute.AssetType)
-                    )
-                    {
-                        Debug.LogWarning(
-                            $"[DetectAssetChanged] {type.FullName}.{method.Name} expects created asset parameter type {createdElementType.FullName}, which is not compatible with watched asset type {attribute.AssetType.FullName}."
-                        );
-                        continue;
-                    }
-
-                    bool includeAssignableTypes = attribute.IncludeAssignableTypes;
-                    if (
-                        !WatchersByAssetType.TryGetValue(
-                            attribute.AssetType,
-                            out AssetWatcher watcher
-                        )
-                    )
-                    {
-                        watcher = new AssetWatcher(attribute.AssetType, includeAssignableTypes);
-                        PopulateKnownAssetPaths(watcher, loadedTypes);
-                        WatchersByAssetType.Add(attribute.AssetType, watcher);
-                    }
-                    else if (includeAssignableTypes && !watcher.IncludeAssignableTypes)
-                    {
-                        watcher.EnableAssignableMatching();
-                        PopulateKnownAssetPaths(watcher, loadedTypes);
-                    }
-
-                    MethodSubscription subscription = new()
-                    {
-                        _declaringType = type,
-                        _method = method,
-                        _flags = attribute.Flags,
-                        _parameterMode = parameterMode,
-                        _createdParameterElementType = createdElementType,
-                        _searchPrefabs = attribute.SearchPrefabs,
-                        _searchSceneObjects = attribute.SearchSceneObjects,
-                    };
-
-                    if (attribute.SearchPrefabs && !watcher.SearchPrefabs)
-                    {
-                        watcher.EnablePrefabSearch();
-                    }
-
-                    if (attribute.SearchSceneObjects && !watcher.SearchSceneObjects)
-                    {
-                        watcher.EnableSceneObjectSearch();
-                    }
-
-                    bool alreadyExists = false;
-                    foreach (MethodSubscription existing in watcher.Subscriptions)
-                    {
-                        if (existing._declaringType == type && existing._method == method)
-                        {
-                            alreadyExists = true;
-                            break;
-                        }
-                    }
-                    if (!alreadyExists)
-                    {
-                        watcher.Subscriptions.Add(subscription);
-                    }
-                }
-            }
-        }
-
-        private static Dictionary<Type, AssetWatcher> CloneWatchers(
-            IReadOnlyDictionary<Type, AssetWatcher> source
-        )
-        {
-            Dictionary<Type, AssetWatcher> clones = new(source.Count);
-            foreach (KeyValuePair<Type, AssetWatcher> pair in source)
-            {
-                clones.Add(pair.Key, CloneWatcher(pair.Value));
-            }
-            return clones;
-        }
-
-        private static AssetWatcher CloneWatcher(AssetWatcher source)
-        {
-            if (source == null)
-            {
-                return null;
-            }
-
-            AssetWatcher clone = new(source.AssetType, source.IncludeAssignableTypes);
-            clone.SubAssetSearchFilter = source.SubAssetSearchFilter;
-            if (source.SearchPrefabs)
-            {
-                clone.EnablePrefabSearch();
-            }
-            if (source.SearchSceneObjects)
-            {
-                clone.EnableSceneObjectSearch();
-            }
-            clone.KnownAssetPaths.UnionWith(source.KnownAssetPaths);
-            foreach (MethodSubscription subscription in source.Subscriptions)
-            {
-                clone.Subscriptions.Add(subscription == null ? null : subscription.Clone());
-            }
-            return clone;
-        }
-
-        private static Queue<PendingAssetChangeSet> ClonePendingChanges(
-            IEnumerable<PendingAssetChangeSet> source
-        )
-        {
-            Queue<PendingAssetChangeSet> clones = new();
-            foreach (PendingAssetChangeSet pendingChange in source)
-            {
-                clones.Enqueue(ClonePendingChange(pendingChange));
-            }
-            return clones;
-        }
-
-        private static PendingAssetChangeSet ClonePendingChange(PendingAssetChangeSet source)
-        {
-            if (source == null)
-            {
-                return null;
-            }
-
-            return new PendingAssetChangeSet(
-                CopyPaths(source.Imported),
-                CopyPaths(source.Deleted),
-                CopyPaths(source.Moved),
-                CopyPaths(source.MovedFrom)
-            );
-        }
-
-        private static string[] CopyPaths(IReadOnlyList<string> source)
-        {
-            int sourceCount = source.Count;
-            string[] copy = new string[sourceCount];
-            if (source is string[] sourceArray)
-            {
-                Array.Copy(sourceArray, copy, sourceArray.Length);
-                return copy;
-            }
-            if (source is ICollection<string> sourceCollection)
-            {
-                sourceCollection.CopyTo(copy, 0);
-                return copy;
-            }
-            for (int index = 0; index < sourceCount; ++index)
-            {
-                copy[index] = source[index];
-            }
-            return copy;
-        }
-
         private static void PopulateKnownAssetPaths(
             AssetWatcher watcher,
             IReadOnlyList<Type> loadedTypes
@@ -1473,58 +1217,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
 
             watcher.SubAssetSearchFilter = subAssetSearchFilter.ToString();
-
-            // Test types without matching filenames can evade Unity filters; this fallback stays in fixture folders.
-            if (_includeTestAssets)
-            {
-                string testFolder = "Assets/" + TestAssetFolderMarker;
-                if (!AssetDatabase.IsValidFolder(testFolder))
-                {
-                    return;
-                }
-
-                // Check the filesystem too because Unity can log before throwing for a deleted folder.
-                string fullTestFolderPath = Path.Combine(
-                    Path.GetDirectoryName(Application.dataPath) ?? string.Empty,
-                    testFolder
-                );
-                if (!Directory.Exists(fullTestFolderPath))
-                {
-                    return;
-                }
-
-                // The folder may disappear between validation and search.
-                string[] testGuids;
-                try
-                {
-                    testGuids = AssetDatabase.FindAssets(
-                        "t:ScriptableObject",
-                        new[] { testFolder }
-                    );
-                }
-                catch (Exception ex)
-                    when (ex is not OutOfMemoryException and not StackOverflowException)
-                {
-                    // Fixture cleanup can delete the folder between validation and search.
-                    return;
-                }
-
-                foreach (string testGuidsElement in testGuids)
-                {
-                    string path = AssetDatabase.GUIDToAssetPath(testGuidsElement);
-                    if (watcher.KnownAssetPaths.Contains(path))
-                    {
-                        continue;
-                    }
-
-                    // Metadata answers the main-asset type without deserializing consumer objects during import.
-                    Type testAssetType = AssetDatabase.GetMainAssetTypeAtPath(path);
-                    if (testAssetType != null && watcher.AssetType.IsAssignableFrom(testAssetType))
-                    {
-                        watcher.KnownAssetPaths.Add(path);
-                    }
-                }
-            }
         }
 
         private static IEnumerable<Type> ResolveSearchableAssetTypes(
@@ -1598,61 +1290,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
         }
 
-        private static bool TryResolveParameterMode(
-            Type declaringType,
-            MethodInfo method,
-            out SubscriptionParameterMode mode,
-            out Type createdElementType
-        )
-        {
-            if (method.ReturnType != typeof(void))
-            {
-                LogUnsupportedSignature(
-                    declaringType,
-                    method,
-                    "must return void to receive DetectAssetChanged notifications."
-                );
-                mode = SubscriptionParameterMode.None;
-                createdElementType = null;
-                return false;
-            }
-
-            ParameterInfo[] parameters = method.GetParameters();
-            if (parameters.Length == 0)
-            {
-                mode = SubscriptionParameterMode.None;
-                createdElementType = null;
-                return true;
-            }
-
-            if (parameters.Length == 1 && parameters[0].ParameterType == typeof(AssetChangeContext))
-            {
-                mode = SubscriptionParameterMode.Context;
-                createdElementType = null;
-                return true;
-            }
-
-            if (
-                parameters.Length == 2
-                && TryResolveCreatedParameterType(parameters[0].ParameterType, out Type elementType)
-                && parameters[1].ParameterType == typeof(string[])
-            )
-            {
-                mode = SubscriptionParameterMode.CreatedAndDeleted;
-                createdElementType = elementType;
-                return true;
-            }
-
-            LogUnsupportedSignature(
-                declaringType,
-                method,
-                "has an unsupported parameter signature for DetectAssetChanged."
-            );
-            mode = SubscriptionParameterMode.None;
-            createdElementType = null;
-            return false;
-        }
-
         private static bool TryResolveCreatedParameterType(Type parameterType, out Type elementType)
         {
             if (parameterType == null || !parameterType.IsArray)
@@ -1692,35 +1329,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             return parameterElementType.IsAssignableFrom(assetType);
         }
 
-        private static void UpdateLoopWindow(int processedBatches)
-        {
-            double now = TimeProvider();
-            double loopWindow = ResolveLoopWindowSeconds();
-            if (loopWindow <= 0d)
-            {
-                loopWindow = UnityHelpersSettings.DefaultDetectAssetChangeLoopWindowSeconds;
-            }
-
-            if (loopWindow < now - _lastChangeProcessTimestamp)
-            {
-                _consecutiveChangeBatches = 0;
-            }
-
-            _lastChangeProcessTimestamp = now;
-            _consecutiveChangeBatches += processedBatches;
-            if (MaxConsecutiveChangeSetsWithinWindow <= _consecutiveChangeBatches)
-            {
-                EnterLoopProtection();
-            }
-        }
-
         private static double ResolveLoopWindowSeconds()
         {
-            if (_loopWindowSecondsOverride is > 0d)
-            {
-                return _loopWindowSecondsOverride.Value;
-            }
-
             double configured;
             try
             {
@@ -1762,41 +1372,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
         private static bool ShouldSkipPath(string assetPath)
         {
-            if (string.IsNullOrWhiteSpace(assetPath))
-            {
-                return true;
-            }
-
-            // Fixture-scoped folders prevent one test's asset changes from invoking another test's handlers.
-            if (_includeTestAssets && _testAssetFolderAllowlist != null)
-            {
-                bool allowed = false;
-                foreach (string prefix in _testAssetFolderAllowlist)
-                {
-                    if (
-                        !string.IsNullOrEmpty(prefix)
-                        && assetPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-                    )
-                    {
-                        allowed = true;
-                        break;
-                    }
-                }
-                if (!allowed)
-                {
-                    return true;
-                }
-            }
-
-            if (
-                !_includeTestAssets
-                && 0 <= assetPath.IndexOf(TestAssetFolderMarker, StringComparison.OrdinalIgnoreCase)
-            )
-            {
-                return true;
-            }
-
-            return false;
+            return string.IsNullOrWhiteSpace(assetPath);
         }
 
         private static bool IsScenePath(string assetPath)
@@ -1830,42 +1406,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             internal Type _createdParameterElementType;
             internal bool _searchPrefabs;
             internal bool _searchSceneObjects;
-
-            internal MethodSubscription Clone()
-            {
-                return new MethodSubscription
-                {
-                    _declaringType = _declaringType,
-                    _method = _method,
-                    _flags = _flags,
-                    _parameterMode = _parameterMode,
-                    _createdParameterElementType = _createdParameterElementType,
-                    _searchPrefabs = _searchPrefabs,
-                    _searchSceneObjects = _searchSceneObjects,
-                };
-            }
-        }
-
-        internal sealed class AssetWatcherSettings
-        {
-            internal bool IncludeAssignableTypes { get; set; }
-            internal bool SearchPrefabs { get; set; }
-            internal bool SearchSceneObjects { get; set; }
-            internal HashSet<string> KnownAssetPaths { get; set; }
-            internal List<MethodSubscription> Subscriptions { get; set; }
-            internal Dictionary<Type, AssetWatcher> WatchersByAssetType { get; set; } = new();
-            internal Queue<PendingAssetChangeSet> PendingAssetChanges { get; set; } = new();
-            internal bool Initialized { get; set; }
-            internal bool IncludeTestAssets { get; set; }
-            internal IReadOnlyList<string> TestAssetFolderAllowlist { get; set; }
-            internal bool ProcessingAssetChanges { get; set; }
-            internal bool LoopProtectionActive { get; set; }
-            internal int ConsecutiveChangeBatches { get; set; }
-            internal double LastChangeProcessTimestamp { get; set; }
-            internal Func<double> TimeProvider { get; set; } = DefaultTimeProvider;
-            internal double? LoopWindowSecondsOverride { get; set; }
-            internal bool DiagnosticsEnabled { get; set; }
-            internal bool? EnabledOverride { get; set; }
         }
 
         internal sealed class AssetWatcher

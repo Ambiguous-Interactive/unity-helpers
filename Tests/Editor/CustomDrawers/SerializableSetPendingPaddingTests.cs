@@ -31,8 +31,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            GroupGUIWidthUtility.ResetForTests();
-            SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
+            SerializableSetPropertyDrawerTestAccess.ResetLayoutTracking();
         }
 
         [Test]
@@ -101,37 +101,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 normalOffset - settingsOffset,
                 "Toggle offset difference should be 10f."
             );
-        }
-
-        [UnityTest]
-        public IEnumerator OnGUINormalContextDrawsManualEntryWithFullPadding()
-        {
-            PaddingTestSetHost host = CreateScriptableObject<PaddingTestSetHost>();
-            host.set.Add(1);
-
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-
-            SerializedProperty setProperty = serializedObject.FindProperty(
-                nameof(PaddingTestSetHost.set)
-            );
-            setProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableSetPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 400f, 300f);
-            GUIContent label = new("Set");
-
-            Rect capturedRect = default;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                serializedObject.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, setProperty, label);
-                capturedRect = drawer.LastResolvedPosition;
-            });
-
-            Assert.Greater(capturedRect.width, 0f, "Resolved position should have valid width.");
         }
 
         [Test]
@@ -273,7 +242,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(false);
-                SerializableSetPropertyDrawer.ClearMainFoldoutAnimCacheForTests();
+                SerializableSetPropertyDrawerTestAccess.ClearMainFoldoutAnimCache();
 
                 setProperty.isExpanded = true;
                 float expandedHeight = drawer.GetPropertyHeight(setProperty, label);
@@ -293,56 +262,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(originalTweenEnabled);
             }
-        }
-
-        [UnityTest]
-        public IEnumerator DrawerMaintainsConsistentPaddingAcrossMultipleRepaints()
-        {
-            PaddingTestSetHost host = CreateScriptableObject<PaddingTestSetHost>();
-            host.set.Add(1);
-
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-
-            SerializedProperty setProperty = serializedObject.FindProperty(
-                nameof(PaddingTestSetHost.set)
-            );
-            setProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableSetPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 400f, 300f);
-            GUIContent label = new("Set");
-
-            Rect firstRect = default;
-            Rect secondRect = default;
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                serializedObject.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, setProperty, label);
-                firstRect = drawer.LastResolvedPosition;
-            });
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                serializedObject.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, setProperty, label);
-                secondRect = drawer.LastResolvedPosition;
-            });
-
-            Assert.AreEqual(
-                firstRect.x,
-                secondRect.x,
-                0.01f,
-                "Resolved x position should be consistent across repaints."
-            );
-            Assert.AreEqual(
-                firstRect.width,
-                secondRect.width,
-                0.01f,
-                "Resolved width should be consistent across repaints."
-            );
         }
 
         [Test]
@@ -375,47 +294,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         }
 
         [Test]
-        public void VeryLargeIndentLevelHandledGracefully()
-        {
-            PaddingTestSetHost host = CreateScriptableObject<PaddingTestSetHost>();
-            host.set.Add(42);
-
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-
-            SerializedProperty setProperty = serializedObject.FindProperty(
-                nameof(PaddingTestSetHost.set)
-            );
-            setProperty.isExpanded = true;
-
-            SerializableSetPropertyDrawer drawer = new();
-            Rect controlRect = new(0f, 0f, 600f, 300f);
-            GUIContent label = new("Set");
-
-            int previousIndentLevel = EditorGUI.indentLevel;
-            try
-            {
-                EditorGUI.indentLevel = 20;
-
-                Assert.DoesNotThrow(
-                    () => drawer.GetPropertyHeight(setProperty, label),
-                    "GetPropertyHeight should not throw for very large indentLevel."
-                );
-
-                Rect resolvedRect = drawer.LastResolvedPosition;
-                Assert.GreaterOrEqual(
-                    resolvedRect.width,
-                    0f,
-                    "Width should not be negative even with very large indentLevel."
-                );
-            }
-            finally
-            {
-                EditorGUI.indentLevel = previousIndentLevel;
-            }
-        }
-
-        [Test]
         public void ZeroIndentLevelAppliesMinimumPadding()
         {
             PaddingTestSetHost host = CreateScriptableObject<PaddingTestSetHost>();
@@ -436,9 +314,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
-                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                     originalRect,
                     skipIndentation: false
                 );
@@ -482,16 +360,16 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int previousIndentLevel = EditorGUI.indentLevel;
             try
             {
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
                 EditorGUI.indentLevel = 1;
-                Rect rectAtLevel1 = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect rectAtLevel1 = SerializableSetPropertyDrawer.ResolveContentRect(
                     originalRect,
                     skipIndentation: false
                 );
 
                 EditorGUI.indentLevel = 4;
-                Rect rectAtLevel4 = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect rectAtLevel4 = SerializableSetPropertyDrawer.ResolveContentRect(
                     originalRect,
                     skipIndentation: false
                 );
@@ -533,9 +411,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
-                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                     originalRect,
                     skipIndentation: false
                 );
@@ -570,9 +448,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = indentLevel;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
-                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                     originalRect,
                     skipIndentation: false
                 );
@@ -628,7 +506,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(false);
-                SerializableSetPropertyDrawer.ClearMainFoldoutAnimCacheForTests();
+                SerializableSetPropertyDrawerTestAccess.ClearMainFoldoutAnimCache();
 
                 setProperty.isExpanded = true;
                 float expandedHeight = drawer.GetPropertyHeight(setProperty, label);
@@ -669,9 +547,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             try
             {
                 EditorGUI.indentLevel = 0;
-                GroupGUIWidthUtility.ResetForTests();
+                GroupGUIWidthUtilityTestAccess.Reset();
 
-                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
+                Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRect(
                     originalRect,
                     skipIndentation: false
                 );

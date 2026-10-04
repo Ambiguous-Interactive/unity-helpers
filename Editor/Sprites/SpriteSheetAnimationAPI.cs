@@ -17,8 +17,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </summary>
     public static class SpriteSheetAnimationAPI
     {
-        internal static Action SaveAssetsAction = AssetDatabase.SaveAssets;
-
         private static readonly char[] InvalidNameCharacters =
         {
             '/',
@@ -301,7 +299,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     createdAsset = true;
                     if (saveAssets)
                     {
-                        SaveAssetsAction();
+                        AssetDatabase.SaveAssets();
                     }
                     assetPath = plannedAssetPath;
                     error = null;

@@ -90,7 +90,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
                 UpdateMaterialInstance();
             }
         }
-        internal Material CachedMaterialInstanceForTests => _cachedMaterialInstance;
 
         /// <summary>
         /// Optional shape mask texture assigned to the material's `_ShapeMask` slot to drive custom shader based masking.
@@ -114,7 +113,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
         /// Stores the dedicated material instance produced by <see cref="UpdateMaterialInstance"/>.
         /// This is a runtime-only object that doesn't survive domain reloads.
         /// </summary>
-        private Material _cachedMaterialInstance;
+        internal Material _cachedMaterialInstance;
 
         /// <summary>
         /// Stores the original user-assigned material before we replace it with our instance.
@@ -122,7 +121,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
         /// </summary>
         [SerializeField]
         [HideInInspector]
-        private Material _baseMaterial;
+        internal Material _baseMaterial;
 
         /// <inheritdoc/>
         protected override void Start()
@@ -157,22 +156,10 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
         }
 #endif
 
-        internal Material BaseMaterialForTests => _baseMaterial;
-
-        internal void InvokeStartForTests()
-        {
-            Start();
-        }
-
-        internal void InvokeOnDestroyForTests()
-        {
-            OnDestroy();
-        }
-
         /// <summary>
         /// Ensures this component owns a dedicated material instance and reapplies mask and color data.
         /// </summary>
-        private void UpdateMaterialInstance()
+        internal void UpdateMaterialInstance()
         {
             Material currentMaterial = material;
 
@@ -278,7 +265,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
         /// <summary>
         /// Releases the cached material instance created for this image.
         /// </summary>
-        private void CleanupMaterialInstance()
+        internal void CleanupMaterialInstance()
         {
             if (_cachedMaterialInstance != null)
             {

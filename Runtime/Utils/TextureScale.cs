@@ -34,9 +34,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public static class TextureScale
     {
-        // This hook injects slice failures into both execution modes to verify identical error handling.
-        internal static Action<int> SliceStartedForTesting;
-
         /// <summary>
         /// Scales a texture using point (nearest neighbor) sampling.
         /// </summary>
@@ -81,6 +78,205 @@ namespace WallstopStudios.UnityHelpers.Utils
             if (apply)
             {
                 tex.Apply(updateMipmaps: false, makeNoLongerReadable: false);
+            }
+        }
+
+        internal static void ScalePixels(
+            Color[] texColors,
+            Color[] newColors,
+            int sourceWidth,
+            int sourceHeight,
+            int newWidth,
+            int newHeight,
+            bool useBilinear,
+            int cores
+        )
+        {
+            // Both filters map each destination pixel to sourceSize / destSize of the source.
+            float ratioX = (float)sourceWidth / newWidth;
+            float ratioY = (float)sourceHeight / newHeight;
+
+            // Premultiplied blending prevents transparent texels tinting visible ones; opaque sources need no extra buffer.
+            using PooledArray<Color> pooledPremultiplied = RentPremultiplied(
+                texColors,
+                useBilinear,
+                out Color[] premultipliedColors
+            );
+
+            if (1 < cores)
+            {
+                int slice = newHeight / cores;
+                using CountdownEvent countdown = new(cores);
+
+                // Task dispatch can throw after queuing slices; finally must wait before returning their pooled buffers.
+                int dispatched = 0;
+                Exception workerFailure = null;
+                Exception discardedFailure = null;
+                bool reachedTheEnd = false;
+                try
+                {
+                    for (int i = 0; i < cores - 1; ++i)
+                    {
+                        int start = slice * i;
+                        int end = slice * (i + 1);
+                        Task.Run(() =>
+                        {
+                            try
+                            {
+                                if (useBilinear)
+                                {
+                                    BilinearScale(
+                                        texColors,
+                                        premultipliedColors,
+                                        newColors,
+                                        sourceWidth,
+                                        sourceHeight,
+                                        newWidth,
+                                        ratioX,
+                                        ratioY,
+                                        start,
+                                        end
+                                    );
+                                }
+                                else
+                                {
+                                    PointScale(
+                                        texColors,
+                                        newColors,
+                                        sourceWidth,
+                                        sourceHeight,
+                                        newWidth,
+                                        ratioX,
+                                        ratioY,
+                                        start,
+                                        end
+                                    );
+                                }
+                            }
+                            catch (Exception sliceFailure)
+                            {
+                                RecordSliceFailure(
+                                    ref workerFailure,
+                                    ref discardedFailure,
+                                    sliceFailure
+                                );
+                            }
+                            finally
+                            {
+                                countdown.Signal();
+                            }
+                        });
+                        ++dispatched;
+                    }
+
+                    // Record slice failure so the first failure wins without masking another exception during unwinding.
+                    int finalStart = slice * (cores - 1);
+                    try
+                    {
+                        if (useBilinear)
+                        {
+                            BilinearScale(
+                                texColors,
+                                premultipliedColors,
+                                newColors,
+                                sourceWidth,
+                                sourceHeight,
+                                newWidth,
+                                ratioX,
+                                ratioY,
+                                finalStart,
+                                newHeight
+                            );
+                        }
+                        else
+                        {
+                            PointScale(
+                                texColors,
+                                newColors,
+                                sourceWidth,
+                                sourceHeight,
+                                newWidth,
+                                ratioX,
+                                ratioY,
+                                finalStart,
+                                newHeight
+                            );
+                        }
+                    }
+                    catch (Exception sliceFailure)
+                    {
+                        RecordSliceFailure(ref workerFailure, ref discardedFailure, sliceFailure);
+                    }
+
+                    reachedTheEnd = true;
+                }
+                finally
+                {
+                    // Signal undispatched slices too; a dispatch failure would otherwise leave the countdown waiting forever.
+                    for (int remaining = cores - dispatched; 0 < remaining; remaining--)
+                    {
+                        countdown.Signal();
+                    }
+
+                    // Wait even when this slice throws, before returning buffers that other workers still use.
+                    countdown.Wait();
+
+                    // Log secondary failures on the main thread after workers stop; a throwing logger must not replace the primary failure.
+                    try
+                    {
+                        if (discardedFailure != null)
+                        {
+                            Debug.LogException(discardedFailure);
+                        }
+
+                        if (!reachedTheEnd && workerFailure != null)
+                        {
+                            Debug.LogException(workerFailure);
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // Preserve the original failure even if the log handler itself exhausts memory.
+                    }
+                }
+
+                // A signaled countdown does not imply successful pixels; propagate recorded worker failures.
+                if (workerFailure != null)
+                {
+                    ExceptionDispatchInfo.Capture(workerFailure).Throw();
+                }
+            }
+            else
+            {
+                if (useBilinear)
+                {
+                    BilinearScale(
+                        texColors,
+                        premultipliedColors,
+                        newColors,
+                        sourceWidth,
+                        sourceHeight,
+                        newWidth,
+                        ratioX,
+                        ratioY,
+                        0,
+                        newHeight
+                    );
+                }
+                else
+                {
+                    PointScale(
+                        texColors,
+                        newColors,
+                        sourceWidth,
+                        sourceHeight,
+                        newWidth,
+                        ratioX,
+                        ratioY,
+                        0,
+                        newHeight
+                    );
+                }
             }
         }
 
@@ -162,197 +358,16 @@ namespace WallstopStudios.UnityHelpers.Utils
                 out Color[] newColors
             );
 
-            // Both filters map each destination pixel to sourceSize / destSize of the source.
-            float ratioX = (float)sourceWidth / newWidth;
-            float ratioY = (float)sourceHeight / newHeight;
-
-            // Premultiplied blending prevents transparent texels tinting visible ones; opaque sources need no extra buffer.
-            using PooledArray<Color> pooledPremultiplied = RentPremultiplied(
+            ScalePixels(
                 texColors,
+                newColors,
+                sourceWidth,
+                sourceHeight,
+                newWidth,
+                newHeight,
                 useBilinear,
-                out Color[] premultipliedColors
+                Mathf.Min(SystemInfo.processorCount, newHeight)
             );
-
-            int cores = Mathf.Min(SystemInfo.processorCount, newHeight);
-
-            if (1 < cores)
-            {
-                int slice = newHeight / cores;
-                using CountdownEvent countdown = new(cores);
-
-                // Task dispatch can throw after queuing slices; finally must wait before returning their pooled buffers.
-                int dispatched = 0;
-                Exception workerFailure = null;
-                Exception discardedFailure = null;
-                bool reachedTheEnd = false;
-                try
-                {
-                    for (int i = 0; i < cores - 1; ++i)
-                    {
-                        int start = slice * i;
-                        int end = slice * (i + 1);
-                        Task.Run(() =>
-                        {
-                            try
-                            {
-                                SliceStartedForTesting?.Invoke(start);
-                                if (useBilinear)
-                                {
-                                    BilinearScale(
-                                        texColors,
-                                        premultipliedColors,
-                                        newColors,
-                                        sourceWidth,
-                                        sourceHeight,
-                                        newWidth,
-                                        ratioX,
-                                        ratioY,
-                                        start,
-                                        end
-                                    );
-                                }
-                                else
-                                {
-                                    PointScale(
-                                        texColors,
-                                        newColors,
-                                        sourceWidth,
-                                        sourceHeight,
-                                        newWidth,
-                                        ratioX,
-                                        ratioY,
-                                        start,
-                                        end
-                                    );
-                                }
-                            }
-                            catch (Exception sliceFailure)
-                            {
-                                RecordSliceFailure(
-                                    ref workerFailure,
-                                    ref discardedFailure,
-                                    sliceFailure
-                                );
-                            }
-                            finally
-                            {
-                                countdown.Signal();
-                            }
-                        });
-                        ++dispatched;
-                    }
-
-                    // Record slice failure so the first failure wins without masking another exception during unwinding.
-                    int finalStart = slice * (cores - 1);
-                    try
-                    {
-                        SliceStartedForTesting?.Invoke(finalStart);
-                        if (useBilinear)
-                        {
-                            BilinearScale(
-                                texColors,
-                                premultipliedColors,
-                                newColors,
-                                sourceWidth,
-                                sourceHeight,
-                                newWidth,
-                                ratioX,
-                                ratioY,
-                                finalStart,
-                                newHeight
-                            );
-                        }
-                        else
-                        {
-                            PointScale(
-                                texColors,
-                                newColors,
-                                sourceWidth,
-                                sourceHeight,
-                                newWidth,
-                                ratioX,
-                                ratioY,
-                                finalStart,
-                                newHeight
-                            );
-                        }
-                    }
-                    catch (Exception sliceFailure)
-                    {
-                        RecordSliceFailure(ref workerFailure, ref discardedFailure, sliceFailure);
-                    }
-
-                    reachedTheEnd = true;
-                }
-                finally
-                {
-                    // Signal undispatched slices too; a dispatch failure would otherwise leave the countdown waiting forever.
-                    for (int remaining = cores - dispatched; 0 < remaining; remaining--)
-                    {
-                        countdown.Signal();
-                    }
-
-                    // Wait even when this slice throws, before returning buffers that other workers still use.
-                    countdown.Wait();
-
-                    // Log secondary failures on the main thread after workers stop; a throwing logger must not replace the primary failure.
-                    try
-                    {
-                        if (discardedFailure != null)
-                        {
-                            Debug.LogException(discardedFailure);
-                        }
-
-                        if (!reachedTheEnd && workerFailure != null)
-                        {
-                            Debug.LogException(workerFailure);
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        // Preserve the original failure even if the log handler itself exhausts memory.
-                    }
-                }
-
-                // A signaled countdown does not imply successful pixels; propagate recorded worker failures.
-                if (workerFailure != null)
-                {
-                    ExceptionDispatchInfo.Capture(workerFailure).Throw();
-                }
-            }
-            else
-            {
-                SliceStartedForTesting?.Invoke(0);
-                if (useBilinear)
-                {
-                    BilinearScale(
-                        texColors,
-                        premultipliedColors,
-                        newColors,
-                        sourceWidth,
-                        sourceHeight,
-                        newWidth,
-                        ratioX,
-                        ratioY,
-                        0,
-                        newHeight
-                    );
-                }
-                else
-                {
-                    PointScale(
-                        texColors,
-                        newColors,
-                        sourceWidth,
-                        sourceHeight,
-                        newWidth,
-                        ratioX,
-                        ratioY,
-                        0,
-                        newHeight
-                    );
-                }
-            }
 
             // Use float texture storage to preserve computed values without 8-bit quantization.
 #if UNITY_2020_1_OR_NEWER

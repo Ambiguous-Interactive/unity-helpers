@@ -297,7 +297,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             WGroupLayoutBuilder.ClearCache();
 
             _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -308,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         {
             WGroupLayoutBuilder.ClearCache();
 
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 _previousConfiguration.Mode,
                 _previousConfiguration.RowCount
             );
@@ -683,7 +683,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             bool expectNotAutoIncludedInGroup
         )
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(mode, rowCount);
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(mode, rowCount);
             WGroupLayoutBuilder.ClearCache();
 
             WGroupAutoIncludeTestTarget target =
@@ -726,7 +726,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             string expectedCapturingGroup
         )
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(mode, rowCount);
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(mode, rowCount);
             WGroupLayoutBuilder.ClearCache();
 
             WGroupLayoutTestTarget target = CreateScriptableObject<WGroupLayoutTestTarget>();
@@ -776,7 +776,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             string[] expectedProperties
         )
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(mode, rowCount);
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(mode, rowCount);
             WGroupLayoutBuilder.ClearCache();
 
             WGroupExplicitAutoIncludeTestTarget target =
@@ -824,7 +824,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ExplicitInfiniteAutoIncludeCapturesAllSubsequent()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -873,7 +873,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ExplicitZeroAutoIncludeCapturesNoSubsequent()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
                 0
             );
@@ -923,7 +923,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void FiniteModeWithZeroRowCountBehavesLikeNone()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 0
             );
@@ -957,7 +957,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         public void HideInInspectorFieldsExcludedFromAutoInclude()
         {
             // Finite mode with enough budget to capture every field, were HideInInspector not respected.
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 6
             );
@@ -1023,7 +1023,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         public void ExplicitlyGroupedHiddenFieldsAreIncluded()
         {
             // None mode, so auto-include cannot interfere.
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -1074,7 +1074,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void HideInInspectorExcludedInInfiniteMode()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
                 0
             );
@@ -1130,7 +1130,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void UngroupedHiddenFieldsInHiddenPropertyPaths()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -1179,7 +1179,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void PropertyOperationIsHiddenInInspectorFlagSetCorrectly()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -1288,7 +1288,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void GroupOperationIsHiddenInInspectorAlwaysFalse()
         {
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );

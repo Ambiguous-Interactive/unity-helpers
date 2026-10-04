@@ -58,7 +58,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 );
             }
 
-            return new ValidationRun(rules, targets, _ => null);
+            return new ValidationRun(rules, targets);
         }
 
         private static ValidationRun CreateRejectedRun(RejectedRunState state)
@@ -500,9 +500,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 UnityEngine.ScriptableObject.CreateInstance<ValidationWindow>()
             );
 
-            window.CompleteForTesting(complete);
+            window.Complete(complete);
 
-            Assert.AreEqual(string.Empty, window.StatusForTesting);
+            Assert.AreEqual(string.Empty, window._status);
             CollectionAssert.AreEqual(new[] { SecondGuid }, ValidationResults.RecordedAssetGuids);
             Assert.AreEqual(1, ValidationResults.Snapshot().Count);
         }
@@ -524,12 +524,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 UnityEngine.ScriptableObject.CreateInstance<ValidationWindow>()
             );
 
-            window.CompleteForTesting(failed);
+            window.Complete(failed);
 
-            Assert.AreEqual(
-                "Validation failed. Previous results retained.",
-                window.StatusForTesting
-            );
+            Assert.AreEqual("Validation failed. Previous results retained.", window._status);
             Assert.AreEqual(1, ValidationResults.CheckedAssetCount);
             Assert.AreEqual("previous", ValidationResults.Snapshot()[0].Message);
         }
@@ -549,9 +546,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 UnityEngine.ScriptableObject.CreateInstance<ValidationWindow>()
             );
 
-            window.CompleteForTesting(cancelled);
+            window.Complete(cancelled);
 
-            Assert.AreEqual("Cancelled. Previous results retained.", window.StatusForTesting);
+            Assert.AreEqual("Cancelled. Previous results retained.", window._status);
             CollectionAssert.AreEqual(new[] { FirstGuid }, ValidationResults.RecordedAssetGuids);
         }
 
@@ -572,9 +569,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 UnityEngine.ScriptableObject.CreateInstance<ValidationWindow>()
             );
 
-            window.CompleteForTesting(cancelled);
+            window.Complete(cancelled);
 
-            Assert.AreEqual("Cancelled. Previous results retained.", window.StatusForTesting);
+            Assert.AreEqual("Cancelled. Previous results retained.", window._status);
             CollectionAssert.AreEqual(new[] { FirstGuid }, ValidationResults.RecordedAssetGuids);
         }
 
@@ -583,7 +580,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             bool wasEnabled = ValidationAutoRun.Enabled;
             ValidationAutoRun.Enabled = true;
-            ValidationAutoRun.ClearPendingForTesting();
+            ValidationAutoRunTestAccess.ClearPending();
             ValidationRun failed = Run(
                 new List<IValidationRule> { new ThrowingRule() },
                 FirstGuid,
@@ -596,14 +593,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             try
             {
-                ValidationAutoRun.CompleteRunForTesting(failed);
+                ValidationAutoRunTestAccess.CompleteRun(failed);
 
                 Assert.AreEqual(2, ValidationAutoRun.PendingCount);
                 Assert.IsFalse(ValidationResults.HasRun);
             }
             finally
             {
-                ValidationAutoRun.ClearPendingForTesting();
+                ValidationAutoRunTestAccess.ClearPending();
                 ValidationAutoRun.Enabled = wasEnabled;
             }
         }
@@ -613,7 +610,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             bool wasEnabled = ValidationAutoRun.Enabled;
             ValidationAutoRun.Enabled = false;
-            ValidationAutoRun.ClearPendingForTesting();
+            ValidationAutoRunTestAccess.ClearPending();
             ValidationRun failed = Run(new ThrowingRule(), FirstGuid);
             ExpectError(
                 UnityEngine.LogType.Warning,
@@ -622,13 +619,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             try
             {
-                ValidationAutoRun.CompleteRunForTesting(failed);
+                ValidationAutoRunTestAccess.CompleteRun(failed);
 
                 Assert.AreEqual(0, ValidationAutoRun.PendingCount);
             }
             finally
             {
-                ValidationAutoRun.ClearPendingForTesting();
+                ValidationAutoRunTestAccess.ClearPending();
                 ValidationAutoRun.Enabled = wasEnabled;
             }
         }

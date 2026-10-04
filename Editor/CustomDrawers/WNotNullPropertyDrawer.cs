@@ -43,14 +43,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         }
 
         /// <summary>
-        /// Clears the height cache. Useful for tests or when font settings change.
-        /// </summary>
-        internal static void ClearHeightCache()
-        {
-            ValidationShared.ClearHeightCache();
-        }
-
-        /// <summary>
         /// Gets the total property height including the help box when the field is null.
         /// </summary>
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)

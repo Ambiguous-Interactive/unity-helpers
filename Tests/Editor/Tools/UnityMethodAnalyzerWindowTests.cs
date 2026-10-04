@@ -353,22 +353,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [Test]
-        public void StartAnalysisWithNoValidDirectoriesSignalsCompletionSource()
+        public void StartAnalysisWithNoValidDirectoriesCompletesAnalysisState()
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
             window._isAnalyzing = false;
             window._sourcePaths = new List<string> { "/nonexistent/path" };
 
             window.StartAnalysis();
 
             Assert.IsTrue(
-                tcs.Task.IsCompleted,
-                "TCS should be completed when no valid directories"
+                !window._isAnalyzing,
+                "Operation should be complete when no valid directories"
             );
-            Assert.IsTrue(tcs.Task.Result, "TCS result should be true");
+            Assert.IsTrue(!window._isAnalyzing, "Operation should no longer be running");
             Assert.IsFalse(window._isAnalyzing, "Should not be analyzing");
         }
 
@@ -394,19 +392,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [Test]
-        public void StartAnalysisWithEmptySourcePathsSignalsCompletionSource()
+        public void StartAnalysisWithEmptySourcePathsCompletesAnalysisState()
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
             window._isAnalyzing = false;
             window._sourcePaths = new List<string>();
 
             window.StartAnalysis();
 
-            Assert.IsTrue(tcs.Task.IsCompleted, "TCS should be completed when empty source paths");
-            Assert.IsTrue(tcs.Task.Result, "TCS result should be true");
+            Assert.IsTrue(
+                !window._isAnalyzing,
+                "Operation should be complete when empty source paths"
+            );
+            Assert.IsTrue(!window._isAnalyzing, "Operation should no longer be running");
             Assert.IsFalse(window._isAnalyzing, "Should not be analyzing");
         }
 
@@ -484,9 +483,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window._isAnalyzing = false;
             window._sourcePaths = new List<string> { _tempDir };
 
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
-
             window.StartAnalysis();
 
             AnalysisWaitResult result = default;
@@ -554,8 +550,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window._sourcePaths = new List<string> { _tempDir };
 
             // FinalizeAnalysis signals this, after HandleAnalysisCompletion runs.
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
 
             window.StartAnalysis();
 
@@ -582,7 +576,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 $"isAnalyzing should be false after proper wait. ImmediatelyReset: {immediatelyReset}. {result}"
             );
             Assert.IsTrue(
-                result.CompletionSourceSignaled,
+                result.UiCompletionObserved,
                 $"Completion source should be signaled after proper wait. {result}"
             );
         }
@@ -601,9 +595,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
             window._isAnalyzing = false;
             window._sourcePaths = new List<string> { _tempDir };
-
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
 
             window.StartAnalysis();
 
@@ -632,19 +623,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         /// <summary>
-        /// Test that WaitForAnalysisCompletion works correctly even when _analysisCompletionSource
-        /// is not set. In this case, it should fall back to checking _isAnalyzing.
+        /// Verifies that the actual analysis task completes and its queued UI state is applied.
         /// </summary>
         [UnityTest]
-        public IEnumerator WaitForAnalysisCompletionWorksWithoutCompletionSource()
+        public IEnumerator WaitForAnalysisCompletionObservesTheRealOperation()
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
-            AddCompilerDiagnostic("NoTCSTest.cs");
+            AddCompilerDiagnostic("RealOperationTest.cs");
 
             window._isAnalyzing = false;
             window._sourcePaths = new List<string> { _tempDir };
-
-            window._analysisCompletionSource = null;
 
             window.StartAnalysis();
 
@@ -653,11 +641,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
             Assert.IsFalse(
                 result.IsAnalyzing,
-                $"isAnalyzing should be false after completion without TCS. {result}"
+                $"isAnalyzing should be false after the actual operation completes. {result}"
             );
-            Assert.IsFalse(
-                result.CompletionSourceSignaled,
-                $"Completion source should NOT be signaled when null. {result}"
+            Assert.IsTrue(
+                result.AnalysisTaskCompleted,
+                $"The actual analysis task should complete. {result}"
+            );
+            Assert.AreEqual(
+                TaskStatus.RanToCompletion,
+                result.AnalysisTaskStatus,
+                result.ToString()
+            );
+            Assert.IsTrue(
+                result.UiCompletionObserved,
+                $"The queued completion should update the actual UI state. {result}"
             );
         }
 
@@ -676,9 +673,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
             window._isAnalyzing = false;
             window._sourcePaths = new List<string> { _tempDir };
-
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
 
             window.StartAnalysis();
 
@@ -712,8 +706,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             for (int iteration = 0; iteration < 3; ++iteration)
             {
                 window._isAnalyzing = false;
-                TaskCompletionSource<bool> tcs = new();
-                window._analysisCompletionSource = tcs;
 
                 window.StartAnalysis();
 
@@ -747,9 +739,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
             window._isAnalyzing = false;
             window._sourcePaths = new List<string> { _tempDir };
-
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
 
             window.StartAnalysis();
 
@@ -1783,9 +1772,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window._isAnalyzing = false;
             window._sourcePaths = new List<string> { _tempDir };
 
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
-
             bool initialIsAnalyzing = window._isAnalyzing;
             string initialStatus = window._statusMessage;
 
@@ -2086,34 +2072,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [Test]
-        public void AnalysisCompletionSourceIsSignaledOnCompletion()
-        {
-            UnityMethodAnalyzerWindow window = CreateWindow();
-
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
-
-            Assert.IsFalse(tcs.Task.IsCompleted, "TCS should not be completed initially");
-
-            window.ResetAnalysisState();
-            tcs.TrySetResult(true);
-
-            Assert.IsTrue(tcs.Task.IsCompleted, "TCS should be completed after TrySetResult");
-            Assert.IsTrue(tcs.Task.Result, "TCS result should be true");
-        }
-
-        [Test]
         public void FinalizeAnalysisResetsStateAndSignalsCompletion()
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
             window._isAnalyzing = true;
             window._analysisProgress = 0.5f;
 
             Assert.IsTrue(window._isAnalyzing, "Should be analyzing initially");
-            Assert.IsFalse(tcs.Task.IsCompleted, "TCS should not be completed initially");
+            Assert.IsFalse(!window._isAnalyzing, "Operation should initially be running");
 
             window._cancellationTokenSource = new CancellationTokenSource();
             window.CancelAnalysis();
@@ -2121,18 +2088,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.IsFalse(window._isAnalyzing, "Should not be analyzing after finalize");
             Assert.AreEqual(0f, window._analysisProgress, "Progress should be reset");
             Assert.IsTrue(
-                tcs.Task.IsCompleted,
-                "TCS should be completed after FinalizeAnalysis via CancelAnalysis"
+                !window._isAnalyzing,
+                "Operation should be complete after FinalizeAnalysis via CancelAnalysis"
             );
         }
 
         [Test]
-        public void FinalizeAnalysisIsIdempotentForTaskCompletionSource()
+        public void RepeatedCancellationKeepsTheOperationComplete()
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
             window._cancellationTokenSource = new CancellationTokenSource();
             window._isAnalyzing = true;
 
@@ -2140,8 +2105,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window.CancelAnalysis();
             window.CancelAnalysis();
 
-            Assert.IsTrue(tcs.Task.IsCompleted, "TCS should be completed");
-            Assert.IsTrue(tcs.Task.Result, "TCS result should be true");
+            Assert.IsTrue(!window._isAnalyzing, "Operation should be complete");
+            Assert.IsTrue(!window._isAnalyzing, "Operation should no longer be running");
         }
 
         [Test]
@@ -2162,21 +2127,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         /// <summary>
-        /// Data-driven test verifying that the TaskCompletionSource is always signaled
+        /// Data-driven test verifying that the analysis operation is always signaled
         /// when StartAnalysis is called with various source path configurations.
         /// </summary>
         [TestCase(
             null,
             true,
-            "TCS should be completed when source paths is null (no-op early return)"
+            "Operation should be complete when source paths is null (no-op early return)"
         )]
-        [TestCase(new string[0], true, "TCS should be completed when source paths is empty")]
+        [TestCase(new string[0], true, "Operation should be complete when source paths is empty")]
         [TestCase(
             new[] { "/nonexistent/path" },
             true,
-            "TCS should be completed when directories dont exist"
+            "Operation should be complete when directories dont exist"
         )]
-        public void TaskCompletionSourceIsSignaledWithVariousSourcePathConfigs(
+        public void AnalysisOperationCompletesWithVariousSourcePathConfigs(
             string[] sourcePaths,
             bool shouldComplete,
             string description
@@ -2184,21 +2149,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             UnityMethodAnalyzerWindow window = CreateWindow();
 
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
             window._sourcePaths = sourcePaths != null ? new List<string>(sourcePaths) : null;
 
             window.StartAnalysis();
 
             Assert.AreEqual(
                 shouldComplete,
-                tcs.Task.IsCompleted,
-                $"{description}. Task status: {tcs.Task.Status}"
+                !window._isAnalyzing,
+                $"{description}. Task status: {window._isAnalyzing}"
             );
 
-            if (tcs.Task.IsCompleted)
+            if (!window._isAnalyzing)
             {
-                Assert.IsTrue(tcs.Task.Result, "TCS result should be true when completed");
+                Assert.IsTrue(
+                    !window._isAnalyzing,
+                    "Operation should no longer be running when completed"
+                );
             }
         }
 
@@ -2651,9 +2617,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             window._isAnalyzing = false;
             window._sourcePaths = new List<string> { _tempDir };
 
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
-
             window.StartAnalysis();
 
             AnalysisWaitResult result = default;
@@ -2698,7 +2661,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         /// The analysis task completion triggers a ContinueWith callback that runs on a
         /// thread pool thread, which enqueues HandleAnalysisCompletion onto the main thread
         /// queue. There's a race between the task completing and the ContinueWith callback
-        /// actually running, so we must loop until the completion source is signaled
+        /// actually running, so we must loop until the operation is no longer running
         /// (which happens at the end of HandleAnalysisCompletion via FinalizeAnalysis).
         /// </remarks>
         private IEnumerator WaitForAnalysisCompletion(
@@ -2708,7 +2671,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         )
         {
             Task analysisTask = window._analysisTask;
-            TaskCompletionSource<bool> tcs = window._analysisCompletionSource;
+
             float startRealTime = Time.realtimeSinceStartup;
             int frameCount = 0;
 
@@ -2743,14 +2706,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
             /*
                 The ContinueWith runs on a thread pool thread and enqueues work on the main thread,
-                so flush and yield until the completion source is signaled -- which is what says
+                so flush and yield until the operation is no longer running -- which is what says
                 HandleAnalysisCompletion ran and called FinalizeAnalysis.
             */
             while ((Time.realtimeSinceStartup - startRealTime) < maxWaitTime)
             {
                 UnityMethodAnalyzerWindow.FlushMainThreadQueue();
 
-                bool completionSignaled = tcs != null && tcs.Task.IsCompleted;
+                bool completionSignaled = !window._isAnalyzing;
                 bool noLongerAnalyzing = !window._isAnalyzing;
 
                 if (completionSignaled || noLongerAnalyzing)
@@ -2781,8 +2744,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 FrameCount = frameCount,
                 AnalysisTaskCompleted = analysisTask != null && analysisTask.IsCompleted,
                 AnalysisTaskStatus = analysisTask?.Status ?? TaskStatus.Created,
-                CompletionSourceSignaled = tcs?.Task.IsCompleted ?? false,
-                CompletionSourceStatus = tcs?.Task.Status ?? TaskStatus.Created,
+                UiCompletionObserved = !window._isAnalyzing,
+                UiCompletionStatus = window._isAnalyzing
+                    ? TaskStatus.Running
+                    : TaskStatus.RanToCompletion,
                 IsAnalyzing = window._isAnalyzing,
                 Progress = window._analysisProgress,
                 StatusMessage = window._statusMessage,
@@ -2905,8 +2870,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             public int FrameCount;
             public bool AnalysisTaskCompleted;
             public TaskStatus AnalysisTaskStatus;
-            public bool CompletionSourceSignaled;
-            public TaskStatus CompletionSourceStatus;
+            public bool UiCompletionObserved;
+            public TaskStatus UiCompletionStatus;
             public bool IsAnalyzing;
             public float Progress;
             public string StatusMessage;
@@ -2915,7 +2880,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 return $"WaitTime: {WaitTime:F2}s, Frames: {FrameCount}, "
                     + $"AnalysisTaskCompleted: {AnalysisTaskCompleted}, AnalysisTaskStatus: {AnalysisTaskStatus}, "
-                    + $"TCSCompleted: {CompletionSourceSignaled}, TCSStatus: {CompletionSourceStatus}, "
+                    + $"UiCompletionObserved: {UiCompletionObserved}, UiCompletionStatus: {UiCompletionStatus}, "
                     + $"IsAnalyzing: {IsAnalyzing}, Progress: {Progress}, Status: '{StatusMessage}'";
             }
         }

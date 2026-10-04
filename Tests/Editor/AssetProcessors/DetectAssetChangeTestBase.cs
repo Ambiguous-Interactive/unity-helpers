@@ -31,17 +31,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             TestRoot + "/AlternatePayload.asset";
 
         /// <summary>
-        /// Path prefixes this fixture family is allowed to drive the processor through.
-        /// Scoped to <see cref="TestRoot"/> so assets created by any OTHER fixture are
-        /// structurally ignored even when
-        /// <see cref="DetectAssetChangeProcessor.IncludeTestAssets"/> is <see langword="true"/>.
-        /// Every setup / reset path in this base class and its derivatives must restore
-        /// this allowlist after calling
-        /// <see cref="DetectAssetChangeProcessor.ResetForTesting()"/> (which clears it).
-        /// </summary>
-        protected static readonly string[] FixtureAllowlist = { TestRoot + "/" };
-
-        /// <summary>
         /// Default path for the payload test asset.
         /// </summary>
         protected virtual string DefaultPayloadAssetPath => TestRoot + "/Payload.asset";
@@ -86,23 +75,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
         }
 
-        /// <summary>
-        /// Resets the processor with a clean state and ensures the test folder is properly registered.
-        /// This method should be called when a test needs to reinitialize the processor after the
-        /// standard SetUp has already run. It ensures the test folder exists before enabling test
-        /// asset inclusion to avoid "Folder not found" warnings from AssetDatabase.FindAssets.
-        /// Re-applies <see cref="FixtureAllowlist"/> after the reset so the structural
-        /// defense against cross-fixture pollution is preserved for the remainder of
-        /// the test.
-        /// </summary>
         protected static void ResetProcessorWithCleanState()
         {
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             EnsureTestFolder();
             // Force the watcher on because CI runs this fixture in batch mode.
             DetectAssetChangeProcessor.EnabledOverride = true;
-            DetectAssetChangeProcessor.IncludeTestAssets = true;
-            DetectAssetChangeProcessor.TestAssetFolderAllowlist = FixtureAllowlist;
         }
 
         /// <summary>
@@ -176,7 +154,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// <para>Relationship to the teardown-flush contract: the contract test
         /// <c>TestTeardownsThatClearHandlerStateFlushDeferralsFirst</c> accepts
         /// three call sites as flush-equivalents — a direct
-        /// <c>AssetPostprocessorDeferral.FlushForTesting()</c> call,
+        /// <c>AssetPostprocessorDeferralTestAccess.Flush()</c> call,
         /// <see cref="AssetPostprocessorTestHandlers.FlushAndClearAll"/>, or
         /// <see cref="AssetPostprocessorTestHandlers.AssertCleanAndClearAll"/>.
         /// Because this method's body IS a call to <c>FlushAndClearAll</c>,

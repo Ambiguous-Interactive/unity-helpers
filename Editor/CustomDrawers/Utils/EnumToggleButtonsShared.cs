@@ -758,13 +758,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             /// <summary>
             /// Creates a new toggle option.
             /// </summary>
-            /// <param name="label">The display label.</param>
+            /// <param name="label">The display label. Null, empty, or whitespace-only captions use "(Unnamed)"; nonblank captions remain exact.</param>
             /// <param name="value">The enum value.</param>
             /// <param name="flagValue">The numeric flag value.</param>
             /// <param name="isZeroFlag">Whether this is a zero flag.</param>
             public ToggleOption(string label, object value, ulong flagValue, bool isZeroFlag)
             {
-                Label = string.IsNullOrEmpty(label) ? "(Unnamed)" : label;
+                Label = string.IsNullOrWhiteSpace(label) ? "(Unnamed)" : label;
 
                 Value = value;
 

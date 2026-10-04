@@ -32,12 +32,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         // Reset closed-generic caches so retained domains cannot carry counts into the next run.
         private static void DropProbePools()
         {
-            SetBuffers<HashSetProbe>.ClearPoolsForTesting();
-            SetBuffers<LruProbe>.ClearPoolsForTesting();
-            SetBuffers<SortedSetProbe>.ClearPoolsForTesting();
-            SetBuffers<UnboundedProbe>.ClearPoolsForTesting();
-            SetBuffers<StableProbe>.ClearPoolsForTesting();
-            DictionaryBuffer<DictionaryProbe, int>.ClearPoolsForTesting();
+            SetBuffers<HashSetProbe>.HashSetCache.Clear();
+            SetBuffers<HashSetProbe>.SortedSetCache.Clear();
+            SetBuffers<LruProbe>.HashSetCache.Clear();
+            SetBuffers<LruProbe>.SortedSetCache.Clear();
+            SetBuffers<SortedSetProbe>.HashSetCache.Clear();
+            SetBuffers<SortedSetProbe>.SortedSetCache.Clear();
+            SetBuffers<UnboundedProbe>.HashSetCache.Clear();
+            SetBuffers<UnboundedProbe>.SortedSetCache.Clear();
+            SetBuffers<StableProbe>.HashSetCache.Clear();
+            SetBuffers<StableProbe>.SortedSetCache.Clear();
+            DictionaryBuffer<DictionaryProbe, int>.DictionaryCache.Clear();
+            DictionaryBuffer<DictionaryProbe, int>.SortedDictionaryCache.Clear();
         }
 
         [SetUp]

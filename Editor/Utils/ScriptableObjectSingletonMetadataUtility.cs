@@ -32,26 +32,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 );
             if (legacyMetadata != null)
             {
-                // Automatic migrations can open modal dialogs during tests; require explicit opt-in.
-                if (
-                    EditorUi.Suppress
-                    && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
-                )
+                // Automatic migrations honor editor UI suppression.
+                if (EditorUi.Suppress)
                 {
                     return legacyMetadata;
                 }
                 return MigrateLegacyMetadata(legacyMetadata);
             }
 
-            // Automatic asset creation can open modal failure dialogs during tests; require explicit opt-in.
-            if (
-                EditorUi.Suppress
-                && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
-            )
+            // Automatic asset creation honors editor UI suppression.
+            if (EditorUi.Suppress)
             {
                 return null;
             }
 
+            return CreateMetadataAsset();
+        }
+
+        /// <summary>Creates missing metadata after the caller resolves existing assets and creation policy.</summary>
+        internal static ScriptableObjectSingletonMetadata CreateMetadataAsset()
+        {
             if (!EnsureResourcesFolder())
             {
                 Debug.LogWarning(
@@ -94,11 +94,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             string assetGuid
         )
         {
-            // During tests, update existing metadata only unless asset creation is explicitly allowed.
-            if (
-                EditorUi.Suppress
-                && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
-            )
+            // Suppressed editor sessions may update existing metadata without creating assets.
+            if (EditorUi.Suppress)
             {
                 ScriptableObjectSingletonMetadata existing =
                     AssetDatabase.LoadAssetAtPath<ScriptableObjectSingletonMetadata>(
@@ -210,19 +207,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             EditorUtility.SetDirty(metadata);
             return staleEntries.Count;
-        }
-
-        /// <summary>
-        /// Resets legacy state for testing. AssetDatabase batch cleanup is now handled
-        /// by the unified <see cref="AssetDatabaseBatchHelper"/>.
-        /// </summary>
-        /// <remarks>
-        /// This method is kept for backward compatibility with test cleanup code.
-        /// The actual AssetDatabase state cleanup is handled by AssetDatabaseBatchHelper.ResetBatchDepth().
-        /// </remarks>
-        internal static void ResetAssetEditingDepthForTesting()
-        {
-            // CommonTestBase owns batch cleanup; this compatibility entry point remains inert.
         }
 
         /// <summary>

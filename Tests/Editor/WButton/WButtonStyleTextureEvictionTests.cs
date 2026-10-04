@@ -41,19 +41,19 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [SetUp]
         public void SetUp()
         {
-            WButtonStyles.TestHooks.ClearColoredStyleCaches();
+            WButtonStylesTestAccess.ClearColoredStyleCaches();
         }
 
         [TearDown]
         public void TearDown()
         {
-            WButtonStyles.TestHooks.ClearColoredStyleCaches();
+            WButtonStylesTestAccess.ClearColoredStyleCaches();
         }
 
         [Test]
         public void TheCacheStopsAtItsBound()
         {
-            int bound = WButtonStyles.TestHooks.MaxColoredButtonStyleCount;
+            int bound = WButtonStylesTestAccess.MaxColoredButtonStyleCount;
             Assert.Greater(bound, 0, "the bound must be positive for this to measure anything");
 
             for (int index = 0; index < bound * 2; ++index)
@@ -61,7 +61,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 _ = WButtonStyles.GetColoredButtonStyle(DistinctColor(index), Color.white);
             }
 
-            Assert.AreEqual(bound, WButtonStyles.TestHooks.ColoredButtonStyleCount);
+            Assert.AreEqual(bound, WButtonStylesTestAccess.ColoredButtonStyleCount);
         }
 
         /// <summary>
@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Texture2D background = style.normal.background;
             Assert.IsTrue(background != null, "the probe must have had a live background");
 
-            int bound = WButtonStyles.TestHooks.MaxColoredButtonStyleCount;
+            int bound = WButtonStylesTestAccess.MaxColoredButtonStyleCount;
             GUIStyle firstChurned = WButtonStyles.GetColoredButtonStyle(
                 DistinctColor(0),
                 Color.white
@@ -113,7 +113,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Texture2D background = style.normal.background;
             Assert.IsTrue(background != null, "the probe must have had a live background");
 
-            int bound = WButtonStyles.TestHooks.MaxColoredButtonStyleCount;
+            int bound = WButtonStylesTestAccess.MaxColoredButtonStyleCount;
             for (int index = 0; index < bound + 1; ++index)
             {
                 _ = WButtonStyles.GetColoredButtonStyle(DistinctColor(index), Color.white);
@@ -121,7 +121,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Assert.AreEqual(
                 bound,
-                WButtonStyles.TestHooks.ColoredButtonStyleCount,
+                WButtonStylesTestAccess.ColoredButtonStyleCount,
                 "the churn never reached the bound, so nothing was evicted"
             );
             Assert.IsTrue(background == null, "the evicted entry's texture outlived its entry");
@@ -136,11 +136,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
             Texture2D background = style.normal.background;
             Assert.IsTrue(background != null, "the probe must have had a live background");
-            Assert.AreEqual(1, WButtonStyles.TestHooks.ColoredButtonStyleCount);
+            Assert.AreEqual(1, WButtonStylesTestAccess.ColoredButtonStyleCount);
 
-            WButtonStyles.TestHooks.ClearColoredStyleCaches();
+            WButtonStylesTestAccess.ClearColoredStyleCaches();
 
-            Assert.AreEqual(0, WButtonStyles.TestHooks.ColoredButtonStyleCount);
+            Assert.AreEqual(0, WButtonStylesTestAccess.ColoredButtonStyleCount);
             Assert.IsTrue(background == null, "Clear dropped a texture without destroying it");
         }
     }

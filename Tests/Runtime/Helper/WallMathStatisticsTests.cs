@@ -1186,7 +1186,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             DisposalLease probe = DisposalLeases.Acquire();
             try
             {
-                int slot = probe.SlotForTests;
+                int slot = probe._slot;
                 bool released = probe.TryClaim();
                 long before = DisposalLeases.CurrentGeneration(slot);
                 /*
@@ -1217,11 +1217,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             DisposalLease balanced = default;
             try
             {
-                int slot = probe.SlotForTests;
+                int slot = probe._slot;
                 bool released = probe.TryClaim();
                 long before = DisposalLeases.CurrentGeneration(slot);
                 balanced = DisposalLeases.Acquire();
-                int reusedSlot = balanced.SlotForTests;
+                int reusedSlot = balanced._slot;
                 bool balancedReleased = balanced.TryClaim();
                 long after = DisposalLeases.CurrentGeneration(slot);
 

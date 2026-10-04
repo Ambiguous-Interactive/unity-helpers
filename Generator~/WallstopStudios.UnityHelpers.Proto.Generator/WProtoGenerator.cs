@@ -527,7 +527,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// The nearest ancestor that carries <c>[WProtoContract]</c>, or <c>null</c>.
+        /// The nearest declared contract before an opt-out boundary, or <c>null</c>.
         /// </summary>
         /// <param name="symbol">The type to walk up from.</param>
         /// <returns>The declared contract this type inherits its serialization from.</returns>
@@ -535,6 +535,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             for (INamedTypeSymbol current = symbol; current != null; current = current.BaseType)
             {
+                if (HasAttribute(current, NotSerializedAttribute))
+                {
+                    return null;
+                }
+
                 if (HasAttribute(current, ContractAttribute))
                 {
                     return current;
@@ -2767,13 +2772,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("internal static class WProtoGeneratedRegistrar" + Writer.Open);
             writer.Indent();
 
-            writer.Line("#if UNITY_INCLUDE_TESTS");
-            writer.Line(
-                "internal static long FirstRegistrationElapsedTimestampTicks { get; private set; }"
-            );
-            writer.Line("internal static bool HasRecordedFirstRegistration { get; private set; }");
-            writer.Line("#endif");
-
             // BeforeSceneLoad follows built-in SubsystemRegistration so consumer formatter replacements win.
             writer.Line("#if UNITY_5_3_OR_NEWER");
             writer.Line("#if UNITY_EDITOR");
@@ -2790,11 +2788,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("#endif");
             writer.Line("internal static void Register()" + Writer.Open);
             writer.Indent();
-            writer.Line("#if UNITY_INCLUDE_TESTS");
-            writer.Line(
-                "long registrationStarted = global::System.Diagnostics.Stopwatch.GetTimestamp();"
-            );
-            writer.Line("#endif");
             writer.Line(Proto + ".WProtoScalarFormatters.RegisterAll();");
             foreach (INamedTypeSymbol enumClosure in enumClosures)
             {
@@ -2855,17 +2848,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 writer.Line(Proto + ".WProtoDeclaredRootProvider.Register" + declaredRoot + "();");
             }
-
-            writer.Line("#if UNITY_INCLUDE_TESTS");
-            writer.Line("if (!HasRecordedFirstRegistration)" + Writer.Open);
-            writer.Indent();
-            writer.Line(
-                "FirstRegistrationElapsedTimestampTicks = global::System.Diagnostics.Stopwatch.GetTimestamp() - registrationStarted;"
-            );
-            writer.Line("HasRecordedFirstRegistration = true;");
-            writer.Outdent();
-            writer.Line("}");
-            writer.Line("#endif");
 
             writer.Outdent();
             writer.Line("}");
@@ -3357,6 +3339,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     type,
                     NamedFlag(attribute, "IsRequired"),
                     NamedFlag(attribute, "OverwriteList"),
+                    NamedFlag(attribute, "IsPacked", true),
                     zigZag,
                     surrogates,
                     nested,
@@ -3592,7 +3575,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return false;
         }
 
-        private static bool NamedFlag(AttributeData attribute, string name)
+        private static bool NamedFlag(
+            AttributeData attribute,
+            string name,
+            bool defaultValue = false
+        )
         {
             foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
             {
@@ -3605,7 +3592,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
-            return false;
+            return defaultValue;
         }
 
         private static bool HasAccessibleParameterlessConstructor(INamedTypeSymbol contract)

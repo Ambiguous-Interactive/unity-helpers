@@ -1064,6 +1064,15 @@ source warning from proving that every possible owner has surrendered its right 
 [compiler restrictions](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/ref-struct)
 do not provide move-only ownership.
 
+The host compiler fixture [DisposalOwnershipCompilerTests](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Generator~/WallstopStudios.UnityHelpers.Analyzers.Tests/DisposalOwnershipCompilerTests.cs)
+compiles the actual shipped `SemaphoreLease` and `DisposalLease` sources at C# 9, with and without
+`SINGLE_THREADED`. Assignment, by-value calls, closure capture, static-field retention, repeated
+`Dispose`, and manual disposal inside `using` compile without either disposal analyzer reporting a
+warning. A separate positive control confirms interface boxing produces WUH022, then compiles the
+same conversion with a local warning suppression and receives no analyzer diagnostic. These tests
+pin the boundary between advisory source checks and runtime ownership; they do not measure Unity
+player timing or allocation.
+
 The runtime sweep identified `DisposableScope`, `DisposableScope<TPrevious>`, `SemaphoreLease`,
 `PooledResource<T>`, and `PooledArray<T>` using shared `(slot, generation)` disposal leases.
 `RestorableGlobal<T>` and editor global scopes use owner-issued borrow identifiers, which also

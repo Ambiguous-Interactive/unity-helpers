@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            ProtoSchemaExporterWindow.SuppressUserPrompts = true;
+
             _window = Track(ScriptableObject.CreateInstance<ProtoSchemaExporterWindow>());
             _outputPath = Path.Combine(
                 Path.Combine(Application.temporaryCachePath, OutputDirectory),
@@ -73,7 +73,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 File.Delete(_outputPath);
             }
 
-            ProtoSchemaExporterWindow.SuppressUserPrompts = false;
             base.TearDown();
         }
 
@@ -96,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void ExportWithoutContractsReportsInsteadOfWriting()
         {
-            _window.SetSelectedAssembliesForTest(Array.Empty<string>());
+            SetSelectedAssemblies(Array.Empty<string>());
 
             Assert.IsFalse(_window.ExportSchemaToPath(_outputPath));
             Assert.IsFalse(File.Exists(_outputPath), "Nothing selected must not write a file.");
@@ -105,9 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void IndividualContractsCanBeSelectedWithinAnAssembly()
         {
-            _window.SetSelectedContractsForTest(
-                new[] { typeof(ProtoSchemaExporterSampleContract) }
-            );
+            SetSelectedContracts(new[] { typeof(ProtoSchemaExporterSampleContract) });
 
             Assert.IsTrue(_window.ExportSchemaToPath(_outputPath));
 
@@ -120,8 +117,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public void PerAssemblyExportWritesOneNamedSchemaForTheSelectedAssembly()
         {
             string assemblyName = typeof(ProtoSchemaExporterSampleContract).Assembly.GetName().Name;
-            _window.ExportLayoutForTest = ProtoSchemaExporterWindow.ExportLayout.OneFilePerAssembly;
-            _window.SetSelectedAssembliesForTest(new[] { assemblyName });
+            _window._exportLayout = ProtoSchemaExporterWindow.ExportLayout.OneFilePerAssembly;
+            SetSelectedAssemblies(new[] { assemblyName });
 
             string outputDirectory = ExportToDirectory("per-assembly");
             try
@@ -141,10 +138,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void PerNamespaceExportGroupsEveryContractOfOneNamespaceIntoOneFile()
         {
-            _window.ExportLayoutForTest = ProtoSchemaExporterWindow
-                .ExportLayout
-                .OneFilePerNamespace;
-            _window.SetSelectedContractsForTest(SampleContracts);
+            _window._exportLayout = ProtoSchemaExporterWindow.ExportLayout.OneFilePerNamespace;
+            SetSelectedContracts(SampleContracts);
 
             string outputDirectory = ExportToDirectory("per-namespace");
             try
@@ -168,8 +163,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void PerContractExportWritesOneSelfContainedFilePerType()
         {
-            _window.ExportLayoutForTest = ProtoSchemaExporterWindow.ExportLayout.OneFilePerContract;
-            _window.SetSelectedContractsForTest(SampleContracts);
+            _window._exportLayout = ProtoSchemaExporterWindow.ExportLayout.OneFilePerContract;
+            SetSelectedContracts(SampleContracts);
 
             string outputDirectory = ExportToDirectory("per-contract");
             try
@@ -193,8 +188,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void AProtoPackageIsWrittenIntoEverySchema()
         {
-            _window.PackageNameForTest = "mygame.save";
-            _window.SetSelectedContractsForTest(SampleContracts);
+            _window._packageName = "mygame.save";
+            SetSelectedContracts(SampleContracts);
 
             Assert.IsTrue(_window.ExportSchemaToPath(_outputPath));
             StringAssert.Contains("package mygame.save;", File.ReadAllText(_outputPath));
@@ -207,13 +202,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [TestCase("has-hyphen")]
         public void AMalformedProtoPackageRefusesInsteadOfWriting(string packageName)
         {
-            _window.PackageNameForTest = packageName;
-            _window.SetSelectedContractsForTest(SampleContracts);
+            _window._packageName = packageName;
+            SetSelectedContracts(SampleContracts);
 
-            Assert.IsFalse(_window.HasUsablePackageNameForTest);
+            Assert.IsFalse(_window.HasUsablePackageName());
             Assert.IsFalse(_window.ExportSchemaToPath(_outputPath));
             Assert.IsFalse(File.Exists(_outputPath), "A refused package must not write a file.");
-            StringAssert.Contains("not a proto3 package", _window.LastStatusForTest);
+            StringAssert.Contains("not a proto3 package", _window._lastStatus);
         }
 
         [TestCase("")]
@@ -223,26 +218,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [TestCase("_leading.Underscore")]
         public void AnOmittedOrWellFormedProtoPackageIsAccepted(string packageName)
         {
-            _window.PackageNameForTest = packageName;
+            _window._packageName = packageName;
 
-            Assert.IsTrue(_window.HasUsablePackageNameForTest);
+            Assert.IsTrue(_window.HasUsablePackageName());
         }
 
         [Test]
         public void TheSearchFilterMatchesTypeAndAssemblyNames()
         {
-            _window.SearchFilterForTest = nameof(ProtoSchemaExporterSecondSampleContract);
+            _window._searchFilter = nameof(ProtoSchemaExporterSecondSampleContract);
 
             CollectionAssert.AreEquivalent(
                 new[] { typeof(ProtoSchemaExporterSecondSampleContract) },
-                _window.VisibleContractsForTest
+                VisibleContracts()
             );
 
-            _window.SearchFilterForTest = typeof(ProtoSchemaExporterSampleContract)
+            _window._searchFilter = typeof(ProtoSchemaExporterSampleContract)
                 .Assembly.GetName()
                 .Name;
 
-            CollectionAssert.IsSupersetOf(_window.VisibleContractsForTest, SampleContracts);
+            CollectionAssert.IsSupersetOf(VisibleContracts(), SampleContracts);
         }
 
         /// <summary>
@@ -253,37 +248,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void EveryDeselectionReachesTheSerializedFieldImmediately()
         {
-            string secondKey = ProtoSchemaExporterWindow.ContractKeyForTest(
+            string secondKey = ProtoSchemaExporterWindow.ContractKey(
                 typeof(ProtoSchemaExporterSecondSampleContract)
             );
-            string firstKey = ProtoSchemaExporterWindow.ContractKeyForTest(
+            string firstKey = ProtoSchemaExporterWindow.ContractKey(
                 typeof(ProtoSchemaExporterSampleContract)
             );
 
-            _window.SetSelectedContractsForTest(
-                new[] { typeof(ProtoSchemaExporterSampleContract) }
-            );
+            SetSelectedContracts(new[] { typeof(ProtoSchemaExporterSampleContract) });
 
-            CollectionAssert.Contains(_window.PersistedExclusionsForTest, secondKey);
-            CollectionAssert.DoesNotContain(_window.PersistedExclusionsForTest, firstKey);
+            CollectionAssert.Contains(_window._excludedContractKeys, secondKey);
+            CollectionAssert.DoesNotContain(_window._excludedContractKeys, firstKey);
         }
 
         [Test]
         public void RestoringTheSerializedStateRebuildsTheLiveSelection()
         {
-            _window.SetSelectedContractsForTest(
-                new[] { typeof(ProtoSchemaExporterSampleContract) }
-            );
+            SetSelectedContracts(new[] { typeof(ProtoSchemaExporterSampleContract) });
 
             // What a domain reload does: the serialized list survives and OnEnable rebuilds the runtime set.
             _window.RestoreSelectionState();
 
             CollectionAssert.DoesNotContain(
-                _window.SelectedContractsForTest,
+                _window.SelectedContracts(),
                 typeof(ProtoSchemaExporterSecondSampleContract)
             );
             CollectionAssert.Contains(
-                _window.SelectedContractsForTest,
+                _window.SelectedContracts(),
                 typeof(ProtoSchemaExporterSampleContract)
             );
         }
@@ -291,18 +282,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void ARefreshKeepsDeselectionsAndAdmitsEverythingElse()
         {
-            _window.SetSelectedContractsForTest(
-                new[] { typeof(ProtoSchemaExporterSampleContract) }
-            );
+            SetSelectedContracts(new[] { typeof(ProtoSchemaExporterSampleContract) });
 
             _window.RefreshInventory();
 
             CollectionAssert.Contains(
-                _window.SelectedContractsForTest,
+                _window.SelectedContracts(),
                 typeof(ProtoSchemaExporterSampleContract)
             );
             CollectionAssert.DoesNotContain(
-                _window.SelectedContractsForTest,
+                _window.SelectedContracts(),
                 typeof(ProtoSchemaExporterSecondSampleContract)
             );
         }
@@ -315,13 +304,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public void EveryFileLayoutIsLabelledAndSelectable()
         {
             Assert.AreEqual(
-                ProtoSchemaExporterWindow.SelectableLayoutsForTest.Count,
-                ProtoSchemaExporterWindow.LayoutLabelsForTest.Count,
+                ProtoSchemaExporterWindow.SelectableLayouts.Length,
+                ProtoSchemaExporterWindow.LayoutLabels.Length,
                 "Every selectable layout needs exactly one label."
             );
-            CollectionAssert.AllItemsAreUnique(ProtoSchemaExporterWindow.SelectableLayoutsForTest);
+            CollectionAssert.AllItemsAreUnique(ProtoSchemaExporterWindow.SelectableLayouts);
             CollectionAssert.DoesNotContain(
-                ProtoSchemaExporterWindow.SelectableLayoutsForTest,
+                ProtoSchemaExporterWindow.SelectableLayouts,
                 default(ProtoSchemaExporterWindow.ExportLayout),
                 "The obsolete zero value must never be offered."
             );
@@ -334,32 +323,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
             Assert.AreEqual(
                 "Game_Save.proto",
-                ProtoSchemaExporterWindow.UniqueFileNameForTest("Game:Save", used)
+                ProtoSchemaExporterWindow.UniqueFileName("Game:Save", used)
             );
             Assert.AreEqual(
                 "Game_Save-2.proto",
-                ProtoSchemaExporterWindow.UniqueFileNameForTest("Game/Save", used)
+                ProtoSchemaExporterWindow.UniqueFileName("Game/Save", used)
             );
             Assert.AreEqual(
                 "Global.proto",
-                ProtoSchemaExporterWindow.UniqueFileNameForTest(string.Empty, used)
+                ProtoSchemaExporterWindow.UniqueFileName(string.Empty, used)
             );
         }
 
         [Test]
         public void AFailedExportIsReportedAsAFailure()
         {
-            _window.PackageNameForTest = "1bad";
+            _window._packageName = "1bad";
 
             Assert.IsFalse(_window.ExportSchemaToPath(_outputPath));
             Assert.IsTrue(
-                _window.LastStatusIsFailureForTest,
+                _window._lastStatusIsFailure,
                 "A refusal must not read as an informational status."
             );
 
-            _window.PackageNameForTest = string.Empty;
+            _window._packageName = string.Empty;
             Assert.IsTrue(_window.ExportSchemaToPath(_outputPath));
-            Assert.IsFalse(_window.LastStatusIsFailureForTest);
+            Assert.IsFalse(_window._lastStatusIsFailure);
         }
 
         /// <summary>
@@ -379,7 +368,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             try
             {
                 Assert.IsFalse(_window.ExportSchemaToPath(directoryPath));
-                StringAssert.Contains("Could not write", _window.LastStatusForTest);
+                StringAssert.Contains("Could not write", _window._lastStatus);
             }
             finally
             {
@@ -472,9 +461,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void DirectExporterMatchesTheWindowForOneSelectedContract()
         {
-            _window.SetSelectedContractsForTest(
-                new[] { typeof(ProtoSchemaExporterSampleContract) }
-            );
+            SetSelectedContracts(new[] { typeof(ProtoSchemaExporterSampleContract) });
             Assert.IsTrue(_window.ExportSchemaToPath(_outputPath));
             string windowSchema = File.ReadAllText(_outputPath);
 
@@ -503,11 +490,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 leafName
             );
             DeleteDirectory(outputDirectory);
-            Assert.IsTrue(
-                _window.ExportSchemasToDirectory(outputDirectory),
-                _window.LastStatusForTest
-            );
+            Assert.IsTrue(_window.ExportSchemasToDirectory(outputDirectory), _window._lastStatus);
             return outputDirectory;
+        }
+
+        private List<Type> VisibleContracts()
+        {
+            List<Type> visible = new();
+            foreach (Type contract in _window._contracts)
+            {
+                if (_window.IsVisible(contract))
+                {
+                    visible.Add(contract);
+                }
+            }
+            return visible;
+        }
+
+        private void SetSelectedContracts(IEnumerable<Type> contracts)
+        {
+            _window.SetSelection(_window._contracts, false);
+            _window.SetSelection(contracts ?? Array.Empty<Type>(), true);
+        }
+
+        private void SetSelectedAssemblies(IEnumerable<string> assemblyNames)
+        {
+            HashSet<string> selectedAssemblies = new(
+                assemblyNames ?? Array.Empty<string>(),
+                StringComparer.Ordinal
+            );
+            _window.SetSelection(_window._contracts, false);
+            List<Type> selected = new();
+            foreach (Type contract in _window._contracts)
+            {
+                if (selectedAssemblies.Contains(ProtoSchemaExporterWindow.AssemblyNameOf(contract)))
+                {
+                    selected.Add(contract);
+                }
+            }
+            _window.SetSelection(selected, true);
         }
     }
 

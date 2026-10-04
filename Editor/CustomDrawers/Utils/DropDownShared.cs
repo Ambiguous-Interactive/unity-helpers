@@ -144,7 +144,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         public static readonly GUIContent EmptyResultsContent = new(EmptyResultsMessage);
 
-        private static readonly Cache<object, string> FormattedOptionCache = CacheBuilder<
+        internal static readonly Cache<object, string> FormattedOptionCache = CacheBuilder<
             object,
             string
         >
@@ -152,12 +152,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             .MaximumSize(MaxFormattedOptionCacheEntries)
             .InitialCapacity(16)
             .Build();
+        internal static GUIStyle s_optionButton;
         private static readonly Dictionary<Type, string[]> EnumDisplayNameCache = new();
         private static readonly Dictionary<int, string> FallbackOptionLabelCache = new();
 
         private static float s_cachedOptionControlHeight = -1f;
         private static float s_cachedOptionRowHeight = -1f;
-        private static GUIStyle s_optionButton;
         private static GUIStyle s_selectedOptionButton;
         private static GUIStyle s_paginationButtonLeft;
         private static GUIStyle s_paginationButtonRight;
@@ -565,7 +565,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             return cached;
         }
 
-        private static void EnsureStylesInitialized()
+        internal static void EnsureStylesInitialized()
         {
             if (s_optionButton != null)
             {
@@ -594,54 +594,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 alignment = TextAnchor.MiddleCenter,
                 padding = new RectOffset(0, 0, 0, 0),
             };
-        }
-
-        /// <summary>
-        /// Test hooks for unit testing internal functionality.
-        /// </summary>
-        internal static class TestHooks
-        {
-            /// <summary>
-            /// Gets the number of formatted option labels currently retained, for testing.
-            /// </summary>
-            public static int FormattedOptionCacheCount => FormattedOptionCache.Count;
-
-            /// <summary>
-            /// Gets the option button margin vertical value for testing.
-            /// </summary>
-            public static int OptionButtonMarginVertical
-            {
-                get
-                {
-                    EnsureStylesInitialized();
-                    return s_optionButton.margin?.vertical ?? 0;
-                }
-            }
-
-            /// <summary>
-            /// Gets the option footer padding for testing.
-            /// </summary>
-            public static float OptionFooterPadding => OptionBottomPadding;
-
-            /// <summary>
-            /// Gets the popup width value for testing.
-            /// </summary>
-            public static float PopupWidthValue => PopupWidth;
-
-            /// <summary>
-            /// Gets the empty search horizontal padding value for testing.
-            /// </summary>
-            public static float EmptySearchHorizontalPaddingValue => EmptySearchHorizontalPadding;
-
-            /// <summary>
-            /// Gets the empty results message value for testing.
-            /// </summary>
-            public static string EmptyResultsMessageValue => EmptyResultsMessage;
-
-            /// <summary>
-            /// Gets the empty search extra padding value for testing.
-            /// </summary>
-            public static float EmptySearchExtraPaddingValue => EmptySearchExtraPadding;
         }
     }
 #endif

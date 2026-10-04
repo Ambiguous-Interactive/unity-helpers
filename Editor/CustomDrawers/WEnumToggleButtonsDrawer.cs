@@ -1385,9 +1385,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         internal bool IsZeroFlag { get; }
 
+        // Caption fallback does not normalize the independently stored option value.
         internal ToggleOption(string label, object value, ulong flagValue, bool isZeroFlag)
         {
-            Label = string.IsNullOrEmpty(label) ? "(Unnamed)" : label;
+            Label = string.IsNullOrWhiteSpace(label) ? "(Unnamed)" : label;
             Value = value;
             FlagValue = flagValue;
             IsZeroFlag = isZeroFlag;

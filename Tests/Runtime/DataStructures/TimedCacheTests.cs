@@ -15,6 +15,155 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class TimedCacheTests
     {
+        [TestCase(1f, 0f, 1)]
+        [TestCase(0f, 0f, 1)]
+        [TestCase(-1f, 0f, 2)]
+        [TestCase(0f, 1f, 1)]
+        [TestCase(-1f, 1f, 1)]
+        [TestCase(-2f, 1f, 2)]
+        public void LargeLifetimeAndJitterRetainSmallElapsedResidual(
+            float startTime,
+            float jitter,
+            int expectedValue
+        )
+        {
+            float now = startTime;
+            int calls = 0;
+            TimedCache<int> cache = new(
+                () => ++calls,
+                float.MaxValue,
+                useJitter: true,
+                timeProvider: () => now,
+                jitterOverride: jitter
+            );
+            Assert.AreEqual(1, cache.Value);
+            now = float.MaxValue;
+            Assert.AreEqual(expectedValue, cache.Value);
+        }
+
+        [Test]
+        public void ResetDiscardsLargeLifetimeJitterResidual()
+        {
+            float now = -1f;
+            int calls = 0;
+            TimedCache<int> cache = new(
+                () => ++calls,
+                float.MaxValue,
+                useJitter: true,
+                timeProvider: () => now,
+                jitterOverride: 1f
+            );
+            Assert.AreEqual(1, cache.Value);
+            cache.Reset();
+            Assert.AreEqual(2, cache.Value);
+            now = float.MaxValue;
+            Assert.AreEqual(3, cache.Value);
+        }
+
+        [TestCase(16777216f, 3f, 0f, 16777220f)]
+        [TestCase(-33554432f, 3f, 0f, -33554428f)]
+        [TestCase(-float.MaxValue, float.MaxValue * 0.75f, float.MaxValue * 0.75f, float.MaxValue)]
+        public void ExpirationPreservesFiniteElapsedTime(
+            float initialTime,
+            float lifetime,
+            float jitter,
+            float expiredTime
+        )
+        {
+            float now = initialTime;
+            int calls = 0;
+            TimedCache<int> cache = new(
+                () => ++calls,
+                lifetime,
+                useJitter: true,
+                timeProvider: () => now,
+                jitterOverride: jitter
+            );
+            Assert.AreEqual(1, cache.Value);
+            now = initialTime + 2f;
+            Assert.AreEqual(1, cache.Value);
+            now = expiredTime;
+            Assert.AreEqual(2, cache.Value);
+            Assert.AreEqual(2, cache.Value);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void FailedRefreshPreservesValueTimerAndInitialJitter(bool manualReset)
+        {
+            float now = 0f;
+            int calls = 0;
+            bool failClock = false;
+            int clockReads = 0;
+            TimedCache<int> cache = new(
+                () => ++calls,
+                1f,
+                useJitter: true,
+                timeProvider: () =>
+                {
+                    ++clockReads;
+                    if (failClock && (manualReset || 1 < clockReads))
+                    {
+                        throw new InvalidOperationException();
+                    }
+                    return now;
+                },
+                jitterOverride: 2f
+            );
+            Assert.AreEqual(1, cache.Value);
+            now = 4f;
+            failClock = true;
+            clockReads = 0;
+            if (manualReset)
+            {
+                Assert.Throws<InvalidOperationException>(() => cache.Reset());
+            }
+            else
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                {
+                    _ = cache.Value;
+                });
+            }
+            failClock = false;
+            now = 2f;
+            Assert.AreEqual(1, cache.Value);
+            now = 4f;
+            int refreshed = cache.Value;
+            Assert.AreEqual(calls, refreshed);
+            now = 5.5f;
+            Assert.AreEqual(refreshed + 1, cache.Value);
+        }
+
+        [Test]
+        public void FailedProducerPreservesInitialJitter()
+        {
+            float now = 0f;
+            int calls = 0;
+            bool failProducer = false;
+            TimedCache<int> cache = new(
+                () => failProducer ? throw new InvalidOperationException() : ++calls,
+                1f,
+                useJitter: true,
+                timeProvider: () => now,
+                jitterOverride: 2f
+            );
+            Assert.AreEqual(1, cache.Value);
+            now = 4f;
+            failProducer = true;
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                _ = cache.Value;
+            });
+            failProducer = false;
+            now = 2f;
+            Assert.AreEqual(1, cache.Value);
+            now = 4f;
+            Assert.AreEqual(2, cache.Value);
+            now = 5.5f;
+            Assert.AreEqual(3, cache.Value);
+        }
+
         [Test]
         public void ConstructorValidatesArguments()
         {
@@ -379,22 +528,32 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Jitter should delay expiration. Now={time.Now:F3}s, jitter={jitterOverride:F3}s."
             );
 
-            float deltaToBoundary = MathF.Max(jitterOverride - Epsilon, 0f);
-            if (0f < deltaToBoundary)
+            double expiration = (double)CacheTtl + jitterOverride;
+            float lastCachedTime = (float)expiration;
+            if (expiration < lastCachedTime)
             {
-                time.Advance(deltaToBoundary);
-                Assert.AreEqual(
-                    1,
-                    cache.Value,
-                    $"Cache expired before reaching TTL + jitter. Now={time.Now:F3}s, boundary={(CacheTtl + jitterOverride):F3}s."
+                lastCachedTime = BitConverter.Int32BitsToSingle(
+                    BitConverter.SingleToInt32Bits(lastCachedTime) - 1
                 );
             }
+            float firstExpiredTime = BitConverter.Int32BitsToSingle(
+                BitConverter.SingleToInt32Bits(lastCachedTime) + 1
+            );
+            Assert.IsTrue(lastCachedTime <= expiration);
+            Assert.IsTrue(expiration < firstExpiredTime);
 
-            time.Advance(Epsilon * 2f);
+            time.Now = lastCachedTime;
+            Assert.AreEqual(
+                1,
+                cache.Value,
+                $"Cache expired before TTL + jitter. Now={time.Now:R}s, boundary={expiration:R}s."
+            );
+
+            time.Now = firstExpiredTime;
             Assert.AreEqual(
                 2,
                 cache.Value,
-                $"Cache failed to expire after surpassing TTL + jitter. Now={time.Now:F3}s, boundary={(CacheTtl + jitterOverride):F3}s."
+                $"Cache failed to expire beyond TTL + jitter. Now={time.Now:R}s, boundary={expiration:R}s."
             );
             Assert.AreEqual(
                 2,

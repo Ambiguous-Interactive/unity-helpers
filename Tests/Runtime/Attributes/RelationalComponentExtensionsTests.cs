@@ -55,7 +55,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             [Values(0, 1, 2)] int capability
         )
         {
-            using IDisposable scope = ReflectionHelpers.OverrideReflectionCapabilities(
+            using IDisposable scope = new ReflectionCapabilityScope(
                 capability == 0,
                 capability == 1
             );

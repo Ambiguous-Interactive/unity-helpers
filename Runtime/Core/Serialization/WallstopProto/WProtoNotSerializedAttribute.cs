@@ -23,7 +23,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <para>
     /// It is a statement about this type alone, and it stops the walk: a subclass of an opted-out
     /// type has no serialized ancestor between it and the contract either, so nothing writes it as
-    /// the contract and nothing generates for it.
+    /// the contract and nothing generates for it. Cross-assembly inheritance diagnostics also
+    /// stop at this boundary rather than treating an unannotated descendant as a contract.
     /// </para>
     /// <para>
     /// A promise rather than an enforcement. A contract that is neither sealed nor a value type

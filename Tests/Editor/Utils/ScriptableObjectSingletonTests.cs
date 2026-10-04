@@ -284,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnitySetUp]
         public IEnumerator SetUp()
         {
-            RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+            RuntimeStateTestUtilities.PrepareForSceneLoad();
             _previousEditorUiSuppress = EditorUi.Suppress;
             EditorUi.Suppress = true;
 
@@ -835,7 +835,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             MissingResourceSingleton.ClearInstance();
             Assert.IsFalse(MissingResourceSingleton._lazyInstance.IsValueCreated);
 
-            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            RuntimeStateTestUtilities.SimulateApplicationQuitting();
             try
             {
                 Assert.IsTrue(MissingResourceSingleton.Instance == null);
@@ -843,7 +843,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             finally
             {
-                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+                RuntimeStateTestUtilities.PrepareForSceneLoad();
             }
 
             yield break;
@@ -855,7 +855,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestSingleton loaded = TestSingleton.Instance;
             Assert.IsTrue(loaded != null);
 
-            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            RuntimeStateTestUtilities.SimulateApplicationQuitting();
             try
             {
                 Assert.AreSame(loaded, TestSingleton.Instance);
@@ -863,7 +863,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             finally
             {
-                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+                RuntimeStateTestUtilities.PrepareForSceneLoad();
             }
 
             yield break;
@@ -957,13 +957,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
+            if (
+                AssetDatabase.LoadAssetAtPath<ScriptableObjectSingletonMetadata>(
+                    ScriptableObjectSingletonMetadata.AssetPath
+                ) == null
+            )
+            {
+                Assert.IsTrue(
+                    ScriptableObjectSingletonMetadataUtility.CreateMetadataAsset() != null,
+                    "The fixture must create real metadata before testing singleton entry updates under suppression."
+                );
+            }
+
             using (
                 SingletonCreatorTestScope scope = SingletonCreatorTestScope.RestrictTo(
                     scenario.SingletonType
                 )
             )
             {
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             }
             yield return null;
 
@@ -1146,7 +1158,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             using (SingletonCreatorTestScope.RestrictTo(typeof(DeepPathResourceSingleton)))
             {
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             }
 
             DeepPathResourceSingleton.ClearInstance();
@@ -1277,7 +1289,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestSingleton.ClearInstance();
             yield return null;
 
-            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            RuntimeStateTestUtilities.SimulateApplicationQuitting();
             Task task;
             try
             {
@@ -1293,7 +1305,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             finally
             {
-                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+                RuntimeStateTestUtilities.PrepareForSceneLoad();
             }
 
             Assert.IsTrue(task.IsFaulted);
@@ -1402,7 +1414,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             private readonly bool _previousIncludeTests;
             private readonly bool _previousIgnoreExclusion;
             private readonly bool _previousAllowAssetCreation;
-            private readonly bool _previousIgnoreCompilationState;
+
             private readonly Func<Type, bool> _previousFilter;
 
             private SingletonCreatorTestScope(Type[] allowedTypes)
@@ -1419,20 +1431,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 EnsureMetadataFolder();
 
                 System.Collections.Generic.HashSet<Type> allowed = new(allowedTypes);
-                _previousIncludeTests = ScriptableObjectSingletonCreator.IncludeTestAssemblies;
+                _previousIncludeTests =
+                    ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies;
                 _previousIgnoreExclusion =
-                    ScriptableObjectSingletonCreator.IgnoreExclusionAttribute;
+                    ScriptableObjectSingletonCreatorTestAccess.IgnoreExclusionAttribute;
                 _previousAllowAssetCreation =
-                    ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression;
-                _previousIgnoreCompilationState =
-                    ScriptableObjectSingletonCreator.IgnoreCompilationState;
-                _previousFilter = ScriptableObjectSingletonCreator.TypeFilter;
-                ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-                ScriptableObjectSingletonCreator.IgnoreExclusionAttribute = true;
-                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
+                    ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression;
+
+                _previousFilter = ScriptableObjectSingletonCreatorTestAccess.TypeFilter;
+                ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = true;
+                ScriptableObjectSingletonCreatorTestAccess.IgnoreExclusionAttribute = true;
+                ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression =
+                    true;
                 // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
-                ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
-                ScriptableObjectSingletonCreator.TypeFilter = type =>
+
+                ScriptableObjectSingletonCreatorTestAccess.TypeFilter = type =>
                 {
                     if (!allowed.Contains(type))
                     {
@@ -1481,14 +1494,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             public void Dispose()
             {
-                ScriptableObjectSingletonCreator.TypeFilter = _previousFilter;
-                ScriptableObjectSingletonCreator.IncludeTestAssemblies = _previousIncludeTests;
-                ScriptableObjectSingletonCreator.IgnoreExclusionAttribute =
+                ScriptableObjectSingletonCreatorTestAccess.TypeFilter = _previousFilter;
+                ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies =
+                    _previousIncludeTests;
+                ScriptableObjectSingletonCreatorTestAccess.IgnoreExclusionAttribute =
                     _previousIgnoreExclusion;
-                ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression =
+                ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression =
                     _previousAllowAssetCreation;
-                ScriptableObjectSingletonCreator.IgnoreCompilationState =
-                    _previousIgnoreCompilationState;
             }
         }
     }

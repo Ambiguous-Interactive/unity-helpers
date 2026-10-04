@@ -30,7 +30,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private const string DeeplyNestedFolder =
             "Assets/Resources/DuplicateCleanupTests/Nested/Deep";
         private bool _previousEditorUiSuppress;
-        private bool _previousIgnoreCompilationState;
+
         private bool _cleanedUp;
 
         /// <summary>
@@ -207,14 +207,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             _cleanedUp = false;
             _previousEditorUiSuppress = EditorUi.Suppress;
             EditorUi.Suppress = true;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = true;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = true;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = true;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = true;
             // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
-            _previousIgnoreCompilationState =
-                ScriptableObjectSingletonCreator.IgnoreCompilationState;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
-            ScriptableObjectSingletonCreator.TypeFilter = static type =>
+
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
                 type == typeof(CleanupEnabledSingleton)
                 || type == typeof(CleanupDisabledSingleton)
                 || type == typeof(CleanupWithDataSingleton);
@@ -226,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             EnsureFolder(TestRoot);
             // Ensure the metadata folder exists to prevent modal dialogs
             EnsureFolder("Assets/Resources/Wallstop Studios/Unity Helpers");
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
         }
 
         [TearDown]
@@ -236,13 +234,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             CleanupTestAssets();
 
-            ScriptableObjectSingletonCreator.TypeFilter = null;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState =
-                _previousIgnoreCompilationState;
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = false;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = false;
+
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
 
             base.TearDown();
             EditorUi.Suppress = _previousEditorUiSuppress;
@@ -257,13 +254,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             CleanupTestAssets();
             yield return null;
 
-            ScriptableObjectSingletonCreator.TypeFilter = null;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState =
-                _previousIgnoreCompilationState;
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = false;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = false;
+
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
 
             IEnumerator baseEnumerator = base.UnityTearDown();
             while (baseEnumerator.MoveNext())
@@ -312,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Is.Not.Null
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -356,7 +352,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Is.Not.Null
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -411,7 +407,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     RegexOptions.IgnoreCase
                 )
             );
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -465,7 +461,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Is.Not.Null
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -520,7 +516,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Setup: Duplicate asset should exist at '{duplicatePath}'"
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
 
             // Two yields: the folder cleanup runs after StopAssetEditing.
             yield return null;
@@ -613,7 +609,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Setup: Other asset should exist at '{otherAssetPath}'"
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -657,7 +653,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Is.Not.Null
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -688,7 +684,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Is.Not.Null
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -723,7 +719,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -809,7 +805,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
 
             // Multiple yields to ensure Unity has time to process all AssetDatabase operations
             yield return null;
@@ -879,7 +875,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
 
             // Multiple yields to ensure Unity has time to process all AssetDatabase operations
             yield return null;
@@ -947,7 +943,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
 
             // Multiple yields to ensure Unity has time to process all AssetDatabase operations
             yield return null;

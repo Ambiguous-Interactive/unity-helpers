@@ -322,8 +322,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// </summary>
         private static readonly Color SheetPivotColor = new Color(1f, 0.84f, 0f, 0.8f);
 
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
-
         [SerializeField]
         internal List<Object> _inputDirectories = new();
 
@@ -429,10 +427,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         internal List<SpriteSheetEntry> _discoveredSheets;
 
+        internal SerializedObject _serializedObject;
+
         // Intentionally not serialized - users must re-acknowledge danger each session
         private bool _ackDanger;
-
-        private SerializedObject _serializedObject;
         private SerializedProperty _inputDirectoriesProperty;
         private SerializedProperty _spriteNameRegexProperty;
         private SerializedProperty _outputDirectoryProperty;

@@ -22,6 +22,148 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class MapDifferentialTests
     {
+#if !PROTOBUF_NET_ORACLE_V2
+        [Test]
+        public void MapOracleIsPinnedToVersionThreeTwoFiftySix()
+        {
+            System.Diagnostics.FileVersionInfo version =
+                System.Diagnostics.FileVersionInfo.GetVersionInfo(
+                    typeof(ProtoBuf.Serializer).Assembly.Location
+                );
+            Assert.AreEqual(3, version.FileMajorPart);
+            Assert.AreEqual(2, version.FileMinorPart);
+            Assert.AreEqual(56, version.FileBuildPart);
+        }
+#endif
+
+        [TestCase(0, 0d, "0A00")]
+        [TestCase(0, 1d, "0A0911000000000000F03F")]
+        [TestCase(1, 0d, "0A020801")]
+        [TestCase(1, 1d, "0A0B080111000000000000F03F")]
+        public void IntegerDoubleMapMatchesPinnedV3Bytes(int key, double value, string expected)
+        {
+            ZeroKeyMapContract contract = new ZeroKeyMapContract
+            {
+                Signed32 = new Dictionary<int, double> { { key, value } },
+            };
+            Assert.AreEqual(expected, OracleHex(contract), "Pinned integer-key oracle bytes");
+            Assert.AreEqual(expected, Encode(contract));
+            using MemoryStream stream = new MemoryStream(Parse(expected));
+            ZeroKeyMapContract oracleRead = ProtoBuf.Serializer.Deserialize<ZeroKeyMapContract>(
+                stream
+            );
+            Assert.AreEqual(value, oracleRead.Signed32.ValueFor(key));
+        }
+
+        [TestCase((ZeroMapKeyKind)0, 0d, "32020800")]
+        [TestCase((ZeroMapKeyKind)0, 1d, "320B080011000000000000F03F")]
+        [TestCase(ZeroMapKeyKind.Other, 0d, "32020807")]
+        [TestCase(ZeroMapKeyKind.Other, 1d, "320B080711000000000000F03F")]
+        public void EnumDoubleMapMatchesPinnedV3Bytes(
+            ZeroMapKeyKind key,
+            double value,
+            string expected
+        )
+        {
+            ZeroKeyMapContract contract = new ZeroKeyMapContract
+            {
+                Enumeration = new Dictionary<ZeroMapKeyKind, double> { { key, value } },
+            };
+#if PROTOBUF_NET_ORACLE_V2
+            string v2Expected =
+                "320B080"
+                + (key == (ZeroMapKeyKind)0 ? "0" : "7")
+                + "11"
+                + (value == 0d ? "0000000000000000" : "000000000000F03F");
+            Assert.AreEqual(
+                v2Expected,
+                OracleHex(contract),
+                "v2 retains enum keys and default fixed-width values"
+            );
+#else
+            Assert.AreEqual(expected, OracleHex(contract), "Pinned protobuf-net 3.2.56 bytes");
+#endif
+            Assert.AreEqual(expected, Encode(contract));
+            using MemoryStream stream = new MemoryStream(Parse(expected));
+            ZeroKeyMapContract oracleRead = ProtoBuf.Serializer.Deserialize<ZeroKeyMapContract>(
+                stream
+            );
+            Assert.AreEqual(value, oracleRead.Enumeration.ValueFor(key));
+        }
+
+        [TestCase("320911000000000000F03F", 1d)]
+        [TestCase("320B080011000000000000F03F", 1d)]
+        [TestCase("3200", 0d)]
+        [TestCase("32020800", 0d)]
+        public void KeylessAndExplicitZeroEnumEntriesCrossRead(string hex, double expected)
+        {
+            WProtoReader reader = new WProtoReader(Parse(hex));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<ZeroKeyMapContract>()
+                    .TryRead(ref reader, out ZeroKeyMapContract read)
+            );
+            using MemoryStream stream = new MemoryStream(Parse(hex));
+            ZeroKeyMapContract oracle = ProtoBuf.Serializer.Deserialize<ZeroKeyMapContract>(stream);
+            CollectionAssert.AreEquivalent(oracle.Enumeration, read.Enumeration);
+            Assert.AreEqual(expected, read.Enumeration.ValueFor((ZeroMapKeyKind)0));
+        }
+
+        [TestCase("0A0911000000000000F03F")]
+        [TestCase("0A0B080011000000000000F03F")]
+        [TestCase("0A00")]
+        [TestCase("0A020800")]
+        public void KeylessAndExplicitZeroMapEntriesCrossRead(string hex)
+        {
+            WProtoReader reader = new WProtoReader(Parse(hex));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<ZeroKeyMapContract>()
+                    .TryRead(ref reader, out ZeroKeyMapContract read)
+            );
+            using MemoryStream stream = new MemoryStream(Parse(hex));
+            ZeroKeyMapContract oracle = ProtoBuf.Serializer.Deserialize<ZeroKeyMapContract>(stream);
+            CollectionAssert.AreEquivalent(oracle.Signed32, read.Signed32);
+            Assert.AreEqual(hex.Contains("11") ? 1d : 0d, read.Signed32.ValueFor(0));
+        }
+
+#if !PROTOBUF_NET_ORACLE_V2
+        [Test]
+        public void DefaultScalarMapKeysMatchV3AcrossShapes()
+        {
+            ZeroKeyMapContract[] contracts =
+            {
+                new ZeroKeyMapContract { Signed32 = new Dictionary<int, double> { { 0, 1 } } },
+                new ZeroKeyMapContract { Signed64 = new Dictionary<long, double> { { 0, 1 } } },
+                new ZeroKeyMapContract { Unsigned32 = new Dictionary<uint, double> { { 0, 1 } } },
+                new ZeroKeyMapContract { Unsigned64 = new Dictionary<ulong, double> { { 0, 1 } } },
+                new ZeroKeyMapContract { Boolean = new Dictionary<bool, double> { { false, 1 } } },
+                new ZeroKeyMapContract
+                {
+                    Enumeration = new Dictionary<ZeroMapKeyKind, double>
+                    {
+                        { (ZeroMapKeyKind)0, 1 },
+                    },
+                },
+                new ZeroKeyMapContract { Single = new Dictionary<float, double> { { 0, 1 } } },
+                new ZeroKeyMapContract { Double = new Dictionary<double, double> { { 0, 1 } } },
+                new ZeroKeyMapContract
+                {
+                    Text = new Dictionary<string, double> { { string.Empty, 1 } },
+                },
+            };
+            Assert.Multiple(() =>
+            {
+                foreach (ZeroKeyMapContract contract in contracts)
+                {
+                    string expected = OracleHex(contract);
+                    TestContext.WriteLine(expected);
+                    Assert.AreEqual(expected, Encode(contract));
+                }
+            });
+        }
+#endif
+
         [Test]
         public void AnEntryIsAMessageWithTheKeyAtOneAndTheValueAtTwo()
         {
@@ -214,7 +356,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 string.Empty,
                 Encode(Bare(c => c.ByName = new Dictionary<string, int>()))
             );
-            Assert.IsNull(RoundTrip(Bare(c => c.ByName = new Dictionary<string, int>())).ByName);
+            Assert.IsTrue(
+                RoundTrip(Bare(c => c.ByName = new Dictionary<string, int>())).ByName == null
+            );
         }
 
         [Test]
@@ -447,6 +591,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(0, writer.Depth, "a map entry left the nesting depth unbalanced");
         }
 
+#if !PROTOBUF_NET_ORACLE_V2
+        [Test]
+        public void ExoticNumericKeysMatchActualV3OracleForZeroAndNonzero()
+        {
+            ExoticKeyContract[] contracts =
+            {
+                new ExoticKeyContract { ByFloat = new Dictionary<float, int> { { 0f, 2 } } },
+                new ExoticKeyContract { ByFloat = new Dictionary<float, int> { { 1.5f, 2 } } },
+                new ExoticKeyContract { ByDouble = new Dictionary<double, int> { { 0d, 2 } } },
+                new ExoticKeyContract { ByDouble = new Dictionary<double, int> { { 1.5d, 2 } } },
+                new ExoticKeyContract
+                {
+                    ByEnum = new Dictionary<MapKeyKind, int> { { MapKeyKind.None, 2 } },
+                },
+                new ExoticKeyContract
+                {
+                    ByEnum = new Dictionary<MapKeyKind, int> { { MapKeyKind.Other, 2 } },
+                },
+            };
+            foreach (ExoticKeyContract contract in contracts)
+            {
+                Assert.AreEqual(OracleHex(contract), Encode(contract));
+            }
+        }
+#endif
+
         [Test]
         public void KeysTheSpecForbidsMatchTheOracleRatherThanBeingRefused()
         {
@@ -461,7 +631,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 )
             );
             Assert.AreEqual(
-                "0A070D000000001002",
+                "0A021002",
                 Encode(new ExoticKeyContract { ByFloat = new Dictionary<float, int> { { 0f, 2 } } })
             );
             Assert.AreEqual(
@@ -471,7 +641,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 )
             );
             Assert.AreEqual(
-                "120B0900000000000000001002",
+                "12021002",
                 Encode(
                     new ExoticKeyContract { ByDouble = new Dictionary<double, int> { { 0d, 2 } } }
                 )

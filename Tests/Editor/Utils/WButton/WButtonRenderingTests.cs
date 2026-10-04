@@ -25,11 +25,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
     {
         private static void ClearWButtonCaches()
         {
-            WButtonGUI.ClearGroupDataForTesting();
-            WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPriorityWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPlacementWarningsForTesting();
-            WButtonGUI.ClearConflictWarningContentCacheForTesting();
+            WButtonGUITestAccess.ClearGroupData();
+            WButtonGUITestAccess.ClearConflictingDrawOrderWarnings();
+            WButtonGUITestAccess.ClearConflictingGroupPriorityWarnings();
+            WButtonGUITestAccess.ClearConflictingGroupPlacementWarnings();
+            WButtonGUITestAccess.ClearConflictWarningContentCache();
             WButtonGUI.ClearContextCache();
         }
 
@@ -278,7 +278,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             Assert.That(drawnAtTop, Is.True, "Should render top placement group at top");
             Assert.That(drawnAtBottom, Is.True, "Should render bottom placement group at bottom");
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> topGroups = groupCounts
                 .Keys.Where(k => k._groupPlacement == WButtonGroupPlacement.Top)
                 .ToList();
@@ -310,7 +310,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> testGroupKeys = groupCounts
                 .Keys.Where(k =>
                     string.Equals(k._groupName, "TestGroup", System.StringComparison.Ordinal)
@@ -345,7 +345,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> ungroupedKeys = groupCounts
                 .Keys.Where(k => string.IsNullOrEmpty(k._groupName))
                 .ToList();
@@ -373,7 +373,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             WButtonGroupKey highPriorityKey = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "HighPriority", System.StringComparison.Ordinal)
             );
@@ -408,7 +408,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, string> groupNames = WButtonGUI.GetGroupNamesForTesting();
+            Dictionary<WButtonGroupKey, string> groupNames = WButtonGUITestAccess.GetGroupNames();
 
             Assert.That(
                 groupNames.Values,
@@ -420,14 +420,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         [Test]
         public void CustomGroupNamesAppearInHeaders()
         {
-            WButtonGUI.ClearGroupDataForTesting();
+            WButtonGUITestAccess.ClearGroupData();
 
             Dictionary<int, string> names = new() { { -1, "MyCustomGroup" } };
             Dictionary<int, int> counts = new() { { -1, 2 }, { -2, 1 } };
-            WButtonGUI.SetGroupNamesForTesting(names);
-            WButtonGUI.SetGroupCountsForTesting(counts);
+            WButtonGUITestAccess.SetGroupNames(names);
+            WButtonGUITestAccess.SetGroupCounts(counts);
 
-            GUIContent header = WButtonGUI.BuildGroupHeader(-1);
+            GUIContent header = WButtonGUITestAccess.BuildGroupHeader(-1);
 
             Assert.That(
                 header.text,
@@ -456,7 +456,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
 
             foreach (KeyValuePair<WButtonGroupKey, int> entry in groupCounts)
             {
@@ -644,7 +644,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 globalPlacementIsTop: true
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             int totalButtons = groupCounts.Values.Sum();
 
             Assert.That(
@@ -1144,7 +1144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 "Should handle special characters in group names"
             );
 
-            Dictionary<WButtonGroupKey, string> groupNames = WButtonGUI.GetGroupNamesForTesting();
+            Dictionary<WButtonGroupKey, string> groupNames = WButtonGUITestAccess.GetGroupNames();
             Assert.That(
                 groupNames.Values.Any(n => n.Contains("&")),
                 Is.True,

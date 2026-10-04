@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            ValidateAssignmentPropertyDrawer.ClearHeightCache();
+            WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils.ValidationShared.ClearHeightCache();
         }
 
         [TestCase(null, true, TestName = "ValidateAssignment.Message.Null.UsesDefault")]
@@ -824,7 +824,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "First GetPropertyHeight call should not throw"
             );
 
-            ValidateAssignmentPropertyDrawer.ClearHeightCache();
+            WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils.ValidationShared.ClearHeightCache();
 
             float height2 = 0f;
             Assert.DoesNotThrow(

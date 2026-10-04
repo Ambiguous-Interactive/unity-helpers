@@ -357,7 +357,12 @@ when initial jitter or `waitBefore` is enabled. Jitter is applied only before th
 For cached computations, `TimedCache<T>` requires a finite nonnegative lifetime and throws
 `ArgumentException` for a negative or nonfinite lifetime. Negative or nonfinite jitter overrides
 act as zero jitter. Zero lifetime supports jitter without requesting an empty random range;
-an explicit finite positive jitter override still delays the initial expiry.
+an explicit finite positive jitter override still delays the initial expiry. Expiry arithmetic
+preserves finite lifetimes and jitter when their sum would overflow a float. The supplied float
+clock expires the cache only when elapsed time exceeds the lifetime plus initial jitter. Small
+clock offsets and jitter remain significant beside very large lifetimes. A factory or time provider
+exception leaves the cached value, refresh timer, and initial jitter unchanged; retrying
+uses the original expiry schedule. A successful refresh consumes the initial jitter.
 
 ---
 
@@ -643,7 +648,7 @@ using (var buffer = Buffers<Transform>.List.Get())
 
 **Problem it solves:** Unity APIs can only be called from the main thread. Background Tasks/threads can't directly manipulate GameObjects. This marshals callbacks back to the main thread.
 
-See the dedicated [Unity Main Thread Dispatcher guide](../logging/unity-main-thread-dispatcher.md) for details about auto-creation, queue limits, the `AutoCreationScope` helper, and the `CreateTestScope(...)` convenience method that packages can use in their own test fixtures.
+See the dedicated [Unity Main Thread Dispatcher guide](../logging/unity-main-thread-dispatcher.md) for details about auto-creation, queue limits, the `AutoCreationScope` helper, and instance cleanup through the public `AutoCreationScope.Enabled(...)` and `Disabled(...)` operations.
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
@@ -688,7 +693,9 @@ async Task<string> GetTextFromMainThread()
 
 **Disposal discards queued work.** `Dispose()` and `DisposeAsync()` cancel the worker rather than
 draining it, so anything enqueued but not yet started is dropped; the `await` inside
-`DisposeAsync()` waits only for the item already in flight. That is what you want for work that can
+`DisposeAsync()` waits only for the item already in flight. Disposal immediately removes pending
+work and releases the queue's references to its delegates; concurrent submissions cannot leave new
+work in a shut-down queue. `Count` reaches zero once the in-flight item finishes. That is what you want for work that can
 simply be redone, such as a generation pass, and not what you want for durable work such as a
 persistence write.
 
@@ -696,7 +703,8 @@ The window is narrow enough to hide in testing: work enqueued a millisecond or m
 almost always completes, work enqueued immediately before it almost never does.
 
 Call `DrainAsync()` when queued items must run. It closes the pool to new work permanently, then
-returns once the queue is empty and nothing is executing:
+returns once the queue is empty and nothing is executing. If disposal interrupts the drain,
+`DrainAsync()` returns `false` even when disposal emptied the pending queue:
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Threading;

@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+            RuntimeStateTestUtilities.PrepareForSceneLoad();
             DestroyAll<TestRuntimeSingleton>();
             DestroyAll<PreservableSingleton>();
             DestroyAll<NonPreservableSingleton>();
@@ -113,7 +113,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void ApplicationShutdownRefusesCreationButKeepsAnExistingInstanceAvailable()
         {
-            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            RuntimeStateTestUtilities.SimulateApplicationQuitting();
             try
             {
                 Assert.IsTrue(TestRuntimeSingleton.Instance == null);
@@ -122,16 +122,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     UnityObjectExtensions.FindObjectsOfTypeShim<TestRuntimeSingleton>(true).Length
                 );
 
-                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+                RuntimeStateTestUtilities.PrepareForSceneLoad();
                 TestRuntimeSingleton created = TestRuntimeSingleton.Instance;
                 Track(created.gameObject);
 
-                RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+                RuntimeStateTestUtilities.SimulateApplicationQuitting();
                 Assert.AreSame(created, TestRuntimeSingleton.Instance);
             }
             finally
             {
-                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+                RuntimeStateTestUtilities.PrepareForSceneLoad();
             }
         }
 
@@ -157,10 +157,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void ReturningToEditModeClearsTheShutdownGuardWithoutADomainReload()
         {
-            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            RuntimeStateTestUtilities.SimulateApplicationQuitting();
             Assert.IsTrue(TestRuntimeSingleton.Instance == null);
 
-            RuntimeSingletonRegistry.NotifyReturnedToEditModeForTesting();
+            RuntimeStateTestUtilities.ReturnToEditMode();
             TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
             Track(instance.gameObject);
 
@@ -173,7 +173,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
             Track(instance.gameObject);
 
-            string description = RuntimeSingletonRegistry.DescribeLiveInstancesForTesting();
+            string description = RuntimeStateTestUtilities.DescribeLiveSingletons();
 
             StringAssert.Contains(nameof(TestRuntimeSingleton), description);
             StringAssert.Contains(instance.name, description);
@@ -1318,7 +1318,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestRuntimeSingleton authored = authoredObject.AddComponent<TestRuntimeSingleton>();
 
             RuntimeSingletonRegistry.ResetAllRegisteredCaches();
-            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            RuntimeStateTestUtilities.SimulateApplicationQuitting();
             try
             {
                 TestRuntimeSingleton resolved = TestRuntimeSingleton.Instance;
@@ -1331,7 +1331,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             finally
             {
-                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+                RuntimeStateTestUtilities.PrepareForSceneLoad();
             }
         }
 

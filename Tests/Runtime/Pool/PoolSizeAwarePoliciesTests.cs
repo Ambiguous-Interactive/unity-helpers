@@ -23,7 +23,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         public void SetUp()
         {
             PoolPurgeSettings.ResetToDefaults();
-            PoolSizeEstimator.ClearCaches();
+            PoolSizeEstimator.SizeCache.Clear();
+            PoolSizeEstimator.LohCache.Clear();
             _wasMemoryPressureEnabled = MemoryPressureMonitor.Enabled;
             MemoryPressureMonitor.Enabled = false;
         }
@@ -32,7 +33,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         public void TearDown()
         {
             PoolPurgeSettings.ResetToDefaults();
-            PoolSizeEstimator.ClearCaches();
+            PoolSizeEstimator.SizeCache.Clear();
+            PoolSizeEstimator.LohCache.Clear();
             MemoryPressureMonitor.Enabled = _wasMemoryPressureEnabled;
         }
 
@@ -192,7 +194,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             int firstSize = PoolSizeEstimator.EstimateItemSizeBytes<SmallClass>();
 
-            PoolSizeEstimator.ClearCaches();
+            PoolSizeEstimator.SizeCache.Clear();
+            PoolSizeEstimator.LohCache.Clear();
 
             int secondSize = PoolSizeEstimator.EstimateItemSizeBytes<SmallClass>();
             Assert.AreEqual(firstSize, secondSize, "Size should be consistent after cache clear");

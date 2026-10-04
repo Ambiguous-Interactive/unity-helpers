@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         [TestCase(4)]
         public void KernelHasExpectedLengthAndNormalizes(int radius)
         {
-            float[] kernel = ImageBlurTool.KernelForTests(radius);
+            float[] kernel = ImageBlurTool.GenerateGaussianKernel(radius);
             Assert.NotNull(kernel);
             Assert.AreEqual(radius * 2 + 1, kernel.Length);
             float sum = 0f;
@@ -270,7 +270,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             }
             tex.Apply();
 
-            Texture2D blurred = Track(ImageBlurTool.BlurredForTests(tex, 2));
+            Texture2D blurred = Track(ImageBlurToolTestAccess.Blurred(tex, 2));
             Assert.IsTrue(blurred != null);
             Assert.AreEqual(tex.width, blurred.width);
             Assert.AreEqual(tex.height, blurred.height);
@@ -284,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.IsFalse(source.isReadable);
             int temporaryTextureCount = CountTemporaryTextures();
 
-            Assert.Throws<ArgumentException>(() => ImageBlurTool.BlurredForTests(source, 2));
+            Assert.Throws<ArgumentException>(() => ImageBlurToolTestAccess.Blurred(source, 2));
 
             Assert.That(CountTemporaryTextures(), Is.EqualTo(temporaryTextureCount));
         }
@@ -377,7 +377,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Texture2D source = Track(new Texture2D(width, height, TextureFormat.RGBAFloat, false));
             source.SetPixels(pixels);
             source.Apply();
-            Texture2D blurred = Track(ImageBlurTool.BlurredForTests(source, radius));
+            Texture2D blurred = Track(ImageBlurToolTestAccess.Blurred(source, radius));
             return blurred.GetPixels();
         }
 
@@ -386,7 +386,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Texture2D source = Track(new Texture2D(width, height, TextureFormat.RGBAFloat, false));
             source.SetPixels(pixels);
             source.Apply();
-            Texture2D blurred = Track(ImageBlurTool.BlurredForTests(source, radius, runInParallel));
+            Texture2D blurred = Track(
+                ImageBlurToolTestAccess.Blurred(source, radius, runInParallel)
+            );
             return blurred.GetPixels();
         }
     }

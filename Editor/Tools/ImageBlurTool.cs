@@ -21,9 +21,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private const long ParallelBlurPixelThreshold = 256L;
 
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
-
         public List<Object> imageSources = new();
+        internal SerializedObject _serializedObject;
 
         private readonly List<Texture2D> _orderedTextures = new();
         private readonly List<Texture2D> _manualTextures = new();
@@ -32,7 +31,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private Vector2 _scrollPosition;
 
         private GUIStyle _impactButtonStyle;
-        private SerializedObject _serializedObject;
         private SerializedProperty _imageSourcesProperty;
 
         private readonly List<Object> _lastSeenImageSources = new();
@@ -63,35 +61,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
         }
 
-        internal static Texture2D BlurredForTests(Texture2D original, int radius)
-        {
-            return CreateBlurredTexture(original, radius, null);
-        }
-
-        internal static Texture2D BlurredForTests(
-            Texture2D original,
-            int radius,
-            bool runInParallel
-        )
-        {
-            return CreateBlurredTexture(original, radius, runInParallel);
-        }
-
-        internal static float[] KernelForTests(int radius)
-        {
-            return GenerateGaussianKernel(radius);
-        }
-
         internal static bool ShouldBlurInParallel(int width, int height, int partitionCount)
         {
             return ParallelBlurPixelThreshold <= (long)width * height && 1 < partitionCount;
         }
 
-        internal static Texture2D CreateBlurredTexture(
-            Texture2D original,
-            int radius,
-            bool? parallelOverride
-        )
+        internal static Texture2D CreateBlurredTexture(Texture2D original, int radius)
         {
             Texture2D blurred = new(original.width, original.height, original.format, false)
             {
@@ -141,12 +116,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     tempStraight,
                     blurredPixels
                 );
-                bool horizontalParallel = parallelOverride.HasValue
-                    ? parallelOverride.Value
-                    : ShouldBlurInParallel(width, height, height);
-                bool verticalParallel = parallelOverride.HasValue
-                    ? parallelOverride.Value
-                    : ShouldBlurInParallel(width, height, width);
+                bool horizontalParallel = ShouldBlurInParallel(width, height, height);
+                bool verticalParallel = ShouldBlurInParallel(width, height, width);
                 job.ExecuteHorizontalPass(horizontalParallel);
                 job.ExecuteVerticalPass(verticalParallel);
 
@@ -161,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
         }
 
-        private static float[] GenerateGaussianKernel(int radius)
+        internal static float[] GenerateGaussianKernel(int radius)
         {
             int size = radius * 2 + 1;
             float[] kernel = new float[size];
@@ -502,7 +473,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             ApplyBlurToTextures(toProcess, _blurRadius, EditorUi.Info);
         }
 
-        private sealed class BlurJob
+        internal sealed class BlurJob
         {
             private readonly int _width;
             private readonly int _height;

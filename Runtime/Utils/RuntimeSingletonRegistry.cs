@@ -21,16 +21,16 @@ namespace WallstopStudios.UnityHelpers.Utils
     {
         internal static bool IsClearingInstances => _isClearingInstances;
 
+        internal static bool _isApplicationQuitting;
+
         private static readonly Dictionary<Type, RuntimeSingletonRegistration> _registrations =
             new();
 
         private static readonly Queue<Action> _pendingClears = new();
         private static readonly HashSet<Action> _clearingActions = new();
         private static bool _isClearingInstances;
-
-        private static bool _isApplicationQuitting;
 #if UNITY_EDITOR
-        private static bool _isEditorQuitting;
+        internal static bool _isEditorQuitting;
 #endif
 
         internal static bool IsApplicationQuitting
@@ -85,13 +85,18 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void OnSubsystemRegistration()
+        internal static void OnSubsystemRegistration()
         {
             _isApplicationQuitting = false;
 #if UNITY_EDITOR
             _isEditorQuitting = false;
 #endif
             SubscribeToLifecycleEvents();
+        }
+
+        internal static void OnApplicationQuitting()
+        {
+            _isApplicationQuitting = true;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -113,11 +118,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 #endif
         }
 
-        private static void OnApplicationQuitting()
-        {
-            _isApplicationQuitting = true;
-        }
-
 #if UNITY_EDITOR
         private static void OnEditorQuitting()
         {
@@ -137,28 +137,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 #endif
-
-        internal static void NotifyApplicationQuittingForTesting()
-        {
-            OnApplicationQuitting();
-#if UNITY_EDITOR
-            _isEditorQuitting = true;
-#endif
-        }
-
-        internal static void PrepareForSceneLoadForTesting()
-        {
-            OnSubsystemRegistration();
-            ResetAllRegisteredCaches();
-        }
-
-        internal static void NotifyReturnedToEditModeForTesting()
-        {
-            _isApplicationQuitting = false;
-#if UNITY_EDITOR
-            _isEditorQuitting = false;
-#endif
-        }
 
         /// <summary>
         /// Resets every registered singleton cache without destroying live instances.
@@ -236,69 +214,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        internal static string DescribeLiveInstancesForTesting()
-        {
-            StringBuilder builder = null;
-            foreach (RuntimeSingletonRegistration registration in GetRegistrationsSnapshot())
-            {
-                UnityEngine.Object cachedInstance = null;
-                try
-                {
-                    cachedInstance = registration.getCachedInstance();
-                }
-                catch (Exception ex)
-                {
-                    builder ??= new StringBuilder();
-                    builder.Append(registration.type.FullName);
-                    builder.Append(" cache inspection failed: ");
-                    builder.Append(ex);
-                    builder.AppendLine();
-                }
-
-                UnityEngine.Object[] liveInstances = Array.Empty<UnityEngine.Object>();
-                try
-                {
-                    liveInstances =
-                        registration.findLiveInstances() ?? Array.Empty<UnityEngine.Object>();
-                }
-                catch (Exception ex)
-                {
-                    builder ??= new StringBuilder();
-                    builder.Append(registration.type.FullName);
-                    builder.Append(" live-instance inspection failed: ");
-                    builder.Append(ex);
-                    builder.AppendLine();
-                }
-
-                foreach (UnityEngine.Object liveInstance in liveInstances)
-                {
-                    if (liveInstance == null)
-                    {
-                        continue;
-                    }
-
-                    builder ??= new StringBuilder();
-                    builder.Append(registration.type.FullName);
-                    builder.Append(" '");
-                    builder.Append(liveInstance.name);
-                    builder.Append("'#");
-                    builder.Append(liveInstance.GetUnityObjectId());
-                    if (liveInstance is Component component && component.gameObject != null)
-                    {
-                        builder.Append(" scene='");
-                        builder.Append(component.gameObject.scene.name);
-                        builder.Append("'");
-                    }
-                    builder.Append(" cached=");
-                    builder.Append(cachedInstance == liveInstance);
-                    builder.AppendLine();
-                }
-            }
-
-            return builder?.ToString().Trim();
-        }
-
-        private static RuntimeSingletonRegistration[] GetRegistrationsSnapshot()
+        internal static RuntimeSingletonRegistration[] GetRegistrationsSnapshot()
         {
             lock (_registrations)
             {
@@ -310,7 +226,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        private sealed class RuntimeSingletonRegistration
+        internal sealed class RuntimeSingletonRegistration
         {
             internal readonly Type type;
             internal readonly Action resetCacheAction;

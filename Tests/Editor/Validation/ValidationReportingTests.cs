@@ -19,9 +19,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     /// JSON report says, and what makes a batch run exit non-zero.
     /// </summary>
     /// <remarks>
-    /// Everything here is driven from constructed findings and an injected loader rather than from
-    /// the asset database, so the assertions are about the reporting contract rather than about
-    /// whatever assets the test project happens to hold.
+    /// Rules report constructed findings through ordinary asset-database-backed runs. Load-failure
+    /// schema controls exercise the same failure-recording phase used by the production loader.
     /// </remarks>
     [TestFixture]
     public sealed class ValidationReportingTests : CommonTestBase
@@ -110,17 +109,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             };
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { new ScriptedRule(findings) },
-                targets,
-                Never
+                targets
             );
             while (!run.Step(double.MaxValue)) { }
 
             return run;
-        }
-
-        private static Object Never(ValidationTarget target)
-        {
-            return null;
         }
 
         [Test]
@@ -355,8 +348,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 new List<ValidationTarget>
                 {
                     new ValidationTarget(FirstGuid, "Assets/A.asset", typeof(ScriptableObject)),
-                },
-                target => throw new InvalidOperationException("load failed")
+                }
+            );
+            run.RecordLoadFailure(
+                new ValidationTarget(FirstGuid, "Assets/A.asset", typeof(ScriptableObject)),
+                new InvalidOperationException("load failed")
             );
             while (!run.Step(double.MaxValue)) { }
 
@@ -427,8 +423,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 new List<ValidationTarget>
                 {
                     new ValidationTarget(FirstGuid, "Assets/A.asset", typeof(ScriptableObject)),
-                },
-                Never
+                }
             );
             while (!run.Step(double.MaxValue)) { }
 

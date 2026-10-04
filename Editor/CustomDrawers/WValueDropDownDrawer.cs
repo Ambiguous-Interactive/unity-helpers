@@ -25,16 +25,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     [CustomPropertyDrawer(typeof(WValueDropDownAttribute))]
     public sealed class WValueDropDownDrawer : PropertyDrawer
     {
-        private const float ButtonWidth = DropDownShared.ButtonWidth;
-        private const float PageLabelWidth = DropDownShared.PageLabelWidth;
-        private const float PaginationButtonHeight = DropDownShared.PaginationButtonHeight;
-        private const float PopupWidth = DropDownShared.PopupWidth;
-        private const float OptionBottomPadding = DropDownShared.OptionBottomPadding;
-        private const float OptionRowExtraHeight = DropDownShared.OptionRowExtraHeight;
-        private const float EmptySearchHorizontalPadding =
+        internal const float PaginationButtonHeight = DropDownShared.PaginationButtonHeight;
+        internal const float PopupWidth = DropDownShared.PopupWidth;
+        internal const float OptionBottomPadding = DropDownShared.OptionBottomPadding;
+        internal const float EmptySearchHorizontalPadding =
             DropDownShared.EmptySearchHorizontalPadding;
-        private const float EmptySearchExtraPadding = DropDownShared.EmptySearchExtraPadding;
-        private const string EmptyResultsMessage = DropDownShared.EmptyResultsMessage;
+        internal const float EmptySearchExtraPadding = DropDownShared.EmptySearchExtraPadding;
+        internal const string EmptyResultsMessage = DropDownShared.EmptyResultsMessage;
 
         /// <summary>
         /// The number of property paths whose display labels are retained.
@@ -46,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// array of dropdowns contributes one path per element -- so the live set never reaches the
         /// bound.
         /// </remarks>
-        private const int MaxDisplayLabelsCacheEntries = 512;
+        internal const int MaxDisplayLabelsCacheEntries = 512;
 
         /// <summary>
         /// The number of distinct option values whose formatted label is retained.
@@ -56,19 +53,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// game's own dropdown source, so an unbounded cache roots every option ever rendered
         /// across scene changes and play sessions.
         /// </remarks>
-        private const int MaxFormattedOptionCacheEntries = 2048;
-        private static readonly GUIContent EmptyResultsContent = DropDownShared.EmptyResultsContent;
-        private static float s_cachedOptionControlHeight = -1f;
-        private static float s_cachedOptionRowHeight = -1f;
+        internal const int MaxFormattedOptionCacheEntries = 2048;
 
-        private static readonly Cache<string, DisplayLabelsCache> DisplayLabelsCaches =
+        private const float ButtonWidth = DropDownShared.ButtonWidth;
+        private const float PageLabelWidth = DropDownShared.PageLabelWidth;
+        private const float OptionRowExtraHeight = DropDownShared.OptionRowExtraHeight;
+        internal static readonly Cache<string, DisplayLabelsCache> DisplayLabelsCaches =
             CacheBuilder<string, DisplayLabelsCache>
                 .NewBuilder()
                 .MaximumSize(MaxDisplayLabelsCacheEntries)
                 .InitialCapacity(16)
                 .KeyComparer(StringComparer.Ordinal)
                 .Build();
-        private static readonly Cache<object, string> FormattedOptionCache = CacheBuilder<
+
+        internal static readonly Cache<object, string> FormattedOptionCache = CacheBuilder<
             object,
             string
         >
@@ -76,6 +74,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             .MaximumSize(MaxFormattedOptionCacheEntries)
             .InitialCapacity(16)
             .Build();
+
+        private static readonly GUIContent EmptyResultsContent = DropDownShared.EmptyResultsContent;
+        private static float s_cachedOptionControlHeight = -1f;
+        private static float s_cachedOptionRowHeight = -1f;
+
         private static readonly GUIContent ReusableDropDownButtonContent = new();
 
         internal static void ApplyOption(SerializedProperty property, object selectedOption)
@@ -156,6 +159,268 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     ApplyGenericProperty(property, selectedOption);
                     break;
             }
+        }
+
+        internal static int CalculateRowsOnPage(int filteredCount, int pageSize, int currentPage)
+        {
+            if (filteredCount <= 0 || pageSize <= 0)
+            {
+                return 1;
+            }
+
+            int maxPageIndex = CalculatePageCount(pageSize, filteredCount) - 1;
+            int clampedPage = Mathf.Clamp(currentPage, 0, Mathf.Max(0, maxPageIndex));
+            int startIndex = clampedPage * pageSize;
+            int remaining = filteredCount - startIndex;
+            if (remaining <= 0)
+            {
+                return 1;
+            }
+
+            return Mathf.Min(pageSize, remaining);
+        }
+
+        internal static int ResolveSelectedIndex(
+            SerializedProperty property,
+            Type valueType,
+            object[] options
+        )
+        {
+            int optionsLength = options.Length;
+            for (int index = 0; index < optionsLength; index += 1)
+            {
+                if (OptionMatches(property, valueType, options[index]))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        // Authored options can convert to serialized types; normalize them without weakening public equality contracts.
+        internal static bool MatchesAuthoredOption(object serializedValue, object option)
+        {
+            if (serializedValue.Equals(option))
+            {
+                return true;
+            }
+
+            object serializedUnderlying = UnderlyingValueOf(serializedValue);
+            object optionUnderlying = UnderlyingValueOf(option);
+            if (serializedUnderlying == null || optionUnderlying == null)
+            {
+                return false;
+            }
+
+            if (serializedUnderlying.Equals(optionUnderlying))
+            {
+                return true;
+            }
+
+            return SharePlanarCoordinates(serializedUnderlying, optionUnderlying);
+        }
+
+        internal static string[] GetOrCreateDisplayLabels(string cacheKey, object[] options)
+        {
+            if (
+                DisplayLabelsCaches.TryGet(cacheKey, out DisplayLabelsCache cached)
+                && cached != null
+            )
+            {
+                if (ReferenceEquals(cached.sourceOptions, options))
+                {
+                    return cached.labels;
+                }
+
+                int optionsLength = options.Length;
+                if (
+                    cached.sourceOptions != null
+                    && cached.sourceOptions.Length == optionsLength
+                    && cached.labels != null
+                    && cached.labels.Length == optionsLength
+                )
+                {
+                    bool match = true;
+                    for (int i = 0; i < optionsLength && match; ++i)
+                    {
+                        if (!Equals(cached.sourceOptions[i], options[i]))
+                        {
+                            match = false;
+                        }
+                    }
+                    if (match)
+                    {
+                        return cached.labels;
+                    }
+                }
+            }
+
+            string[] labels = BuildDisplayLabelsUncached(options);
+            DisplayLabelsCaches.Set(
+                cacheKey,
+                new DisplayLabelsCache { sourceOptions = options, labels = labels }
+            );
+            return labels;
+        }
+
+        internal static string[] BuildDisplayLabelsUncached(object[] options)
+        {
+            int optionsLength = options.Length;
+            string[] labels = new string[optionsLength];
+            for (int index = 0; index < optionsLength; index += 1)
+            {
+                labels[index] = FormatOptionCached(options[index]);
+            }
+
+            return labels;
+        }
+
+        internal static string FormatOptionCached(object option)
+        {
+            if (option == null)
+            {
+                return "(null)";
+            }
+
+            if (FormattedOptionCache.TryGet(option, out string cached))
+            {
+                return cached;
+            }
+
+            string formatted;
+            if (option is Type type)
+            {
+                formatted = SerializableTypeCatalog.GetDisplayName(type);
+            }
+            else if (option is SerializableType serializableType)
+            {
+                formatted = serializableType.DisplayName;
+            }
+            else if (option is UnityEngine.Object unityObject)
+            {
+                if (unityObject == null)
+                {
+                    formatted = "(None)";
+                }
+                else
+                {
+                    string objectName = unityObject.name;
+                    formatted = string.IsNullOrWhiteSpace(objectName)
+                        ? unityObject.GetType().Name
+                        : objectName;
+                }
+            }
+            else if (option is IFormattable formattable)
+            {
+                formatted = formattable.ToString(null, CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                formatted = option.ToString();
+            }
+
+            if (string.IsNullOrEmpty(formatted))
+            {
+                formatted = $"({option.GetType().Name})";
+            }
+
+            FormattedOptionCache.Set(option, formatted);
+            return formatted;
+        }
+
+        internal static float CalculatePopupTargetHeight(int rowsOnPage, bool includePagination)
+        {
+            int clampedRows = Mathf.Max(1, rowsOnPage);
+            float chromeHeight = CalculatePopupChromeHeight(includePagination);
+            float optionListHeight = clampedRows * GetOptionRowHeight();
+            float unclampedHeight = chromeHeight + optionListHeight;
+            return unclampedHeight;
+        }
+
+        internal static float CalculatePopupChromeHeight(bool includePagination)
+        {
+            float searchHeight = EditorGUIUtility.singleLineHeight;
+            float paginationHeight = includePagination
+                ? PopupStyles.PaginationButtonLeft.fixedHeight
+                : EditorGUIUtility.standardVerticalSpacing;
+            float footerHeight = EditorGUIUtility.standardVerticalSpacing + OptionBottomPadding;
+            return searchHeight + paginationHeight + footerHeight;
+        }
+
+        internal static float CalculateEmptySearchHeight(float measuredHelpBoxHeight = -1f)
+        {
+            GUIStyle helpStyle = EditorStyles.helpBox;
+            int helpMargin = helpStyle.margin?.horizontal ?? 0;
+            float availableWidth = PopupWidth - EmptySearchHorizontalPadding - helpMargin;
+            availableWidth = Mathf.Max(32f, availableWidth);
+            float helpBoxHeight;
+            if (0f < measuredHelpBoxHeight)
+            {
+                helpBoxHeight = measuredHelpBoxHeight;
+            }
+            else
+            {
+                float calculated = helpStyle.CalcHeight(EmptyResultsContent, availableWidth);
+                float marginVertical = helpStyle.margin?.vertical ?? 0;
+                helpBoxHeight = calculated + marginVertical;
+            }
+
+            float searchRow =
+                EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
+            float topSpacer = EditorGUIUtility.standardVerticalSpacing;
+            float bottomSpacer = EditorGUIUtility.standardVerticalSpacing;
+            float footer =
+                EditorGUIUtility.standardVerticalSpacing
+                + OptionBottomPadding
+                + EmptySearchExtraPadding;
+
+            float result = searchRow + topSpacer + helpBoxHeight + bottomSpacer + footer;
+            return result;
+        }
+
+        internal static float GetOptionRowHeight()
+        {
+            if (0f < s_cachedOptionRowHeight)
+            {
+                return s_cachedOptionRowHeight;
+            }
+
+            float controlHeight = GetOptionControlHeight();
+            RectOffset margin = PopupStyles.OptionButton.margin;
+            float adjustedMargin = 0f;
+            if (margin != null)
+            {
+                adjustedMargin = Mathf.Max(
+                    0f,
+                    margin.vertical - EditorGUIUtility.standardVerticalSpacing
+                );
+            }
+            else
+            {
+                adjustedMargin = EditorGUIUtility.standardVerticalSpacing;
+            }
+
+            s_cachedOptionRowHeight = controlHeight + adjustedMargin;
+            return s_cachedOptionRowHeight;
+        }
+
+        internal static float GetOptionControlHeight()
+        {
+            if (0f < s_cachedOptionControlHeight)
+            {
+                return s_cachedOptionControlHeight;
+            }
+
+            float width = PopupWidth - 32f;
+            float measured = PopupStyles.OptionButton.CalcHeight(GUIContent.none, width);
+            if (measured <= 0f || float.IsNaN(measured))
+            {
+                measured = EditorGUIUtility.singleLineHeight + OptionRowExtraHeight;
+            }
+
+            s_cachedOptionControlHeight = measured;
+            return measured;
         }
 
         private static string GetPaginationLabel(int page, int totalPages)
@@ -277,25 +542,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return (filteredCount + pageSize - 1) / pageSize;
         }
 
-        private static int CalculateRowsOnPage(int filteredCount, int pageSize, int currentPage)
-        {
-            if (filteredCount <= 0 || pageSize <= 0)
-            {
-                return 1;
-            }
-
-            int maxPageIndex = CalculatePageCount(pageSize, filteredCount) - 1;
-            int clampedPage = Mathf.Clamp(currentPage, 0, Mathf.Max(0, maxPageIndex));
-            int startIndex = clampedPage * pageSize;
-            int remaining = filteredCount - startIndex;
-            if (remaining <= 0)
-            {
-                return 1;
-            }
-
-            return Mathf.Min(pageSize, remaining);
-        }
-
         private static void DrawPopupDropDown(
             Rect position,
             SerializedProperty property,
@@ -369,24 +615,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             EditorGUI.showMixedValue = previousMixed;
 
             EditorGUI.EndProperty();
-        }
-
-        private static int ResolveSelectedIndex(
-            SerializedProperty property,
-            Type valueType,
-            object[] options
-        )
-        {
-            int optionsLength = options.Length;
-            for (int index = 0; index < optionsLength; index += 1)
-            {
-                if (OptionMatches(property, valueType, options[index]))
-                {
-                    return index;
-                }
-            }
-
-            return -1;
         }
 
         private static string ResolveDisplayValue(
@@ -518,29 +746,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return MatchesAuthoredOption(boxedValue, option);
-        }
-
-        // Authored options can convert to serialized types; normalize them without weakening public equality contracts.
-        private static bool MatchesAuthoredOption(object serializedValue, object option)
-        {
-            if (serializedValue.Equals(option))
-            {
-                return true;
-            }
-
-            object serializedUnderlying = UnderlyingValueOf(serializedValue);
-            object optionUnderlying = UnderlyingValueOf(option);
-            if (serializedUnderlying == null || optionUnderlying == null)
-            {
-                return false;
-            }
-
-            if (serializedUnderlying.Equals(optionUnderlying))
-            {
-                return true;
-            }
-
-            return SharePlanarCoordinates(serializedUnderlying, optionUnderlying);
         }
 
         private static object UnderlyingValueOf(object value)
@@ -858,114 +1063,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return ReferenceEquals(currentValue, optionObject);
-        }
-
-        private static string[] GetOrCreateDisplayLabels(string cacheKey, object[] options)
-        {
-            if (
-                DisplayLabelsCaches.TryGet(cacheKey, out DisplayLabelsCache cached)
-                && cached != null
-            )
-            {
-                if (ReferenceEquals(cached.sourceOptions, options))
-                {
-                    return cached.labels;
-                }
-
-                int optionsLength = options.Length;
-                if (
-                    cached.sourceOptions != null
-                    && cached.sourceOptions.Length == optionsLength
-                    && cached.labels != null
-                    && cached.labels.Length == optionsLength
-                )
-                {
-                    bool match = true;
-                    for (int i = 0; i < optionsLength && match; ++i)
-                    {
-                        if (!Equals(cached.sourceOptions[i], options[i]))
-                        {
-                            match = false;
-                        }
-                    }
-                    if (match)
-                    {
-                        return cached.labels;
-                    }
-                }
-            }
-
-            string[] labels = BuildDisplayLabelsUncached(options);
-            DisplayLabelsCaches.Set(
-                cacheKey,
-                new DisplayLabelsCache { sourceOptions = options, labels = labels }
-            );
-            return labels;
-        }
-
-        private static string[] BuildDisplayLabelsUncached(object[] options)
-        {
-            int optionsLength = options.Length;
-            string[] labels = new string[optionsLength];
-            for (int index = 0; index < optionsLength; index += 1)
-            {
-                labels[index] = FormatOptionCached(options[index]);
-            }
-
-            return labels;
-        }
-
-        private static string FormatOptionCached(object option)
-        {
-            if (option == null)
-            {
-                return "(null)";
-            }
-
-            if (FormattedOptionCache.TryGet(option, out string cached))
-            {
-                return cached;
-            }
-
-            string formatted;
-            if (option is Type type)
-            {
-                formatted = SerializableTypeCatalog.GetDisplayName(type);
-            }
-            else if (option is SerializableType serializableType)
-            {
-                formatted = serializableType.DisplayName;
-            }
-            else if (option is UnityEngine.Object unityObject)
-            {
-                if (unityObject == null)
-                {
-                    formatted = "(None)";
-                }
-                else
-                {
-                    string objectName = unityObject.name;
-                    formatted = string.IsNullOrWhiteSpace(objectName)
-                        ? unityObject.GetType().Name
-                        : objectName;
-                }
-            }
-            else if (option is IFormattable formattable)
-            {
-                formatted = formattable.ToString(null, CultureInfo.InvariantCulture);
-            }
-            else
-            {
-                formatted = option.ToString();
-            }
-
-            if (string.IsNullOrEmpty(formatted))
-            {
-                formatted = $"({option.GetType().Name})";
-            }
-
-            FormattedOptionCache.Set(option, formatted);
-            return formatted;
         }
 
         private static void ApplyBoolean(SerializedProperty property, object selectedOption)
@@ -1366,100 +1463,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private static float CalculatePopupTargetHeight(int rowsOnPage, bool includePagination)
-        {
-            int clampedRows = Mathf.Max(1, rowsOnPage);
-            float chromeHeight = CalculatePopupChromeHeight(includePagination);
-            float optionListHeight = clampedRows * GetOptionRowHeight();
-            float unclampedHeight = chromeHeight + optionListHeight;
-            return unclampedHeight;
-        }
-
-        private static float CalculatePopupChromeHeight(bool includePagination)
-        {
-            float searchHeight = EditorGUIUtility.singleLineHeight;
-            float paginationHeight = includePagination
-                ? PopupStyles.PaginationButtonLeft.fixedHeight
-                : EditorGUIUtility.standardVerticalSpacing;
-            float footerHeight = EditorGUIUtility.standardVerticalSpacing + OptionBottomPadding;
-            return searchHeight + paginationHeight + footerHeight;
-        }
-
-        private static float CalculateEmptySearchHeight(float measuredHelpBoxHeight = -1f)
-        {
-            GUIStyle helpStyle = EditorStyles.helpBox;
-            int helpMargin = helpStyle.margin?.horizontal ?? 0;
-            float availableWidth = PopupWidth - EmptySearchHorizontalPadding - helpMargin;
-            availableWidth = Mathf.Max(32f, availableWidth);
-            float helpBoxHeight;
-            if (0f < measuredHelpBoxHeight)
-            {
-                helpBoxHeight = measuredHelpBoxHeight;
-            }
-            else
-            {
-                float calculated = helpStyle.CalcHeight(EmptyResultsContent, availableWidth);
-                float marginVertical = helpStyle.margin?.vertical ?? 0;
-                helpBoxHeight = calculated + marginVertical;
-            }
-
-            float searchRow =
-                EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-            float topSpacer = EditorGUIUtility.standardVerticalSpacing;
-            float bottomSpacer = EditorGUIUtility.standardVerticalSpacing;
-            float footer =
-                EditorGUIUtility.standardVerticalSpacing
-                + OptionBottomPadding
-                + EmptySearchExtraPadding;
-
-            float result = searchRow + topSpacer + helpBoxHeight + bottomSpacer + footer;
-            return result;
-        }
-
-        private static float GetOptionRowHeight()
-        {
-            if (0f < s_cachedOptionRowHeight)
-            {
-                return s_cachedOptionRowHeight;
-            }
-
-            float controlHeight = GetOptionControlHeight();
-            RectOffset margin = PopupStyles.OptionButton.margin;
-            float adjustedMargin = 0f;
-            if (margin != null)
-            {
-                adjustedMargin = Mathf.Max(
-                    0f,
-                    margin.vertical - EditorGUIUtility.standardVerticalSpacing
-                );
-            }
-            else
-            {
-                adjustedMargin = EditorGUIUtility.standardVerticalSpacing;
-            }
-
-            s_cachedOptionRowHeight = controlHeight + adjustedMargin;
-            return s_cachedOptionRowHeight;
-        }
-
-        private static float GetOptionControlHeight()
-        {
-            if (0f < s_cachedOptionControlHeight)
-            {
-                return s_cachedOptionControlHeight;
-            }
-
-            float width = PopupWidth - 32f;
-            float measured = PopupStyles.OptionButton.CalcHeight(GUIContent.none, width);
-            if (measured <= 0f || float.IsNaN(measured))
-            {
-                measured = EditorGUIUtility.singleLineHeight + OptionRowExtraHeight;
-            }
-
-            s_cachedOptionControlHeight = measured;
-            return measured;
-        }
-
         private static string GetTypeMismatchMessage(
             SerializedProperty property,
             WValueDropDownAttribute dropdownAttribute
@@ -1697,13 +1700,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return selector;
         }
 
-        private sealed class DisplayLabelsCache
+        internal sealed class DisplayLabelsCache
         {
             public object[] sourceOptions;
             public string[] labels;
         }
 
-        private sealed class WValueDropDownPopupSelectorElement : WDropDownPopupSelectorBase<string>
+        internal sealed class WValueDropDownPopupSelectorElement
+            : WDropDownPopupSelectorBase<string>
         {
             protected override int OptionCount => _options.Length;
 
@@ -1777,7 +1781,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private sealed class WValueDropDownSelector : WDropDownSelectorBase<string>
+        internal sealed class WValueDropDownSelector : WDropDownSelectorBase<string>
         {
             protected override int OptionCount => _options.Length;
 
@@ -1826,129 +1830,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        internal static class TestHooks
-        {
-            /// <summary>
-            /// Gets the number of display-label sets currently retained, for testing.
-            /// </summary>
-            public static int DisplayLabelsCacheCount => DisplayLabelsCaches.Count;
-
-            /// <summary>
-            /// Gets the bound the display-label cache evicts at, for testing.
-            /// </summary>
-            public static int MaxDisplayLabelsCacheCount => MaxDisplayLabelsCacheEntries;
-
-            /// <summary>
-            /// Gets the number of formatted option labels currently retained, for testing.
-            /// </summary>
-            public static int FormattedOptionCacheCount => FormattedOptionCache.Count;
-
-            /// <summary>
-            /// Gets the bound the formatted option cache evicts at, for testing.
-            /// </summary>
-            public static int MaxFormattedOptionCacheCount => MaxFormattedOptionCacheEntries;
-
-            public static int OptionButtonMarginVertical =>
-                PopupStyles.OptionButton.margin?.vertical ?? 0;
-
-            public static float OptionFooterPadding => OptionBottomPadding;
-
-            public static float PaginationButtonHeight =>
-                PopupStyles.PaginationButtonLeft.fixedHeight;
-
-            public static float PopupWidthValue => PopupWidth;
-
-            public static float EmptySearchHorizontalPaddingValue => EmptySearchHorizontalPadding;
-
-            public static string EmptyResultsMessageValue => EmptyResultsMessage;
-
-            public static float EmptySearchExtraPaddingValue => EmptySearchExtraPadding;
-
-            /// <summary>
-            /// Reads the cached display labels for a property path, populating them when absent.
-            /// </summary>
-            public static string[] GetOrCreateDisplayLabels(string cacheKey, object[] options)
-            {
-                return WValueDropDownDrawer.GetOrCreateDisplayLabels(cacheKey, options);
-            }
-
-            /// <summary>
-            /// Drops every cached display-label set and formatted option label, for testing.
-            /// </summary>
-            public static void ClearCaches()
-            {
-                DisplayLabelsCaches.Clear();
-                FormattedOptionCache.Clear();
-            }
-
-            public static float CalculatePopupTargetHeight(int rowsOnPage, bool includePagination)
-            {
-                return WValueDropDownDrawer.CalculatePopupTargetHeight(
-                    rowsOnPage,
-                    includePagination
-                );
-            }
-
-            public static float CalculatePopupChromeHeight(bool includePagination)
-            {
-                return WValueDropDownDrawer.CalculatePopupChromeHeight(includePagination);
-            }
-
-            public static float GetOptionRowHeight()
-            {
-                return WValueDropDownDrawer.GetOptionRowHeight();
-            }
-
-            public static float GetOptionControlHeight()
-            {
-                return WValueDropDownDrawer.GetOptionControlHeight();
-            }
-
-            public static float CalculateEmptySearchHeight()
-            {
-                return WValueDropDownDrawer.CalculateEmptySearchHeight();
-            }
-
-            public static float CalculateEmptySearchHeightWithMeasurement(float measuredHelpHeight)
-            {
-                return WValueDropDownDrawer.CalculateEmptySearchHeight(measuredHelpHeight);
-            }
-
-            public static int CalculateRowsOnPage(int filteredCount, int pageSize, int currentPage)
-            {
-                return WValueDropDownDrawer.CalculateRowsOnPage(
-                    filteredCount,
-                    pageSize,
-                    currentPage
-                );
-            }
-
-            public static int ResolveSelectedIndex(
-                SerializedProperty property,
-                Type valueType,
-                object[] options
-            )
-            {
-                return WValueDropDownDrawer.ResolveSelectedIndex(property, valueType, options);
-            }
-
-            public static bool MatchesAuthoredOption(object serializedValue, object option)
-            {
-                return WValueDropDownDrawer.MatchesAuthoredOption(serializedValue, option);
-            }
-
-            public static string FormatOptionCached(object option)
-            {
-                return WValueDropDownDrawer.FormatOptionCached(option);
-            }
-
-            public static string[] BuildDisplayLabelsUncached(object[] options)
-            {
-                return WValueDropDownDrawer.BuildDisplayLabelsUncached(options);
-            }
-        }
-
-        private static class PopupStyles
+        internal static class PopupStyles
         {
             public static GUIStyle OptionButton =>
                 _optionButton ??= new GUIStyle("Button")

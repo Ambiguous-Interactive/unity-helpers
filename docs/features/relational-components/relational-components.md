@@ -616,8 +616,8 @@ VContainer (1.16.x)
 
   ```csharp
   var cache = ScriptableObject.CreateInstance<AttributeMetadataCache>();
-  // populate cache._relationalTypeMetadata with your test component types
-  cache.ForceRebuildForTests(); // rebuild lookups so the initializer can discover your types
+  // Populate metadata with cache.SetMetadata(...) in the editor.
+  // Lookups rebuild on first use after metadata changes.
   var builder = new ContainerBuilder();
   builder.RegisterInstance(cache).AsSelf();
   builder.Register<RelationalComponentAssigner>(Lifetime.Singleton)

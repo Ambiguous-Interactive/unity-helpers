@@ -29,15 +29,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
         internal static void GenerateCache()
         {
-            // Automatic cache generation can open modal failure dialogs during tests; require explicit test opt-in.
-            if (
-                EditorUi.Suppress
-                && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
-            )
+            // Automatic cache generation honors editor UI suppression.
+            if (EditorUi.Suppress)
             {
                 return;
             }
 
+            GenerateCacheContents();
+        }
+
+        /// <summary>Builds and persists the cache after automatic generation policy permits it.</summary>
+        internal static void GenerateCacheContents()
+        {
             try
             {
                 List<Type> attributeComponentTypes = FindAttributeComponentTypes();
@@ -164,13 +167,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
         /// Reports a <see cref="SingletonCreationAttribute"/> that cannot do what its author meant,
         /// or <c>null</c> when the annotation is sound.
         /// </summary>
-        /// <remarks>
-        /// The attributes arrive as arguments rather than being read off <paramref name="type"/> so a
-        /// test can drive every branch without annotating a deliberately wrong type -- which
-        /// <see cref="TypeCache"/> would then find on every editor load, and this method would then
-        /// complain about forever. It is the technique <c>RuntimeMismatchSingleton</c> already uses
-        /// for the auto-loader's own mismatch rules.
-        /// </remarks>
         /// <param name="type">The annotated type.</param>
         /// <param name="creation">Its <see cref="SingletonCreationAttribute"/>, or <c>null</c>.</param>
         /// <param name="autoLoad">Its <see cref="AutoLoadSingletonAttribute"/>, or <c>null</c>.</param>

@@ -597,7 +597,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal const float PendingExpandableValueFoldoutGutter = 7f;
         internal const float RowExpandableValueFoldoutGutter = 24f;
 
-        private const float PendingSectionPadding = 6f;
+        internal const float PendingSectionPadding = 6f;
         private const float PendingSectionPaddingProjectSettings = 2f;
         private const float PendingFoldoutInspectorLabelShift = 2.5f;
         private const float DictionaryRowSimpleValueWidthRatio = 0.54f;
@@ -648,31 +648,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             ref object value
         );
 
-        internal static bool HasLastPendingHeaderRect { get; private set; }
-        internal static Rect LastPendingHeaderRect { get; private set; }
-        internal static Rect LastPendingFoldoutToggleRect { get; private set; }
-        internal static Rect LastPendingLabelHitRect { get; private set; }
-        internal static Rect LastPendingAbsoluteLabelHitRect { get; private set; }
-        internal static bool HasLastMainFoldoutRect { get; private set; }
-        internal static Rect LastMainFoldoutRect { get; private set; }
-        internal static bool HasLastPendingFieldRects { get; private set; }
-        internal static Rect LastPendingKeyFieldRect { get; private set; }
-        internal static Rect LastPendingValueFieldRect { get; private set; }
-        internal static bool HasLastRowRects { get; private set; }
-        internal static Rect LastRowOriginalRect { get; private set; }
-        internal static Rect LastRowKeyRect { get; private set; }
-        internal static Rect LastRowValueRect { get; private set; }
-        internal static float LastRowValueBaseX { get; private set; }
-        internal static bool LastPendingValueUsedFoldoutLabel { get; private set; }
-        internal static bool LastRowValueUsedFoldoutLabel { get; private set; }
-        internal static float LastPendingValueFoldoutOffset { get; private set; }
-        internal static float LastRowValueFoldoutOffset { get; private set; }
-        internal static bool HasLastRowChildContentRect { get; private set; }
-        internal static Rect LastRowChildContentRect { get; private set; }
-        internal static bool HasRowChildLabelWidthData { get; private set; }
-        internal static float LastRowChildMinLabelWidth { get; private set; }
-        internal static float LastRowChildMaxLabelWidth { get; private set; }
-
         private static GUIContent DuplicateIconTemplate =>
             _duplicateIconTemplate ??= EditorGUIUtility.IconContent("console.warnicon.sml");
 
@@ -690,6 +665,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static GUIContent PaginationLastContent =>
             _paginationLastContent ??= EditorGUIUtility.TrTextContent(">>", "Jump to last page");
+
+        /// <summary>
+        /// Frame number when a child property drawer signaled that its height changed.
+        /// When this matches the current frame, the row render cache should be invalidated.
+        /// </summary>
+        internal static int _childHeightChangedFrame = -1;
+
+        internal static readonly Cache<MainFoldoutCacheKey, AnimBool> MainFoldoutAnimations =
+            CacheBuilder<MainFoldoutCacheKey, AnimBool>
+                .NewBuilder()
+                .MaximumSize(MaxFoldoutAnimations)
+                .InitialCapacity(16)
+                .OnEviction(static (_, anim, _) => Unsubscribe(anim))
+                .TransferOwnershipOnRemoval()
+                .Build();
 
         private static readonly BindingFlags ReflectionBindingFlags =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -714,6 +704,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly Color NullKeyHighlightColor = new(0.84f, 0.2f, 0.2f, 0.6f);
         private static readonly Dictionary<Type, PaletteValueRenderer> PaletteValueRenderers =
             BuildPaletteValueRenderers();
+
         private static readonly GUIContent DuplicateTooltipContent = new();
         private static readonly GUIContent DuplicateIconContentCache = new();
         private static readonly GUIContent NullKeyTooltipContent = new();
@@ -745,36 +736,18 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly ReorderableList.DrawNoneElementCallback EmptyDrawNoneCallback =
             static _ => { };
 
-        /// <summary>
-        /// Frame number when a child property drawer signaled that its height changed.
-        /// When this matches the current frame, the row render cache should be invalidated.
-        /// </summary>
-        private static int _childHeightChangedFrame = -1;
-
         private static readonly Dictionary<PropertyCacheKey, string> SingleTargetPropertyKeyCache =
             new();
 
-        private static readonly Cache<MainFoldoutCacheKey, AnimBool> MainFoldoutAnimations =
-            CacheBuilder<MainFoldoutCacheKey, AnimBool>
-                .NewBuilder()
-                .MaximumSize(MaxFoldoutAnimations)
-                .InitialCapacity(16)
-                .OnEviction(static (_, anim, _) => Unsubscribe(anim))
-                .TransferOwnershipOnRemoval()
-                .Build();
-
-        internal Rect LastResolvedPosition { get; private set; }
-        internal Rect LastListRect { get; private set; }
-        internal bool HasLastListRect { get; private set; }
+        internal readonly Dictionary<string, PendingEntry> _pendingEntries = new();
+        internal readonly Dictionary<RowFoldoutKey, bool> _rowValueFoldoutStates = new();
 
         private readonly Dictionary<string, ReorderableList> _lists = new();
-        private readonly Dictionary<string, PendingEntry> _pendingEntries = new();
         private readonly Dictionary<string, PaginationState> _paginationStates = new();
         private readonly Dictionary<string, ListPageCache> _pageCaches = new();
         private readonly Dictionary<string, KeyIndexCache> _keyIndexCaches = new();
         private readonly Dictionary<string, DuplicateKeyState> _duplicateStates = new();
         private readonly Dictionary<string, NullKeyState> _nullKeyStates = new();
-        private readonly Dictionary<RowFoldoutKey, bool> _rowValueFoldoutStates = new();
         private readonly Dictionary<string, Type> _valueTypes = new();
         private readonly Dictionary<string, int> _sortedOrderHashes = new();
         private readonly Dictionary<string, HeightCacheEntry> _heightCache = new();
@@ -792,6 +765,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private int _lastPrimedFoldoutFrame = -1;
 
         private bool _currentDrawInsideWGroup;
+        private float _currentListContentWidth;
 
         /// <summary>
         /// Signals that a child property drawer's height has changed and the parent
@@ -802,78 +776,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             _childHeightChangedFrame = Time.frameCount;
             InternalEditorUtility.RepaintAllViews();
-        }
-
-        /// <summary>
-        /// Gets the frame number when the child height changed signal was last set.
-        /// For testing purposes only.
-        /// </summary>
-        internal static int GetChildHeightChangedFrameForTests()
-        {
-            return _childHeightChangedFrame;
-        }
-
-        /// <summary>
-        /// Resets the child height changed frame to -1 for testing purposes.
-        /// </summary>
-        internal static void ResetChildHeightChangedFrameForTests()
-        {
-            _childHeightChangedFrame = -1;
-        }
-
-        internal static void ResetLayoutTrackingForTests()
-        {
-            HasLastPendingHeaderRect = false;
-            LastPendingHeaderRect = default;
-            LastPendingFoldoutToggleRect = default;
-            LastPendingLabelHitRect = default;
-            LastPendingAbsoluteLabelHitRect = default;
-            HasLastPendingFieldRects = false;
-            HasLastMainFoldoutRect = false;
-            LastMainFoldoutRect = default;
-            LastPendingValueUsedFoldoutLabel = false;
-            LastRowValueUsedFoldoutLabel = false;
-            LastPendingValueFoldoutOffset = 0f;
-            LastRowValueFoldoutOffset = 0f;
-            HasLastRowRects = false;
-            HasLastRowChildContentRect = false;
-            HasRowChildLabelWidthData = false;
-            LastRowChildMinLabelWidth = 0f;
-            LastRowChildMaxLabelWidth = 0f;
-            LastRowChildContentRect = default;
-            LastPendingKeyFieldRect = default;
-            LastPendingValueFieldRect = default;
-        }
-
-        /// <summary>
-        /// Returns the resolved pending section padding value for test diagnostics.
-        /// </summary>
-        internal static float GetPendingSectionPaddingForTests()
-        {
-            return PendingSectionPadding;
-        }
-
-        internal static EventType GetEffectiveMouseEventTypeForTests(
-            EventType eventType,
-            EventType rawEventType
-        )
-        {
-            return GetEffectiveMouseEventType(eventType, rawEventType);
-        }
-
-        internal static bool TryTogglePendingFoldoutLabelForTests(
-            Event currentEvent,
-            Rect labelHitRect,
-            Rect absoluteLabelHitRect,
-            ref bool expanded
-        )
-        {
-            return TryTogglePendingFoldoutLabel(
-                currentEvent,
-                labelHitRect,
-                absoluteLabelHitRect,
-                ref expanded
-            );
         }
 
         internal static float CalculateDictionaryRowHeight(
@@ -950,20 +852,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             float phase = (float)(elapsed * DuplicateShakeFrequency);
             float seed = arrayIndex * 0.35f;
             return Mathf.Sin(phase + seed) * DuplicateShakeAmplitude;
-        }
-
-        internal static bool HasDroppedValuesArrayForTests(SerializedProperty dictionaryProperty)
-        {
-            return HasDroppedValuesArray(
-                new CachedPropertyPair
-                {
-                    keysProperty = dictionaryProperty.FindPropertyRelative(
-                        SerializableDictionarySerializedPropertyNames.Keys
-                    ),
-                    valuesProperty = ResolveValuesArray(dictionaryProperty),
-                },
-                dictionaryProperty
-            );
         }
 
         internal static void SyncListSelectionWithPagination(
@@ -1288,87 +1176,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             pending.lastDuplicateCheckValueRevision = pending.valueRevision;
             pending.lastDuplicateCheckResult = matches;
             return matches;
-        }
-
-        internal static bool IsTweeningEnabledForTests(bool isSortedDictionary)
-        {
-            return ShouldTweenPendingFoldout(isSortedDictionary);
-        }
-
-        /// <summary>
-        /// Returns the expected static foldout progress without animation.
-        /// This static method cannot access instance animation state.
-        /// Use <see cref="GetPendingFoldoutProgressFromInstance"/> for actual animation testing.
-        /// </summary>
-        internal static float GetPendingFoldoutProgressForTests(
-            SerializedProperty property,
-            bool expanded,
-            bool isSorted
-        )
-        {
-            return expanded ? 1f : 0f;
-        }
-
-        /// <summary>
-        /// Clears the main foldout animation cache. Used for testing purposes.
-        /// </summary>
-        internal static void ClearMainFoldoutAnimCacheForTests()
-        {
-            MainFoldoutAnimations.Clear();
-        }
-
-        /// <summary>
-        /// Returns true if a main foldout AnimBool exists for the given property path and target object.
-        /// </summary>
-        internal static bool HasMainFoldoutAnimBoolForTests(
-            SerializedObject serializedObject,
-            string propertyPath
-        )
-        {
-            MainFoldoutCacheKey cacheKey = GetMainFoldoutCacheKey(serializedObject, propertyPath);
-            return MainFoldoutAnimations.ContainsKey(cacheKey);
-        }
-
-        /// <summary>
-        /// Gets the main foldout progress for testing purposes.
-        /// </summary>
-        internal static float GetMainFoldoutProgressForTests(
-            SerializedObject serializedObject,
-            string propertyPath,
-            bool isExpanded,
-            bool isSortedDictionary
-        )
-        {
-            return GetMainFoldoutProgress(
-                serializedObject,
-                propertyPath,
-                isExpanded,
-                isSortedDictionary
-            );
-        }
-
-        /// <summary>
-        /// Gets the main foldout cache key for testing purposes.
-        /// Returns the string representation of the struct key.
-        /// </summary>
-        internal static string GetMainFoldoutCacheKeyForTests(
-            SerializedObject serializedObject,
-            string propertyPath
-        )
-        {
-            return GetMainFoldoutCacheKey(serializedObject, propertyPath).ToString();
-        }
-
-        /// <summary>
-        /// Resolves the content rect for testing purposes, applying WGroup padding and indentation
-        /// without requiring a full OnGUI context.
-        /// </summary>
-        /// <param name="position">The original position rect.</param>
-        /// <param name="skipIndentation">Whether to skip standard Unity indentation.</param>
-        /// <returns>The resolved content rect.</returns>
-        internal static Rect ResolveContentRectForTests(Rect position, bool skipIndentation = false)
-        {
-            return ResolveContentRect(position, skipIndentation);
         }
 
         internal static object DrawFieldForType(
@@ -2090,7 +1897,23 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             serializedObject.UpdateIfRequiredOrScript();
         }
 
-        private static Rect ResolveContentRect(Rect position, bool skipIndentation = false)
+        internal static float ResolveRowContentWidth(float rowWidth, float listContentWidth)
+        {
+            float minContentWidth =
+                DictionaryRowKeyColumnMinWidth
+                + DictionaryRowValueColumnMinWidth
+                + DictionaryRowKeyValueGap
+                + DictionaryRowFieldPadding * 4f;
+            if (rowWidth < minContentWidth)
+            {
+                return 0f < listContentWidth
+                    ? Mathf.Max(minContentWidth, listContentWidth)
+                    : minContentWidth;
+            }
+            return rowWidth;
+        }
+
+        internal static Rect ResolveContentRect(Rect position, bool skipIndentation = false)
         {
             float leftPadding = GroupGUIWidthUtility.CurrentLeftPadding;
             float rightPadding = GroupGUIWidthUtility.CurrentRightPadding;
@@ -2198,12 +2021,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return final;
         }
 
-        private static Rect ConvertGroupRectToAbsolute(Rect rect, Rect groupRect)
-        {
-            return new Rect(rect.x + groupRect.x, rect.y + groupRect.y, rect.width, rect.height);
-        }
-
-        private static EventType GetEffectiveMouseEventType(Event currentEvent)
+        internal static EventType GetEffectiveMouseEventType(Event currentEvent)
         {
             if (currentEvent == null)
             {
@@ -2213,7 +2031,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return GetEffectiveMouseEventType(currentEvent.type, currentEvent.rawType);
         }
 
-        private static EventType GetEffectiveMouseEventType(
+        internal static EventType GetEffectiveMouseEventType(
             EventType eventType,
             EventType rawEventType
         )
@@ -2226,7 +2044,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return eventType;
         }
 
-        private static bool TryTogglePendingFoldoutLabel(
+        internal static bool TryTogglePendingFoldoutLabel(
             Event currentEvent,
             Rect labelHitRect,
             Rect absoluteLabelHitRect,
@@ -2259,6 +2077,340 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return true;
+        }
+
+        // Collection values use boxed wrappers when Unity refuses the plain array; ordinary values resolve first.
+        internal static SerializedProperty ResolveValuesArray(SerializedProperty dictionaryProperty)
+        {
+            return dictionaryProperty.FindPropertyRelative(
+                    SerializableDictionarySerializedPropertyNames.Values
+                )
+                ?? dictionaryProperty.FindPropertyRelative(
+                    SerializableDictionarySerializedPropertyNames.BoxedValues
+                );
+        }
+
+        // Resolved keys with unresolved values indicate serialization failure; neither resolved means the property is unknown.
+        internal static bool HasDroppedValuesArray(
+            CachedPropertyPair propertyPair,
+            SerializedProperty dictionaryProperty
+        )
+        {
+            if (propertyPair.keysProperty == null)
+            {
+                return false;
+            }
+
+            SerializedProperty valuesProperty = propertyPair.valuesProperty;
+            if (valuesProperty == null)
+            {
+                return true;
+            }
+
+            if (
+                !string.Equals(
+                    valuesProperty.name,
+                    SerializableDictionarySerializedPropertyNames.BoxedValues,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return false;
+            }
+
+            // An empty boxed array cannot prove serializability; runtime type metadata distinguishes unsupported values from empty dictionaries.
+            if (valuesProperty.arraySize == 0)
+            {
+                // Unresolvable instances are unknown, not evidence that an empty dictionary cannot serialize.
+                return GetDictionaryInstance(dictionaryProperty)
+                        is ISerializableDictionaryBoxedValues boxing
+                    && !boxing.UsesBoxedValues;
+            }
+
+            // Boxes only help if Unity can serialize their Data fields; inspect a real element when one exists.
+            SerializedProperty firstBox = valuesProperty.GetArrayElementAtIndex(0);
+            return firstBox == null
+                || firstBox.FindPropertyRelative(
+                    SerializableDictionarySerializedPropertyNames.BoxedValueData
+                ) == null;
+        }
+
+        internal static RowFoldoutKey BuildRowFoldoutStateKey(string cacheKey, int globalIndex)
+        {
+            return new RowFoldoutKey(cacheKey, globalIndex);
+        }
+
+        internal static float ResolvePendingFoldoutToggleOffset(
+            SerializedProperty dictionaryProperty
+        )
+        {
+            SerializedObject serializedObject = dictionaryProperty?.serializedObject;
+            if (!TargetsUnityHelpersSettings(serializedObject))
+            {
+                return PendingFoldoutToggleOffset;
+            }
+
+            return PendingFoldoutToggleOffsetProjectSettings;
+        }
+
+        internal static float ResolvePendingFoldoutLabelContentOffset(
+            SerializedProperty dictionaryProperty
+        )
+        {
+            SerializedObject serializedObject = dictionaryProperty?.serializedObject;
+            if (TargetsUnityHelpersSettings(serializedObject))
+            {
+                return PendingFoldoutLabelContentOffset;
+            }
+
+            return PendingFoldoutLabelContentOffset - PendingFoldoutInspectorLabelShift;
+        }
+
+        internal static float CalculateRowChildLabelWidth(
+            float valueColumnWidth,
+            SerializedProperty property
+        )
+        {
+            float ratioWidth = Mathf.Max(0f, valueColumnWidth * DictionaryRowChildLabelWidthRatio);
+            float measuredWidth = ratioWidth;
+            if (property != null)
+            {
+                RowChildLabelContent.text = property.displayName ?? string.Empty;
+                RowChildLabelContent.image = null;
+                RowChildLabelContent.tooltip = null;
+                Vector2 labelSize = GetRowChildLabelStyle().CalcSize(RowChildLabelContent);
+                measuredWidth = Mathf.Max(0f, labelSize.x + DictionaryRowChildLabelTextPadding);
+            }
+
+            float availableWidth = Mathf.Max(
+                0f,
+                valueColumnWidth - DictionaryRowChildHorizontalPadding * 2f
+            );
+            float maxAllowed = Mathf.Min(
+                DictionaryRowChildLabelWidthMax,
+                Mathf.Max(DictionaryRowChildLabelWidthMin, availableWidth)
+            );
+
+            float targetWidth = 0f < measuredWidth ? measuredWidth : ratioWidth;
+            return Mathf.Clamp(targetWidth, DictionaryRowChildLabelWidthMin, maxAllowed);
+        }
+
+        /// <summary>
+        /// Computes the cache key for main foldout animations.
+        /// Includes the target object's instance ID to prevent collisions between different objects.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static MainFoldoutCacheKey GetMainFoldoutCacheKey(
+            SerializedObject serializedObject,
+            string propertyPath
+        )
+        {
+            long instanceId =
+                serializedObject?.targetObject != null
+                    ? serializedObject.targetObject.GetUnityObjectId()
+                    : 0;
+            return new MainFoldoutCacheKey(instanceId, propertyPath);
+        }
+
+        internal static float GetMainFoldoutProgress(
+            SerializedObject serializedObject,
+            string propertyPath,
+            bool isExpanded,
+            bool isSortedDictionary
+        )
+        {
+            bool shouldTween = ShouldTweenMainFoldout(isSortedDictionary);
+            if (!shouldTween)
+            {
+                float immediateProgress = isExpanded ? 1f : 0f;
+
+                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                    "GetMainFoldoutProgress_NoTween",
+                    propertyPath ?? "(unknown)",
+                    false,
+                    isExpanded,
+                    immediateProgress,
+                    false
+                );
+
+                return immediateProgress;
+            }
+
+            AnimBool anim = EnsureMainFoldoutAnim(
+                serializedObject,
+                propertyPath,
+                isExpanded,
+                isSortedDictionary
+            );
+            if (anim == null)
+            {
+                float fallbackProgress = isExpanded ? 1f : 0f;
+
+                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                    "GetMainFoldoutProgress_NoAnimBool",
+                    propertyPath ?? "(unknown)",
+                    true,
+                    isExpanded,
+                    fallbackProgress,
+                    false
+                );
+
+                return fallbackProgress;
+            }
+
+            if (anim.isAnimating)
+            {
+                RequestRepaint();
+            }
+
+            float animatedProgress = anim.faded;
+
+            SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                "GetMainFoldoutProgress_Animated",
+                propertyPath ?? "(unknown)",
+                true,
+                isExpanded,
+                animatedProgress,
+                true
+            );
+
+            return animatedProgress;
+        }
+
+        internal static bool ShouldTweenPendingFoldout(bool isSortedDictionary)
+        {
+            return isSortedDictionary
+                ? UnityHelpersSettings.ShouldTweenSerializableSortedDictionaryFoldouts()
+                : UnityHelpersSettings.ShouldTweenSerializableDictionaryFoldouts();
+        }
+
+        internal static AnimBool EnsurePendingFoldoutAnim(
+            PendingEntry pending,
+            string propertyPath = null
+        )
+        {
+            if (pending == null)
+            {
+                return null;
+            }
+
+            bool shouldTween = ShouldTweenPendingFoldout(pending.isSorted);
+            float speed = GetPendingFoldoutAnimationSpeed(pending.isSorted);
+
+            SerializableCollectionTweenDiagnostics.LogTweenSettingsQuery(
+                "EnsurePendingFoldoutAnim",
+                propertyPath ?? "(unknown)",
+                pending.isSorted,
+                shouldTween,
+                speed
+            );
+
+            if (!shouldTween)
+            {
+                if (pending.foldoutAnim != null)
+                {
+                    pending.foldoutAnim.valueChanged.RemoveListener(RequestRepaint);
+                    pending.foldoutAnim = null;
+
+                    SerializableCollectionTweenDiagnostics.LogAnimBoolDestroyed(
+                        propertyPath ?? "(unknown)",
+                        "TweeningDisabled"
+                    );
+                }
+
+                return null;
+            }
+
+            if (pending.foldoutAnim == null)
+            {
+                pending.foldoutAnim = CreatePendingFoldoutAnim(
+                    pending.isExpanded,
+                    pending.isSorted,
+                    propertyPath
+                );
+            }
+            else
+            {
+                pending.foldoutAnim.speed = speed;
+
+                if (pending.foldoutAnim.target != pending.isExpanded)
+                {
+                    pending.foldoutAnim.target = pending.isExpanded;
+                }
+            }
+
+            return pending.foldoutAnim;
+        }
+
+        internal static float GetPendingFoldoutProgress(
+            PendingEntry pending,
+            string propertyPath = null
+        )
+        {
+            if (pending == null)
+            {
+                return 0f;
+            }
+
+            bool shouldTween = ShouldTweenPendingFoldout(pending.isSorted);
+
+            // EnsurePendingFoldoutAnim also disposes animation state when tweening is disabled.
+            AnimBool anim = EnsurePendingFoldoutAnim(pending, propertyPath);
+
+            if (!shouldTween)
+            {
+                float immediateProgress = pending.isExpanded ? 1f : 0f;
+
+                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                    "GetPendingFoldoutProgress_NoTween",
+                    propertyPath ?? "(unknown)",
+                    false,
+                    pending.isExpanded,
+                    immediateProgress,
+                    pending.foldoutAnim != null
+                );
+
+                return immediateProgress;
+            }
+
+            if (anim == null)
+            {
+                float fallbackProgress = pending.isExpanded ? 1f : 0f;
+
+                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                    "GetPendingFoldoutProgress_NoAnimBool",
+                    propertyPath ?? "(unknown)",
+                    true,
+                    pending.isExpanded,
+                    fallbackProgress,
+                    false
+                );
+
+                return fallbackProgress;
+            }
+
+            anim.target = pending.isExpanded;
+            if (anim.isAnimating)
+            {
+                RequestRepaint();
+            }
+            float animatedProgress = anim.faded;
+
+            SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                "GetPendingFoldoutProgress_Animated",
+                propertyPath ?? "(unknown)",
+                true,
+                pending.isExpanded,
+                animatedProgress,
+                true
+            );
+
+            return animatedProgress;
+        }
+
+        private static Rect ConvertGroupRectToAbsolute(Rect rect, Rect groupRect)
+        {
+            return new Rect(rect.x + groupRect.x, rect.y + groupRect.y, rect.width, rect.height);
         }
 
         private static void DrawDuplicateTooltip(Rect rect, string tooltip)
@@ -2334,17 +2486,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return height;
-        }
-
-        // Collection values use boxed wrappers when Unity refuses the plain array; ordinary values resolve first.
-        private static SerializedProperty ResolveValuesArray(SerializedProperty dictionaryProperty)
-        {
-            return dictionaryProperty.FindPropertyRelative(
-                    SerializableDictionarySerializedPropertyNames.Values
-                )
-                ?? dictionaryProperty.FindPropertyRelative(
-                    SerializableDictionarySerializedPropertyNames.BoxedValues
-                );
         }
 
         // Identify wrappers by the array field, so consumer types with a Data member are not accidentally unwrapped.
@@ -2424,51 +2565,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static float GetWarningBarHeight()
         {
             return EditorGUIUtility.singleLineHeight * 1.6f;
-        }
-
-        // Resolved keys with unresolved values indicate serialization failure; neither resolved means the property is unknown.
-        private static bool HasDroppedValuesArray(
-            CachedPropertyPair propertyPair,
-            SerializedProperty dictionaryProperty
-        )
-        {
-            if (propertyPair.keysProperty == null)
-            {
-                return false;
-            }
-
-            SerializedProperty valuesProperty = propertyPair.valuesProperty;
-            if (valuesProperty == null)
-            {
-                return true;
-            }
-
-            if (
-                !string.Equals(
-                    valuesProperty.name,
-                    SerializableDictionarySerializedPropertyNames.BoxedValues,
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                return false;
-            }
-
-            // An empty boxed array cannot prove serializability; runtime type metadata distinguishes unsupported values from empty dictionaries.
-            if (valuesProperty.arraySize == 0)
-            {
-                // Unresolvable instances are unknown, not evidence that an empty dictionary cannot serialize.
-                return GetDictionaryInstance(dictionaryProperty)
-                        is ISerializableDictionaryBoxedValues boxing
-                    && !boxing.UsesBoxedValues;
-            }
-
-            // Boxes only help if Unity can serialize their Data fields; inspect a real element when one exists.
-            SerializedProperty firstBox = valuesProperty.GetArrayElementAtIndex(0);
-            return firstBox == null
-                || firstBox.FindPropertyRelative(
-                    SerializableDictionarySerializedPropertyNames.BoxedValueData
-                ) == null;
         }
 
         // Height measurement has no rect, so wrap the rare serialization error using Inspector width.
@@ -2660,11 +2756,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private static RowFoldoutKey BuildRowFoldoutStateKey(string cacheKey, int globalIndex)
-        {
-            return new RowFoldoutKey(cacheKey, globalIndex);
-        }
-
         private static int GetRelativeIndex(ListPageCache cache, int globalIndex)
         {
             if (globalIndex < 0)
@@ -2804,19 +2895,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private static float ResolvePendingFoldoutToggleOffset(
-            SerializedProperty dictionaryProperty
-        )
-        {
-            SerializedObject serializedObject = dictionaryProperty?.serializedObject;
-            if (!TargetsUnityHelpersSettings(serializedObject))
-            {
-                return PendingFoldoutToggleOffset;
-            }
-
-            return PendingFoldoutToggleOffsetProjectSettings;
-        }
-
         private static float ResolvePendingSectionPadding(SerializedProperty dictionaryProperty)
         {
             SerializedObject serializedObject = dictionaryProperty?.serializedObject;
@@ -2826,19 +2904,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return PendingSectionPaddingProjectSettings;
-        }
-
-        private static float ResolvePendingFoldoutLabelContentOffset(
-            SerializedProperty dictionaryProperty
-        )
-        {
-            SerializedObject serializedObject = dictionaryProperty?.serializedObject;
-            if (TargetsUnityHelpersSettings(serializedObject))
-            {
-                return PendingFoldoutLabelContentOffset;
-            }
-
-            return PendingFoldoutLabelContentOffset - PendingFoldoutInspectorLabelShift;
         }
 
         private static bool TargetsUnityHelpersSettings(SerializedObject serializedObject)
@@ -3303,8 +3368,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     }
                 }
 
-                TrackRowChildLayout(childRect, childLabelWidth);
-
                 childY = childRect.yMax + EditorGUIUtility.standardVerticalSpacing;
             }
 
@@ -3313,35 +3376,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 (childY - EditorGUIUtility.standardVerticalSpacing) - valueRect.y
             );
             return changed;
-        }
-
-        private static float CalculateRowChildLabelWidth(
-            float valueColumnWidth,
-            SerializedProperty property
-        )
-        {
-            float ratioWidth = Mathf.Max(0f, valueColumnWidth * DictionaryRowChildLabelWidthRatio);
-            float measuredWidth = ratioWidth;
-            if (property != null)
-            {
-                RowChildLabelContent.text = property.displayName ?? string.Empty;
-                RowChildLabelContent.image = null;
-                RowChildLabelContent.tooltip = null;
-                Vector2 labelSize = GetRowChildLabelStyle().CalcSize(RowChildLabelContent);
-                measuredWidth = Mathf.Max(0f, labelSize.x + DictionaryRowChildLabelTextPadding);
-            }
-
-            float availableWidth = Mathf.Max(
-                0f,
-                valueColumnWidth - DictionaryRowChildHorizontalPadding * 2f
-            );
-            float maxAllowed = Mathf.Min(
-                DictionaryRowChildLabelWidthMax,
-                Mathf.Max(DictionaryRowChildLabelWidthMin, availableWidth)
-            );
-
-            float targetWidth = 0f < measuredWidth ? measuredWidth : ratioWidth;
-            return Mathf.Clamp(targetWidth, DictionaryRowChildLabelWidthMin, maxAllowed);
         }
 
         private static GUIStyle GetRowChildLabelStyle()
@@ -3356,30 +3390,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return _rowChildLabelStyle;
-        }
-
-        private static void TrackRowChildLayout(Rect childRect, float labelWidth)
-        {
-            HasLastRowChildContentRect = true;
-            LastRowChildContentRect = childRect;
-
-            if (!HasRowChildLabelWidthData)
-            {
-                HasRowChildLabelWidthData = true;
-                LastRowChildMinLabelWidth = labelWidth;
-                LastRowChildMaxLabelWidth = labelWidth;
-                return;
-            }
-
-            LastRowChildMinLabelWidth = Mathf.Min(LastRowChildMinLabelWidth, labelWidth);
-            LastRowChildMaxLabelWidth = Mathf.Max(LastRowChildMaxLabelWidth, labelWidth);
-        }
-
-        private static void TrackPendingFieldRects(Rect keyRect, Rect valueRect)
-        {
-            HasLastPendingFieldRects = true;
-            LastPendingKeyFieldRect = keyRect;
-            LastPendingValueFieldRect = valueRect;
         }
 
         private static Func<object, object, int> CreateManualKeyComparisonDelegate(Type keyType)
@@ -3792,23 +3802,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        /// <summary>
-        /// Computes the cache key for main foldout animations.
-        /// Includes the target object's instance ID to prevent collisions between different objects.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static MainFoldoutCacheKey GetMainFoldoutCacheKey(
-            SerializedObject serializedObject,
-            string propertyPath
-        )
-        {
-            long instanceId =
-                serializedObject?.targetObject != null
-                    ? serializedObject.targetObject.GetUnityObjectId()
-                    : 0;
-            return new MainFoldoutCacheKey(instanceId, propertyPath);
-        }
-
         private static bool ShouldTweenMainFoldout(bool isSortedDictionary)
         {
             return isSortedDictionary
@@ -3879,78 +3872,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return anim;
         }
 
-        private static float GetMainFoldoutProgress(
-            SerializedObject serializedObject,
-            string propertyPath,
-            bool isExpanded,
-            bool isSortedDictionary
-        )
-        {
-            bool shouldTween = ShouldTweenMainFoldout(isSortedDictionary);
-            if (!shouldTween)
-            {
-                float immediateProgress = isExpanded ? 1f : 0f;
-
-                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                    "GetMainFoldoutProgress_NoTween",
-                    propertyPath ?? "(unknown)",
-                    false,
-                    isExpanded,
-                    immediateProgress,
-                    false
-                );
-
-                return immediateProgress;
-            }
-
-            AnimBool anim = EnsureMainFoldoutAnim(
-                serializedObject,
-                propertyPath,
-                isExpanded,
-                isSortedDictionary
-            );
-            if (anim == null)
-            {
-                float fallbackProgress = isExpanded ? 1f : 0f;
-
-                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                    "GetMainFoldoutProgress_NoAnimBool",
-                    propertyPath ?? "(unknown)",
-                    true,
-                    isExpanded,
-                    fallbackProgress,
-                    false
-                );
-
-                return fallbackProgress;
-            }
-
-            if (anim.isAnimating)
-            {
-                RequestRepaint();
-            }
-
-            float animatedProgress = anim.faded;
-
-            SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                "GetMainFoldoutProgress_Animated",
-                propertyPath ?? "(unknown)",
-                true,
-                isExpanded,
-                animatedProgress,
-                true
-            );
-
-            return animatedProgress;
-        }
-
-        private static bool ShouldTweenPendingFoldout(bool isSortedDictionary)
-        {
-            return isSortedDictionary
-                ? UnityHelpersSettings.ShouldTweenSerializableSortedDictionaryFoldouts()
-                : UnityHelpersSettings.ShouldTweenSerializableDictionaryFoldouts();
-        }
-
         private static float GetPendingFoldoutAnimationSpeed(bool isSortedDictionary)
         {
             return isSortedDictionary
@@ -3978,64 +3899,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return anim;
         }
 
-        private static AnimBool EnsurePendingFoldoutAnim(
-            PendingEntry pending,
-            string propertyPath = null
-        )
-        {
-            if (pending == null)
-            {
-                return null;
-            }
-
-            bool shouldTween = ShouldTweenPendingFoldout(pending.isSorted);
-            float speed = GetPendingFoldoutAnimationSpeed(pending.isSorted);
-
-            SerializableCollectionTweenDiagnostics.LogTweenSettingsQuery(
-                "EnsurePendingFoldoutAnim",
-                propertyPath ?? "(unknown)",
-                pending.isSorted,
-                shouldTween,
-                speed
-            );
-
-            if (!shouldTween)
-            {
-                if (pending.foldoutAnim != null)
-                {
-                    pending.foldoutAnim.valueChanged.RemoveListener(RequestRepaint);
-                    pending.foldoutAnim = null;
-
-                    SerializableCollectionTweenDiagnostics.LogAnimBoolDestroyed(
-                        propertyPath ?? "(unknown)",
-                        "TweeningDisabled"
-                    );
-                }
-
-                return null;
-            }
-
-            if (pending.foldoutAnim == null)
-            {
-                pending.foldoutAnim = CreatePendingFoldoutAnim(
-                    pending.isExpanded,
-                    pending.isSorted,
-                    propertyPath
-                );
-            }
-            else
-            {
-                pending.foldoutAnim.speed = speed;
-
-                if (pending.foldoutAnim.target != pending.isExpanded)
-                {
-                    pending.foldoutAnim.target = pending.isExpanded;
-                }
-            }
-
-            return pending.foldoutAnim;
-        }
-
         private static void RequestRepaint()
         {
             // Repaint all views because SettingsProvider and Inspector can both host this drawer.
@@ -4048,72 +3911,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 anim.valueChanged.RemoveListener(RequestRepaint);
             }
-        }
-
-        private static float GetPendingFoldoutProgress(
-            PendingEntry pending,
-            string propertyPath = null
-        )
-        {
-            if (pending == null)
-            {
-                return 0f;
-            }
-
-            bool shouldTween = ShouldTweenPendingFoldout(pending.isSorted);
-
-            // EnsurePendingFoldoutAnim also disposes animation state when tweening is disabled.
-            AnimBool anim = EnsurePendingFoldoutAnim(pending, propertyPath);
-
-            if (!shouldTween)
-            {
-                float immediateProgress = pending.isExpanded ? 1f : 0f;
-
-                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                    "GetPendingFoldoutProgress_NoTween",
-                    propertyPath ?? "(unknown)",
-                    false,
-                    pending.isExpanded,
-                    immediateProgress,
-                    pending.foldoutAnim != null
-                );
-
-                return immediateProgress;
-            }
-
-            if (anim == null)
-            {
-                float fallbackProgress = pending.isExpanded ? 1f : 0f;
-
-                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                    "GetPendingFoldoutProgress_NoAnimBool",
-                    propertyPath ?? "(unknown)",
-                    true,
-                    pending.isExpanded,
-                    fallbackProgress,
-                    false
-                );
-
-                return fallbackProgress;
-            }
-
-            anim.target = pending.isExpanded;
-            if (anim.isAnimating)
-            {
-                RequestRepaint();
-            }
-            float animatedProgress = anim.faded;
-
-            SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                "GetPendingFoldoutProgress_Animated",
-                propertyPath ?? "(unknown)",
-                true,
-                pending.isExpanded,
-                animatedProgress,
-                true
-            );
-
-            return animatedProgress;
         }
 
         private static GUIStyle GetFooterLabelStyle()
@@ -6067,25 +5864,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     return;
                 }
 
-                float minContentWidth =
-                    DictionaryRowKeyColumnMinWidth
-                    + DictionaryRowValueColumnMinWidth
-                    + DictionaryRowKeyValueGap
-                    + DictionaryRowFieldPadding * 4f;
-                if (rect.width < minContentWidth)
-                {
-                    float fallbackWidth = minContentWidth;
-                    if (HasLastListRect && 0f < LastListRect.width)
-                    {
-                        fallbackWidth = Mathf.Max(fallbackWidth, LastListRect.width);
-                    }
-                    else if (0f < LastResolvedPosition.width)
-                    {
-                        fallbackWidth = Mathf.Max(fallbackWidth, LastResolvedPosition.width);
-                    }
-
-                    rect.width = fallbackWidth;
-                }
+                rect.width = ResolveRowContentWidth(rect.width, _currentListContentWidth);
 
                 int globalIndex = currentCache.entries[index].arrayIndex;
                 CachedPropertyPair elementPair = GetOrCreateCachedPropertyPair(
@@ -6221,9 +6000,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     Mathf.Max(0f, rowRightEdge - valueRect.x)
                 );
 
-                LastRowOriginalRect = rect;
-                LastRowValueBaseX = valueRect.x;
-
                 float rowFieldPadding = DictionaryRowFieldPadding;
                 keyRect.x += rowFieldPadding;
                 keyRect.width = Mathf.Max(0f, keyRect.width - rowFieldPadding);
@@ -6261,9 +6037,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     }
                 }
 
-                HasLastRowRects = true;
-                LastRowKeyRect = keyRect;
-
                 EditorGUI.BeginChangeCheck();
                 EditorGUI.PropertyField(keyRect, keyProperty, GUIContent.none, true);
                 if (EditorGUI.EndChangeCheck())
@@ -6284,7 +6057,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     float foldoutOffset = RowExpandableValueFoldoutGutter;
                     valueRect.x += foldoutOffset;
                     valueRect.width = Mathf.Max(0f, valueRect.width - foldoutOffset);
-                    LastRowValueFoldoutOffset = foldoutOffset;
+
                     valueChanged = DrawRowFoldoutValue(
                         valueRect,
                         valueProperty,
@@ -6296,13 +6069,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
                 else
                 {
-                    LastRowValueFoldoutOffset = 0f;
                     EditorGUI.BeginChangeCheck();
                     EditorGUI.PropertyField(valueRect, valueProperty, valueLabel, true);
                     valueChanged = EditorGUI.EndChangeCheck();
                 }
-
-                LastRowValueRect = valueRect;
 
                 if (valueChanged)
                 {
@@ -6332,7 +6102,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     MarkListCacheDirty(key);
                     RequestRepaint();
                 }
-                LastRowValueUsedFoldoutLabel = valueSupportsFoldout;
             };
 
             list.onRemoveCallback = reorderableList =>
@@ -6733,17 +6502,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             keysToRemoveLease.Dispose();
         }
 
-        internal void SetRowFoldoutStateForTests(string cacheKey, int globalIndex, bool isExpanded)
-        {
-            RowFoldoutKey key = BuildRowFoldoutStateKey(cacheKey, globalIndex);
-            if (!key.IsValid)
-            {
-                return;
-            }
-
-            _rowValueFoldoutStates[key] = isExpanded;
-        }
-
         internal void RemoveEntryAtIndex(
             int removeIndex,
             ReorderableList list,
@@ -7070,94 +6828,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        /// <summary>
-        /// Gets the actual animated foldout progress from the drawer instance's pending entry.
-        /// Use this for testing that animations are actually progressing over time.
-        /// </summary>
-        /// <param name="property">The serialized property for the dictionary.</param>
-        /// <returns>
-        /// The current animation progress (0 to 1), or -1 if no pending entry exists for this property.
-        /// When tweening is disabled, returns 0 or 1 immediately based on expanded state.
-        /// </returns>
-        internal float GetPendingFoldoutProgressFromInstance(SerializedProperty property)
-        {
-            if (property == null)
-            {
-                return -1f;
-            }
-
-            string cacheKey = GetListKey(property);
-            if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
-            {
-                return -1f;
-            }
-
-            return GetPendingFoldoutProgress(pending);
-        }
-
-        /// <summary>
-        /// Gets the pending entry's expanded state and animation information for testing.
-        /// </summary>
-        /// <param name="property">The serialized property for the dictionary.</param>
-        /// <param name="isExpanded">Output: whether the pending section is logically expanded.</param>
-        /// <param name="animProgress">Output: the current animation progress (0 to 1).</param>
-        /// <param name="hasAnimBool">Output: whether an AnimBool is active for this entry.</param>
-        /// <returns>True if a pending entry was found, false otherwise.</returns>
-        internal bool TryGetPendingAnimationStateForTests(
-            SerializedProperty property,
-            out bool isExpanded,
-            out float animProgress,
-            out bool hasAnimBool
-        )
-        {
-            if (property == null)
-            {
-                isExpanded = false;
-                animProgress = 0f;
-                hasAnimBool = false;
-                return false;
-            }
-
-            string cacheKey = GetListKey(property);
-            if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
-            {
-                isExpanded = false;
-                animProgress = 0f;
-                hasAnimBool = false;
-                return false;
-            }
-
-            isExpanded = pending.isExpanded;
-            hasAnimBool = pending.foldoutAnim != null;
-            animProgress = GetPendingFoldoutProgress(pending);
-            return true;
-        }
-
-        /// <summary>
-        /// Sets the pending entry's expanded state for testing purposes.
-        /// This properly triggers animation state updates.
-        /// </summary>
-        internal void SetPendingExpandedStateForTests(SerializedProperty property, bool expanded)
-        {
-            if (property == null)
-            {
-                return;
-            }
-
-            string cacheKey = GetListKey(property);
-            if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
-            {
-                return;
-            }
-
-            pending.isExpanded = expanded;
-            AnimBool anim = EnsurePendingFoldoutAnim(pending, property.propertyPath);
-            if (anim != null)
-            {
-                anim.target = expanded;
-            }
-        }
-
         internal void InvokeClearDictionary(
             SerializedProperty dictionaryProperty,
             SerializedProperty keysProperty,
@@ -7185,8 +6855,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             SerializableDictionaryIndentDiagnostics.LogGroupPaddingState("OnGUI entry");
 
             Rect contentPosition = ResolveContentRect(originalPosition, targetsSettings);
-            LastResolvedPosition = contentPosition;
-            HasLastListRect = false;
+            _currentListContentWidth = contentPosition.width;
 
             EditorGUI.BeginProperty(originalPosition, label, property);
             // WGroup already provides SettingsProvider indentation; applying EditorGUI indentation would double it.
@@ -7286,9 +6955,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     label,
                     true
                 );
-
-                HasLastMainFoldoutRect = true;
-                LastMainFoldoutRect = foldoutRect;
 
                 float mainFoldoutProgress = GetMainFoldoutProgress(
                     property.serializedObject,
@@ -7410,8 +7076,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         y = pendingY + EditorGUIUtility.standardVerticalSpacing;
 
                         Rect listRect = new(position.x, y, position.width, list.GetHeight());
-                        LastListRect = listRect;
-                        HasLastListRect = true;
 
                         // Opaque backgrounds cover Unity's defaults instead of tinting them.
                         if (_currentDrawInsideWGroup && Event.current.type == EventType.Repaint)
@@ -8532,19 +8196,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     headerRect.height
                 );
 
-                HasLastPendingHeaderRect = true;
-                LastPendingHeaderRect = ConvertGroupRectToAbsolute(headerRect, containerRect);
-                LastPendingFoldoutToggleRect = ConvertGroupRectToAbsolute(
-                    foldoutToggleRect,
-                    containerRect
-                );
-
                 Event currentEvent = Event.current;
                 bool expanded = pending.isExpanded;
 
                 Rect absoluteLabelHitRect = ConvertGroupRectToAbsolute(labelHitRect, containerRect);
-                LastPendingLabelHitRect = labelHitRect;
-                LastPendingAbsoluteLabelHitRect = absoluteLabelHitRect;
+
                 bool mouseInLabelRect =
                     labelHitRect.Contains(currentEvent.mousePosition)
                     || absoluteLabelHitRect.Contains(currentEvent.mousePosition);
@@ -8641,11 +8297,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     GUI.EndGroup();
                     y = containerRect.yMax;
-                    LastPendingValueUsedFoldoutLabel = false;
-                    LastPendingValueFoldoutOffset = 0f;
-                    HasLastPendingFieldRects = false;
-                    LastPendingKeyFieldRect = default;
-                    LastPendingValueFieldRect = default;
+
                     return;
                 }
 
@@ -8692,7 +8344,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     InvalidatePendingDuplicateCache(pending);
                 }
-                Rect absoluteKeyRect = ConvertGroupRectToAbsolute(keyRect, containerRect);
 
                 float valueHeight = pendingMetrics.ValueHeight;
                 // Key and value share one column; identical origins and gutters keep stacked fields aligned.
@@ -8724,8 +8375,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     MarkPendingValueChanged(pending);
                 }
-                LastPendingValueUsedFoldoutLabel = pendingValueSupportsFoldout;
-                LastPendingValueFoldoutOffset = pendingValueFoldoutOffset;
+
                 if (
                     pendingValueSupportsFoldout
                     && pending.valueWrapperProperty is { isExpanded: false }
@@ -8733,8 +8383,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     pending.valueWrapperProperty.isExpanded = true;
                 }
-                Rect absoluteValueRect = ConvertGroupRectToAbsolute(valueRect, containerRect);
-                TrackPendingFieldRects(absoluteKeyRect, absoluteValueRect);
+
                 innerY += valueHeight + spacing;
 
                 bool keySupported = IsTypeSupported(keyType);
@@ -9335,7 +8984,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             state.MarkDirty();
         }
 
-        private sealed class CachedPropertyPair
+        internal sealed class CachedPropertyPair
         {
             public SerializedProperty keysProperty;
             public SerializedProperty valuesProperty;
@@ -9505,7 +9154,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// Struct key for MainFoldoutAnimations cache to avoid string allocations.
         /// Uses (instanceId, propertyPath) pair for cache identity.
         /// </summary>
-        private readonly struct MainFoldoutCacheKey : IEquatable<MainFoldoutCacheKey>
+        internal readonly struct MainFoldoutCacheKey : IEquatable<MainFoldoutCacheKey>
         {
             public readonly long InstanceId;
             public readonly string PropertyPath;

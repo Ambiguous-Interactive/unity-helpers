@@ -89,7 +89,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         public override void TearDown()
         {
             base.TearDown();
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             CleanupTrackedFoldersAndAssets();
         }
 
@@ -194,43 +194,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         }
 
         [Test]
-        public void DirectApiReportsCleanupFailureAfterImportingPublishedOutput()
+        public void PublishedOutputSurvivesAnActualStagingCleanupFailure()
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                Assert.Ignore("Windows moves the staged file and has no post-publish cleanup.");
-            }
-
-            string sourcePath = Path.Combine(_testRoot, "cleanup-warning.png").SanitizePath();
-            string expectedOutputPath = Path.Combine(_testRoot, "cleanup-warning_blurred_2.png")
-                .SanitizePath();
-            CreatePng(sourcePath, Color.magenta);
-            TrackAssetPath(expectedOutputPath);
-            Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
-            Assert.That(source, Is.Not.Null);
-
-            RestorableGlobal<Action<string>> deleteStagedFile = new(
-                () => ExclusiveFilePublisher.DeleteStagedFile,
-                action => ExclusiveFilePublisher.DeleteStagedFile = action
+            string root = Path.Combine(
+                Application.temporaryCachePath,
+                Guid.NewGuid().ToString("N")
             );
-            using (
-                deleteStagedFile.Borrow(_ =>
-                    throw new IOException("Simulated staged cleanup failure.")
-                )
-            )
+            Directory.CreateDirectory(root);
+            try
             {
-                bool success = ImageBlurAPI.TryWriteAsset(
-                    source,
-                    2,
-                    out string outputPath,
-                    out string error
+                string outputPath = Path.Combine(root, "output.txt");
+                File.WriteAllText(outputPath, "published");
+                string stagedDirectory = Path.Combine(root, "staged");
+                Directory.CreateDirectory(stagedDirectory);
+                Exception warning = ExclusiveFilePublisher.RemoveStagedFileAfterPublication(
+                    stagedDirectory,
+                    outputPath
                 );
-
-                Assert.That(success, Is.False);
-                Assert.That(outputPath, Is.EqualTo(expectedOutputPath));
-                StringAssert.Contains("Published", error);
-                Assert.That(File.Exists(RelToFull(outputPath)), Is.True);
-                Assert.That(AssetDatabase.LoadAssetAtPath<Texture2D>(outputPath), Is.Not.Null);
+                Assert.IsInstanceOf<IOException>(warning);
+                StringAssert.Contains("Published", warning.Message);
+                Assert.AreEqual("published", File.ReadAllText(outputPath));
+                Assert.IsTrue(Directory.Exists(stagedDirectory));
+            }
+            finally
+            {
+                Directory.Delete(root, true);
             }
         }
 

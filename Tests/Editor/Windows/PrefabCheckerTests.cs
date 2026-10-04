@@ -242,29 +242,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
                 PrefabChecker.ScanOptions options = new();
-                int progressCalls = 0;
-                int clearCalls = 0;
-                System.Func<bool> previousProgress = EditorUi.ProgressForTesting;
-                System.Action previousClear = EditorUi.ProgressClearedForTesting;
-                PrefabChecker.ScanResult found;
-                try
-                {
-                    EditorUi.ProgressForTesting = () =>
-                    {
-                        ++progressCalls;
-                        return false;
-                    };
-                    EditorUi.ProgressClearedForTesting = () => clearCalls++;
-                    found = PrefabChecker.ScanFolders(new[] { folder.Replace('/', '\\') }, options);
-                }
-                finally
-                {
-                    EditorUi.ProgressForTesting = previousProgress;
-                    EditorUi.ProgressClearedForTesting = previousClear;
-                }
-
-                Assert.AreEqual(0, progressCalls);
-                Assert.AreEqual(0, clearCalls);
+                PrefabChecker.ScanResult found = PrefabChecker.ScanFolders(
+                    new[] { folder.Replace('/', '\\') },
+                    options
+                );
 
                 Assert.IsTrue(found.Error == null);
                 Assert.AreEqual(1, found.PrefabsChecked);

@@ -13,8 +13,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     /// </summary>
     internal static class ExclusiveFilePublisher
     {
-        internal static Action<string> DeleteStagedFile = File.Delete;
-
         /// <summary>
         /// Returns false when another entry occupies the destination. Publish failures throw;
         /// cleanup failures return a warning after the output is already published.
@@ -40,21 +38,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             if (removeStagedFile)
             {
-                try
-                {
-                    DeleteStagedFile(stagedPath);
-                }
-                catch (Exception cleanupError)
-                {
-                    warning = new IOException(
-                        $"Published '{destinationPath}' but could not remove staged file '{stagedPath}'.",
-                        cleanupError
-                    );
-                }
+                warning = RemoveStagedFileAfterPublication(stagedPath, destinationPath);
             }
 
             cleanupWarning = warning;
             return true;
+        }
+
+        internal static Exception RemoveStagedFileAfterPublication(
+            string stagedPath,
+            string destinationPath
+        )
+        {
+            try
+            {
+                File.Delete(stagedPath);
+                return null;
+            }
+            catch (Exception cleanupError)
+            {
+                return new IOException(
+                    $"Published '{destinationPath}' but could not remove staged file '{stagedPath}'.",
+                    cleanupError
+                );
+            }
         }
     }
 #endif

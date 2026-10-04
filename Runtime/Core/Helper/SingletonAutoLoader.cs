@@ -15,18 +15,67 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// </summary>
     internal static class SingletonAutoLoader
     {
-        private static readonly Dictionary<string, Action> _cachedLoaders = new(
+        internal static readonly Dictionary<string, Action> _cachedLoaders = new(
             StringComparer.Ordinal
         );
-        private static readonly HashSet<RuntimeInitializeLoadType> _executedLoadTypes = new();
-        private static readonly object _executionLock = new();
-        private static readonly Dictionary<Type, PropertyInfo> _runtimeInstanceProperties = new();
-        private static readonly Dictionary<Type, PropertyInfo> _scriptableInstanceProperties =
+        internal static readonly HashSet<RuntimeInitializeLoadType> _executedLoadTypes = new();
+        internal static readonly object _executionLock = new();
+        internal static readonly Dictionary<Type, PropertyInfo> _runtimeInstanceProperties = new();
+        internal static readonly Dictionary<Type, PropertyInfo> _scriptableInstanceProperties =
             new();
-        private static readonly object _loaderBuildLock = new();
-#if UNITY_INCLUDE_TESTS
-        private static bool? _testPlayModeOverride;
-#endif
+        internal static readonly object _loaderBuildLock = new();
+
+        internal static void ExecuteEntries(
+            IReadOnlyList<AttributeMetadataCache.AutoLoadSingletonEntry> entries,
+            RuntimeInitializeLoadType loadType,
+            bool enforceSingleExecution,
+            bool requirePlayMode
+        )
+        {
+            if (entries == null || entries.Count == 0)
+            {
+                return;
+            }
+
+            bool isPlayMode = Application.isPlaying;
+
+            if (requirePlayMode && !isPlayMode)
+            {
+                return;
+            }
+
+            if (enforceSingleExecution)
+            {
+                lock (_executionLock)
+                {
+                    if (!_executedLoadTypes.Add(loadType))
+                    {
+                        return;
+                    }
+                }
+            }
+
+            for (int i = 0; i < entries.Count; ++i)
+            {
+                AttributeMetadataCache.AutoLoadSingletonEntry entry = entries[i];
+                if (entry == null || entry.loadType != loadType)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    Action loader = GetOrCreateLoader(entry);
+                    loader?.Invoke();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError(
+                        $"SingletonAutoLoader: Failed to auto-load '{entry.typeName}'. {e}"
+                    );
+                }
+            }
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void AutoLoadSubsystemRegistration()
@@ -74,64 +123,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             entries ??= Array.Empty<AttributeMetadataCache.AutoLoadSingletonEntry>();
 
             ExecuteEntries(entries, loadType, enforceSingleExecution: true, requirePlayMode: true);
-        }
-
-        private static void ExecuteEntries(
-            IReadOnlyList<AttributeMetadataCache.AutoLoadSingletonEntry> entries,
-            RuntimeInitializeLoadType loadType,
-            bool enforceSingleExecution,
-            bool requirePlayMode
-        )
-        {
-            if (entries == null || entries.Count == 0)
-            {
-                return;
-            }
-
-            bool isPlayMode = Application.isPlaying;
-#if UNITY_INCLUDE_TESTS
-            if (_testPlayModeOverride.HasValue)
-            {
-                isPlayMode = _testPlayModeOverride.Value;
-            }
-#endif
-
-            if (requirePlayMode && !isPlayMode)
-            {
-                return;
-            }
-
-            if (enforceSingleExecution)
-            {
-                lock (_executionLock)
-                {
-                    if (!_executedLoadTypes.Add(loadType))
-                    {
-                        return;
-                    }
-                }
-            }
-
-            for (int i = 0; i < entries.Count; ++i)
-            {
-                AttributeMetadataCache.AutoLoadSingletonEntry entry = entries[i];
-                if (entry == null || entry.loadType != loadType)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    Action loader = GetOrCreateLoader(entry);
-                    loader?.Invoke();
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError(
-                        $"SingletonAutoLoader: Failed to auto-load '{entry.typeName}'. {e}"
-                    );
-                }
-            }
         }
 
         private static Action GetOrCreateLoader(AttributeMetadataCache.AutoLoadSingletonEntry entry)
@@ -284,54 +275,5 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
         }
-
-#if UNITY_INCLUDE_TESTS
-        internal static void ExecuteEntriesForTests(
-            bool simulatePlayMode,
-            RuntimeInitializeLoadType loadType,
-            params AttributeMetadataCache.AutoLoadSingletonEntry[] entries
-        )
-        {
-            bool? previousOverride = _testPlayModeOverride;
-            try
-            {
-                _testPlayModeOverride = simulatePlayMode;
-                ExecuteEntries(
-                    entries,
-                    loadType,
-                    enforceSingleExecution: false,
-                    requirePlayMode: true
-                );
-            }
-            finally
-            {
-                _testPlayModeOverride = previousOverride;
-            }
-        }
-
-        /// <summary>
-        /// Resets every static cache so a test that asserts a first-resolution log (e.g. the
-        /// "does not derive from RuntimeSingleton" / "Unable to resolve type" warnings) actually
-        /// re-emits it. Without this, the per-<c>typeName</c> loader cache and per-<see cref="Type"/>
-        /// instance-property caches suppress the warning on the second PlayMode test in the same
-        /// domain, leaving a <see cref="UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType,
-        /// string)"/> unconsumed -- which then bleeds across the frame boundary and fails an innocent
-        /// bystander fixture. Production keeps the dedupe (correct anti-spam); only tests reset it.
-        /// </summary>
-        internal static void ClearCachesForTests()
-        {
-            lock (_loaderBuildLock)
-            {
-                _cachedLoaders.Clear();
-                _runtimeInstanceProperties.Clear();
-                _scriptableInstanceProperties.Clear();
-            }
-
-            lock (_executionLock)
-            {
-                _executedLoadTypes.Clear();
-            }
-        }
-#endif
     }
 }

@@ -1,5 +1,7 @@
 Param(
-    [switch]$VerboseOutput
+    [switch]$VerboseOutput,
+    [switch]$LicensePipeOnly,
+    [switch]$PipePressureOnly
 )
 
 Set-StrictMode -Version Latest
@@ -430,6 +432,186 @@ exit 0
     Set-Content -Path $scriptPath -Value $script -Encoding UTF8
     return $scriptPath
 }
+
+function Invoke-BoundedPipeProcess {
+    param(
+        [string]$FileName,
+        [string[]]$Arguments,
+        [string]$WorkingDirectory
+    )
+
+    $process = $null
+    try {
+        $info = [System.Diagnostics.ProcessStartInfo]::new()
+        $info.FileName = $FileName
+        foreach ($argument in $Arguments) {
+            [void]$info.ArgumentList.Add($argument)
+        }
+        $info.WorkingDirectory = $WorkingDirectory
+        $info.UseShellExecute = $false
+        $info.RedirectStandardOutput = $true
+        $info.RedirectStandardError = $true
+        $process = [System.Diagnostics.Process]::Start($info)
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $completed = $process.WaitForExit(10000)
+        if (-not $completed) {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
+        return [pscustomobject]@{
+            Completed = $completed
+            ExitCode  = $process.ExitCode
+            Stdout    = $stdoutTask.GetAwaiter().GetResult()
+            Stderr    = $stderrTask.GetAwaiter().GetResult()
+        }
+    }
+    finally {
+        if ($null -ne $process) {
+            if (-not $process.HasExited) {
+                $process.Kill($true)
+                $process.WaitForExit()
+            }
+            $process.Dispose()
+        }
+    }
+}
+
+function Test-GitStderrPipeDrain {
+    $repoPath = New-TestRepo -ConfigurePushDefaults
+    try {
+        $arguments = @('-c', "alias.pressure=!printf '%100000s' x >&2; exit 37", 'pressure')
+        $control = Invoke-BoundedPipeProcess -FileName (Get-Command git -ErrorAction Stop).Source -Arguments $arguments -WorkingDirectory $repoPath
+        $stderrBytes = [System.Text.Encoding]::UTF8.GetByteCount($control.Stderr)
+        Write-TestResult 'GitStderrPipeDrain_ActualPressure' ($control.Completed -and $control.ExitCode -eq 37 -and $control.Stdout -eq '' -and $stderrBytes -eq 100000) "Expected real Git to emit 100000 stderr bytes and exit 37 within 10 seconds; completed=$($control.Completed), exit=$($control.ExitCode), stderrBytes=$stderrBytes."
+
+        $sourceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        $errors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'scripts/agent-preflight.ps1'), [ref]$null, [ref]$errors)
+        if ($errors.Count -gt 0) {
+            throw "Preflight source parse failed: $($errors -join '; ')"
+        }
+        $runner = [System.Collections.Generic.List[string]]::new()
+        $runner.Add('param([string]$Helper, [string]$RepoRoot)')
+        $runner.Add("Set-StrictMode -Version Latest`n`$ErrorActionPreference = 'Stop'")
+        foreach ($name in @('Split-NulPathText', 'Invoke-GitPathList', 'Invoke-GitRawText')) {
+            $functions = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $false))
+            if ($functions.Count -ne 1) {
+                throw "Expected exactly one actual preflight function named $name."
+            }
+            $runner.Add($functions[0].Extent.Text)
+        }
+        $runner.Add(@'
+$result = & $Helper -RepoRoot $RepoRoot -Arguments @('-c', "alias.pressure=!printf '%100000s' x >&2; exit 37", 'pressure')
+if ($Helper -eq 'Invoke-GitPathList') {
+    if (@($result).Count -ne 0) {
+        throw 'A failed Git command must return no paths.'
+    }
+}
+else {
+    if ($result.ExitCode -ne 37 -or $result.Stdout -ne '') {
+        throw 'Raw Git failure exit code or stdout changed.'
+    }
+}
+Write-Output 'PIPE_RETURN_OK'
+exit 0
+'@)
+        $runnerPath = Join-Path $repoPath 'scripts/pipe-pressure-helper.ps1'
+        [System.IO.File]::WriteAllText($runnerPath, ($runner -join "`n"))
+        foreach ($helper in @('Invoke-GitPathList', 'Invoke-GitRawText')) {
+            $result = Invoke-BoundedPipeProcess -FileName (Get-Command pwsh -ErrorAction Stop).Source -Arguments @('-NoProfile', '-File', $runnerPath, '-Helper', $helper, '-RepoRoot', $repoPath) -WorkingDirectory $repoPath
+            Write-TestResult "GitStderrPipeDrain.$helper.CompletesWithinTimeout" $result.Completed "The actual helper did not complete within 10 seconds. Stderr: $($result.Stderr)"
+            Write-TestResult "GitStderrPipeDrain.$helper.PreservesReturnSemantics" ($result.Completed -and $result.ExitCode -eq 0 -and $result.Stdout.Contains('PIPE_RETURN_OK')) "The actual helper's return semantics failed. Exit=$($result.ExitCode); stderr=$($result.Stderr)"
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $repoPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-LicensePipeDrain {
+    $repoPath = New-TestRepo -ConfigurePushDefaults
+    $process = $null
+    try {
+        $fileCount = 512
+        $directoryName = 'PipeDrain-' + ('p' * 90)
+        $directory = Join-Path $repoPath $directoryName
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+        $paths = [System.Collections.Generic.List[string]]::new()
+        $currentYear = (Get-Date).Year
+        for ($index = 0; $index -lt $fileCount; ++$index) {
+            $className = 'PipeDrain' + $index
+            $fileName = ('x' * 60) + $index.ToString('D4') + '.cs'
+            $relativePath = $directoryName + '/' + $fileName
+            $paths.Add($relativePath)
+            $year = if ($index -eq $fileCount - 1) { $currentYear - 1 } else { $currentYear }
+            [System.IO.File]::WriteAllText(
+                (Join-Path $repoPath $relativePath),
+                "// MIT License - Copyright (c) $year wallstop`n// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE`n`npublic sealed class $className {}`n"
+            )
+            [System.IO.File]::WriteAllText(
+                (Join-Path $repoPath ($relativePath + '.meta')),
+                "fileFormatVersion: 2`nguid: $([Guid]::NewGuid().ToString('N'))`n"
+            )
+        }
+        $pathList = Join-Path $repoPath 'license-pipe-paths.txt'
+        [System.IO.File]::WriteAllLines($pathList, $paths)
+        $inputBytes = [System.Text.Encoding]::UTF8.GetByteCount(($paths -join "`0") + "`0")
+        Write-TestResult 'LicensePipeDrain_ExceedsPipeCapacity' ($inputBytes -gt 65536) "Expected more than 64 KiB of real path input; got $inputBytes bytes."
+
+        $info = [System.Diagnostics.ProcessStartInfo]::new()
+        $info.FileName = (Get-Command pwsh -ErrorAction Stop).Source
+        foreach ($argument in @('-NoProfile', '-File', (Join-Path $repoPath 'scripts/agent-preflight.ps1'), '-PathList', $pathList)) {
+            [void]$info.ArgumentList.Add($argument)
+        }
+        $info.WorkingDirectory = $repoPath
+        $info.UseShellExecute = $false
+        $info.RedirectStandardOutput = $true
+        $info.RedirectStandardError = $true
+        $process = [System.Diagnostics.Process]::Start($info)
+        $outputTask = $process.StandardOutput.ReadToEndAsync()
+        $errorTask = $process.StandardError.ReadToEndAsync()
+        $completed = $process.WaitForExit(30000)
+        if (-not $completed) {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
+        $output = $outputTask.GetAwaiter().GetResult() + $errorTask.GetAwaiter().GetResult()
+        Write-TestResult 'LicensePipeDrain_CompletesWithinTimeout' $completed "Actual preflight did not complete within 30 seconds. Output: $output"
+        if ($completed) {
+            Write-TestResult 'LicensePipeDrain_LastFileChecked' ($process.ExitCode -eq 1 -and $output.Contains($paths[$fileCount - 1]) -and $output.Contains('License year header issues detected')) "Expected the last file's license mismatch, got exit $($process.ExitCode). Output: $output"
+            Write-TestResult 'LicensePipeDrain_LibraryNotSkipped' (-not $output.Contains('Skipped the license year check')) "The actual license library must execute. Output: $output"
+        }
+    }
+    finally {
+        if ($null -ne $process) {
+            if (-not $process.HasExited) {
+                $process.Kill($true)
+                $process.WaitForExit()
+            }
+            $process.Dispose()
+        }
+        Remove-Item -LiteralPath $repoPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+if ($PipePressureOnly) {
+    Test-GitStderrPipeDrain
+    if ($script:TestsFailed -gt 0) {
+        exit 1
+    }
+    exit 0
+}
+
+Test-LicensePipeDrain
+if ($LicensePipeOnly) {
+    if ($script:TestsFailed -gt 0) {
+        exit 1
+    }
+    exit 0
+}
+
+Test-GitStderrPipeDrain
 
 Write-Host 'Testing agent-preflight.ps1...' -ForegroundColor White
 

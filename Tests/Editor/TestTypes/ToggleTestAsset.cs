@@ -25,6 +25,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         public string stateName = "Idle";
 
         [WEnumToggleButtons]
+        [StringInList(" ", "\t\r\n", "\u00a0\u2003", "  Visible  ")]
+        public string literalStateName = "Idle";
+
+        [WEnumToggleButtons]
         [WValueDropDown(typeof(DropdownProvider), nameof(DropdownProvider.GetPriorityEntries))]
         public int priority = 1;
 

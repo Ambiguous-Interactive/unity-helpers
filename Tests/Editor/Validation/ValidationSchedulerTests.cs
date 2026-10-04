@@ -27,7 +27,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
         private static ValidationRun EmptyRun()
         {
-            return new ValidationRun(null, null, Never);
+            return new ValidationRun(null, null);
         }
 
         private static ValidationRun PendingRun()
@@ -41,14 +41,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         "Assets/First.asset",
                         typeof(ScriptableObject)
                     ),
-                },
-                Never
+                }
             );
-        }
-
-        private static Object Never(ValidationTarget target)
-        {
-            return null;
         }
 
         [SetUp]
@@ -257,7 +251,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
         [TestCase(0)]
         [TestCase(1)]
-        [TestCase(2)]
         public void DisablingInsideForeignCallbacksStopsTheOldRunWithoutStealingItsReplacement(
             int boundary
         )
@@ -279,7 +272,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 validate = () =>
                 {
                     ++calls;
-                    if (boundary == 2)
+                    if (boundary == 1)
                         cancel();
                 },
             };
@@ -293,13 +286,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         "Assets/Pending.asset",
                         typeof(ScriptableObject)
                     ),
-                },
-                _ =>
-                {
-                    ++calls;
-                    if (boundary == 1)
-                        cancel();
-                    return null;
                 }
             );
             try

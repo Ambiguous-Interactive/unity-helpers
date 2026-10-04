@@ -48,7 +48,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         public void SetUp()
         {
             // Reset before an inconclusive skip so inherited state cannot roll forward to another fixture.
-            AssetPostprocessorDeferral.ResetForTesting();
+            AssetPostprocessorDeferralTestAccess.Reset();
             SkipIfDeferralDisabled();
         }
 
@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         public void TearDown()
         {
             // Cap-hit tests deliberately leave a drain queued.
-            AssetPostprocessorDeferral.ResetForTesting();
+            AssetPostprocessorDeferralTestAccess.Reset();
             /*
                 LogAssert state is process-global, so an un-consumed expectation leaks into the
                 next test unless an unmatched log fails here.
@@ -68,12 +68,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// Verifies the reentrant fan-out happy path: when a drain re-schedules
         /// a fresh delegate (distinct from itself, so the per-caller dedup does
         /// not short-circuit the append), each reentrant append is processed in
-        /// a subsequent iteration of <c>FlushForTesting</c>'s outer loop. With a
+        /// a subsequent iteration of <c>Flush</c>'s outer loop. With a
         /// finite fan-out well below the cap, the queue drains cleanly with no
         /// warning and no items remaining.
         /// </summary>
         [Test]
-        public void FlushForTestingReEntrantAppendsUnderCapDrainsCleanly()
+        public void FlushReEntrantAppendsUnderCapDrainsCleanly()
         {
             int callCount = 0;
             int remaining = 10;
@@ -95,13 +95,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             AssetPostprocessorDeferral.Schedule(CreateSelfReschedulingAction());
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.AreEqual(10, callCount, "All 10 reentrant drains should have executed.");
             Assert.AreEqual(0, remaining, "Re-schedule counter should have exhausted.");
             Assert.AreEqual(
                 0,
-                AssetPostprocessorDeferral.PendingDrainCountForTesting,
+                AssetPostprocessorDeferralTestAccess.PendingDrainCount,
                 "Queue should be empty after clean drain."
             );
         }
@@ -114,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// <c>FlushIterationCap</c> fails the test.
         /// </summary>
         [Test]
-        public void FlushForTestingUnboundedReEntrantRescheduleHitsCapAndWarns()
+        public void FlushUnboundedReEntrantRescheduleHitsCapAndWarns()
         {
             int callCount = 0;
 
@@ -131,8 +131,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             AssetPostprocessorDeferral.Schedule(CreateNeverTerminatingAction());
 
-            LogAssert.Expect(LogType.Warning, new Regex("FlushForTesting hit the iteration cap"));
-            AssetPostprocessorDeferral.FlushForTesting();
+            LogAssert.Expect(LogType.Warning, new Regex("Flush hit the iteration cap"));
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.AreEqual(
                 32,
@@ -142,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
             Assert.AreEqual(
                 1,
-                AssetPostprocessorDeferral.PendingDrainCountForTesting,
+                AssetPostprocessorDeferralTestAccess.PendingDrainCount,
                 "Cap-hit path should leave exactly one drain pending (the last re-schedule)."
             );
         }
@@ -163,7 +163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             AssetPostprocessorDeferral.Schedule(drain);
             AssetPostprocessorDeferral.Schedule(drain);
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.AreEqual(
                 1,
@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             AssetPostprocessorDeferral.Schedule(drain);
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.AreEqual(
                 5,
@@ -211,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
             Assert.AreEqual(
                 0,
-                AssetPostprocessorDeferral.PendingDrainCountForTesting,
+                AssetPostprocessorDeferralTestAccess.PendingDrainCount,
                 "Queue should be empty after all self-rescheduled iterations run."
             );
         }
@@ -235,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             AssetPostprocessorDeferral.Schedule(b);
             AssetPostprocessorDeferral.Schedule(a);
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             CollectionAssert.AreEqual(
                 new[] { "A", "B" },
@@ -279,7 +279,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             AssetPostprocessorDeferral.Schedule(first);
             AssetPostprocessorDeferral.Schedule(second);
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.AreEqual(
                 2,
@@ -296,7 +296,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// filter.
         /// </summary>
         [Test]
-        public void FlushForTestingDrainThrowsIsSwallowedAndLaterDrainsStillRun()
+        public void FlushDrainThrowsIsSwallowedAndLaterDrainsStillRun()
         {
             int secondCallCount = 0;
 
@@ -309,7 +309,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 LogType.Exception,
                 new Regex("InvalidOperationException: synthetic drain failure")
             );
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             Assert.AreEqual(
                 1,

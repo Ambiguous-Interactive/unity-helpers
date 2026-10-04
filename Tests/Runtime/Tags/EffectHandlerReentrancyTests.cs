@@ -67,12 +67,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             Assert.AreEqual(
                 0,
-                handler.TraversalDepthForTesting,
+                handler._traversalDepth,
                 "The traversal counter must return to zero once every callback has unwound."
             );
             Assert.AreEqual(
                 0,
-                handler.DeferredLeaseCountForTesting,
+                handler._deferredBehaviorLeases.Count
+                    + handler._deferredPeriodicLeases.Count
+                    + handler._deferredHandleLeases.Count
+                    + handler._deferredCosmeticLeases.Count,
                 "Every deferred pooled lease must be released once the outermost traversal exits."
             );
         }
@@ -317,7 +320,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 RentAndMutateBehaviorBuffer();
             };
 
-            int processedTicks = handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f);
+            int processedTicks = handler.ProcessBehaviorTicks(deltaTime: 0.1f);
 
             Assert.AreEqual(1, processedTicks);
             Assert.AreEqual(1, ReentrantEffectBehavior.TickCount);
@@ -325,7 +328,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(1, ReentrantEffectBehavior.RemoveCount);
             Assert.AreEqual(2, RecordingEffectBehavior.RemoveCount);
             Assert.IsFalse(handler.IsEffectActive(effect));
-            Assert.AreEqual(0, handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f));
+            Assert.AreEqual(0, handler.ProcessBehaviorTicks(deltaTime: 0.1f));
             AssertHandlerIsIdle(handler);
         }
 
@@ -358,7 +361,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 600f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 600f).Value;
             ReentrantEffectBehavior.PeriodicTickHook = (context, _) =>
             {
                 context.handler.RemoveEffect(context.handle);
@@ -366,7 +369,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 RentAndMutatePeriodicBuffer();
             };
 
-            int consumedTicks = handler.ProcessPeriodicEffectsForTesting(
+            int consumedTicks = handler.ProcessPeriodicEffects(
                 currentTime: 600.6f,
                 deltaTime: 0.6f
             );
@@ -377,11 +380,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(1, ReentrantEffectBehavior.RemoveCount);
             Assert.AreEqual(1, RecordingEffectBehavior.RemoveCount);
             Assert.IsFalse(handler.IsEffectActive(effect));
-            Assert.AreEqual(
-                0,
-                handler.ProcessPeriodicEffectsForTesting(currentTime: 601.6f, deltaTime: 1f)
-            );
-            Assert.AreEqual(0, handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f));
+            Assert.AreEqual(0, handler.ProcessPeriodicEffects(currentTime: 601.6f, deltaTime: 1f));
+            Assert.AreEqual(0, handler.ProcessBehaviorTicks(deltaTime: 0.1f));
             AssertHandlerIsIdle(handler);
         }
 
@@ -577,7 +577,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsFalse(tags.HasTag(LifecycleTag));
             Assert.AreEqual(100f, attributes.health.CurrentValue);
             Assert.AreEqual(1, ReentrantEffectBehavior.RemoveCount);
-            Assert.AreEqual(0, handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f));
+            Assert.AreEqual(0, handler.ProcessBehaviorTicks(deltaTime: 0.1f));
 
             int entriesAfterFailure = EffectLifecycleLog.Entries.Count;
             handler.RemoveEffect(handle);
@@ -633,7 +633,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(100f, attributes.health.CurrentValue);
             Assert.AreEqual(1, ReentrantEffectBehavior.RemoveCount);
             Assert.AreEqual(1, ReentrantCosmeticComponent.RemovedCount);
-            Assert.AreEqual(0, handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f));
+            Assert.AreEqual(0, handler.ProcessBehaviorTicks(deltaTime: 0.1f));
 
             yield return null;
 
@@ -675,7 +675,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(0, handler.GetActiveEffects().Count);
             Assert.IsFalse(tags.HasTag(LifecycleTag));
             Assert.AreEqual(100f, attributes.health.CurrentValue);
-            Assert.AreEqual(0, handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f));
+            Assert.AreEqual(0, handler.ProcessBehaviorTicks(deltaTime: 0.1f));
             Assert.AreEqual(initialChildCount, entity.transform.childCount);
             AssertHandlerIsIdle(handler);
         }
@@ -1066,7 +1066,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 RentAndMutateBehaviorBuffer();
             };
 
-            int processedTicks = handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f);
+            int processedTicks = handler.ProcessBehaviorTicks(deltaTime: 0.1f);
 
             Assert.AreEqual(1, processedTicks);
             Assert.AreEqual(1, ReentrantEffectBehavior.TickCount);

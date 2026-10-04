@@ -46,20 +46,18 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 StartSelfUpdate();
             }
         }
-        internal Texture2D[] ComputedTexturesForTests => _computed;
-        internal bool SelfUpdateActiveForTests => _selfUpdateItem != null;
+        internal readonly Texture2D[] _computed;
+        internal readonly Stopwatch _timer;
+
+        internal TimeSpan _lastTick;
+        internal IVisualElementScheduledItem _selfUpdateItem;
 
         private readonly AnimatedSpriteLayer[] _layers;
-        private readonly Texture2D[] _computed;
 
         private readonly Color _backgroundColor;
         private readonly Rect? _largestArea;
-        private readonly Stopwatch _timer;
         private readonly bool _updatesSelf;
         private readonly float _pixelCutoff;
-
-        private TimeSpan _lastTick;
-        private IVisualElementScheduledItem _selfUpdateItem;
         private float _fps;
         private int _index;
 
@@ -122,7 +120,40 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 && ParallelBlendThreshold <= (long)spriteWidth * spriteHeight;
         }
 
-        internal static void ComposeSpriteOntoBufferForTests(
+        internal static void ComposeSpriteOntoBuffer(
+            Color[] bufferPixels,
+            int bufferWidth,
+            int bufferHeight,
+            Color[] spritePixels,
+            int spriteWidth,
+            int spriteHeight,
+            float baseX,
+            float baseY,
+            float layerAlpha,
+            float pixelCutoff
+        )
+        {
+            if (spriteWidth == 0 || spriteHeight == 0)
+            {
+                return;
+            }
+
+            ComposeSpriteOntoBuffer(
+                bufferPixels,
+                bufferWidth,
+                bufferHeight,
+                spritePixels,
+                spriteWidth,
+                spriteHeight,
+                baseX,
+                baseY,
+                layerAlpha,
+                pixelCutoff,
+                ShouldBlendInParallel(spriteWidth, spriteHeight)
+            );
+        }
+
+        internal static void ComposeSpriteOntoBuffer(
             Color[] bufferPixels,
             int bufferWidth,
             int bufferHeight,
@@ -136,19 +167,25 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             bool useParallel
         )
         {
-            ComposeSpriteOntoBuffer(
+            BlendSpriteRowJob job = new(
                 bufferPixels,
                 bufferWidth,
                 bufferHeight,
                 spritePixels,
                 spriteWidth,
-                spriteHeight,
                 baseX,
                 baseY,
                 layerAlpha,
-                pixelCutoff,
-                useParallel
+                pixelCutoff
             );
+
+            if (useParallel)
+            {
+                Parallel.For(0, spriteHeight, job.Execute);
+                return;
+            }
+
+            job.RunSequential(spriteHeight);
         }
 
         /// <remarks>
@@ -188,74 +225,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         private static TimeSpan GetFrameInterval(float fps)
         {
             return TimeSpan.FromMilliseconds(GetFrameIntervalMilliseconds(fps));
-        }
-
-        private static void ComposeSpriteOntoBuffer(
-            Color[] bufferPixels,
-            int bufferWidth,
-            int bufferHeight,
-            Color[] spritePixels,
-            int spriteWidth,
-            int spriteHeight,
-            float baseX,
-            float baseY,
-            float layerAlpha,
-            float pixelCutoff
-        )
-        {
-            if (spriteWidth == 0 || spriteHeight == 0)
-            {
-                return;
-            }
-
-            ComposeSpriteOntoBuffer(
-                bufferPixels,
-                bufferWidth,
-                bufferHeight,
-                spritePixels,
-                spriteWidth,
-                spriteHeight,
-                baseX,
-                baseY,
-                layerAlpha,
-                pixelCutoff,
-                ShouldBlendInParallel(spriteWidth, spriteHeight)
-            );
-        }
-
-        private static void ComposeSpriteOntoBuffer(
-            Color[] bufferPixels,
-            int bufferWidth,
-            int bufferHeight,
-            Color[] spritePixels,
-            int spriteWidth,
-            int spriteHeight,
-            float baseX,
-            float baseY,
-            float layerAlpha,
-            float pixelCutoff,
-            bool useParallel
-        )
-        {
-            BlendSpriteRowJob job = new(
-                bufferPixels,
-                bufferWidth,
-                bufferHeight,
-                spritePixels,
-                spriteWidth,
-                baseX,
-                baseY,
-                layerAlpha,
-                pixelCutoff
-            );
-
-            if (useParallel)
-            {
-                Parallel.For(0, spriteHeight, job.Execute);
-                return;
-            }
-
-            job.RunSequential(spriteHeight);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -408,12 +377,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             _lastTick += deltaTime;
 
             Render(_index);
-        }
-
-        internal void SetElapsedSinceLastFrameForTests(TimeSpan elapsedSinceLastFrame)
-        {
-            _timer.Stop();
-            _lastTick = _timer.Elapsed - elapsedSinceLastFrame;
         }
 
         private bool CanSelfUpdate()

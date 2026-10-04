@@ -976,6 +976,17 @@ public sealed class PlayerHealth : AttributesComponent
 - Periodic payloads run only for Duration/Infinite effects; they automatically stop after `maxTicks` or when the effect handle is removed.
 - Combine multiple definitions for mixed cadences (e.g., fast minor regen + slower burst heals).
 
+Periodic schedules preserve their initial delay and cadence at large finite clocks. Repeated
+processing at an unchanged clock does not create new due ticks; an overdue schedule can still
+consume its backlog, bounded to 32 ticks per definition per pass. Ticks include the exact scheduled
+boundary, and moving the finite clock backward leaves the phase unchanged. Intervals below 0.01
+seconds use that minimum; negative initial delays use zero.
+
+Refreshing or reapplying an existing handle preserves its periodic phase and tick count. Removing
+it and applying a fresh handle starts a new schedule. Initial delay and interval are captured when
+the handle is created; changes to `maxTicks` remain live. Nonfinite timing retains its existing
+comparison behavior.
+
 ### Effect Behaviours
 
 - Attach `EffectBehavior` ScriptableObjects to the `behaviors` list for per-handle runtime logic.
@@ -1358,6 +1369,15 @@ if (effectHandler.TryGetRemainingDuration(effectHandle, out float remaining))
     UpdateDurationUI(remaining);
 }
 ```
+
+Duration effects retain the authored duration when they are applied or refreshed. They expire
+when elapsed time reaches that duration, including at large finite clock values. Reapplication
+keeps the original start unless its reset policy allows a refresh. Small clock offsets remain
+significant beside very large lifetimes. Remaining-duration queries retain small positive
+countdowns, round to the nearest float, and report zero once the duration has elapsed; `Infinite`
+effects have no tracked countdown. Clock sampling
+still follows Unity's `Time.time`, so expiry occurs on the first sampled frame at or after the
+lifetime, and a clock moving backward extends the countdown.
 
 **Effect Manipulation:**
 

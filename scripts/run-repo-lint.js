@@ -178,6 +178,11 @@ const CHECKS = [
     run: "npm run lint:nested-type-placement"
   },
   {
+    id: "production-test-hooks",
+    name: "Production code excludes test-only hooks",
+    run: "npm run lint:production-test-hooks"
+  },
+  {
     id: "xml-doc-summaries",
     name: "One <summary> per doc comment block",
     run: "npm run lint:xml-doc-summaries"

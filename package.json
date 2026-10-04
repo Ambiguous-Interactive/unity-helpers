@@ -178,6 +178,8 @@
     "lint:editor-assembly-monobehaviours": "node scripts/lint-editor-assembly-monobehaviours.js --verbose",
     "lint:changelog": "pwsh -NoProfile -File scripts/lint-changelog.ps1 -VerboseOutput",
     "lint:duplicate-usings": "pwsh -NoProfile -File scripts/lint-duplicate-usings.ps1 -VerboseOutput",
+    "lint:production-test-hooks": "node scripts/lint-production-test-hooks.js",
+    "test:lint-production-test-hooks": "node scripts/tests/test-lint-production-test-hooks.js",
     "lint:xml-doc-summaries": "node scripts/lint-xml-doc-summaries.js --verbose",
     "lint:yaml": "pwsh -NoProfile -File scripts/lint-yaml.ps1 -VerboseOutput",
     "lint:dependabot": "pwsh -NoProfile -File scripts/lint-dependabot.ps1 -VerboseOutput",

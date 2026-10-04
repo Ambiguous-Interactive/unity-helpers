@@ -29,8 +29,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// actually write, which replicate protobuf-net's <c>.bcl.*</c> conventions.
     /// </para>
     /// <para>
-    /// Two writer behaviors have no proto3 spelling and are deliberately not reflected in the
-    /// schema: <see cref="WProtoMemberAttribute.IsRequired"/>, which changes only whether a default
+    /// Explicit <see cref="WProtoMemberAttribute.IsPacked"/> opt-outs render as
+    /// <c>[packed = false]</c> on eligible repeated fields. Other writer behaviors are not reflected
+    /// in the schema: <see cref="WProtoMemberAttribute.IsRequired"/>, which changes only whether a default
     /// value is written, and the never-packed rule for <see cref="char"/> runs, which changes only
     /// whether runs are compressed. Neither changes a field's number or type, so a schema consumer
     /// decodes both correctly without knowing them.
@@ -364,6 +365,36 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             {
                 _surrogates = surrogates ?? new Dictionary<Type, Type>();
                 _declaredSubtypes = declaredSubtypes;
+            }
+
+            private static bool CanPackSchemaElement(Type type)
+            {
+                if (type == null)
+                {
+                    return false;
+                }
+                if (type.IsEnum)
+                {
+                    return true;
+                }
+                switch (Type.GetTypeCode(type))
+                {
+                    case TypeCode.Boolean:
+                    case TypeCode.Char:
+                    case TypeCode.SByte:
+                    case TypeCode.Byte:
+                    case TypeCode.Int16:
+                    case TypeCode.UInt16:
+                    case TypeCode.Int32:
+                    case TypeCode.UInt32:
+                    case TypeCode.Int64:
+                    case TypeCode.UInt64:
+                    case TypeCode.Single:
+                    case TypeCode.Double:
+                        return true;
+                    default:
+                        return false;
+                }
             }
 
             private static string SanitizeIdentifier(string desired)
@@ -824,7 +855,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 if (TryShapeRepeated(memberType, member, ownerName, out string repeatedType))
                 {
-                    return $"repeated {repeatedType} {member.SchemaName} = {member.Tag};";
+                    string packingOption =
+                        !member.IsPacked
+                        && CanPackSchemaElement(GetElementType(memberType))
+                        && !TryResolveSurrogate(GetElementType(memberType), out _)
+                            ? " [packed = false]"
+                            : string.Empty;
+                    return $"repeated {repeatedType} {member.SchemaName} = {member.Tag}{packingOption};";
                 }
 
                 _diagnostics.Add(
@@ -1401,6 +1438,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     Tag = marker.Tag,
                     MemberType = memberType,
                     DataFormatZigZag = marker.DataFormat == WProtoDataFormat.ZigZag,
+                    IsPacked = marker.IsPacked,
                 };
             }
 
@@ -1585,6 +1623,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             public int Tag;
             public Type MemberType;
             public bool DataFormatZigZag;
+            public bool IsPacked = true;
         }
     }
 }

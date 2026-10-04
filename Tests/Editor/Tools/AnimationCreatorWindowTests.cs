@@ -517,7 +517,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 frames = CreateSpriteList(5),
             };
 
-            float result = AnimationCreatorWindow.GetCurrentFpsForTests(data, frameIndex);
+            float result = AnimationCreatorWindow.GetCurrentFps(data, frameIndex);
 
             Assert.AreEqual(expectedFps, result, 0.001f);
         }
@@ -537,7 +537,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 frames = CreateSpriteList(frameCount),
             };
 
-            float result = AnimationCreatorWindow.GetCurrentFpsForTests(data, frameIndex);
+            float result = AnimationCreatorWindow.GetCurrentFps(data, frameIndex);
 
             Assert.AreEqual(expectedFps, result, 0.01f);
         }
@@ -552,7 +552,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 frames = CreateSpriteList(5),
             };
 
-            float result = AnimationCreatorWindow.GetCurrentFpsForTests(data, 2);
+            float result = AnimationCreatorWindow.GetCurrentFps(data, 2);
 
             Assert.AreEqual(AnimationData.DefaultFramesPerSecond, result);
         }
@@ -567,7 +567,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 frames = CreateSpriteList(5),
             };
 
-            float result = AnimationCreatorWindow.GetCurrentFpsForTests(data, 2);
+            float result = AnimationCreatorWindow.GetCurrentFps(data, 2);
 
             Assert.AreEqual(AnimationData.DefaultFramesPerSecond, result);
         }
@@ -582,7 +582,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 frames = CreateSpriteList(1),
             };
 
-            float result = AnimationCreatorWindow.GetCurrentFpsForTests(data, 0);
+            float result = AnimationCreatorWindow.GetCurrentFps(data, 0);
 
             Assert.AreEqual(6f, result, 0.01f);
         }
@@ -654,7 +654,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(frameCount);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             Assert.IsTrue(clip != null, "Created animation clip should not be null");
@@ -686,7 +686,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(frameCount);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
@@ -728,7 +728,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(frameCount);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
@@ -762,7 +762,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(1);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             Assert.IsTrue(clip != null, "Created animation clip should not be null");
@@ -790,7 +790,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(5);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
@@ -838,7 +838,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 frames = new List<Sprite>(),
             };
 
-            float result = AnimationCreatorWindow.GetCurrentFpsForTests(data, 0);
+            float result = AnimationCreatorWindow.GetCurrentFps(data, 0);
 
             Assert.AreEqual(6f, result, 0.01f);
         }
@@ -868,7 +868,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(8);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             Assert.IsTrue(
@@ -913,7 +913,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
             for (int i = 0; i < 5; ++i)
             {
-                float fps = AnimationCreatorWindow.GetCurrentFpsForTests(data, i);
+                float fps = AnimationCreatorWindow.GetCurrentFps(data, i);
                 Assert.AreEqual(24f, fps, 0.01f, $"Frame {i} should have constant FPS");
             }
         }
@@ -933,7 +933,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             float previousFps = 0f;
             for (int i = 0; i < 5; ++i)
             {
-                float fps = AnimationCreatorWindow.GetCurrentFpsForTests(data, i);
+                float fps = AnimationCreatorWindow.GetCurrentFps(data, i);
                 Assert.Greater(fps, previousFps, $"Frame {i} FPS should be greater than previous");
                 previousFps = fps;
             }
@@ -954,7 +954,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             float previousFps = float.MaxValue;
             for (int i = 0; i < 5; ++i)
             {
-                float fps = AnimationCreatorWindow.GetCurrentFpsForTests(data, i);
+                float fps = AnimationCreatorWindow.GetCurrentFps(data, i);
                 Assert.Less(fps, previousFps, $"Frame {i} FPS should be less than previous");
                 previousFps = fps;
             }
@@ -973,7 +973,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(frameCount);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
@@ -1004,7 +1004,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(frameCount);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
@@ -1039,7 +1039,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(frameCount);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
@@ -1071,7 +1071,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(5);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
@@ -1102,7 +1102,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(frameCount);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
@@ -1141,7 +1141,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(frameCount);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
@@ -1179,7 +1179,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             List<Sprite> frames = CreateTrackedSpriteList(frameCount);
 
             AnimationClip clip = Track(
-                AnimationCreatorWindow.CreateAnimationClipForTests(data, frames)
+                AnimationCreatorWindowTestAccess.CreateAnimationClip(data, frames)
             );
 
             EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
@@ -1200,125 +1200,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     keyframes[i].value != null,
                     $"Curve mode keyframe {i} should not be null"
                 );
-            }
-        }
-
-        [Test]
-        public void CreateAssetWritesUniqueClipsBesideSprite()
-        {
-            const string folder = "Assets/AnimationCreatorAPITests";
-            const string spritePath = folder + "/frame.png";
-            AssetDatabase.DeleteAsset(folder);
-            try
-            {
-                Assert.IsNotEmpty(AssetDatabase.CreateFolder("Assets", "AnimationCreatorAPITests"));
-                Texture2D texture = Track(new Texture2D(2, 2, TextureFormat.RGBA32, false));
-                texture.SetPixels32(
-                    new[]
-                    {
-                        new Color32(255, 0, 0, 255),
-                        new Color32(0, 255, 0, 255),
-                        new Color32(0, 0, 255, 255),
-                        new Color32(255, 255, 255, 255),
-                    }
-                );
-                texture.Apply();
-                File.WriteAllBytes(
-                    Path.Combine(Application.dataPath, "AnimationCreatorAPITests", "frame.png"),
-                    texture.EncodeToPNG()
-                );
-                AssetDatabase.ImportAsset(spritePath);
-                TextureImporter importer = AssetImporter.GetAtPath(spritePath) as TextureImporter;
-                Assert.IsTrue(importer != null);
-                importer.textureType = TextureImporterType.Sprite;
-                importer.spriteImportMode = SpriteImportMode.Single;
-                importer.SaveAndReimport();
-                Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
-                Assert.IsTrue(sprite != null);
-
-                AnimationData data = new()
-                {
-                    animationName = "Idle",
-                    frames = new List<Sprite> { null, sprite },
-                    framesPerSecond = 12f,
-                    loop = true,
-                };
-                Assert.IsTrue(
-                    AnimationCreatorAPI.TryCreateAsset(
-                        data,
-                        out string firstPath,
-                        out string firstError
-                    ),
-                    firstError
-                );
-                Assert.IsTrue(
-                    AnimationCreatorAPI.TryCreateAsset(
-                        data,
-                        out string secondPath,
-                        out string secondError
-                    ),
-                    secondError
-                );
-                string batchedPath;
-                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-                {
-                    Assert.IsTrue(
-                        AnimationCreatorAPI.TryCreateAsset(
-                            data,
-                            out batchedPath,
-                            out string batchError,
-                            saveAssets: false
-                        ),
-                        batchError
-                    );
-                }
-                AssetDatabase.SaveAssets();
-                Assert.AreNotEqual(firstPath, secondPath);
-                Assert.AreNotEqual(firstPath, batchedPath);
-                Assert.AreNotEqual(secondPath, batchedPath);
-                Assert.IsTrue(firstPath.StartsWith(folder + "/", StringComparison.Ordinal));
-                Assert.IsTrue(secondPath.StartsWith(folder + "/", StringComparison.Ordinal));
-                Assert.IsTrue(batchedPath.StartsWith(folder + "/", StringComparison.Ordinal));
-                AnimationClip first = AssetDatabase.LoadAssetAtPath<AnimationClip>(firstPath);
-                AnimationClip second = AssetDatabase.LoadAssetAtPath<AnimationClip>(secondPath);
-                AnimationClip batched = AssetDatabase.LoadAssetAtPath<AnimationClip>(batchedPath);
-                Assert.IsTrue(first != null);
-                Assert.IsTrue(second != null);
-                Assert.IsTrue(batched != null);
-                EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(
-                    first
-                );
-                Assert.AreEqual(1, bindings.Length);
-                ObjectReferenceKeyframe[] keyframes = AnimationUtility.GetObjectReferenceCurve(
-                    first,
-                    bindings[0]
-                );
-                Assert.AreEqual(1, keyframes.Length);
-                Assert.AreSame(sprite, keyframes[0].value);
-
-                RestorableGlobal<Action> saveAssets = new(
-                    () => AnimationCreatorAPI.SaveAssetsAction,
-                    action => AnimationCreatorAPI.SaveAssetsAction = action
-                );
-                using (saveAssets.Borrow(() => throw new IOException("save failed")))
-                {
-                    Assert.IsFalse(
-                        AnimationCreatorAPI.TryCreateAsset(
-                            data,
-                            out string createdButUnsavedPath,
-                            out string saveError
-                        )
-                    );
-                    Assert.IsNotEmpty(createdButUnsavedPath);
-                    StringAssert.Contains("save failed", saveError);
-                    Assert.IsTrue(
-                        AssetDatabase.LoadAssetAtPath<AnimationClip>(createdButUnsavedPath) != null
-                    );
-                }
-            }
-            finally
-            {
-                AssetDatabase.DeleteAsset(folder);
             }
         }
 

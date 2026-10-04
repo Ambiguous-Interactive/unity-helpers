@@ -16,7 +16,8 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// <para>
     /// <b>Disposal discards queued work.</b> <see cref="Dispose"/> and <see cref="DisposeAsync"/>
     /// cancel the worker rather than draining it, so anything enqueued but not yet started is
-    /// dropped. The <c>await</c> inside <see cref="DisposeAsync"/> waits only for the item already
+    /// removed from the queue immediately, releasing its captured references. The <c>await</c>
+    /// inside <see cref="DisposeAsync"/> waits only for the item already
     /// in flight. That is the right behavior for work that can simply be redone, such as
     /// generation passes, and the wrong behavior for durable work such as persistence writes:
     /// call <see cref="DrainAsync"/> first when queued items must run.
@@ -38,7 +39,6 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// </example>
     public sealed class SingleThreadedThreadPool : IDisposable
     {
-        // Polling only during teardown avoids synchronization overhead in enqueue.
         private static readonly TimeSpan DrainPollInterval = TimeSpan.FromMilliseconds(1);
 
         /// <summary>
@@ -62,6 +62,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         private volatile bool _isWorking;
         private volatile bool _disposed;
 
+        private readonly object _workGate = new();
         private readonly Task _workerTask;
         private readonly ConcurrentQueue<WorkItem> _work;
         private readonly SemaphoreSlim _workAvailable;
@@ -102,13 +103,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// <param name="work">The action to run.</param>
         public void Enqueue(Action work)
         {
-            if (_disposed || !_acceptingWork)
-            {
-                return;
-            }
-
-            _work.Enqueue(WorkItem.FromAction(work));
-            Signal();
+            EnqueueWork(WorkItem.FromAction(work));
         }
 
         /// <summary>
@@ -118,13 +113,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// <param name="work">The asynchronous action to run.</param>
         public void Enqueue(Func<Task> work)
         {
-            if (_disposed || !_acceptingWork)
-            {
-                return;
-            }
-
-            _work.Enqueue(WorkItem.FromTask(work));
-            Signal();
+            EnqueueWork(WorkItem.FromTask(work));
         }
 
         /// <summary>
@@ -134,13 +123,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// <param name="work">The asynchronous action to run.</param>
         public void Enqueue(Func<ValueTask> work)
         {
-            if (_disposed || !_acceptingWork)
-            {
-                return;
-            }
-
-            _work.Enqueue(WorkItem.FromValueTask(work));
-            Signal();
+            EnqueueWork(WorkItem.FromValueTask(work));
         }
 
         /// <summary>
@@ -157,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// item is executing. The guarantee is that every item the calling thread enqueued before
         /// this call has run; a concurrent producer racing this call is not covered, so stop those
         /// producers first. Disposal is still required afterwards -- draining does not stop the
-        /// worker or release its handles.
+        /// worker or release its handles. Reports failure if disposal interrupts the drain.
         /// </remarks>
         /// <example>
         /// <code><![CDATA[
@@ -171,12 +154,15 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// </example>
         public async ValueTask<bool> DrainAsync(CancellationToken cancellationToken = default)
         {
-            if (_disposed)
+            lock (_workGate)
             {
-                return false;
-            }
+                if (_disposed)
+                {
+                    return false;
+                }
 
-            _acceptingWork = false;
+                _acceptingWork = false;
+            }
             Signal();
 
             while (!_work.IsEmpty || _isWorking)
@@ -189,7 +175,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
                 // A stopped worker will never drain what is left, so waiting for it would hang.
                 if (_workerTask.IsCompleted && !_isWorking)
                 {
-                    return _work.IsEmpty;
+                    return HasCompletedDrain();
                 }
 
                 try
@@ -202,26 +188,31 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
                 }
             }
 
-            return true;
+            return HasCompletedDrain();
         }
 
         /// <summary>
         /// Cancels the worker and releases its handles, discarding any work still queued.
         /// </summary>
         /// <remarks>
-        /// Waits only for the item already in flight. Call <see cref="DrainAsync"/> first when
-        /// queued items must run.
+        /// Releases queued references before waiting for the item already in flight. Submissions
+        /// racing disposal cannot publish new queued work. Call <see cref="DrainAsync"/> first
+        /// when queued items must run.
         /// </remarks>
         public async ValueTask DisposeAsync()
         {
-            if (_disposed)
+            lock (_workGate)
             {
-                return;
-            }
+                if (_disposed)
+                {
+                    return;
+                }
 
-            _acceptingWork = false;
-            _active = false;
-            _disposed = true;
+                _acceptingWork = false;
+                _active = false;
+                _disposed = true;
+                _work.Clear();
+            }
 
             _cancellationTokenSource.Cancel();
             Signal();
@@ -257,6 +248,49 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
 
+        private bool HasCompletedDrain()
+        {
+            lock (_workGate)
+            {
+                return !_disposed && _work.IsEmpty && !_isWorking;
+            }
+        }
+
+        private void EnqueueWork(WorkItem work)
+        {
+            lock (_workGate)
+            {
+                if (_disposed || !_acceptingWork)
+                {
+                    return;
+                }
+
+                _work.Enqueue(work);
+            }
+            Signal();
+        }
+
+        private bool TryStartWork(out WorkItem work)
+        {
+            lock (_workGate)
+            {
+                if (!_active || _work.IsEmpty)
+                {
+                    work = default;
+                    return false;
+                }
+
+                _isWorking = true;
+                if (_work.TryDequeue(out work))
+                {
+                    return true;
+                }
+
+                _isWorking = false;
+                return false;
+            }
+        }
+
         private void Signal()
         {
             try
@@ -274,16 +308,11 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             {
                 try
                 {
-                    // Mark busy before dequeue so DrainAsync cannot observe an empty queue while an item is in flight.
-                    if (!_work.IsEmpty)
+                    if (TryStartWork(out WorkItem workItem))
                     {
-                        _isWorking = true;
                         try
                         {
-                            if (_work.TryDequeue(out WorkItem workItem))
-                            {
-                                await workItem.ExecuteAsync().ConfigureAwait(false);
-                            }
+                            await workItem.ExecuteAsync().ConfigureAwait(false);
                         }
                         catch (Exception e)
                         {

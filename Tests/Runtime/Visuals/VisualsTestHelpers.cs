@@ -71,7 +71,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
         public static Texture2D[] GetComputedTextures(LayeredImage image, List<Object> tracked)
         {
-            Texture2D[] computed = image?.ComputedTexturesForTests;
+            Texture2D[] computed = image?._computed;
 
             foreach (Texture2D texture in computed)
             {

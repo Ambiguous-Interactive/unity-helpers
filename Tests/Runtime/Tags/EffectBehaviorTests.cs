@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             effect.behaviors.Add(behavior);
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 10f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 10f).Value;
             Assert.AreEqual(1, RecordingEffectBehavior.ApplyCount);
             Assert.AreEqual(
                 1,
@@ -74,17 +74,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 "OnApply should fire immediately."
             );
 
-            int tickCount = handler.ProcessBehaviorTicksForTesting(deltaTime: 0.02f);
+            int tickCount = handler.ProcessBehaviorTicks(deltaTime: 0.02f);
             Assert.AreEqual(1, tickCount);
             Assert.IsNotEmpty(
                 RecordingEffectBehavior.TickContexts,
                 "OnTick should run when behavior ticks are processed."
             );
 
-            int periodicTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 10f,
-                deltaTime: 0.02f
-            );
+            int periodicTicks = handler.ProcessPeriodicEffects(currentTime: 10f, deltaTime: 0.02f);
             Assert.AreEqual(1, periodicTicks);
 
             Assert.AreEqual(
@@ -157,12 +154,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             effect.behaviors.Add(behavior);
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 20f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 20f).Value;
 
-            int ticks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 20.11f,
-                deltaTime: 0.11f
-            );
+            int ticks = handler.ProcessPeriodicEffects(currentTime: 20.11f, deltaTime: 0.11f);
             Assert.AreEqual(3, ticks);
 
             Assert.AreEqual(

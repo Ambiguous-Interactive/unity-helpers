@@ -3060,20 +3060,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             Assert.IsFalse(eventSystem.TryApplyPixelDragThresholdForCurrentDpi(10));
 
-            try
-            {
-                UnityExtensions.ScreenDpiProvider = () => 320f;
-                EventSystem liveEventSystem = CreateEventSystem();
-                Assert.IsTrue(liveEventSystem.TryApplyPixelDragThresholdForCurrentDpi(10));
-                Assert.AreEqual(20, liveEventSystem.pixelDragThreshold);
-
-                UnityEngine.Object.DestroyImmediate(liveEventSystem); // UNH-SUPPRESS UNH001: the subject is destroyed-object fail-soft behavior.
-                Assert.IsFalse(liveEventSystem.TryApplyPixelDragThresholdForCurrentDpi(10));
-            }
-            finally
-            {
-                UnityExtensions.ResetScreenDpiProvider();
-            }
+            EventSystem liveEventSystem = CreateEventSystem();
+            int expected = UnityExtensions.CalculatePixelDragThreshold(10, Screen.dpi);
+            Assert.IsTrue(liveEventSystem.TryApplyPixelDragThresholdForCurrentDpi(10));
+            Assert.AreEqual(expected, liveEventSystem.pixelDragThreshold);
+            UnityEngine.Object.DestroyImmediate(liveEventSystem); // UNH-SUPPRESS UNH001: the subject is destroyed-object fail-soft behavior.
+            Assert.IsFalse(liveEventSystem.TryApplyPixelDragThresholdForCurrentDpi(10));
         }
 
         [Test]

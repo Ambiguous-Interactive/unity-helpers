@@ -157,3 +157,21 @@ namespace 'Unity.CompilationPipeline'` -- the name bound to a NAMESPACE, not to 
   ([#569](https://github.com/Ambiguous-Interactive/unity-helpers/issues/569)). Before filing such a
   failure as an artifact OR as a regression, grep the code under test for `Application.isPlaying`.
   It is a third category: a real defect that only this harness can see.
+
+### Native asynchronous runner limits (session 348)
+
+The pipeline backend rejects `mode: "all"` with `async_tests: true` before clearing its
+previous result. A response can therefore contain an old completed run. Run `editor` and
+`playmode` separately and verify a fresh job identity and status, its filter and discovered case count.
+A request timeout does not end the native job; poll that job until terminal before editing
+C# sources, refreshing assets or submitting another run.
+
+Capture growing validation logs and generated host-only C# samples outside the Unity
+package, for example under `/tmp`. Unity imports even gitignored package files. A changing
+log caused file-size assertions during `AssetDatabase.Refresh`; generated documentation
+samples also entered authored-script validation. Preserve those artifacts outside the
+package before a native run, and copy completed logs into ignored progress afterward.
+
+Compare summary totals with individual results. This backend can report more summary cases
+than its callback result list contains. Preserve both counts and investigate missing failed
+identities; an incomplete leaf list cannot justify accepting a failed summary.

@@ -31,6 +31,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// Lookup order (lazy):
     /// 1) Load from a custom Resources subfolder when the type is decorated with
     ///    <see cref="WallstopStudios.UnityHelpers.Core.Attributes.ScriptableSingletonPathAttribute"/>.
+    ///    Blank subfolders, including whitespace wrapped in slashes, use the Resources root.
     /// 2) Load from a folder named after the type (Resources/&lt;TypeName&gt;).
     /// 3) Load by exact type name in Resources root, then fallback to all matches in Resources.
     ///
@@ -123,6 +124,40 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             return new Lazy<T>(() => LoadInstance());
         }
+
+        internal static string BuildLoadPath(string resourcesPath, string typeName)
+        {
+            if (string.IsNullOrWhiteSpace(typeName))
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(resourcesPath))
+            {
+                return typeName;
+            }
+
+            string trimmed = resourcesPath.Trim().Trim('/');
+            return string.IsNullOrWhiteSpace(trimmed) ? typeName : $"{trimmed}/{typeName}";
+        }
+
+#if UNITY_EDITOR
+        internal static string BuildCanonicalAssetPath(string loadPath)
+        {
+            if (string.IsNullOrWhiteSpace(loadPath))
+            {
+                return null;
+            }
+
+            string sanitized = loadPath.SanitizePath().Trim('/');
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                return null;
+            }
+
+            return $"Assets/Resources/{sanitized}.asset".Replace("//", "/");
+        }
+#endif
 
         private static string GetResourcesPath()
         {
@@ -262,23 +297,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static T LoadFromResourcesPath(string resourcesPath, string typeName)
         {
             string loadPath = BuildLoadPath(resourcesPath, typeName);
-            return string.IsNullOrEmpty(loadPath) ? null : Resources.Load<T>(loadPath);
-        }
-
-        private static string BuildLoadPath(string resourcesPath, string typeName)
-        {
-            if (string.IsNullOrWhiteSpace(typeName))
-            {
-                return null;
-            }
-
-            if (string.IsNullOrWhiteSpace(resourcesPath))
-            {
-                return typeName;
-            }
-
-            string trimmed = resourcesPath.Trim().Trim('/');
-            return string.IsNullOrEmpty(trimmed) ? typeName : $"{trimmed}/{typeName}";
+            return string.IsNullOrWhiteSpace(loadPath) ? null : Resources.Load<T>(loadPath);
         }
 
         /// <summary>
@@ -663,22 +682,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             Debug.LogWarning(
                 $"ScriptableObjectSingleton detected duplicate assets for {type.FullName} under '{assetFolder}'. Using '{canonicalLabel}'. Remove extra copies or add [AllowDuplicateCleanup] attribute for automatic cleanup:{Environment.NewLine} - {string.Join(Environment.NewLine + " - ", duplicates)}"
             );
-        }
-
-        private static string BuildCanonicalAssetPath(string loadPath)
-        {
-            if (string.IsNullOrWhiteSpace(loadPath))
-            {
-                return null;
-            }
-
-            string sanitized = loadPath.SanitizePath().Trim('/');
-            if (string.IsNullOrEmpty(sanitized))
-            {
-                return null;
-            }
-
-            return $"Assets/Resources/{sanitized}.asset".Replace("//", "/");
         }
 #endif
     }

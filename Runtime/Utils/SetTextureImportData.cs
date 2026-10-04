@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 #if UNITY_EDITOR
 
             string assetPath = AssetDatabase.GetAssetPath(texture);
-            if (string.IsNullOrEmpty(assetPath))
+            if (string.IsNullOrWhiteSpace(assetPath))
             {
                 return;
             }
@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             string assetPath = AssetDatabase.GetAssetPath(texture);
-            if (string.IsNullOrEmpty(assetPath))
+            if (string.IsNullOrWhiteSpace(assetPath))
             {
                 return;
             }

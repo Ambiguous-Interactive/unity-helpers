@@ -23,6 +23,46 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class WEnumToggleButtonsDrawerTests : CommonTestBase
     {
+        private static IEnumerable<TestCaseData> CaptionCases()
+        {
+            foreach (bool shared in new[] { false, true })
+            {
+                string route = shared ? "Shared" : "Standard";
+                yield return new TestCaseData(shared, null, "(Unnamed)").SetName(
+                    $"Caption.{route}.Null"
+                );
+                yield return new TestCaseData(shared, string.Empty, "(Unnamed)").SetName(
+                    $"Caption.{route}.Empty"
+                );
+                yield return new TestCaseData(shared, " ", "(Unnamed)").SetName(
+                    $"Caption.{route}.Space"
+                );
+                yield return new TestCaseData(shared, "\t\r\n", "(Unnamed)").SetName(
+                    $"Caption.{route}.Control"
+                );
+                yield return new TestCaseData(shared, "\u00a0\u2003", "(Unnamed)").SetName(
+                    $"Caption.{route}.Unicode"
+                );
+                yield return new TestCaseData(shared, "  Visible  ", "  Visible  ").SetName(
+                    $"Caption.{route}.Padded"
+                );
+            }
+        }
+
+        private static IEnumerable<TestCaseData> LiteralStringCases()
+        {
+            yield return new TestCaseData(" ", "(Unnamed)").SetName("LiteralSelection.Space");
+            yield return new TestCaseData("\t\r\n", "(Unnamed)").SetName(
+                "LiteralSelection.Control"
+            );
+            yield return new TestCaseData("\u00a0\u2003", "(Unnamed)").SetName(
+                "LiteralSelection.Unicode"
+            );
+            yield return new TestCaseData("  Visible  ", "  Visible  ").SetName(
+                "LiteralSelection.Padded"
+            );
+        }
+
         // Negative enum members previously overflowed Convert.ToUInt64 and broke inspector drawing.
         private static IEnumerable<TestCaseData> SignedUnderlyingTypeCases()
         {
@@ -438,6 +478,67 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             WEnumToggleButtonsUtility.ApplyOption(property, toggleSet, desiredOption, true);
             serializedObject.ApplyModifiedProperties();
             Assert.AreEqual(60, asset.intSelection);
+        }
+
+        [TestCaseSource(nameof(CaptionCases))]
+        public void ToggleCaptionsUseReadableFallback(bool shared, string caption, string expected)
+        {
+            object value = new object();
+            if (shared)
+            {
+                EnumShared.ToggleOption option = new(caption, value, 17UL, true);
+                Assert.That(option.Label, Is.EqualTo(expected));
+                Assert.That(option.Value, Is.SameAs(value));
+                Assert.That(option.FlagValue, Is.EqualTo(17UL));
+                Assert.That(option.IsZeroFlag, Is.True);
+            }
+            else
+            {
+                ToggleOption option = new(caption, value, 17UL, true);
+                Assert.That(option.Label, Is.EqualTo(expected));
+                Assert.That(option.Value, Is.SameAs(value));
+                Assert.That(option.FlagValue, Is.EqualTo(17UL));
+                Assert.That(option.IsZeroFlag, Is.True);
+            }
+        }
+
+        [TestCaseSource(nameof(LiteralStringCases))]
+        public void StringInListSelectionAndSerializationPreserveLiteralWhitespace(
+            string value,
+            string expectedCaption
+        )
+        {
+            ToggleTestAsset asset = CreateScriptableObject<ToggleTestAsset>();
+            using SerializedObject serializedObject = new(asset);
+            serializedObject.Update();
+            using SerializedProperty property = serializedObject.FindProperty(
+                nameof(ToggleTestAsset.literalStateName)
+            );
+            ToggleSet toggleSet = WEnumToggleButtonsUtility.CreateToggleSet(
+                property,
+                GetFieldInfo(nameof(ToggleTestAsset.literalStateName))
+            );
+            Assert.That(toggleSet.Source, Is.EqualTo(ToggleSource.Dropdown));
+            ToggleOption option = GetOptionByValue(toggleSet, value);
+            Assert.That(option.Label, Is.EqualTo(expectedCaption));
+            Assert.That(option.Value, Is.EqualTo(value));
+            WEnumToggleButtonsUtility.ApplyOption(property, toggleSet, option, true);
+            serializedObject.ApplyModifiedProperties();
+            Assert.That(asset.literalStateName, Is.EqualTo(value));
+            serializedObject.Update();
+            Assert.That(property.stringValue, Is.EqualTo(value));
+            Assert.That(
+                WEnumToggleButtonsUtility.IsOptionActive(property, toggleSet, option),
+                Is.True
+            );
+            ToggleOption different = new("Other", value + " ", 0UL, false);
+            Assert.That(
+                WEnumToggleButtonsUtility.IsOptionActive(property, toggleSet, different),
+                Is.False
+            );
+            ToggleTestAsset restored = CreateScriptableObject<ToggleTestAsset>();
+            EditorJsonUtility.FromJsonOverwrite(EditorJsonUtility.ToJson(asset), restored);
+            Assert.That(restored.literalStateName, Is.EqualTo(value));
         }
 
         [Test]

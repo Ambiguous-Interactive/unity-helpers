@@ -31,32 +31,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         /// </summary>
         internal static event Action<HashSet<string>> OnWEnumToggleButtonsColorKeysChanged;
 
-        private static readonly Dictionary<string, Color> PreviousWButtonButtonColors = new(
+        internal static readonly Dictionary<string, Color> PreviousWButtonButtonColors = new(
             StringComparer.OrdinalIgnoreCase
         );
 
-        private static readonly Dictionary<string, Color> PreviousWButtonTextColors = new(
+        internal static readonly Dictionary<string, Color> PreviousWButtonTextColors = new(
             StringComparer.OrdinalIgnoreCase
         );
 
-        private static readonly Dictionary<string, Color> PreviousWEnumSelectedBackgrounds = new(
+        internal static readonly Dictionary<string, Color> PreviousWEnumSelectedBackgrounds = new(
             StringComparer.OrdinalIgnoreCase
         );
 
-        private static readonly Dictionary<string, Color> PreviousWEnumSelectedTexts = new(
+        internal static readonly Dictionary<string, Color> PreviousWEnumSelectedTexts = new(
             StringComparer.OrdinalIgnoreCase
         );
 
-        private static readonly Dictionary<string, Color> PreviousWEnumInactiveBackgrounds = new(
+        internal static readonly Dictionary<string, Color> PreviousWEnumInactiveBackgrounds = new(
             StringComparer.OrdinalIgnoreCase
         );
 
-        private static readonly Dictionary<string, Color> PreviousWEnumInactiveTexts = new(
+        internal static readonly Dictionary<string, Color> PreviousWEnumInactiveTexts = new(
             StringComparer.OrdinalIgnoreCase
         );
 
-        private static HashSet<string> _changedWButtonKeys;
-        private static HashSet<string> _changedWEnumKeys;
+        internal static HashSet<string> _changedWButtonKeys;
+        internal static HashSet<string> _changedWEnumKeys;
 
         /// <summary>
         /// Captures the current state of custom color dictionaries so we can detect changes later.
@@ -126,19 +126,222 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
         }
 
-        /// <summary>
-        /// Clears all cached state. Useful for tests or domain reload scenarios.
-        /// </summary>
-        internal static void ClearCache()
+        internal static HashSet<string> DetectWButtonChanges(SerializedObject settingsObject)
         {
-            PreviousWButtonButtonColors.Clear();
-            PreviousWButtonTextColors.Clear();
-            PreviousWEnumSelectedBackgrounds.Clear();
-            PreviousWEnumSelectedTexts.Clear();
-            PreviousWEnumInactiveBackgrounds.Clear();
-            PreviousWEnumInactiveTexts.Clear();
-            _changedWButtonKeys = null;
-            _changedWEnumKeys = null;
+            HashSet<string> changedKeys = null;
+
+            SerializedProperty customColors = settingsObject.FindProperty(
+                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
+            );
+
+            if (customColors == null)
+            {
+                return changedKeys;
+            }
+
+            SerializedProperty keys = customColors.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty values = customColors.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+
+            if (keys == null || values == null)
+            {
+                return changedKeys;
+            }
+
+            HashSet<string> currentKeys = new(StringComparer.OrdinalIgnoreCase);
+
+            int count = Mathf.Min(keys.arraySize, values.arraySize);
+            for (int index = 0; index < count; ++index)
+            {
+                SerializedProperty keyProp = keys.GetArrayElementAtIndex(index);
+                SerializedProperty valueProp = values.GetArrayElementAtIndex(index);
+
+                if (keyProp == null || valueProp == null)
+                {
+                    continue;
+                }
+
+                string key = keyProp.stringValue;
+                if (string.IsNullOrEmpty(key))
+                {
+                    continue;
+                }
+
+                currentKeys.Add(key);
+
+                SerializedProperty buttonColor = valueProp.FindPropertyRelative(
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton
+                );
+                SerializedProperty textColor = valueProp.FindPropertyRelative(
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
+                );
+
+                bool buttonChanged = false;
+                bool textChanged = false;
+
+                if (buttonColor != null)
+                {
+                    if (
+                        !PreviousWButtonButtonColors.TryGetValue(key, out Color previousButton)
+                        || !ColorsEqual(previousButton, buttonColor.colorValue)
+                    )
+                    {
+                        buttonChanged = true;
+                    }
+                }
+
+                if (textColor != null)
+                {
+                    if (
+                        !PreviousWButtonTextColors.TryGetValue(key, out Color previousText)
+                        || !ColorsEqual(previousText, textColor.colorValue)
+                    )
+                    {
+                        textChanged = true;
+                    }
+                }
+
+                if (buttonChanged || textChanged)
+                {
+                    changedKeys ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    changedKeys.Add(key);
+                }
+            }
+
+            // Removed keys may exist only in a text-color snapshot; inspect every map.
+            CollectRemovedKeys(PreviousWButtonButtonColors, currentKeys, ref changedKeys);
+            CollectRemovedKeys(PreviousWButtonTextColors, currentKeys, ref changedKeys);
+
+            return changedKeys;
+        }
+
+        internal static HashSet<string> DetectWEnumToggleButtonsChanges(
+            SerializedObject settingsObject
+        )
+        {
+            HashSet<string> changedKeys = null;
+
+            SerializedProperty customColors = settingsObject.FindProperty(
+                UnityHelpersSettings.SerializedPropertyNames.WEnumToggleButtonsCustomColors
+            );
+
+            if (customColors == null)
+            {
+                return changedKeys;
+            }
+
+            SerializedProperty keys = customColors.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty values = customColors.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+
+            if (keys == null || values == null)
+            {
+                return changedKeys;
+            }
+
+            HashSet<string> currentKeys = new(StringComparer.OrdinalIgnoreCase);
+
+            int count = Mathf.Min(keys.arraySize, values.arraySize);
+            for (int index = 0; index < count; ++index)
+            {
+                SerializedProperty keyProp = keys.GetArrayElementAtIndex(index);
+                SerializedProperty valueProp = values.GetArrayElementAtIndex(index);
+
+                if (keyProp == null || valueProp == null)
+                {
+                    continue;
+                }
+
+                string key = keyProp.stringValue;
+                if (string.IsNullOrEmpty(key))
+                {
+                    continue;
+                }
+
+                currentKeys.Add(key);
+
+                SerializedProperty selectedBg = valueProp.FindPropertyRelative(
+                    UnityHelpersSettings
+                        .SerializedPropertyNames
+                        .WEnumToggleButtonsSelectedBackground
+                );
+                SerializedProperty selectedText = valueProp.FindPropertyRelative(
+                    UnityHelpersSettings.SerializedPropertyNames.WEnumToggleButtonsSelectedText
+                );
+                SerializedProperty inactiveBg = valueProp.FindPropertyRelative(
+                    UnityHelpersSettings
+                        .SerializedPropertyNames
+                        .WEnumToggleButtonsInactiveBackground
+                );
+                SerializedProperty inactiveText = valueProp.FindPropertyRelative(
+                    UnityHelpersSettings.SerializedPropertyNames.WEnumToggleButtonsInactiveText
+                );
+
+                bool anyChanged = false;
+
+                if (selectedBg != null)
+                {
+                    if (
+                        !PreviousWEnumSelectedBackgrounds.TryGetValue(key, out Color previous)
+                        || !ColorsEqual(previous, selectedBg.colorValue)
+                    )
+                    {
+                        anyChanged = true;
+                    }
+                }
+
+                if (!anyChanged && selectedText != null)
+                {
+                    if (
+                        !PreviousWEnumSelectedTexts.TryGetValue(key, out Color previous)
+                        || !ColorsEqual(previous, selectedText.colorValue)
+                    )
+                    {
+                        anyChanged = true;
+                    }
+                }
+
+                if (!anyChanged && inactiveBg != null)
+                {
+                    if (
+                        !PreviousWEnumInactiveBackgrounds.TryGetValue(key, out Color previous)
+                        || !ColorsEqual(previous, inactiveBg.colorValue)
+                    )
+                    {
+                        anyChanged = true;
+                    }
+                }
+
+                if (!anyChanged && inactiveText != null)
+                {
+                    if (
+                        !PreviousWEnumInactiveTexts.TryGetValue(key, out Color previous)
+                        || !ColorsEqual(previous, inactiveText.colorValue)
+                    )
+                    {
+                        anyChanged = true;
+                    }
+                }
+
+                if (anyChanged)
+                {
+                    changedKeys ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    changedKeys.Add(key);
+                }
+            }
+
+            CollectRemovedKeys(PreviousWEnumSelectedBackgrounds, currentKeys, ref changedKeys);
+            CollectRemovedKeys(PreviousWEnumSelectedTexts, currentKeys, ref changedKeys);
+            CollectRemovedKeys(PreviousWEnumInactiveBackgrounds, currentKeys, ref changedKeys);
+            CollectRemovedKeys(PreviousWEnumInactiveTexts, currentKeys, ref changedKeys);
+
+            return changedKeys;
         }
 
         private static void CaptureWButtonColors(SerializedObject settingsObject)
@@ -287,98 +490,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
         }
 
-        private static HashSet<string> DetectWButtonChanges(SerializedObject settingsObject)
-        {
-            HashSet<string> changedKeys = null;
-
-            SerializedProperty customColors = settingsObject.FindProperty(
-                UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
-            );
-
-            if (customColors == null)
-            {
-                return changedKeys;
-            }
-
-            SerializedProperty keys = customColors.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            SerializedProperty values = customColors.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-
-            if (keys == null || values == null)
-            {
-                return changedKeys;
-            }
-
-            HashSet<string> currentKeys = new(StringComparer.OrdinalIgnoreCase);
-
-            int count = Mathf.Min(keys.arraySize, values.arraySize);
-            for (int index = 0; index < count; ++index)
-            {
-                SerializedProperty keyProp = keys.GetArrayElementAtIndex(index);
-                SerializedProperty valueProp = values.GetArrayElementAtIndex(index);
-
-                if (keyProp == null || valueProp == null)
-                {
-                    continue;
-                }
-
-                string key = keyProp.stringValue;
-                if (string.IsNullOrEmpty(key))
-                {
-                    continue;
-                }
-
-                currentKeys.Add(key);
-
-                SerializedProperty buttonColor = valueProp.FindPropertyRelative(
-                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorButton
-                );
-                SerializedProperty textColor = valueProp.FindPropertyRelative(
-                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorText
-                );
-
-                bool buttonChanged = false;
-                bool textChanged = false;
-
-                if (buttonColor != null)
-                {
-                    if (
-                        !PreviousWButtonButtonColors.TryGetValue(key, out Color previousButton)
-                        || !ColorsEqual(previousButton, buttonColor.colorValue)
-                    )
-                    {
-                        buttonChanged = true;
-                    }
-                }
-
-                if (textColor != null)
-                {
-                    if (
-                        !PreviousWButtonTextColors.TryGetValue(key, out Color previousText)
-                        || !ColorsEqual(previousText, textColor.colorValue)
-                    )
-                    {
-                        textChanged = true;
-                    }
-                }
-
-                if (buttonChanged || textChanged)
-                {
-                    changedKeys ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    changedKeys.Add(key);
-                }
-            }
-
-            // Removed keys may exist only in a text-color snapshot; inspect every map.
-            CollectRemovedKeys(PreviousWButtonButtonColors, currentKeys, ref changedKeys);
-            CollectRemovedKeys(PreviousWButtonTextColors, currentKeys, ref changedKeys);
-
-            return changedKeys;
-        }
-
         private static void CollectRemovedKeys(
             Dictionary<string, Color> previous,
             HashSet<string> currentKeys,
@@ -395,132 +506,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 changedKeys ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 changedKeys.Add(previousKey);
             }
-        }
-
-        private static HashSet<string> DetectWEnumToggleButtonsChanges(
-            SerializedObject settingsObject
-        )
-        {
-            HashSet<string> changedKeys = null;
-
-            SerializedProperty customColors = settingsObject.FindProperty(
-                UnityHelpersSettings.SerializedPropertyNames.WEnumToggleButtonsCustomColors
-            );
-
-            if (customColors == null)
-            {
-                return changedKeys;
-            }
-
-            SerializedProperty keys = customColors.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            SerializedProperty values = customColors.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-
-            if (keys == null || values == null)
-            {
-                return changedKeys;
-            }
-
-            HashSet<string> currentKeys = new(StringComparer.OrdinalIgnoreCase);
-
-            int count = Mathf.Min(keys.arraySize, values.arraySize);
-            for (int index = 0; index < count; ++index)
-            {
-                SerializedProperty keyProp = keys.GetArrayElementAtIndex(index);
-                SerializedProperty valueProp = values.GetArrayElementAtIndex(index);
-
-                if (keyProp == null || valueProp == null)
-                {
-                    continue;
-                }
-
-                string key = keyProp.stringValue;
-                if (string.IsNullOrEmpty(key))
-                {
-                    continue;
-                }
-
-                currentKeys.Add(key);
-
-                SerializedProperty selectedBg = valueProp.FindPropertyRelative(
-                    UnityHelpersSettings
-                        .SerializedPropertyNames
-                        .WEnumToggleButtonsSelectedBackground
-                );
-                SerializedProperty selectedText = valueProp.FindPropertyRelative(
-                    UnityHelpersSettings.SerializedPropertyNames.WEnumToggleButtonsSelectedText
-                );
-                SerializedProperty inactiveBg = valueProp.FindPropertyRelative(
-                    UnityHelpersSettings
-                        .SerializedPropertyNames
-                        .WEnumToggleButtonsInactiveBackground
-                );
-                SerializedProperty inactiveText = valueProp.FindPropertyRelative(
-                    UnityHelpersSettings.SerializedPropertyNames.WEnumToggleButtonsInactiveText
-                );
-
-                bool anyChanged = false;
-
-                if (selectedBg != null)
-                {
-                    if (
-                        !PreviousWEnumSelectedBackgrounds.TryGetValue(key, out Color previous)
-                        || !ColorsEqual(previous, selectedBg.colorValue)
-                    )
-                    {
-                        anyChanged = true;
-                    }
-                }
-
-                if (!anyChanged && selectedText != null)
-                {
-                    if (
-                        !PreviousWEnumSelectedTexts.TryGetValue(key, out Color previous)
-                        || !ColorsEqual(previous, selectedText.colorValue)
-                    )
-                    {
-                        anyChanged = true;
-                    }
-                }
-
-                if (!anyChanged && inactiveBg != null)
-                {
-                    if (
-                        !PreviousWEnumInactiveBackgrounds.TryGetValue(key, out Color previous)
-                        || !ColorsEqual(previous, inactiveBg.colorValue)
-                    )
-                    {
-                        anyChanged = true;
-                    }
-                }
-
-                if (!anyChanged && inactiveText != null)
-                {
-                    if (
-                        !PreviousWEnumInactiveTexts.TryGetValue(key, out Color previous)
-                        || !ColorsEqual(previous, inactiveText.colorValue)
-                    )
-                    {
-                        anyChanged = true;
-                    }
-                }
-
-                if (anyChanged)
-                {
-                    changedKeys ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    changedKeys.Add(key);
-                }
-            }
-
-            CollectRemovedKeys(PreviousWEnumSelectedBackgrounds, currentKeys, ref changedKeys);
-            CollectRemovedKeys(PreviousWEnumSelectedTexts, currentKeys, ref changedKeys);
-            CollectRemovedKeys(PreviousWEnumInactiveBackgrounds, currentKeys, ref changedKeys);
-            CollectRemovedKeys(PreviousWEnumInactiveTexts, currentKeys, ref changedKeys);
-
-            return changedKeys;
         }
 
         /// <remarks>

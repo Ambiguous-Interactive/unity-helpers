@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void PrepareSingletons()
         {
             UnityMainThreadGuard.Capture(Thread.CurrentThread);
-            RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+            RuntimeStateTestUtilities.PrepareForSceneLoad();
         }
 
         [TearDown]

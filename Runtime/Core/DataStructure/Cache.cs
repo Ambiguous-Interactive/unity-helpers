@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Runtime.InteropServices;
     using System.Threading;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Utils;
 #if !SINGLE_THREADED
@@ -43,6 +44,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     /// <typeparam name="TKey">The type of keys in the cache.</typeparam>
     /// <typeparam name="TValue">The type of values in the cache.</typeparam>
+    /// <remarks>Finite clock offsets and jitter remain significant beside large lifetimes; expiration includes the exact lifetime boundary. Disabled expiration has no deadline.</remarks>
     public sealed class Cache<TKey, TValue> : IDisposable
     {
         private const int InvalidIndex = -1;
@@ -51,13 +53,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const float ThrashWindowSeconds = 1f;
         private IRandom Random => _random ??= PRNG.Instance;
 
+        // Delay PRNG initialization to avoid static-initializer deadlocks while Unity opens a scene.
+        internal IRandom _random;
+
         private readonly CacheOptions<TKey, TValue> _options;
         private readonly Func<float> _timeProvider;
 
         private readonly Queue<EvictionNotification> _pendingEvictions;
-
-        // Delay PRNG initialization to avoid static-initializer deadlocks while Unity opens a scene.
-        private IRandom _random;
         private ReaderWriterLockSlim _lock;
 
 #if SINGLE_THREADED
@@ -112,12 +114,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
         }
+        internal int _probationCount;
+        internal int _protectedCount;
+        internal int _protectedCapacity;
 
-        internal int ProtectedCapacityForTesting => _protectedCapacity;
-
-        internal int ProtectedCountForTesting => _protectedCount;
-
-        internal int ProbationCountForTesting => _probationCount;
         private CacheEntry[] _entries;
         private int _count;
         private int _capacity;
@@ -133,9 +133,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private int _probationTail;
         private int _protectedHead;
         private int _protectedTail;
-        private int _probationCount;
-        private int _protectedCount;
-        private int _protectedCapacity;
 
         private int _freeListHead;
 
@@ -224,6 +221,29 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             InitializeFreeList();
             InitializeLinkedLists();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsLifetimeExpired(
+            float startedAt,
+            double duration,
+            double remainder,
+            float currentTime
+        )
+        {
+            if (!float.IsFinite(startedAt) || !float.IsFinite(currentTime))
+            {
+                float roundedDuration = (float)(duration + remainder);
+                float deadline = (float)((double)startedAt + roundedDuration);
+                return deadline <= currentTime;
+            }
+            return CompensatedTime.HasElapsed(
+                startedAt,
+                currentTime,
+                duration,
+                remainder,
+                inclusive: true
+            );
         }
 
         private static float DefaultTimeProvider()
@@ -387,6 +407,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Adds or updates an entry in the cache with a custom TTL.
         /// </summary>
+        /// <remarks>A failing custom lifetime function preserves existing values, expiration schedules, and cache storage.</remarks>
         /// <param name="key">The key of the entry.</param>
         /// <param name="value">The value to cache.</param>
         /// <param name="ttlSeconds">Custom TTL in seconds. If null, uses default expiration.</param>
@@ -823,6 +844,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private void SetUnlocked(TKey key, TValue value, float? ttlSeconds = null)
         {
             float currentTime = _timeProvider();
+            double expirationDuration = ComputeExpirationDuration(
+                key,
+                value,
+                ttlSeconds,
+                out double expirationRemainder,
+                out bool hasExpiration
+            );
 
             if (_keyToIndex.TryGetValue(key, out int existingIndex))
             {
@@ -830,14 +858,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 long oldWeight = _options.Weigher != null ? _entries[existingIndex].Weight : 0;
 
                 _entries[existingIndex].Value = value;
-                _entries[existingIndex].WriteTime = currentTime;
+                _entries[existingIndex].ExpirationStartedAt = currentTime;
                 _entries[existingIndex].AccessTime = currentTime;
-                _entries[existingIndex].ExpirationTime = ComputeExpirationTime(
-                    key,
-                    value,
-                    currentTime,
-                    ttlSeconds
-                );
+                _entries[existingIndex].ExpirationDuration = expirationDuration;
+                _entries[existingIndex].ExpirationRemainder = expirationRemainder;
+                _entries[existingIndex].HasExpiration = hasExpiration;
 
                 if (_options.Weigher != null)
                 {
@@ -887,9 +912,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 Key = key,
                 Value = value,
-                WriteTime = currentTime,
+                ExpirationStartedAt = currentTime,
                 AccessTime = currentTime,
-                ExpirationTime = ComputeExpirationTime(key, value, currentTime, ttlSeconds),
+                ExpirationDuration = expirationDuration,
+                ExpirationRemainder = expirationRemainder,
+                HasExpiration = hasExpiration,
                 Frequency = 1,
                 PrevIndex = InvalidIndex,
                 NextIndex = InvalidIndex,
@@ -938,14 +965,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             InitializeLinkedLists();
         }
 
-        private float ComputeExpirationTime(
+        private double ComputeExpirationDuration(
             TKey key,
             TValue value,
-            float currentTime,
-            float? explicitTtl
+            float? explicitTtl,
+            out double remainder,
+            out bool hasExpiration
         )
         {
-            float ttl;
+            double ttl;
 
             if (explicitTtl.HasValue && 0f < explicitTtl.Value)
             {
@@ -961,32 +989,51 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             else
             {
-                return float.MaxValue;
+                remainder = 0d;
+                hasExpiration = false;
+                return 0d;
             }
 
-            if (_options.UseJitter && 0f < ttl)
+            float jitter = 0f;
+            if (_options.UseJitter && 0d < ttl)
             {
                 float maxJitter =
-                    0f < _options.JitterMaxSeconds ? _options.JitterMaxSeconds : ttl * 0.1f;
-                ttl += Random.NextFloat(0f, maxJitter);
+                    0f < _options.JitterMaxSeconds ? _options.JitterMaxSeconds : (float)ttl * 0.1f;
+                jitter = Random.NextFloat(0f, maxJitter);
             }
 
-            return currentTime + ttl;
+            CompensatedTime.Sum(ttl, jitter, out double duration, out double durationRemainder);
+            remainder = durationRemainder;
+            hasExpiration = true;
+            return duration;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsExpired(int index, float currentTime)
         {
-            if (_entries[index].ExpirationTime <= currentTime)
+            if (
+                _entries[index].HasExpiration
+                && IsLifetimeExpired(
+                    _entries[index].ExpirationStartedAt,
+                    _entries[index].ExpirationDuration,
+                    _entries[index].ExpirationRemainder,
+                    currentTime
+                )
+            )
             {
                 return true;
             }
 
             if (0f < _options.ExpireAfterAccessSeconds)
             {
-                float slidingExpiration =
-                    _entries[index].AccessTime + _options.ExpireAfterAccessSeconds;
-                if (slidingExpiration <= currentTime)
+                if (
+                    IsLifetimeExpired(
+                        _entries[index].AccessTime,
+                        _options.ExpireAfterAccessSeconds,
+                        0d,
+                        currentTime
+                    )
+                )
                 {
                     return true;
                 }
@@ -1001,7 +1048,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             if (0f < _options.ExpireAfterAccessSeconds)
             {
-                _entries[index].ExpirationTime = currentTime + _options.ExpireAfterAccessSeconds;
+                _entries[index].ExpirationStartedAt = currentTime;
+                _entries[index].ExpirationDuration = _options.ExpireAfterAccessSeconds;
+                _entries[index].ExpirationRemainder = 0d;
+                _entries[index].HasExpiration = true;
             }
 
             switch (_options.Policy)
@@ -1773,14 +1823,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             public TKey Key;
             public TValue Value;
-            public float WriteTime;
+            public float ExpirationStartedAt;
             public float AccessTime;
-            public float ExpirationTime;
+            public double ExpirationDuration;
+            public double ExpirationRemainder;
             public int Frequency;
             public int PrevIndex;
             public int NextIndex;
             public byte SegmentIndex;
             public bool IsAlive;
+            public bool HasExpiration;
             public long Weight;
         }
 

@@ -203,11 +203,13 @@ content lives in sub-objects, and a prefab, leaves a key no field claims in each
 asserts the outcome and the object count. It pins the prefab finding directly — the same prefab
 rewritten with assets only comes back byte-identical, stale key and all.
 
-The two branches nothing authorable can trigger — a rewrite that loses content, and a rewrite that
-throws — reach production code through one seam each, and everything after the seam is the real
-thing: the comparison, the error log, the byte restore, and the forced re-import. A render profile
-loses content and a test cannot build one; nothing at all makes `ForceReserializeAssets` throw. The
-confirmation dialog stays anyway, and committing first is still the advice.
+The completion and recovery phases are exercised directly, without injected production callbacks:
+a fixture deletes a real authored sub-asset before completion, and a real filesystem exception
+exercises recovery after the asset has been changed. These controls check the object-count guard,
+error log, byte restore, and forced re-import. Concurrent edits and unwritable destinations check
+that restoration refuses unsafe or failed writes. This phase composition does not make
+`ForceReserializeAssets` itself lose content or throw, and does not prove the public entry point's
+catch routing. The confirmation dialog remains, and committing first is still the advice.
 
 ## The reader underneath
 

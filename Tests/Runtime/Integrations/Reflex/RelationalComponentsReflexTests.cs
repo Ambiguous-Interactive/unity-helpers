@@ -406,7 +406,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
             };
 
             cache._relationalTypeMetadata = relationalTypes;
-            cache.ForceRebuildForTests();
+            global::WallstopStudios.UnityHelpers.Tests.Core.AttributeMetadataCacheTestUtilities.Rebuild(
+                cache
+            );
             return cache;
         }
 

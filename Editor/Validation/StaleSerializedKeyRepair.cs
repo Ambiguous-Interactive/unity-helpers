@@ -62,56 +62,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns>What happened.</returns>
         public static StaleSerializedKeyRepairOutcome RepairAsset(string assetPath)
         {
-            return RepairAsset(assetPath, null);
-        }
-
-        /// <summary>
-        /// Rewrites one asset, counting what it holds through <paramref name="objectCounter"/>.
-        /// </summary>
-        /// <param name="assetPath">The asset to rewrite.</param>
-        /// <param name="objectCounter">
-        /// Answers how many non-null objects the asset holds, or <c>null</c> for the asset database.
-        /// </param>
-        /// <returns>What happened.</returns>
-        /// <remarks>
-        /// The production entry point supplies no counter and so takes the asset database's answer.
-        /// The seam exists because nothing a test can author makes <c>ForceReserializeAssets</c>
-        /// lose content -- a <c>VolumeProfile</c> does, and five modelled <c>HideFlags</c> shapes do
-        /// not -- so the undo this type exists for would otherwise never execute.
-        /// </remarks>
-        internal static StaleSerializedKeyRepairOutcome RepairAsset(
-            string assetPath,
-            Func<string, int> objectCounter
-        )
-        {
-            return RepairAsset(assetPath, objectCounter, null);
-        }
-
-        /// <summary>
-        /// Rewrites one asset through <paramref name="rewriteAsset"/>, counting what it holds
-        /// through <paramref name="objectCounter"/>.
-        /// </summary>
-        /// <param name="assetPath">The asset to rewrite.</param>
-        /// <param name="objectCounter">
-        /// Answers how many non-null objects the asset holds, or <c>null</c> for the asset database.
-        /// </param>
-        /// <param name="rewriteAsset">
-        /// Rewrites the asset, or <c>null</c> for <c>ForceReserializeAssets</c>.
-        /// </param>
-        /// <returns>What happened.</returns>
-        /// <remarks>
-        /// The second seam exists for the same reason the first one does: nothing a test can author
-        /// makes <c>ForceReserializeAssets</c> throw, so the branch that undoes a failed rewrite
-        /// would otherwise never execute and its outcome would be unverified forever.
-        /// </remarks>
-        internal static StaleSerializedKeyRepairOutcome RepairAsset(
-            string assetPath,
-            Func<string, int> objectCounter,
-            Action<string> rewriteAsset
-        )
-        {
-            Func<string, int> countObjects = objectCounter ?? LoadedObjectCount;
-            Action<string> rewrite = rewriteAsset ?? ForceReserialize;
             if (string.IsNullOrEmpty(assetPath))
             {
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
@@ -129,7 +79,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
             }
 
-            int before = countObjects(assetPath);
+            int before = LoadedObjectCount(assetPath);
             if (before <= 0)
             {
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
@@ -137,19 +87,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             try
             {
-                rewrite(assetPath);
+                ForceReserialize(assetPath);
             }
             catch (Exception exception)
             {
-                // Report restoration only after its outcome is known.
-                Debug.LogError($"[Unity Helpers] Rewriting {assetPath} threw: {exception}.");
-                return Restore(assetPath, filePath, original, ReadCurrentBytes(filePath))
-                    ? StaleSerializedKeyRepairOutcome.RefusedRewriteThrew
-                    : StaleSerializedKeyRepairOutcome.RefusedUndoFailed;
+                return RecoverRewriteFailure(assetPath, filePath, original, exception);
             }
 
+            return CompleteRewrite(assetPath, filePath, original, before);
+        }
+
+        /// <summary>Checks the rewritten asset against its original object count and bytes.</summary>
+        internal static StaleSerializedKeyRepairOutcome CompleteRewrite(
+            string assetPath,
+            string filePath,
+            byte[] original,
+            int before
+        )
+        {
             byte[] rewritten = ReadCurrentBytes(filePath);
-            int after = countObjects(assetPath);
+            int after = LoadedObjectCount(assetPath);
             if (after < before)
             {
                 return Restore(assetPath, filePath, original, rewritten)
@@ -160,6 +117,62 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return SameBytes(filePath, original)
                 ? StaleSerializedKeyRepairOutcome.NotRewritten
                 : StaleSerializedKeyRepairOutcome.Repaired;
+        }
+
+        /// <summary>Reports a failed rewrite and restores its original bytes before re-importing.</summary>
+        internal static StaleSerializedKeyRepairOutcome RecoverRewriteFailure(
+            string assetPath,
+            string filePath,
+            byte[] original,
+            Exception exception
+        )
+        {
+            // Report restoration only after its outcome is known.
+            Debug.LogError($"[Unity Helpers] Rewriting {assetPath} threw: {exception}.");
+            return Restore(assetPath, filePath, original, ReadCurrentBytes(filePath))
+                ? StaleSerializedKeyRepairOutcome.RefusedRewriteThrew
+                : StaleSerializedKeyRepairOutcome.RefusedUndoFailed;
+        }
+
+        /// <summary>Puts the original bytes back and makes the editor re-read them.</summary>
+        /// <param name="assetPath">The asset path, for the re-import.</param>
+        /// <param name="filePath">The resolved path, for the write.</param>
+        /// <param name="original">The bytes captured before the rewrite.</param>
+        /// <returns><c>false</c> when the undo did not complete.</returns>
+        /// <remarks>
+        /// A failure here is the worst outcome this type has: the rewrite already happened, so
+        /// swallowing it would leave a damaged asset while the caller reported a refusal. It is
+        /// reported as an error naming the file, because the recovery is a human restoring it.
+        /// </remarks>
+        internal static bool Restore(
+            string assetPath,
+            string filePath,
+            byte[] original,
+            byte[] rewritten
+        )
+        {
+            if (
+                !DurableFile.TryCompareThenReplaceBytes(
+                    filePath,
+                    rewritten,
+                    original,
+                    out Exception writeError
+                )
+            )
+            {
+                Debug.LogError(
+                    $"[Unity Helpers] Could not undo the rewrite of {assetPath}: {writeError}. "
+                        + $"Inspect {filePath} and restore the original bytes from source control "
+                        + "before saving the project."
+                );
+                return false;
+            }
+
+            AssetDatabase.ImportAsset(
+                assetPath,
+                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
+            );
+            return true;
         }
 
         private static void ForceReserialize(string assetPath)
@@ -228,47 +241,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 return null;
             }
-        }
-
-        /// <summary>Puts the original bytes back and makes the editor re-read them.</summary>
-        /// <param name="assetPath">The asset path, for the re-import.</param>
-        /// <param name="filePath">The resolved path, for the write.</param>
-        /// <param name="original">The bytes captured before the rewrite.</param>
-        /// <returns><c>false</c> when the undo did not complete.</returns>
-        /// <remarks>
-        /// A failure here is the worst outcome this type has: the rewrite already happened, so
-        /// swallowing it would leave a damaged asset while the caller reported a refusal. It is
-        /// reported as an error naming the file, because the recovery is a human restoring it.
-        /// </remarks>
-        private static bool Restore(
-            string assetPath,
-            string filePath,
-            byte[] original,
-            byte[] rewritten
-        )
-        {
-            if (
-                !DurableFile.TryCompareThenReplaceBytes(
-                    filePath,
-                    rewritten,
-                    original,
-                    out Exception writeError
-                )
-            )
-            {
-                Debug.LogError(
-                    $"[Unity Helpers] Could not undo the rewrite of {assetPath}: {writeError}. "
-                        + $"Inspect {filePath} and restore the original bytes from source control "
-                        + "before saving the project."
-                );
-                return false;
-            }
-
-            AssetDatabase.ImportAsset(
-                assetPath,
-                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
-            );
-            return true;
         }
     }
 #endif

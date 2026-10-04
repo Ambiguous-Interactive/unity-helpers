@@ -75,17 +75,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         private readonly HashSet<GameObject> _spawnedPrefabs = new();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void ClearSpawnedPrefabs()
+        internal static void ClearSpawnedPrefabs()
         {
             SpawnedPrefabs.Clear();
         }
-
-#if UNITY_INCLUDE_TESTS
-        internal static void ClearSpawnedPrefabsForTesting()
-        {
-            SpawnedPrefabs.Clear();
-        }
-#endif
 
         /// <summary>
         /// Removes Unity's default "(Clone)" suffix from instantiated prefab names.

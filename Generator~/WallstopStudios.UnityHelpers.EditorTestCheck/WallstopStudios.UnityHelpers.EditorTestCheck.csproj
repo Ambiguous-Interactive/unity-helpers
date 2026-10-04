@@ -68,7 +68,7 @@
 
     ================================ WHAT IT COMPILES ================================
 
-    764 of the 807 files under `Tests/Editor/`, plus the four trees they bind:
+    811 of the 856 files under `Tests/Editor/`, plus the four trees they bind:
 
       * `Runtime/**`, `Styles/**` and `Editor/**`, with TypeCheck's and EditorCheck's exclusions,
         because every editmode asmdef references `WallstopStudios.UnityHelpers`, all but three
@@ -126,7 +126,7 @@
 
     ============================ WHAT IT DOES NOT COVER ============================
 
-    42 of the 820 files under `Tests/Editor/` are excluded, in FIVE groups, every one of them
+    45 of the 856 files under `Tests/Editor/` are excluded, in FIVE groups, every one of them
     removed ONE PER LINE WITH ITS REASON below rather than through a semicolon-packed `Exclude`, so
     each reason travels with the exclusion it explains. Not one of them is excluded because the
     fixture is wrong:
@@ -383,7 +383,7 @@
     <Compile Include="$(RepoRoot)/Tests/Runtime/TestTypes/**/*.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/TestDoubles/**/*.cs" />
     <!--
-      The tree this project exists for: 764 of the 807 files under `Tests/Editor/`. GROUP 1 of the
+      The tree this project exists for: 811 of the 856 files under `Tests/Editor/`. GROUP 1 of the
       five exclusion groups is the only one expressed as an `Exclude`, because it is a whole
       directory with one reason rather than a list of files with their own.
     -->
@@ -394,11 +394,16 @@
     <!-- GROUP 5, 1 file: CASCADE ONLY. Exercises the uGUI-dependent component and custom editor excluded above. -->
     <Compile Remove="$(RepoRoot)/Tests/Editor/Utils/MatchColliderToSpriteEditorTests.cs" />
     <!--
-      GROUP 2, 22 files: CASCADE ONLY off the two editor drawers removed above, which are themselves
+      GROUP 2, 25 files: CASCADE ONLY off the two editor drawers removed above, which are themselves
       out because `SerializedProperty.managedReferenceValue` has no getter in Unity3D.SDK 2021.1.14.
       Nothing is wrong with any of these fixtures and none of them can be shimmed back in - see THE
       ONE GAP WORTH REOPENING in the header. Each line names which of the two drawers it binds.
     -->
+    <!-- Native-only adapters bind the same drawers excluded for the SDK managedReferenceValue getter gap. Validate their fixtures in the Unity editor. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/TestAccess/SerializableDictionaryPropertyDrawerTestAccess.cs" />
+    <Compile Remove="$(RepoRoot)/Tests/Editor/TestAccess/SerializableSetPropertyDrawerTestAccess.cs" />
+    <!-- The new real layout fixture also binds both native-only drawer implementations. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableCollectionLayoutCalculationTests.cs" />
     <!-- CASCADE ONLY: names `SerializableSetPropertyDrawer`. -->
     <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/EditorDrawerStaticStyleInitializationTests.cs" />
     <!-- CASCADE ONLY: names both drawers. -->

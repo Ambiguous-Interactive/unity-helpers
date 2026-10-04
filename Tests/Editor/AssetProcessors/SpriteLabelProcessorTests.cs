@@ -54,8 +54,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static string[] SnapshotNormalizedPendingPaths()
         {
-            return SpriteLabelProcessor
-                .SnapshotPendingImportedPathsForTesting()
+            return SpriteLabelProcessorTestAccess
+                .SnapshotPendingImportedPaths()
                 .Select(path => path.ToLowerInvariant())
                 .OrderBy(path => path, StringComparer.Ordinal)
                 .ToArray();
@@ -64,7 +64,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         private static string DescribePendingState()
         {
             string[] normalized = SnapshotNormalizedPendingPaths();
-            return $"PendingImportedPaths.Count={SpriteLabelProcessor.PendingImportedPathCountForTesting}; "
+            return $"PendingImportedPaths.Count={SpriteLabelProcessorTestAccess.PendingImportedPathCount}; "
                 + $"Normalized=[{string.Join(", ", normalized)}]";
         }
 
@@ -73,31 +73,31 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             // First in SetUp, so leaked handler statics are attributed to the prior fixture.
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
-            SpriteLabelProcessor.ResetForTesting();
+            SpriteLabelProcessorTestAccess.Reset();
         }
 
         [TearDown]
         public void TearDown()
         {
-            AssetPostprocessorDeferral.FlushForTesting();
-            SpriteLabelProcessor.ResetForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
+            SpriteLabelProcessorTestAccess.Reset();
         }
 
         [Test]
         [TestCaseSource(nameof(EnqueuePathFilteringCases))]
-        public void EnqueueImportedPathsForTestingFiltersAndDeduplicatesPaths(
+        public void EnqueueImportedPathsFiltersAndDeduplicatesPaths(
             string[] importedPaths,
             string[] expectedNormalizedPaths
         )
         {
-            SpriteLabelProcessor.EnqueueImportedPathsForTesting(importedPaths);
+            SpriteLabelProcessorTestAccess.EnqueueImportedPaths(importedPaths);
 
             string[] normalizedPaths = SnapshotNormalizedPendingPaths();
             string details = DescribePendingState();
 
             Assert.AreEqual(
                 expectedNormalizedPaths.Length,
-                SpriteLabelProcessor.PendingImportedPathCountForTesting,
+                SpriteLabelProcessorTestAccess.PendingImportedPathCount,
                 "Only unique sprite candidate assets under Assets/ should remain queued. " + details
             );
             CollectionAssert.AreEquivalent(
@@ -108,30 +108,30 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
-        public void EnqueueImportedPathsForTestingNullOrEmptyInputDoesNotMutateState()
+        public void EnqueueImportedPathsNullOrEmptyInputDoesNotMutateState()
         {
             Assert.AreEqual(
                 0,
-                SpriteLabelProcessor.PendingImportedPathCountForTesting,
+                SpriteLabelProcessorTestAccess.PendingImportedPathCount,
                 "Expected clean state at test start. " + DescribePendingState()
             );
 
-            SpriteLabelProcessor.EnqueueImportedPathsForTesting(
+            SpriteLabelProcessorTestAccess.EnqueueImportedPaths(
                 new[] { "Assets/Sprites/Hero.png" }
             );
             Assert.AreEqual(
                 1,
-                SpriteLabelProcessor.PendingImportedPathCountForTesting,
+                SpriteLabelProcessorTestAccess.PendingImportedPathCount,
                 "Expected a seeded pending path before null/empty no-op checks. "
                     + DescribePendingState()
             );
 
-            SpriteLabelProcessor.EnqueueImportedPathsForTesting(null);
-            SpriteLabelProcessor.EnqueueImportedPathsForTesting(Array.Empty<string>());
+            SpriteLabelProcessorTestAccess.EnqueueImportedPaths(null);
+            SpriteLabelProcessorTestAccess.EnqueueImportedPaths(Array.Empty<string>());
 
             Assert.AreEqual(
                 1,
-                SpriteLabelProcessor.PendingImportedPathCountForTesting,
+                SpriteLabelProcessorTestAccess.PendingImportedPathCount,
                 "Null/empty inputs should leave pending state unchanged. " + DescribePendingState()
             );
             CollectionAssert.AreEquivalent(
@@ -142,12 +142,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
-        public void EnqueueImportedPathsForTestingDeduplicatesAcrossMultipleCalls()
+        public void EnqueueImportedPathsDeduplicatesAcrossMultipleCalls()
         {
-            SpriteLabelProcessor.EnqueueImportedPathsForTesting(
+            SpriteLabelProcessorTestAccess.EnqueueImportedPaths(
                 new[] { "Assets/Sprites/Hero.png", "Assets/Sprites/Villain.jpg" }
             );
-            SpriteLabelProcessor.EnqueueImportedPathsForTesting(
+            SpriteLabelProcessorTestAccess.EnqueueImportedPaths(
                 new[] { "assets/sprites/HERO.PNG", "Assets/Sprites/Sidekick.jpeg" }
             );
 
@@ -164,7 +164,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
             Assert.AreEqual(
                 3,
-                SpriteLabelProcessor.PendingImportedPathCountForTesting,
+                SpriteLabelProcessorTestAccess.PendingImportedPathCount,
                 "Expected exactly three unique candidate paths after two enqueue batches. "
                     + DescribePendingState()
             );

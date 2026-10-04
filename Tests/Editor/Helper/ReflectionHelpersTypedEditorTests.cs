@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Reflection;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     public sealed class TypedHelperEditorTarget
     {
@@ -26,12 +27,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             FieldInfo field = typeof(TypedHelperEditorTarget).GetField(
                 nameof(TypedHelperEditorTarget.Field)
             );
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: false
-                )
-            )
+            using (new ReflectionCapabilityScope(expressions: false, dynamicIl: false))
             {
                 FieldSetter<TypedHelperEditorTarget, int> setter = ReflectionHelpers.GetFieldSetter<
                     TypedHelperEditorTarget,
@@ -49,12 +45,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             PropertyInfo property = typeof(TypedHelperEditorTarget).GetProperty(
                 nameof(TypedHelperEditorTarget.Property)
             );
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: false
-                )
-            )
+            using (new ReflectionCapabilityScope(expressions: false, dynamicIl: false))
             {
                 Action<TypedHelperEditorTarget, int> setter = ReflectionHelpers.GetPropertySetter<
                     TypedHelperEditorTarget,
@@ -73,12 +64,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 nameof(TypedHelperEditorTarget.Property)
             );
             TypedHelperEditorTarget instance = new() { Property = 56 };
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: false
-                )
-            )
+            using (new ReflectionCapabilityScope(expressions: false, dynamicIl: false))
             {
                 Func<TypedHelperEditorTarget, int> getter = ReflectionHelpers.GetPropertyGetter<
                     TypedHelperEditorTarget,

@@ -152,11 +152,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         {
             base.BaseSetUp();
             WGroupLayoutBuilder.ClearCache();
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
             _originalIndentLevel = EditorGUI.indentLevel;
             EditorGUI.indentLevel = 0;
             _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -166,9 +166,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         public override void TearDown()
         {
             WGroupLayoutBuilder.ClearCache();
-            GroupGUIWidthUtility.ResetForTests();
+            GroupGUIWidthUtilityTestAccess.Reset();
             EditorGUI.indentLevel = _originalIndentLevel;
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 _previousConfiguration.Mode,
                 _previousConfiguration.RowCount
             );

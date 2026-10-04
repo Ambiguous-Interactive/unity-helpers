@@ -75,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public static int CachedCount => Cache.Count;
 
-        private static readonly Cache<string, StringWrapper> Cache = CacheBuilder<
+        internal static readonly Cache<string, StringWrapper> Cache = CacheBuilder<
             string,
             StringWrapper
         >
@@ -140,11 +140,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int count = Cache.Count;
             Cache.Clear();
             return count;
-        }
-
-        internal static bool IsCachedForTesting(string value)
-        {
-            return value != null && Cache.ContainsKey(value);
         }
 
         public bool Equals(StringWrapper other)

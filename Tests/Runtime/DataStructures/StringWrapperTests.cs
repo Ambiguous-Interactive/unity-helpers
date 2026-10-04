@@ -285,14 +285,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             _ = StringWrapper.Get("third");
 
             Assert.IsFalse(
-                StringWrapper.IsCachedForTesting("second"),
+                StringWrapper.Cache.ContainsKey("second"),
                 "The least recently requested string is the one that must go."
             );
             Assert.IsTrue(
-                StringWrapper.IsCachedForTesting("first"),
+                StringWrapper.Cache.ContainsKey("first"),
                 "Requesting a string again must renew it, not merely read it."
             );
-            Assert.IsTrue(StringWrapper.IsCachedForTesting("third"));
+            Assert.IsTrue(StringWrapper.Cache.ContainsKey("third"));
         }
 
         /// <summary>
