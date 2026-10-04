@@ -320,25 +320,23 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             _disposed = true;
 
-            using (Buffers<T>.List.Get(out List<T> pending))
+            using PurgeBufferLease<T> pendingLease = PurgeBuffer<T>.Get(out List<T> pending);
+            foreach (InFlightItem item in _inFlight)
             {
-                foreach (InFlightItem item in _inFlight)
-                {
-                    pending.Add(item.Value);
-                }
-                _inFlight.Clear();
-                pending.AddRange(_idle);
-                _idle.Clear();
+                pending.Add(item.Value);
+            }
+            _inFlight.Clear();
+            pending.AddRange(_idle);
+            _idle.Clear();
 
-                foreach (T current in pending)
+            foreach (T current in pending)
+            {
+                if (IsGone(current))
                 {
-                    if (IsGone(current))
-                    {
-                        continue;
-                    }
-
-                    TryInvoke(_onDestroy, current);
+                    continue;
                 }
+
+                TryInvoke(_onDestroy, current);
             }
         }
 

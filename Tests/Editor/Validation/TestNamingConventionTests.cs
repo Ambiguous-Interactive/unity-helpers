@@ -7,11 +7,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Collections.Generic;
     using System.IO;
     using System.Reflection;
+    using System.Runtime.CompilerServices;
     using System.Text;
     using System.Text.RegularExpressions;
     using NUnit.Framework;
-    using UnityEditor;
-    using UnityEngine;
 
     /// <summary>
     /// Validates that test files follow naming conventions.
@@ -44,6 +43,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             @"\.SetName\s*\(\s*""([^""]+)""",
             RegexOptions.Compiled
         );
+
+        /// <summary>
+        /// Iterates every <c>.cs</c> file under <c>&lt;packagePath&gt;/Tests</c>
+        /// and invokes <paramref name="visitor"/> with the relative file path,
+        /// 1-based line number, and line text. Returns the absolute path of the
+        /// tests directory that was scanned. Missing or unreadable source fails the scan.
+        /// </summary>
+        internal static string ScanTestFiles(
+            string packagePath,
+            Action<string, int, string> visitor
+        )
+        {
+            string testsPath = Path.Combine(packagePath, "Tests");
+            Assert.IsTrue(
+                Directory.Exists(testsPath),
+                "Tests directory not found under: " + packagePath
+            );
+
+            string[] testFiles = Directory.GetFiles(testsPath, "*.cs", SearchOption.AllDirectories);
+            Assert.IsTrue(0 < testFiles.Length, "No test source files found under: " + testsPath);
+            Assert.IsTrue(
+                Array.Exists(
+                    testFiles,
+                    path =>
+                        string.Equals(
+                            Path.GetFileName(path),
+                            nameof(TestNamingConventionTests) + ".cs",
+                            StringComparison.Ordinal
+                        )
+                ),
+                "The naming fixture source must belong to the scanned tree."
+            );
+            foreach (string filePath in testFiles)
+            {
+                if (filePath.EndsWith(".meta"))
+                {
+                    continue;
+                }
+
+                string[] lines = File.ReadAllLines(filePath);
+
+                string relativePath = GetRelativePath(filePath, packagePath);
+                for (int lineIndex = 0; lineIndex < lines.Length; ++lineIndex)
+                {
+                    visitor(relativePath, lineIndex + 1, lines[lineIndex]);
+                }
+            }
+
+            return testsPath;
+        }
 
         /// <summary>
         /// Iterates every public/non-public/instance/static method on every type of
@@ -108,49 +157,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return scannedAssemblies;
         }
 
-        /// <summary>
-        /// Iterates every <c>.cs</c> file under <c>&lt;packagePath&gt;/Tests</c>
-        /// and invokes <paramref name="visitor"/> with the relative file path,
-        /// 1-based line number, and line text. Returns the absolute path of the
-        /// tests directory that was scanned, or <see langword="null"/> if no
-        /// tests directory was found beneath <paramref name="packagePath"/>.
-        /// </summary>
-        private static string ScanTestFiles(string packagePath, Action<string, int, string> visitor)
-        {
-            string testsPath = Path.Combine(packagePath, "Tests");
-            if (!Directory.Exists(testsPath))
-            {
-                return null;
-            }
-
-            string[] testFiles = Directory.GetFiles(testsPath, "*.cs", SearchOption.AllDirectories);
-            foreach (string filePath in testFiles)
-            {
-                if (filePath.EndsWith(".meta"))
-                {
-                    continue;
-                }
-
-                string[] lines;
-                try
-                {
-                    lines = File.ReadAllLines(filePath);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                string relativePath = GetRelativePath(filePath, packagePath);
-                for (int lineIndex = 0; lineIndex < lines.Length; ++lineIndex)
-                {
-                    visitor(relativePath, lineIndex + 1, lines[lineIndex]);
-                }
-            }
-
-            return testsPath;
-        }
-
         private static List<Assembly> GetTestAssemblies()
         {
             List<Assembly> testAssemblies = new();
@@ -213,59 +219,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return false;
         }
 
-        private static string GetPackagePath()
+        private static string GetPackagePath([CallerFilePath] string sourcePath = "")
         {
-            string[] guids = AssetDatabase.FindAssets("package t:TextAsset");
-            foreach (string guid in guids)
-            {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (
-                    path.EndsWith("package.json")
-                    && path.Contains("com.wallstop-studios.unity-helpers")
-                )
-                {
-                    return Path.GetDirectoryName(path);
-                }
-            }
-
-            Assembly thisAssembly = typeof(TestNamingConventionTests).Assembly;
-            string assemblyLocation = thisAssembly.Location;
-            if (!string.IsNullOrEmpty(assemblyLocation))
-            {
-                string current = Path.GetDirectoryName(assemblyLocation);
-                for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); ++i)
-                {
-                    if (File.Exists(Path.Combine(current, "package.json")))
-                    {
-                        return current;
-                    }
-
-                    current = Path.GetDirectoryName(current);
-                }
-            }
-
-            string dataPath = Application.dataPath;
-            string projectRoot = Path.GetDirectoryName(dataPath);
-
-            string[] possiblePaths =
-            {
-                Path.Combine(projectRoot, "Packages", "com.wallstop-studios.unity-helpers"),
-                Path.Combine(dataPath, "..", "Packages", "com.wallstop-studios.unity-helpers"),
-            };
-
-            foreach (string possiblePath in possiblePaths)
-            {
-                string normalized = Path.GetFullPath(possiblePath);
-                if (
-                    Directory.Exists(normalized)
-                    && File.Exists(Path.Combine(normalized, "package.json"))
-                )
-                {
-                    return normalized;
-                }
-            }
-
-            return null;
+            string root = TestPackageRoot.Resolve(
+                typeof(TestNamingConventionTests).Assembly,
+                sourcePath
+            );
+            Assert.IsFalse(
+                string.IsNullOrWhiteSpace(root),
+                "Could not resolve this package and its Tests directory."
+            );
+            return root;
         }
 
         private static string GetRelativePath(string fullPath, string basePath)
@@ -329,12 +293,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         public void TestNameAttributeValuesDoNotContainUnderscores()
         {
             string packagePath = GetPackagePath();
-            if (string.IsNullOrEmpty(packagePath))
-            {
-                Assert.Inconclusive("Could not determine package path");
-                return;
-            }
-
             List<string> violations = new();
             string scannedRoot = ScanTestFiles(
                 packagePath,
@@ -355,12 +313,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             );
 
-            if (scannedRoot == null)
-            {
-                Assert.Inconclusive("Tests directory not found under: " + packagePath);
-                return;
-            }
-
             Assert.IsEmpty(
                 violations,
                 $"Found {violations.Count} TestName value(s) with underscores (scanned {scannedRoot}):\n"
@@ -376,12 +328,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         public void SetNameMethodValuesDoNotContainUnderscores()
         {
             string packagePath = GetPackagePath();
-            if (string.IsNullOrEmpty(packagePath))
-            {
-                Assert.Inconclusive("Could not determine package path");
-                return;
-            }
-
             List<string> violations = new();
             string scannedRoot = ScanTestFiles(
                 packagePath,
@@ -401,12 +347,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     }
                 }
             );
-
-            if (scannedRoot == null)
-            {
-                Assert.Inconclusive("Tests directory not found under: " + packagePath);
-                return;
-            }
 
             Assert.IsEmpty(
                 violations,
@@ -513,12 +453,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         public void AllTestNamingConventionsAreFollowed()
         {
             string packagePath = GetPackagePath();
-            if (string.IsNullOrEmpty(packagePath))
-            {
-                Assert.Inconclusive("Could not determine package path");
-                return;
-            }
-
             StringBuilder violations = new();
             int violationCount = 0;
 
@@ -567,12 +501,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     }
                 }
             );
-
-            if (scannedRoot == null)
-            {
-                Assert.Inconclusive("Tests directory not found under: " + packagePath);
-                return;
-            }
 
             Assert.IsTrue(
                 0 < scannedAssemblies.Count,

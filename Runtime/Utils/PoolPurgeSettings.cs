@@ -1719,10 +1719,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool ignoreHysteresis = !respectHysteresis;
 
             // Snapshot under lock so slow pool cleanup runs without blocking registration.
-            using PooledResource<List<IPurgeable>> pooled = Buffers<IPurgeable>.List.Get(
+            using PurgeBufferLease<IPurgeable> poolsToPurgeLease = PurgeBuffer<IPurgeable>.Get(
                 out List<IPurgeable> poolsToPurge
             );
-
             lock (RegistryLock)
             {
                 for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
@@ -1776,10 +1775,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool ignoreHysteresis = !respectHysteresis;
 
             // Snapshot under lock so slow pool cleanup runs without blocking registration.
-            using PooledResource<List<IPurgeable>> pooled = Buffers<IPurgeable>.List.Get(
+            using PurgeBufferLease<IPurgeable> poolsToPurgeLease = PurgeBuffer<IPurgeable>.Get(
                 out List<IPurgeable> poolsToPurge
             );
-
             lock (RegistryLock)
             {
                 for (int i = RegisteredPools.Count - 1; 0 <= i; i--)

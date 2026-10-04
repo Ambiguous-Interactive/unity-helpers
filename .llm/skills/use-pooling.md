@@ -36,6 +36,10 @@
 
 [Read section](../references/use-pooling-part-2.md#pattern-nested-pooling)
 
+## Scratch Buffers Inside Pool Infrastructure
+
+[Read section](../references/use-pooling-part-2.md#scratch-buffers-inside-pool-infrastructure)
+
 ## Pattern: Conditional Pooling
 
 [Read section](../references/use-pooling-part-2.md#pattern-conditional-pooling)
