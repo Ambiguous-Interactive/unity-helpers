@@ -39,6 +39,70 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             MemoryPressureMonitor.Enabled = _wasMemoryPressureEnabled;
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void NestedCrossPoolPurgeKeepsBothSnapshotsExclusive(bool mutateDuringDisposal)
+        {
+            List<int> outerIds = new();
+            List<int> innerIds = new();
+            List<int> disposedIds = new();
+            int nestedCount = -1;
+            bool entered = false;
+            using WallstopGenericPool<TestPoolItem> inner = new(
+                () => new TestPoolItem(),
+                preWarmCount: 2,
+                onDisposal: item => disposedIds.Add(item.Id),
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    UseIntelligentPurging = false,
+                    TimeProvider = TestTimeProvider,
+                    OnPurge = (item, reason) => innerIds.Add(item.Id),
+                }
+            );
+            Action nest = () =>
+            {
+                if (!entered)
+                {
+                    entered = true;
+                    nestedCount = inner.ForceFullPurge();
+                }
+            };
+            using WallstopGenericPool<TestPoolItem> outer = new(
+                () => new TestPoolItem(),
+                preWarmCount: 2,
+                onDisposal: item =>
+                {
+                    disposedIds.Add(item.Id);
+                    if (mutateDuringDisposal)
+                    {
+                        nest();
+                    }
+                },
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    UseIntelligentPurging = false,
+                    TimeProvider = TestTimeProvider,
+                    OnPurge = (item, reason) =>
+                    {
+                        outerIds.Add(item.Id);
+                        if (!mutateDuringDisposal)
+                        {
+                            nest();
+                        }
+                    },
+                }
+            );
+            Assert.AreEqual(2, outer.ForceFullPurge());
+            Assert.AreEqual(2, nestedCount);
+            CollectionAssert.AreEquivalent(new[] { 1, 2 }, innerIds);
+            CollectionAssert.AreEquivalent(new[] { 3, 4 }, outerIds);
+            CollectionAssert.AreEquivalent(new[] { 1, 2, 3, 4 }, disposedIds);
+            Assert.AreEqual(0, inner.Count);
+            Assert.AreEqual(0, outer.Count);
+        }
+
         [Test]
         public void ConstructorWithNullProducerThrowsArgumentNullException()
         {
@@ -1172,6 +1236,335 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             tracked.Dispose();
             Assert.AreEqual(0, pool.CurrentlyRented);
             Assert.AreEqual(2, disposeCount);
+        }
+
+        [TestCase(0, 0, false, TestName = "PurgeReentrancy.Default.Rent.OnPurge")]
+        [TestCase(0, 0, true, TestName = "PurgeReentrancy.Default.Rent.OnDisposal")]
+        [TestCase(0, 1, false, TestName = "PurgeReentrancy.Default.Dispose.OnPurge")]
+        [TestCase(0, 1, true, TestName = "PurgeReentrancy.Default.Dispose.OnDisposal")]
+        [TestCase(0, 2, false, TestName = "PurgeReentrancy.Default.NestedPurge.OnPurge")]
+        [TestCase(0, 2, true, TestName = "PurgeReentrancy.Default.NestedPurge.OnDisposal")]
+        [TestCase(1, 0, false, TestName = "PurgeReentrancy.Reason.Rent.OnPurge")]
+        [TestCase(1, 0, true, TestName = "PurgeReentrancy.Reason.Rent.OnDisposal")]
+        [TestCase(1, 1, false, TestName = "PurgeReentrancy.Reason.Dispose.OnPurge")]
+        [TestCase(1, 1, true, TestName = "PurgeReentrancy.Reason.Dispose.OnDisposal")]
+        [TestCase(1, 2, false, TestName = "PurgeReentrancy.Reason.NestedPurge.OnPurge")]
+        [TestCase(1, 2, true, TestName = "PurgeReentrancy.Reason.NestedPurge.OnDisposal")]
+        [TestCase(2, 0, false, TestName = "PurgeReentrancy.Full.Rent.OnPurge")]
+        [TestCase(2, 0, true, TestName = "PurgeReentrancy.Full.Rent.OnDisposal")]
+        [TestCase(2, 1, false, TestName = "PurgeReentrancy.Full.Dispose.OnPurge")]
+        [TestCase(2, 1, true, TestName = "PurgeReentrancy.Full.Dispose.OnDisposal")]
+        [TestCase(2, 2, false, TestName = "PurgeReentrancy.Full.NestedPurge.OnPurge")]
+        [TestCase(2, 2, true, TestName = "PurgeReentrancy.Full.NestedPurge.OnDisposal")]
+        [TestCase(3, 0, false, TestName = "PurgeReentrancy.FullReason.Rent.OnPurge")]
+        [TestCase(3, 0, true, TestName = "PurgeReentrancy.FullReason.Rent.OnDisposal")]
+        [TestCase(3, 1, false, TestName = "PurgeReentrancy.FullReason.Dispose.OnPurge")]
+        [TestCase(3, 1, true, TestName = "PurgeReentrancy.FullReason.Dispose.OnDisposal")]
+        [TestCase(3, 2, false, TestName = "PurgeReentrancy.FullReason.NestedPurge.OnPurge")]
+        [TestCase(3, 2, true, TestName = "PurgeReentrancy.FullReason.NestedPurge.OnDisposal")]
+        [TestCase(4, 0, false, TestName = "PurgeReentrancy.Budget.Rent.OnPurge")]
+        [TestCase(4, 0, true, TestName = "PurgeReentrancy.Budget.Rent.OnDisposal")]
+        [TestCase(4, 1, false, TestName = "PurgeReentrancy.Budget.Dispose.OnPurge")]
+        [TestCase(4, 1, true, TestName = "PurgeReentrancy.Budget.Dispose.OnDisposal")]
+        [TestCase(4, 2, false, TestName = "PurgeReentrancy.Budget.NestedPurge.OnPurge")]
+        [TestCase(4, 2, true, TestName = "PurgeReentrancy.Budget.NestedPurge.OnDisposal")]
+        [TestCase(5, 0, false, TestName = "PurgeReentrancy.Critical.Rent.OnPurge")]
+        [TestCase(5, 0, true, TestName = "PurgeReentrancy.Critical.Rent.OnDisposal")]
+        [TestCase(5, 1, false, TestName = "PurgeReentrancy.Critical.Dispose.OnPurge")]
+        [TestCase(5, 1, true, TestName = "PurgeReentrancy.Critical.Dispose.OnDisposal")]
+        [TestCase(5, 2, false, TestName = "PurgeReentrancy.Critical.NestedPurge.OnPurge")]
+        [TestCase(5, 2, true, TestName = "PurgeReentrancy.Critical.NestedPurge.OnDisposal")]
+        public void PurgeDetachesSelectedItemsBeforeCallbacks(
+            int purgePath,
+            int callbackAction,
+            bool mutateDuringDisposal
+        )
+        {
+            List<int> purgedIds = new();
+            List<int> disposedIds = new();
+            bool entered = false;
+            int nestedPurgeCount = -1;
+            PooledResource<TestPoolItem> borrowed = default;
+            TestPoolItem borrowedItem = null;
+            WallstopGenericPool<TestPoolItem> pool = null;
+            Action mutate = () =>
+            {
+                if (entered)
+                {
+                    return;
+                }
+                entered = true;
+                if (callbackAction == 0)
+                {
+                    borrowed = pool.Get(out borrowedItem);
+                }
+                else if (callbackAction == 1)
+                {
+                    pool.Dispose();
+                }
+                else
+                {
+                    nestedPurgeCount = pool.Purge();
+                }
+            };
+            pool = new WallstopGenericPool<TestPoolItem>(
+                () => new TestPoolItem(),
+                preWarmCount: 4,
+                onDisposal: item =>
+                {
+                    disposedIds.Add(item.Id);
+                    item.WasDisposed = true;
+                    if (mutateDuringDisposal)
+                    {
+                        mutate();
+                    }
+                },
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    UseIntelligentPurging = false,
+                    TimeProvider = TestTimeProvider,
+                    OnPurge = (item, reason) =>
+                    {
+                        purgedIds.Add(item.Id);
+                        if (!mutateDuringDisposal)
+                        {
+                            mutate();
+                        }
+                    },
+                }
+            );
+            try
+            {
+                int purged = 0;
+                Assert.DoesNotThrow(() =>
+                {
+                    if (purgePath == 0)
+                    {
+                        purged = pool.Purge();
+                    }
+                    else if (purgePath == 1)
+                    {
+                        purged = pool.Purge(PurgeReason.Explicit);
+                    }
+                    else if (purgePath == 2)
+                    {
+                        purged = pool.ForceFullPurge();
+                    }
+                    else if (purgePath == 3)
+                    {
+                        purged = pool.ForceFullPurge(PurgeReason.Explicit);
+                    }
+                    else if (purgePath == 4)
+                    {
+                        purged = pool.PurgeForBudget(4);
+                    }
+                    else
+                    {
+                        purged = pool.PurgeCritical(_currentTime);
+                    }
+                });
+                Assert.AreEqual(4, purged);
+                CollectionAssert.AreEquivalent(new[] { 1, 2, 3, 4 }, purgedIds);
+                CollectionAssert.AreEquivalent(new[] { 1, 2, 3, 4 }, disposedIds);
+                Assert.AreEqual(0, pool.Count);
+                if (callbackAction == 2)
+                {
+                    Assert.AreEqual(0, nestedPurgeCount);
+                }
+                if (callbackAction == 0)
+                {
+                    Assert.IsTrue(borrowedItem != null);
+                    Assert.AreEqual(5, borrowedItem.Id);
+                    Assert.IsFalse(borrowedItem.WasDisposed);
+                    Assert.AreEqual(1, pool.CurrentlyRented);
+                }
+            }
+            finally
+            {
+                borrowed.Dispose();
+                pool.Dispose();
+            }
+        }
+
+        [TestCase(0, false, TestName = "PurgeBudgetRetention.Rent.OnPurge")]
+        [TestCase(0, true, TestName = "PurgeBudgetRetention.Rent.OnDisposal")]
+        [TestCase(1, false, TestName = "PurgeBudgetRetention.Dispose.OnPurge")]
+        [TestCase(1, true, TestName = "PurgeBudgetRetention.Dispose.OnDisposal")]
+        [TestCase(2, false, TestName = "PurgeBudgetRetention.NestedPurge.OnPurge")]
+        [TestCase(2, true, TestName = "PurgeBudgetRetention.NestedPurge.OnDisposal")]
+        public void BudgetPurgeKeepsRetainedAndBorrowedItemsAlive(
+            int callbackAction,
+            bool rentDuringDisposal
+        )
+        {
+            List<int> purgedIds = new();
+            List<int> disposedIds = new();
+            bool entered = false;
+            int nestedPurgeCount = -1;
+            PooledResource<TestPoolItem> borrowed = default;
+            TestPoolItem borrowedItem = null;
+            WallstopGenericPool<TestPoolItem> pool = null;
+            Action rent = () =>
+            {
+                if (!entered)
+                {
+                    entered = true;
+                    if (callbackAction == 0)
+                    {
+                        borrowed = pool.Get(out borrowedItem);
+                    }
+                    else if (callbackAction == 1)
+                    {
+                        pool.Dispose();
+                    }
+                    else
+                    {
+                        nestedPurgeCount = pool.Purge();
+                    }
+                }
+            };
+            pool = new WallstopGenericPool<TestPoolItem>(
+                () => new TestPoolItem(),
+                preWarmCount: 4,
+                onDisposal: item =>
+                {
+                    disposedIds.Add(item.Id);
+                    item.WasDisposed = true;
+                    if (rentDuringDisposal)
+                    {
+                        rent();
+                    }
+                },
+                options: new PoolOptions<TestPoolItem>
+                {
+                    MinRetainCount = 1,
+                    Triggers = PurgeTrigger.Explicit,
+                    UseIntelligentPurging = false,
+                    TimeProvider = TestTimeProvider,
+                    OnPurge = (item, reason) =>
+                    {
+                        purgedIds.Add(item.Id);
+                        if (!rentDuringDisposal)
+                        {
+                            rent();
+                        }
+                    },
+                }
+            );
+            try
+            {
+                int purged = 0;
+                Assert.DoesNotThrow(() => purged = pool.PurgeForBudget(2));
+                Assert.AreEqual(2, purged);
+                if (callbackAction == 0)
+                {
+                    CollectionAssert.AreEquivalent(new[] { 3, 4 }, purgedIds);
+                    CollectionAssert.AreEquivalent(new[] { 3, 4 }, disposedIds);
+                    Assert.AreEqual(1, pool.Count);
+                    Assert.IsTrue(borrowedItem != null);
+                    Assert.AreEqual(2, borrowedItem.Id);
+                    Assert.IsFalse(borrowedItem.WasDisposed);
+                    Assert.AreEqual(1, pool.CurrentlyRented);
+                }
+                else if (callbackAction == 1)
+                {
+                    CollectionAssert.AreEquivalent(new[] { 3, 4 }, purgedIds);
+                    CollectionAssert.AreEquivalent(new[] { 1, 2, 3, 4 }, disposedIds);
+                    Assert.AreEqual(0, pool.Count);
+                }
+                else
+                {
+                    CollectionAssert.AreEquivalent(new[] { 2, 3, 4 }, purgedIds);
+                    CollectionAssert.AreEquivalent(new[] { 2, 3, 4 }, disposedIds);
+                    Assert.AreEqual(1, nestedPurgeCount);
+                    Assert.AreEqual(1, pool.Count);
+                }
+            }
+            finally
+            {
+                borrowed.Dispose();
+                pool.Dispose();
+            }
+        }
+
+        [TestCase(true, false, TestName = "AutomaticPurgeReentrancy.Idle.OnPurge")]
+        [TestCase(true, true, TestName = "AutomaticPurgeReentrancy.Idle.OnDisposal")]
+        [TestCase(false, false, TestName = "AutomaticPurgeReentrancy.Capacity.OnPurge")]
+        [TestCase(false, true, TestName = "AutomaticPurgeReentrancy.Capacity.OnDisposal")]
+        public void AutomaticPurgeCallbacksCannotRentSelectedItems(
+            bool idleTimeout,
+            bool rentDuringDisposal
+        )
+        {
+            List<int> purgedIds = new();
+            List<int> disposedIds = new();
+            bool entered = false;
+            PooledResource<TestPoolItem> borrowed = default;
+            PooledResource<TestPoolItem> acquired = default;
+            TestPoolItem borrowedItem = null;
+            WallstopGenericPool<TestPoolItem> pool = null;
+            Action rent = () =>
+            {
+                if (!entered)
+                {
+                    entered = true;
+                    borrowed = pool.Get(out borrowedItem);
+                }
+            };
+            pool = new WallstopGenericPool<TestPoolItem>(
+                () => new TestPoolItem(),
+                preWarmCount: 4,
+                onDisposal: item =>
+                {
+                    disposedIds.Add(item.Id);
+                    item.WasDisposed = true;
+                    if (rentDuringDisposal)
+                    {
+                        rent();
+                    }
+                },
+                options: new PoolOptions<TestPoolItem>
+                {
+                    MaxPoolSize = idleTimeout ? 0 : 1,
+                    IdleTimeoutSeconds = idleTimeout ? 1f : 0f,
+                    MaxPurgesPerOperation = 0,
+                    Triggers = PurgeTrigger.OnRent,
+                    UseIntelligentPurging = false,
+                    TimeProvider = TestTimeProvider,
+                    OnPurge = (item, reason) =>
+                    {
+                        purgedIds.Add(item.Id);
+                        if (!rentDuringDisposal)
+                        {
+                            rent();
+                        }
+                    },
+                }
+            );
+            try
+            {
+                _currentTime = 3f;
+                TestPoolItem acquiredItem = null;
+                Assert.DoesNotThrow(() => acquired = pool.Get(out acquiredItem));
+                int[] expected = idleTimeout ? new[] { 1, 2, 3, 4 } : new[] { 2, 3, 4 };
+                CollectionAssert.AreEquivalent(expected, purgedIds);
+                CollectionAssert.AreEquivalent(expected, disposedIds);
+                Assert.IsTrue(borrowedItem != null);
+                Assert.AreEqual(idleTimeout ? 5 : 1, borrowedItem.Id);
+                Assert.IsFalse(borrowedItem.WasDisposed);
+                Assert.IsTrue(acquiredItem != null);
+                Assert.AreEqual(idleTimeout ? 6 : 5, acquiredItem.Id);
+                Assert.IsFalse(acquiredItem.WasDisposed);
+                Assert.AreEqual(0, pool.Count);
+                Assert.AreEqual(2, pool.CurrentlyRented);
+            }
+            finally
+            {
+                borrowed.Dispose();
+                acquired.Dispose();
+                pool.Dispose();
+            }
         }
 
         [Test]

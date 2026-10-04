@@ -1157,6 +1157,7 @@ no formatter would surface as an exception from the first save in a shipped play
 | `WPROTO009` | A contract is nested inside a generic type and cannot be registered                  |
 | `WPROTO010` | A hook sits on a struct contract, where `in` copies the value and discards mutations |
 | `WPROTO011` | A class contract has no parameterless constructor to read into                       |
+| `WPROTO050` | A generated constructor cannot call an accessible base constructor without arguments |
 
 `WPROTO028` is a **warning** that reports a skip rather than a refusal. It fires when a
 closed construction found in your source cannot be named by the generated registrar, most often a
@@ -2225,6 +2226,18 @@ C# permits a `readonly` field to be assigned only by a constructor of its declar
 formatter is not enough. But the generator reopens the contract as `partial`, so it emits a **private
 constructor there**, and the formatter builds the value once every member has been read. Your type
 keeps the immutability you chose and gains no public surface.
+
+An immutable class also needs a base constructor callable without arguments. A protected
+parameterless constructor is sufficient; accessible optional or `params` constructors work when
+C# resolves the zero-argument call unambiguously. If the base requires arguments or its constructor
+is inaccessible, `WPROTO050` names the contract and base and withholds the invalid generated
+constructor and formatter. This also applies to a readonly collection on a subtype. The generator
+cannot infer base arguments from the payload. Add a suitable base constructor, use writable
+serialized members with your own parameterless constructor that initializes the base, or supply a
+hand-written formatter. `SkipConstructor` does not bypass construction for readonly fields and
+get-only properties. A mutable class using `SkipConstructor` also needs an accessible base
+constructor callable without arguments: its generated constructor runs that base call, so it reports
+`WPROTO050` under the same conditions.
 
 The generated constructor takes a `WProtoConstruct` marker as its first parameter purely so it cannot
 collide with one you wrote yourself: a two-field type very plausibly has its own `(int, int)`

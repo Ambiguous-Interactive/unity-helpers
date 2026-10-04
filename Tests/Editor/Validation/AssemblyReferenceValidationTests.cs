@@ -324,82 +324,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return values.ToArray();
         }
 
-        private static string GetPackagePath()
+        private static string GetPackagePath([CallerFilePath] string sourcePath = "")
         {
-            string[] guids = AssetDatabase.FindAssets("package t:TextAsset");
-            foreach (string guid in guids)
-            {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (
-                    path.EndsWith("package.json")
-                    && path.Contains("com.wallstop-studios.unity-helpers")
-                    && !path.Contains("/node_modules/")
-                    && !path.Contains("\\node_modules\\")
-                )
-                {
-                    return Path.GetDirectoryName(path);
-                }
-            }
-
-            Assembly thisAssembly = typeof(AssemblyReferenceValidationTests).Assembly;
-            string assemblyLocation = thisAssembly.Location;
-            if (!string.IsNullOrEmpty(assemblyLocation))
-            {
-                string current = Path.GetDirectoryName(assemblyLocation);
-                for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); ++i)
-                {
-                    if (File.Exists(Path.Combine(current, "package.json")))
-                    {
-                        return current;
-                    }
-
-                    current = Path.GetDirectoryName(current);
-                }
-            }
-
-            string dataPath = Application.dataPath;
-            string projectRoot = Path.GetDirectoryName(dataPath);
-
-            string[] possiblePaths =
-            {
-                Path.Combine(projectRoot, "Packages", "com.wallstop-studios.unity-helpers"),
-                Path.Combine(dataPath, "..", "Packages", "com.wallstop-studios.unity-helpers"),
-            };
-
-            foreach (string possiblePath in possiblePaths)
-            {
-                string normalized = Path.GetFullPath(possiblePath);
-                if (
-                    Directory.Exists(normalized)
-                    && File.Exists(Path.Combine(normalized, "package.json"))
-                )
-                {
-                    return normalized;
-                }
-            }
-
-            string scriptPath = GetScriptFilePath();
-            if (!string.IsNullOrEmpty(scriptPath))
-            {
-                const int levelsToPackageRoot = 3;
-                string currentDir = Path.GetDirectoryName(scriptPath);
-                for (int i = 0; i < levelsToPackageRoot; ++i)
-                {
-                    currentDir = Path.Combine(currentDir, "..");
-                }
-                string packageRoot = Path.GetFullPath(currentDir);
-                if (File.Exists(Path.Combine(packageRoot, "package.json")))
-                {
-                    return packageRoot;
-                }
-            }
-
-            return null;
-        }
-
-        private static string GetScriptFilePath([CallerFilePath] string path = "")
-        {
-            return path;
+            string root = TestPackageRoot.Resolve(
+                typeof(AssemblyReferenceValidationTests).Assembly,
+                sourcePath
+            );
+            Assert.IsFalse(
+                string.IsNullOrWhiteSpace(root),
+                "Could not resolve this package and its Tests directory."
+            );
+            return root;
         }
 
         /// <summary>

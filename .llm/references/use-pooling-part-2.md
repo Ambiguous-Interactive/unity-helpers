@@ -33,6 +33,32 @@ public void ProcessGroups()
 
 ---
 
+## Scratch Buffers Inside Pool Infrastructure
+
+Do not rent purge or disposal snapshots from `Buffers<T>` or `WallstopGenericPool<T>` inside
+those pools' own implementation: acquiring or returning the scratch lease can trigger another
+purge. Use an independent scratch cache with no lifecycle callbacks or registry participation.
+
+- A `[ThreadStatic]` field isolates threads, not nested calls. Detach a free buffer on checkout
+  so a callback that reenters the same pool, or another pool with the same element type, receives
+  a distinct buffer until the outer call returns it.
+- Keep the checkout alive through the last callback. Return it in `finally`, and clear all item
+  references even when the buffer will be discarded.
+- Prefer a concrete internal struct `IDisposable` lease and `using` for lexical scratch ownership.
+  Reuse `DisposalLease` so copied or stale leases cannot return a buffer twice; a per-struct flag
+  cannot protect copies. Avoid boxing the lease or allocating a return delegate.
+- Preserve lazy acquisition: when a snapshot is needed only after selecting an item, keep a default
+  local lease, acquire it at that point and dispose it in `finally`. Do not force eager rentals or
+  mutate a readonly `using` local to acquire later. Scoped leases follow the package's threading
+  contract, including single-thread use under `SINGLE_THREADED`.
+- Bound both retained buffer count and capacity per thread and closed generic type. Discard
+  oversized or excess returns; a low-memory purge must not permanently retain its largest batch.
+- Preserve retirement ordering: detach every selected item and update bookkeeping before invoking
+  callbacks. Buffer reuse must not turn a stable snapshot back into live pool enumeration.
+- Verify nested ownership, repeated reuse, reference clearing, capacity/depth bounds and thread
+  isolation. Warmed allocation measurements need a working known-allocation positive control;
+  cold growth and overflow still allocate, and host results do not establish player throughput.
+
 ## Pattern: Conditional Pooling
 
 ```csharp
