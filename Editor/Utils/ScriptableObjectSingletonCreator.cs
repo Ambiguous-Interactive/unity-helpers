@@ -19,7 +19,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     using Object = UnityEngine.Object;
 
     /// <summary>Creates and relocates singleton assets during editor initialization.</summary>
-    /// <remarks>Unexpected processing failures release the reentrancy guard after leaving the asset batch scope.</remarks>
+    /// <remarks>
+    /// Unexpected processing failures release the reentrancy guard after leaving the asset batch scope.
+    /// Creation and synchronous import run with batching paused before the created asset is verified.
+    /// </remarks>
     [InitializeOnLoad]
     public static class ScriptableObjectSingletonCreator
     {
@@ -288,12 +291,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         {
                             // Register the parent outside batching before CreateAsset requires it.
                             AssetDatabaseBatchHelper.EnsureAssetParentFolder(targetAssetPath);
-                            AssetDatabase.CreateAsset(instance, targetAssetPath);
-                            // Import synchronously so the following LoadAssetAtPath can see the new asset.
-                            AssetDatabase.ImportAsset(
-                                targetAssetPath,
-                                ImportAssetOptions.ForceSynchronousImport
-                            );
+                            // Imports must finish before the following lookup; active batching defers them.
+                            using (AssetDatabaseBatchHelper.PauseBatch())
+                            {
+                                AssetDatabase.CreateAsset(instance, targetAssetPath);
+                                AssetDatabase.ImportAsset(
+                                    targetAssetPath,
+                                    ImportAssetOptions.ForceSynchronousImport
+                                );
+                            }
                         }
                         catch (Exception ex)
                         {
