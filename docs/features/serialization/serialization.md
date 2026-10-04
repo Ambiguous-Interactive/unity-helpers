@@ -1206,7 +1206,9 @@ See [Retiring a member](#retiring-a-member) and
 
 `WPROTO044` fires when an implicit subclass derives from a contract in **another assembly** whose
 formatter has no generated extension body. Rebuild that assembly with the current generator;
-immutable bases still require composition. See
+immutable bases still require composition. An intermediate `[WProtoNotSerialized]` stops this
+ancestor lookup, so its unannotated descendants do not receive `WPROTO044`, including across
+assembly boundaries. Explicit contradictory declarations still report `WPROTO045`. See
 [Extending a hierarchy across assemblies](#extending-a-hierarchy-across-assemblies).
 `WPROTO045` fires when the `[WProtoNotSerialized]` opt-out sits beside a declaration that says the
 opposite; and `WPROTO047` **warns** when a type inherits its contract and declares `[WProtoMember]`
@@ -1573,10 +1575,19 @@ three of them are the opposite of the rule for a plain member:
   it instead. An **absent** field leaves the constructor's value alone either way; there is nothing
   for an overwrite to be triggered by. For a `Stack<T>` "appends" means the first decoded element
   ends up on top, which is what makes writing top-first and pushing back in reverse round-trip.
-- **A run of packable scalars is written packed**: one key and one length for the whole run instead
-  of a key per element, which roughly halves a repeated `int`. protobuf-net writes unpacked and reads
-  either form, so this is a size win rather than a compatibility break, and payloads in both forms
-  are accepted here.
+- **A run of packable scalars is written packed by default**: one key and one length for the whole
+  run instead of a key per element, which roughly halves a repeated `int`. Set
+  `[WProtoMember(2, IsPacked = false)]` on an array or collection to write one field key per element,
+  matching protobuf-net's default repeated encoding. This also applies to generic scalar runs and
+  enum runs. Readers accept packed, unpacked, and mixed runs regardless of the write setting, so
+  existing payloads remain readable. The generated proto3 schema includes `[packed = false]` for
+  eligible members with the opt-out. Strings, messages, and chars retain their existing unpacked
+  encoding; scalar members, maps, and the contents of nested collection wrappers are unaffected.
+
+For example, an `int[]` member at field 2 containing `{3, 1, 4, 0, 2}` writes
+`12 05 03 01 04 00 02` by default and `10 03 10 01 10 04 10 00 10 02` with `IsPacked = false`.
+The values are identical after reading; byte hashes differ between these encodings. Select the
+write policy when matching a legacy payload's repeated-field bytes matters.
 
 **Reading a packed run allocates the collection once.** The run's length prefix already says how
 many elements follow, so the generated reader sizes its destination up front instead of doubling it

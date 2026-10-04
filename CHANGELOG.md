@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WProtoMember.IsPacked = false` to write unpacked numeric and enum collections matching protobuf-net defaults, while preserving existing packed writes and both read forms ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Add `SystemArrayPool<T>.TryWithBuffer` for synchronous borrowed spans with explicit state, optional results, and reported callback or cleanup errors ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Add `WUH022` to report boxing disposable structs and suggest concrete or constrained generic disposal ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Add opt-in `WUH021` to flag repeated size observations, including interface `Count`, known `Length`/`LongLength` properties, and non-predicate LINQ `Count()`/`LongCount()`, when one snapshot is intended.
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop WallstopProto `WPROTO044` inheritance diagnostics at an intermediate `[WProtoNotSerialized]` boundary, including referenced assemblies, while retaining contradictory declaration errors ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Fix WallstopProto map keys to match protobuf-net 3.2.56: write zero enum keys and omit zero floating-point keys while preserving reads of older payloads ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Fix periodic effects repeating ticks before their cadence at large clocks; initial delays, tick limits, refresh phase, and catch-up limits are preserved ([#934](https://github.com/Ambiguous-Interactive/unity-helpers/issues/934)).
 - Fix cache and effect lifetimes at large clocks, including small timing offsets and jitter; preserve remaining effect time and disabled cache expiry ([#932](https://github.com/Ambiguous-Interactive/unity-helpers/issues/932)).

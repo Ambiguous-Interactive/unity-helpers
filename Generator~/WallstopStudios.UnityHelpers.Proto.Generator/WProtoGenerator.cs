@@ -527,7 +527,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// The nearest ancestor that carries <c>[WProtoContract]</c>, or <c>null</c>.
+        /// The nearest declared contract before an opt-out boundary, or <c>null</c>.
         /// </summary>
         /// <param name="symbol">The type to walk up from.</param>
         /// <returns>The declared contract this type inherits its serialization from.</returns>
@@ -535,6 +535,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             for (INamedTypeSymbol current = symbol; current != null; current = current.BaseType)
             {
+                if (HasAttribute(current, NotSerializedAttribute))
+                {
+                    return null;
+                }
+
                 if (HasAttribute(current, ContractAttribute))
                 {
                     return current;
@@ -3334,6 +3339,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     type,
                     NamedFlag(attribute, "IsRequired"),
                     NamedFlag(attribute, "OverwriteList"),
+                    NamedFlag(attribute, "IsPacked", true),
                     zigZag,
                     surrogates,
                     nested,
@@ -3569,7 +3575,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return false;
         }
 
-        private static bool NamedFlag(AttributeData attribute, string name)
+        private static bool NamedFlag(
+            AttributeData attribute,
+            string name,
+            bool defaultValue = false
+        )
         {
             foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
             {
@@ -3582,7 +3592,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
-            return false;
+            return defaultValue;
         }
 
         private static bool HasAccessibleParameterlessConstructor(INamedTypeSymbol contract)

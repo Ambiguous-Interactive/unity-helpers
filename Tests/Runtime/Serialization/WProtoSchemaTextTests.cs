@@ -43,6 +43,72 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void ExplicitUnpackedRepeatedMembersRenderTheirWritePolicy()
+        {
+            Assert.IsTrue(
+                WProtoSchemaText.TryWriteSchema(
+                    new[]
+                    {
+                        typeof(WProtoUnpackedRepeatedContract),
+                        typeof(WProtoUnpackedRepeatedBox<int>),
+                    },
+                    "test.pkg",
+                    null,
+                    out string schema,
+                    out IReadOnlyList<string> diagnostics
+                )
+            );
+            Assert.AreEqual(1, diagnostics.Count);
+            StringAssert.Contains("not a valid proto3 identifier", diagnostics[0]);
+            StringAssert.Contains("repeated int32 Ints = 1 [packed = false];", schema);
+            StringAssert.Contains("repeated int32 IntList = 2 [packed = false];", schema);
+            StringAssert.Contains(
+                "repeated WProtoRepeatedMode Modes = 3 [packed = false];",
+                schema
+            );
+            StringAssert.Contains(
+                "repeated WProtoRepeatedMode ModeList = 4 [packed = false];",
+                schema
+            );
+            StringAssert.Contains("repeated fixed64 Doubles = 5 [packed = false];", schema);
+            StringAssert.Contains("repeated bool Flags = 6 [packed = false];", schema);
+            StringAssert.Contains("repeated string Texts = 7;", schema);
+            StringAssert.Contains("repeated int32 PackedInts = 8;", schema);
+            StringAssert.Contains("repeated uint32 Chars = 9 [packed = false];", schema);
+            StringAssert.Contains("repeated int32 Array = 1 [packed = false];", schema);
+            StringAssert.Contains("repeated int32 List = 2 [packed = false];", schema);
+            StringAssert.Contains("repeated int32 DefaultPacked = 3;", schema);
+        }
+
+        [Test]
+        public void UnpackedSurrogateElementsRenderMessagesWithoutPackingOptions()
+        {
+            Dictionary<Type, Type> surrogates = new Dictionary<Type, Type>
+            {
+                { typeof(int), typeof(SchemaForeignVectorSurrogate) },
+                { typeof(WProtoRepeatedMode), typeof(SchemaForeignVectorSurrogate) },
+            };
+            Assert.IsTrue(
+                WProtoSchemaText.TryWriteSchema(
+                    new[] { typeof(WProtoUnpackedRepeatedContract) },
+                    null,
+                    surrogates,
+                    out string schema,
+                    out IReadOnlyList<string> diagnostics
+                )
+            );
+            Assert.IsEmpty(diagnostics);
+            StringAssert.Contains("repeated SchemaForeignVectorSurrogate Ints = 1;", schema);
+            StringAssert.Contains("repeated SchemaForeignVectorSurrogate IntList = 2;", schema);
+            StringAssert.Contains("repeated SchemaForeignVectorSurrogate Modes = 3;", schema);
+            StringAssert.Contains("repeated SchemaForeignVectorSurrogate ModeList = 4;", schema);
+            StringAssert.DoesNotContain(
+                "repeated SchemaForeignVectorSurrogate Ints = 1 [packed",
+                schema
+            );
+        }
+
+        [Test]
         public void SimpleContractRendersTheFullSchemaText()
         {
             bool rendered = WProtoSchemaText.TryWriteSchema(

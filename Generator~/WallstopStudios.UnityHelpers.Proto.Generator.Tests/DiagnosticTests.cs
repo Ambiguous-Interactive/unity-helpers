@@ -1724,6 +1724,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>An opted-out intermediate type stops inherited cross-assembly diagnostics.</summary>
+        [TestCase(false, TestName = "OptOutBoundary.ConsumerIntermediate")]
+        [TestCase(true, TestName = "OptOutBoundary.ReferencedIntermediate")]
+        public void AnUnannotatedLeafBelowAnOptOutHasNoInheritedContract(bool upstreamIntermediate)
+        {
+            string upstreamBody =
+                @"namespace Upstream {
+                [WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }";
+            if (upstreamIntermediate)
+            {
+                upstreamBody += @"[WProtoNotSerialized] public class Middle : Base { }";
+            }
+            MetadataReference upstream = CompileReference("UpstreamAssembly", upstreamBody + "}");
+            string consumerBody = upstreamIntermediate
+                ? @"public sealed class Leaf : Upstream.Middle { }"
+                : @"[WProtoNotSerialized] public class Middle : Upstream.Base { }
+                    public sealed class Leaf : Middle { }";
+            ImmutableArray<Diagnostic> diagnostics = Run(consumerBody, upstream);
+            foreach (Diagnostic diagnostic in diagnostics)
+            {
+                Assert.AreNotEqual("WPROTO044", diagnostic.Id, diagnostic.GetMessage());
+                Assert.AreNotEqual(
+                    DiagnosticSeverity.Error,
+                    diagnostic.Severity,
+                    diagnostic.GetMessage()
+                );
+            }
+        }
+
         /// <summary>
         /// A GENERIC contract base is deliberately exempt, and this test is the record of it.
         /// </summary>
