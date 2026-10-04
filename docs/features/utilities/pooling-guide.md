@@ -90,6 +90,12 @@ callback disposes the pool, the returning item is sent to the disposal callback 
 never added back to the disposed pool. The same guarantee holds when a lease return races
 `WallstopGenericPool<T>.Dispose()` in the thread-safe build.
 
+A purge removes its complete selected batch before running `OnPurge` and `onDisposal`, including
+in `SINGLE_THREADED` builds. Those callbacks may rent, dispose or purge the same pool: the original
+batch still receives each cleanup notification once, and a callback cannot rent an entry selected
+for retirement. Nested purges act on the remaining pool; budget limits and minimum retention apply
+when each batch is selected.
+
 A directly constructed `PooledResource<T>` with a null return callback is an inert wrapper. It
 keeps the supplied resource accessible and reserves no disposal slot, even if it is never disposed.
 Disposing or copying it has no effect on the resource. Wrappers with a return callback retain their

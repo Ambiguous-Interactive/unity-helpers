@@ -16,6 +16,17 @@ This removes the released test APIs `AttributeMetadataCache.ForceRebuildForTests
 
 The production-hook gate checks forbidden identifiers and explicit test-only markers with positive controls. Review still checks suffix-free injection and instrumentation. Legitimate discovery of test assemblies and UI suppression during automated editor runs remain supported. The `ValidationRun` loader overload also remains: automatic validation uses it to resolve live prefab-stage roots before falling back to asset loading. Tests use real asset targets and implementation phases.
 
+## Source validation must find its subjects
+
+Package source scans resolve the owning package from its assembly, then use the source file path
+for an Assets installation. Validate the manifest's exact package name and the `Tests` directory;
+a path containing the package name can identify a nested dependency instead. Naming and assembly
+validators share this resolver.
+
+Fail if the expected fixture source is absent, the source set is empty, or a file cannot be read.
+An inconclusive scan does not prove that naming rules passed. Resolver controls cover nested
+dependencies, wrong manifests and the source-path fallback.
+
 ## Why Test "Impossible" States
 
 Production code encounters situations that seem impossible during development:

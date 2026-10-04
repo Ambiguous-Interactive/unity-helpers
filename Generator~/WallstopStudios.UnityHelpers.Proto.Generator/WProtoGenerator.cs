@@ -993,6 +993,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 member.SkipConstructor = declaredSkipConstructor;
             }
 
+            if (
+                !contract.IsValueType
+                && (constructAtEnd || skipConstructor)
+                && !CanCallBaseConstructorWithoutArguments(context.Compilation, contract)
+            )
+            {
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        WProtoDiagnostics.GeneratedBaseConstructor,
+                        FirstLocation(contract),
+                        contract.Name,
+                        contract.BaseType.ToDisplayString(),
+                        constructAtEnd
+                            ? "to assign readonly fields or get-only properties"
+                            : "for SkipConstructor"
+                    )
+                );
+                return null;
+            }
+
             ReportInitializersSkipConstructorDiscards(context, contract);
 
             /*
@@ -2125,6 +2145,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// The <c>WProtoConstruct</c> first parameter exists only so the signature cannot collide
         /// with a constructor the author already wrote -- a two-int type very plausibly has an
         /// <c>(int, int)</c> constructor of its own.
+        /// </para>
+        /// <para>
+        /// A class must have a base constructor callable without arguments; otherwise
+        /// <see cref="WProtoDiagnostics.GeneratedBaseConstructor"/> refuses generation.
         /// </para>
         /// <para>
         /// A struct assigns <c>this = default</c> first, because C# requires every field to be
@@ -3593,6 +3617,69 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return defaultValue;
+        }
+
+        /// <summary>Checks the generated base call using the consumer's actual overload resolution.</summary>
+        private static bool CanCallBaseConstructorWithoutArguments(
+            Compilation compilation,
+            INamedTypeSymbol contract
+        )
+        {
+            if (
+                contract.BaseType == null
+                || contract.BaseType.SpecialType == SpecialType.System_Object
+            )
+            {
+                return true;
+            }
+
+            foreach (IMethodSymbol constructor in contract.BaseType.InstanceConstructors)
+            {
+                if (
+                    constructor.Parameters.Length == 0
+                    && compilation.IsSymbolAccessibleWithin(constructor, contract)
+                )
+                {
+                    return true;
+                }
+            }
+
+            foreach (SyntaxReference reference in contract.DeclaringSyntaxReferences)
+            {
+                if (!(reference.GetSyntax() is TypeDeclarationSyntax declaration))
+                {
+                    continue;
+                }
+
+                SyntaxAnnotation annotation = new SyntaxAnnotation();
+                ConstructorInitializerSyntax initializer = SyntaxFactory
+                    .ConstructorInitializer(
+                        SyntaxKind.BaseConstructorInitializer,
+                        SyntaxFactory.ArgumentList()
+                    )
+                    .WithAdditionalAnnotations(annotation);
+                ConstructorDeclarationSyntax probe = SyntaxFactory
+                    .ConstructorDeclaration(declaration.Identifier)
+                    .WithModifiers(
+                        SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PrivateKeyword))
+                    )
+                    .WithParameterList(SyntaxFactory.ParameterList())
+                    .WithInitializer(initializer)
+                    .WithBody(SyntaxFactory.Block());
+                SyntaxTree original = declaration.SyntaxTree;
+                SyntaxNode root = original
+                    .GetRoot()
+                    .ReplaceNode(declaration, declaration.AddMembers(probe));
+                SyntaxTree tree = original.WithRootAndOptions(root, original.Options);
+                Compilation bindingCompilation = compilation.ReplaceSyntaxTree(original, tree);
+                foreach (SyntaxNode node in tree.GetRoot().GetAnnotatedNodes(annotation))
+                {
+                    return bindingCompilation.GetSemanticModel(tree).GetSymbolInfo(node).Symbol
+                        is IMethodSymbol;
+                }
+            }
+
+            return false;
         }
 
         private static bool HasAccessibleParameterlessConstructor(INamedTypeSymbol contract)

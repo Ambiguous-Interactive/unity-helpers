@@ -3737,6 +3737,279 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        [TestCase("public Base(int seed) { }", false)]
+        [TestCase("public Base(int seed) { }", true)]
+        [TestCase("private Base() { } protected Base(int seed) { }", false)]
+        [TestCase("private Base() { } protected Base(int seed) { }", true)]
+        public void ImmutableConstructionWithoutAnAccessibleBaseConstructorIsRefused(
+            string baseConstructors,
+            bool skipConstructor
+        )
+        {
+            string source =
+                "public class Base { "
+                + baseConstructors
+                + " } "
+                + "[WProtoContract(SkipConstructor = "
+                + (skipConstructor ? "true" : "false")
+                + ")] public partial class Frozen : Base { "
+                + "[WProtoMember(1)] public readonly System.Collections.Generic.List<int> Values; "
+                + "public Frozen(int seed) : base(seed) { Values = new System.Collections.Generic.List<int>(); } } "
+                + "[WProtoContract] public partial class Unrelated { [WProtoMember(1)] public int Value; }";
+
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Diagnostic error = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO050", StringComparison.Ordinal)
+            );
+            Assert.AreEqual(DiagnosticSeverity.Error, error.Severity);
+            StringAssert.Contains("Frozen", error.GetMessage());
+            StringAssert.Contains("Base", error.GetMessage());
+            StringAssert.Contains("parameterless", error.GetMessage());
+            Assert.AreEqual(
+                "Frozen",
+                error.Location.SourceTree.GetText().ToString(error.Location.SourceSpan)
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            );
+            string output = string.Join(
+                "\n",
+                generated.SyntaxTrees.Skip(1).Select(tree => tree.ToString())
+            );
+            StringAssert.DoesNotContain("private Frozen(", output);
+            StringAssert.DoesNotContain("IWProtoFormatter<global::Consumer.Frozen>", output);
+            StringAssert.Contains("IWProtoFormatter<global::Consumer.Unrelated>", output);
+        }
+
+        [TestCase("protected Base(int seed = 1) { }", false)]
+        [TestCase("protected Base(params int[] seeds) { }", false)]
+        [TestCase("public Base() { }", false)]
+        [TestCase("protected Base() { }", false)]
+        [TestCase("internal Base() { }", false)]
+        [TestCase("protected internal Base() { }", false)]
+        [TestCase("private protected Base() { }", false)]
+        [TestCase("protected Base() { }", true)]
+        [TestCase("protected Base() { }", true, "abstract")]
+        public void ImmutableConstructionWithAnAccessibleBaseConstructorCompiles(
+            string baseConstructor,
+            bool skipConstructor,
+            string baseModifier = ""
+        )
+        {
+            string source =
+                "public "
+                + baseModifier
+                + " class Base { "
+                + baseConstructor
+                + " } "
+                + "[WProtoContract(SkipConstructor = "
+                + (skipConstructor ? "true" : "false")
+                + ")] public partial class Frozen : Base { "
+                + "[WProtoMember(1)] public readonly System.Collections.Generic.List<int> Values; "
+                + "public Frozen(int seed) { Values = new System.Collections.Generic.List<int>(); } }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.IsEmpty(
+                diagnostics.Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            );
+        }
+
+        [TestCase("protected Base(int seed = 1) { }")]
+        [TestCase("protected Base(params int[] seeds) { }")]
+        public void ImmutableConstructionKeepsAnImplicitConstructorCallingOptionalBaseArguments(
+            string baseConstructor
+        )
+        {
+            string source =
+                "public class Base { "
+                + baseConstructor
+                + " } "
+                + "[WProtoContract] public partial class Frozen : Base { "
+                + "[WProtoMember(1)] public readonly int Value; }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.IsEmpty(
+                diagnostics.Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            );
+        }
+
+        [Test]
+        public void ImmutableConstructionRefusesAmbiguousOptionalBaseConstructors()
+        {
+            string source =
+                @"public class Base { protected Base(int seed = 1) { } protected Base(string seed = null) { } }
+                [WProtoContract] public partial class Frozen : Base {
+                    [WProtoMember(1)] public readonly int Value;
+                    public Frozen(int value) : base(value) { Value = value; }
+                }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.AreEqual(
+                1,
+                diagnostics.Count(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO050", StringComparison.Ordinal)
+                )
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            );
+        }
+
+        [TestCase("protected Base() { }", false)]
+        [TestCase("internal Base() { } protected Base(int seed) { }", true)]
+        [TestCase("private protected Base() { } protected Base(int seed) { }", true)]
+        [TestCase("protected internal Base() { }", false)]
+        public void ImmutableConstructionHonorsReferencedBaseConstructorAccessibility(
+            string baseConstructors,
+            bool refused
+        )
+        {
+            MetadataReference upstream = CompileReference(
+                "ConstructorBaseAssembly",
+                "namespace External { public class Base { " + baseConstructors + " } }"
+            );
+            string source =
+                "[WProtoContract] public partial class Frozen : External.Base { "
+                + "[WProtoMember(1)] public readonly int Value; public Frozen(int value) "
+                + (refused ? ": base(value) " : "")
+                + "{ Value = value; } }";
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                source,
+                new[] { upstream },
+                true,
+                out Compilation generated
+            );
+            Assert.AreEqual(
+                refused ? 1 : 0,
+                diagnostics.Count(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO050", StringComparison.Ordinal)
+                )
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ImmutableRecordConstructionChecksOptionalBaseArguments(bool refused)
+        {
+            string source =
+                "public record Base { protected Base(int seed"
+                + (refused ? "" : " = 1")
+                + ") { } } [WProtoContract] public partial record Frozen : Base { "
+                + "[WProtoMember(1)] public readonly int Value; "
+                + "public Frozen(int value) : base(value) { Value = value; } }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.AreEqual(
+                refused ? 1 : 0,
+                diagnostics.Count(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO050", StringComparison.Ordinal)
+                )
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            );
+        }
+
+        [TestCase("protected Base(int seed) { }", true)]
+        [TestCase("private Base() { } protected Base(int seed) { }", true)]
+        [TestCase("protected Base(int seed = 1) { }", false)]
+        [TestCase("protected Base() { } protected Base(int seed) { }", false)]
+        public void SkippingMutableConstructionChecksItsGeneratedBaseCall(
+            string baseConstructors,
+            bool refused
+        )
+        {
+            string source =
+                "public class Base { "
+                + baseConstructors
+                + " } "
+                + "[WProtoContract(SkipConstructor = true)] public partial class Mutable : Base { "
+                + "[WProtoMember(1)] public int Value; public Mutable(int value) : base(value) { Value = value; } }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.AreEqual(
+                refused ? 1 : 0,
+                diagnostics.Count(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO050", StringComparison.Ordinal)
+                )
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            );
+        }
+
+        [Test]
+        public void MutableConstructionCanUseAnAuthorProvidedBaseInitializer()
+        {
+            string source =
+                @"public class Base { protected Base(int seed) { } }
+                [WProtoContract] public partial class Mutable : Base {
+                    [WProtoMember(1)] public int Value;
+                    public Mutable() : base(1) { }
+                }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.IsEmpty(
+                diagnostics.Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            );
+        }
+
+        [Test]
+        public void ImmutableSubtypeWithAParameterizedContractBaseIsRefusedWithoutBreakingItsRoot()
+        {
+            string source =
+                @"[WProtoContract(SkipConstructor = true)] public partial class Base
+                  {
+                      [WProtoMember(1)] public int Seed;
+                      protected Base(int seed) { Seed = seed; }
+                  }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 10)] public partial class Frozen : Base
+                  {
+                      [WProtoMember(1)] public readonly System.Collections.Generic.List<int> Values;
+                      public Frozen(int seed) : base(seed) { Values = new System.Collections.Generic.List<int>(); }
+                  }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.AreEqual(
+                1,
+                diagnostics.Count(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO050", StringComparison.Ordinal)
+                )
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            );
+            string output = string.Join(
+                "\n",
+                generated.SyntaxTrees.Skip(1).Select(tree => tree.ToString())
+            );
+            StringAssert.DoesNotContain("private Frozen(", output);
+            StringAssert.Contains("IWProtoFormatter<global::Consumer.Base>", output);
+        }
+
         [Test]
         public void AMutableClassWithNoParameterlessConstructorIsStillAnError()
         {

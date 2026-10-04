@@ -616,6 +616,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 DiagnosticSeverity.Info,
                 isEnabledByDefault: true
             );
+        internal static readonly DiagnosticDescriptor GeneratedBaseConstructor =
+            new DiagnosticDescriptor(
+                "WPROTO050",
+                "WallstopProto generated constructor cannot initialize its base",
+                "'{0}' requires a generated constructor {2}, but its base '{1}' has no accessible parameterless constructor or constructor callable without arguments. Add an accessible base constructor callable without arguments, use writable serialized members with an author-provided parameterless constructor and without SkipConstructor, or supply a hand-written formatter. SkipConstructor does not bypass the generated base call; base arguments cannot be inferred.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
         internal static readonly DiagnosticDescriptor UnsupportedDefaultValue =
             new DiagnosticDescriptor(
                 "WPROTO049",
