@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2025-2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 namespace WallstopStudios.UnityHelpers.Tests.Utils
@@ -321,6 +321,104 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetPostprocessorDeferralTestAccess.Flush();
             EditorUi.Suppress = _previousEditorUiSuppress;
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator CandidateFailureReleasesGuardAndLaterCreatesMissingAsset()
+        {
+            int batchDepth = AssetDatabaseBatchHelper.CurrentBatchDepth;
+            int unityBatchDepth = AssetDatabaseBatchHelper.ActualUnityBatchDepth;
+            InvalidOperationException expected = new InvalidOperationException(
+                nameof(CandidateFailureReleasesGuardAndLaterCreatesMissingAsset)
+            );
+            SingletonCandidateList candidates = new SingletonCandidateList(() =>
+            {
+                Assert.IsTrue(ScriptableObjectSingletonCreator._isEnsuring);
+                Assert.AreEqual(batchDepth + 1, AssetDatabaseBatchHelper.CurrentBatchDepth);
+                throw expected;
+            });
+
+            InvalidOperationException actual = Assert.Throws<InvalidOperationException>(() =>
+                ScriptableObjectSingletonCreator.EnsureSingletonAssets(candidates)
+            );
+            Assert.AreSame(expected, actual);
+            Assert.AreEqual(1, candidates.CountReadCount);
+            Assert.IsFalse(ScriptableObjectSingletonCreator._isEnsuring);
+            Assert.AreEqual(batchDepth, AssetDatabaseBatchHelper.CurrentBatchDepth);
+            Assert.AreEqual(unityBatchDepth, AssetDatabaseBatchHelper.ActualUnityBatchDepth);
+            Assert.IsTrue(
+                AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(TargetAssetPath) == null
+            );
+
+            ScriptableObjectSingletonCreator.EnsureSingletonAssets(
+                new[] { typeof(CreatorPathSingleton) }
+            );
+            yield return null;
+            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
+            yield return null;
+            Assert.IsTrue(
+                AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(TargetAssetPath) != null
+            );
+            Assert.IsFalse(ScriptableObjectSingletonCreator._isEnsuring);
+        }
+
+        [Test]
+        public void CandidateEnumerationBlocksNestedEnsureUntilOuterAttemptEnds()
+        {
+            int batchDepth = AssetDatabaseBatchHelper.CurrentBatchDepth;
+            SingletonCandidateList nested = new SingletonCandidateList(() =>
+                throw new InvalidOperationException(
+                    nameof(CandidateEnumerationBlocksNestedEnsureUntilOuterAttemptEnds)
+                )
+            );
+            SingletonCandidateList candidates = new SingletonCandidateList(() =>
+            {
+                Assert.IsTrue(ScriptableObjectSingletonCreator._isEnsuring);
+                ScriptableObjectSingletonCreator.EnsureSingletonAssets(nested);
+            });
+
+            ScriptableObjectSingletonCreator.EnsureSingletonAssets(candidates);
+            Assert.AreEqual(3, candidates.CountReadCount);
+            Assert.AreEqual(0, nested.CountReadCount);
+            Assert.IsFalse(ScriptableObjectSingletonCreator._isEnsuring);
+            Assert.AreEqual(batchDepth, AssetDatabaseBatchHelper.CurrentBatchDepth);
+        }
+
+        [TestCase(1)]
+        [TestCase(3)]
+        public void CandidateFailurePreservesAnExistingBatch(int failureRead)
+        {
+            int batchDepth = AssetDatabaseBatchHelper.CurrentBatchDepth;
+            int unityBatchDepth = AssetDatabaseBatchHelper.ActualUnityBatchDepth;
+            InvalidOperationException expected = new InvalidOperationException(
+                nameof(CandidateFailurePreservesAnExistingBatch)
+            );
+            int countReads = 0;
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            {
+                int outerDepth = AssetDatabaseBatchHelper.CurrentBatchDepth;
+                int outerUnityDepth = AssetDatabaseBatchHelper.ActualUnityBatchDepth;
+                SingletonCandidateList candidates = new SingletonCandidateList(() =>
+                {
+                    ++countReads;
+                    Assert.IsTrue(ScriptableObjectSingletonCreator._isEnsuring);
+                    Assert.AreEqual(outerDepth + 1, AssetDatabaseBatchHelper.CurrentBatchDepth);
+                    if (countReads == failureRead)
+                    {
+                        throw expected;
+                    }
+                });
+                InvalidOperationException actual = Assert.Throws<InvalidOperationException>(() =>
+                    ScriptableObjectSingletonCreator.EnsureSingletonAssets(candidates)
+                );
+                Assert.AreSame(expected, actual);
+                Assert.AreEqual(failureRead, candidates.CountReadCount);
+                Assert.IsFalse(ScriptableObjectSingletonCreator._isEnsuring);
+                Assert.AreEqual(outerDepth, AssetDatabaseBatchHelper.CurrentBatchDepth);
+                Assert.AreEqual(outerUnityDepth, AssetDatabaseBatchHelper.ActualUnityBatchDepth);
+            }
+            Assert.AreEqual(batchDepth, AssetDatabaseBatchHelper.CurrentBatchDepth);
+            Assert.AreEqual(unityBatchDepth, AssetDatabaseBatchHelper.ActualUnityBatchDepth);
         }
 
         [UnityTest]

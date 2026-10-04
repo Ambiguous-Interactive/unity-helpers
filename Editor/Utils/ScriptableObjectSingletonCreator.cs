@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2025-2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 namespace WallstopStudios.UnityHelpers.Editor.Utils
@@ -18,6 +18,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     using Debug = UnityEngine.Debug;
     using Object = UnityEngine.Object;
 
+    /// <summary>Creates and relocates singleton assets during editor initialization.</summary>
+    /// <remarks>Unexpected processing failures release the reentrancy guard after leaving the asset batch scope.</remarks>
     [InitializeOnLoad]
     public static class ScriptableObjectSingletonCreator
     {
@@ -131,9 +133,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             int singletonsSucceeded = 0;
             List<string> emptyFolderCandidates = null;
 
-            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            try
             {
-                try
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
                 {
                     int staleCount = ScriptableObjectSingletonMetadataUtility.CleanupStaleEntries();
                     if (0 < staleCount)
@@ -352,10 +354,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         anyChanges = true;
                     }
                 }
-                finally { }
             }
-
-            _isEnsuring = false;
+            finally
+            {
+                _isEnsuring = false;
+            }
 
             bool foldersDeleted = false;
             if (emptyFolderCandidates is { Count: > 0 })

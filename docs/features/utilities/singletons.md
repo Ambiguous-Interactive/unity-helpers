@@ -309,7 +309,10 @@ not apply to this cache-only reset.
 Asset management tips:
 
 - Place the asset under `Assets/Resources/` (or under the path from `[ScriptableSingletonPath]`).
-- The Editor’s “ScriptableObject Singleton Creator” runs on load to create missing assets and move misplaced ones. It also supports a test‑assembly toggle used by our test suite.
+- The Editor’s “ScriptableObject Singleton Creator” runs on load to create missing assets and move misplaced ones. Automatic creation respects editor suppression, asset-import workers, and compilation or import activity.
+
+An unexpected error releases the creation guard so a later attempt can run. The active asset batch
+still disposes before the guard releases. Created or moved assets remain in place after a failure.
 
 Lookup order diagram:
 
