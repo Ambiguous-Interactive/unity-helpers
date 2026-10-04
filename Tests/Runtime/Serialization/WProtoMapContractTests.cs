@@ -101,9 +101,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 ByEnum = new Dictionary<WProtoButtonType, double> { { key, value } },
             };
+#if !ENABLE_IL2CPP
+            // protobuf-net tuple-discovery reflection calls an icall IL2CPP lacks.
             using MemoryStream stream = new MemoryStream();
             ProtoBuf.Serializer.Serialize(stream, contract);
             Assert.AreEqual(expected, ToHex(stream.ToArray()));
+#endif
             Assert.AreEqual(expected, Encode(contract));
         }
 
@@ -117,37 +120,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 ByInteger = new Dictionary<int, double> { { key, value } },
             };
+#if !ENABLE_IL2CPP
             using MemoryStream stream = new MemoryStream();
             ProtoBuf.Serializer.Serialize(stream, contract);
             Assert.AreEqual(expected, ToHex(stream.ToArray()));
+#endif
             Assert.AreEqual(expected, Encode(contract));
         }
 
         [TestCase(0f, "1A0911000000000000F03F")]
         [TestCase(1.5f, "1A0E0D0000C03F11000000000000F03F")]
-        public void SingleMapKeysMatchActualOracle(float key, string expected)
+        public void SingleMapKeysMatchV3GoldenBytes(float key, string expected)
         {
             WProtoZeroKeyMapContract contract = new WProtoZeroKeyMapContract
             {
                 BySingle = new Dictionary<float, double> { { key, 1d } },
             };
+#if !ENABLE_IL2CPP
             using MemoryStream stream = new MemoryStream();
             ProtoBuf.Serializer.Serialize(stream, contract);
             Assert.AreEqual(expected, ToHex(stream.ToArray()));
+#endif
             Assert.AreEqual(expected, Encode(contract));
         }
 
         [TestCase(0d, "220911000000000000F03F")]
         [TestCase(1.5d, "221209000000000000F83F11000000000000F03F")]
-        public void DoubleMapKeysMatchActualOracle(double key, string expected)
+        public void DoubleMapKeysMatchV3GoldenBytes(double key, string expected)
         {
             WProtoZeroKeyMapContract contract = new WProtoZeroKeyMapContract
             {
                 ByDouble = new Dictionary<double, double> { { key, 1d } },
             };
+#if !ENABLE_IL2CPP
             using MemoryStream stream = new MemoryStream();
             ProtoBuf.Serializer.Serialize(stream, contract);
             Assert.AreEqual(expected, ToHex(stream.ToArray()));
+#endif
             Assert.AreEqual(expected, Encode(contract));
         }
 
@@ -163,10 +172,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     .Get<WProtoZeroKeyMapContract>()
                     .TryRead(ref reader, out WProtoZeroKeyMapContract read)
             );
+            Assert.AreEqual(1, read.ByEnum.Count);
+#if !ENABLE_IL2CPP
             using MemoryStream stream = new MemoryStream(Parse(hex));
             WProtoZeroKeyMapContract oracle =
                 ProtoBuf.Serializer.Deserialize<WProtoZeroKeyMapContract>(stream);
             CollectionAssert.AreEquivalent(oracle.ByEnum, read.ByEnum);
+#endif
             Assert.AreEqual(expected, read.ByEnum[WProtoButtonType.None]);
         }
 
