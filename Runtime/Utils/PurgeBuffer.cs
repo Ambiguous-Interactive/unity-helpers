@@ -18,6 +18,12 @@ namespace WallstopStudios.UnityHelpers.Utils
         [ThreadStatic]
         private static int _availableCount;
 
+        internal static PurgeBufferLease<T> Get(out List<T> buffer)
+        {
+            buffer = Rent();
+            return new PurgeBufferLease<T>(buffer);
+        }
+
         internal static List<T> Rent()
         {
             if (_availableCount == 0)

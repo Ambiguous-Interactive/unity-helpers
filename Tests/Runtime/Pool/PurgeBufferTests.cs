@@ -37,6 +37,94 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
+        public void DefaultAndNullLeaseDoNotReturnAnOutstandingSnapshot()
+        {
+            using PurgeBufferLease<object> owner = PurgeBuffer<object>.Get(out List<object> buffer);
+            object item = new();
+            buffer.Add(item);
+            PurgeBufferLease<object> empty = default;
+            empty.Dispose();
+            new PurgeBufferLease<object>(null).Dispose();
+            using PurgeBufferLease<object> other = PurgeBuffer<object>.Get(
+                out List<object> otherBuffer
+            );
+            Assert.AreNotSame(buffer, otherBuffer);
+            Assert.AreEqual(1, buffer.Count);
+            Assert.AreSame(item, buffer[0]);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void CopiedLeaseReturnsOnceAndCannotRetireANewOwner(bool disposeCopyFirst)
+        {
+            PurgeBufferLease<object> original = PurgeBuffer<object>.Get(out List<object> buffer);
+            PurgeBufferLease<object> copy = original;
+            buffer.Add(new object());
+            if (disposeCopyFirst)
+            {
+                copy.Dispose();
+            }
+            else
+            {
+                original.Dispose();
+            }
+            Assert.IsEmpty(buffer);
+            using PurgeBufferLease<object> current = PurgeBuffer<object>.Get(
+                out List<object> currentBuffer
+            );
+            Assert.AreSame(buffer, currentBuffer);
+            object item = new();
+            currentBuffer.Add(item);
+            original.Dispose();
+            copy.Dispose();
+            original.Dispose();
+            using PurgeBufferLease<object> nested = PurgeBuffer<object>.Get(
+                out List<object> nestedBuffer
+            );
+            Assert.AreNotSame(currentBuffer, nestedBuffer);
+            Assert.AreEqual(1, currentBuffer.Count);
+            Assert.AreSame(item, currentBuffer[0]);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void UsingLeaseReturnsSnapshotOnEarlyReturnAndException(bool throwFromBody)
+        {
+            List<object> returned = null;
+            void LeaveScope()
+            {
+                using PurgeBufferLease<object> owner = PurgeBuffer<object>.Get(
+                    out List<object> buffer
+                );
+                returned = buffer;
+                buffer.Add(new object());
+                if (throwFromBody)
+                {
+                    throw new InvalidOperationException(
+                        nameof(UsingLeaseReturnsSnapshotOnEarlyReturnAndException)
+                    );
+                }
+                return;
+            }
+
+            if (throwFromBody)
+            {
+                Assert.Throws<InvalidOperationException>(LeaveScope);
+            }
+            else
+            {
+                LeaveScope();
+            }
+            Assert.IsTrue(returned != null);
+            Assert.IsEmpty(returned);
+            using PurgeBufferLease<object> reused = PurgeBuffer<object>.Get(
+                out List<object> reusedBuffer
+            );
+            Assert.AreSame(returned, reusedBuffer);
+            Assert.IsEmpty(reusedBuffer);
+        }
+
+        [Test]
         public void NestedRentKeepsOuterSnapshotExclusiveAndReusesBothBuffers()
         {
             List<object> outer = PurgeBuffer<object>.Rent();

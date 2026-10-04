@@ -102,6 +102,10 @@ hold distinct buffers until their batches finish; returning a buffer clears its 
 Cold growth, deeper nesting and larger batches can still allocate, and oversized buffers are
 discarded after cleanup.
 
+Internal snapshot leases return each buffer once, even if the lease is copied or disposed again
+after that buffer has a new owner. Cleanup runs when the owning scope exits, including early
+returns and exceptions. Automatic purges acquire their snapshots only when they select an item.
+
 A directly constructed `PooledResource<T>` with a null return callback is an inert wrapper. It
 keeps the supplied resource accessible and reserves no disposal slot, even if it is never disposed.
 Disposing or copying it has no effect on the resource. Wrappers with a return callback retain their
