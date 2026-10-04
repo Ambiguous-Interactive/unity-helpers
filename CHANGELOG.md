@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Request synchronous import after stale singleton artifact cleanup before replacement creation ([#942](https://github.com/Ambiguous-Interactive/unity-helpers/issues/942)).
 - Fix unexpected singleton asset creation failures blocking later attempts until a domain reload ([#936](https://github.com/Ambiguous-Interactive/unity-helpers/issues/936)).
 - Stop WallstopProto `WPROTO044` inheritance diagnostics at an intermediate `[WProtoNotSerialized]` boundary, including referenced assemblies, while retaining contradictory declaration errors ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Fix WallstopProto map keys to match protobuf-net 3.2.56: write zero enum keys and omit zero floating-point keys while preserving reads of older payloads ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).

@@ -313,6 +313,8 @@ Asset management tips:
 
 An unexpected error releases the creation guard so a later attempt can run. The active asset batch
 still disposes before the guard releases. Created or moved assets remain in place after a failure.
+When an asset body is missing but its GUID remains, stale-artifact cleanup requests a synchronous
+import before replacement creation.
 
 Lookup order diagram:
 

@@ -1328,6 +1328,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         AssetDatabase.ImportAsset(
                             NormalizePath(assetsRelativePath),
                             ImportAssetOptions.ForceUpdate
+                                | ImportAssetOptions.ForceSynchronousImport
                         );
                     }
                     catch (Exception ex)
