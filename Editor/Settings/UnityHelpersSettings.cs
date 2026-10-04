@@ -155,6 +155,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         private const string FailedTestsExporterFoldoutKey = "FailedTestsExporter";
 
         internal static event Action OnSettingsSaved;
+        internal static SerializedObject _cachedSettingsSerializedObject;
+
         private static readonly Color DefaultLightThemeGroupBackground = new(
             0.82f,
             0.82f,
@@ -181,13 +183,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         private static readonly Color DefaultDarkThemeEnumSelectedTextColor = Color.white;
         private static readonly Color DefaultDarkThemeEnumInactiveColor =
             DefaultDarkThemeButtonColor;
+
         private static readonly Color DefaultDarkThemeEnumInactiveTextColor = Color.white;
         private static readonly Color DefaultCancelButtonColor = new(0.85f, 0.2f, 0.2f, 1f);
         private static readonly Color DefaultCancelButtonTextColor = Color.white;
         private static readonly Color DefaultClearHistoryButtonColor = new(0.75f, 0.45f, 0.45f, 1f);
         private static readonly Color DefaultClearHistoryButtonTextColor = Color.white;
         private static readonly Dictionary<int, bool> SettingsGroupFoldoutStates = new();
-        private static SerializedObject _cachedSettingsSerializedObject;
         private static UnityHelpersBufferSettingsAsset _waitInstructionBufferSettingsAsset;
         private static readonly GUIContent StringInListPageSizeContent =
             EditorGUIUtility.TrTextContent(
@@ -906,6 +908,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         [WGroupEnd(FailedTestsExporterFoldoutKey)]
         internal string _failedTestsOutputDirectory = DefaultFailedTestsOutputDirectory;
 
+        [FormerlySerializedAs("wgroupAutoIncludeMode")]
+        [SerializeField]
+        [Tooltip(
+            "Controls how WGroup automatically includes additional serialized members after a group declaration."
+        )]
+        [WGroup(
+            "WGroup Defaults",
+            displayName: "WGroup Defaults",
+            autoIncludeCount: 4,
+            collapsible: true
+        )]
+        internal WGroupAutoIncludeMode _wgroupAutoIncludeMode = WGroupAutoIncludeMode.Infinite;
+
+        [FormerlySerializedAs("wgroupAutoIncludeRowCount")]
+        [SerializeField]
+        [Tooltip(
+            "Number of additional serialized members captured when the WGroup auto include mode is set to Finite."
+        )]
+        [WShowIf(
+            nameof(_wgroupAutoIncludeMode),
+            expectedValues: new object[] { WGroupAutoIncludeMode.Finite }
+        )]
+        [Range(MinWGroupAutoIncludeRowCount, MaxWGroupAutoIncludeRowCount)]
+        internal int _wgroupAutoIncludeRowCount = DefaultWGroupAutoIncludeRowCount;
+
         [FormerlySerializedAs("waitInstructionBufferApplyOnLoad")]
         [SerializeField]
         [Tooltip(
@@ -1231,31 +1258,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         private List<SerializableTypeIgnorePattern> _serializableTypeIgnorePatterns;
         private string[] _serializableTypeIgnorePatternCache = Array.Empty<string>();
         private int _serializableTypeIgnorePatternCacheVersion = int.MinValue;
-
-        [FormerlySerializedAs("wgroupAutoIncludeMode")]
-        [SerializeField]
-        [Tooltip(
-            "Controls how WGroup automatically includes additional serialized members after a group declaration."
-        )]
-        [WGroup(
-            "WGroup Defaults",
-            displayName: "WGroup Defaults",
-            autoIncludeCount: 4,
-            collapsible: true
-        )]
-        private WGroupAutoIncludeMode _wgroupAutoIncludeMode = WGroupAutoIncludeMode.Infinite;
-
-        [FormerlySerializedAs("wgroupAutoIncludeRowCount")]
-        [SerializeField]
-        [Tooltip(
-            "Number of additional serialized members captured when the WGroup auto include mode is set to Finite."
-        )]
-        [WShowIf(
-            nameof(_wgroupAutoIncludeMode),
-            expectedValues: new object[] { WGroupAutoIncludeMode.Finite }
-        )]
-        [Range(MinWGroupAutoIncludeRowCount, MaxWGroupAutoIncludeRowCount)]
-        private int _wgroupAutoIncludeRowCount = DefaultWGroupAutoIncludeRowCount;
 
         [FormerlySerializedAs("wgroupFoldoutsStartCollapsed")]
         [SerializeField]
@@ -1736,21 +1738,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             instance._wgroupFoldoutTweenEnabled = value;
         }
 
-        internal static void SetWGroupAutoIncludeConfigurationForTests(
-            WGroupAutoIncludeMode mode,
-            int rowCount
-        )
-        {
-            UnityHelpersSettings settings = instance;
-            settings._wgroupAutoIncludeMode = mode;
-            settings._wgroupAutoIncludeRowCount = Mathf.Clamp(
-                rowCount,
-                MinWGroupAutoIncludeRowCount,
-                MaxWGroupAutoIncludeRowCount
-            );
-            settings.SaveSettings();
-        }
-
         internal static bool HasWButtonPaletteColorKey(string colorKey)
         {
             return instance.ContainsColorKey(colorKey);
@@ -1826,15 +1813,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             return _cachedSettingsSerializedObject;
-        }
-
-        /// <summary>
-        /// Clears the cached SerializedObject for testing purposes.
-        /// </summary>
-        internal static void ClearCachedSerializedObjectForTests()
-        {
-            _cachedSettingsSerializedObject?.Dispose();
-            _cachedSettingsSerializedObject = null;
         }
 
         private static string ValidateFailedTestsOutputDirectory(string directory)
@@ -5502,67 +5480,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 WEnumToggleButtonsCustomColor._hasInactiveTextColor
             );
             internal const string FailedTestsOutputDirectory = nameof(_failedTestsOutputDirectory);
-
-            /// <summary>
-            /// Gets the serialized property name value for the given constant name.
-            /// Exposed for testing to avoid reflection-based field access.
-            /// </summary>
-            internal static string GetPropertyNameValue(string constantName)
-            {
-                return constantName switch
-                {
-                    nameof(SerializableTypeIgnorePatterns) => SerializableTypeIgnorePatterns,
-                    nameof(SerializableTypePatternsInitialized) =>
-                        SerializableTypePatternsInitialized,
-                    nameof(SerializableTypePattern) => SerializableTypePattern,
-                    nameof(LegacyWButtonPriorityColors) => LegacyWButtonPriorityColors,
-                    nameof(WButtonCustomColors) => WButtonCustomColors,
-                    nameof(WGroupFoldoutsStartCollapsed) => WGroupFoldoutsStartCollapsed,
-                    nameof(WGroupFoldoutTweenEnabled) => WGroupFoldoutTweenEnabled,
-                    nameof(WGroupFoldoutSpeed) => WGroupFoldoutSpeed,
-                    nameof(WEnumToggleButtonsCustomColors) => WEnumToggleButtonsCustomColors,
-                    nameof(InlineEditorFoldoutBehavior) => InlineEditorFoldoutBehavior,
-                    nameof(InlineEditorFoldoutTweenEnabled) => InlineEditorFoldoutTweenEnabled,
-                    nameof(InlineEditorFoldoutSpeed) => InlineEditorFoldoutSpeed,
-                    nameof(WButtonFoldoutTweenEnabled) => WButtonFoldoutTweenEnabled,
-                    nameof(SerializableDictionaryFoldoutTweenEnabled) =>
-                        SerializableDictionaryFoldoutTweenEnabled,
-                    nameof(SerializableSortedDictionaryFoldoutTweenEnabled) =>
-                        SerializableSortedDictionaryFoldoutTweenEnabled,
-                    nameof(SerializableSetFoldoutTweenEnabled) =>
-                        SerializableSetFoldoutTweenEnabled,
-                    nameof(SerializableSortedSetFoldoutTweenEnabled) =>
-                        SerializableSortedSetFoldoutTweenEnabled,
-                    nameof(FoldoutTweenSettingsInitialized) => FoldoutTweenSettingsInitialized,
-                    nameof(SerializableDictionaryFoldoutSpeed) =>
-                        SerializableDictionaryFoldoutSpeed,
-                    nameof(SerializableSortedDictionaryFoldoutSpeed) =>
-                        SerializableSortedDictionaryFoldoutSpeed,
-                    nameof(SerializableSetFoldoutSpeed) => SerializableSetFoldoutSpeed,
-                    nameof(SerializableSortedSetFoldoutSpeed) => SerializableSortedSetFoldoutSpeed,
-                    nameof(DetectAssetChangeLoopWindowSeconds) =>
-                        DetectAssetChangeLoopWindowSeconds,
-                    nameof(DeferAssetPostprocessorCallbacks) => DeferAssetPostprocessorCallbacks,
-                    nameof(WButtonPriority) => WButtonPriority,
-                    nameof(WButtonCustomColorButton) => WButtonCustomColorButton,
-                    nameof(WButtonCustomColorText) => WButtonCustomColorText,
-                    nameof(WButtonCustomColorHasText) => WButtonCustomColorHasText,
-                    nameof(WEnumToggleButtonsSelectedBackground) =>
-                        WEnumToggleButtonsSelectedBackground,
-                    nameof(WEnumToggleButtonsSelectedText) => WEnumToggleButtonsSelectedText,
-                    nameof(WEnumToggleButtonsInactiveBackground) =>
-                        WEnumToggleButtonsInactiveBackground,
-                    nameof(WEnumToggleButtonsInactiveText) => WEnumToggleButtonsInactiveText,
-                    nameof(WEnumToggleButtonsHasSelectedText) => WEnumToggleButtonsHasSelectedText,
-                    nameof(WEnumToggleButtonsHasInactiveText) => WEnumToggleButtonsHasInactiveText,
-                    nameof(FailedTestsOutputDirectory) => FailedTestsOutputDirectory,
-                    _ => null,
-                };
-            }
         }
 
         /// <summary>
-        /// Constants for custom color drawer layout calculations, exposed for testing.
+        /// Calculates label and field widths for the custom color drawers.
         /// </summary>
         internal static class CustomColorDrawerLayout
         {
@@ -5654,11 +5575,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 float availableWidth = Mathf.Max(0f, position.width - spacing);
                 float halfWidth = availableWidth * 0.5f;
 
-                float labelWidth = Mathf.Clamp(
-                    halfWidth * CustomColorDrawerLabelWidthRatio,
-                    CustomColorDrawerMinLabelWidth,
-                    CustomColorDrawerMaxLabelWidth
-                );
+                float labelWidth = CustomColorDrawerLayout.CalculateLabelWidth(halfWidth);
 
                 float previousLabelWidth = EditorGUIUtility.labelWidth;
                 EditorGUIUtility.labelWidth = labelWidth;
@@ -5673,8 +5590,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         position.height
                     );
 
-                    float minFieldWidth = CustomColorDrawerMinColorFieldWidth + labelWidth;
-                    bool useLabels = minFieldWidth <= halfWidth;
+                    bool useLabels = CustomColorDrawerLayout.ShouldShowLabels(halfWidth);
 
                     EditorGUI.PropertyField(
                         buttonRect,
@@ -5745,11 +5661,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 float halfWidth = availableWidth * 0.5f;
                 float lineHeight = EditorGUIUtility.singleLineHeight;
 
-                float labelWidth = Mathf.Clamp(
-                    halfWidth * CustomColorDrawerLabelWidthRatio,
-                    CustomColorDrawerMinLabelWidth,
-                    CustomColorDrawerMaxLabelWidth
-                );
+                float labelWidth = CustomColorDrawerLayout.CalculateLabelWidth(halfWidth);
 
                 float previousLabelWidth = EditorGUIUtility.labelWidth;
                 EditorGUIUtility.labelWidth = labelWidth;
@@ -5781,8 +5693,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         lineHeight
                     );
 
-                    float minFieldWidth = CustomColorDrawerMinColorFieldWidth + labelWidth;
-                    bool useLabels = minFieldWidth <= halfWidth;
+                    bool useLabels = CustomColorDrawerLayout.ShouldShowLabels(halfWidth);
 
                     EditorGUI.PropertyField(
                         selectedBackgroundRect,

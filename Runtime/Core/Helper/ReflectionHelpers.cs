@@ -97,12 +97,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// used, allowing the system to track which strategies have been attempted and failed for each member.
     /// A blocklist tracks strategies that failed for specific members, avoiding repeated failed attempts.
     /// </para>
-    /// <para><b>Testing Support</b></para>
-    /// <para>
-    /// The internal <c>OverrideReflectionCapabilities</c> method allows tests to force specific strategies,
-    /// enabling verification that all fallback paths work correctly. Use the returned <c>IDisposable</c>
-    /// to restore original capabilities after the test.
-    /// </para>
     /// <para><b>File Organization</b></para>
     /// <para>
     /// This is a partial class split across multiple files:
@@ -137,11 +131,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const string EnabledPropertyName = "enabled";
 
 #if !SINGLE_THREADED
-        private static readonly ConcurrentDictionary<string, Type> TypeResolutionCache = new(
+        internal static readonly ConcurrentDictionary<string, Type> TypeResolutionCache = new(
             StringComparer.Ordinal
         );
 #else
-        private static readonly Dictionary<string, Type> TypeResolutionCache = new(
+        internal static readonly Dictionary<string, Type> TypeResolutionCache = new(
             StringComparer.Ordinal
         );
 #endif
@@ -264,27 +258,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 #endif
 
-        internal static bool ExpressionsEnabled =>
-            _expressionCapabilityOverride ?? CanCompileExpressions;
+        internal static bool ExpressionsEnabled { get; set; } = CheckExpressionCompilationSupport();
 
-        internal static bool DynamicIlEnabled => _dynamicIlCapabilityOverride ?? DynamicIlSupported;
-
-        private static readonly bool CanCompileExpressions = CheckExpressionCompilationSupport();
-        private static readonly bool DynamicIlSupported = CheckDynamicIlSupport();
-        private static bool? _expressionCapabilityOverride;
-        private static bool? _dynamicIlCapabilityOverride;
-
-        internal static IDisposable OverrideReflectionCapabilities(
-            bool? expressions,
-            bool? dynamicIl
-        )
-        {
-            bool? previousExpressions = _expressionCapabilityOverride;
-            bool? previousDynamicIl = _dynamicIlCapabilityOverride;
-            _expressionCapabilityOverride = expressions;
-            _dynamicIlCapabilityOverride = dynamicIl;
-            return new CapabilityOverrideScope(previousExpressions, previousDynamicIl);
-        }
+        internal static bool DynamicIlEnabled { get; set; } = CheckDynamicIlSupport();
 
 #if SINGLE_THREADED
         private static readonly Dictionary<
@@ -5848,31 +5824,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             catch
             {
                 return null;
-            }
-        }
-
-        private sealed class CapabilityOverrideScope : IDisposable
-        {
-            private readonly bool? _previousExpressions;
-            private readonly bool? _previousDynamicIl;
-            private bool _disposed;
-
-            internal CapabilityOverrideScope(bool? expressions, bool? dynamicIl)
-            {
-                _previousExpressions = expressions;
-                _previousDynamicIl = dynamicIl;
-            }
-
-            public void Dispose()
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                _expressionCapabilityOverride = _previousExpressions;
-                _dynamicIlCapabilityOverride = _previousDynamicIl;
-                _disposed = true;
             }
         }
 

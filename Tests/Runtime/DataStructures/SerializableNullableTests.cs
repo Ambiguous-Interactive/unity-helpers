@@ -266,7 +266,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void OnBeforeSerializeClearsStaleValueWhenEmpty()
         {
             SerializableNullable<int> wrapped = default;
-            wrapped.ForceStateForTesting(hasValue: false, rawValue: 99);
+            wrapped._hasValue = false;
+            wrapped._value = 99;
 
             ISerializationCallbackReceiver receiver = wrapped;
             receiver.OnBeforeSerialize();
@@ -280,7 +281,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void OnAfterDeserializeClearsStaleValueWhenEmpty()
         {
             SerializableNullable<int> wrapped = default;
-            wrapped.ForceStateForTesting(hasValue: false, rawValue: 123);
+            wrapped._hasValue = false;
+            wrapped._value = 123;
 
             ISerializationCallbackReceiver receiver = wrapped;
             receiver.OnAfterDeserialize();

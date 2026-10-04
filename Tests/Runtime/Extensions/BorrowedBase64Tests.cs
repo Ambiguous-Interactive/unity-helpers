@@ -604,7 +604,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             DisposalLease probe = DisposalLeases.Acquire();
             try
             {
-                int slot = probe.SlotForTests;
+                int slot = probe._slot;
                 Assert.IsTrue(probe.TryClaim());
                 long before = DisposalLeases.CurrentGeneration(slot);
                 Assert.AreEqual("abc", "YWJj".FromBase64());

@@ -76,13 +76,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [SerializeField]
         [ProtoMember(1)]
         [WProtoMember(1)]
-        private bool _hasValue;
+        internal bool _hasValue;
 
         [SerializeField]
         [ProtoMember(2, IsRequired = false)]
         [WProtoMember(2, IsRequired = false)]
         [WShowIf(nameof(_hasValue))]
-        private T _value;
+        internal T _value;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SerializableNullable{T}"/> struct.
@@ -308,12 +308,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
             EqualityComparer<T> comparer = EqualityComparer<T>.Default;
             return comparer.Equals(_value, other);
-        }
-
-        internal void ForceStateForTesting(bool hasValue, T rawValue)
-        {
-            _hasValue = hasValue;
-            _value = rawValue;
         }
 
         bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)

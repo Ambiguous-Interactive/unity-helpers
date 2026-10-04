@@ -569,7 +569,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             EffectHandler handler = entity.GetComponent<EffectHandler>();
             handler.RemoveEffect(activeHandle);
-            activeHandle = handler.ApplyEffectForTesting(effect, currentTime: -10f).Value;
+            activeHandle = handler.ApplyEffect(effect, currentTime: -10f).Value;
             Assert.IsTrue(entity.TryGetRemainingDuration(activeHandle, out float beforeNoRefresh));
             Assert.AreEqual(0f, beforeNoRefresh);
 
@@ -646,7 +646,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
 
             EffectHandler handler = entity.GetComponent<EffectHandler>();
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: -10f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: -10f).Value;
             Assert.IsTrue(entity.TryGetRemainingDuration(handle, out float beforeRefresh));
             Assert.AreEqual(0f, beforeRefresh);
 

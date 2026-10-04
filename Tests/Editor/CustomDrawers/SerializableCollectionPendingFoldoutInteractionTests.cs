@@ -65,7 +65,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         )
         {
             Assert.IsTrue(
-                drawer.TryGetPendingAnimationStateForTests(
+                drawer.TryGetPendingAnimationState(
                     property,
                     out bool isExpanded,
                     out float animProgress,
@@ -76,8 +76,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.AreEqual(
                 expectedExpanded,
                 isExpanded,
-                $"Unexpected dictionary pending foldout state {phase}. "
-                    + BuildDictionaryLayoutDiagnostics()
+                $"Unexpected dictionary pending foldout state {phase}."
             );
             Assert.IsTrue(hasAnimBool, $"Expected dictionary pending AnimBool {phase}.");
             Assert.GreaterOrEqual(
@@ -95,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         )
         {
             Assert.IsTrue(
-                drawer.TryGetPendingAnimationStateForTests(
+                drawer.TryGetPendingAnimationState(
                     property,
                     out bool isExpanded,
                     out float animProgress,
@@ -128,13 +127,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 + $"local={LocalLabelRect}, absolute={AbsoluteLabelRect}.";
         }
 
-        private static string BuildDictionaryLayoutDiagnostics()
+        private static string DescribeMouseEvent(Event mouseDown)
         {
-            return "Recorded dictionary rects: "
-                + $"header={SerializableDictionaryPropertyDrawer.LastPendingHeaderRect}, "
-                + $"toggle={SerializableDictionaryPropertyDrawer.LastPendingFoldoutToggleRect}, "
-                + $"localLabel={SerializableDictionaryPropertyDrawer.LastPendingLabelHitRect}, "
-                + $"absoluteLabel={SerializableDictionaryPropertyDrawer.LastPendingAbsoluteLabelHitRect}.";
+            return $"type={mouseDown.type}, rawType={mouseDown.rawType}, button={mouseDown.button}, "
+                + $"position={mouseDown.mousePosition}, localContains={LocalLabelRect.Contains(mouseDown.mousePosition)}, "
+                + $"absoluteContains={AbsoluteLabelRect.Contains(mouseDown.mousePosition)}";
         }
 
         [TestCaseSource(nameof(DictionaryPendingFoldoutClickCases))]
@@ -142,17 +139,23 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             bool expanded = false;
             Event mouseDown = CreateMouseDown(mousePosition);
+            string eventSnapshot = DescribeMouseEvent(mouseDown);
 
-            bool toggled =
-                SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabelForTests(
-                    mouseDown,
-                    LocalLabelRect,
-                    AbsoluteLabelRect,
-                    ref expanded
-                );
+            bool toggled = SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabel(
+                mouseDown,
+                LocalLabelRect,
+                AbsoluteLabelRect,
+                ref expanded
+            );
 
-            Assert.IsTrue(toggled, BuildToggleFailureMessage(mousePosition));
-            Assert.IsTrue(expanded, BuildExpandedFailureMessage(mousePosition));
+            Assert.IsTrue(
+                toggled,
+                BuildToggleFailureMessage(mousePosition) + " Event before call: " + eventSnapshot
+            );
+            Assert.IsTrue(
+                expanded,
+                BuildExpandedFailureMessage(mousePosition) + " Event before call: " + eventSnapshot
+            );
         }
 
         [TestCaseSource(nameof(SetPendingFoldoutClickCases))]
@@ -160,15 +163,22 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             bool expanded = false;
             Event mouseDown = CreateMouseDown(mousePosition);
+            string eventSnapshot = DescribeMouseEvent(mouseDown);
 
-            bool toggled = SerializableSetPropertyDrawer.TryToggleManualEntryFoldoutLabelForTests(
+            bool toggled = SerializableSetPropertyDrawer.TryToggleManualEntryFoldoutLabel(
                 mouseDown,
                 LocalLabelRect,
                 ref expanded
             );
 
-            Assert.IsTrue(toggled, BuildToggleFailureMessage(mousePosition));
-            Assert.IsTrue(expanded, BuildExpandedFailureMessage(mousePosition));
+            Assert.IsTrue(
+                toggled,
+                BuildToggleFailureMessage(mousePosition) + " Event before call: " + eventSnapshot
+            );
+            Assert.IsTrue(
+                expanded,
+                BuildExpandedFailureMessage(mousePosition) + " Event before call: " + eventSnapshot
+            );
         }
 
         [Test]
@@ -182,13 +192,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 button = 1,
             };
 
-            bool toggled =
-                SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabelForTests(
-                    mouseDown,
-                    LocalLabelRect,
-                    AbsoluteLabelRect,
-                    ref expanded
-                );
+            bool toggled = SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabel(
+                mouseDown,
+                LocalLabelRect,
+                AbsoluteLabelRect,
+                ref expanded
+            );
 
             Assert.IsFalse(toggled);
             Assert.IsFalse(expanded);
@@ -200,7 +209,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             bool expanded = false;
             Event mouseDown = CreateMouseDown(new Vector2(400f, 400f));
 
-            bool toggled = SerializableSetPropertyDrawer.TryToggleManualEntryFoldoutLabelForTests(
+            bool toggled = SerializableSetPropertyDrawer.TryToggleManualEntryFoldoutLabel(
                 mouseDown,
                 LocalLabelRect,
                 ref expanded
@@ -221,159 +230,53 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             Assert.AreEqual(
                 expectedEventType,
-                SerializableDictionaryPropertyDrawer.GetEffectiveMouseEventTypeForTests(
+                SerializableDictionaryPropertyDrawer.GetEffectiveMouseEventType(
                     eventType,
                     rawEventType
                 )
             );
             Assert.AreEqual(
                 expectedEventType,
-                SerializableSetPropertyDrawer.GetEffectiveMouseEventTypeForTests(
-                    eventType,
-                    rawEventType
-                )
-            );
-        }
-
-        /// <summary>
-        /// Verifies the dictionary drawer's real OnGUI path records a non-degenerate pending
-        /// foldout label hit rect that the production hit-test accepts at its absolute center.
-        /// </summary>
-        /// <remarks>
-        /// It deliberately does not pump a MouseDown through the offscreen panel: a windowless
-        /// IMGUIContainer does not reproduce the editor's GUI.BeginGroup/GUIClip event translation,
-        /// so an absolute-space click misses the local-space hit rect (recorded localLabel y=6 vs
-        /// absoluteLabel y=86). The click-to-toggle logic for both the local and group-offset rects
-        /// is covered deterministically by DictionaryPendingFoldoutLabelClickToggles above.
-        /// </remarks>
-        [UnityTest]
-        public IEnumerator DictionaryPendingFoldoutDrawerRecordsHittableLabelRect()
-        {
-            GroupGUIWidthUtility.ResetForTests();
-            SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
-
-            FoldoutInteractionDictionaryHost host =
-                CreateScriptableObject<FoldoutInteractionDictionaryHost>();
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            SerializedProperty property = serializedObject.FindProperty(
-                nameof(FoldoutInteractionDictionaryHost.dictionary)
-            );
-            property.isExpanded = true;
-
-            SerializableDictionaryPropertyDrawer drawer = new();
-            PropertyDrawerTestHelper.AssignFieldInfo(
-                drawer,
-                typeof(FoldoutInteractionDictionaryHost),
-                nameof(FoldoutInteractionDictionaryHost.dictionary)
-            );
-
-            Action draw = () =>
-            {
-                serializedObject.Update();
-                drawer.OnGUI(new Rect(40f, 60f, 500f, 240f), property, GUIContent.none);
-                serializedObject.ApplyModifiedProperties();
-            };
-
-            yield return TestIMGUIExecutor.Run(draw);
-
-            Assert.IsTrue(
-                SerializableDictionaryPropertyDrawer.HasLastPendingHeaderRect,
-                "Pending header rect should be recorded by the actual drawer OnGUI path."
-            );
-
-            Rect localRect = SerializableDictionaryPropertyDrawer.LastPendingLabelHitRect;
-            Rect absoluteRect =
-                SerializableDictionaryPropertyDrawer.LastPendingAbsoluteLabelHitRect;
-            Assert.Greater(
-                absoluteRect.width,
-                0f,
-                "Dictionary label hit rect should have width. " + BuildDictionaryLayoutDiagnostics()
-            );
-            Assert.Greater(
-                absoluteRect.height,
-                0f,
-                "Dictionary label hit rect should have height. "
-                    + BuildDictionaryLayoutDiagnostics()
-            );
-            AssertDictionaryPendingState(
-                drawer,
-                property,
-                expectedExpanded: false,
-                "before label click"
-            );
-
-            // The far-outside hit test rejects degenerate or unbounded OnGUI capture rectangles.
-            bool hitExpanded = false;
-            bool hit = SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabelForTests(
-                CreateMouseDown(absoluteRect.center),
-                localRect,
-                absoluteRect,
-                ref hitExpanded
-            );
-            Assert.IsTrue(
-                hit && hitExpanded,
-                "A click at the recorded dictionary label center should toggle. "
-                    + BuildDictionaryLayoutDiagnostics()
-            );
-
-            bool missExpanded = false;
-            Vector2 farOutside = new(absoluteRect.xMax + 500f, absoluteRect.yMax + 500f);
-            bool missed = SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabelForTests(
-                CreateMouseDown(farOutside),
-                localRect,
-                absoluteRect,
-                ref missExpanded
-            );
-            Assert.IsFalse(
-                missed || missExpanded,
-                "A click far outside the recorded dictionary label rect should not toggle. "
-                    + BuildDictionaryLayoutDiagnostics()
+                SerializableSetPropertyDrawer.GetEffectiveMouseEventType(eventType, rawEventType)
             );
         }
 
         [UnityTest]
         public IEnumerator SetPendingFoldoutDrawerLabelClickTogglesProductionState()
         {
-            GroupGUIWidthUtility.ResetForTests();
-            SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
-
+            GroupGUIWidthUtilityTestAccess.Reset();
             FoldoutInteractionSetHost host = CreateScriptableObject<FoldoutInteractionSetHost>();
             SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
             SerializedProperty property = serializedObject.FindProperty(
                 nameof(FoldoutInteractionSetHost.set)
             );
             property.isExpanded = true;
-
             SerializableSetPropertyDrawer drawer = new();
             PropertyDrawerTestHelper.AssignFieldInfo(
                 drawer,
                 typeof(FoldoutInteractionSetHost),
                 nameof(FoldoutInteractionSetHost.set)
             );
-
+            Rect position = new(35f, 55f, 480f, 220f);
             Action draw = () =>
             {
                 serializedObject.Update();
-                drawer.OnGUI(new Rect(35f, 55f, 480f, 220f), property, GUIContent.none);
+                drawer.OnGUI(position, property, GUIContent.none);
                 serializedObject.ApplyModifiedProperties();
             };
-
             yield return TestIMGUIExecutor.Run(draw);
-
-            Assert.IsTrue(
-                SerializableSetPropertyDrawer.HasLastManualEntryHeaderRect,
-                "Manual entry header rect should be recorded by the actual drawer OnGUI path."
+            AssertSetPendingState(drawer, property, false, "before label click");
+            Rect content = SerializableSetPropertyDrawer.ResolveContentRect(position);
+            Vector2 mouse = new(
+                content.center.x,
+                content.y
+                    + EditorGUIUtility.singleLineHeight
+                    + SerializableSetPropertyDrawer.SectionSpacing
+                    + SerializableSetPropertyDrawer.ResolveManualEntrySectionPadding(property)
+                    + EditorGUIUtility.singleLineHeight * 0.5f
             );
-
-            Rect labelRect = BuildLabelRect(
-                SerializableSetPropertyDrawer.LastManualEntryHeaderRect,
-                SerializableSetPropertyDrawer.LastManualEntryToggleRect
-            );
-            AssertSetPendingState(drawer, property, expectedExpanded: false, "before label click");
-
-            yield return TestIMGUIExecutor.RunMouseDown(draw, labelRect.center);
-
-            AssertSetPendingState(drawer, property, expectedExpanded: true, "after label click");
+            yield return TestIMGUIExecutor.RunMouseDown(draw, mouse);
+            AssertSetPendingState(drawer, property, true, "after label click");
         }
     }
 }

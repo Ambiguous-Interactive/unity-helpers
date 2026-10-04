@@ -87,7 +87,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static object[] _singleIndexArgs;
 
         private static int _lastConditionCacheFrame = -1;
-        private WShowIfAttribute _overrideAttribute;
 
         /// <summary>
         /// Checks whether a property with [WShowIf] attribute should be visible.
@@ -802,11 +801,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        internal void InitializeForTesting(WShowIfAttribute attributeOverride)
-        {
-            _overrideAttribute = attributeOverride;
-        }
-
         internal bool ShouldShow(SerializedProperty property)
         {
             // Unity invokes collection drawers per element; hiding elements while the container remains visible corrupts layout.
@@ -860,11 +854,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private WShowIfAttribute ResolveAttribute()
         {
-            if (_overrideAttribute != null)
-            {
-                return _overrideAttribute;
-            }
-
             return attribute as WShowIfAttribute;
         }
 

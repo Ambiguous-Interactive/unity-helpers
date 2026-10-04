@@ -248,7 +248,7 @@ internal static class UnityMainThreadDispatcherEditorTestBootstrap
 
 The runtime and editor `CommonTestBase` fixtures demonstrate the intended per-test lifecycle via `UnityMainThreadDispatcher.AutoCreationScope`:
 
-1. At `[SetUp]` it grabs `UnityMainThreadDispatcher.CreateTestScope(destroyImmediate: true)` which internally disables auto-creation, destroys stragglers, and then re-enables auto-creation so the test can access `Instance` normally.
+1. At `[SetUp]` a test-owned helper composes the real scoped auto-creation and cleanup operations. Downstream fixtures can use `AutoCreationScope.Enabled(destroyExistingInstanceOnEnter: true, destroyInstancesOnDispose: true, destroyImmediate: true)` to enable access and clean up on exit.
 2. Production code can create/destroy the dispatcher freely; the scope tracks everything automatically.
 3. During every teardown stage it disposes the scope, restoring the previous auto-creation flag and destroying any dispatcher created while the test runs; no manual try/finally blocks required.
 

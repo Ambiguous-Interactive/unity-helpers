@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Editor.TestAssets;
     using Object = UnityEngine.Object;
 
@@ -28,20 +29,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     {
         private const string TestScenePath = TestRoot + "/TestScene.unity";
 
-        /// <summary>
-        /// Folder prefixes this fixture is allowed to drive the processor through.
-        /// Covers (a) the fixture's own test root for payload assets, (b) the
-        /// committed shared-prefab fixtures under Packages, and (c) the dynamic
-        /// prefab workspace. Everything else is structurally ignored even with
-        /// <see cref="DetectAssetChangeProcessor.IncludeTestAssets"/> on.
-        /// </summary>
-        private static readonly string[] PrefabSceneFixtureAllowlist =
-        {
-            TestRoot + "/",
-            "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/TestAssets/Prefabs/",
-            "Assets/Temp/DynamicPrefabFixtures/",
-        };
-
         private static readonly (Type HandlerType, string HumanName)[] HandlerTypesUnderTest =
         {
             (typeof(TestPrefabAssetChangeHandler), "TestPrefabAssetChangeHandler"),
@@ -53,8 +40,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         protected override string DefaultPayloadAssetPath => TestRoot + "/Payload.asset";
 
         private readonly List<GameObject> _instantiatedSceneObjects = new();
-        private DetectAssetChangeProcessor.AssetWatcherSettings _fixtureSettings;
-        private DetectAssetChangeProcessor.AssetWatcherSettings _settings;
+        private DetectAssetChangeProcessorTestAccess.AssetWatcherSettings _fixtureSettings;
+        private DetectAssetChangeProcessorTestAccess.AssetWatcherSettings _settings;
 
         /// <summary>
         /// Counts how many times the specified handler instances were invoked.
@@ -124,19 +111,18 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
-            _settings = DetectAssetChangeProcessor.GetSettingsForTesting();
+            _settings = DetectAssetChangeProcessorTestAccess.GetSettings();
             SharedPrefabTestFixtures.AcquireFixtures();
             CleanupTestFolders();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             // Flush cleanup mutations before the first test can observe a late drain.
-            AssetPostprocessorDeferral.FlushForTesting();
-            DetectAssetChangeProcessor.ResetForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
+            DetectAssetChangeProcessorTestAccess.Reset();
             DetectAssetChangeProcessor.EnabledOverride = true;
-            DetectAssetChangeProcessor.IncludeTestAssets = true;
-            DetectAssetChangeProcessor.TestAssetFolderAllowlist = PrefabSceneFixtureAllowlist;
-            DetectAssetChangeProcessor.EnsureInitializedForTesting();
-            _fixtureSettings = DetectAssetChangeProcessor.GetSettingsForTesting();
-            DetectAssetChangeProcessor.ResetForTesting(_settings);
+
+            DetectAssetChangeProcessorTestAccess.EnsureInitialized();
+            _fixtureSettings = DetectAssetChangeProcessorTestAccess.GetSettings();
+            DetectAssetChangeProcessorTestAccess.Reset(_settings);
         }
 
         [OneTimeTearDown]
@@ -149,11 +135,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 SharedPrefabTestFixtures.ReleaseFixtures();
                 CleanupDeferredAssetsAndFolders();
                 // Cleanup queues drains that must finish before the next fixture can observe handler state.
-                AssetPostprocessorDeferral.FlushForTesting();
+                AssetPostprocessorDeferralTestAccess.Flush();
             }
             finally
             {
-                DetectAssetChangeProcessor.ResetForTesting(_settings);
+                DetectAssetChangeProcessorTestAccess.Reset(_settings);
             }
         }
 
@@ -176,14 +162,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             // Setup mutations can queue drains; the shared helper flushes before clearing handler state.
             AssetPostprocessorTestHandlers.FlushAndClearAll();
 
-            // Configure the allowlist last so setup drains run while the processor is still unconfigured.
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
         }
 
         [TearDown]
         public override void TearDown()
         {
-            DetectAssetChangeProcessor.ResetForTesting(_settings);
+            DetectAssetChangeProcessorTestAccess.Reset(_settings);
 
             foreach (GameObject go in _instantiatedSceneObjects)
             {
@@ -224,9 +209,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             ClearTestState();
 
             // Need to reset processor so it finds the handler
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -267,9 +252,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             ClearTestState();
 
             // Reset processor so it finds the handler
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -277,7 +262,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
             ClearTestState();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 null,
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -310,9 +295,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -346,9 +331,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -400,9 +385,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -436,9 +421,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -463,9 +448,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -499,9 +484,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -509,7 +494,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
             ClearTestState();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 null,
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -553,9 +538,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -594,9 +579,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -638,9 +623,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -691,9 +676,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -752,9 +737,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -780,11 +765,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
             Assert.DoesNotThrow(() =>
             {
-                DetectAssetChangeProcessor.ProcessChangesForTesting(
+                DetectAssetChangeProcessorTestAccess.ProcessChanges(
                     new[] { DefaultPayloadAssetPath },
                     null,
                     null,
@@ -800,11 +785,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
             Assert.DoesNotThrow(() =>
             {
-                DetectAssetChangeProcessor.ProcessChangesForTesting(
+                DetectAssetChangeProcessorTestAccess.ProcessChanges(
                     new[] { DefaultPayloadAssetPath },
                     null,
                     null,
@@ -823,14 +808,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
             // Tracking still guarantees cleanup if the attempted early destruction fails.
             Object.DestroyImmediate(go); // UNH-SUPPRESS: Testing destroyed object handling
 
             Assert.DoesNotThrow(() =>
             {
-                DetectAssetChangeProcessor.ProcessChangesForTesting(
+                DetectAssetChangeProcessorTestAccess.ProcessChanges(
                     new[] { DefaultPayloadAssetPath },
                     null,
                     null,
@@ -845,11 +830,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
             Assert.DoesNotThrow(() =>
             {
-                DetectAssetChangeProcessor.ProcessChangesForTesting(
+                DetectAssetChangeProcessorTestAccess.ProcessChanges(
                     new[] { DefaultPayloadAssetPath },
                     null,
                     null,
@@ -907,9 +892,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAsset();
             ClearTestState();
 
-            ResetProcessorWithPrefabSceneFixtureAllowlist();
+            ResetProcessorForPrefabSceneFixture();
 
-            DetectAssetChangeProcessor.ProcessChangesForTesting(
+            DetectAssetChangeProcessorTestAccess.ProcessChanges(
                 new[] { DefaultPayloadAssetPath },
                 null,
                 null,
@@ -994,24 +979,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
         }
 
-        /// <summary>
-        /// Resets the processor to a clean state while preserving this fixture's
-        /// <see cref="PrefabSceneFixtureAllowlist"/>. Every in-test call site that resets the
-        /// processor MUST go through this helper — calling
-        /// <see cref="DetectAssetChangeProcessor.ResetForTesting()"/> directly drops
-        /// the allowlist, which silently opens the structural defense against
-        /// cross-fixture pollution for the remainder of that test.
-        /// </summary>
-        private void ResetProcessorWithPrefabSceneFixtureAllowlist()
+        private void ResetProcessorForPrefabSceneFixture()
         {
-            DetectAssetChangeProcessor.ResetForTesting(_fixtureSettings);
+            DetectAssetChangeProcessorTestAccess.Reset(_fixtureSettings);
             /*
                 Reset clears the enablement override; force it back on because CI runs these watcher tests in
                 batch mode.
             */
             DetectAssetChangeProcessor.EnabledOverride = true;
-            DetectAssetChangeProcessor.IncludeTestAssets = true;
-            DetectAssetChangeProcessor.TestAssetFolderAllowlist = PrefabSceneFixtureAllowlist;
         }
 
         private GameObject InstantiateInScene(GameObject prefab)

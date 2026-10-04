@@ -18,8 +18,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     /// that it always makes progress.
     /// </summary>
     /// <remarks>
-    /// The run is driven by an injected loader rather than the asset database, so every assertion
-    /// here is about the engine rather than about whatever assets the test project happens to hold.
+    /// Runs use the actual asset database. Asset-binding controls create isolated fixture assets;
+    /// missing paths exercise the ordinary null-load policy without altering the loader.
     /// </remarks>
     [TestFixture]
     public sealed class ValidationRunTests : CommonTestBase
@@ -38,11 +38,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 null,
                 "message"
             );
-        }
-
-        private static Object Never(ValidationTarget target)
-        {
-            return null;
         }
 
         private static List<ValidationTarget> OneTarget()
@@ -78,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [Test]
         public void AnEmptyRunIsCompleteBeforeItStarts()
         {
-            ValidationRun run = new ValidationRun(null, null, Never);
+            ValidationRun run = new ValidationRun(null, null);
 
             Assert.IsTrue(run.IsComplete);
             Assert.AreEqual(0, run.TotalCount);
@@ -103,8 +98,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { null, counted, null },
-                targets,
-                Never
+                targets
             );
 
             Assert.AreEqual(1, run.TotalCount);
@@ -124,61 +118,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
-        public void AnAssetNoRuleClaimsIsNeverLoaded()
+        public void AnAssetNoRuleClaimsIsNotValidated()
         {
             CountingRule declining = new CountingRule(false);
-            int loads = 0;
-
-            ValidationRun run = new ValidationRun(
-                new List<IValidationRule> { declining },
-                TwoTargets(),
-                target =>
-                {
-                    ++loads;
-                    return null;
-                }
-            );
+            ValidationRun run = new ValidationRun(new[] { declining }, TwoTargets());
 
             Assert.IsTrue(run.Step(1000.0));
             Assert.AreEqual(2, declining.AppliesToCalls);
             Assert.AreEqual(0, declining.ValidateCalls);
-            Assert.AreEqual(0, loads, "A declined asset must not be deserialized.");
+            Assert.IsEmpty(run.Findings);
+            Assert.IsEmpty(run.Failures);
         }
 
         [Test]
-        public void AClaimedAssetIsLoadedOncePerAssetNotOncePerRule()
+        public void RulesShareTheLoadedAssetEvenWhenTheFirstRuleDeletesItsPath()
         {
-            CountingRule first = new CountingRule(true);
-            CountingRule second = new CountingRule(true);
-            int loads = 0;
-
-            ValidationRun run = new ValidationRun(
-                new List<IValidationRule> { first, second },
-                TwoTargets(),
-                target =>
-                {
-                    ++loads;
-                    return null;
-                }
+            ValidationTarget target = CreateLoadTarget(
+                nameof(RulesShareTheLoadedAssetEvenWhenTheFirstRuleDeletesItsPath),
+                out Object asset
             );
+            CountingRule first = new CountingRule(true)
+            {
+                OnValidate = _ => Assert.IsTrue(AssetDatabase.DeleteAsset(target.AssetPath)),
+            };
+            CountingRule second = new CountingRule(true);
+            ValidationRun run = new ValidationRun(new[] { first, second }, new[] { target });
 
             Assert.IsTrue(run.Step(1000.0));
-            Assert.AreEqual(2, first.ValidateCalls);
-            Assert.AreEqual(2, second.ValidateCalls);
-            Assert.AreEqual(2, loads);
+            Assert.AreEqual(1, first.ValidateCalls);
+            Assert.AreEqual(1, second.ValidateCalls);
+            Assert.AreSame(asset, first.LastAsset);
+            Assert.AreSame(
+                first.LastAsset,
+                second.LastAsset,
+                "The second rule must receive the original loaded reference, not reload the deleted path."
+            );
+            Assert.IsTrue(ValidationRun.LoadMainAsset(target) == null);
+            Assert.IsEmpty(run.Failures);
         }
 
         [Test]
         public void TheLoadedAssetReachesTheRuleAndTheFinding()
         {
-            ScriptableObject asset = Track(ScriptableObject.CreateInstance<ScriptableObject>());
-            ReportingRule reporting = new ReportingRule(ValidationSeverity.Error, 1);
-
-            ValidationRun run = new ValidationRun(
-                new List<IValidationRule> { reporting },
-                OneTarget(),
-                target => asset
+            ValidationTarget target = CreateLoadTarget(
+                nameof(TheLoadedAssetReachesTheRuleAndTheFinding),
+                out Object asset
             );
+            ReportingRule reporting = new ReportingRule(ValidationSeverity.Error, 1);
+            ValidationRun run = new ValidationRun(new[] { reporting }, new[] { target });
 
             Assert.IsTrue(run.Step(1000.0));
             Assert.AreEqual(1, run.Findings.Count);
@@ -196,8 +183,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { reporting },
-                TwoTargets(),
-                Never
+                TwoTargets()
             );
 
             Assert.IsTrue(run.Step(1000.0));
@@ -213,8 +199,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { broken, healthy },
-                TwoTargets(),
-                Never
+                TwoTargets()
             );
 
             Assert.IsTrue(run.Step(1000.0));
@@ -233,8 +218,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { broken },
-                OneTarget(),
-                Never
+                OneTarget()
             );
 
             Assert.IsTrue(run.Step(1000.0));
@@ -249,33 +233,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         public void ARuleThatThrowsWhileClaimingIsRecordedAndSkipped()
         {
             ThrowingRule broken = new ThrowingRule(throwFromAppliesTo: true);
-            int loads = 0;
 
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { broken },
-                OneTarget(),
-                target =>
-                {
-                    ++loads;
-                    return null;
-                }
+                OneTarget()
             );
 
             Assert.IsTrue(run.Step(1000.0));
             Assert.AreEqual(1, run.Failures.Count);
             Assert.AreEqual(0, broken.ValidateCalls);
-            Assert.AreEqual(0, loads);
         }
 
         [Test]
-        public void ALoaderThatThrowsIsBlamedOnTheLoadAndTheRuleStillRuns()
+        public void ARecordedLoadFailureIsDistinctFromRuleFailuresAndDoesNotStopValidation()
         {
             ReportingRule reporting = new ReportingRule(ValidationSeverity.Warning, 1);
 
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { reporting },
-                OneTarget(),
-                target => throw new InvalidOperationException("import is broken")
+                OneTarget()
+            );
+
+            run.RecordLoadFailure(
+                OneTarget()[0],
+                new InvalidOperationException("import is broken")
             );
 
             Assert.IsTrue(run.Step(1000.0));
@@ -291,8 +272,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { new NamelessThrowingRule() },
-                OneTarget(),
-                Never
+                OneTarget()
             );
 
             Assert.IsTrue(run.Step(1000.0));
@@ -309,8 +289,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { counted },
-                TwoTargets(),
-                Never
+                TwoTargets()
             );
 
             Assert.IsFalse(run.Step(budget));
@@ -326,8 +305,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { reporting },
-                TwoTargets(),
-                Never
+                TwoTargets()
             );
 
             Assert.IsFalse(run.Step(0.0));
@@ -500,6 +478,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsEmpty(ValidationTargets.Enumerate("Assets/NoSuchFolderForValidationTests"));
         }
 
+        private ValidationTarget CreateLoadTarget(string assetName, out Object asset)
+        {
+            string folder = "Assets/" + nameof(ValidationRunTests) + "Load";
+            if (!AssetDatabase.IsValidFolder(folder))
+            {
+                AssetDatabase.CreateFolder("Assets", nameof(ValidationRunTests) + "Load");
+            }
+            TrackFolder(folder);
+            string path = folder + "/" + assetName + ".asset";
+            asset = Track(ScriptableObject.CreateInstance<DroppedSerializedFieldAsset>());
+            AssetDatabase.CreateAsset(asset, path);
+            TrackAssetPath(path);
+            AssetDatabase.SaveAssets();
+            return new ValidationTarget(AssetDatabase.AssetPathToGUID(path), path, asset.GetType());
+        }
+
         /// <summary>Counts what the engine asked it, and answers the same way every time.</summary>
         private sealed class CountingRule : IValidationRule
         {
@@ -510,6 +504,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             internal int AppliesToCalls { get; private set; }
 
             internal int ValidateCalls { get; private set; }
+
+            internal Object LastAsset { get; private set; }
+
+            internal Action<Object> OnValidate { get; set; }
 
             private readonly bool _claims;
 
@@ -531,6 +529,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             )
             {
                 ++ValidateCalls;
+                LastAsset = asset;
+                OnValidate?.Invoke(asset);
             }
         }
 

@@ -11,17 +11,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
     public static partial class UnityExtensions
     {
-#if UNITY_EDITOR || UNITY_INCLUDE_TESTS
-        internal static Func<float> ScreenDpiProvider
-        {
-            get => _screenDpiProvider ?? DefaultScreenDpiProvider;
-            set => _screenDpiProvider = value;
-        }
-
-        private static readonly Func<float> DefaultScreenDpiProvider = () => Screen.dpi;
-        private static Func<float> _screenDpiProvider;
-#endif
-
         /// <summary>
         /// Sets all color states of a UI Slider to the same color.
         /// </summary>
@@ -161,18 +150,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             eventSystem.pixelDragThreshold = CalculatePixelDragThreshold(
                 baseThreshold,
-                GetScreenDpi(),
+                Screen.dpi,
                 referenceDpi
             );
             return true;
         }
-
-#if UNITY_EDITOR || UNITY_INCLUDE_TESTS
-        internal static void ResetScreenDpiProvider()
-        {
-            _screenDpiProvider = null;
-        }
-#endif
 
         /// <summary>Tries to resolve a pointer position on the target rectangle's plane.</summary>
         /// <param name="pointerEventData">The pointer event to resolve.</param>
@@ -352,15 +334,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float x = float.IsNaN(point.x) ? 0f : Mathf.Clamp(point.x, 0f, Screen.width);
             float y = float.IsNaN(point.y) ? 0f : Mathf.Clamp(point.y, 0f, Screen.height);
             return new Vector2(x, y);
-        }
-
-        private static float GetScreenDpi()
-        {
-#if UNITY_EDITOR || UNITY_INCLUDE_TESTS
-            return ScreenDpiProvider();
-#else
-            return Screen.dpi;
-#endif
         }
 
         private static bool IsFinite(Vector2 point)

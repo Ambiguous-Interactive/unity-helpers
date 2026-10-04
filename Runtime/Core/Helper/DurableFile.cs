@@ -70,12 +70,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             encoderShouldEmitUTF8Identifier: false
         );
 
-#if UNITY_EDITOR
-        internal static Action<string> BeforeStagedSwapForTests { get; set; }
-        internal static Action<string> BeforeStagedCleanupForTests { get; set; }
-        internal static Action<string> BeforeCompareReadForTests { get; set; }
-#endif
-
         /// <summary>
         /// Replaces a file's entire contents, staging and flushing before the swap.
         /// </summary>
@@ -426,9 +420,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             staging.Flush(flushToDisk: true);
                         }
 
-#if UNITY_EDITOR
-                        BeforeStagedSwapForTests?.Invoke(temporaryPath);
-#endif
                         Swap(temporaryPath, destinationPath);
                     }
 
@@ -437,9 +428,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 catch (Exception e)
                 {
-#if UNITY_EDITOR
-                    BeforeStagedCleanupForTests?.Invoke(temporaryPath);
-#endif
                     DiscardStagedFile(temporaryPath);
                     error = e;
                     return false;
@@ -536,14 +524,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// The failure when this returns false; null otherwise. If staged bytes could not be
         /// published, <see cref="PreservedStagingPathDataKey"/> identifies their path in Data.
         /// </param>
-        /// <param name="beforeMove">Optional action invoked just before publication.</param>
         /// <returns>True when the new file was published without replacing another file.</returns>
-        internal static bool TryCreateAllBytes(
-            string path,
-            byte[] contents,
-            out Exception error,
-            Action<string> beforeMove = null
-        )
+        internal static bool TryCreateAllBytes(string path, byte[] contents, out Exception error)
         {
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -587,7 +569,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         staging.Flush(flushToDisk: true);
                     }
 
-                    beforeMove?.Invoke(path);
                     if (
                         !TryPublishStagedFileWithoutOverwrite(
                             temporaryPath,
@@ -600,12 +581,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     }
                     ownsTemporary = leavesStaged;
                     moved = true;
-                    if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(contents))
-                    {
-                        throw new IOException(
-                            $"Created file at {path}, but its contents differ; inspect it before retrying."
-                        );
-                    }
+                    VerifyCreatedContents(path, contents);
                     if (leavesStaged)
                     {
                         File.Delete(temporaryPath);
@@ -773,9 +749,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         return false;
                     }
-#if UNITY_EDITOR
-                    BeforeCompareReadForTests?.Invoke(temporaryPath);
-#endif
                     byte[] current = File.ReadAllBytes(path);
                     if (!BytesEqual(current, expected))
                     {
@@ -791,9 +764,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     staging.Flush(flushToDisk: true);
                     staging.Dispose();
                     staging = null;
-#if UNITY_EDITOR
-                    BeforeStagedSwapForTests?.Invoke(temporaryPath);
-#endif
                     Swap(temporaryPath, path);
                     ownsStaging = false;
                     error = null;
@@ -884,9 +854,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     staging.Flush(flushToDisk: true);
                     staging.Dispose();
                     staging = null;
-#if UNITY_EDITOR
-                    BeforeStagedSwapForTests?.Invoke(temporaryPath);
-#endif
                     Swap(temporaryPath, path);
                     ownsStaging = false;
                     error = null;
@@ -989,20 +956,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             staging.Flush(flushToDisk: true);
                         }
 
-#if UNITY_EDITOR
-                        BeforeStagedSwapForTests?.Invoke(temporaryPath);
-#endif
-                        cancellationToken.ThrowIfCancellationRequested();
-                        Swap(temporaryPath, destinationPath);
+                        PublishStagedFile(temporaryPath, destinationPath, cancellationToken);
                     }
 
                     return null;
                 }
                 catch (Exception e)
                 {
-#if UNITY_EDITOR
-                    BeforeStagedCleanupForTests?.Invoke(temporaryPath);
-#endif
                     DiscardStagedFile(temporaryPath);
                     return e;
                 }
@@ -1010,6 +970,108 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     ReleaseStagingOwnership(ownership);
                 }
+            }
+        }
+
+        /// <summary>Verifies a newly published document before its staged name is removed.</summary>
+        internal static void VerifyCreatedContents(string path, byte[] contents)
+        {
+            if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(contents))
+            {
+                throw new IOException(
+                    $"Created file at {path}, but its contents differ; inspect it before retrying."
+                );
+            }
+        }
+
+        // Only a successful exclusive staging open establishes cleanup ownership; failed opens may name another writer.
+        /// <summary>Opens the staging file exclusively for writing.</summary>
+        internal static FileStream OpenStagingStream(string temporaryPath, bool useAsync)
+        {
+            return new FileStream(
+                temporaryPath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                DefaultBufferSize,
+                useAsync
+            );
+        }
+
+        // Isolate expected sharing failures from IL2CPP callers and async state machines.
+        /// <summary>Acquires cooperating-writer ownership until the returned stream is disposed.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static bool TryOpenStagingOwnership(
+            string temporaryPath,
+            out FileStream ownership,
+            out Exception error
+        )
+        {
+            try
+            {
+                ownership = new FileStream(
+                    temporaryPath + OwnershipSuffix,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.Read,
+                    bufferSize: 1,
+                    FileOptions.DeleteOnClose
+                );
+                error = null;
+                return true;
+            }
+            catch (IOException e)
+            {
+                ownership = null;
+                error = e;
+                return false;
+            }
+            catch (Exception e)
+            {
+                ownership = null;
+                error = e;
+                return false;
+            }
+        }
+
+        /// <summary>Removes an owned staging file without masking the original failure.</summary>
+        internal static void DiscardStagedFile(string temporaryPath)
+        {
+            try
+            {
+                File.Delete(temporaryPath);
+            }
+            catch (Exception) { }
+        }
+
+        /// <summary>Publishes completed staging contents unless cancellation was requested.</summary>
+        internal static void PublishStagedFile(
+            string temporaryPath,
+            string path,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Swap(temporaryPath, path);
+        }
+
+        // The destination can change after the existence probe; retry the matching alternative on that race.
+        /// <summary>Publishes a staging file over an absent or existing destination.</summary>
+        internal static void Swap(string temporaryPath, string path)
+        {
+            if (File.Exists(path))
+            {
+                Replace(temporaryPath, path);
+                return;
+            }
+
+            try
+            {
+                File.Move(temporaryPath, path);
+            }
+            catch (IOException) when (File.Exists(path))
+            {
+                Replace(temporaryPath, path);
             }
         }
 
@@ -1090,19 +1152,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         staging.Flush(flushToDisk: true);
                     }
 
-#if UNITY_EDITOR
-                    BeforeStagedSwapForTests?.Invoke(temporaryPath);
-#endif
-                    cancellationToken.ThrowIfCancellationRequested();
-                    Swap(temporaryPath, path);
+                    PublishStagedFile(temporaryPath, path, cancellationToken);
 
                     return null;
                 }
                 catch (Exception e)
                 {
-#if UNITY_EDITOR
-                    BeforeStagedCleanupForTests?.Invoke(temporaryPath);
-#endif
                     DiscardStagedFile(temporaryPath);
                     return e;
                 }
@@ -1146,9 +1201,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     staging.Flush(flushToDisk: true);
                 }
 
-#if UNITY_EDITOR
-                BeforeStagedSwapForTests?.Invoke(temporaryPath);
-#endif
                 Swap(temporaryPath, path);
 
                 error = null;
@@ -1156,9 +1208,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (Exception e)
             {
-#if UNITY_EDITOR
-                BeforeStagedCleanupForTests?.Invoke(temporaryPath);
-#endif
                 DiscardStagedFile(temporaryPath);
                 error = e;
                 return false;
@@ -1264,54 +1313,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
-        // Only a successful exclusive staging open establishes cleanup ownership; failed opens may name another writer.
-        private static FileStream OpenStagingStream(string temporaryPath, bool useAsync)
-        {
-            return new FileStream(
-                temporaryPath,
-                FileMode.Create,
-                FileAccess.Write,
-                FileShare.None,
-                DefaultBufferSize,
-                useAsync
-            );
-        }
-
-        // Isolate expected sharing failures from IL2CPP callers and async state machines.
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static bool TryOpenStagingOwnership(
-            string temporaryPath,
-            out FileStream ownership,
-            out Exception error
-        )
-        {
-            try
-            {
-                ownership = new FileStream(
-                    temporaryPath + OwnershipSuffix,
-                    FileMode.OpenOrCreate,
-                    FileAccess.ReadWrite,
-                    FileShare.Read,
-                    bufferSize: 1,
-                    FileOptions.DeleteOnClose
-                );
-                error = null;
-                return true;
-            }
-            catch (IOException e)
-            {
-                ownership = null;
-                error = e;
-                return false;
-            }
-            catch (Exception e)
-            {
-                ownership = null;
-                error = e;
-                return false;
-            }
-        }
-
         private static void ReleaseStagingOwnership(FileStream ownership)
         {
             ReleaseFileStream(ownership);
@@ -1348,34 +1349,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
-            }
-        }
-
-        private static void DiscardStagedFile(string temporaryPath)
-        {
-            try
-            {
-                File.Delete(temporaryPath);
-            }
-            catch (Exception) { }
-        }
-
-        // The destination can change after the existence probe; retry the matching alternative on that race.
-        private static void Swap(string temporaryPath, string path)
-        {
-            if (File.Exists(path))
-            {
-                Replace(temporaryPath, path);
-                return;
-            }
-
-            try
-            {
-                File.Move(temporaryPath, path);
-            }
-            catch (IOException) when (File.Exists(path))
-            {
-                Replace(temporaryPath, path);
             }
         }
 

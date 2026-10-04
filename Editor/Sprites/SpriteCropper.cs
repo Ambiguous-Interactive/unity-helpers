@@ -61,8 +61,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private const int ParallelScanRowThreshold = 512;
 
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
-
         [SerializeField]
         internal List<Object> _inputDirectories = new();
 
@@ -97,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         internal bool _copyDefaultPlatformSettings = true;
 
         internal List<string> _filesToProcess;
-        private SerializedObject _serializedObject;
+        internal SerializedObject _serializedObject;
         private SerializedProperty _inputDirectoriesProperty;
         private SerializedProperty _onlyNecessaryProperty;
         private SerializedProperty _leftPaddingProperty;

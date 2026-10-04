@@ -41,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         public void SetUp()
         {
             PoolPurgeSettings.ResetToDefaults();
-            PoolPurgeSettings.ReinitializeBuiltInDefaults();
+            PoolStateTestUtilities.ReinitializeBuiltInDefaults();
             _wasMemoryPressureEnabled = MemoryPressureMonitor.Enabled;
             MemoryPressureMonitor.Enabled = false;
         }
@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void BuiltInDefaultsAreInitializedLazily()
         {
-            PoolPurgeSettings.ClearBuiltInTypeConfigurations();
+            PoolStateTestUtilities.ClearBuiltInTypeConfigurations();
 
             Assert.IsFalse(
                 PoolPurgeSettings.BuiltInDefaultsInitialized,
@@ -77,10 +77,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             PoolPurgeSettings.GetEffectiveOptions<List<int>>();
             Assert.IsTrue(PoolPurgeSettings.BuiltInDefaultsInitialized);
 
-            PoolPurgeSettings.ClearBuiltInTypeConfigurations();
+            PoolStateTestUtilities.ClearBuiltInTypeConfigurations();
             Assert.IsFalse(PoolPurgeSettings.BuiltInDefaultsInitialized);
 
-            PoolPurgeSettings.ReinitializeBuiltInDefaults();
+            PoolStateTestUtilities.ReinitializeBuiltInDefaults();
             Assert.IsTrue(PoolPurgeSettings.BuiltInDefaultsInitialized);
         }
 
@@ -664,7 +664,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Exception capturedException = null;
             int successCount = 0;
 
-            PoolPurgeSettings.ClearBuiltInTypeConfigurations();
+            PoolStateTestUtilities.ClearBuiltInTypeConfigurations();
 
             System.Threading.Thread[] threads = new System.Threading.Thread[threadCount];
             for (int t = 0; t < threadCount; ++t)

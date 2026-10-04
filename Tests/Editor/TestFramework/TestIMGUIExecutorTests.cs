@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
 {
 #if UNITY_EDITOR
     using System.Collections;
+    using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
@@ -58,6 +59,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
         [UnityTest]
         public IEnumerator RunMouseDownPumpsMouseDownBetweenLayoutAndRepaint()
         {
+            List<string> receivedEvents = new();
             bool sawLayout = false;
             bool sawMouseDown = false;
             bool sawRepaint = false;
@@ -67,6 +69,9 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 () =>
                 {
                     Event currentEvent = Event.current;
+                    receivedEvents.Add(
+                        $"{currentEvent.type}/{currentEvent.rawType} button={currentEvent.button} position={currentEvent.mousePosition}"
+                    );
                     if (currentEvent.type == EventType.Layout)
                     {
                         sawLayout = true;
@@ -85,9 +90,19 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 mousePosition
             );
 
-            Assert.IsTrue(sawLayout, "Expected the offscreen pump to run Layout first.");
-            Assert.IsTrue(sawMouseDown, "Expected the offscreen pump to run MouseDown.");
-            Assert.IsTrue(sawRepaint, "Expected the offscreen pump to run Repaint last.");
+            string eventSnapshot = string.Join(", ", receivedEvents);
+            Assert.IsTrue(
+                sawLayout,
+                "Expected the offscreen pump to run Layout first. Received: " + eventSnapshot
+            );
+            Assert.IsTrue(
+                sawMouseDown,
+                "Expected the offscreen pump to run MouseDown. Received: " + eventSnapshot
+            );
+            Assert.IsTrue(
+                sawRepaint,
+                "Expected the offscreen pump to run Repaint last. Received: " + eventSnapshot
+            );
         }
     }
 #endif

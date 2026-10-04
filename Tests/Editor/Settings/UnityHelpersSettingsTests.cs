@@ -1,11 +1,16 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+// UNH-SUPPRESS UNH003: this fixture preserves an existing project asset, or owns one shared
+// resource asset until OneTimeTearDown. Per-test tracked-object destruction would delete the
+// resource before the remaining controls run.
+
 #if UNITY_EDITOR
 namespace WallstopStudios.UnityHelpers.Tests.Settings
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
     using NUnit.Framework;
     using UnityEditor;
@@ -15,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
     using WallstopStudios.UnityHelpers.Editor.Extensions;
     using WallstopStudios.UnityHelpers.Editor.Settings;
     using WallstopStudios.UnityHelpers.Editor.Utils.WButton;
+    using WallstopStudios.UnityHelpers.Editor.Validation;
     using WallstopStudios.UnityHelpers.Settings;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -55,6 +61,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             );
             return (keys, values);
         }
+
+        private readonly List<string> _ownedBufferSettingsFolders = new();
+        private UnityHelpersBufferSettingsAsset _bufferSettingsAsset;
+        private byte[] _originalBufferSettingsBytes;
+        private string _originalBufferSettingsJson;
+        private bool _originalBufferSettingsDirty;
+        private bool _ownsBufferSettingsAsset;
 
         private static void AssertColorsApproximately(
             Color expected,
@@ -378,6 +391,131 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             return 0 < propertyNames.Count
                 ? string.Join(", ", propertyNames)
                 : "(no visible properties found)";
+        }
+
+        [OneTimeSetUp]
+        public void ProvisionBufferSettingsAsset()
+        {
+            string assetPath = UnityHelpersBufferSettingsAsset.AssetPath;
+            string filePath = AuthoredAssetPaths.ToFileSystemPath(assetPath);
+            _bufferSettingsAsset = AssetDatabase.LoadAssetAtPath<UnityHelpersBufferSettingsAsset>(
+                assetPath
+            );
+            if (_bufferSettingsAsset != null)
+            {
+                _originalBufferSettingsBytes = File.ReadAllBytes(filePath);
+                _originalBufferSettingsJson = EditorJsonUtility.ToJson(_bufferSettingsAsset);
+                _originalBufferSettingsDirty = EditorUtility.IsDirty(_bufferSettingsAsset);
+            }
+            else
+            {
+                Assert.IsFalse(
+                    File.Exists(filePath),
+                    "Preserve an existing unreadable settings asset."
+                );
+                string folder = Path.GetDirectoryName(assetPath).Replace('\\', '/');
+                List<string> missingFolders = new();
+                for (string candidate = folder; !AssetDatabase.IsValidFolder(candidate); )
+                {
+                    missingFolders.Add(candidate);
+                    candidate = Path.GetDirectoryName(candidate).Replace('\\', '/');
+                }
+                for (int index = missingFolders.Count - 1; 0 <= index; --index)
+                {
+                    string candidate = missingFolders[index];
+                    string parent = Path.GetDirectoryName(candidate).Replace('\\', '/');
+                    string name = Path.GetFileName(candidate);
+                    Assert.IsFalse(string.IsNullOrEmpty(AssetDatabase.CreateFolder(parent, name)));
+                    _ownedBufferSettingsFolders.Add(candidate);
+                }
+
+                _bufferSettingsAsset =
+                    ScriptableObject.CreateInstance<UnityHelpersBufferSettingsAsset>(); // UNH-SUPPRESS UNH002: persisted fixture asset, deleted in OneTimeTearDown only when owned.
+                _bufferSettingsAsset.SyncFromRuntime();
+                _ownsBufferSettingsAsset = true;
+                AssetDatabase.CreateAsset(_bufferSettingsAsset, assetPath);
+            }
+
+            AssetDatabase.ImportAsset(
+                assetPath,
+                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
+            );
+            Assert.IsTrue(
+                Resources.Load<UnityHelpersBufferSettingsAsset>(
+                    UnityHelpersBufferSettingsAsset.ResourcePath
+                ) != null,
+                "The fixture's real buffer settings resource must load before its controls run."
+            );
+        }
+
+        [OneTimeTearDown]
+        public void RestoreBufferSettingsAsset()
+        {
+            string assetPath = UnityHelpersBufferSettingsAsset.AssetPath;
+            try
+            {
+                if (_ownsBufferSettingsAsset)
+                {
+                    AssetDatabase.DeleteAsset(assetPath);
+                    if (_bufferSettingsAsset != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(_bufferSettingsAsset); // UNH-SUPPRESS UNH001: release an owned instance if asset publication failed.
+                    }
+                }
+                else if (_originalBufferSettingsBytes != null)
+                {
+                    File.WriteAllBytes(
+                        AuthoredAssetPaths.ToFileSystemPath(assetPath),
+                        _originalBufferSettingsBytes
+                    );
+                    AssetDatabase.ImportAsset(
+                        assetPath,
+                        ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
+                    );
+                    _bufferSettingsAsset =
+                        AssetDatabase.LoadAssetAtPath<UnityHelpersBufferSettingsAsset>(assetPath);
+                    Assert.IsTrue(
+                        _bufferSettingsAsset != null,
+                        "The original settings asset must reload."
+                    );
+                    if (_bufferSettingsAsset != null)
+                    {
+                        EditorJsonUtility.FromJsonOverwrite(
+                            _originalBufferSettingsJson,
+                            _bufferSettingsAsset
+                        );
+                        if (_originalBufferSettingsDirty)
+                        {
+                            EditorUtility.SetDirty(_bufferSettingsAsset);
+                        }
+                        else
+                        {
+                            EditorUtility.ClearDirty(_bufferSettingsAsset);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                for (int index = _ownedBufferSettingsFolders.Count - 1; 0 <= index; --index)
+                {
+                    string folder = _ownedBufferSettingsFolders[index];
+                    string filePath = AuthoredAssetPaths.ToFileSystemPath(folder);
+                    if (
+                        Directory.Exists(filePath)
+                        && Directory.GetFileSystemEntries(filePath).Length == 0
+                    )
+                    {
+                        AssetDatabase.DeleteAsset(folder);
+                    }
+                }
+                _ownedBufferSettingsFolders.Clear();
+                _bufferSettingsAsset = null;
+                _originalBufferSettingsBytes = null;
+                _originalBufferSettingsJson = null;
+                _originalBufferSettingsDirty = false;
+                _ownsBufferSettingsAsset = false;
+            }
         }
 
         [Test]
@@ -1303,7 +1441,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             try
             {
-                UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+                UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                     UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                     1000
                 );
@@ -1322,7 +1460,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             }
             finally
             {
-                UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+                UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                     original.Mode,
                     original.RowCount
                 );
@@ -2185,8 +2323,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             string expectedFieldDescription
         )
         {
-            string actualFieldName =
-                UnityHelpersSettings.SerializedPropertyNames.GetPropertyNameValue(constantName);
+            string actualFieldName = UnityHelpersSettingsTestAccess.GetPropertyNameValue(
+                constantName
+            );
             Assert.IsTrue(
                 actualFieldName != null,
                 $"SerializedPropertyNames.{constantName} should have a non-null value."
@@ -2244,9 +2383,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         [TestCase(nameof(UnityHelpersSettings.SerializedPropertyNames.InlineEditorFoldoutSpeed))]
         public void SerializedPropertyNamesResolvesToSerializedProperty(string constantName)
         {
-            string fieldName = UnityHelpersSettings.SerializedPropertyNames.GetPropertyNameValue(
-                constantName
-            );
+            string fieldName = UnityHelpersSettingsTestAccess.GetPropertyNameValue(constantName);
 
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
             using SerializedObject serialized = new(settings);
@@ -2315,9 +2452,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             Type expectedFieldType
         )
         {
-            string fieldName = UnityHelpersSettings.SerializedPropertyNames.GetPropertyNameValue(
-                constantName
-            );
+            string fieldName = UnityHelpersSettingsTestAccess.GetPropertyNameValue(constantName);
 
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
             using SerializedObject serialized = new(settings);
@@ -2505,14 +2640,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             UnityHelpersBufferSettingsAsset asset = Resources.Load<UnityHelpersBufferSettingsAsset>(
                 UnityHelpersBufferSettingsAsset.ResourcePath
             );
-            if (asset == null)
-            {
-                Assert.Inconclusive(
-                    "UnityHelpersBufferSettingsAsset not found in Resources. "
-                        + "Run the settings UI to create the asset first."
-                );
-                return;
-            }
+            Assert.IsTrue(
+                asset != null,
+                "The fixture must retain its provisioned buffer settings resource."
+            );
 
             float originalQuantization = asset.QuantizationStepSeconds;
             int originalMaxEntries = asset.MaxDistinctEntries;
@@ -2624,14 +2755,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             UnityHelpersBufferSettingsAsset asset = Resources.Load<UnityHelpersBufferSettingsAsset>(
                 UnityHelpersBufferSettingsAsset.ResourcePath
             );
-            if (asset == null)
-            {
-                Assert.Inconclusive(
-                    "UnityHelpersBufferSettingsAsset not found in Resources. "
-                        + "Run the settings UI to create the asset first."
-                );
-                return;
-            }
+            Assert.IsTrue(
+                asset != null,
+                "The fixture must retain its provisioned buffer settings resource."
+            );
 
             float originalRuntimeQuantization = Buffers.WaitInstructionQuantizationStepSeconds;
             int originalRuntimeMaxEntries = Buffers.WaitInstructionMaxDistinctEntries;
@@ -2714,14 +2841,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             UnityHelpersBufferSettingsAsset asset = Resources.Load<UnityHelpersBufferSettingsAsset>(
                 UnityHelpersBufferSettingsAsset.ResourcePath
             );
-            if (asset == null)
-            {
-                Assert.Inconclusive(
-                    "UnityHelpersBufferSettingsAsset not found in Resources. "
-                        + "Run the settings UI to create the asset first."
-                );
-                return;
-            }
+            Assert.IsTrue(
+                asset != null,
+                "The fixture must retain its provisioned buffer settings resource."
+            );
 
             float originalRuntimeQuantization = Buffers.WaitInstructionQuantizationStepSeconds;
             int originalRuntimeMaxEntries = Buffers.WaitInstructionMaxDistinctEntries;
@@ -2804,14 +2927,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             UnityHelpersBufferSettingsAsset asset = Resources.Load<UnityHelpersBufferSettingsAsset>(
                 UnityHelpersBufferSettingsAsset.ResourcePath
             );
-            if (asset == null)
-            {
-                Assert.Inconclusive(
-                    "UnityHelpersBufferSettingsAsset not found in Resources. "
-                        + "Run the settings UI to create the asset first."
-                );
-                return;
-            }
+            Assert.IsTrue(
+                asset != null,
+                "The fixture must retain its provisioned buffer settings resource."
+            );
 
             float originalQuantization = asset.QuantizationStepSeconds;
 
@@ -2862,14 +2981,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             UnityHelpersBufferSettingsAsset asset = Resources.Load<UnityHelpersBufferSettingsAsset>(
                 UnityHelpersBufferSettingsAsset.ResourcePath
             );
-            if (asset == null)
-            {
-                Assert.Inconclusive(
-                    "UnityHelpersBufferSettingsAsset not found in Resources. "
-                        + "Run the settings UI to create the asset first."
-                );
-                return;
-            }
+            Assert.IsTrue(
+                asset != null,
+                "The fixture must retain its provisioned buffer settings resource."
+            );
 
             int originalMaxEntries = asset.MaxDistinctEntries;
 
@@ -2909,14 +3024,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             UnityHelpersBufferSettingsAsset asset = Resources.Load<UnityHelpersBufferSettingsAsset>(
                 UnityHelpersBufferSettingsAsset.ResourcePath
             );
-            if (asset == null)
-            {
-                Assert.Inconclusive(
-                    "UnityHelpersBufferSettingsAsset not found in Resources. "
-                        + "Run the settings UI to create the asset first."
-                );
-                return;
-            }
+            Assert.IsTrue(
+                asset != null,
+                "The fixture must retain its provisioned buffer settings resource."
+            );
 
             float originalRuntimeQuantization = Buffers.WaitInstructionQuantizationStepSeconds;
             int originalRuntimeMaxEntries = Buffers.WaitInstructionMaxDistinctEntries;
@@ -3019,14 +3130,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             UnityHelpersBufferSettingsAsset asset = Resources.Load<UnityHelpersBufferSettingsAsset>(
                 UnityHelpersBufferSettingsAsset.ResourcePath
             );
-            if (asset == null)
-            {
-                Assert.Inconclusive(
-                    "UnityHelpersBufferSettingsAsset not found in Resources. "
-                        + "Run the settings UI to create the asset first."
-                );
-                return;
-            }
+            Assert.IsTrue(
+                asset != null,
+                "The fixture must retain its provisioned buffer settings resource."
+            );
 
             float originalRuntimeQuantization = Buffers.WaitInstructionQuantizationStepSeconds;
             int originalRuntimeMaxEntries = Buffers.WaitInstructionMaxDistinctEntries;
@@ -3177,14 +3284,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             UnityHelpersBufferSettingsAsset asset = Resources.Load<UnityHelpersBufferSettingsAsset>(
                 UnityHelpersBufferSettingsAsset.ResourcePath
             );
-            if (asset == null)
-            {
-                Assert.Inconclusive(
-                    "UnityHelpersBufferSettingsAsset not found in Resources. "
-                        + "Run the settings UI to create the asset first."
-                );
-                return;
-            }
+            Assert.IsTrue(
+                asset != null,
+                "The fixture must retain its provisioned buffer settings resource."
+            );
 
             using SerializedObject serialized = new(asset);
 

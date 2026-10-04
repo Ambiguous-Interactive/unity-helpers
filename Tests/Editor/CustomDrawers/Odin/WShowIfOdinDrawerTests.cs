@@ -34,7 +34,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             WShowIfAttribute attribute
         )
         {
-            object conditionValue = WShowIfOdinDrawer.GetConditionValueForTest(
+            object conditionValue = WShowIfOdinDrawer.GetConditionValue(
                 target,
                 attribute.conditionField
             );
@@ -1332,10 +1332,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             OdinShowIfBoolTarget target = CreateScriptableObject<OdinShowIfBoolTarget>();
 
-            object conditionValue = WShowIfOdinDrawer.GetConditionValueForTest(
-                target,
-                "nonExistentField"
-            );
+            object conditionValue = WShowIfOdinDrawer.GetConditionValue(target, "nonExistentField");
 
             Assert.That(conditionValue, Is.Null, "Non-existent field should return null");
         }
@@ -1343,7 +1340,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void NullParentValueHandledGracefully()
         {
-            object conditionValue = WShowIfOdinDrawer.GetConditionValueForTest(null, "someField");
+            object conditionValue = WShowIfOdinDrawer.GetConditionValue(null, "someField");
 
             Assert.That(conditionValue, Is.Null, "Null parent should return null condition value");
         }
@@ -1353,10 +1350,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             OdinShowIfBoolTarget target = CreateScriptableObject<OdinShowIfBoolTarget>();
 
-            object conditionValue = WShowIfOdinDrawer.GetConditionValueForTest(
-                target,
-                string.Empty
-            );
+            object conditionValue = WShowIfOdinDrawer.GetConditionValue(target, string.Empty);
 
             Assert.That(conditionValue, Is.Null, "Empty condition field name should return null");
         }

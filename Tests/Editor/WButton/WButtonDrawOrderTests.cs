@@ -216,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         public void DrawOrderZeroIsTopPlacement()
         {
             WButtonGroupKey key = new(0, 0, null, 0, WButtonGroupPlacement.UseGlobalSetting);
-            GUIContent header = WButtonGUI.BuildGroupHeader(key);
+            GUIContent header = WButtonGUITestAccess.BuildGroupHeader(key);
 
             Assert.That(header, Is.Not.Null);
         }
@@ -226,11 +226,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         {
             WButtonGroupKey key = new(0, -1, null, 0, WButtonGroupPlacement.UseGlobalSetting);
 
-            WButtonGUI.ClearGroupDataForTesting();
+            WButtonGUITestAccess.ClearGroupData();
             Dictionary<int, int> counts = new() { { -1, 1 } };
-            WButtonGUI.SetGroupCountsForTesting(counts);
+            WButtonGUITestAccess.SetGroupCounts(counts);
 
-            GUIContent header = WButtonGUI.BuildGroupHeader(key);
+            GUIContent header = WButtonGUITestAccess.BuildGroupHeader(key);
 
             Assert.That(header, Is.Not.Null);
             Assert.That(header.text, Is.EqualTo(WButtonStyles.TopGroupLabel.text));
@@ -241,11 +241,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         {
             WButtonGroupKey key = new(0, -2, null, 0, WButtonGroupPlacement.Bottom);
 
-            WButtonGUI.ClearGroupDataForTesting();
+            WButtonGUITestAccess.ClearGroupData();
             Dictionary<int, int> counts = new() { { -2, 1 } };
-            WButtonGUI.SetGroupCountsForTesting(counts);
+            WButtonGUITestAccess.SetGroupCounts(counts);
 
-            GUIContent header = WButtonGUI.BuildGroupHeader(key);
+            GUIContent header = WButtonGUITestAccess.BuildGroupHeader(key);
 
             Assert.That(header, Is.Not.Null, "Header should not be null");
             Assert.That(
@@ -260,11 +260,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         {
             WButtonGroupKey key = new(0, -2, null, 0, WButtonGroupPlacement.UseGlobalSetting);
 
-            WButtonGUI.ClearGroupDataForTesting();
+            WButtonGUITestAccess.ClearGroupData();
             Dictionary<int, int> counts = new() { { -2, 1 } };
-            WButtonGUI.SetGroupCountsForTesting(counts);
+            WButtonGUITestAccess.SetGroupCounts(counts);
 
-            GUIContent header = WButtonGUI.BuildGroupHeader(key);
+            GUIContent header = WButtonGUITestAccess.BuildGroupHeader(key);
 
             Assert.That(header, Is.Not.Null, "Header should not be null");
             Assert.That(

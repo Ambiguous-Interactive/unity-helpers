@@ -102,7 +102,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// 1000.
         /// </para>
         /// <para>
-        /// This is a deliberate divergence from protobuf-net's OUTPUT at CompatibilityLevel 200,
+        /// The member can opt out through <c>IsPacked = false</c>, retaining one key per element.
+        /// The default is a deliberate divergence from protobuf-net's OUTPUT at CompatibilityLevel 200,
         /// which writes unpacked, and it is safe because wire compatibility is about what the other
         /// side can READ. Measured against protobuf-net 3.2.56: a packed run decodes into a field it
         /// declares unpacked, exactly, for every packable element type -- int, long, ulong, bool,
@@ -114,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// closure, so its run is decided at runtime by <c>WProtoGeneric&lt;T&gt;</c> instead.
         /// </para>
         /// </remarks>
-        private bool WritesPacked => !_elementIsGeneric && _shape.Packable;
+        private bool WritesPacked => _isPacked && !_elementIsGeneric && _shape.Packable;
 
         /// <summary>Whether the member is walked by index rather than with <c>foreach</c>.</summary>
         private bool IsArray => _form.WalksByIndex;
@@ -142,6 +143,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly string _collectionDisplay;
         private readonly bool _collectionIsValueType;
         private readonly bool _overwrite;
+        private readonly bool _isPacked;
         private readonly bool _elementIsReference;
         private readonly bool _elementIsGeneric;
 
@@ -157,7 +159,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string collectionDisplay,
             bool collectionIsValueType,
             bool overwrite,
-            bool elementIsGeneric
+            bool elementIsGeneric,
+            bool isPacked
         )
             : base(name, tag)
         {
@@ -170,6 +173,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _collectionDisplay = collectionDisplay;
             _collectionIsValueType = collectionIsValueType;
             _overwrite = overwrite;
+            _isPacked = isPacked;
             _elementIsGeneric = elementIsGeneric;
             _elementIsReference = !elementIsGeneric && shape.IsReference;
         }
@@ -184,6 +188,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             int tag,
             ITypeSymbol type,
             bool overwriteList,
+            bool isPacked,
             SurrogateMap surrogates,
             NestedCollections nested
         )
@@ -231,7 +236,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 TypeNaming.Display(type),
                 type.IsValueType,
                 overwriteList,
-                elementIsGeneric
+                elementIsGeneric,
+                isPacked
             );
         }
 
@@ -291,7 +297,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 false,
                 // Wrapper arrays have no constructor seed, so reads replace rather than append.
                 true,
-                elementIsGeneric
+                elementIsGeneric,
+                true
             );
         }
 
@@ -495,7 +502,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return;
             }
 
-            if (_elementIsGeneric)
+            if (_elementIsGeneric && _isPacked)
             {
                 EmitGenericMeasure(writer);
                 return;
@@ -504,11 +511,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             int open = OpenLoop(writer);
             writer.Line(
                 "size += "
-                    + Proto
-                    + ".WProtoSizes.TagSize("
-                    + Tag
-                    + ") + "
-                    + Shape.Fill(_shape.SizeExpression, ElementLocal)
+                    + (
+                        _elementIsGeneric
+                            ? Generic + ".MeasureElement(" + Tag + ", " + ElementLocal + ")"
+                            : Proto
+                                + ".WProtoSizes.TagSize("
+                                + Tag
+                                + ") + "
+                                + Shape.Fill(_shape.SizeExpression, ElementLocal)
+                    )
                     + ";"
             );
             CloseAll(writer, open);
@@ -524,7 +535,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return;
             }
 
-            if (_elementIsGeneric)
+            if (_elementIsGeneric && _isPacked)
             {
                 EmitGenericWrite(writer);
                 return;

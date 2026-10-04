@@ -88,7 +88,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             WGroupLayoutBuilder.ClearCache();
 
             _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
             );
@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         {
             WGroupLayoutBuilder.ClearCache();
 
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+            UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
                 _previousConfiguration.Mode,
                 _previousConfiguration.RowCount
             );

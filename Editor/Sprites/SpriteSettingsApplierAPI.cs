@@ -21,18 +21,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </summary>
     public static class SpriteSettingsApplierAPI
     {
-        internal static Func<string, bool> DeleteProfileAssetAction = AssetDatabase.DeleteAsset;
-        internal static Action<UnityEngine.Object, string> CreateProfileAssetAction =
-            AssetDatabase.CreateAsset;
-        internal static Action<string> BeforeAbsentRestoreMoveForTests;
-        internal static Action SaveProfileAssetsAction = AssetDatabase.SaveAssets;
-        internal static Func<string, string, string> MoveProfileAssetAction =
-            AssetDatabase.MoveAsset;
-        internal static Action<string, ImportAssetOptions> ImportProfileAssetAction =
-            AssetDatabase.ImportAsset;
-        internal static Func<string, SpriteSettingsProfileCollection> LoadProfileAssetAction =
-            AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>;
-
         /// <summary>Applies profiles to explicit asset paths and persists changed importers.</summary>
         /// <remarks>
         /// Cancellation retains completed changes. Reimport and asset-database side effects cannot
@@ -683,6 +671,48 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return changed;
         }
 
+        internal static bool ProfilesMatchExpected(
+            SpriteSettingsProfileCollection committed,
+            int expectedCount,
+            string expectedJson
+        )
+        {
+            return committed != null
+                && committed.profiles != null
+                && committed.profiles.Count == expectedCount
+                && string.Equals(
+                    Serializer.JsonStringify(committed.profiles),
+                    expectedJson,
+                    StringComparison.Ordinal
+                );
+        }
+
+        internal static bool TryRestoreAbsentProfileBytes(
+            string fullPath,
+            byte[] bytes,
+            out Exception error
+        )
+        {
+            return DurableFile.TryCreateAllBytes(fullPath, bytes, out error);
+        }
+
+        internal static bool TryDeleteProfileAsset(string assetPath, out string error)
+        {
+            bool deleted = AssetDatabase.DeleteAsset(assetPath);
+            string fullPath = ProfileFullPath(assetPath);
+            if (
+                !deleted
+                || File.Exists(fullPath)
+                || AssetDatabase.LoadMainAssetAtPath(assetPath) != null
+            )
+            {
+                error = $"Could not remove partial profiles asset at {assetPath}.";
+                return false;
+            }
+            error = null;
+            return true;
+        }
+
         private static bool TrySaveProfilesCore(
             string assetPath,
             IReadOnlyList<SpriteSettings> profiles,
@@ -771,14 +801,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 target.profiles = copies;
                 target.name =
                     existing != null ? existing.name : Path.GetFileNameWithoutExtension(path);
-                CreateProfileAssetAction(target, writePath);
+                AssetDatabase.CreateAsset(target, writePath);
                 ownedGuid = AssetDatabase.AssetPathToGUID(writePath);
                 if (string.IsNullOrEmpty(ownedGuid))
                 {
                     throw new IOException($"Could not identify profiles asset at {writePath}.");
                 }
-                SaveProfileAssetsAction();
-                if (LoadProfileAssetAction(writePath) == null)
+                AssetDatabase.SaveAssets();
+                if (
+                    AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(writePath)
+                    == null
+                )
                 {
                     throw new IOException($"Could not create profiles asset at {writePath}.");
                 }
@@ -787,7 +820,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     string moveError;
                     try
                     {
-                        moveError = MoveProfileAssetAction(writePath, path);
+                        moveError = AssetDatabase.MoveAsset(writePath, path);
                     }
                     catch (Exception moveException)
                     {
@@ -805,8 +838,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         );
                     }
                     moveCommitted = true;
-                    ImportProfileAssetAction(path, ImportAssetOptions.ForceSynchronousImport);
-                    SpriteSettingsProfileCollection committed = LoadProfileAssetAction(path);
+                    AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+                    SpriteSettingsProfileCollection committed =
+                        AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(path);
                     if (
                         !ProfilesMatchExpected(
                             committed,
@@ -845,10 +879,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     replacementSucceeded = true;
                 }
-                ImportProfileAssetAction(path, ImportAssetOptions.ForceSynchronousImport);
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
                 if (
                     !ProfilesMatchExpected(
-                        LoadProfileAssetAction(path),
+                        AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(path),
                         expectedProfilesCount,
                         expectedProfilesJson
                     )
@@ -938,53 +972,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 error = failure;
                 return false;
             }
-        }
-
-        private static bool ProfilesMatchExpected(
-            SpriteSettingsProfileCollection committed,
-            int expectedCount,
-            string expectedJson
-        )
-        {
-            return committed != null
-                && committed.profiles != null
-                && committed.profiles.Count == expectedCount
-                && string.Equals(
-                    Serializer.JsonStringify(committed.profiles),
-                    expectedJson,
-                    StringComparison.Ordinal
-                );
-        }
-
-        private static bool TryRestoreAbsentProfileBytes(
-            string fullPath,
-            byte[] bytes,
-            out Exception error
-        )
-        {
-            return DurableFile.TryCreateAllBytes(
-                fullPath,
-                bytes,
-                out error,
-                BeforeAbsentRestoreMoveForTests
-            );
-        }
-
-        private static bool TryDeleteProfileAsset(string assetPath, out string error)
-        {
-            bool deleted = DeleteProfileAssetAction(assetPath);
-            string fullPath = ProfileFullPath(assetPath);
-            if (
-                !deleted
-                || File.Exists(fullPath)
-                || AssetDatabase.LoadMainAssetAtPath(assetPath) != null
-            )
-            {
-                error = $"Could not remove partial profiles asset at {assetPath}.";
-                return false;
-            }
-            error = null;
-            return true;
         }
 
         private static string ProfileFullPath(string assetPath)

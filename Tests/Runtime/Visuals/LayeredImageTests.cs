@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
                 yield return AttachToRuntimePanel(image);
 
-                Assert.IsFalse(image.SelfUpdateActiveForTests);
+                Assert.IsFalse(image._selfUpdateItem != null);
                 Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
 
                 Assert.DoesNotThrow(() => image.Update(force: true));
@@ -194,16 +194,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 updatesSelf: true
             );
             Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
-            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Assert.IsFalse(image._selfUpdateItem != null);
 
             yield return AttachToRuntimePanel(image);
 
-            Assert.IsTrue(image.SelfUpdateActiveForTests);
+            Assert.IsTrue(image._selfUpdateItem != null);
 
             yield return WaitUntilBackgroundIs(image, computed[1], "initial self-update");
 
             image.Fps = 0f;
-            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Assert.IsFalse(image._selfUpdateItem != null);
             Texture2D pausedFrame = image.style.backgroundImage.value.texture;
 
             yield return null;
@@ -232,22 +232,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 updatesSelf: true
             );
             Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
-            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Assert.IsFalse(image._selfUpdateItem != null);
 
             yield return AttachToRuntimePanel(image);
 
-            Assert.IsTrue(image.SelfUpdateActiveForTests);
+            Assert.IsTrue(image._selfUpdateItem != null);
 
             yield return WaitUntilBackgroundIs(image, computed[1], "initial self-update");
 
             image.Fps = 0f;
-            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Assert.IsFalse(image._selfUpdateItem != null);
             Texture2D pausedFrame = image.style.backgroundImage.value.texture;
             yield return null;
             Assert.AreSame(pausedFrame, image.style.backgroundImage.value.texture);
 
             image.Fps = 60f;
-            Assert.IsTrue(image.SelfUpdateActiveForTests);
+            Assert.IsTrue(image._selfUpdateItem != null);
 
             yield return WaitUntilBackgroundIs(image, computed[2], "resumed self-update");
         }
@@ -272,11 +272,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             yield return AttachToRuntimePanel(image);
 
-            Assert.IsTrue(image.SelfUpdateActiveForTests);
+            Assert.IsTrue(image._selfUpdateItem != null);
             yield return WaitUntilBackgroundIs(image, computed[1], "attached self-update");
 
             image.RemoveFromHierarchy();
-            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Assert.IsFalse(image._selfUpdateItem != null);
             Texture2D detachedFrame = image.style.backgroundImage.value.texture;
 
             yield return null;
@@ -301,13 +301,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             );
             Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
 
-            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Assert.IsFalse(image._selfUpdateItem != null);
             Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
 
             image.Update(force: true);
 
             Assert.AreSame(computed[0], image.style.backgroundImage.value.texture);
-            Assert.IsFalse(image.SelfUpdateActiveForTests);
+            Assert.IsFalse(image._selfUpdateItem != null);
         }
 
         [UnityTest]
@@ -779,7 +779,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 parallel[index] = background;
             }
 
-            LayeredImage.ComposeSpriteOntoBufferForTests(
+            LayeredImage.ComposeSpriteOntoBuffer(
                 sequential,
                 bufferWidth,
                 bufferHeight,
@@ -792,7 +792,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 0.01f,
                 useParallel: false
             );
-            LayeredImage.ComposeSpriteOntoBufferForTests(
+            LayeredImage.ComposeSpriteOntoBuffer(
                 parallel,
                 bufferWidth,
                 bufferHeight,
@@ -827,9 +827,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             yield return AttachToRuntimePanel(image);
 
-            image.SetElapsedSinceLastFrameForTests(
-                TimeSpanFromFractionalMilliseconds(elapsedMilliseconds)
-            );
+            image._timer.Stop();
+            image._lastTick =
+                image._timer.Elapsed - TimeSpanFromFractionalMilliseconds(elapsedMilliseconds);
             image.Update();
 
             Assert.AreSame(

@@ -33,18 +33,18 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         public void SetUp()
         {
             base.BaseSetUp();
-            WButtonGUI.ClearGroupDataForTesting();
-            WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
-            WButtonGUI.ClearConflictWarningContentCacheForTesting();
+            WButtonGUITestAccess.ClearGroupData();
+            WButtonGUITestAccess.ClearConflictingDrawOrderWarnings();
+            WButtonGUITestAccess.ClearConflictWarningContentCache();
             WButtonGUI.ClearContextCache();
         }
 
         [TearDown]
         public override void TearDown()
         {
-            WButtonGUI.ClearGroupDataForTesting();
-            WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
-            WButtonGUI.ClearConflictWarningContentCacheForTesting();
+            WButtonGUITestAccess.ClearGroupData();
+            WButtonGUITestAccess.ClearConflictingDrawOrderWarnings();
+            WButtonGUITestAccess.ClearConflictWarningContentCache();
             WButtonGUI.ClearContextCache();
             base.TearDown();
         }
@@ -67,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> setupGroups = groupCounts
                 .Keys.Where(k =>
                     string.Equals(k._groupName, "Setup", System.StringComparison.Ordinal)
@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             WButtonGroupKey setupGroup = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "Setup", System.StringComparison.Ordinal)
             );
@@ -136,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.DrawOrderConflictInfo> warnings =
-                WButtonGUI.GetConflictingDrawOrderWarnings();
+                WButtonGUI.ConflictingDrawOrderWarnings;
 
             Assert.That(warnings, Contains.Key("Setup"), "Should have warning for Setup group");
             WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Setup");
@@ -164,7 +164,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> actionsGroups = groupCounts
                 .Keys.Where(k =>
                     string.Equals(k._groupName, "Actions", System.StringComparison.Ordinal)
@@ -201,7 +201,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             WButtonGroupKey actionsGroup = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "Actions", System.StringComparison.Ordinal)
             );
@@ -228,7 +228,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.DrawOrderConflictInfo> warnings =
-                WButtonGUI.GetConflictingDrawOrderWarnings();
+                WButtonGUI.ConflictingDrawOrderWarnings;
 
             Assert.That(warnings, Contains.Key("Actions"));
             WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Actions");
@@ -264,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
 
             List<WButtonGroupKey> groupAKeys = groupCounts
                 .Keys.Where(k =>
@@ -309,7 +309,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
 
             WButtonGroupKey groupA = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "GroupA", System.StringComparison.Ordinal)
@@ -349,7 +349,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.DrawOrderConflictInfo> warnings =
-                WButtonGUI.GetConflictingDrawOrderWarnings();
+                WButtonGUI.ConflictingDrawOrderWarnings;
 
             Assert.That(warnings, Contains.Key("GroupA"));
             Assert.That(warnings, Contains.Key("GroupB"));
@@ -382,7 +382,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
 
             List<WButtonGroupKey> setupGroups = groupCounts
                 .Keys.Where(k =>
@@ -424,7 +424,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> ungroupedGroups = groupCounts
                 .Keys.Where(k => string.IsNullOrEmpty(k._groupName))
                 .ToList();
@@ -463,7 +463,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             // The first-declared button has drawOrder 10; -10 is numerically lower but declared second.
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             WButtonGroupKey testGroup = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "Test", System.StringComparison.Ordinal)
             );
@@ -493,7 +493,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> extremeGroups = groupCounts
                 .Keys.Where(k =>
                     string.Equals(k._groupName, "Extreme", System.StringComparison.Ordinal)
@@ -524,7 +524,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.DrawOrderConflictInfo> warnings =
-                WButtonGUI.GetConflictingDrawOrderWarnings();
+                WButtonGUI.ConflictingDrawOrderWarnings;
 
             Assert.That(warnings, Contains.Key("Extreme"));
             Assert.That(warnings.ValueFor("Extreme")._allDrawOrders, Contains.Item(int.MinValue));
@@ -553,7 +553,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Assert.That(drawnTop, Is.True, "Group should render at top placement");
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             WButtonGroupKey crossGroup = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "CrossPlacement", System.StringComparison.Ordinal)
             );
@@ -594,10 +594,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(
                 drawnTop,
                 Is.True,
-                $"Group with UseGlobalSetting should render at Top when globalPlacementIsTop=true. Groups: {string.Join(", ", WButtonGUI.GetGroupCountsForTesting().Keys.Select(k => $"{k._groupName}:{k._groupPlacement}"))}"
+                $"Group with UseGlobalSetting should render at Top when globalPlacementIsTop=true. Groups: {string.Join(", ", WButtonGUITestAccess.GetGroupCounts().Keys.Select(k => $"{k._groupName}:{k._groupPlacement}"))}"
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             WButtonGroupKey crossGroup = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "CrossPlacement", System.StringComparison.Ordinal)
             );
@@ -638,7 +638,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.DrawOrderConflictInfo> warnings =
-                WButtonGUI.GetConflictingDrawOrderWarnings();
+                WButtonGUI.ConflictingDrawOrderWarnings;
 
             Assert.That(
                 warnings.ContainsKey("NoConflict"),
@@ -646,7 +646,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Should not generate warning for matching draw orders"
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> noConflictGroups = groupCounts
                 .Keys.Where(k =>
                     string.Equals(k._groupName, "NoConflict", System.StringComparison.Ordinal)
@@ -676,7 +676,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.DrawOrderConflictInfo> warnings =
-                WButtonGUI.GetConflictingDrawOrderWarnings();
+                WButtonGUI.ConflictingDrawOrderWarnings;
 
             Assert.That(warnings.ContainsKey("Single"), Is.False);
         }
@@ -753,7 +753,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, string> groupNames = WButtonGUI.GetGroupNamesForTesting();
+            Dictionary<WButtonGroupKey, string> groupNames = WButtonGUITestAccess.GetGroupNames();
             WButtonGroupKey setupKey = groupNames.Keys.FirstOrDefault(k =>
                 string.Equals(k._groupName, "Setup", System.StringComparison.Ordinal)
             );
@@ -788,10 +788,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(
                 anyDrawn,
                 Is.True,
-                $"Buttons must always be rendered. Groups found: {string.Join(", ", WButtonGUI.GetGroupCountsForTesting().Keys.Select(k => $"{k._groupName}:{k._drawOrder}:{k._groupPlacement}"))}"
+                $"Buttons must always be rendered. Groups found: {string.Join(", ", WButtonGUITestAccess.GetGroupCounts().Keys.Select(k => $"{k._groupName}:{k._drawOrder}:{k._groupPlacement}"))}"
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             int totalButtons = groupCounts.Values.Sum();
             Assert.That(totalButtons, Is.EqualTo(2), "Both buttons must be in groups");
         }
@@ -816,7 +816,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             Assert.That(anyDrawn, Is.True);
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             int totalButtons = groupCounts.Values.Sum();
             Assert.That(totalButtons, Is.EqualTo(3));
         }
@@ -842,7 +842,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 globalPlacementIsTop: false
             );
 
-            WButtonGUI.ClearGroupDataForTesting();
+            WButtonGUITestAccess.ClearGroupData();
 
             bool drawnBottom = WButtonGUI.DrawButtons(
                 editor,
@@ -893,7 +893,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             int totalButtons = groupCounts.Values.Sum();
 
             Assert.That(totalButtons, Is.EqualTo(4), "All 4 buttons must be rendered");
@@ -924,10 +924,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(
                 drawnTop,
                 Is.True,
-                $"Group with UseGlobalSetting must render at Top when globalPlacementIsTop=true. Groups: {string.Join(", ", WButtonGUI.GetGroupCountsForTesting().Keys.Select(k => $"{k._groupName}:{k._drawOrder}:{k._groupPlacement}"))}"
+                $"Group with UseGlobalSetting must render at Top when globalPlacementIsTop=true. Groups: {string.Join(", ", WButtonGUITestAccess.GetGroupCounts().Keys.Select(k => $"{k._groupName}:{k._drawOrder}:{k._groupPlacement}"))}"
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             WButtonGroupKey setupGroup = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "Setup", System.StringComparison.Ordinal)
             );
@@ -968,7 +968,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.DrawOrderConflictInfo> warnings =
-                WButtonGUI.GetConflictingDrawOrderWarnings();
+                WButtonGUI.ConflictingDrawOrderWarnings;
 
             Assert.That(warnings, Contains.Key("Setup"));
             WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Setup");
@@ -997,7 +997,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.DrawOrderConflictInfo> warnings =
-                WButtonGUI.GetConflictingDrawOrderWarnings();
+                WButtonGUI.ConflictingDrawOrderWarnings;
 
             WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Setup");
 
@@ -1030,7 +1030,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> ungroupedKeys = groupCounts
                 .Keys.Where(k => string.IsNullOrEmpty(k._groupName))
                 .ToList();
@@ -1062,7 +1062,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             IReadOnlyDictionary<string, WButtonGUI.DrawOrderConflictInfo> warnings =
-                WButtonGUI.GetConflictingDrawOrderWarnings();
+                WButtonGUI.ConflictingDrawOrderWarnings;
 
             Assert.That(
                 warnings.Count,
@@ -1089,15 +1089,15 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Assert.That(WButtonGUI.GetGroupCountsForTesting().Count, Is.GreaterThan(0));
-            Assert.That(WButtonGUI.GetConflictingDrawOrderWarnings().Count, Is.GreaterThan(0));
+            Assert.That(WButtonGUITestAccess.GetGroupCounts().Count, Is.GreaterThan(0));
+            Assert.That(WButtonGUI.ConflictingDrawOrderWarnings.Count, Is.GreaterThan(0));
 
-            WButtonGUI.ClearGroupDataForTesting();
-            WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
-            WButtonGUI.ClearConflictWarningContentCacheForTesting();
+            WButtonGUITestAccess.ClearGroupData();
+            WButtonGUITestAccess.ClearConflictingDrawOrderWarnings();
+            WButtonGUITestAccess.ClearConflictWarningContentCache();
 
-            Assert.That(WButtonGUI.GetGroupCountsForTesting().Count, Is.EqualTo(0));
-            Assert.That(WButtonGUI.GetConflictingDrawOrderWarnings().Count, Is.EqualTo(0));
+            Assert.That(WButtonGUITestAccess.GetGroupCounts().Count, Is.EqualTo(0));
+            Assert.That(WButtonGUI.ConflictingDrawOrderWarnings.Count, Is.EqualTo(0));
         }
 
         [Test]
@@ -1120,7 +1120,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             WButtonGroupKey testGroup = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "Test", System.StringComparison.Ordinal)
             );
@@ -1152,7 +1152,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             WButtonGroupKey crossGroup = groupCounts.Keys.First(k =>
                 string.Equals(k._groupName, "CrossPlacement", System.StringComparison.Ordinal)
             );
@@ -1190,7 +1190,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
+            Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUITestAccess.GetGroupCounts();
             List<WButtonGroupKey> sortedKeys = groupCounts.Keys.OrderBy(k => k._drawOrder).ToList();
 
             int previousDrawOrder = int.MinValue;
@@ -1278,7 +1278,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 drawn,
                 Is.EqualTo(expectedDrawn),
                 $"With globalPlacementIsTop={globalPlacementIsTop} and placementToTry={placementToTry}, drawn should be {expectedDrawn}. "
-                    + $"Groups found: {string.Join(", ", WButtonGUI.GetGroupCountsForTesting().Keys.Select(k => $"{k._groupName}:{k._drawOrder}:{k._groupPlacement}"))}"
+                    + $"Groups found: {string.Join(", ", WButtonGUITestAccess.GetGroupCounts().Keys.Select(k => $"{k._groupName}:{k._drawOrder}:{k._groupPlacement}"))}"
             );
         }
 
@@ -1300,7 +1300,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 WButtonGroupPlacement.UseGlobalSetting
             );
 
-            GUIContent header = WButtonGUI.BuildGroupHeader(key);
+            GUIContent header = WButtonGUITestAccess.BuildGroupHeader(key);
             Assert.That(
                 header.text,
                 Does.Contain(WButtonStyles.TopGroupLabel.text).Or.EqualTo("TestGroup"),
@@ -1315,13 +1315,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             string expectedLabelName
         )
         {
-            WButtonGUI.ClearGroupDataForTesting();
+            WButtonGUITestAccess.ClearGroupData();
             Dictionary<int, int> counts = new() { { 0, 1 } };
-            WButtonGUI.SetGroupCountsForTesting(counts);
+            WButtonGUITestAccess.SetGroupCounts(counts);
 
             WButtonGroupKey key = new(WButtonAttribute.NoGroupPriority, 0, null, 0, placement);
 
-            GUIContent header = WButtonGUI.BuildGroupHeader(key);
+            GUIContent header = WButtonGUITestAccess.BuildGroupHeader(key);
             GUIContent expectedLabel =
                 placement == WButtonGroupPlacement.Top
                     ? WButtonStyles.TopGroupLabel

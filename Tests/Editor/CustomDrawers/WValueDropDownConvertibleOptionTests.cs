@@ -55,7 +55,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             object[] options = attribute.GetOptions(asset);
             Assert.IsTrue(options != null, $"{propertyPath} produced no options.");
 
-            return WValueDropDownDrawer.TestHooks.ResolveSelectedIndex(
+            return WValueDropDownDrawerTestAccess.ResolveSelectedIndex(
                 property,
                 attribute.ValueType,
                 options
@@ -248,7 +248,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         )
         {
             Assert.IsTrue(
-                WValueDropDownDrawer.TestHooks.MatchesAuthoredOption(serializedValue, option),
+                WValueDropDownDrawerTestAccess.MatchesAuthoredOption(serializedValue, option),
                 $"{serializedValue.GetType().Name} holding {serializedValue} must match the authored "
                     + $"{option.GetType().Name} {option}"
             );
@@ -262,7 +262,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         )
         {
             Assert.IsFalse(
-                WValueDropDownDrawer.TestHooks.MatchesAuthoredOption(serializedValue, option),
+                WValueDropDownDrawerTestAccess.MatchesAuthoredOption(serializedValue, option),
                 $"{serializedValue.GetType().Name} holding {serializedValue} must not match the "
                     + $"authored {option.GetType().Name} {option}"
             );

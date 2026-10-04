@@ -440,6 +440,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         false,
                         // Wrappers have no constructor seed, so reads replace rather than append.
                         true,
+                        true,
                         false,
                         _surrogates,
                         this,

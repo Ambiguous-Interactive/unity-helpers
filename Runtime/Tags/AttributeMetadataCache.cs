@@ -92,6 +92,16 @@ namespace WallstopStudios.UnityHelpers.Tags
         internal RelationalTypeMetadata[] _relationalTypeMetadata =
             Array.Empty<RelationalTypeMetadata>();
 
+        internal readonly object _lookupLock = new();
+
+        internal Dictionary<Type, string[]> _typeFieldsLookup;
+        internal Dictionary<Type, RelationalFieldMetadata[]> _relationalFieldsLookup;
+        internal Dictionary<
+            Type,
+            ResolvedRelationalFieldMetadata[]
+        > _resolvedRelationalFieldsLookup;
+        internal Dictionary<ElementTypeKey, Type> _elementTypeLookup;
+
         [Header("Initialization")]
         [Tooltip(
             "If enabled, pre-warms RelationalComponent reflection caches at runtime before the first scene loads. Useful to avoid first-use stalls on IL2CPP or slow devices."
@@ -114,13 +124,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         [SerializeField]
         private AutoLoadSingletonEntry[] _autoLoadSingletons =
             Array.Empty<AutoLoadSingletonEntry>();
-
-        private readonly object _lookupLock = new();
-
-        private Dictionary<Type, string[]> _typeFieldsLookup;
-        private Dictionary<Type, RelationalFieldMetadata[]> _relationalFieldsLookup;
-        private Dictionary<Type, ResolvedRelationalFieldMetadata[]> _resolvedRelationalFieldsLookup;
-        private Dictionary<ElementTypeKey, Type> _elementTypeLookup;
 
         private void OnEnable()
         {
@@ -151,130 +154,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                     $"AttributeMetadataCache: Exception during relational prewarm on load: {e}"
                 );
             }
-        }
-#endif
-
-        private void BuildLookup()
-        {
-            lock (_lookupLock)
-            {
-                if (
-                    _typeFieldsLookup != null
-                    && _relationalFieldsLookup != null
-                    && _resolvedRelationalFieldsLookup != null
-                    && _elementTypeLookup != null
-                )
-                {
-                    return;
-                }
-
-                Dictionary<Type, string[]> typeFieldsLookup = new(_typeMetadata?.Length ?? 0);
-                Dictionary<Type, RelationalFieldMetadata[]> relationalFieldsLookup = new(
-                    _relationalTypeMetadata?.Length ?? 0
-                );
-                Dictionary<Type, ResolvedRelationalFieldMetadata[]> resolvedRelationalFieldsLookup =
-                    new(_relationalTypeMetadata?.Length ?? 0);
-                Dictionary<ElementTypeKey, Type> elementTypeLookup = new(
-                    _relationalTypeMetadata?.Length ?? 0
-                );
-
-                if (_typeMetadata != null)
-                {
-                    foreach (TypeFieldMetadata metadata in _typeMetadata)
-                    {
-                        if (
-                            metadata == null
-                            || !TryResolveType(metadata.typeName, out Type componentType)
-                        )
-                        {
-                            LogMissingType(metadata?.typeName, "attribute component");
-                            continue;
-                        }
-
-                        string[] fieldNames = metadata.fieldNames ?? Array.Empty<string>();
-                        typeFieldsLookup[componentType] = fieldNames;
-                    }
-                }
-
-                if (_relationalTypeMetadata != null)
-                {
-                    foreach (RelationalTypeMetadata metadata in _relationalTypeMetadata)
-                    {
-                        if (
-                            metadata == null
-                            || !TryResolveType(metadata.typeName, out Type relationalType)
-                        )
-                        {
-                            LogMissingType(metadata?.typeName, "relational component");
-                            continue;
-                        }
-
-                        RelationalFieldMetadata[] fields =
-                            metadata.fields ?? Array.Empty<RelationalFieldMetadata>();
-
-                        relationalFieldsLookup[relationalType] = fields;
-
-                        ResolvedRelationalFieldMetadata[] resolvedFields =
-                            new ResolvedRelationalFieldMetadata[fields.Length];
-
-                        int fieldsLength = fields.Length;
-                        for (int i = 0; i < fieldsLength; ++i)
-                        {
-                            RelationalFieldMetadata field = fields[i];
-                            Type elementType = null;
-
-                            if (!string.IsNullOrWhiteSpace(field.elementTypeName))
-                            {
-                                if (TryResolveType(field.elementTypeName, out elementType))
-                                {
-                                    elementTypeLookup[
-                                        new ElementTypeKey(relationalType, field.fieldName)
-                                    ] = elementType;
-                                }
-                                else
-                                {
-                                    LogMissingType(field.elementTypeName, "relational element");
-                                }
-                            }
-
-                            resolvedFields[i] = new ResolvedRelationalFieldMetadata(
-                                field.fieldName,
-                                field.attributeKind,
-                                field.fieldKind,
-                                elementType,
-                                field.isInterface
-                            );
-                        }
-
-                        resolvedRelationalFieldsLookup[relationalType] = resolvedFields;
-                    }
-                }
-
-                _typeFieldsLookup = typeFieldsLookup;
-                _relationalFieldsLookup = relationalFieldsLookup;
-                _resolvedRelationalFieldsLookup = resolvedRelationalFieldsLookup;
-                _elementTypeLookup = elementTypeLookup;
-            }
-        }
-
-#if UNITY_INCLUDE_TESTS
-        /// <summary>
-        /// Rebuilds all cached lookup tables. Intended for editor and test usage.
-        /// </summary>
-        /// <remarks>
-        /// This clears internal dictionaries and forces a full rebuild, ensuring test isolation.
-        /// </remarks>
-        public void ForceRebuildForTests()
-        {
-            lock (_lookupLock)
-            {
-                _typeFieldsLookup = null;
-                _relationalFieldsLookup = null;
-                _resolvedRelationalFieldsLookup = null;
-                _elementTypeLookup = null;
-            }
-
-            BuildLookup();
         }
 #endif
 
@@ -439,6 +318,109 @@ namespace WallstopStudios.UnityHelpers.Tags
                 new ElementTypeKey(componentType, fieldName),
                 out elementType
             );
+        }
+
+        internal void BuildLookup()
+        {
+            lock (_lookupLock)
+            {
+                if (
+                    _typeFieldsLookup != null
+                    && _relationalFieldsLookup != null
+                    && _resolvedRelationalFieldsLookup != null
+                    && _elementTypeLookup != null
+                )
+                {
+                    return;
+                }
+
+                Dictionary<Type, string[]> typeFieldsLookup = new(_typeMetadata?.Length ?? 0);
+                Dictionary<Type, RelationalFieldMetadata[]> relationalFieldsLookup = new(
+                    _relationalTypeMetadata?.Length ?? 0
+                );
+                Dictionary<Type, ResolvedRelationalFieldMetadata[]> resolvedRelationalFieldsLookup =
+                    new(_relationalTypeMetadata?.Length ?? 0);
+                Dictionary<ElementTypeKey, Type> elementTypeLookup = new(
+                    _relationalTypeMetadata?.Length ?? 0
+                );
+
+                if (_typeMetadata != null)
+                {
+                    foreach (TypeFieldMetadata metadata in _typeMetadata)
+                    {
+                        if (
+                            metadata == null
+                            || !TryResolveType(metadata.typeName, out Type componentType)
+                        )
+                        {
+                            LogMissingType(metadata?.typeName, "attribute component");
+                            continue;
+                        }
+
+                        string[] fieldNames = metadata.fieldNames ?? Array.Empty<string>();
+                        typeFieldsLookup[componentType] = fieldNames;
+                    }
+                }
+
+                if (_relationalTypeMetadata != null)
+                {
+                    foreach (RelationalTypeMetadata metadata in _relationalTypeMetadata)
+                    {
+                        if (
+                            metadata == null
+                            || !TryResolveType(metadata.typeName, out Type relationalType)
+                        )
+                        {
+                            LogMissingType(metadata?.typeName, "relational component");
+                            continue;
+                        }
+
+                        RelationalFieldMetadata[] fields =
+                            metadata.fields ?? Array.Empty<RelationalFieldMetadata>();
+
+                        relationalFieldsLookup[relationalType] = fields;
+
+                        ResolvedRelationalFieldMetadata[] resolvedFields =
+                            new ResolvedRelationalFieldMetadata[fields.Length];
+
+                        int fieldsLength = fields.Length;
+                        for (int i = 0; i < fieldsLength; ++i)
+                        {
+                            RelationalFieldMetadata field = fields[i];
+                            Type elementType = null;
+
+                            if (!string.IsNullOrWhiteSpace(field.elementTypeName))
+                            {
+                                if (TryResolveType(field.elementTypeName, out elementType))
+                                {
+                                    elementTypeLookup[
+                                        new ElementTypeKey(relationalType, field.fieldName)
+                                    ] = elementType;
+                                }
+                                else
+                                {
+                                    LogMissingType(field.elementTypeName, "relational element");
+                                }
+                            }
+
+                            resolvedFields[i] = new ResolvedRelationalFieldMetadata(
+                                field.fieldName,
+                                field.attributeKind,
+                                field.fieldKind,
+                                elementType,
+                                field.isInterface
+                            );
+                        }
+
+                        resolvedRelationalFieldsLookup[relationalType] = resolvedFields;
+                    }
+                }
+
+                _typeFieldsLookup = typeFieldsLookup;
+                _relationalFieldsLookup = relationalFieldsLookup;
+                _resolvedRelationalFieldsLookup = resolvedRelationalFieldsLookup;
+                _elementTypeLookup = elementTypeLookup;
+            }
         }
 
 #if UNITY_EDITOR
@@ -1210,7 +1192,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
         }
 
-        private readonly struct ElementTypeKey : IEquatable<ElementTypeKey>
+        internal readonly struct ElementTypeKey : IEquatable<ElementTypeKey>
         {
             private readonly Type _componentType;
             private readonly string _fieldName;

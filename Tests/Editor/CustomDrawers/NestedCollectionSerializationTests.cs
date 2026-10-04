@@ -457,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryDrawerAcceptsTheListWrapper()
         {
             Assert.That(
-                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                SerializableDictionaryPropertyDrawerTestAccess.HasDroppedValuesArray(
                     FindCollection(nameof(NestedCollectionSerializationHost.wrappedValues))
                 ),
                 Is.False
@@ -472,7 +472,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryDrawerAcceptsACollectionValueType()
         {
             Assert.That(
-                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                SerializableDictionaryPropertyDrawerTestAccess.HasDroppedValuesArray(
                     FindCollection(nameof(NestedCollectionSerializationHost.droppedValues))
                 ),
                 Is.False
@@ -489,7 +489,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryDrawerReportsAValueTypeBoxingCannotRepair()
         {
             Assert.That(
-                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                SerializableDictionaryPropertyDrawerTestAccess.HasDroppedValuesArray(
                     FindCollection(nameof(NestedCollectionSerializationHost.nestedListValues))
                 ),
                 Is.True,
@@ -502,7 +502,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void SortedDictionaryDrawerReportsAValueTypeBoxingCannotRepair()
         {
             Assert.That(
-                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                SerializableDictionaryPropertyDrawerTestAccess.HasDroppedValuesArray(
                     FindCollection(nameof(NestedCollectionSerializationHost.sortedNestedListValues))
                 ),
                 Is.True,
@@ -520,7 +520,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryDrawerStaysSilentOnAnEmptyBoxedCollectionValue()
         {
             Assert.That(
-                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                SerializableDictionaryPropertyDrawerTestAccess.HasDroppedValuesArray(
                     FindCollection(nameof(NestedCollectionSerializationHost.sortedDroppedValues))
                 ),
                 Is.False,
@@ -532,7 +532,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryDrawerAcceptsASupportedValueType()
         {
             Assert.That(
-                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                SerializableDictionaryPropertyDrawerTestAccess.HasDroppedValuesArray(
                     FindCollection(nameof(NestedCollectionSerializationHost.control))
                 ),
                 Is.False
@@ -543,7 +543,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void DictionaryDrawerAcceptsTheCacheForm()
         {
             Assert.That(
-                SerializableDictionaryPropertyDrawer.HasDroppedValuesArrayForTests(
+                SerializableDictionaryPropertyDrawerTestAccess.HasDroppedValuesArray(
                     FindCollection(nameof(NestedCollectionSerializationHost.cachedValues))
                 ),
                 Is.False
@@ -580,10 +580,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableHashSetSerializedPropertyNames.Items
             );
 
-            Assert.That(
-                SerializableSetPropertyDrawer.HasDroppedItemsArrayForTests(true, items),
-                Is.True
-            );
+            Assert.That(SerializableSetPropertyDrawer.HasDroppedItemsArray(true, items), Is.True);
         }
 
         [Test]
@@ -594,10 +591,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableHashSetSerializedPropertyNames.Items
             );
 
-            Assert.That(
-                SerializableSetPropertyDrawer.HasDroppedItemsArrayForTests(true, items),
-                Is.False
-            );
+            Assert.That(SerializableSetPropertyDrawer.HasDroppedItemsArray(true, items), Is.False);
         }
 
         /// <summary>
@@ -607,10 +601,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetDrawerIgnoresAPropertyThatIsNotASet()
         {
-            Assert.That(
-                SerializableSetPropertyDrawer.HasDroppedItemsArrayForTests(false, null),
-                Is.False
-            );
+            Assert.That(SerializableSetPropertyDrawer.HasDroppedItemsArray(false, null), Is.False);
         }
 
         /// <summary>

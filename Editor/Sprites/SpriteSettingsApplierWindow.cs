@@ -41,8 +41,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </remarks>
     public sealed class SpriteSettingsApplierWindow : EditorWindow
     {
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
-
         private List<(string fullFilePath, string relativePath)> GetTargetSpritePaths()
         {
             List<(string fullFilePath, string relativePath)> filePaths = _targetSpriteBuffer;
@@ -156,7 +154,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public List<SpriteSettings> spriteSettings = new() { new SpriteSettings() };
         public List<Object> directories = new();
 
-        private SerializedObject _serializedObject;
+        internal SerializedObject _serializedObject;
         private SerializedProperty _spritesProp;
         private SerializedProperty _spriteFileExtensionsProp;
         private SerializedProperty _spriteSettingsProp;

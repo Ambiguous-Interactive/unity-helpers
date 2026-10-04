@@ -318,7 +318,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             try
             {
-                Texture2D created = ImageBlurTool.CreateBlurredTexture(source, radius, null);
+                Texture2D created = ImageBlurTool.CreateBlurredTexture(source, radius);
                 if (created != null)
                 {
                     blurred = created;

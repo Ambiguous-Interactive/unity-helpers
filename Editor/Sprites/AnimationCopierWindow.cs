@@ -63,10 +63,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         internal int UnchangedCount => _unchangedAnimations.Count;
         internal int OrphansCount => _destinationOrphans.Count;
 
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
         internal string _filterText = string.Empty;
         internal bool _filterUseRegex;
         internal bool _sortAscending = true;
+
+        internal SerializedObject _serializedObject;
 
         [SerializeField]
         private string _animationSourcePathRelative = "Assets/Sprites";
@@ -80,8 +81,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private bool _isAnalyzing;
         private bool _isCopying;
         private bool _isDeleting;
-
-        private SerializedObject _serializedObject;
         private SerializedProperty _animationSourcesPathProperty;
         private SerializedProperty _animationDestinationPathProperty;
 

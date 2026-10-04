@@ -358,33 +358,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         }
 
         [Test]
-        public void PublishedOutputIsImportedWhenStagedCleanupWarns()
+        public void PublishedOutputSurvivesAnActualStagingCleanupFailure()
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                Assert.Ignore("Windows moves the staged file and has no post-publish cleanup.");
-            }
-
-            int initialFileCount = CountNonMetaFiles();
-            RestorableGlobal<Action<string>> deleteStagedFile = new(
-                () => ExclusiveFilePublisher.DeleteStagedFile,
-                action => ExclusiveFilePublisher.DeleteStagedFile = action
+            string root = Path.Combine(
+                Application.temporaryCachePath,
+                Guid.NewGuid().ToString("N")
             );
-            using (
-                deleteStagedFile.Borrow(_ =>
-                    throw new IOException("Simulated staged cleanup failure.")
-                )
-            )
+            Directory.CreateDirectory(root);
+            try
             {
-                SpriteSheetExtractionResult result = SpriteSheetExtractionAPI.Extract(Requests());
-
-                Assert.That(result.ExtractedCount, Is.EqualTo(1));
-                Assert.That(result.SkippedCount, Is.Zero);
-                Assert.That(result.Errors, Has.Count.EqualTo(1));
-                StringAssert.Contains("Published", result.Errors[0]);
-                Assert.That(File.Exists(ToFullPath(Output)), Is.True);
-                Assert.That(AssetDatabase.LoadAssetAtPath<Texture2D>(Output), Is.Not.Null);
-                Assert.That(CountNonMetaFiles(), Is.EqualTo(initialFileCount + 1));
+                string outputPath = Path.Combine(root, "output.txt");
+                File.WriteAllText(outputPath, "published");
+                string stagedDirectory = Path.Combine(root, "staged");
+                Directory.CreateDirectory(stagedDirectory);
+                Exception warning = ExclusiveFilePublisher.RemoveStagedFileAfterPublication(
+                    stagedDirectory,
+                    outputPath
+                );
+                Assert.IsInstanceOf<IOException>(warning);
+                StringAssert.Contains("Published", warning.Message);
+                Assert.AreEqual("published", File.ReadAllText(outputPath));
+                Assert.IsTrue(Directory.Exists(stagedDirectory));
+            }
+            finally
+            {
+                Directory.Delete(root, true);
             }
         }
 

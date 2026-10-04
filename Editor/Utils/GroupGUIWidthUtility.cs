@@ -144,12 +144,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         internal static WGroupThemeState? CurrentThemeState => _currentThemeState;
 
-        private static float _totalPadding;
-        private static float _totalLeftPadding;
-        private static float _totalRightPadding;
-        private static int _scopeDepth;
-        private static bool _isInsideWGroupPropertyDraw;
-        private static WGroupThemeState? _currentThemeState;
+        internal static float _totalPadding;
+        internal static float _totalLeftPadding;
+        internal static float _totalRightPadding;
+        internal static int _scopeDepth;
+        internal static bool _isInsideWGroupPropertyDraw;
+        internal static WGroupThemeState? _currentThemeState;
 
         /// <summary>
         /// Cached foldout arrow texture for drawing themed foldouts.
@@ -160,17 +160,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// Cached expanded foldout arrow texture for drawing themed foldouts.
         /// </summary>
         private static Texture2D _foldoutArrowDown;
-
-        [System.Diagnostics.Conditional("UNITY_EDITOR")]
-        internal static void ResetForTests()
-        {
-            _totalPadding = 0f;
-            _totalLeftPadding = 0f;
-            _totalRightPadding = 0f;
-            _scopeDepth = 0;
-            _isInsideWGroupPropertyDraw = false;
-            _currentThemeState = null;
-        }
 
         internal static IDisposable PushWGroupPropertyContext()
         {

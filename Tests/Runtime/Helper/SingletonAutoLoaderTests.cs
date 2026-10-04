@@ -48,12 +48,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
+        private static void ClearLoaderCaches()
+        {
+            lock (SingletonAutoLoader._loaderBuildLock)
+            {
+                SingletonAutoLoader._cachedLoaders.Clear();
+                SingletonAutoLoader._runtimeInstanceProperties.Clear();
+                SingletonAutoLoader._scriptableInstanceProperties.Clear();
+            }
+            lock (SingletonAutoLoader._executionLock)
+            {
+                SingletonAutoLoader._executedLoadTypes.Clear();
+            }
+        }
+
+        private static void ExecuteEntries(
+            RuntimeInitializeLoadType loadType,
+            params AttributeMetadataCache.AutoLoadSingletonEntry[] entries
+        )
+        {
+            SingletonAutoLoader.ExecuteEntries(
+                entries,
+                loadType,
+                enforceSingleExecution: false,
+                requirePlayMode: false
+            );
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
             base.BaseSetUp();
             // Reset static caches so each test emits the warning its LogAssert expectation consumes.
-            SingletonAutoLoader.ClearCachesForTests();
+            ClearLoaderCaches();
             AutoRuntimeSingleton.ClearForTests();
             AutoScriptableSingleton.ClearForTests();
             RuntimeMismatchSingleton.ClearForTests();
@@ -63,8 +90,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator AutoLoaderInitializesRuntimeSingletons()
         {
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: true,
+            ExecuteEntries(
                 RuntimeInitializeLoadType.BeforeSplashScreen,
                 CreateRuntimeEntry<AutoRuntimeSingleton>()
             );
@@ -85,8 +111,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             instance.hideFlags = HideFlags.DontSave;
             Track(instance);
 
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: true,
+            ExecuteEntries(
                 RuntimeInitializeLoadType.BeforeSplashScreen,
                 CreateScriptableEntry<AutoScriptableSingleton>()
             );
@@ -98,32 +123,61 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [UnityTest]
-        public IEnumerator AutoLoaderSkipsWhenNotPlaying()
+        public IEnumerator AutoLoaderRuntimeEntryRespectsActualPlayMode()
         {
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: false,
+            bool isPlaying = Application.isPlaying;
+            SingletonAutoLoader.ExecuteEntries(
+                new[] { CreateRuntimeEntry<AutoRuntimeSingleton>() },
                 RuntimeInitializeLoadType.BeforeSplashScreen,
-                CreateRuntimeEntry<AutoRuntimeSingleton>()
+                enforceSingleExecution: false,
+                requirePlayMode: true
             );
 
             yield return null;
 
-            Assert.IsFalse(AutoRuntimeSingleton.HasInstance);
-            Assert.AreEqual(0, AutoRuntimeSingleton.AwakenCount);
+            Assert.AreEqual(isPlaying, AutoRuntimeSingleton.HasInstance);
+            Assert.AreEqual(
+                isPlaying,
+                SingletonAutoLoader._cachedLoaders.ContainsKey(
+                    typeof(AutoRuntimeSingleton).AssemblyQualifiedName
+                )
+            );
+            if (isPlaying)
+            {
+                Assert.GreaterOrEqual(AutoRuntimeSingleton.AwakenCount, 1);
+                Track(AutoRuntimeSingleton.Instance.gameObject);
+            }
+            else
+            {
+                Assert.AreEqual(0, AutoRuntimeSingleton.AwakenCount);
+            }
         }
 
         [UnityTest]
-        public IEnumerator AutoLoaderSkipsScriptableSingletonsWhenNotPlaying()
+        public IEnumerator AutoLoaderScriptableEntryRespectsActualPlayMode()
         {
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: false,
+            AutoScriptableSingleton instance = Track(
+                ScriptableObject.CreateInstance<AutoScriptableSingleton>()
+            );
+            instance.hideFlags = HideFlags.DontSave;
+            AutoScriptableSingleton.ClearForTests();
+            bool isPlaying = Application.isPlaying;
+            SingletonAutoLoader.ExecuteEntries(
+                new[] { CreateScriptableEntry<AutoScriptableSingleton>() },
                 RuntimeInitializeLoadType.BeforeSplashScreen,
-                CreateScriptableEntry<AutoScriptableSingleton>()
+                enforceSingleExecution: false,
+                requirePlayMode: true
             );
 
             yield return null;
 
-            Assert.IsFalse(AutoScriptableSingleton.HasInstance);
+            Assert.AreEqual(isPlaying, AutoScriptableSingleton.HasInstance);
+            Assert.AreEqual(
+                isPlaying,
+                SingletonAutoLoader._cachedLoaders.ContainsKey(
+                    typeof(AutoScriptableSingleton).AssemblyQualifiedName
+                )
+            );
             Assert.AreEqual(0, AutoScriptableSingleton.CreatedCount);
         }
 
@@ -135,8 +189,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 new Regex("Unable to resolve type", RegexOptions.IgnoreCase)
             );
 
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: true,
+            ExecuteEntries(
                 RuntimeInitializeLoadType.BeforeSplashScreen,
                 new AttributeMetadataCache.AutoLoadSingletonEntry(
                     "Missing.Type, UnknownAssembly",
@@ -156,8 +209,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 new Regex("does not derive from RuntimeSingleton", RegexOptions.IgnoreCase)
             );
 
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: true,
+            ExecuteEntries(
                 RuntimeInitializeLoadType.BeforeSplashScreen,
                 CreateRuntimeEntry<ScriptableMismatchSingleton>()
             );
@@ -176,8 +228,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 new Regex("does not derive from ScriptableObjectSingleton", RegexOptions.IgnoreCase)
             );
 
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: true,
+            ExecuteEntries(
                 RuntimeInitializeLoadType.BeforeSplashScreen,
                 CreateScriptableEntry<RuntimeMismatchSingleton>()
             );
@@ -191,8 +242,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator AutoLoaderSkipsEntriesWithDifferentLoadType()
         {
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: true,
+            ExecuteEntries(
                 RuntimeInitializeLoadType.AfterSceneLoad,
                 new AttributeMetadataCache.AutoLoadSingletonEntry(
                     typeof(AutoRuntimeSingleton).AssemblyQualifiedName,
@@ -210,8 +260,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator AutoLoaderIgnoresDuplicateEntries()
         {
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: true,
+            ExecuteEntries(
                 RuntimeInitializeLoadType.BeforeSplashScreen,
                 CreateRuntimeEntry<AutoRuntimeSingleton>(),
                 CreateRuntimeEntry<AutoRuntimeSingleton>()
@@ -229,8 +278,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 new Regex("Unable to resolve type", RegexOptions.IgnoreCase)
             );
 
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: true,
+            ExecuteEntries(
                 RuntimeInitializeLoadType.BeforeSplashScreen,
                 new AttributeMetadataCache.AutoLoadSingletonEntry(
                     "Unknown.Type, MissingAssembly",
@@ -261,8 +309,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     ? RuntimeInitializeLoadType.AfterSceneLoad
                     : RuntimeInitializeLoadType.BeforeSplashScreen;
 
-            SingletonAutoLoader.ExecuteEntriesForTests(
-                simulatePlayMode: true,
+            ExecuteEntries(
                 loadType,
                 CreateRuntimeEntry<AutoRuntimeSingleton>(loadType),
                 CreateRuntimeEntry<RuntimeMismatchSingleton>(otherLoadType)

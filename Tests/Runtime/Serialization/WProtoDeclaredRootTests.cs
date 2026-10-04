@@ -59,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void ReleaseRoots()
         {
             // A claim is process-global; leaking one leaves IRandom unserved for every test after.
-            Serializer.ClearProtobufRootCacheForTesting(typeof(IRandom));
+            ProtoRootTestUtilities.ClearRootCaches(typeof(IRandom));
         }
 
         [Test]
@@ -195,7 +195,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "and the read side must fall back rather than throw"
             );
 
-            Serializer.ClearProtobufRootCacheForTesting(typeof(IRandom));
+            ProtoRootTestUtilities.ClearRootCaches(typeof(IRandom));
 
             Assert.IsTrue(
                 WProtoFacade.TrySerialize(generator, out byte[] _),

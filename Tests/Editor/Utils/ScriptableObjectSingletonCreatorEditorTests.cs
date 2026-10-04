@@ -1,4 +1,4 @@
-// MIT License - Copyright (c) 2025 wallstop
+// MIT License - Copyright (c) 2025-2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 namespace WallstopStudios.UnityHelpers.Tests.Utils
@@ -18,6 +18,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.AssetProcessors;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 
     [TestFixture]
@@ -37,7 +38,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private const string WrongAssetPathCaseVariant =
             WrongFolderCaseVariant + "/CreatorPathSingleton.asset";
         private bool _previousEditorUiSuppress;
-        private bool _previousIgnoreCompilationState;
 
         private static void DeleteAssetIfExists(string assetPath)
         {
@@ -245,17 +245,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             _previousEditorUiSuppress = EditorUi.Suppress;
             EditorUi.Suppress = true;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = true;
 
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = true;
             // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
-            _previousIgnoreCompilationState =
-                ScriptableObjectSingletonCreator.IgnoreCompilationState;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
-            ScriptableObjectSingletonCreator.TypeFilter = static type =>
+
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
                 type == typeof(CreatorPathSingleton) || type == typeof(NestedDiskSingleton);
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
             // Ensure the metadata folder exists to prevent modal dialogs
             EnsureFolder("Assets/Resources/Wallstop Studios/Unity Helpers");
             DeleteAssetIfExists(TargetAssetPath);
@@ -310,26 +308,123 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
             TryDeleteEmptyFolder(ResourcesRoot);
             yield return null;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
-            ScriptableObjectSingletonCreator.TypeFilter = null;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState =
-                _previousIgnoreCompilationState;
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = false;
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
+            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = false;
+
+            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
             AssetDatabase.SaveAssets();
             AssetDatabaseBatchHelper.RefreshIfNotBatching(
                 ImportAssetOptions.ForceSynchronousImport
             );
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             EditorUi.Suppress = _previousEditorUiSuppress;
             yield return null;
         }
 
         [UnityTest]
+        public IEnumerator CandidateFailureReleasesGuardAndLaterCreatesMissingAsset()
+        {
+            int batchDepth = AssetDatabaseBatchHelper.CurrentBatchDepth;
+            int unityBatchDepth = AssetDatabaseBatchHelper.ActualUnityBatchDepth;
+            InvalidOperationException expected = new InvalidOperationException(
+                nameof(CandidateFailureReleasesGuardAndLaterCreatesMissingAsset)
+            );
+            SingletonCandidateList candidates = new SingletonCandidateList(() =>
+            {
+                Assert.IsTrue(ScriptableObjectSingletonCreator._isEnsuring);
+                Assert.AreEqual(batchDepth + 1, AssetDatabaseBatchHelper.CurrentBatchDepth);
+                throw expected;
+            });
+
+            InvalidOperationException actual = Assert.Throws<InvalidOperationException>(() =>
+                ScriptableObjectSingletonCreator.EnsureSingletonAssets(candidates)
+            );
+            Assert.AreSame(expected, actual);
+            Assert.AreEqual(1, candidates.CountReadCount);
+            Assert.IsFalse(ScriptableObjectSingletonCreator._isEnsuring);
+            Assert.AreEqual(batchDepth, AssetDatabaseBatchHelper.CurrentBatchDepth);
+            Assert.AreEqual(unityBatchDepth, AssetDatabaseBatchHelper.ActualUnityBatchDepth);
+            Assert.IsTrue(
+                AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(TargetAssetPath) == null
+            );
+
+            ScriptableObjectSingletonCreator.EnsureSingletonAssets(
+                new[] { typeof(CreatorPathSingleton) }
+            );
+            yield return null;
+            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
+            yield return null;
+            Assert.IsTrue(
+                AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(TargetAssetPath) != null
+            );
+            Assert.IsFalse(ScriptableObjectSingletonCreator._isEnsuring);
+        }
+
+        [Test]
+        public void CandidateEnumerationBlocksNestedEnsureUntilOuterAttemptEnds()
+        {
+            int batchDepth = AssetDatabaseBatchHelper.CurrentBatchDepth;
+            SingletonCandidateList nested = new SingletonCandidateList(() =>
+                throw new InvalidOperationException(
+                    nameof(CandidateEnumerationBlocksNestedEnsureUntilOuterAttemptEnds)
+                )
+            );
+            SingletonCandidateList candidates = new SingletonCandidateList(() =>
+            {
+                Assert.IsTrue(ScriptableObjectSingletonCreator._isEnsuring);
+                ScriptableObjectSingletonCreator.EnsureSingletonAssets(nested);
+            });
+
+            ScriptableObjectSingletonCreator.EnsureSingletonAssets(candidates);
+            Assert.AreEqual(3, candidates.CountReadCount);
+            Assert.AreEqual(0, nested.CountReadCount);
+            Assert.IsFalse(ScriptableObjectSingletonCreator._isEnsuring);
+            Assert.AreEqual(batchDepth, AssetDatabaseBatchHelper.CurrentBatchDepth);
+        }
+
+        [TestCase(1)]
+        [TestCase(3)]
+        public void CandidateFailurePreservesAnExistingBatch(int failureRead)
+        {
+            int batchDepth = AssetDatabaseBatchHelper.CurrentBatchDepth;
+            int unityBatchDepth = AssetDatabaseBatchHelper.ActualUnityBatchDepth;
+            InvalidOperationException expected = new InvalidOperationException(
+                nameof(CandidateFailurePreservesAnExistingBatch)
+            );
+            int countReads = 0;
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            {
+                int outerDepth = AssetDatabaseBatchHelper.CurrentBatchDepth;
+                int outerUnityDepth = AssetDatabaseBatchHelper.ActualUnityBatchDepth;
+                SingletonCandidateList candidates = new SingletonCandidateList(() =>
+                {
+                    ++countReads;
+                    Assert.IsTrue(ScriptableObjectSingletonCreator._isEnsuring);
+                    Assert.AreEqual(outerDepth + 1, AssetDatabaseBatchHelper.CurrentBatchDepth);
+                    if (countReads == failureRead)
+                    {
+                        throw expected;
+                    }
+                });
+                InvalidOperationException actual = Assert.Throws<InvalidOperationException>(() =>
+                    ScriptableObjectSingletonCreator.EnsureSingletonAssets(candidates)
+                );
+                Assert.AreSame(expected, actual);
+                Assert.AreEqual(failureRead, candidates.CountReadCount);
+                Assert.IsFalse(ScriptableObjectSingletonCreator._isEnsuring);
+                Assert.AreEqual(outerDepth, AssetDatabaseBatchHelper.CurrentBatchDepth);
+                Assert.AreEqual(outerUnityDepth, AssetDatabaseBatchHelper.ActualUnityBatchDepth);
+            }
+            Assert.AreEqual(batchDepth, AssetDatabaseBatchHelper.CurrentBatchDepth);
+            Assert.AreEqual(unityBatchDepth, AssetDatabaseBatchHelper.ActualUnityBatchDepth);
+        }
+
+        [UnityTest]
         public IEnumerator CreatesAssetAtAttributePath()
         {
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
@@ -352,7 +447,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabase.SaveAssets();
             yield return null;
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
             CreatorPathSingleton relocated = AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(
@@ -378,7 +473,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabase.CreateAsset(instance, WrongAssetPathCaseVariant);
             AssetDatabase.SaveAssets();
             yield return null;
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
@@ -432,17 +527,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 duplicate folders are contractual.
             */
 
-            Func<Type, bool> originalFilter = ScriptableObjectSingletonCreator.TypeFilter;
-            ScriptableObjectSingletonCreator.TypeFilter = type => type == scenario.SingletonType;
+            Func<Type, bool> originalFilter = ScriptableObjectSingletonCreatorTestAccess.TypeFilter;
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = type =>
+                type == scenario.SingletonType;
             try
             {
-                ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+                ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
                 AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
                 yield return null;
             }
             finally
             {
-                ScriptableObjectSingletonCreator.TypeFilter = originalFilter;
+                ScriptableObjectSingletonCreatorTestAccess.TypeFilter = originalFilter;
             }
 
             yield return WaitUntilFolderValid(scenario.FolderPath);
@@ -488,7 +584,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     RegexOptions.IgnoreCase
                 )
             );
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
 
             LogAssert.ignoreFailingMessages = false;
@@ -520,7 +616,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             yield return null;
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
@@ -542,7 +638,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             DeleteAssetIfExists(TargetAssetPath);
             yield return null;
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return WaitUntilAssetLoaded(TargetAssetPath);
             Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(TargetAssetPath) != null);
 
@@ -567,14 +663,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Deleting the asset body file must unload it (its .meta/GUID is retained separately)."
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return WaitUntilAssetLoaded(TargetAssetPath);
 
             Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Object>(TargetAssetPath) != null);
         }
 
         [UnityTest]
-        public IEnumerator EnsureSingletonAssetsCreatesFolderHierarchyWhenMissing()
+        public IEnumerator MetadataCreationPhaseCreatesFolderHierarchyWhenMissing()
         {
             string metadataFolder = "Assets/Resources/Wallstop Studios/Unity Helpers";
 
@@ -589,7 +685,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Setup: Metadata folder should not exist before test"
             );
 
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            ScriptableObjectSingletonMetadata created =
+                ScriptableObjectSingletonMetadataUtility.CreateMetadataAsset();
+            Assert.IsTrue(
+                created != null,
+                "The real metadata creation phase must create its asset."
+            );
+            ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets();
             yield return null;
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
@@ -623,7 +725,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
 
             Assert.DoesNotThrow(
-                () => ScriptableObjectSingletonCreator.EnsureSingletonAssets(),
+                () => ScriptableObjectSingletonCreatorTestAccess.EnsureSingletonAssets(),
                 "EnsureSingletonAssets should not throw when folders already exist"
             );
             yield return null;

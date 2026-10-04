@@ -30,13 +30,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            WInLineEditorOdinDrawer.ClearCachedStateForTesting();
+            WInLineEditorOdinDrawerTestAccess.ClearCachedState();
         }
 
         [TearDown]
         public override void TearDown()
         {
-            WInLineEditorOdinDrawer.ClearCachedStateForTesting();
+            WInLineEditorOdinDrawerTestAccess.ClearCachedState();
             base.TearDown();
         }
 
@@ -288,11 +288,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             string foldoutKey = "test::persistenceTest";
 
-            WInLineEditorOdinDrawer.SetFoldoutStateForTesting(foldoutKey, true);
-            bool state1 = WInLineEditorOdinDrawer.GetFoldoutStateForTesting(foldoutKey);
+            WInLineEditorOdinDrawerTestAccess.SetFoldoutState(foldoutKey, true);
+            bool state1 = WInLineEditorOdinDrawerTestAccess.GetFoldoutState(foldoutKey);
 
-            WInLineEditorOdinDrawer.SetFoldoutStateForTesting(foldoutKey, false);
-            bool state2 = WInLineEditorOdinDrawer.GetFoldoutStateForTesting(foldoutKey);
+            WInLineEditorOdinDrawerTestAccess.SetFoldoutState(foldoutKey, false);
+            bool state2 = WInLineEditorOdinDrawerTestAccess.GetFoldoutState(foldoutKey);
 
             Assert.That(state1, Is.True, "First state should be true");
             Assert.That(state2, Is.False, "Second state should be false after modification");
@@ -438,7 +438,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             }
             finally
             {
-                WInLineEditorOdinDrawer.ClearCachedStateForTesting();
+                WInLineEditorOdinDrawerTestAccess.ClearCachedState();
             }
         }
 
@@ -824,16 +824,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         }
 
         [Test]
-        public void ClearCachedStateForTestingClearsFoldoutStates()
+        public void ClearCachedStateClearsFoldoutStates()
         {
             string foldoutKey = "test::clearTest";
-            WInLineEditorOdinDrawer.SetFoldoutStateForTesting(foldoutKey, true);
+            WInLineEditorOdinDrawerTestAccess.SetFoldoutState(foldoutKey, true);
 
-            bool stateBefore = WInLineEditorOdinDrawer.GetFoldoutStateForTesting(foldoutKey);
+            bool stateBefore = WInLineEditorOdinDrawerTestAccess.GetFoldoutState(foldoutKey);
 
-            WInLineEditorOdinDrawer.ClearCachedStateForTesting();
+            WInLineEditorOdinDrawerTestAccess.ClearCachedState();
 
-            bool stateAfter = WInLineEditorOdinDrawer.GetFoldoutStateForTesting(foldoutKey);
+            bool stateAfter = WInLineEditorOdinDrawerTestAccess.GetFoldoutState(foldoutKey);
 
             Assert.That(stateBefore, Is.True, "State should be true before clearing");
             Assert.That(
@@ -849,11 +849,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             string key1 = "test::independent1";
             string key2 = "test::independent2";
 
-            WInLineEditorOdinDrawer.SetFoldoutStateForTesting(key1, true);
-            WInLineEditorOdinDrawer.SetFoldoutStateForTesting(key2, false);
+            WInLineEditorOdinDrawerTestAccess.SetFoldoutState(key1, true);
+            WInLineEditorOdinDrawerTestAccess.SetFoldoutState(key2, false);
 
-            bool state1 = WInLineEditorOdinDrawer.GetFoldoutStateForTesting(key1);
-            bool state2 = WInLineEditorOdinDrawer.GetFoldoutStateForTesting(key2);
+            bool state1 = WInLineEditorOdinDrawerTestAccess.GetFoldoutState(key1);
+            bool state2 = WInLineEditorOdinDrawerTestAccess.GetFoldoutState(key2);
 
             Assert.That(state1, Is.True, "Key1 should be true");
             Assert.That(state2, Is.False, "Key2 should be false");

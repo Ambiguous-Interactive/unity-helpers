@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         public void RestorePreferences()
         {
             ValidationScheduler.Stop();
-            ValidationAutoRun.ClearPendingForTesting();
+            ValidationAutoRunTestAccess.ClearPending();
             ValidationAutoRun.Enabled = _automatic;
             ValidationPreferences.Enabled = _enabled;
         }
@@ -47,8 +47,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         "Assets/Pending.asset",
                         typeof(ScriptableObject)
                     ),
-                },
-                _ => null
+                }
             );
             Assert.IsTrue(ValidationScheduler.TryStart(blocker));
             ValidationAutoRun.Enabled = automatic;

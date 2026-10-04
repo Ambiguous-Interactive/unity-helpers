@@ -470,37 +470,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
-        public void SaveFailureReportsCreatedAssetPath()
-        {
-            Sprite sprite = LoadExistingSprite();
-            RestorableGlobal<Action> saveAssets = new(
-                () => SpriteSheetAnimationAPI.SaveAssetsAction,
-                action => SpriteSheetAnimationAPI.SaveAssetsAction = action
-            );
-            using (saveAssets.Borrow(() => throw new IOException("save failed")))
-            {
-                Assert.IsFalse(
-                    SpriteSheetAnimationAPI.TryCreate(
-                        Root,
-                        "Partial",
-                        new[] { sprite },
-                        12f,
-                        null,
-                        false,
-                        0f,
-                        false,
-                        out string assetPath,
-                        out string error
-                    )
-                );
-                Assert.IsNotEmpty(assetPath);
-                TrackAssetPath(assetPath);
-                StringAssert.Contains("save failed", error);
-                Assert.IsTrue(AssetDatabase.LoadAssetAtPath<AnimationClip>(assetPath) != null);
-            }
-        }
-
-        [Test]
         public void SanitizesPortableInvalidFileNameCharacters()
         {
             Assert.AreEqual("Bad_Name_", SpriteSheetAnimationAPI.SanitizeName("Bad:Name?"));

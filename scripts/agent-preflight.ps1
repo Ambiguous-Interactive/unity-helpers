@@ -55,16 +55,23 @@ function Invoke-GitPathList {
 
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
-    [void]$process.Start()
-    $stdout = $process.StandardOutput.ReadToEnd()
-    [void]$process.StandardError.ReadToEnd()
-    $process.WaitForExit()
+    try {
+        [void]$process.Start()
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        [void]$stderrTask.GetAwaiter().GetResult()
+        $process.WaitForExit()
 
-    if ($process.ExitCode -ne 0) {
-        return @()
+        if ($process.ExitCode -ne 0) {
+            return @()
+        }
+
+        return @(Split-NulPathText -Text $stdout)
     }
-
-    return @(Split-NulPathText -Text $stdout)
+    finally {
+        $process.Dispose()
+    }
 }
 
 function Get-GitChangedPaths {
@@ -214,14 +221,21 @@ function Invoke-GitRawText {
 
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
-    [void]$process.Start()
-    $stdout = $process.StandardOutput.ReadToEnd()
-    [void]$process.StandardError.ReadToEnd()
-    $process.WaitForExit()
+    try {
+        [void]$process.Start()
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        [void]$stderrTask.GetAwaiter().GetResult()
+        $process.WaitForExit()
 
-    return [pscustomobject]@{
-        ExitCode = $process.ExitCode
-        Stdout   = $stdout
+        return [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            Stdout   = $stdout
+        }
+    }
+    finally {
+        $process.Dispose()
     }
 }
 
@@ -1446,6 +1460,8 @@ function Resolve-LicenseYearsWithLibrary {
     $standardOutput = ''
     try {
         $process = [System.Diagnostics.Process]::Start($info)
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
         $encoding = [System.Text.UTF8Encoding]::new($false)
         $stream = $process.StandardInput.BaseStream
         foreach ($path in $Paths) {
@@ -1455,8 +1471,8 @@ function Resolve-LicenseYearsWithLibrary {
         }
         $stream.Flush()
         $process.StandardInput.Close()
-        $standardOutput = $process.StandardOutput.ReadToEnd()
-        $process.StandardError.ReadToEnd() | Out-Null
+        $standardOutput = $stdoutTask.GetAwaiter().GetResult()
+        [void]$stderrTask.GetAwaiter().GetResult()
         $process.WaitForExit()
         if ($process.ExitCode -ne 0) {
             return $null

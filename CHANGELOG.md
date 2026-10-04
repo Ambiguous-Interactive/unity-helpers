@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WProtoMember.IsPacked = false` to write unpacked numeric and enum collections matching protobuf-net defaults, while preserving existing packed writes and both read forms ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Add `SystemArrayPool<T>.TryWithBuffer` for synchronous borrowed spans with explicit state, optional results, and reported callback or cleanup errors ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Add `WUH022` to report boxing disposable structs and suggest concrete or constrained generic disposal ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Add opt-in `WUH021` to flag repeated size observations, including interface `Count`, known `Length`/`LongLength` properties, and non-predicate LINQ `Count()`/`LongCount()`, when one snapshot is intended.
@@ -27,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix singleton asset recreation after stale GUID cleanup by requesting synchronous cleanup and pausing batching during creation and import ([#942](https://github.com/Ambiguous-Interactive/unity-helpers/issues/942)).
+- Fix unexpected singleton asset creation failures blocking later attempts until a domain reload ([#936](https://github.com/Ambiguous-Interactive/unity-helpers/issues/936)).
+- Stop WallstopProto `WPROTO044` inheritance diagnostics at an intermediate `[WProtoNotSerialized]` boundary, including referenced assemblies, while retaining contradictory declaration errors ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
+- Fix WallstopProto map keys to match protobuf-net 3.2.56: write zero enum keys and omit zero floating-point keys while preserving reads of older payloads ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
+- Fix periodic effects repeating ticks before their cadence at large clocks; initial delays, tick limits, refresh phase, and catch-up limits are preserved ([#934](https://github.com/Ambiguous-Interactive/unity-helpers/issues/934)).
+- Fix cache and effect lifetimes at large clocks, including small timing offsets and jitter; preserve remaining effect time and disabled cache expiry ([#932](https://github.com/Ambiguous-Interactive/unity-helpers/issues/932)).
+- Fix discarded worker jobs retaining captured references after shutdown, including submissions racing disposal ([#844](https://github.com/Ambiguous-Interactive/unity-helpers/issues/844)).
+- Fix pool acquisition and warm-up failures leaking items or leaving phantom active rentals; acquisition callbacks can query pool state across threads ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
+- Fix timed cache refresh failures changing cached values or consuming initial jitter, and preserve expiry when finite lifetime plus jitter exceeds float range ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).
+- Fix singleton loading to use the Resources root when configured subfolders contain only slashes and whitespace; spaces inside valid folders are preserved ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix invisible whitespace-only toggle captions by showing `(Unnamed)`; literal string values and padded captions stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix sprite sheet automatic config lookup throwing for invalid paths; invalid paths and missing sidecars preserve loaded settings ([#929](https://github.com/Ambiguous-Interactive/unity-helpers/issues/929)).
 - Fix sprite sheet configuration save/load accepting blank texture paths; valid filenames containing spaces and serialized hashes keep their exact values ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
@@ -68,6 +79,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve large `Deque<T>` array transfers with contiguous copies, preserving logical order, offsets, and covariant destination behavior ([#904](https://github.com/Ambiguous-Interactive/unity-helpers/issues/904)).
 - Improve `JesseSort` for mixed regions, sparse disorder, and natural runs using the upstream live-phase design ([#747](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)).
 - Improve parent and child collection transfers with bulk copying for `Component` fields while retaining typed enumeration for derived components ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
+
+### Removed
+
+- Remove production test-only APIs and injected callbacks; package tests now access real implementation internals ([#935](https://github.com/Ambiguous-Interactive/unity-helpers/issues/935)).
 
 ## [3.6.2] - 2026-09-28
 

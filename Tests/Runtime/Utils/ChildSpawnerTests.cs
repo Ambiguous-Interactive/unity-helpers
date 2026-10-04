@@ -27,13 +27,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            ChildSpawner.ClearSpawnedPrefabsForTesting();
+            ChildSpawner.ClearSpawnedPrefabs();
         }
 
         [TearDown]
         public override void TearDown()
         {
-            ChildSpawner.ClearSpawnedPrefabsForTesting();
+            ChildSpawner.ClearSpawnedPrefabs();
             base.TearDown();
         }
 

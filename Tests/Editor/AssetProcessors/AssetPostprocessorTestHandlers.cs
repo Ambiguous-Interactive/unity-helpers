@@ -111,7 +111,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             IReadOnlyList<HandlerEntry> entries = LazyEntries.Value;
             ResetShouldThrowAll(entries);
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             IReadOnlyList<string> pollutionErrors = DescribePollution();
             ClearAllInternal(entries);
             if (0 < pollutionErrors.Count)
@@ -144,7 +144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             ResetShouldThrowAll(entries);
 
             // Pending drains must finish before handler state is cleared or they can repopulate it afterward.
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             ClearAllInternal(entries);
         }

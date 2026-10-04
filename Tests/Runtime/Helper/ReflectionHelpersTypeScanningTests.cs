@@ -110,10 +110,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             Assert.IsTrue(Type.GetType(moved, throwOnError: false) == null);
 
-            int cachedNamesBefore = ReflectionHelpers.ResolvedTypeCacheCountForTesting;
+            int cachedNamesBefore = ReflectionHelpers.TypeResolutionCache.Count;
             Assert.AreSame(expected, ReflectionHelpers.TryResolveType(moved));
             Assert.AreSame(expected, ReflectionHelpers.TryResolveType(moved));
-            Assert.AreEqual(cachedNamesBefore, ReflectionHelpers.ResolvedTypeCacheCountForTesting);
+            Assert.AreEqual(cachedNamesBefore, ReflectionHelpers.TypeResolutionCache.Count);
         }
 
         [Test]
@@ -138,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void UnresolvableTypeNamesAreNotCached()
         {
-            int before = ReflectionHelpers.ResolvedTypeCacheCountForTesting;
+            int before = ReflectionHelpers.TypeResolutionCache.Count;
 
             for (int index = 0; index < 256; ++index)
             {
@@ -150,7 +150,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Assert.AreEqual(
                 before,
-                ReflectionHelpers.ResolvedTypeCacheCountForTesting,
+                ReflectionHelpers.TypeResolutionCache.Count,
                 "A name no loaded assembly declares must leave no entry behind."
             );
         }
@@ -165,12 +165,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string assemblyQualifiedName = typeof(PrewarmTesterComponent).AssemblyQualifiedName;
             Assert.IsTrue(ReflectionHelpers.TryResolveType(assemblyQualifiedName) != null);
 
-            int afterFirst = ReflectionHelpers.ResolvedTypeCacheCountForTesting;
+            int afterFirst = ReflectionHelpers.TypeResolutionCache.Count;
             Assert.IsTrue(ReflectionHelpers.TryResolveType(assemblyQualifiedName) != null);
 
             Assert.AreEqual(
                 afterFirst,
-                ReflectionHelpers.ResolvedTypeCacheCountForTesting,
+                ReflectionHelpers.TypeResolutionCache.Count,
                 "A repeated successful resolution must be served from the cache."
             );
         }

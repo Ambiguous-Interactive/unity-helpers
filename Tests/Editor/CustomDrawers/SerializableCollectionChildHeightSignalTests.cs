@@ -26,15 +26,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
         }
 
         [TearDown]
         public override void TearDown()
         {
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
             base.TearDown();
         }
 
@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
 
             int frameValue =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.GreaterOrEqual(
                 frameValue,
                 0,
@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
 
-            int frameValue = SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+            int frameValue = SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.GreaterOrEqual(
                 frameValue,
                 0,
@@ -68,13 +68,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionarySignalSetsFrameCounterToCurrentFrame()
         {
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
             int expectedFrame = Time.frameCount;
 
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
 
             int actualFrame =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.AreEqual(
                 expectedFrame,
                 actualFrame,
@@ -85,12 +85,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetSignalSetsFrameCounterToCurrentFrame()
         {
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
             int expectedFrame = Time.frameCount;
 
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
 
-            int actualFrame = SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+            int actualFrame = SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.AreEqual(
                 expectedFrame,
                 actualFrame,
@@ -103,10 +103,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
 
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
             int frameValue =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.AreEqual(-1, frameValue, "Reset should set frame counter to -1.");
         }
 
@@ -115,9 +115,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
 
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
-            int frameValue = SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+            int frameValue = SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.AreEqual(-1, frameValue, "Reset should set frame counter to -1.");
         }
 
@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
 
             int actualFrame =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.AreEqual(
                 expectedFrame,
                 actualFrame,
@@ -148,7 +148,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
 
-            int actualFrame = SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+            int actualFrame = SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.AreEqual(
                 expectedFrame,
                 actualFrame,
@@ -159,10 +159,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionaryFrameCounterInitializesToNegativeOne()
         {
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
             int frameValue =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
 
             Assert.AreEqual(-1, frameValue, "Frame counter should initialize to -1.");
         }
@@ -170,9 +170,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetFrameCounterInitializesToNegativeOne()
         {
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
-            int frameValue = SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+            int frameValue = SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
 
             Assert.AreEqual(-1, frameValue, "Frame counter should initialize to -1.");
         }
@@ -180,15 +180,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionarySignalIsIdempotentWithinSameFrame()
         {
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
             int firstCallFrame =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
 
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
             int secondCallFrame =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
 
             Assert.AreEqual(
                 firstCallFrame,
@@ -200,14 +200,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetSignalIsIdempotentWithinSameFrame()
         {
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
-            int firstCallFrame = SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+            int firstCallFrame =
+                SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
 
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
             int secondCallFrame =
-                SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
 
             Assert.AreEqual(
                 firstCallFrame,
@@ -219,12 +220,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionarySignalValueIsNonNegativeAfterSignaling()
         {
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
 
             int frameValue =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.GreaterOrEqual(
                 frameValue,
                 0,
@@ -235,11 +236,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetSignalValueIsNonNegativeAfterSignaling()
         {
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
 
-            int frameValue = SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+            int frameValue = SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.GreaterOrEqual(
                 frameValue,
                 0,
@@ -250,14 +251,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void BothDrawersCanBeSignaledIndependently()
         {
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
 
             int dictionaryFrame =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
-            int setFrame = SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
+            int setFrame = SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
 
             Assert.AreNotEqual(
                 dictionaryFrame,
@@ -271,15 +272,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SignalingBothDrawersUpdatesFrameIndependently()
         {
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
 
             int dictionaryFrame =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
-            int setFrame = SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
+            int setFrame = SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
 
             Assert.AreEqual(
                 dictionaryFrame,
@@ -300,12 +301,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
             int setFrameBeforeReset =
-                SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
 
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
             int setFrameAfterReset =
-                SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.AreEqual(
                 setFrameBeforeReset,
                 setFrameAfterReset,
@@ -319,12 +320,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
             int dictionaryFrameBeforeReset =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
 
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
 
             int dictionaryFrameAfterReset =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             Assert.AreEqual(
                 dictionaryFrameBeforeReset,
                 dictionaryFrameAfterReset,
@@ -335,13 +336,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionarySignalMatchesCurrentTimeFrameCount()
         {
-            SerializableDictionaryPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableDictionaryPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
             int frameBefore = Time.frameCount;
 
             SerializableDictionaryPropertyDrawer.SignalChildHeightChanged();
 
             int signalFrame =
-                SerializableDictionaryPropertyDrawer.GetChildHeightChangedFrameForTests();
+                SerializableDictionaryPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             int frameAfter = Time.frameCount;
 
             Assert.GreaterOrEqual(
@@ -359,12 +360,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetSignalMatchesCurrentTimeFrameCount()
         {
-            SerializableSetPropertyDrawer.ResetChildHeightChangedFrameForTests();
+            SerializableSetPropertyDrawerTestAccess.ResetChildHeightChangedFrame();
             int frameBefore = Time.frameCount;
 
             SerializableSetPropertyDrawer.SignalChildHeightChanged();
 
-            int signalFrame = SerializableSetPropertyDrawer.GetChildHeightChangedFrameForTests();
+            int signalFrame = SerializableSetPropertyDrawerTestAccess.GetChildHeightChangedFrame();
             int frameAfter = Time.frameCount;
 
             Assert.GreaterOrEqual(

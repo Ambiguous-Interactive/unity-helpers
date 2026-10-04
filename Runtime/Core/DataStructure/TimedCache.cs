@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
+    using Helper;
     using Random;
     using UnityEngine;
 
@@ -20,6 +21,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// <remarks>
     /// Use for expensive computations that can be reused for a short period (e.g., path costs, counts, queries).
     /// Optionally introduces a one-time jitter to spread refreshes across frames when many caches exist.
+    /// Failed factories or time providers preserve the cached value, timer, and initial jitter.
+    /// Finite clock offsets and jitter remain significant beside very large lifetimes.
     /// </remarks>
     public sealed class TimedCache<T>
     {
@@ -36,15 +39,27 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
                 else
                 {
-                    float expiration =
-                        _cacheTtl + (_shouldUseJitter && !_usedJitter ? _jitterAmount : 0f);
-                    if (_lastRead.Value + expiration < CurrentTime)
+                    float jitter = _shouldUseJitter && !_usedJitter ? _jitterAmount : 0f;
+                    CompensatedTime.Sum(
+                        _cacheTtl,
+                        jitter,
+                        out double expiration,
+                        out double remainder
+                    );
+                    float currentTime = CurrentTime;
+                    bool expired =
+                        float.IsFinite(_lastRead.Value) && float.IsFinite(currentTime)
+                            ? CompensatedTime.HasElapsed(
+                                _lastRead.Value,
+                                currentTime,
+                                expiration,
+                                remainder,
+                                inclusive: false
+                            )
+                            : expiration < (double)currentTime - _lastRead.Value;
+                    if (expired)
                     {
-                        if (_shouldUseJitter)
-                        {
-                            _usedJitter = true;
-                        }
-                        ResetInternal(consumeJitter: false);
+                        ResetInternal(consumeJitter: true);
                     }
                 }
 
@@ -108,8 +123,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void ResetInternal(bool consumeJitter)
         {
-            _value = _valueProducer();
-            _lastRead = CurrentTime;
+            T value = _valueProducer();
+            float refreshedAt = CurrentTime;
+            _value = value;
+            _lastRead = refreshedAt;
             if (consumeJitter && _shouldUseJitter)
             {
                 _usedJitter = true;

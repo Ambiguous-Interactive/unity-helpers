@@ -376,7 +376,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 10f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 10f).Value;
             Assert.IsTrue(
                 handler.TryGetRemainingDuration(
                     handle,
@@ -386,7 +386,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             Assert.AreEqual(0.25f, beforeReapply, RemainingDurationEpsilon);
 
-            EffectHandle? reapplied = handler.ApplyEffectForTesting(effect, currentTime: 10.2f);
+            EffectHandle? reapplied = handler.ApplyEffect(effect, currentTime: 10.2f);
             Assert.IsTrue(reapplied.HasValue);
             Assert.AreEqual(handle, reapplied.Value);
 
@@ -516,6 +516,112 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             handler.RemoveEffect(second);
         }
 
+        [TestCase(100f, 0f, 1)]
+        [TestCase(100f, 1f, 0)]
+        [TestCase(16777216f, 0f, 1)]
+        [TestCase(16777216f, 1f, 0)]
+        [TestCase(float.MaxValue, 0f, 1)]
+        [TestCase(float.MaxValue, 1f, 0)]
+        public void PeriodicCadenceDoesNotRepeatAtUnchangedClock(
+            float startTime,
+            float initialDelay,
+            int expectedTicks
+        )
+        {
+            (_, EffectHandler handler, TestAttributesComponent attributes, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(PeriodicCadenceDoesNotRepeatAtUnchangedClock),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    PeriodicEffectDefinition definition = new()
+                    {
+                        initialDelay = initialDelay,
+                        interval = 1f,
+                    };
+                    definition.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.health),
+                            action = ModificationAction.Addition,
+                            value = -1f,
+                        }
+                    );
+                    e.periodicEffects.Add(definition);
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, startTime).Value;
+            Assert.AreEqual(expectedTicks, handler.ProcessPeriodicEffects(startTime, 0f));
+            Assert.AreEqual(0, handler.ProcessPeriodicEffects(startTime, 0f));
+            Assert.AreEqual(
+                100f - expectedTicks,
+                attributes.health.CurrentValue,
+                RemainingDurationEpsilon
+            );
+            handler.RemoveEffect(handle);
+        }
+
+        [Test]
+        public void PeriodicCancellationOriginCatchUpRetainsThePerPassCap()
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(PeriodicCancellationOriginCatchUpRetainsThePerPassCap),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    e.periodicEffects.Add(
+                        new PeriodicEffectDefinition
+                        {
+                            initialDelay = float.MaxValue,
+                            interval = 0.25f,
+                        }
+                    );
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, -float.MaxValue).Value;
+            Assert.AreEqual(32, handler.ProcessPeriodicEffects(10f, 0f));
+            Assert.AreEqual(9, handler.ProcessPeriodicEffects(10f, 0f));
+            Assert.AreEqual(0, handler.ProcessPeriodicEffects(10f, 0f));
+            handler.RemoveEffect(handle);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void PeriodicPhaseSurvivesDurationRefreshAndReapplication(bool reapply)
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(PeriodicPhaseSurvivesDurationRefreshAndReapplication),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = 10f;
+                    e.stackingMode = EffectStackingMode.Refresh;
+                    e.resetDurationOnReapplication = true;
+                    e.periodicEffects.Add(new PeriodicEffectDefinition { interval = 1f });
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, 100f).Value;
+            Assert.AreEqual(1, handler.ProcessPeriodicEffects(100f, 0f));
+            if (reapply)
+            {
+                Assert.AreEqual(handle, handler.ApplyEffect(effect, 100.5f).Value);
+            }
+            else
+            {
+                Assert.IsTrue(handler.RefreshEffect(handle, false, 100.5f));
+            }
+            Assert.AreEqual(0, handler.ProcessPeriodicEffects(100.5f, 0f));
+            Assert.AreEqual(1, handler.ProcessPeriodicEffects(101f, 0f));
+            handler.RemoveEffect(handle);
+            EffectHandle fresh = handler.ApplyEffect(effect, 101f).Value;
+            Assert.AreNotEqual(handle, fresh);
+            Assert.AreEqual(1, handler.ProcessPeriodicEffects(101f, 0f));
+            Assert.AreEqual(0, handler.ProcessPeriodicEffects(101f, 0f));
+            handler.RemoveEffect(fresh);
+        }
+
         [UnityTest]
         public IEnumerator PeriodicEffectHonorsInitialDelayAndMaxTicks()
         {
@@ -550,10 +656,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 5f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 5f).Value;
             Assert.AreEqual(100f, attributes.health.CurrentValue, 0.01f);
 
-            int beforeDelayTicks = handler.ProcessPeriodicEffectsForTesting(
+            int beforeDelayTicks = handler.ProcessPeriodicEffects(
                 currentTime: 5.049f,
                 deltaTime: 0.049f
             );
@@ -563,21 +669,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 "No periodic ticks should occur before the initial delay elapses."
             );
 
-            int firstTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 5.051f,
-                deltaTime: 0.05f
-            );
+            int firstTicks = handler.ProcessPeriodicEffects(currentTime: 5.051f, deltaTime: 0.05f);
             Assert.AreEqual(1, firstTicks);
             Assert.AreEqual(90f, attributes.health.CurrentValue, 0.01f);
 
-            int secondTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 5.101f,
-                deltaTime: 0.05f
-            );
+            int secondTicks = handler.ProcessPeriodicEffects(currentTime: 5.101f, deltaTime: 0.05f);
             Assert.AreEqual(1, secondTicks);
             Assert.AreEqual(80f, attributes.health.CurrentValue, 0.01f);
 
-            int afterMaxTicks = handler.ProcessPeriodicEffectsForTesting(
+            int afterMaxTicks = handler.ProcessPeriodicEffects(
                 currentTime: 5.201f,
                 deltaTime: 0.1f
             );
@@ -617,18 +717,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 20f).Value;
-            int ticks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 20.16f,
-                deltaTime: 0.16f
-            );
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 20f).Value;
+            int ticks = handler.ProcessPeriodicEffects(currentTime: 20.16f, deltaTime: 0.16f);
             Assert.Greater(ticks, 0);
             float afterTicks = attributes.health.CurrentValue;
             Assert.Less(afterTicks, 100f);
 
             handler.RemoveEffect(handle);
             float afterRemoval = attributes.health.CurrentValue;
-            int ticksAfterRemoval = handler.ProcessPeriodicEffectsForTesting(
+            int ticksAfterRemoval = handler.ProcessPeriodicEffects(
                 currentTime: 20.26f,
                 deltaTime: 0.1f
             );
@@ -659,21 +756,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 30f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 30f).Value;
             float overdueTime = 40f;
 
-            int firstCatchUpTicks = handler.ProcessPeriodicEffectsForTesting(
-                overdueTime,
-                deltaTime: 10f
-            );
+            int firstCatchUpTicks = handler.ProcessPeriodicEffects(overdueTime, deltaTime: 10f);
             Assert.AreEqual(32, firstCatchUpTicks);
             Assert.AreEqual(32, attributes.notifications.Count);
             Assert.AreEqual(68f, attributes.health.CurrentValue, 0.01f);
 
-            int secondCatchUpTicks = handler.ProcessPeriodicEffectsForTesting(
-                overdueTime,
-                deltaTime: 0f
-            );
+            int secondCatchUpTicks = handler.ProcessPeriodicEffects(overdueTime, deltaTime: 0f);
             Assert.AreEqual(32, secondCatchUpTicks);
             Assert.AreEqual(64, attributes.notifications.Count);
             Assert.AreEqual(36f, attributes.health.CurrentValue, 0.01f);
@@ -734,24 +825,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 50f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 50f).Value;
 
-            int firstTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 50.021f,
-                deltaTime: 0.02f
-            );
+            int firstTicks = handler.ProcessPeriodicEffects(currentTime: 50.021f, deltaTime: 0.02f);
             Assert.AreEqual(1, firstTicks);
 
-            int secondTicks = handler.ProcessPeriodicEffectsForTesting(
+            int secondTicks = handler.ProcessPeriodicEffects(
                 currentTime: 50.051f,
                 deltaTime: 0.03f
             );
             Assert.AreEqual(1, secondTicks);
 
-            int finalTicks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 50.221f,
-                deltaTime: 0.17f
-            );
+            int finalTicks = handler.ProcessPeriodicEffects(currentTime: 50.221f, deltaTime: 0.17f);
             Assert.AreEqual(3, finalTicks);
             Assert.AreEqual(5, attributes.notifications.Count);
 
@@ -808,7 +893,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 70f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 70f).Value;
             Assert.IsTrue(
                 handler.TryGetRemainingDuration(
                     handle,
@@ -848,7 +933,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 100f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 100f).Value;
             Assert.IsTrue(
                 handler.TryGetRemainingDuration(
                     handle,
@@ -927,7 +1012,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 200f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 200f).Value;
             Assert.IsTrue(
                 handler.TryGetRemainingDuration(
                     handle,
@@ -981,15 +1066,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 300f).Value;
-            int ticks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 300.35f,
-                deltaTime: 0.35f
-            );
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 300f).Value;
+            int ticks = handler.ProcessPeriodicEffects(currentTime: 300.35f, deltaTime: 0.35f);
             Assert.AreEqual(3, ticks);
             Assert.AreEqual(70f, attributes.health.CurrentValue, 0.01f);
 
-            int afterMaxTicks = handler.ProcessPeriodicEffectsForTesting(
+            int afterMaxTicks = handler.ProcessPeriodicEffects(
                 currentTime: 300.55f,
                 deltaTime: 0.2f
             );
@@ -1025,15 +1107,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             effect.behaviors.Add(behavior);
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 400f).Value;
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 400f).Value;
             Assert.AreEqual(1, RecordingEffectBehavior.ApplyCount);
 
-            int tickCount = handler.ProcessBehaviorTicksForTesting(deltaTime: 0.033f);
+            int tickCount = handler.ProcessBehaviorTicks(deltaTime: 0.033f);
             Assert.AreEqual(1, tickCount);
             Assert.Greater(RecordingEffectBehavior.TickCount, 0);
             Assert.AreEqual(0.033f, RecordingEffectBehavior.TickContexts[0].deltaTime);
 
-            int periodicTicks = handler.ProcessPeriodicEffectsForTesting(
+            int periodicTicks = handler.ProcessPeriodicEffects(
                 currentTime: 400.12f,
                 deltaTime: 0.12f
             );
@@ -1111,8 +1193,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             effect.behaviors.Add(behavior);
 
-            EffectHandle handle = handler.ApplyEffectForTesting(effect, currentTime: 500f).Value;
-            int tickCount = handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f);
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 500f).Value;
+            int tickCount = handler.ProcessBehaviorTicks(deltaTime: 0.1f);
             Assert.AreEqual(1, tickCount);
 
             Assert.AreEqual(0, RecordingEffectBehavior.PeriodicTickCount);
@@ -1229,10 +1311,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 );
             }
 
-            int ticks = handler.ProcessPeriodicEffectsForTesting(
-                currentTime: 600f,
-                deltaTime: 0.1f
-            );
+            int ticks = handler.ProcessPeriodicEffects(currentTime: 600f, deltaTime: 0.1f);
             Assert.AreEqual(0, ticks);
             Assert.AreEqual(100f, attributes.health.CurrentValue, 0.01f);
         }
@@ -1311,6 +1390,328 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreNotEqual(first, second);
 
             handler.RemoveAllEffects();
+        }
+
+        [TestCase(100f, 0.5f, TestName = "EffectDuration.OrdinaryClock")]
+        [TestCase(16777216f, 1f, TestName = "EffectDuration.LargeClock")]
+        [TestCase(33554432f, 2f, TestName = "EffectDuration.CollapsedDeadline")]
+        [TestCase(33554432f, 3f, TestName = "EffectDuration.RoundedDeadline")]
+        [TestCase(float.MaxValue, 1f, TestName = "EffectDuration.ExtremeClock")]
+        [TestCase(float.MaxValue, float.MaxValue, TestName = "EffectDuration.FiniteOverflow")]
+        [TestCase(100f, float.PositiveInfinity, TestName = "EffectDuration.InfinityPolicy")]
+        [TestCase(100f, float.NaN, TestName = "EffectDuration.NaNPolicy")]
+        public void DurationSurvivesApplyRefreshAndEnsureAtSameClock(
+            float currentTime,
+            float duration
+        )
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(DurationSurvivesApplyRefreshAndEnsureAtSameClock),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = duration;
+                    e.resetDurationOnReapplication = true;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, currentTime, out float remaining)
+            );
+            Assert.That(remaining, Is.EqualTo(duration));
+            Assert.IsTrue(handler.RefreshEffect(handle, false, currentTime));
+            Assert.IsTrue(handler.TryGetRemainingDuration(handle, currentTime, out remaining));
+            Assert.That(remaining, Is.EqualTo(duration));
+            EffectHandle ensured = handler.EnsureHandle(effect, true, currentTime).Value;
+            Assert.AreEqual(handle, ensured);
+            Assert.IsTrue(handler.TryGetRemainingDuration(ensured, currentTime, out remaining));
+            Assert.That(remaining, Is.EqualTo(duration));
+        }
+
+        [TestCase(false, TestName = "EffectDuration.Reapply.KeepsStart")]
+        [TestCase(true, TestName = "EffectDuration.Reapply.ResetsStart")]
+        public void ReapplicationRetainsDurationPolicyAtLargeClock(bool reset)
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(ReapplicationRetainsDurationPolicyAtLargeClock),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = 3f;
+                    e.resetDurationOnReapplication = reset;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, 33554432f).Value;
+            EffectHandle reapplied = handler.ApplyEffect(effect, 33554436f).Value;
+            Assert.AreEqual(handle, reapplied);
+            Assert.IsTrue(handler.TryGetRemainingDuration(handle, 33554436f, out float remaining));
+            Assert.That(remaining, Is.EqualTo(reset ? 3f : 0f));
+        }
+
+        [TestCase(float.Epsilon, 1f, -0.000000059604644775390625f, 1.00000011920928955078125f)]
+        [TestCase(
+            -7.888609052210118e-31f,
+            1f,
+            0.0000000298023223876953125f,
+            0.999999940395355224609375f
+        )]
+        [TestCase(7.888609052210118e-31f, 1f, 0.0000000298023223876953125f, 1f)]
+        [TestCase(1.0141204801825835e31f, float.MaxValue, float.Epsilon, float.MaxValue)]
+        [TestCase(1.0141204801825835e31f, float.MaxValue, -float.Epsilon, float.PositiveInfinity)]
+        [TestCase(1.0141204801825835e31f, float.MaxValue, 0f, float.PositiveInfinity)]
+        public void RemainingDurationRoundsExactFloatMidpointsAndOverflow(
+            float startTime,
+            float duration,
+            float currentTime,
+            float expectedRemaining
+        )
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(RemainingDurationRoundsExactFloatMidpointsAndOverflow),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = duration;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, startTime).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, currentTime, out float remaining)
+            );
+            Assert.AreEqual(expectedRemaining, remaining);
+        }
+
+        [TestCase(1f, 1f, false)]
+        [TestCase(0f, 0f, true)]
+        [TestCase(-1f, 0f, true)]
+        public void LargeDurationRetainsSmallRemainingTimeAndExpiryResidual(
+            float startTime,
+            float expectedRemaining,
+            bool expired
+        )
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(LargeDurationRetainsSmallRemainingTimeAndExpiryResidual),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = float.MaxValue;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, startTime).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, float.MaxValue, out float remaining)
+            );
+            Assert.AreEqual(expectedRemaining, remaining);
+            handler.ProcessEffectExpirations(float.MaxValue);
+            Assert.AreEqual(
+                !expired,
+                handler.TryGetRemainingDuration(handle, float.MaxValue, out _)
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DurationRefreshPreservesOrReplacesSmallElapsedResidual(bool reset)
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            AttributeEffect effect = CreateEffect(
+                nameof(DurationRefreshPreservesOrReplacesSmallElapsedResidual),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = float.MaxValue;
+                    e.resetDurationOnReapplication = reset;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, 1f).Value;
+            Assert.AreEqual(reset, handler.RefreshEffect(handle, false, -1f));
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, float.MaxValue, out float remaining)
+            );
+            Assert.AreEqual(reset ? 0f : 1f, remaining);
+            handler.ProcessEffectExpirations(float.MaxValue);
+            Assert.AreEqual(!reset, handler.TryGetRemainingDuration(handle, float.MaxValue, out _));
+        }
+
+        [TestCase(10f, 0.5f, 10.25f, false, TestName = "EffectExpiry.Ordinary.BeforeBoundary")]
+        [TestCase(10f, 0.5f, 10.5f, true, TestName = "EffectExpiry.Ordinary.AtBoundary")]
+        [TestCase(16777216f, 1f, 16777216f, false, TestName = "EffectExpiry.Large.SameClock")]
+        [TestCase(16777216f, 1f, 16777218f, true, TestName = "EffectExpiry.Large.NextClock")]
+        [TestCase(16777216f, 2f, 16777218f, true, TestName = "EffectExpiry.Large.AtBoundary")]
+        [TestCase(
+            float.MaxValue,
+            float.Epsilon,
+            float.MaxValue,
+            false,
+            TestName = "EffectExpiry.TinyDuration"
+        )]
+        [TestCase(
+            float.MaxValue,
+            float.MaxValue,
+            float.MaxValue,
+            false,
+            TestName = "EffectExpiry.FiniteOverflow"
+        )]
+        [TestCase(
+            -float.MaxValue,
+            float.MaxValue,
+            float.MaxValue,
+            true,
+            TestName = "EffectExpiry.OppositeExtremes"
+        )]
+        [TestCase(10f, 2f, 9f, false, TestName = "EffectExpiry.BackwardClock")]
+        [TestCase(10f, 0f, 10f, true, TestName = "EffectExpiry.ZeroDuration")]
+        [TestCase(10f, -1f, 10f, true, TestName = "EffectExpiry.NegativeDuration")]
+        [TestCase(
+            10f,
+            float.PositiveInfinity,
+            float.MaxValue,
+            false,
+            TestName = "EffectExpiry.InfinityDuration"
+        )]
+        [TestCase(10f, float.NaN, float.MaxValue, false, TestName = "EffectExpiry.NaNDuration")]
+        public void ExpirationPassPreservesInclusiveDurationBoundary(
+            float start,
+            float duration,
+            float currentTime,
+            bool expires
+        )
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(ExpirationPassPreservesInclusiveDurationBoundary),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = duration;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, start).Value;
+            int removed = 0;
+            handler.OnEffectRemoved += _ => ++removed;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, currentTime, out float beforeExpiration)
+            );
+            if (expires)
+            {
+                Assert.That(beforeExpiration, Is.EqualTo(0f));
+            }
+            handler.ProcessEffectExpirations(currentTime);
+            Assert.AreEqual(expires ? 1 : 0, removed);
+            Assert.AreEqual(expires ? 0 : 1, handler.GetEffectStackCount(effect));
+            Assert.AreEqual(
+                !expires,
+                handler.TryGetRemainingDuration(handle, currentTime, out float remaining)
+            );
+            if (expires)
+            {
+                Assert.That(remaining, Is.EqualTo(0f));
+            }
+            else if (!float.IsNaN(duration))
+            {
+                double expected = (double)duration - ((double)currentTime - start);
+                Assert.That(remaining, Is.EqualTo((float)expected));
+            }
+            else
+            {
+                Assert.IsTrue(float.IsNaN(remaining));
+            }
+            handler.ProcessEffectExpirations(currentTime);
+            Assert.AreEqual(expires ? 1 : 0, removed);
+        }
+
+        [Test]
+        public void DurationSnapshotAndInfinitePolicySurviveAssetChanges()
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(DurationSnapshotAndInfinitePolicySurviveAssetChanges),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = 2f;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, 16777216f).Value;
+            effect.duration = 100f;
+            Assert.IsTrue(handler.TryGetRemainingDuration(handle, 16777216f, out float remaining));
+            Assert.That(remaining, Is.EqualTo(2f));
+            handler.ProcessEffectExpirations(16777218f);
+            Assert.IsFalse(handler.IsEffectActive(effect));
+            effect.durationType = ModifierDurationType.Infinite;
+            handle = handler.ApplyEffect(effect, float.MaxValue).Value;
+            handler.ProcessEffectExpirations(float.MaxValue);
+            Assert.IsTrue(handler.IsEffectActive(effect));
+            Assert.IsFalse(handler.TryGetRemainingDuration(handle, float.MaxValue, out remaining));
+            Assert.That(remaining, Is.EqualTo(0f));
+            Assert.IsFalse(handler.RefreshEffect(handle, true, float.MaxValue));
+        }
+
+        [TestCase(
+            float.MaxValue,
+            float.MaxValue,
+            float.PositiveInfinity,
+            true,
+            TestName = "EffectClock.Infinity.AfterFiniteOverflow"
+        )]
+        [TestCase(
+            -float.MaxValue,
+            -float.MaxValue,
+            float.NegativeInfinity,
+            true,
+            TestName = "EffectClock.NegativeInfinity.AfterFiniteOverflow"
+        )]
+        [TestCase(10f, 1f, float.NaN, false, TestName = "EffectClock.NaN")]
+        public void NonfiniteClockRetainsExistingQueryAndExpirationPolicy(
+            float start,
+            float duration,
+            float currentTime,
+            bool expires
+        )
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(NonfiniteClockRetainsExistingQueryAndExpirationPolicy),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = duration;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, start).Value;
+            Assert.IsTrue(
+                handler.TryGetRemainingDuration(handle, currentTime, out float remaining)
+            );
+            Assert.IsTrue(float.IsNaN(remaining));
+            handler.ProcessEffectExpirations(currentTime);
+            Assert.AreEqual(!expires, handler.IsEffectActive(effect));
+        }
+
+        [TestCase(false, TestName = "EffectExpiry.Refresh.RespectsPolicy")]
+        [TestCase(true, TestName = "EffectExpiry.Refresh.IgnoresPolicy")]
+        public void RefreshResetsActualExpirationOnlyWhenAllowed(bool ignorePolicy)
+        {
+            EffectHandler handler = CreateEntity().handler;
+            AttributeEffect effect = CreateEffect(
+                nameof(RefreshResetsActualExpirationOnlyWhenAllowed),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Duration;
+                    e.duration = 4f;
+                    e.resetDurationOnReapplication = false;
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, 16777216f).Value;
+            Assert.AreEqual(ignorePolicy, handler.RefreshEffect(handle, ignorePolicy, 16777218f));
+            handler.ProcessEffectExpirations(16777220f);
+            Assert.AreEqual(ignorePolicy, handler.IsEffectActive(effect));
+            handler.ProcessEffectExpirations(16777222f);
+            Assert.IsFalse(handler.IsEffectActive(effect));
         }
 
         private CosmeticEffectData CreateCosmeticTemplate(

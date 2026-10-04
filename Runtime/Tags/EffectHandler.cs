@@ -72,13 +72,17 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         public event Action<EffectHandle> OnEffectRemoved;
 
-        internal int TraversalDepthForTesting => _traversalDepth;
+        // Defer pool returns until traversals finish so callbacks cannot clear or reuse an enumerated list.
+        internal readonly List<PooledResource<List<EffectBehavior>>> _deferredBehaviorLeases =
+            new();
+        internal readonly List<
+            PooledResource<List<PeriodicEffectRuntimeState>>
+        > _deferredPeriodicLeases = new();
+        internal readonly List<PooledResource<List<EffectHandle>>> _deferredHandleLeases = new();
+        internal readonly List<PooledResource<List<CosmeticEffectData>>> _deferredCosmeticLeases =
+            new();
 
-        internal int DeferredLeaseCountForTesting =>
-            _deferredBehaviorLeases.Count
-            + _deferredPeriodicLeases.Count
-            + _deferredHandleLeases.Count
-            + _deferredCosmeticLeases.Count;
+        internal int _traversalDepth;
 
         [SiblingComponent]
 #pragma warning disable CS0649
@@ -103,7 +107,8 @@ namespace WallstopStudios.UnityHelpers.Tags
         private readonly Dictionary<long, EffectStackKey> _stackKeyByHandleId = new();
 
         // Iterating effect IDs is cheaper than iterating full handles.
-        private readonly Dictionary<long, float> _effectExpirations = new();
+        private readonly Dictionary<long, (float startTime, float duration)> _effectExpirations =
+            new();
         private readonly Dictionary<long, EffectHandle> _effectHandlesById = new();
 
         private readonly List<long> _expiredEffectIds = new();
@@ -116,17 +121,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             long,
             PooledResource<List<EffectBehavior>>
         > _behaviorsByHandleId = new();
-
-        // Defer pool returns until traversals finish so callbacks cannot clear or reuse an enumerated list.
-        private readonly List<PooledResource<List<EffectBehavior>>> _deferredBehaviorLeases = new();
-        private readonly List<
-            PooledResource<List<PeriodicEffectRuntimeState>>
-        > _deferredPeriodicLeases = new();
-        private readonly List<PooledResource<List<EffectHandle>>> _deferredHandleLeases = new();
-        private readonly List<PooledResource<List<CosmeticEffectData>>> _deferredCosmeticLeases =
-            new();
-
-        private int _traversalDepth;
 
         private bool _initialized;
 
@@ -383,6 +377,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <param name="handle">The handle to inspect.</param>
         /// <param name="remainingDuration">When this method returns, contains the remaining time in seconds, or zero if unavailable.</param>
         /// <returns><c>true</c> if the handle has a tracked duration; otherwise, <c>false</c>.</returns>
+        /// <remarks>Finite clock offsets remain significant beside large lifetimes; remaining time rounds to the nearest float. Infinite effects have no tracked duration.</remarks>
         public bool TryGetRemainingDuration(EffectHandle handle, out float remainingDuration)
         {
             return TryGetRemainingDuration(handle, Time.time, out remainingDuration);
@@ -461,116 +456,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             _attributes?.Remove(attributesComponent);
         }
 
-        internal EffectHandle? ApplyEffectForTesting(AttributeEffect effect, float currentTime)
-        {
-            return ApplyEffect(effect, currentTime);
-        }
-
-        internal bool TryGetRemainingDuration(
-            EffectHandle handle,
-            float currentTime,
-            out float remainingDuration
-        )
-        {
-            long handleId = handle.id;
-            if (!_effectExpirations.TryGetValue(handleId, out float expiration))
-            {
-                remainingDuration = 0f;
-                return false;
-            }
-
-            float timeRemaining = expiration - currentTime;
-            if (timeRemaining < 0f)
-            {
-                timeRemaining = 0f;
-            }
-
-            remainingDuration = timeRemaining;
-            return true;
-        }
-
-        internal EffectHandle? EnsureHandle(
-            AttributeEffect effect,
-            bool refreshDuration,
-            float currentTime
-        )
-        {
-            if (effect == null)
-            {
-                return null;
-            }
-
-            foreach (EffectHandle handle in _appliedEffects)
-            {
-                if (handle.effect == effect)
-                {
-                    if (refreshDuration)
-                    {
-                        _ = RefreshEffect(
-                            handle,
-                            ignoreReapplicationPolicy: false,
-                            currentTime: currentTime
-                        );
-                    }
-
-                    return handle;
-                }
-            }
-
-            return ApplyEffect(effect, currentTime);
-        }
-
-        internal bool RefreshEffect(
-            EffectHandle handle,
-            bool ignoreReapplicationPolicy,
-            float currentTime
-        )
-        {
-            AttributeEffect effect = handle.effect;
-            if (effect == null)
-            {
-                return false;
-            }
-
-            if (effect.durationType != ModifierDurationType.Duration)
-            {
-                return false;
-            }
-
-            if (!ignoreReapplicationPolicy && !effect.resetDurationOnReapplication)
-            {
-                return false;
-            }
-
-            long handleId = handle.id;
-            if (!_effectExpirations.ContainsKey(handleId))
-            {
-                return false;
-            }
-
-            float newExpiration = currentTime + effect.duration;
-            _effectExpirations[handleId] = newExpiration;
-            _effectHandlesById[handleId] = handle;
-            return true;
-        }
-
-        internal int ProcessBehaviorTicksForTesting(float deltaTime)
-        {
-            return ProcessBehaviorTicks(deltaTime);
-        }
-
-        internal int ProcessPeriodicEffectsForTesting(float currentTime, float deltaTime)
-        {
-            return ProcessPeriodicEffects(currentTime, deltaTime);
-        }
-
-        private void Awake()
-        {
-            this.AssignRelationalComponents();
-            _initialized = true;
-        }
-
-        private EffectHandle? ApplyEffect(AttributeEffect effect, float currentTime)
+        internal EffectHandle? ApplyEffect(AttributeEffect effect, float currentTime)
         {
             if (effect == null)
             {
@@ -670,6 +556,333 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             return newHandle;
+        }
+
+        internal bool TryGetRemainingDuration(
+            EffectHandle handle,
+            float currentTime,
+            out float remainingDuration
+        )
+        {
+            long handleId = handle.id;
+            if (
+                !_effectExpirations.TryGetValue(
+                    handleId,
+                    out (float startTime, float duration) timing
+                )
+            )
+            {
+                remainingDuration = 0f;
+                return false;
+            }
+
+            double timeRemaining =
+                float.IsFinite(timing.startTime) && float.IsFinite(currentTime)
+                    ? CompensatedTime.RemainingDuration(
+                        timing.startTime,
+                        timing.duration,
+                        currentTime
+                    )
+                    : (float)((double)timing.startTime + timing.duration) - currentTime;
+            if (timeRemaining < 0f)
+            {
+                timeRemaining = 0f;
+            }
+
+            remainingDuration = (float)timeRemaining;
+            return true;
+        }
+
+        internal EffectHandle? EnsureHandle(
+            AttributeEffect effect,
+            bool refreshDuration,
+            float currentTime
+        )
+        {
+            if (effect == null)
+            {
+                return null;
+            }
+
+            foreach (EffectHandle handle in _appliedEffects)
+            {
+                if (handle.effect == effect)
+                {
+                    if (refreshDuration)
+                    {
+                        _ = RefreshEffect(
+                            handle,
+                            ignoreReapplicationPolicy: false,
+                            currentTime: currentTime
+                        );
+                    }
+
+                    return handle;
+                }
+            }
+
+            return ApplyEffect(effect, currentTime);
+        }
+
+        internal bool RefreshEffect(
+            EffectHandle handle,
+            bool ignoreReapplicationPolicy,
+            float currentTime
+        )
+        {
+            AttributeEffect effect = handle.effect;
+            if (effect == null)
+            {
+                return false;
+            }
+
+            if (effect.durationType != ModifierDurationType.Duration)
+            {
+                return false;
+            }
+
+            if (!ignoreReapplicationPolicy && !effect.resetDurationOnReapplication)
+            {
+                return false;
+            }
+
+            long handleId = handle.id;
+            if (!_effectExpirations.ContainsKey(handleId))
+            {
+                return false;
+            }
+
+            _effectExpirations[handleId] = (currentTime, effect.duration);
+            _effectHandlesById[handleId] = handle;
+            return true;
+        }
+
+        internal int ProcessBehaviorTicks(float deltaTime)
+        {
+            if (_behaviorsByHandleId.Count <= 0)
+            {
+                return 0;
+            }
+
+            int processedTicks = 0;
+            ++_traversalDepth;
+            try
+            {
+                using PooledResource<List<long>> behaviorHandleIdsResource = Buffers<long>.List.Get(
+                    out List<long> behaviorHandleIdsBuffer
+                );
+                behaviorHandleIdsBuffer.AddRange(_behaviorsByHandleId.Keys);
+
+                foreach (long handleId in behaviorHandleIdsBuffer)
+                {
+                    if (!_effectHandlesById.TryGetValue(handleId, out EffectHandle handle))
+                    {
+                        continue;
+                    }
+
+                    if (
+                        !_behaviorsByHandleId.TryGetValue(
+                            handleId,
+                            out PooledResource<List<EffectBehavior>> behaviorLease
+                        )
+                    )
+                    {
+                        continue;
+                    }
+
+                    List<EffectBehavior> behaviors = behaviorLease.resource;
+                    EffectBehaviorContext context = new(this, handle, deltaTime);
+                    foreach (EffectBehavior behavior in behaviors)
+                    {
+                        if (behavior == null)
+                        {
+                            continue;
+                        }
+
+                        behavior.OnTick(context);
+                        ++processedTicks;
+                        // OnTick can remove the handle and destroy every remaining clone.
+                        if (!_effectHandlesById.ContainsKey(handleId))
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                EndTraversal();
+            }
+
+            return processedTicks;
+        }
+
+        internal int ProcessPeriodicEffects(float currentTime, float deltaTime)
+        {
+            if (_periodicEffectStates.Count <= 0)
+            {
+                return 0;
+            }
+
+            int consumedTicks = 0;
+            ++_traversalDepth;
+            try
+            {
+                using PooledResource<List<long>> periodicRemovalResource = Buffers<long>.List.Get(
+                    out List<long> periodicRemovalBuffer
+                );
+                using PooledResource<List<long>> periodHandleIdsResource = Buffers<long>.List.Get(
+                    out List<long> periodicHandleIdsBuffer
+                );
+                periodicHandleIdsBuffer.AddRange(_periodicEffectStates.Keys);
+
+                foreach (long handleId in periodicHandleIdsBuffer)
+                {
+                    if (!_effectHandlesById.TryGetValue(handleId, out EffectHandle handle))
+                    {
+                        periodicRemovalBuffer.Add(handleId);
+                        continue;
+                    }
+
+                    if (
+                        !_periodicEffectStates.TryGetValue(
+                            handleId,
+                            out PooledResource<List<PeriodicEffectRuntimeState>> runtimesLease
+                        )
+                    )
+                    {
+                        continue;
+                    }
+
+                    List<PeriodicEffectRuntimeState> runtimes = runtimesLease.resource;
+                    bool hasActive = false;
+                    bool stillApplied = true;
+
+                    foreach (PeriodicEffectRuntimeState runtimeState in runtimes)
+                    {
+                        if (runtimeState == null)
+                        {
+                            continue;
+                        }
+
+                        int consumedTicksThisUpdate = 0;
+                        while (
+                            consumedTicksThisUpdate < MaxPeriodicCatchUpTicksPerUpdate
+                            && _effectHandlesById.ContainsKey(handleId)
+                            && runtimeState.TryConsumeTick(currentTime)
+                        )
+                        {
+                            ++consumedTicksThisUpdate;
+                            ++consumedTicks;
+                            ApplyPeriodicTick(handle, runtimeState, currentTime, deltaTime);
+                        }
+
+                        // A periodic callback can cancel the effect; remaining definitions must not tick afterward.
+                        if (!_effectHandlesById.ContainsKey(handleId))
+                        {
+                            stillApplied = false;
+                            break;
+                        }
+
+                        if (!runtimeState.IsComplete)
+                        {
+                            hasActive = true;
+                        }
+                    }
+
+                    if (stillApplied && !hasActive)
+                    {
+                        periodicRemovalBuffer.Add(handleId);
+                    }
+                }
+
+                foreach (long periodicHandleId in periodicRemovalBuffer)
+                {
+                    if (
+                        _periodicEffectStates.Remove(
+                            periodicHandleId,
+                            out PooledResource<List<PeriodicEffectRuntimeState>> lease
+                        )
+                    )
+                    {
+                        ReleasePeriodicStateList(lease);
+                    }
+                }
+            }
+            finally
+            {
+                EndTraversal();
+            }
+
+            return consumedTicks;
+        }
+
+        internal void ProcessEffectExpirations(float currentTime)
+        {
+            if (_effectExpirations.Count <= 0)
+            {
+                return;
+            }
+
+            _expiredEffectIds.Clear();
+            foreach (
+                KeyValuePair<long, (float startTime, float duration)> entry in _effectExpirations
+            )
+            {
+                (float startTime, float duration) timing = entry.Value;
+                bool expired =
+                    float.IsFinite(timing.startTime) && float.IsFinite(currentTime)
+                        ? CompensatedTime.HasElapsed(
+                            timing.startTime,
+                            currentTime,
+                            timing.duration,
+                            0d,
+                            inclusive: true
+                        )
+                        : (float)((double)timing.startTime + timing.duration) <= currentTime;
+                if (expired)
+                {
+                    _expiredEffectIds.Add(entry.Key);
+                }
+            }
+
+            Exception teardownFailure = null;
+            try
+            {
+                // Teardown callbacks can clear this list through OnDestroy; finish expirations before reporting failures.
+#pragma warning disable WUH013 // Teardown callbacks can clear this list through OnDestroy.
+                for (int i = 0; i < _expiredEffectIds.Count; ++i)
+                {
+                    if (
+                        _effectHandlesById.TryGetValue(
+                            _expiredEffectIds[i],
+                            out EffectHandle expiredHandle
+                        )
+                    )
+                    {
+                        teardownFailure = RecordFailure(
+                            teardownFailure,
+                            RemoveEffectCore(expiredHandle)
+                        );
+                    }
+                }
+#pragma warning restore WUH013
+            }
+            finally
+            {
+                _expiredEffectIds.Clear();
+            }
+
+            if (teardownFailure != null)
+            {
+                ExceptionDispatchInfo.Capture(teardownFailure).Throw();
+            }
+        }
+
+        private void Awake()
+        {
+            this.AssignRelationalComponents();
+            _initialized = true;
         }
 
         private List<EffectHandle> TryGetStackHandles(EffectStackKey stackKey)
@@ -1073,7 +1286,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             {
                 if (!exists || effect.resetDurationOnReapplication)
                 {
-                    _effectExpirations[handleId] = currentTime + effect.duration;
+                    _effectExpirations[handleId] = (currentTime, effect.duration);
                 }
             }
 
@@ -1674,52 +1887,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private void ProcessEffectExpirations()
         {
-            if (_effectExpirations.Count <= 0)
-            {
-                return;
-            }
-
-            _expiredEffectIds.Clear();
-            float currentTime = Time.time;
-            foreach (KeyValuePair<long, float> entry in _effectExpirations)
-            {
-                if (entry.Value <= currentTime)
-                {
-                    _expiredEffectIds.Add(entry.Key);
-                }
-            }
-
-            Exception teardownFailure = null;
-            try
-            {
-                // Teardown callbacks can clear this list through OnDestroy; finish expirations before reporting failures.
-#pragma warning disable WUH013 // Teardown callbacks can clear this list through OnDestroy.
-                for (int i = 0; i < _expiredEffectIds.Count; ++i)
-                {
-                    if (
-                        _effectHandlesById.TryGetValue(
-                            _expiredEffectIds[i],
-                            out EffectHandle expiredHandle
-                        )
-                    )
-                    {
-                        teardownFailure = RecordFailure(
-                            teardownFailure,
-                            RemoveEffectCore(expiredHandle)
-                        );
-                    }
-                }
-#pragma warning restore WUH013
-            }
-            finally
-            {
-                _expiredEffectIds.Clear();
-            }
-
-            if (teardownFailure != null)
-            {
-                ExceptionDispatchInfo.Capture(teardownFailure).Throw();
-            }
+            ProcessEffectExpirations(Time.time);
         }
 
         private void ProcessBehaviorTicks()
@@ -1727,169 +1895,9 @@ namespace WallstopStudios.UnityHelpers.Tags
             _ = ProcessBehaviorTicks(Time.deltaTime);
         }
 
-        private int ProcessBehaviorTicks(float deltaTime)
-        {
-            if (_behaviorsByHandleId.Count <= 0)
-            {
-                return 0;
-            }
-
-            int processedTicks = 0;
-            ++_traversalDepth;
-            try
-            {
-                using PooledResource<List<long>> behaviorHandleIdsResource = Buffers<long>.List.Get(
-                    out List<long> behaviorHandleIdsBuffer
-                );
-                behaviorHandleIdsBuffer.AddRange(_behaviorsByHandleId.Keys);
-
-                foreach (long handleId in behaviorHandleIdsBuffer)
-                {
-                    if (!_effectHandlesById.TryGetValue(handleId, out EffectHandle handle))
-                    {
-                        continue;
-                    }
-
-                    if (
-                        !_behaviorsByHandleId.TryGetValue(
-                            handleId,
-                            out PooledResource<List<EffectBehavior>> behaviorLease
-                        )
-                    )
-                    {
-                        continue;
-                    }
-
-                    List<EffectBehavior> behaviors = behaviorLease.resource;
-                    EffectBehaviorContext context = new(this, handle, deltaTime);
-                    foreach (EffectBehavior behavior in behaviors)
-                    {
-                        if (behavior == null)
-                        {
-                            continue;
-                        }
-
-                        behavior.OnTick(context);
-                        ++processedTicks;
-                        // OnTick can remove the handle and destroy every remaining clone.
-                        if (!_effectHandlesById.ContainsKey(handleId))
-                        {
-                            break;
-                        }
-                    }
-                }
-            }
-            finally
-            {
-                EndTraversal();
-            }
-
-            return processedTicks;
-        }
-
         private void ProcessPeriodicEffects()
         {
             _ = ProcessPeriodicEffects(Time.time, Time.deltaTime);
-        }
-
-        private int ProcessPeriodicEffects(float currentTime, float deltaTime)
-        {
-            if (_periodicEffectStates.Count <= 0)
-            {
-                return 0;
-            }
-
-            int consumedTicks = 0;
-            ++_traversalDepth;
-            try
-            {
-                using PooledResource<List<long>> periodicRemovalResource = Buffers<long>.List.Get(
-                    out List<long> periodicRemovalBuffer
-                );
-                using PooledResource<List<long>> periodHandleIdsResource = Buffers<long>.List.Get(
-                    out List<long> periodicHandleIdsBuffer
-                );
-                periodicHandleIdsBuffer.AddRange(_periodicEffectStates.Keys);
-
-                foreach (long handleId in periodicHandleIdsBuffer)
-                {
-                    if (!_effectHandlesById.TryGetValue(handleId, out EffectHandle handle))
-                    {
-                        periodicRemovalBuffer.Add(handleId);
-                        continue;
-                    }
-
-                    if (
-                        !_periodicEffectStates.TryGetValue(
-                            handleId,
-                            out PooledResource<List<PeriodicEffectRuntimeState>> runtimesLease
-                        )
-                    )
-                    {
-                        continue;
-                    }
-
-                    List<PeriodicEffectRuntimeState> runtimes = runtimesLease.resource;
-                    bool hasActive = false;
-                    bool stillApplied = true;
-
-                    foreach (PeriodicEffectRuntimeState runtimeState in runtimes)
-                    {
-                        if (runtimeState == null)
-                        {
-                            continue;
-                        }
-
-                        int consumedTicksThisUpdate = 0;
-                        while (
-                            consumedTicksThisUpdate < MaxPeriodicCatchUpTicksPerUpdate
-                            && _effectHandlesById.ContainsKey(handleId)
-                            && runtimeState.TryConsumeTick(currentTime)
-                        )
-                        {
-                            ++consumedTicksThisUpdate;
-                            ++consumedTicks;
-                            ApplyPeriodicTick(handle, runtimeState, currentTime, deltaTime);
-                        }
-
-                        // A periodic callback can cancel the effect; remaining definitions must not tick afterward.
-                        if (!_effectHandlesById.ContainsKey(handleId))
-                        {
-                            stillApplied = false;
-                            break;
-                        }
-
-                        if (!runtimeState.IsComplete)
-                        {
-                            hasActive = true;
-                        }
-                    }
-
-                    if (stillApplied && !hasActive)
-                    {
-                        periodicRemovalBuffer.Add(handleId);
-                    }
-                }
-
-                foreach (long periodicHandleId in periodicRemovalBuffer)
-                {
-                    if (
-                        _periodicEffectStates.Remove(
-                            periodicHandleId,
-                            out PooledResource<List<PeriodicEffectRuntimeState>> lease
-                        )
-                    )
-                    {
-                        ReleasePeriodicStateList(lease);
-                    }
-                }
-            }
-            finally
-            {
-                EndTraversal();
-            }
-
-            return consumedTicks;
         }
     }
 }

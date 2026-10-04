@@ -28,6 +28,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         private int _wbuttonEventCount;
         private int _wenumEventCount;
 
+        /// <summary>
+        /// Clears all cached state. Useful for tests or domain reload scenarios.
+        /// </summary>
+        private static void ClearCache()
+        {
+            ColorKeyChangeNotifier.PreviousWButtonButtonColors.Clear();
+            ColorKeyChangeNotifier.PreviousWButtonTextColors.Clear();
+            ColorKeyChangeNotifier.PreviousWEnumSelectedBackgrounds.Clear();
+            ColorKeyChangeNotifier.PreviousWEnumSelectedTexts.Clear();
+            ColorKeyChangeNotifier.PreviousWEnumInactiveBackgrounds.Clear();
+            ColorKeyChangeNotifier.PreviousWEnumInactiveTexts.Clear();
+            ColorKeyChangeNotifier._changedWButtonKeys = null;
+            ColorKeyChangeNotifier._changedWEnumKeys = null;
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -39,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             _wbuttonEventCount = 0;
             _wenumEventCount = 0;
 
-            ColorKeyChangeNotifier.ClearCache();
+            ClearCache();
             ColorKeyChangeNotifier.OnWButtonColorKeysChanged += OnWButtonColorKeysChanged;
             ColorKeyChangeNotifier.OnWEnumToggleButtonsColorKeysChanged +=
                 OnWEnumToggleButtonsColorKeysChanged;
@@ -51,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             ColorKeyChangeNotifier.OnWButtonColorKeysChanged -= OnWButtonColorKeysChanged;
             ColorKeyChangeNotifier.OnWEnumToggleButtonsColorKeysChanged -=
                 OnWEnumToggleButtonsColorKeysChanged;
-            ColorKeyChangeNotifier.ClearCache();
+            ClearCache();
 
             _serializedSettings?.Dispose();
             _serializedSettings = null;
@@ -235,7 +250,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         public void ClearCacheResetsState()
         {
             ColorKeyChangeNotifier.CaptureCurrentState(_serializedSettings);
-            ColorKeyChangeNotifier.ClearCache();
+            ClearCache();
 
             Assert.DoesNotThrow(() =>
                 ColorKeyChangeNotifier.CaptureCurrentState(_serializedSettings)

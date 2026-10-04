@@ -33,8 +33,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private const string ClaimSuffix = ".claim";
 
-        internal static Action AfterBeginClaimForTests { get; set; }
-
         /// <summary>
         ///     Resolves the summary path for a single test mode.
         /// </summary>
@@ -135,7 +133,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
 
                 using FileStream claim = OpenBeginClaim(summaryPath, competingSummaryPath);
-                AfterBeginClaimForTests?.Invoke();
                 if (
                     IsMarkedRunning(summaryPath)
                     || (
@@ -322,19 +319,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
         }
 
-        private static FileStream OpenClaim(string summaryPath)
-        {
-            return new FileStream(
-                summaryPath + ClaimSuffix,
-                FileMode.OpenOrCreate,
-                FileAccess.ReadWrite,
-                FileShare.Read,
-                bufferSize: 1,
-                FileOptions.DeleteOnClose
-            );
-        }
-
-        private static FileStream OpenBeginClaim(string summaryPath, string competingSummaryPath)
+        internal static FileStream OpenBeginClaim(string summaryPath, string competingSummaryPath)
         {
             if (string.IsNullOrWhiteSpace(competingSummaryPath))
             {
@@ -345,6 +330,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             string claimPath = Path.Combine(directory, "unity-helpers-test-run.claim");
             return new FileStream(
                 claimPath,
+                FileMode.OpenOrCreate,
+                FileAccess.ReadWrite,
+                FileShare.Read,
+                bufferSize: 1,
+                FileOptions.DeleteOnClose
+            );
+        }
+
+        private static FileStream OpenClaim(string summaryPath)
+        {
+            return new FileStream(
+                summaryPath + ClaimSuffix,
                 FileMode.OpenOrCreate,
                 FileAccess.ReadWrite,
                 FileShare.Read,

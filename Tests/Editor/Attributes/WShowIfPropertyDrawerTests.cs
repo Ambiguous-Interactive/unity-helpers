@@ -24,7 +24,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         private static WShowIfPropertyDrawer CreateDrawer(WShowIfAttribute attribute)
         {
             WShowIfPropertyDrawer drawer = new();
-            drawer.InitializeForTesting(attribute);
+            WallstopStudios.UnityHelpers.Tests.TestUtils.PropertyDrawerTestHelper.AssignAttribute(
+                drawer,
+                attribute
+            );
             return drawer;
         }
 

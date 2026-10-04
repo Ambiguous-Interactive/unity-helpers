@@ -108,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// to properly destroy Editor instances when they are evicted from the cache.
         /// Lazy-initialized to prevent Unity Editor hangs during static initialization.
         /// </summary>
-        private static Cache<long, Editor> EditorCache =>
+        internal static Cache<long, Editor> EditorCache =>
             _editorCache ??= CacheBuilder<long, Editor>
                 .NewBuilder()
                 .MaximumSize(MaxEditorCacheSize)
@@ -132,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// Cache for foldout expansion states, keyed by a unique foldout identifier.
         /// Limited to <see cref="MaxFoldoutStatesCacheSize"/> entries to prevent unbounded memory growth.
         /// </summary>
-        private static readonly Dictionary<string, bool> FoldoutStates = new Dictionary<
+        internal static readonly Dictionary<string, bool> FoldoutStates = new Dictionary<
             string,
             bool
         >(StringComparer.Ordinal);
@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// Cache for scroll positions, keyed by a unique scroll identifier.
         /// Limited to <see cref="MaxScrollPositionsCacheSize"/> entries to prevent unbounded memory growth.
         /// </summary>
-        private static readonly Dictionary<string, Vector2> ScrollPositions = new Dictionary<
+        internal static readonly Dictionary<string, Vector2> ScrollPositions = new Dictionary<
             string,
             Vector2
         >(StringComparer.Ordinal);
@@ -602,69 +602,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
 
             // Clearing must not initialize the cache; eviction destroys each cached editor.
             _editorCache?.Clear();
-        }
-
-        /// <summary>
-        /// Clears all cached state. Primarily for testing purposes.
-        /// </summary>
-        internal static void ClearCachedStateForTesting()
-        {
-            ClearCache();
-        }
-
-        /// <summary>
-        /// Test hook to set the foldout state for a given key.
-        /// </summary>
-        /// <param name="key">The foldout key.</param>
-        /// <param name="expanded">Whether the foldout should be expanded.</param>
-        internal static void SetFoldoutStateForTesting(string key, bool expanded)
-        {
-            if (!string.IsNullOrEmpty(key))
-            {
-                FoldoutStates[key] = expanded;
-            }
-        }
-
-        /// <summary>
-        /// Test hook to get the foldout state for a given key.
-        /// </summary>
-        /// <param name="key">The foldout key.</param>
-        /// <returns>True if expanded; false otherwise.</returns>
-        internal static bool GetFoldoutStateForTesting(string key)
-        {
-            if (string.IsNullOrEmpty(key))
-            {
-                return false;
-            }
-
-            return FoldoutStates.TryGetValue(key, out bool value) && value;
-        }
-
-        /// <summary>
-        /// Test hook to get the number of cached editors.
-        /// </summary>
-        /// <returns>The number of cached editors.</returns>
-        internal static int GetEditorCacheCountForTesting()
-        {
-            return EditorCache.Count;
-        }
-
-        /// <summary>
-        /// Test hook to get the number of cached foldout states.
-        /// </summary>
-        /// <returns>The number of cached foldout states.</returns>
-        internal static int GetFoldoutStateCacheCountForTesting()
-        {
-            return FoldoutStates.Count;
-        }
-
-        /// <summary>
-        /// Test hook to get the number of cached scroll positions.
-        /// </summary>
-        /// <returns>The number of cached scroll positions.</returns>
-        internal static int GetScrollPositionCacheCountForTesting()
-        {
-            return ScrollPositions.Count;
         }
 
         /// <summary>

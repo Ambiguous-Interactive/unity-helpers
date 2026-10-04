@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             _originalTweenEnabled = settings.WGroupFoldoutTweenEnabled;
             _originalTweenSpeed = settings.WGroupFoldoutSpeed;
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
         }
 
         [TearDown]
@@ -63,7 +63,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             settings.WGroupFoldoutTweenEnabled = _originalTweenEnabled;
             settings.WGroupFoldoutSpeed = _originalTweenSpeed;
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
         }
 
         [Test]
@@ -235,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 hideHeader: false
             );
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
 
             float progressExpanded = WGroupAnimationState.GetFadeProgress(
                 definition,
@@ -560,7 +560,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             AnimBool animBefore = WGroupAnimationState.GetOrCreateAnim(definition, expanded: true);
             Assert.IsTrue(animBefore != null, "AnimBool should exist before clearing cache.");
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
 
             AnimBool animAfter = WGroupAnimationState.GetOrCreateAnim(definition, expanded: true);
             Assert.IsTrue(animAfter != null, "AnimBool should be recreated after clearing cache.");
@@ -646,7 +646,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             settings.WGroupFoldoutTweenEnabled = true;
             settings.WGroupFoldoutSpeed = speed;
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
             WGroupDefinition definition = CreateTestDefinition(
                 "VariableSpeedGroup",
                 "testProperty",
@@ -1070,7 +1070,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             Assert.IsTrue(anim2Before != null, "AnimBool 2 should exist before clearing.");
             Assert.IsTrue(anim3Before != null, "AnimBool 3 should exist before clearing.");
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
 
             AnimBool anim1After = WGroupAnimationState.GetOrCreateAnim(
                 definition,

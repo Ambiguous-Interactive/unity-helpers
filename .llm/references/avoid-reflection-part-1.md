@@ -35,6 +35,10 @@ Do not use these reflection APIs to access WallstopStudios code members:
 
 Change `private` members to `internal` and rely on the `InternalsVisibleTo` infrastructure already in place.
 
+Expose the actual implementation, not a test-only wrapper. Shipped production code must contain no test-only APIs, state, callbacks, branches or instrumentation, including code hidden behind `UNITY_INCLUDE_TESTS`. Never introduce `ForTest`, `ForTesting`, `ForTests`, `TestHooks` or `TestOnly` members, and do not merely rename such hooks. Test setup and simulated failures belong in test assemblies. Prefer the real lifecycle method, algorithm phase, state field or filesystem primitive; preserve failure and cleanup controls while changing their setup. Legitimate production discovery of test assemblies and authoring types remains supported.
+
+`npm run lint:production-test-hooks` scans shipped C# under Runtime, Editor, production Generator projects, Samples and Styles, including generator source literals. It rejects forbidden naming tokens in ordinary source and emitted literal code, plus explicit test-only hook/code marker forms; its contract tests retain rejecting and accepting controls. Test projects and the enumerated host check tools are excluded. Every expected production root must exist as a directory, and the scan must find production C#; missing roots and empty scans fail rather than accepting a subset. This naming/marker gate is not a complete C# parser. Interpolation expressions inside strings are masked; references or local functions found only inside those expressions are not covered. It does not prove semantic absence of test-only code: review production call sites and behavior, including suffix-free injected delegates and conditional instrumentation. Do not claim end-to-end scheduling coverage when a test exercises only separately exposed implementation phases.
+
 ```csharp
 // ❌ FORBIDDEN - Reflection on our code
 var field = typeof(OurClass).GetField("_someField", BindingFlags.NonPublic | BindingFlags.Instance);

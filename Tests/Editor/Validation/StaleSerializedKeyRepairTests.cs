@@ -40,7 +40,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private const string MonoBehaviourDocument = "--- !u!114 ";
         private const int SubObjectCount = 3;
         private const int DamagedWeight = 41;
-        private const string RewriteFailureMessage = "the reserialize refused this asset";
 
         private string _folderName;
         private string _folder;
@@ -147,6 +146,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
 
             return count;
+        }
+
+        private static void RemoveSubObject(string assetPath)
+        {
+            Object[] objects = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+            Object main = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            foreach (Object candidate in objects)
+            {
+                if (candidate != null && candidate != main)
+                {
+                    Object.DestroyImmediate(candidate, true); // UNH-SUPPRESS UNH001: deleting the authored sub-asset is the subject of this test.
+                    AssetDatabase.SaveAssets();
+                    return;
+                }
+            }
+
+            Assert.Fail($"{assetPath} has no sub-asset to remove.");
         }
 
         [OneTimeSetUp]
@@ -327,8 +343,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         /// Nothing a test can author makes <c>ForceReserializeAssets</c> lose anything -- a
         /// <c>VolumeProfile</c> went from twenty serialized documents to one while the rewrite
         /// reported success, and five modelled <c>HideFlags</c> shapes reproduced none of it. So the
-        /// loss is supplied through the counter seam and everything after it is production code: the
-        /// comparison, the restore, and the forced re-import. The subject is damaged for real, in
+        /// completion phase is exercised after deleting a real sub-asset. The comparison, restore,
+        /// and forced re-import are the same phases the public repair uses. The subject is damaged in
         /// both places a real loss damages it, so both halves of the undo have something to reverse.
         /// The weight assertion is not vacuous: measured on 6000.4.6f1, writing the original bytes
         /// back <em>without</em> the re-import leaves the editor holding the damaged value, so
@@ -345,24 +361,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 "The subject has no sub-objects, so a loss cannot be modelled against it."
             );
 
-            int counts = 0;
-            StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
+            int before = NonNullObjectCount(_lostSubObjects);
+            DamageInPlace(_lostSubObjects);
+            RemoveSubObject(_lostSubObjects);
+            Assert.AreEqual(before - 1, NonNullObjectCount(_lostSubObjects));
+            StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.CompleteRewrite(
                 _lostSubObjects,
-                assetPath =>
-                {
-                    int held = NonNullObjectCount(assetPath);
-                    ++counts;
-                    if (counts < 2)
-                    {
-                        return held;
-                    }
-
-                    return held - 1;
-                },
-                assetPath => DamageInPlace(assetPath)
+                filePath,
+                original,
+                before
             );
 
-            Assert.AreEqual(2, counts, "The rewrite was never counted on both sides of itself.");
             Assert.AreEqual(
                 StaleSerializedKeyRepairOutcome.RefusedLostSubObjects,
                 outcome,
@@ -377,6 +386,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             AuthoredRequirementTestAsset restored =
                 AssetDatabase.LoadAssetAtPath<AuthoredRequirementTestAsset>(_lostSubObjects);
             Assert.IsTrue(restored != null, _lostSubObjects);
+            Assert.AreEqual(before, NonNullObjectCount(_lostSubObjects));
             Assert.AreEqual(
                 0,
                 restored.weight,
@@ -398,27 +408,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             try
             {
-                int counts = 0;
-                StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
-                    _lostSubObjects,
-                    assetPath =>
-                    {
-                        int held = NonNullObjectCount(assetPath);
-                        ++counts;
-                        if (counts < 2)
-                        {
-                            return held;
-                        }
-
-                        File.AppendAllText(filePath, "\n# concurrent edit\n");
-                        edited = File.ReadAllBytes(filePath);
-                        return held - 1;
-                    },
-                    assetPath => DamageInPlace(assetPath)
+                DamageInPlace(_lostSubObjects);
+                byte[] rewritten = File.ReadAllBytes(filePath);
+                File.AppendAllText(filePath, "\n# concurrent edit\n");
+                edited = File.ReadAllBytes(filePath);
+                Assert.IsFalse(
+                    StaleSerializedKeyRepair.Restore(_lostSubObjects, filePath, original, rewritten)
                 );
-
-                Assert.AreEqual(2, counts);
-                Assert.AreEqual(StaleSerializedKeyRepairOutcome.RefusedUndoFailed, outcome);
                 CollectionAssert.AreEqual(edited, File.ReadAllBytes(filePath));
             }
             finally
@@ -440,7 +436,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         /// root, which is how the package's own containers run.
         /// </remarks>
         [Test]
-        public void AnUndoThatCannotWriteIsReportedRatherThanSwallowed()
+        public void RestorationThatCannotWriteIsReportedRatherThanSwallowed()
         {
             string filePath = AuthoredAssetPaths.ToFileSystemPath(_undoFailed);
             byte[] original = File.ReadAllBytes(filePath);
@@ -451,28 +447,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             try
             {
-                int counts = 0;
-                StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
-                    _undoFailed,
-                    assetPath =>
-                    {
-                        int held = NonNullObjectCount(assetPath);
-                        ++counts;
-                        if (counts < 2)
-                        {
-                            return held;
-                        }
-
-                        File.Delete(filePath);
-                        Directory.CreateDirectory(filePath);
-                        return held - 1;
-                    }
-                );
-
-                Assert.AreEqual(
-                    StaleSerializedKeyRepairOutcome.RefusedUndoFailed,
-                    outcome,
-                    "An undo that could not write must not report the same refusal as one that did."
+                StaleSerializedKeyRepairOutcome rewriteOutcome =
+                    StaleSerializedKeyRepair.RepairAsset(_undoFailed);
+                Assert.AreEqual(StaleSerializedKeyRepairOutcome.Repaired, rewriteOutcome);
+                byte[] rewritten = File.ReadAllBytes(filePath);
+                File.Delete(filePath);
+                Directory.CreateDirectory(filePath);
+                Assert.IsFalse(
+                    StaleSerializedKeyRepair.Restore(_undoFailed, filePath, original, rewritten),
+                    "Restoration must report that the destination is now a directory."
                 );
             }
             finally
@@ -497,37 +480,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         /// Every guard <c>RefusedUnreadable</c> describes has already passed by the time the rewrite
         /// runs: the file existed, its bytes were read, and its objects loaded. Reporting it there
         /// sent a human at permissions and paths while the real failure was Unity's rewrite call.
-        /// Nothing a test can author makes <c>ForceReserializeAssets</c> throw, so the throw is
-        /// supplied through the rewrite seam and everything after it -- the log, the byte restore
-        /// and the forced re-import -- is production code
+        /// A real filesystem exception exercises the repair's shared recovery phase: its log,
+        /// byte restore, and forced re-import. This does not force Unity's rewrite API to throw
         /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/679">#679</see>).
         /// </remarks>
         [Test]
-        public void ARewriteThatThrowsIsNotReportedAsUnreadable()
+        public void RewriteFailureRecoveryIsNotReportedAsUnreadable()
         {
             string filePath = AuthoredAssetPaths.ToFileSystemPath(_rewriteThrew);
             byte[] original = File.ReadAllBytes(filePath);
+            DamageInPlace(_rewriteThrew);
+            Exception rewriteError = ReadDirectoryFailure();
             LogAssert.Expect(
                 LogType.Error,
                 new Regex(
                     Regex.Escape(
-                        $"Rewriting {_rewriteThrew} threw: {typeof(InvalidOperationException).FullName}: {RewriteFailureMessage}"
+                        $"Rewriting {_rewriteThrew} threw: {rewriteError.GetType().FullName}"
                     )
                 )
             );
+            StaleSerializedKeyRepairOutcome outcome =
+                StaleSerializedKeyRepair.RecoverRewriteFailure(
+                    _rewriteThrew,
+                    filePath,
+                    original,
+                    rewriteError
+                );
 
-            int rewrites = 0;
-            StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
-                _rewriteThrew,
-                null,
-                _ =>
-                {
-                    ++rewrites;
-                    throw new InvalidOperationException(RewriteFailureMessage);
-                }
-            );
-
-            Assert.AreEqual(1, rewrites, "The rewrite seam never ran, so nothing threw.");
             Assert.AreEqual(
                 StaleSerializedKeyRepairOutcome.RefusedRewriteThrew,
                 outcome,
@@ -538,6 +517,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 File.ReadAllBytes(filePath),
                 "The refusal did not put the original bytes back."
             );
+            AuthoredRequirementTestAsset restored =
+                AssetDatabase.LoadAssetAtPath<AuthoredRequirementTestAsset>(_rewriteThrew);
+            Assert.IsTrue(restored != null);
+            Assert.AreEqual(0, restored.weight);
         }
 
         /// <summary>
@@ -555,16 +538,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         /// because a <c>$</c> would also assert whatever Unity appends to a message.
         /// </remarks>
         [Test]
-        public void ARewriteThatThrewAndCouldNotBeUndoneReportsTheWorstOutcome()
+        public void RewriteFailureRecoveryThatCannotRestoreReportsTheWorstOutcome()
         {
             string filePath = AuthoredAssetPaths.ToFileSystemPath(_rewriteUndoFailed);
             byte[] original = File.ReadAllBytes(filePath);
+            Exception rewriteError = ReadDirectoryFailure();
             LogAssert.Expect(
                 LogType.Error,
                 new Regex(
                     "(?![\\s\\S]*(being put back|Nothing was repaired))"
                         + Regex.Escape(
-                            $"Rewriting {_rewriteUndoFailed} threw: {typeof(InvalidOperationException).FullName}: {RewriteFailureMessage}"
+                            $"Rewriting {_rewriteUndoFailed} threw: {rewriteError.GetType().FullName}"
                         )
                 )
             );
@@ -575,23 +559,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             try
             {
-                StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
-                    _rewriteUndoFailed,
-                    null,
-                    _ =>
-                    {
-                        File.Delete(filePath);
-                        Directory.CreateDirectory(filePath);
-                        throw new InvalidOperationException(RewriteFailureMessage);
-                    }
-                );
-
-                Assert.AreEqual(
-                    StaleSerializedKeyRepairOutcome.RefusedUndoFailed,
-                    outcome,
-                    "A rewrite that threw and could not be undone must report the outcome that needs "
-                        + "a human, not the one that says the bytes came back."
-                );
+                File.Delete(filePath);
+                Directory.CreateDirectory(filePath);
+                StaleSerializedKeyRepairOutcome outcome =
+                    StaleSerializedKeyRepair.RecoverRewriteFailure(
+                        _rewriteUndoFailed,
+                        filePath,
+                        original,
+                        rewriteError
+                    );
+                Assert.AreEqual(StaleSerializedKeyRepairOutcome.RefusedUndoFailed, outcome);
             }
             finally
             {
@@ -631,19 +608,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [Test]
         public void AnAssetThatLoadsNoObjectsIsRefusedAsUnreadable()
         {
-            int counts = 0;
+            string assetPath = $"{_folder}/Unimported.unityhelpersunknown";
+            string filePath = AuthoredAssetPaths.ToFileSystemPath(assetPath);
+            byte[] original = { 1, 2, 3 };
+            File.WriteAllBytes(filePath, original);
+            Assert.AreEqual(0, NonNullObjectCount(assetPath));
             StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
-                _rewriteThrew,
-                _ =>
-                {
-                    ++counts;
-                    return 0;
-                },
-                _ => Assert.Fail("The rewrite ran for an asset that loaded nothing.")
+                assetPath
             );
-
-            Assert.AreEqual(1, counts, "The count seam never ran, so the guard was not reached.");
             Assert.AreEqual(StaleSerializedKeyRepairOutcome.RefusedUnreadable, outcome);
+            CollectionAssert.AreEqual(original, File.ReadAllBytes(filePath));
+        }
+
+        private Exception ReadDirectoryFailure()
+        {
+            try
+            {
+                File.ReadAllBytes(AuthoredAssetPaths.ToFileSystemPath(_folder));
+            }
+            catch (IOException exception)
+            {
+                return exception;
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                return exception;
+            }
+
+            Assert.Fail("Reading a directory as file bytes did not fail.");
+            return null;
         }
 
         private string CreateStaleKeyAsset(string name)

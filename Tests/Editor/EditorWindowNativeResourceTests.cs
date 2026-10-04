@@ -104,12 +104,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
                 FitTextureSizeWindow window = Track(
                     ScriptableObject.CreateInstance<FitTextureSizeWindow>()
                 );
-                SerializedObject bound = window.SerializedStateForTesting;
+                SerializedObject bound = window._serializedObject;
                 Assert.IsTrue(bound != null);
                 Assert.AreNotSame(previous, bound);
                 bound.Update();
                 Object.DestroyImmediate(window); // UNH-SUPPRESS: teardown is the subject
-                Assert.IsTrue(window.SerializedStateForTesting == null);
+                Assert.IsTrue(window._serializedObject == null);
                 Assert.Catch(() => bound.Update());
                 previous = bound;
             }

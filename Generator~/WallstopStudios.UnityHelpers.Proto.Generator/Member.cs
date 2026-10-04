@@ -191,6 +191,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             ITypeSymbol type,
             bool isRequired,
             bool overwriteList,
+            bool isPacked,
             bool zigZag,
             SurrogateMap surrogates,
             NestedCollections nested,
@@ -247,6 +248,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 tag,
                 type,
                 overwriteList,
+                isPacked,
                 surrogates,
                 nested
             );

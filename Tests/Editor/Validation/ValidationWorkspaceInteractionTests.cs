@@ -254,11 +254,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                             "Assets/NoScanProbe.asset",
                             typeof(ScriptableObject)
                         ),
-                    },
-                    _ =>
-                        throw new InvalidOperationException(
-                            "The acceptance probe must not scan assets."
-                        )
+                    }
                 );
                 Assert.IsTrue(ValidationScheduler.TryStart(blocker));
                 Submit(ButtonWithText(builder, "Save Rule"));

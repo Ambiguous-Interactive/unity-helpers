@@ -63,9 +63,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        internal static int CachedTypeNameCountForTesting => SimplifiedTypeNameCache.Count;
-
-        private static readonly Cache<string, Type> SimplifiedTypeNameCache = CacheBuilder<
+        internal static readonly Cache<string, Type> SimplifiedTypeNameCache = CacheBuilder<
             string,
             Type
         >

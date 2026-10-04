@@ -48,7 +48,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             _originalTweenEnabled = settings.WGroupFoldoutTweenEnabled;
             _originalTweenSpeed = settings.WGroupFoldoutSpeed;
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
         }
 
         [TearDown]
@@ -58,7 +58,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             settings.WGroupFoldoutTweenEnabled = _originalTweenEnabled;
             settings.WGroupFoldoutSpeed = _originalTweenSpeed;
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
         }
 
         /// <summary>
@@ -75,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
         [Test]
         public void TheAnimationCacheStopsAtItsBound()
         {
-            int bound = WGroupAnimationState.MaxCachedAnimations;
+            int bound = WGroupAnimationState.MaxFoldoutAnimations;
             Assert.Greater(bound, 0, "the bound must be positive for this to measure anything");
 
             for (int index = 0; index < bound * 2; ++index)
@@ -87,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 _ = WGroupAnimationState.GetOrCreateAnim(definition, expanded: true);
             }
 
-            Assert.AreEqual(bound, WGroupAnimationState.CachedAnimationCount);
+            Assert.AreEqual(bound, WGroupAnimationState.FoldoutAnimations.Count);
         }
 
         [Test]
@@ -247,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 expanded: true
             );
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
 
             AnimBool anim1After = WGroupAnimationState.GetOrCreateAnim(definition1, expanded: true);
             AnimBool anim2After = WGroupAnimationState.GetOrCreateAnim(definition2, expanded: true);
@@ -337,7 +337,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
             settings.WGroupFoldoutSpeed = speed;
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
             WGroupDefinition definition = CreateTestDefinition("TestGroup", "testProperty");
             AnimBool anim = WGroupAnimationState.GetOrCreateAnim(definition, expanded: true);
 
@@ -351,9 +351,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
         [Test]
         public void ClearCacheCanBeCalledMultipleTimesSafely()
         {
-            WGroupAnimationState.ClearCache();
-            WGroupAnimationState.ClearCache();
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
+            WGroupAnimationState.FoldoutAnimations.Clear();
+            WGroupAnimationState.FoldoutAnimations.Clear();
 
             WGroupDefinition definition = CreateTestDefinition("TestGroup", "testProperty");
             AnimBool anim = WGroupAnimationState.GetOrCreateAnim(definition, expanded: true);
@@ -554,7 +554,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 expanded: true
             );
 
-            WGroupAnimationState.ClearCache();
+            WGroupAnimationState.FoldoutAnimations.Clear();
 
             AnimBool anim1After = WGroupAnimationState.GetOrCreateAnim(
                 definition,

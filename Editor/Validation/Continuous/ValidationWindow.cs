@@ -38,7 +38,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </summary>
         private const string DefaultSuppressionsPath = "ValidationSuppressions.txt";
 
-        internal string StatusForTesting => _status;
+        /// <summary>What the progress label reads when no run is active.</summary>
+        internal string _status = string.Empty;
 
         private readonly List<ValidationFinding> _visible = new List<ValidationFinding>();
 
@@ -56,9 +57,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         /// <summary>Whether the run the scheduler is driving is the one this window started.</summary>
         private bool _owned;
-
-        /// <summary>What the progress label reads when no run is active.</summary>
-        private string _status = string.Empty;
 
         private Label _summary;
         private Label _progress;
@@ -116,9 +114,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
         }
 
-        internal void CompleteForTesting(ValidationRun run)
+        internal void Complete(ValidationRun run)
         {
-            Complete(run);
+            _lastCompletedRun = run;
+            bool committed = ValidationResults.TryRecordRun(run);
+            if (run.IsCancelled)
+            {
+                _status = "Cancelled. Previous results retained.";
+            }
+            else if (!committed)
+            {
+                _status = "Validation failed. Previous results retained.";
+                Debug.LogWarning("[Asset Validation] " + _status);
+            }
+            else
+            {
+                _status = string.Empty;
+            }
+
+            for (int index = 0; index < run.Failures.Count; ++index)
+            {
+                Debug.LogError("[Asset Validation] " + run.Failures[index]);
+            }
+
+            _owned = false;
+            if (_run != null)
+            {
+                _run.text = "Validate Project";
+            }
+            if (_progress != null)
+            {
+                _progress.text = _status;
+            }
+            Refresh();
         }
 
         private void OnEnable()
@@ -278,41 +306,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             return true;
-        }
-
-        private void Complete(ValidationRun run)
-        {
-            _lastCompletedRun = run;
-            bool committed = ValidationResults.TryRecordRun(run);
-            if (run.IsCancelled)
-            {
-                _status = "Cancelled. Previous results retained.";
-            }
-            else if (!committed)
-            {
-                _status = "Validation failed. Previous results retained.";
-                Debug.LogWarning("[Asset Validation] " + _status);
-            }
-            else
-            {
-                _status = string.Empty;
-            }
-
-            for (int index = 0; index < run.Failures.Count; ++index)
-            {
-                Debug.LogError("[Asset Validation] " + run.Failures[index]);
-            }
-
-            _owned = false;
-            if (_run != null)
-            {
-                _run.text = "Validate Project";
-            }
-            if (_progress != null)
-            {
-                _progress.text = _status;
-            }
-            Refresh();
         }
 
         /// <summary>

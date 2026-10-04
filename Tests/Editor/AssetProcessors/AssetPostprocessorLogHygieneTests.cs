@@ -87,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             EnsureTestFolder();
             TrackFolder(TestRoot);
             // Folder creation can queue drains that would pollute the first test.
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
         }
 
         [SetUp]
@@ -103,28 +103,24 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 state during the test.
             */
             AssetPostprocessorTestHandlers.FlushAndClearAll();
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             /*
                 The native callback declines initialization in batch mode; force it on so this regression test
                 reaches the watcher.
             */
             _watcherScope = AssetChangeDetectionUtility.EnabledScope(true);
-            DetectAssetChangeProcessor.IncludeTestAssets = true;
-            // Limit observed assets to this fixture to prevent cross-fixture handler invocations.
-            DetectAssetChangeProcessor.TestAssetFolderAllowlist = new[] { TestRoot + "/" };
         }
 
         [TearDown]
         public override void TearDown()
         {
-            DetectAssetChangeProcessor.TestAssetFolderAllowlist = null;
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessorTestAccess.Reset();
             _watcherScope?.Dispose();
             _watcherScope = null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             base.TearDown();
             // Flush after base teardown because destroying tracked assets can enqueue more drains.
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
             AssetPostprocessorTestHandlers.FlushAndClearAll();
         }
 
@@ -185,13 +181,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 AssetDatabase.CreateAsset(payload, payloadPath);
             });
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             logScope.AssertNoSendMessageWarnings();
         }
 
         /// <summary>
-        /// Drives sub-asset matching through ProcessChangesForTesting and checks that imported
+        /// Drives sub-asset matching through ProcessChanges and checks that imported
         /// textures do not emit SendMessage warnings. This complements the prefab test above.
         /// </summary>
         [Test]
@@ -242,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             });
 
-            AssetPostprocessorDeferral.FlushForTesting();
+            AssetPostprocessorDeferralTestAccess.Flush();
 
             logScope.AssertNoSendMessageWarnings();
         }

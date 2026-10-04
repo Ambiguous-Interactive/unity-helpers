@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         /// The bound is far above the handful of palette entries a project authors, so an eviction
         /// only ever discards a colour the user dragged through.
         /// </remarks>
-        private const int MaxColoredButtonStyles = 64;
+        internal const int MaxColoredButtonStyles = 64;
 
         internal static GUIStyle GroupStyle
         {
@@ -133,6 +133,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
         }
 
+        internal static readonly Cache<ButtonStyleKey, ColoredButtonStyle> ColoredButtonStyles =
+            CacheBuilder<ButtonStyleKey, ColoredButtonStyle>
+                .NewBuilder()
+                .MaximumSize(MaxColoredButtonStyles)
+                .InitialCapacity(16)
+                .KeyComparer(new ButtonStyleKeyComparer())
+                .OnEviction(static (_, evicted, _) => evicted.Destroy())
+                .TransferOwnershipOnRemoval()
+                .Build();
+
+        internal static readonly Cache<ButtonStyleKey, ColoredButtonStyle> ColoredMiniButtonStyles =
+            CacheBuilder<ButtonStyleKey, ColoredButtonStyle>
+                .NewBuilder()
+                .MaximumSize(MaxColoredButtonStyles)
+                .InitialCapacity(16)
+                .KeyComparer(new ButtonStyleKeyComparer())
+                .OnEviction(static (_, evicted, _) => evicted.Destroy())
+                .TransferOwnershipOnRemoval()
+                .Build();
+
         private static GUIStyle _groupStyle;
         private static GUIStyle _headerStyle;
         private static GUIStyle _baseButtonStyle;
@@ -144,25 +164,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static GUIContent _topHeaderContent;
         private static GUIContent _bottomHeaderContent;
         private static readonly EditorCacheHelper.ColorComparer ColorEquality = new();
-
-        private static readonly Cache<ButtonStyleKey, ColoredButtonStyle> ColoredButtonStyles =
-            CacheBuilder<ButtonStyleKey, ColoredButtonStyle>
-                .NewBuilder()
-                .MaximumSize(MaxColoredButtonStyles)
-                .InitialCapacity(16)
-                .KeyComparer(new ButtonStyleKeyComparer())
-                .OnEviction(static (_, evicted, _) => evicted.Destroy())
-                .TransferOwnershipOnRemoval()
-                .Build();
-        private static readonly Cache<ButtonStyleKey, ColoredButtonStyle> ColoredMiniButtonStyles =
-            CacheBuilder<ButtonStyleKey, ColoredButtonStyle>
-                .NewBuilder()
-                .MaximumSize(MaxColoredButtonStyles)
-                .InitialCapacity(16)
-                .KeyComparer(new ButtonStyleKeyComparer())
-                .OnEviction(static (_, evicted, _) => evicted.Destroy())
-                .TransferOwnershipOnRemoval()
-                .Build();
 
         internal static GUIStyle GetFoldoutContainerStyle(bool expanded)
         {
@@ -289,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             return style;
         }
 
-        private readonly struct ButtonStyleKey : System.IEquatable<ButtonStyleKey>
+        internal readonly struct ButtonStyleKey : System.IEquatable<ButtonStyleKey>
         {
             private Color ButtonColor { get; }
 
@@ -334,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
         }
 
-        private sealed class ColoredButtonStyle
+        internal sealed class ColoredButtonStyle
         {
             internal readonly GUIStyle style;
 
@@ -368,33 +369,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 DestroyTexture(_normal);
                 DestroyTexture(_hover);
                 DestroyTexture(_active);
-            }
-        }
-
-        internal static class TestHooks
-        {
-            /// <summary>
-            /// Gets the number of colored button styles currently retained, for testing.
-            /// </summary>
-            internal static int ColoredButtonStyleCount => ColoredButtonStyles.Count;
-
-            /// <summary>
-            /// Gets the number of colored mini button styles currently retained, for testing.
-            /// </summary>
-            internal static int ColoredMiniButtonStyleCount => ColoredMiniButtonStyles.Count;
-
-            /// <summary>
-            /// Gets the bound both colored style caches evict at.
-            /// </summary>
-            internal static int MaxColoredButtonStyleCount => MaxColoredButtonStyles;
-
-            /// <summary>
-            /// Drops every cached colored style, destroying the textures each owns.
-            /// </summary>
-            internal static void ClearColoredStyleCaches()
-            {
-                ColoredButtonStyles.Clear();
-                ColoredMiniButtonStyles.Clear();
             }
         }
     }
