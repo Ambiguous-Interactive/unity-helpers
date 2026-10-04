@@ -39,6 +39,70 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             MemoryPressureMonitor.Enabled = _wasMemoryPressureEnabled;
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void NestedCrossPoolPurgeKeepsBothSnapshotsExclusive(bool mutateDuringDisposal)
+        {
+            List<int> outerIds = new();
+            List<int> innerIds = new();
+            List<int> disposedIds = new();
+            int nestedCount = -1;
+            bool entered = false;
+            using WallstopGenericPool<TestPoolItem> inner = new(
+                () => new TestPoolItem(),
+                preWarmCount: 2,
+                onDisposal: item => disposedIds.Add(item.Id),
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    UseIntelligentPurging = false,
+                    TimeProvider = TestTimeProvider,
+                    OnPurge = (item, reason) => innerIds.Add(item.Id),
+                }
+            );
+            Action nest = () =>
+            {
+                if (!entered)
+                {
+                    entered = true;
+                    nestedCount = inner.ForceFullPurge();
+                }
+            };
+            using WallstopGenericPool<TestPoolItem> outer = new(
+                () => new TestPoolItem(),
+                preWarmCount: 2,
+                onDisposal: item =>
+                {
+                    disposedIds.Add(item.Id);
+                    if (mutateDuringDisposal)
+                    {
+                        nest();
+                    }
+                },
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    UseIntelligentPurging = false,
+                    TimeProvider = TestTimeProvider,
+                    OnPurge = (item, reason) =>
+                    {
+                        outerIds.Add(item.Id);
+                        if (!mutateDuringDisposal)
+                        {
+                            nest();
+                        }
+                    },
+                }
+            );
+            Assert.AreEqual(2, outer.ForceFullPurge());
+            Assert.AreEqual(2, nestedCount);
+            CollectionAssert.AreEquivalent(new[] { 1, 2 }, innerIds);
+            CollectionAssert.AreEquivalent(new[] { 3, 4 }, outerIds);
+            CollectionAssert.AreEquivalent(new[] { 1, 2, 3, 4 }, disposedIds);
+            Assert.AreEqual(0, inner.Count);
+            Assert.AreEqual(0, outer.Count);
+        }
+
         [Test]
         public void ConstructorWithNullProducerThrowsArgumentNullException()
         {

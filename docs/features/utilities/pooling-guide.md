@@ -96,6 +96,12 @@ batch still receives each cleanup notification once, and a callback cannot rent 
 for retirement. Nested purges act on the remaining pool; budget limits and minimum retention apply
 when each batch is selected.
 
+Purge and disposal snapshots use independent reusable buffers. Each thread and snapshot element
+type retains at most four empty buffers, each with capacity at most 4,096 entries. Nested callbacks
+hold distinct buffers until their batches finish; returning a buffer clears its item references.
+Cold growth, deeper nesting and larger batches can still allocate, and oversized buffers are
+discarded after cleanup.
+
 A directly constructed `PooledResource<T>` with a null return callback is an inert wrapper. It
 keeps the supplied resource accessible and reserves no disposal slot, even if it is never disposed.
 Disposing or copying it has no effect on the resource. Wrappers with a return callback retain their

@@ -516,20 +516,27 @@ namespace WallstopStudios.UnityHelpers.Utils
                 Volatile.Write(ref _comparerPoolMaxDistinctEntries, maximumSize);
                 while (true)
                 {
-                    Action<int>[] resizeActions;
-                    lock (ResizeActions)
+                    List<Action<int>> resizeActions = PurgeBuffer<Action<int>>.Rent();
+                    try
                     {
-                        resizeActions = ResizeActions.ToArray();
-                    }
+                        lock (ResizeActions)
+                        {
+                            resizeActions.AddRange(ResizeActions);
+                        }
 
-                    int publishedMaximum = ComparerPoolMaxDistinctEntries;
-                    foreach (Action<int> resize in resizeActions)
-                    {
-                        resize(publishedMaximum);
+                        int publishedMaximum = ComparerPoolMaxDistinctEntries;
+                        foreach (Action<int> resize in resizeActions)
+                        {
+                            resize(publishedMaximum);
+                        }
+                        if (publishedMaximum == ComparerPoolMaxDistinctEntries)
+                        {
+                            return;
+                        }
                     }
-                    if (publishedMaximum == ComparerPoolMaxDistinctEntries)
+                    finally
                     {
-                        return;
+                        PurgeBuffer<Action<int>>.Return(resizeActions);
                     }
                 }
             }
@@ -1426,31 +1433,38 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return 0;
             }
 
-            List<PooledEntry> toPurge = new();
-            int purged = 0;
-
-            for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
+            List<PooledEntry> toPurge = PurgeBuffer<PooledEntry>.Rent();
+            try
             {
-                PooledEntry entry = _pool[i];
-                _pool.RemoveAt(i);
-                ++purged;
-                ++_purgeCount;
+                int purged = 0;
 
-                toPurge.Add(entry);
+                for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
+                {
+                    PooledEntry entry = _pool[i];
+                    _pool.RemoveAt(i);
+                    ++purged;
+                    ++_purgeCount;
+
+                    toPurge.Add(entry);
+                }
+
+                if (0 < purged)
+                {
+                    ++_fullPurgeOperations;
+                }
+
+                foreach (PooledEntry entry in toPurge)
+                {
+                    InvokeOnPurge(entry.Value, reason);
+                    InvokeOnDispose(entry.Value);
+                }
+
+                return purged;
             }
-
-            if (0 < purged)
+            finally
             {
-                ++_fullPurgeOperations;
+                PurgeBuffer<PooledEntry>.Return(toPurge);
             }
-
-            foreach (PooledEntry entry in toPurge)
-            {
-                InvokeOnPurge(entry.Value, reason);
-                InvokeOnDispose(entry.Value);
-            }
-
-            return purged;
         }
 
         /// <summary>
@@ -1502,33 +1516,40 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             int effectiveMinRetain = MinRetainCount;
 
-            List<PooledEntry> toPurge = new();
-            int purged = 0;
-
-            for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
+            List<PooledEntry> toPurge = PurgeBuffer<PooledEntry>.Rent();
+            try
             {
-                PooledEntry entry = _pool[i];
-                _pool.RemoveAt(i);
-                ++purged;
-                ++_purgeCount;
+                int purged = 0;
 
-                toPurge.Add(entry);
+                for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
+                {
+                    PooledEntry entry = _pool[i];
+                    _pool.RemoveAt(i);
+                    ++purged;
+                    ++_purgeCount;
+
+                    toPurge.Add(entry);
+                }
+
+                _hasPendingPurges = false;
+
+                if (0 < purged)
+                {
+                    ++_fullPurgeOperations;
+                }
+
+                foreach (PooledEntry entry in toPurge)
+                {
+                    InvokeOnPurge(entry.Value, reason);
+                    InvokeOnDispose(entry.Value);
+                }
+
+                return purged;
             }
-
-            _hasPendingPurges = false;
-
-            if (0 < purged)
+            finally
             {
-                ++_fullPurgeOperations;
+                PurgeBuffer<PooledEntry>.Return(toPurge);
             }
-
-            foreach (PooledEntry entry in toPurge)
-            {
-                InvokeOnPurge(entry.Value, reason);
-                InvokeOnDispose(entry.Value);
-            }
-
-            return purged;
         }
 
         /// <inheritdoc />
@@ -1540,26 +1561,37 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             int minRetain = MinRetainCount;
-            List<PooledEntry> toPurge = new();
-            int purged = 0;
-
-            for (int i = _pool.Count - 1; 0 <= i && purged < count && minRetain < _pool.Count; i--)
+            List<PooledEntry> toPurge = PurgeBuffer<PooledEntry>.Rent();
+            try
             {
-                PooledEntry entry = _pool[i];
-                _pool.RemoveAt(i);
-                ++purged;
-                ++_purgeCount;
+                int purged = 0;
 
-                toPurge.Add(entry);
+                for (
+                    int i = _pool.Count - 1;
+                    0 <= i && purged < count && minRetain < _pool.Count;
+                    i--
+                )
+                {
+                    PooledEntry entry = _pool[i];
+                    _pool.RemoveAt(i);
+                    ++purged;
+                    ++_purgeCount;
+
+                    toPurge.Add(entry);
+                }
+
+                foreach (PooledEntry entry in toPurge)
+                {
+                    InvokeOnPurge(entry.Value, PurgeReason.BudgetExceeded);
+                    InvokeOnDispose(entry.Value);
+                }
+
+                return purged;
             }
-
-            foreach (PooledEntry entry in toPurge)
+            finally
             {
-                InvokeOnPurge(entry.Value, PurgeReason.BudgetExceeded);
-                InvokeOnDispose(entry.Value);
+                PurgeBuffer<PooledEntry>.Return(toPurge);
             }
-
-            return purged;
         }
 
         /// <summary>
@@ -1620,32 +1652,39 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal int PurgeCritical(float currentTime)
         {
             int minRetain = MinRetainCount;
-            List<PooledEntry> toPurge = new();
-            int purged = 0;
-
-            for (int i = _pool.Count - 1; 0 <= i && minRetain < _pool.Count; i--)
+            List<PooledEntry> toPurge = PurgeBuffer<PooledEntry>.Rent();
+            try
             {
-                PooledEntry entry = _pool[i];
-                _pool.RemoveAt(i);
-                ++purged;
-                ++_purgeCount;
+                int purged = 0;
 
-                toPurge.Add(entry);
+                for (int i = _pool.Count - 1; 0 <= i && minRetain < _pool.Count; i--)
+                {
+                    PooledEntry entry = _pool[i];
+                    _pool.RemoveAt(i);
+                    ++purged;
+                    ++_purgeCount;
+
+                    toPurge.Add(entry);
+                }
+
+                _hasPendingPurges = false;
+                if (0 < purged)
+                {
+                    ++_fullPurgeOperations;
+                }
+
+                foreach (PooledEntry entry in toPurge)
+                {
+                    InvokeOnPurge(entry.Value, PurgeReason.MemoryPressure);
+                    InvokeOnDispose(entry.Value);
+                }
+
+                return purged;
             }
-
-            _hasPendingPurges = false;
-            if (0 < purged)
+            finally
             {
-                ++_fullPurgeOperations;
+                PurgeBuffer<PooledEntry>.Return(toPurge);
             }
-
-            foreach (PooledEntry entry in toPurge)
-            {
-                InvokeOnPurge(entry.Value, PurgeReason.MemoryPressure);
-                InvokeOnDispose(entry.Value);
-            }
-
-            return purged;
         }
 
         private void ReturnToPool(T value)
@@ -1800,145 +1839,152 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             List<KeyValuePair<T, PurgeReason>> pendingCallbacks = null;
-            T[] expiredValues = null;
-            int purged = 0;
-            bool hitPurgeLimit = false;
-            bool moreEligibleItems = false;
-
-            // Return times are ordered, so the first unexpired entry ends an idle-only scan.
-            if (hasIdleTimeout && !hasMaxSize && !isExplicit && !inHysteresis)
+            try
             {
-                int expiredCount = 0;
-                foreach (PooledEntry entry in _pool)
+                int purged = 0;
+                bool hitPurgeLimit = false;
+                bool moreEligibleItems = false;
+
+                // Return times are ordered, so the first unexpired entry ends an idle-only scan.
+                if (hasIdleTimeout && !hasMaxSize && !isExplicit && !inHysteresis)
                 {
-                    if (_pool.Count - expiredCount <= effectiveMinRetain)
+                    int expiredCount = 0;
+                    foreach (PooledEntry entry in _pool)
                     {
-                        break;
+                        if (_pool.Count - expiredCount <= effectiveMinRetain)
+                        {
+                            break;
+                        }
+
+                        if (hasMaxPurgesLimit && maxPurgesLimit <= expiredCount)
+                        {
+                            hitPurgeLimit = true;
+                            moreEligibleItems = true;
+                            break;
+                        }
+
+                        if (effectiveIdleTimeout <= (currentTime - entry.ReturnTime))
+                        {
+                            ++expiredCount;
+                        }
+                        else
+                        {
+                            // All subsequent items are newer, none can be expired
+                            break;
+                        }
                     }
 
-                    if (hasMaxPurgesLimit && maxPurgesLimit <= expiredCount)
+                    // Remove entries before callbacks can reenter and rent them.
+                    if (0 < expiredCount)
                     {
-                        hitPurgeLimit = true;
-                        moreEligibleItems = true;
-                        break;
-                    }
+                        pendingCallbacks = PurgeBuffer<KeyValuePair<T, PurgeReason>>.Rent();
+                        for (int i = 0; i < expiredCount; ++i)
+                        {
+                            pendingCallbacks.Add(
+                                new KeyValuePair<T, PurgeReason>(
+                                    _pool[i].Value,
+                                    PurgeReason.IdleTimeout
+                                )
+                            );
+                        }
 
-                    if (effectiveIdleTimeout <= (currentTime - entry.ReturnTime))
-                    {
-                        ++expiredCount;
+                        _pool.RemoveRange(0, expiredCount);
+                        purged += expiredCount;
+                        _purgeCount += expiredCount;
+                        _idleTimeoutPurges += expiredCount;
                     }
-                    else
+                }
+                else
+                {
+                    for (
+                        int i = _pool.Count - 1;
+                        0 <= i
+                            && (isExplicit || hasIdleTimeout || comfortableSize < _pool.Count)
+                            && effectiveMinRetain < _pool.Count;
+                        i--
+                    )
                     {
-                        // All subsequent items are newer, none can be expired
-                        break;
+                        if (hasMaxPurgesLimit && maxPurgesLimit <= purged)
+                        {
+                            hitPurgeLimit = true;
+                            moreEligibleItems = true;
+                            break;
+                        }
+
+                        PooledEntry entry = _pool[i];
+                        PurgeReason reason = PurgeReason.Explicit;
+                        bool shouldPurge = false;
+
+                        if (
+                            hasIdleTimeout
+                            && effectiveIdleTimeout <= (currentTime - entry.ReturnTime)
+                        )
+                        {
+                            reason = PurgeReason.IdleTimeout;
+                            shouldPurge = true;
+                            ++_idleTimeoutPurges;
+                        }
+                        else if (!inHysteresis && hasMaxSize && maxSize < _pool.Count)
+                        {
+                            reason = PurgeReason.CapacityExceeded;
+                            shouldPurge = true;
+                            ++_capacityPurges;
+                        }
+                        else if (!inHysteresis && isExplicit)
+                        {
+                            shouldPurge = true;
+                        }
+
+                        if (shouldPurge)
+                        {
+                            // Remove before invoking callbacks so reentrant rents cannot observe the purged entry.
+                            _pool.RemoveAt(i);
+                            ++purged;
+                            ++_purgeCount;
+
+                            pendingCallbacks ??= PurgeBuffer<KeyValuePair<T, PurgeReason>>.Rent();
+                            pendingCallbacks.Add(
+                                new KeyValuePair<T, PurgeReason>(entry.Value, reason)
+                            );
+                        }
                     }
                 }
 
-                // Remove entries before callbacks can reenter and rent them.
-                if (0 < expiredCount)
+                if (hitPurgeLimit && moreEligibleItems)
                 {
-                    expiredValues = new T[expiredCount];
-                    for (int i = 0; i < expiredCount; ++i)
-                    {
-                        expiredValues[i] = _pool[i].Value;
-                    }
-
-                    _pool.RemoveRange(0, expiredCount);
-                    purged += expiredCount;
-                    _purgeCount += expiredCount;
-                    _idleTimeoutPurges += expiredCount;
+                    _hasPendingPurges = true;
+                    ++_partialPurgeOperations;
                 }
-            }
-            else
-            {
-                for (
-                    int i = _pool.Count - 1;
-                    0 <= i
-                        && (isExplicit || hasIdleTimeout || comfortableSize < _pool.Count)
-                        && effectiveMinRetain < _pool.Count;
-                    i--
-                )
+                else
                 {
-                    if (hasMaxPurgesLimit && maxPurgesLimit <= purged)
+                    _hasPendingPurges = false;
+                    if (0 < purged)
                     {
-                        hitPurgeLimit = true;
-                        moreEligibleItems = true;
-                        break;
-                    }
-
-                    PooledEntry entry = _pool[i];
-                    PurgeReason reason = PurgeReason.Explicit;
-                    bool shouldPurge = false;
-
-                    if (hasIdleTimeout && effectiveIdleTimeout <= (currentTime - entry.ReturnTime))
-                    {
-                        reason = PurgeReason.IdleTimeout;
-                        shouldPurge = true;
-                        ++_idleTimeoutPurges;
-                    }
-                    else if (!inHysteresis && hasMaxSize && maxSize < _pool.Count)
-                    {
-                        reason = PurgeReason.CapacityExceeded;
-                        shouldPurge = true;
-                        ++_capacityPurges;
-                    }
-                    else if (!inHysteresis && isExplicit)
-                    {
-                        shouldPurge = true;
-                    }
-
-                    if (shouldPurge)
-                    {
-                        // Remove before invoking callbacks so reentrant rents cannot observe the purged entry.
-                        _pool.RemoveAt(i);
-                        ++purged;
-                        ++_purgeCount;
-
-                        pendingCallbacks ??= new List<KeyValuePair<T, PurgeReason>>();
-                        pendingCallbacks.Add(new KeyValuePair<T, PurgeReason>(entry.Value, reason));
+                        ++_fullPurgeOperations;
                     }
                 }
-            }
 
-            if (hitPurgeLimit && moreEligibleItems)
-            {
-                _hasPendingPurges = true;
-                ++_partialPurgeOperations;
-            }
-            else
-            {
-                _hasPendingPurges = false;
-                if (0 < purged)
+                // Advance the throttle after empty scans too; over-capacity pools already bypass it.
+                if (_lastAutoPurgeTime < currentTime)
                 {
-                    ++_fullPurgeOperations;
+                    _lastAutoPurgeTime = currentTime;
                 }
-            }
 
-            // Advance the throttle after empty scans too; over-capacity pools already bypass it.
-            if (_lastAutoPurgeTime < currentTime)
-            {
-                _lastAutoPurgeTime = currentTime;
-            }
-
-            if (expiredValues != null)
-            {
-                foreach (T expiredValue in expiredValues)
+                if (pendingCallbacks != null)
                 {
-                    InvokeOnPurge(expiredValue, PurgeReason.IdleTimeout);
-                    InvokeOnDispose(expiredValue);
+                    foreach (KeyValuePair<T, PurgeReason> pending in pendingCallbacks)
+                    {
+                        InvokeOnPurge(pending.Key, pending.Value);
+                        InvokeOnDispose(pending.Key);
+                    }
                 }
-            }
 
-            if (pendingCallbacks != null)
+                return purged;
+            }
+            finally
             {
-                foreach (KeyValuePair<T, PurgeReason> pending in pendingCallbacks)
-                {
-                    InvokeOnPurge(pending.Key, pending.Value);
-                    InvokeOnDispose(pending.Key);
-                }
+                PurgeBuffer<KeyValuePair<T, PurgeReason>>.Return(pendingCallbacks);
             }
-
-            return purged;
         }
 
         private void InvokeOnPurge(T value, PurgeReason reason)
@@ -2500,32 +2546,38 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             // Renting a pooled list here can recursively trigger this purge and overflow the stack.
-            List<PooledEntry> toPurge = new();
-
-            lock (_lock)
+            List<PooledEntry> toPurge = PurgeBuffer<PooledEntry>.Rent();
+            try
             {
-                for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
+                lock (_lock)
                 {
-                    toPurge.Add(_pool[i]);
-                    _pool.RemoveAt(i);
+                    for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
+                    {
+                        toPurge.Add(_pool[i]);
+                        _pool.RemoveAt(i);
+                    }
                 }
-            }
 
-            int purged = toPurge.Count;
-            if (0 < purged)
+                int purged = toPurge.Count;
+                if (0 < purged)
+                {
+                    Interlocked.Add(ref _purgeCount, purged);
+
+                    Interlocked.Increment(ref _fullPurgeOperations);
+                }
+
+                foreach (PooledEntry entry in toPurge)
+                {
+                    InvokeOnPurge(entry.Value, reason);
+                    InvokeOnDispose(entry.Value);
+                }
+
+                return purged;
+            }
+            finally
             {
-                Interlocked.Add(ref _purgeCount, purged);
-
-                Interlocked.Increment(ref _fullPurgeOperations);
+                PurgeBuffer<PooledEntry>.Return(toPurge);
             }
-
-            foreach (PooledEntry entry in toPurge)
-            {
-                InvokeOnPurge(entry.Value, reason);
-                InvokeOnDispose(entry.Value);
-            }
-
-            return purged;
         }
 
         /// <summary>
@@ -2578,33 +2630,39 @@ namespace WallstopStudios.UnityHelpers.Utils
             int effectiveMinRetain = MinRetainCount;
 
             // Renting a pooled list here can recursively trigger this purge.
-            List<PooledEntry> toPurge = new();
-
-            lock (_lock)
+            List<PooledEntry> toPurge = PurgeBuffer<PooledEntry>.Rent();
+            try
             {
-                for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
+                lock (_lock)
                 {
-                    toPurge.Add(_pool[i]);
-                    _pool.RemoveAt(i);
+                    for (int i = _pool.Count - 1; 0 <= i && effectiveMinRetain < _pool.Count; i--)
+                    {
+                        toPurge.Add(_pool[i]);
+                        _pool.RemoveAt(i);
+                    }
                 }
+
+                Volatile.Write(ref _hasPendingPurges, 0);
+
+                int purged = toPurge.Count;
+                if (0 < purged)
+                {
+                    Interlocked.Add(ref _purgeCount, purged);
+                    Interlocked.Increment(ref _fullPurgeOperations);
+                }
+
+                foreach (PooledEntry entry in toPurge)
+                {
+                    InvokeOnPurge(entry.Value, reason);
+                    InvokeOnDispose(entry.Value);
+                }
+
+                return purged;
             }
-
-            Volatile.Write(ref _hasPendingPurges, 0);
-
-            int purged = toPurge.Count;
-            if (0 < purged)
+            finally
             {
-                Interlocked.Add(ref _purgeCount, purged);
-                Interlocked.Increment(ref _fullPurgeOperations);
+                PurgeBuffer<PooledEntry>.Return(toPurge);
             }
-
-            foreach (PooledEntry entry in toPurge)
-            {
-                InvokeOnPurge(entry.Value, reason);
-                InvokeOnDispose(entry.Value);
-            }
-
-            return purged;
         }
 
         /// <inheritdoc />
@@ -2618,34 +2676,40 @@ namespace WallstopStudios.UnityHelpers.Utils
             int minRetain = MinRetainCount;
 
             // Renting a pooled list here can recursively trigger this purge.
-            List<PooledEntry> toPurge = new();
-
-            lock (_lock)
+            List<PooledEntry> toPurge = PurgeBuffer<PooledEntry>.Rent();
+            try
             {
-                for (
-                    int i = _pool.Count - 1;
-                    0 <= i && toPurge.Count < count && minRetain < _pool.Count;
-                    i--
-                )
+                lock (_lock)
                 {
-                    toPurge.Add(_pool[i]);
-                    _pool.RemoveAt(i);
+                    for (
+                        int i = _pool.Count - 1;
+                        0 <= i && toPurge.Count < count && minRetain < _pool.Count;
+                        i--
+                    )
+                    {
+                        toPurge.Add(_pool[i]);
+                        _pool.RemoveAt(i);
+                    }
                 }
-            }
 
-            int purged = toPurge.Count;
-            if (0 < purged)
+                int purged = toPurge.Count;
+                if (0 < purged)
+                {
+                    Interlocked.Add(ref _purgeCount, purged);
+                }
+
+                foreach (PooledEntry entry in toPurge)
+                {
+                    InvokeOnPurge(entry.Value, PurgeReason.BudgetExceeded);
+                    InvokeOnDispose(entry.Value);
+                }
+
+                return purged;
+            }
+            finally
             {
-                Interlocked.Add(ref _purgeCount, purged);
+                PurgeBuffer<PooledEntry>.Return(toPurge);
             }
-
-            foreach (PooledEntry entry in toPurge)
-            {
-                InvokeOnPurge(entry.Value, PurgeReason.BudgetExceeded);
-                InvokeOnDispose(entry.Value);
-            }
-
-            return purged;
         }
 
         /// <summary>
@@ -2696,21 +2760,28 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             GlobalPoolRegistry.Unregister(this);
 
-            List<PooledEntry> toDispose;
-            lock (_lock)
+            List<PooledEntry> toDispose = PurgeBuffer<PooledEntry>.Rent();
+            try
             {
-                toDispose = new List<PooledEntry>(_pool);
-                _pool.Clear();
-            }
+                lock (_lock)
+                {
+                    toDispose.AddRange(_pool);
+                    _pool.Clear();
+                }
 
-            if (_onDispose == null)
-            {
-                return;
-            }
+                if (_onDispose == null)
+                {
+                    return;
+                }
 
-            foreach (PooledEntry entry in toDispose)
+                foreach (PooledEntry entry in toDispose)
+                {
+                    InvokeOnDispose(entry.Value);
+                }
+            }
+            finally
             {
-                InvokeOnDispose(entry.Value);
+                PurgeBuffer<PooledEntry>.Return(toDispose);
             }
         }
 
@@ -2718,33 +2789,39 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             int minRetain = MinRetainCount;
 
-            List<PooledEntry> toPurge = new();
-
-            lock (_lock)
+            List<PooledEntry> toPurge = PurgeBuffer<PooledEntry>.Rent();
+            try
             {
-                for (int i = _pool.Count - 1; 0 <= i && minRetain < _pool.Count; i--)
+                lock (_lock)
                 {
-                    toPurge.Add(_pool[i]);
-                    _pool.RemoveAt(i);
+                    for (int i = _pool.Count - 1; 0 <= i && minRetain < _pool.Count; i--)
+                    {
+                        toPurge.Add(_pool[i]);
+                        _pool.RemoveAt(i);
+                    }
                 }
+
+                Volatile.Write(ref _hasPendingPurges, 0);
+
+                int purged = toPurge.Count;
+                if (0 < purged)
+                {
+                    Interlocked.Add(ref _purgeCount, purged);
+                    Interlocked.Increment(ref _fullPurgeOperations);
+                }
+
+                foreach (PooledEntry entry in toPurge)
+                {
+                    InvokeOnPurge(entry.Value, PurgeReason.MemoryPressure);
+                    InvokeOnDispose(entry.Value);
+                }
+
+                return purged;
             }
-
-            Volatile.Write(ref _hasPendingPurges, 0);
-
-            int purged = toPurge.Count;
-            if (0 < purged)
+            finally
             {
-                Interlocked.Add(ref _purgeCount, purged);
-                Interlocked.Increment(ref _fullPurgeOperations);
+                PurgeBuffer<PooledEntry>.Return(toPurge);
             }
-
-            foreach (PooledEntry entry in toPurge)
-            {
-                InvokeOnPurge(entry.Value, PurgeReason.MemoryPressure);
-                InvokeOnDispose(entry.Value);
-            }
-
-            return purged;
         }
 
         private void ReturnToPool(T value)
@@ -2934,149 +3011,157 @@ namespace WallstopStudios.UnityHelpers.Utils
             // Renting a pooled list here can recursively trigger this purge and overflow the stack.
             List<PooledEntry> entriesToPurge = null;
             List<PurgeReason> purgeReasons = null;
-            int purgeCount = 0;
-            bool hitPurgeLimit = false;
-            bool moreEligibleItems = false;
-
-            lock (_lock)
+            try
             {
-                if (hasIdleTimeout && !hasMaxSize && !isExplicit && !inHysteresis)
+                int purgeCount = 0;
+                bool hitPurgeLimit = false;
+                bool moreEligibleItems = false;
+
+                lock (_lock)
                 {
-                    int expiredCount = 0;
-                    foreach (PooledEntry entry in _pool)
+                    if (hasIdleTimeout && !hasMaxSize && !isExplicit && !inHysteresis)
                     {
-                        if (_pool.Count - expiredCount <= effectiveMinRetain)
+                        int expiredCount = 0;
+                        foreach (PooledEntry entry in _pool)
                         {
-                            break;
+                            if (_pool.Count - expiredCount <= effectiveMinRetain)
+                            {
+                                break;
+                            }
+
+                            if (hasMaxPurgesLimit && maxPurgesLimit <= expiredCount)
+                            {
+                                hitPurgeLimit = true;
+                                moreEligibleItems = true;
+                                break;
+                            }
+
+                            if (effectiveIdleTimeout <= (currentTime - entry.ReturnTime))
+                            {
+                                entriesToPurge ??= PurgeBuffer<PooledEntry>.Rent();
+                                purgeReasons ??= PurgeBuffer<PurgeReason>.Rent();
+                                entriesToPurge.Add(entry);
+                                purgeReasons.Add(PurgeReason.IdleTimeout);
+                                ++expiredCount;
+                                Interlocked.Increment(ref _idleTimeoutPurges);
+                            }
+                            else
+                            {
+                                break;
+                            }
                         }
 
-                        if (hasMaxPurgesLimit && maxPurgesLimit <= expiredCount)
+                        if (0 < expiredCount)
                         {
-                            hitPurgeLimit = true;
-                            moreEligibleItems = true;
-                            break;
-                        }
-
-                        if (effectiveIdleTimeout <= (currentTime - entry.ReturnTime))
-                        {
-                            entriesToPurge ??= new List<PooledEntry>();
-                            purgeReasons ??= new List<PurgeReason>();
-                            entriesToPurge.Add(entry);
-                            purgeReasons.Add(PurgeReason.IdleTimeout);
-                            ++expiredCount;
-                            Interlocked.Increment(ref _idleTimeoutPurges);
-                        }
-                        else
-                        {
-                            break;
+                            _pool.RemoveRange(0, expiredCount);
+                            purgeCount += expiredCount;
                         }
                     }
-
-                    if (0 < expiredCount)
+                    else
                     {
-                        _pool.RemoveRange(0, expiredCount);
-                        purgeCount += expiredCount;
+                        for (
+                            int i = _pool.Count - 1;
+                            0 <= i
+                                && (isExplicit || hasIdleTimeout || comfortableSize < _pool.Count)
+                                && effectiveMinRetain < _pool.Count;
+                            i--
+                        )
+                        {
+                            if (hasMaxPurgesLimit && maxPurgesLimit <= purgeCount)
+                            {
+                                hitPurgeLimit = true;
+                                moreEligibleItems = true;
+                                break;
+                            }
+
+                            PooledEntry entry = _pool[i];
+                            PurgeReason reason = PurgeReason.Explicit;
+                            bool shouldPurge = false;
+
+                            if (
+                                hasIdleTimeout
+                                && effectiveIdleTimeout <= (currentTime - entry.ReturnTime)
+                            )
+                            {
+                                reason = PurgeReason.IdleTimeout;
+                                shouldPurge = true;
+                                Interlocked.Increment(ref _idleTimeoutPurges);
+                            }
+                            else if (!inHysteresis && hasMaxSize && maxSize < _pool.Count)
+                            {
+                                reason = PurgeReason.CapacityExceeded;
+                                shouldPurge = true;
+                                Interlocked.Increment(ref _capacityPurges);
+                            }
+                            else if (!inHysteresis && isExplicit)
+                            {
+                                shouldPurge = true;
+                            }
+
+                            if (shouldPurge)
+                            {
+                                entriesToPurge ??= PurgeBuffer<PooledEntry>.Rent();
+                                purgeReasons ??= PurgeBuffer<PurgeReason>.Rent();
+                                entriesToPurge.Add(entry);
+                                purgeReasons.Add(reason);
+                                _pool.RemoveAt(i);
+                                ++purgeCount;
+                            }
+                        }
                     }
+                }
+
+                if (hitPurgeLimit && moreEligibleItems)
+                {
+                    Volatile.Write(ref _hasPendingPurges, 1);
+                    Interlocked.Increment(ref _partialPurgeOperations);
                 }
                 else
                 {
-                    for (
-                        int i = _pool.Count - 1;
-                        0 <= i
-                            && (isExplicit || hasIdleTimeout || comfortableSize < _pool.Count)
-                            && effectiveMinRetain < _pool.Count;
-                        i--
-                    )
+                    Volatile.Write(ref _hasPendingPurges, 0);
+                    if (0 < purgeCount)
                     {
-                        if (hasMaxPurgesLimit && maxPurgesLimit <= purgeCount)
-                        {
-                            hitPurgeLimit = true;
-                            moreEligibleItems = true;
-                            break;
-                        }
-
-                        PooledEntry entry = _pool[i];
-                        PurgeReason reason = PurgeReason.Explicit;
-                        bool shouldPurge = false;
-
-                        if (
-                            hasIdleTimeout
-                            && effectiveIdleTimeout <= (currentTime - entry.ReturnTime)
-                        )
-                        {
-                            reason = PurgeReason.IdleTimeout;
-                            shouldPurge = true;
-                            Interlocked.Increment(ref _idleTimeoutPurges);
-                        }
-                        else if (!inHysteresis && hasMaxSize && maxSize < _pool.Count)
-                        {
-                            reason = PurgeReason.CapacityExceeded;
-                            shouldPurge = true;
-                            Interlocked.Increment(ref _capacityPurges);
-                        }
-                        else if (!inHysteresis && isExplicit)
-                        {
-                            shouldPurge = true;
-                        }
-
-                        if (shouldPurge)
-                        {
-                            entriesToPurge ??= new List<PooledEntry>();
-                            purgeReasons ??= new List<PurgeReason>();
-                            entriesToPurge.Add(entry);
-                            purgeReasons.Add(reason);
-                            _pool.RemoveAt(i);
-                            ++purgeCount;
-                        }
+                        Interlocked.Increment(ref _fullPurgeOperations);
                     }
                 }
-            }
 
-            if (hitPurgeLimit && moreEligibleItems)
-            {
-                Volatile.Write(ref _hasPendingPurges, 1);
-                Interlocked.Increment(ref _partialPurgeOperations);
-            }
-            else
-            {
-                Volatile.Write(ref _hasPendingPurges, 0);
-                if (0 < purgeCount)
+                Interlocked.Add(ref _purgeCount, purgeCount);
+
+                if (entriesToPurge != null)
                 {
-                    Interlocked.Increment(ref _fullPurgeOperations);
+                    for (int i = 0; i < entriesToPurge.Count; ++i)
+                    {
+                        InvokeOnPurge(entriesToPurge[i].Value, purgeReasons[i]);
+                        InvokeOnDispose(entriesToPurge[i].Value);
+                    }
                 }
+
+                // Advance after empty scans too; CAS max prevents out-of-order callers from regressing the throttle clock.
+                while (true)
+                {
+                    float current = Volatile.Read(ref _lastAutoPurgeTime);
+                    if (currentTime <= current)
+                    {
+                        break;
+                    }
+                    float observed = Interlocked.CompareExchange(
+                        ref _lastAutoPurgeTime,
+                        currentTime,
+                        current
+                    );
+                    if (observed == current)
+                    {
+                        break;
+                    }
+                }
+
+                return purgeCount;
             }
-
-            Interlocked.Add(ref _purgeCount, purgeCount);
-
-            if (entriesToPurge != null)
+            finally
             {
-                for (int i = 0; i < entriesToPurge.Count; ++i)
-                {
-                    InvokeOnPurge(entriesToPurge[i].Value, purgeReasons[i]);
-                    InvokeOnDispose(entriesToPurge[i].Value);
-                }
+                PurgeBuffer<PooledEntry>.Return(entriesToPurge);
+                PurgeBuffer<PurgeReason>.Return(purgeReasons);
             }
-
-            // Advance after empty scans too; CAS max prevents out-of-order callers from regressing the throttle clock.
-            while (true)
-            {
-                float current = Volatile.Read(ref _lastAutoPurgeTime);
-                if (currentTime <= current)
-                {
-                    break;
-                }
-                float observed = Interlocked.CompareExchange(
-                    ref _lastAutoPurgeTime,
-                    currentTime,
-                    current
-                );
-                if (observed == current)
-                {
-                    break;
-                }
-            }
-
-            return purgeCount;
         }
 
         private void InvokeOnPurge(T value, PurgeReason reason)

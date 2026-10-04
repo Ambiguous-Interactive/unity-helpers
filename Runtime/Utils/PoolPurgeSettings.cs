@@ -1719,42 +1719,46 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool ignoreHysteresis = !respectHysteresis;
 
             // Snapshot under lock so slow pool cleanup runs without blocking registration.
-            using PooledResource<List<IPurgeable>> pooled = Buffers<IPurgeable>.List.Get(
-                out List<IPurgeable> poolsToPurge
-            );
-
-            lock (RegistryLock)
+            List<IPurgeable> poolsToPurge = PurgeBuffer<IPurgeable>.Rent();
+            try
             {
-                for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
+                lock (RegistryLock)
                 {
-                    if (RegisteredPools[i].TryGetTarget(out IPurgeable pool))
+                    for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
                     {
-                        poolsToPurge.Add(pool);
-                    }
-                    else
-                    {
-                        RegisteredPools.RemoveAt(i);
+                        if (RegisteredPools[i].TryGetTarget(out IPurgeable pool))
+                        {
+                            poolsToPurge.Add(pool);
+                        }
+                        else
+                        {
+                            RegisteredPools.RemoveAt(i);
+                        }
                     }
                 }
-            }
 
-            foreach (IPurgeable poolToPurge in poolsToPurge)
-            {
-                try
+                foreach (IPurgeable poolToPurge in poolsToPurge)
                 {
-                    totalPurged += poolToPurge.Purge(reason, ignoreHysteresis);
-                }
-                catch (Exception e)
-                {
-                    // One pool failure must not prevent cleanup of the others.
+                    try
+                    {
+                        totalPurged += poolToPurge.Purge(reason, ignoreHysteresis);
+                    }
+                    catch (Exception e)
+                    {
+                        // One pool failure must not prevent cleanup of the others.
 #if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
-                    Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool: {e}");
+                        Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool: {e}");
 #endif
-                    _ = e;
+                        _ = e;
+                    }
                 }
-            }
 
-            return totalPurged;
+                return totalPurged;
+            }
+            finally
+            {
+                PurgeBuffer<IPurgeable>.Return(poolsToPurge);
+            }
         }
 
         /// <summary>
@@ -1776,42 +1780,46 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool ignoreHysteresis = !respectHysteresis;
 
             // Snapshot under lock so slow pool cleanup runs without blocking registration.
-            using PooledResource<List<IPurgeable>> pooled = Buffers<IPurgeable>.List.Get(
-                out List<IPurgeable> poolsToPurge
-            );
-
-            lock (RegistryLock)
+            List<IPurgeable> poolsToPurge = PurgeBuffer<IPurgeable>.Rent();
+            try
             {
-                for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
+                lock (RegistryLock)
                 {
-                    if (RegisteredPools[i].TryGetTarget(out IPurgeable pool))
+                    for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
                     {
-                        poolsToPurge.Add(pool);
-                    }
-                    else
-                    {
-                        RegisteredPools.RemoveAt(i);
+                        if (RegisteredPools[i].TryGetTarget(out IPurgeable pool))
+                        {
+                            poolsToPurge.Add(pool);
+                        }
+                        else
+                        {
+                            RegisteredPools.RemoveAt(i);
+                        }
                     }
                 }
-            }
 
-            foreach (IPurgeable poolToPurge in poolsToPurge)
-            {
-                try
+                foreach (IPurgeable poolToPurge in poolsToPurge)
                 {
-                    totalPurged += poolToPurge.ForceFullPurge(reason, ignoreHysteresis);
-                }
-                catch (Exception e)
-                {
-                    // One pool failure must not prevent cleanup of the others.
+                    try
+                    {
+                        totalPurged += poolToPurge.ForceFullPurge(reason, ignoreHysteresis);
+                    }
+                    catch (Exception e)
+                    {
+                        // One pool failure must not prevent cleanup of the others.
 #if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
-                    Debug.LogWarning($"[PoolPurgeSettings] Failed to force-purge pool: {e}");
+                        Debug.LogWarning($"[PoolPurgeSettings] Failed to force-purge pool: {e}");
 #endif
-                    _ = e;
+                        _ = e;
+                    }
                 }
-            }
 
-            return totalPurged;
+                return totalPurged;
+            }
+            finally
+            {
+                PurgeBuffer<IPurgeable>.Return(poolsToPurge);
+            }
         }
 
         /// <summary>

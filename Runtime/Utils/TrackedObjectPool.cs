@@ -320,7 +320,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             _disposed = true;
 
-            using (Buffers<T>.List.Get(out List<T> pending))
+            List<T> pending = PurgeBuffer<T>.Rent();
+            try
             {
                 foreach (InFlightItem item in _inFlight)
                 {
@@ -339,6 +340,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                     TryInvoke(_onDestroy, current);
                 }
+            }
+            finally
+            {
+                PurgeBuffer<T>.Return(pending);
             }
         }
 

@@ -77,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Reduce repeated pool purge and disposal snapshot allocations with bounded buffer reuse that preserves nested callback ownership.
 - Improve directly constructed `PooledResource<T>` wrappers with no return callback by avoiding disposal tracking; callback-backed leases remain copy-safe ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Improve large `Deque<T>` array transfers with contiguous copies, preserving logical order, offsets, and covariant destination behavior ([#904](https://github.com/Ambiguous-Interactive/unity-helpers/issues/904)).
 - Improve `JesseSort` for mixed regions, sparse disorder, and natural runs using the upstream live-phase design ([#747](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)).
