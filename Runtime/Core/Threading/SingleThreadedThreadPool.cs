@@ -63,6 +63,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         private volatile bool _disposed;
 
         private readonly object _workGate = new();
+        private Task _disposalTask;
         private readonly Task _workerTask;
         private readonly ConcurrentQueue<WorkItem> _work;
         private readonly SemaphoreSlim _workAvailable;
@@ -197,39 +198,25 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// <remarks>
         /// Releases queued references before waiting for the item already in flight. Submissions
         /// racing disposal cannot publish new queued work. Call <see cref="DrainAsync"/> first
-        /// when queued items must run.
+        /// when queued items must run. Concurrent calls wait for the same worker shutdown and
+        /// handle cleanup. A work item may initiate shutdown, but must return before that
+        /// shutdown can complete.
         /// </remarks>
-        public async ValueTask DisposeAsync()
+        public ValueTask DisposeAsync()
         {
             lock (_workGate)
             {
-                if (_disposed)
+                if (_disposalTask == null)
                 {
-                    return;
+                    _acceptingWork = false;
+                    _active = false;
+                    _disposed = true;
+                    _work.Clear();
+                    _disposalTask = DisposeWorkerAsync();
                 }
 
-                _acceptingWork = false;
-                _active = false;
-                _disposed = true;
-                _work.Clear();
+                return new ValueTask(_disposalTask);
             }
-
-            _cancellationTokenSource.Cancel();
-            Signal();
-            try
-            {
-                await _workerTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected during shutdown
-            }
-            catch { }
-
-            _cancellationTokenSource?.Dispose();
-            _workAvailable?.Dispose();
-
-            GC.SuppressFinalize(this);
         }
 
         /// <summary>
@@ -241,11 +228,32 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// <c>ConfigureAwait(false)</c> throughout, so it posts nothing back to Unity's main
         /// thread. A work item whose own continuations capture the main thread's context would
         /// deadlock here, because <c>OnDestroy</c> runs on that thread. Prefer
-        /// <see cref="DisposeAsync"/> when the work items await anything context-bound.
+        /// <see cref="DisposeAsync"/> when the work items await anything context-bound. Calling
+        /// this method from a work item waits on that same item and cannot complete.
         /// </remarks>
         public void Dispose()
         {
             DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+
+        private async Task DisposeWorkerAsync()
+        {
+            _cancellationTokenSource.Cancel();
+            Signal();
+            try
+            {
+                await _workerTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during shutdown.
+            }
+            catch { }
+
+            _cancellationTokenSource.Dispose();
+            _workAvailable.Dispose();
+
+            GC.SuppressFinalize(this);
         }
 
         private bool HasCompletedDrain()

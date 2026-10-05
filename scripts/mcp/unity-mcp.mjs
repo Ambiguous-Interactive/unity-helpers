@@ -603,18 +603,31 @@ export async function notifyInitialized(
   }
 }
 
-/**
- * Count the tools an endpoint exposes.
- *
- * Unity registers the `Unity_*` tools from inside the editor, so a bridge with no editor attached
- * completes the handshake perfectly and exposes nothing. That state is indistinguishable from a
- * working setup unless you ask -- observed live: a healthy, authenticating bridge on 9007 with
- * `tools/list` returning zero, while `probe` happily reported "reachable".
- *
- * Returns `undefined` when the endpoint will not answer at all, which is NOT treated as empty:
- * only a definitive zero is worth failing on.
- */
-export async function countTools(url, options, sessionId, protocolVersion, fetchImpl = fetch) {
+function safeProbeDetail(value, options) {
+  let text = typeof value === "string" ? value : "request failed";
+  if (options.bearerToken) {
+    text = text.split(options.bearerToken).join("[REDACTED]");
+  }
+  text = text
+    .replace(/\b(Bearer|Basic)\s+[^\s,;"'<>]+/gi, "$1 [REDACTED]")
+    .replace(
+      /(["']?(?:authorization|(?:access[_-]?)?token|api[_-]?key|password|secret)["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)(?:\s*\[REDACTED\])?/gi,
+      "$1[REDACTED]"
+    )
+    .replace(/[\x00-\x1f\x7f]/g, " ");
+  return text.length <= 240 ? text : `${text.slice(0, 237)}...`;
+}
+
+async function probeRequest(
+  url,
+  options,
+  sessionId,
+  protocolVersion,
+  method,
+  params,
+  id,
+  fetchImpl
+) {
   const headers = {
     Accept: "application/json, text/event-stream",
     "Content-Type": "application/json",
@@ -626,32 +639,97 @@ export async function countTools(url, options, sessionId, protocolVersion, fetch
   if (sessionId) {
     headers["Mcp-Session-Id"] = sessionId;
   }
-
   try {
     const response = await fetchImpl(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} }),
+      body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
       signal: AbortSignal.timeout(options.timeout)
     });
     if (!response.ok) {
-      return undefined;
+      return {
+        failure: {
+          status:
+            response.status === 401 || response.status === 403 ? "unauthorized" : "http-error",
+          detail: `${method}: HTTP ${response.status}`
+        }
+      };
     }
     const message = parseProbePayload(
       response.headers.get("content-type") ?? "",
       await response.text(),
-      3
+      id
     );
-    // A bridge that rewrites an empty initial registry into an error (see emptyRegistryGuidance)
-    // must still classify as no tools, not as an endpoint that would not answer.
-    if (message?.error?.code === -32002) {
-      return 0;
+    const missingToolMessage =
+      method === "tools/call" && typeof params?.name === "string"
+        ? `Tool ${params.name} not found`
+        : undefined;
+    if (message?.error) {
+      if (
+        message.error.code === -32601 ||
+        (message.error.code === -32602 &&
+          missingToolMessage !== undefined &&
+          message.error.message === missingToolMessage)
+      ) {
+        return {};
+      }
+      return {
+        errorCode: message.error.code,
+        failure: {
+          status: "backend-error",
+          detail: `${method}: MCP ${Number.isInteger(message.error.code) ? message.error.code : "error"}: ${safeProbeDetail(message.error.message, options)}`
+        }
+      };
     }
-    const tools = message?.result?.tools;
-    return Array.isArray(tools) ? tools.length : undefined;
-  } catch {
-    return undefined;
+    if (message?.result?.isError) {
+      const content = message.result.content;
+      const text = Array.isArray(content)
+        ? content.find((entry) => entry?.type === "text")?.text
+        : undefined;
+      if (
+        missingToolMessage !== undefined &&
+        Array.isArray(content) &&
+        content.length === 1 &&
+        text === missingToolMessage
+      ) {
+        return {};
+      }
+      return {
+        failure: { status: "backend-error", detail: `${method}: ${safeProbeDetail(text, options)}` }
+      };
+    }
+    return { message };
+  } catch (error) {
+    return {
+      failure: {
+        status: "unreachable",
+        detail: `${method}: ${safeProbeDetail(error?.message, options)}`
+      }
+    };
   }
+}
+
+async function queryToolRegistry(url, options, sessionId, protocolVersion, fetchImpl) {
+  const response = await probeRequest(
+    url,
+    options,
+    sessionId,
+    protocolVersion,
+    "tools/list",
+    {},
+    3,
+    fetchImpl
+  );
+  if (response.errorCode === -32002) {
+    return { toolCount: 0, detail: response.failure.detail };
+  }
+  const tools = response.message?.result?.tools;
+  return { toolCount: Array.isArray(tools) ? tools.length : undefined, failure: response.failure };
+}
+
+/** Count tools, returning undefined for an unanswered or failed registry; only a known zero means no editor. */
+export async function countTools(url, options, sessionId, protocolVersion, fetchImpl = fetch) {
+  return (await queryToolRegistry(url, options, sessionId, protocolVersion, fetchImpl)).toolCount;
 }
 
 /**
@@ -661,8 +739,11 @@ export async function countTools(url, options, sessionId, protocolVersion, fetch
 export function projectRootFromEditorStatusText(text) {
   try {
     const payload = JSON.parse(text);
+    if (payload?.success === false || payload?.status === "error") {
+      return undefined;
+    }
     const candidates = [payload?.projectPath, payload?.projectRoot, payload?.project];
-    return candidates.find((value) => typeof value === "string" && value.length > 0);
+    return candidates.find((value) => typeof value === "string" && value.trim().length > 0);
   } catch {
     return undefined;
   }
@@ -673,49 +754,92 @@ export function projectRootFromManageEditorText(text) {
   try {
     const payload = JSON.parse(text);
     const projectRoot = payload?.data?.projectRoot;
-    return typeof projectRoot === "string" && projectRoot.length > 0 ? projectRoot : undefined;
+    return payload?.success !== false &&
+      typeof projectRoot === "string" &&
+      projectRoot.trim().length > 0
+      ? projectRoot
+      : undefined;
   } catch {
     return undefined;
   }
 }
 
 async function callToolText(url, options, sessionId, protocolVersion, name, args, fetchImpl) {
-  const headers = {
-    Accept: "application/json, text/event-stream",
-    "Content-Type": "application/json",
-    "MCP-Protocol-Version": protocolVersion
-  };
-  if (options.bearerToken) {
-    headers.Authorization = `Bearer ${options.bearerToken}`;
-  }
-  if (sessionId) {
-    headers["Mcp-Session-Id"] = sessionId;
-  }
-
-  try {
-    const response = await fetchImpl(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 2,
-        method: "tools/call",
-        params: { name, arguments: args }
-      }),
-      signal: AbortSignal.timeout(options.timeout)
-    });
-    if (!response.ok) {
-      return undefined;
+  const response = await probeRequest(
+    url,
+    options,
+    sessionId,
+    protocolVersion,
+    "tools/call",
+    { name, arguments: args },
+    2,
+    fetchImpl
+  );
+  const content = response.message?.result?.content;
+  const text = Array.isArray(content)
+    ? content.find((entry) => entry?.type === "text")?.text
+    : undefined;
+  if (text !== undefined && !response.failure) {
+    try {
+      const payload = JSON.parse(text);
+      if (payload?.success === false || payload?.status === "error") {
+        return {
+          failure: {
+            status:
+              payload?.error || payload?.status === "error" ? "backend-error" : "unidentified",
+            detail: `${name}: ${safeProbeDetail(payload.message ?? payload.error?.message ?? payload.error, options)}`
+          }
+        };
+      }
+    } catch {
+      /* Identity parsers handle text that is not a JSON object. */
     }
-    const message = parseProbePayload(
-      response.headers.get("content-type") ?? "",
-      await response.text(),
-      2
-    );
-    return message?.result?.content?.find((entry) => entry?.type === "text")?.text;
-  } catch {
-    return undefined;
   }
+  return {
+    text,
+    failure: response.failure && {
+      ...response.failure,
+      detail: `${name}: ${response.failure.detail}`
+    }
+  };
+}
+
+async function queryProjectIdentity(url, options, sessionId, protocolVersion, fetchImpl) {
+  const status = await callToolText(
+    url,
+    options,
+    sessionId,
+    protocolVersion,
+    "editor_status",
+    {},
+    fetchImpl
+  );
+  if (
+    status.failure &&
+    status.failure.status !== "unreachable" &&
+    status.failure.status !== "unidentified"
+  ) {
+    return { failure: status.failure };
+  }
+  const fromStatus = projectRootFromEditorStatusText(status.text);
+  if (fromStatus !== undefined) {
+    return { projectRoot: fromStatus };
+  }
+  const manage = await callToolText(
+    url,
+    options,
+    sessionId,
+    protocolVersion,
+    "Unity_ManageEditor",
+    { Action: "GetProjectRoot" },
+    fetchImpl
+  );
+  const fromManage = projectRootFromManageEditorText(manage.text);
+  if (fromManage !== undefined) {
+    return { projectRoot: fromManage };
+  }
+  const failures = [status.failure, manage.failure].filter(Boolean);
+  return { failure: failures.find((failure) => failure.status !== "unreachable") ?? failures[0] };
 }
 
 /**
@@ -741,31 +865,8 @@ export async function queryProjectRoot(
   protocolVersion,
   fetchImpl = fetch
 ) {
-  const statusText = await callToolText(
-    url,
-    options,
-    sessionId,
-    protocolVersion,
-    "editor_status",
-    {},
-    fetchImpl
-  );
-  if (statusText !== undefined) {
-    const fromStatus = projectRootFromEditorStatusText(statusText);
-    if (fromStatus !== undefined) {
-      return fromStatus;
-    }
-  }
-  const manageText = await callToolText(
-    url,
-    options,
-    sessionId,
-    protocolVersion,
-    "Unity_ManageEditor",
-    { Action: "GetProjectRoot" },
-    fetchImpl
-  );
-  return manageText === undefined ? undefined : projectRootFromManageEditorText(manageText);
+  return (await queryProjectIdentity(url, options, sessionId, protocolVersion, fetchImpl))
+    .projectRoot;
 }
 
 /**
@@ -778,7 +879,15 @@ export async function probeEndpoint(candidate, options, fetchImpl = fetch) {
   const url = endpointUrl(candidate);
   // Failures carry the candidate too, so callers can act on the endpoint that produced them (an
   // `unauthorized` attempt names the bridge whose token needs copying).
-  const classify = (status, detail) => ({ ...candidate, url, ok: false, status, detail });
+  let receivedResponse = false;
+  const classify = (status, detail) => ({
+    ...candidate,
+    url,
+    ok: false,
+    status,
+    detail,
+    receivedResponse
+  });
   if (!(await tcpReachable(candidate.host, candidate.port, options.connectTimeout))) {
     return classify("unreachable", "no TCP listener");
   }
@@ -792,124 +901,139 @@ export async function probeEndpoint(candidate, options, fetchImpl = fetch) {
     headers.Authorization = `Bearer ${options.bearerToken}`;
   }
 
-  let response;
-  let body;
+  let sessionId;
+  let negotiated = options.protocolVersion;
   try {
-    response = await fetchImpl(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "initialize",
-        params: {
-          protocolVersion: options.protocolVersion,
-          capabilities: {},
-          clientInfo: { name: "unity-mcp-probe", version: "1.0.0" }
-        }
-      }),
-      signal: AbortSignal.timeout(options.timeout)
-    });
-    body = await response.text();
-  } catch (error) {
-    return classify("unreachable", error.message);
-  }
+    let response;
+    let body;
+    try {
+      response = await fetchImpl(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: options.protocolVersion,
+            capabilities: {},
+            clientInfo: { name: "unity-mcp-probe", version: "1.0.0" }
+          }
+        }),
+        signal: AbortSignal.timeout(options.timeout)
+      });
+      receivedResponse = true;
+      sessionId = response.headers.get("mcp-session-id");
+      body = await response.text();
+    } catch (error) {
+      return classify("unreachable", safeProbeDetail(error?.message, options));
+    }
 
-  if (response.status === 401 || response.status === 403) {
-    return classify("unauthorized", `HTTP ${response.status}`);
-  }
-  // A WebSocket-only server answers every plain HTTP request with 426. This bridge never emits one,
-  // so a 426 is proof the responder is not it: the port belongs to some other process. That is a
-  // different failure from silence and needs different advice, and folding it into "nothing
-  // responded" once cost a session's time chasing Unity's approval dialog. A 101 is checked beside
-  // it for completeness only -- fetch never surfaces a completed upgrade as a Response, so such a
-  // peer arrives through the catch above as `unreachable`.
-  if (response.status === 426 || response.status === 101) {
-    return classify(
-      "port-occupied",
-      `HTTP ${response.status} ${response.statusText || "Upgrade Required"}`
-    );
-  }
-  if (!response.ok) {
-    return classify("http-error", `HTTP ${response.status} ${body.slice(0, 120)}`);
-  }
+    if (response.status === 401 || response.status === 403) {
+      return classify("unauthorized", `HTTP ${response.status}`);
+    }
+    // A WebSocket-only server answers every plain HTTP request with 426. This bridge never emits one,
+    // so a 426 is proof the responder is not it: the port belongs to some other process. That is a
+    // different failure from silence and needs different advice, and folding it into "nothing
+    // responded" once cost a session's time chasing Unity's approval dialog. A 101 is checked beside
+    // it for completeness only -- fetch never surfaces a completed upgrade as a Response, so such a
+    // peer arrives through the catch above as `unreachable`.
+    if (response.status === 426 || response.status === 101) {
+      return classify(
+        "port-occupied",
+        `HTTP ${response.status} ${safeProbeDetail(response.statusText || "Upgrade Required", options)}`
+      );
+    }
+    if (!response.ok) {
+      return classify("http-error", `HTTP ${response.status} ${safeProbeDetail(body, options)}`);
+    }
 
-  const message = parseProbePayload(response.headers.get("content-type") ?? "", body);
-  if (!message || message.error || typeof message.result?.protocolVersion !== "string") {
-    return classify("malformed", body.slice(0, 120) || "no JSON-RPC result");
-  }
+    const message = parseProbePayload(response.headers.get("content-type") ?? "", body);
+    if (message?.error) {
+      return classify(
+        "backend-error",
+        `initialize: MCP ${Number.isInteger(message.error.code) ? message.error.code : "error"}: ${safeProbeDetail(message.error.message, options)}`
+      );
+    }
+    if (!message || typeof message.result?.protocolVersion !== "string") {
+      return classify("malformed", safeProbeDetail(body, options) || "no JSON-RPC result");
+    }
 
-  const sessionId = response.headers.get("mcp-session-id");
-  const negotiated = message.result.protocolVersion;
+    negotiated = message.result.protocolVersion;
 
-  // The spec requires `notifications/initialized` before any other request. Unity's own server is
-  // lenient, but a conforming relay may refuse the tool call -- and a refused identity query reads
-  // as "would not identify itself", which fails the endpoint. Skipping it would defeat the check on
-  // exactly the servers that follow the protocol most carefully.
-  await notifyInitialized(url, options, sessionId, negotiated, fetchImpl);
+    await notifyInitialized(url, options, sessionId, negotiated, fetchImpl);
+    const registry = await queryToolRegistry(url, options, sessionId, negotiated, fetchImpl);
+    const identity = await queryProjectIdentity(url, options, sessionId, negotiated, fetchImpl);
+    const toolCount = registry.toolCount;
+    const projectRoot = identity.projectRoot;
 
-  // A bridge with no editor attached handshakes perfectly and exposes nothing, so establish that
-  // an editor is actually there before asking which project it has open -- otherwise the useful
-  // diagnosis ("no editor") is reported as the vaguer "would not identify itself".
-  const toolCount = await countTools(url, options, sessionId, negotiated, fetchImpl);
-
-  // Ask WHICH Unity this is before treating the endpoint as usable (issue #333).
-  const projectRoot = await queryProjectRoot(url, options, sessionId, negotiated, fetchImpl);
-
-  if (sessionId) {
-    // Close the session we just opened so probing does not leak relay child processes on the host.
-    await fetchImpl(url, {
-      method: "DELETE",
-      headers: {
-        Accept: "application/json, text/event-stream",
-        ...(options.bearerToken ? { Authorization: `Bearer ${options.bearerToken}` } : {}),
-        "Mcp-Session-Id": sessionId,
-        "MCP-Protocol-Version": negotiated
-      },
-      signal: AbortSignal.timeout(options.timeout)
-    }).catch(() => {});
-  }
-
-  const identified = {
-    url,
-    sessionId,
-    protocolVersion: negotiated,
-    projectRoot,
-    toolCount,
-    ...candidate
-  };
-
-  // Zero tools is unambiguous and worth failing on regardless of whether a project is pinned:
-  // the endpoint cannot do anything an agent wants.
-  if (toolCount === 0) {
-    return {
-      ...identified,
-      ok: false,
-      status: "no-editor",
-      detail: "bridge is up but no Unity editor is attached (tools/list returned 0 tools)"
+    const identified = {
+      url,
+      sessionId,
+      protocolVersion: negotiated,
+      projectRoot,
+      toolCount,
+      ...candidate
     };
-  }
 
-  if (options.expectedProjectRoot && !options.anyProject) {
+    // Zero tools is unambiguous and worth failing on regardless of whether a project is pinned:
+    // the endpoint cannot do anything an agent wants.
+    if (toolCount === 0) {
+      return {
+        ...identified,
+        ok: false,
+        status: "no-editor",
+        detail:
+          registry.detail ??
+          "bridge is up but no Unity editor is attached (tools/list returned 0 tools)"
+      };
+    }
+
+    const failure = registry.failure?.status !== "unreachable" ? registry.failure : undefined;
+    if (failure) {
+      return { ...identified, ok: false, ...failure };
+    }
     if (projectRoot === undefined) {
       return {
         ...identified,
         ok: false,
-        status: "unidentified",
-        detail: "endpoint did not report a project root"
+        ...(identity.failure ??
+          registry.failure ?? {
+            status: "unidentified",
+            detail: "endpoint did not report a project root"
+          })
       };
     }
-    if (!sameProjectRoot(projectRoot, options.expectedProjectRoot)) {
-      return {
-        ...identified,
-        ok: false,
-        status: "project-mismatch",
-        detail: `serves ${projectRoot}, expected ${options.expectedProjectRoot}`
-      };
+    if (options.expectedProjectRoot && !options.anyProject) {
+      if (!sameProjectRoot(projectRoot, options.expectedProjectRoot)) {
+        return {
+          ...identified,
+          ok: false,
+          status: "project-mismatch",
+          detail: `serves ${projectRoot}, expected ${options.expectedProjectRoot}`
+        };
+      }
+    }
+
+    return { ...identified, ok: true, status: "ok" };
+  } finally {
+    if (sessionId) {
+      try {
+        await fetchImpl(url, {
+          method: "DELETE",
+          headers: {
+            Accept: "application/json, text/event-stream",
+            ...(options.bearerToken ? { Authorization: `Bearer ${options.bearerToken}` } : {}),
+            "Mcp-Session-Id": sessionId,
+            "MCP-Protocol-Version": negotiated
+          },
+          signal: AbortSignal.timeout(options.timeout)
+        });
+      } catch {
+        /* Session cleanup is best-effort; retain the probe's real failure. */
+      }
     }
   }
-
-  return { ...identified, ok: true, status: "ok" };
 }
 
 /** Probe every candidate in order and return the first that completes a handshake. */
@@ -2091,12 +2215,26 @@ export async function runProbe(options, runtime = {}) {
   if (!found) {
     // "Nothing responded" is the wrong diagnosis when a healthy bridge answered and was rejected
     // for serving another project. Naming that distinction is most of the value of the check.
+    const backend = attempts.find((attempt) => attempt.status === "backend-error");
+    if (backend) {
+      fail(
+        `A Unity MCP bridge answered at ${backend.url}, but its Unity tool backend failed ` +
+          `(${backend.detail}). Check the host Unity backend's authentication and connection; ` +
+          `changing the client bearer token does not repair a backend failure.\nAttempts:\n${describeAttempts(attempts)}`
+      );
+    }
+    const unidentified = attempts.find((attempt) => attempt.status === "unidentified");
+    if (unidentified) {
+      fail(
+        `A Unity MCP bridge answered at ${unidentified.url}, but did not report a Unity project root. ` +
+          `(${unidentified.detail}). First setup and --any-project still require an identified editor.\nAttempts:\n${describeAttempts(attempts)}`
+      );
+    }
     const noEditor = attempts.find((attempt) => attempt.status === "no-editor");
     if (noEditor) {
       fail(
-        `A Unity MCP bridge is running at ${noEditor.url}, but no Unity editor is attached to it, ` +
-          `so it exposes no Unity_* tools. Open the editor on this repository's Unity project and ` +
-          `approve the connection in its Unity MCP Server settings, then re-run.\n` +
+        `A Unity MCP bridge is running at ${noEditor.url}, but exposes no tools ` +
+          `(${noEditor.detail}). ${emptyRegistryGuidance(options.backend ?? "cli", options.expectedProjectRoot ?? "the selected Unity project")}\n` +
           `Attempts:\n${describeAttempts(attempts)}`
       );
     }
@@ -2144,12 +2282,35 @@ export async function runConfigure(options, runtime = {}) {
   // A live bridge serving a DIFFERENT Unity project is the failure this tooling exists to stop
   // (issue #333). Writing its endpoint would point every agent at the wrong editor while every
   // check reported success, which is exactly how the old scripts behaved.
+  const backend = found
+    ? undefined
+    : attempts.find((attempt) => attempt.status === "backend-error");
+  if (backend) {
+    fail(
+      `A Unity MCP bridge answered at ${backend.url}, but its Unity tool backend failed ` +
+        `(${backend.detail}). Nothing was written and no token was generated. Check the host ` +
+        `Unity backend's authentication and connection; changing the client bearer token does not repair this failure.`
+    );
+  }
+  const unidentified = found
+    ? undefined
+    : attempts.find((attempt) => attempt.status === "unidentified");
+  if (unidentified) {
+    fail(
+      `A Unity MCP bridge answered at ${unidentified.url}, but did not report a Unity project root. ` +
+        `(${unidentified.detail}). Nothing was written and no token was generated. Verify the host backend and its identity tools; ` +
+        `--any-project permits any identified project, not an unidentified endpoint.`
+    );
+  }
   const noEditor = found ? undefined : attempts.find((a) => a.status === "no-editor");
   if (noEditor) {
     fail(
-      `A Unity MCP bridge is running at ${noEditor.url} with no Unity editor attached, so it ` +
-        `exposes no Unity_* tools and cannot be verified. Nothing was written. Open the editor on ` +
-        `this repository's Unity project, approve the connection, then re-run configure.`
+      `A Unity MCP bridge is running at ${noEditor.url}, but exposes no tools ` +
+        `(${noEditor.detail}). Nothing was written and no token was generated. ` +
+        emptyRegistryGuidance(
+          options.backend ?? "cli",
+          options.expectedProjectRoot ?? "the selected Unity project"
+        )
     );
   }
   const mismatch = found ? undefined : attempts.find((a) => a.status === "project-mismatch");
@@ -2178,6 +2339,15 @@ export async function runConfigure(options, runtime = {}) {
       `${occupied.url} answered ${occupied.detail}, which is a WebSocket-only server rather than ` +
         `the unity-mcp relay: another process owns port ${occupied.port}. Nothing was written. ` +
         `Stop that process, or re-run configure with --port pointing somewhere free.`
+    );
+  }
+  const unusable = found
+    ? undefined
+    : attempts.find((attempt) => attempt.receivedResponse || attempt.protocolVersion);
+  if (unusable) {
+    fail(
+      `A server responded at ${unusable.url}, but could not verify MCP initialization, tools and project ` +
+        `(${unusable.status}: ${unusable.detail}). Nothing was written and no token was generated. Recheck the host backend before configuring.`
     );
   }
   const target = endpoint ?? {

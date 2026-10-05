@@ -31,6 +31,143 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
         // Bound the gate wait so an assertion failure cannot stall teardown.
         private const int GateTimeoutMilliseconds = 5_000;
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void WorkItemCanStartShutdownWithoutAwaitingItsOwnCompletion(bool runInBackground)
+        {
+            using ManualResetEventSlim startedShutdown = new(false);
+            using SingleThreadedThreadPool threadPool = new(runInBackground);
+            Task disposal = null;
+            bool observedPendingShutdown = false;
+            threadPool.Enqueue(() =>
+            {
+                disposal = threadPool.DisposeAsync().AsTask();
+                observedPendingShutdown = !disposal.IsCompleted;
+                startedShutdown.Set();
+            });
+            Assert.IsTrue(startedShutdown.Wait(GateTimeoutMilliseconds));
+            Assert.IsTrue(observedPendingShutdown);
+            Assert.IsTrue(disposal.Wait(GateTimeoutMilliseconds));
+            Assert.IsFalse(threadPool.IsAcceptingWork);
+            Assert.AreEqual(0, threadPool.Count);
+            Assert.IsTrue(threadPool.DisposeAsync().AsTask().IsCompleted);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ConcurrentDisposalCallersAllWaitForRunningWork(bool runInBackground)
+        {
+            using ManualResetEventSlim entered = new(false);
+            using ManualResetEventSlim release = new(false);
+            using ManualResetEventSlim submit = new(false);
+            using SingleThreadedThreadPool threadPool = new(runInBackground);
+            threadPool.Enqueue(() =>
+            {
+                entered.Set();
+                release.Wait(DrainTimeoutMilliseconds);
+            });
+            Task<ValueTask>[] callers = new Task<ValueTask>[8];
+            try
+            {
+                Assert.IsTrue(entered.Wait(GateTimeoutMilliseconds));
+                for (int index = 0; index < callers.Length; ++index)
+                {
+                    callers[index] = Task.Run(() =>
+                    {
+                        submit.Wait(DrainTimeoutMilliseconds);
+                        return threadPool.DisposeAsync();
+                    });
+                }
+                submit.Set();
+                Assert.IsTrue(Task.WaitAll(callers, GateTimeoutMilliseconds));
+                foreach (Task<ValueTask> caller in callers)
+                {
+                    Assert.IsFalse(
+                        caller.Result.IsCompleted,
+                        "A concurrent disposal returned while the running item was gated."
+                    );
+                }
+                Assert.IsFalse(threadPool.IsAcceptingWork);
+                Assert.AreEqual(1, threadPool.Count);
+            }
+            finally
+            {
+                submit.Set();
+                release.Set();
+                foreach (Task<ValueTask> caller in callers)
+                {
+                    if (caller != null)
+                    {
+                        Assert.IsTrue(caller.Wait(GateTimeoutMilliseconds));
+                        Assert.IsTrue(caller.Result.AsTask().Wait(GateTimeoutMilliseconds));
+                    }
+                }
+            }
+            Assert.AreEqual(0, threadPool.Count);
+            Assert.IsTrue(threadPool.DisposeAsync().AsTask().IsCompleted);
+        }
+
+        [TestCase(false, 2, false)]
+        [TestCase(false, 8, false)]
+        [TestCase(false, 64, false)]
+        [TestCase(true, 2, false)]
+        [TestCase(true, 8, false)]
+        [TestCase(true, 64, false)]
+        [TestCase(false, 2, true)]
+        [TestCase(true, 2, true)]
+        public void EveryDisposalWaitsForRunningWork(
+            bool runInBackground,
+            int disposalCount,
+            bool workThrows
+        )
+        {
+            using ManualResetEventSlim entered = new(false);
+            using ManualResetEventSlim release = new(false);
+            using SingleThreadedThreadPool threadPool = new(runInBackground);
+            int queuedRuns = 0;
+            threadPool.Enqueue(() =>
+            {
+                entered.Set();
+                release.Wait(DrainTimeoutMilliseconds);
+                if (workThrows)
+                {
+                    throw new InvalidOperationException("Running work failed.");
+                }
+            });
+            Task[] disposals = new Task[disposalCount];
+            try
+            {
+                Assert.IsTrue(entered.Wait(GateTimeoutMilliseconds));
+                threadPool.Enqueue(() => Interlocked.Increment(ref queuedRuns));
+                for (int index = 0; index < disposalCount; ++index)
+                {
+                    disposals[index] = threadPool.DisposeAsync().AsTask();
+                    Assert.IsFalse(
+                        disposals[index].IsCompleted,
+                        $"Disposal {index} returned while the running item was gated."
+                    );
+                }
+                Assert.IsFalse(threadPool.IsAcceptingWork);
+                Assert.AreEqual(1, threadPool.Count);
+            }
+            finally
+            {
+                release.Set();
+                foreach (Task disposal in disposals)
+                {
+                    if (disposal != null)
+                    {
+                        Assert.IsTrue(disposal.Wait(GateTimeoutMilliseconds));
+                    }
+                }
+            }
+            Assert.AreEqual(0, threadPool.Count);
+            Assert.AreEqual(0, Volatile.Read(ref queuedRuns));
+            Assert.AreEqual(workThrows ? 1 : 0, threadPool.Exceptions.Count);
+            Assert.DoesNotThrow(threadPool.Dispose);
+            Assert.IsTrue(threadPool.DisposeAsync().AsTask().IsCompleted);
+        }
+
         [TestCase(false, 0)]
         [TestCase(false, 1)]
         [TestCase(false, 2)]

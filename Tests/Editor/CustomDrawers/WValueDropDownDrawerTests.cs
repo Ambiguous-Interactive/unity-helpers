@@ -23,6 +23,21 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class WValueDropDownDrawerTests : CommonTestBase
     {
+        private static IEnumerable<TestCaseData> CustomOptionLabelData()
+        {
+            string[] labels = { null, "", " ", "\t\r\n", "\u2003\u00a0", "  Visible option  " };
+            foreach (string label in labels)
+            {
+                foreach (bool shared in new[] { false, true })
+                {
+                    foreach (bool formattable in new[] { false, true })
+                    {
+                        yield return new TestCaseData(label, shared, formattable);
+                    }
+                }
+            }
+        }
+
         private static IEnumerable<TestCaseData> FormatOptionCachedNeverReturnsEmptyStringData()
         {
             yield return new TestCaseData(null).SetName("Option.Null");
@@ -766,6 +781,29 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     new object[] { "Different", option }
                 )
             );
+        }
+
+        [TestCaseSource(nameof(CustomOptionLabelData))]
+        public void CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(
+            string text,
+            bool useSharedFormatter,
+            bool useFormattable
+        )
+        {
+            DropDownDisplayText option = useFormattable
+                ? new DropDownFormattableDisplayText(text)
+                : new DropDownDisplayText(text);
+            string expected = string.IsNullOrWhiteSpace(text) ? $"({option.GetType().Name})" : text;
+            string first = useSharedFormatter
+                ? DropDownShared.FormatOption(option)
+                : WValueDropDownDrawer.FormatOptionCached(option);
+            string second = useSharedFormatter
+                ? DropDownShared.FormatOption(option)
+                : WValueDropDownDrawer.FormatOptionCached(option);
+
+            Assert.That(first, Is.EqualTo(expected));
+            Assert.That(second, Is.SameAs(first));
+            Assert.That(option.ToString(), Is.EqualTo(text));
         }
 
         [Test]

@@ -695,7 +695,9 @@ async Task<string> GetTextFromMainThread()
 draining it, so anything enqueued but not yet started is dropped; the `await` inside
 `DisposeAsync()` waits only for the item already in flight. Disposal immediately removes pending
 work and releases the queue's references to its delegates; concurrent submissions cannot leave new
-work in a shut-down queue. `Count` reaches zero once the in-flight item finishes. That is what you want for work that can
+work in a shut-down queue. Concurrent disposal calls all wait for the same in-flight item and handle
+cleanup, so none returns while shutdown is still running. `Count` reaches zero once the in-flight
+item finishes. That is what you want for work that can
 simply be redone, such as a generation pass, and not what you want for durable work such as a
 persistence write.
 
@@ -732,7 +734,9 @@ drain from another thread is not covered, so stop those producers first.
 **One caveat on the synchronous `Dispose()`:** it blocks the calling thread until the in-flight item
 finishes. The pool posts nothing back to Unity's main thread, so this is safe for ordinary work
 items. A work item whose own continuations capture the main thread's synchronization context would
-deadlock, because `OnDestroy` runs on that thread; prefer `DisposeAsync()` there.
+deadlock, because `OnDestroy` runs on that thread; prefer `DisposeAsync()` there. A work item can
+initiate `DisposeAsync()` and then return, but it must not await its own shutdown or call
+`Dispose()` because shutdown waits for that item to finish.
 
 ### Semaphore Leases
 

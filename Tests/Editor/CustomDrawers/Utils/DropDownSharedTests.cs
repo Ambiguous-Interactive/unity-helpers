@@ -5,11 +5,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
 {
 #if UNITY_EDITOR
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
 
     [TestFixture]
     public sealed class DropDownSharedTests
     {
+        [TestCase(null, "Select")]
+        [TestCase("", "Select")]
+        [TestCase(" ", "Select")]
+        [TestCase("\t\r\n", "Select")]
+        [TestCase("\u2003\u00a0", "Select")]
+        [TestCase("Select", "Select")]
+        [TestCase("  Title  ", "  Title  ")]
+        public void PopupTitleUsesVisibleDefaultForBlankText(string title, string expected)
+        {
+            WDropDownPopupData data = new() { Title = title };
+            Assert.That(WDropDownPopupWindow.ResolveTitle(data.Title), Is.EqualTo(expected));
+            Assert.That(data.Title, Is.EqualTo(title));
+        }
+
         [Test]
         [TestCase(0, "(Option 0)", TestName = "Index.Zero.ReturnsOption0")]
         [TestCase(1, "(Option 1)", TestName = "Index.One.ReturnsOption1")]
