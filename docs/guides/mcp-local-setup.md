@@ -157,7 +157,25 @@ A Unity MCP bridge answered at http://192.168.1.33:9003/mcp but has a different 
 (serves D:/Code/IshoBoy, expected D:/Code/Packages).
 ```
 
-Pass `--any-project` to accept whatever answers, when that is genuinely what you want.
+Pass `--any-project` to accept any identified Unity project. It skips comparison with the pinned project;
+it does not permit an unidentified endpoint. First setup also requires a nonempty project root.
+
+The probe distinguishes HTTP `401`/`403` client bearer rejection from `backend-error`: a JSON-RPC or tool
+error returned by the host backend. Backend authentication errors retain bounded, credential-redacted
+context instead of being reported as a missing project. Check the host backend's authentication and
+connection; generating or replacing the client bearer token does not repair that authentication.
+
+A `no-editor` result retains safe registry error context. With the CLI backend, check Pipeline installation,
+editor compilation, `unity status`, and `unity list --project-path "<project>"` on the host. With the relay
+backend, open the editor and approve its connection. See the [failure status reference](https://github.com/wallstop/unity-helpers/blob/main/scripts/mcp/README.md#failure-statuses).
+
+`configure` writes no configuration, token, or project pin for these failed live probes, including HTTP
+initialization errors, malformed initialization replies, and unreadable initialization response bodies. Probe sessions
+close on success and failure. An endpoint with an unavailable tools/list method can still pass if its
+project identity succeeds; a known backend failure cannot. A failed Pipeline identity request cannot be
+hidden by a successful legacy identity fallback; an unavailable identity method can still use the fallback.
+Offline configuration generation remains available when no server responds, but does not verify an editor. Better diagnostics do not establish that the
+host has been repaired.
 
 Two habits keep this from arising at all: every studio project owns a **distinct port** — this one
 uses **9007**, DxMessaging 9003, IshoBoy 9004, DoxReloaded 9010, qora-redux 9020 — and every bridge

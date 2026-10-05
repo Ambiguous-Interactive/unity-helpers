@@ -114,14 +114,15 @@ Three layers keep it pinned, and none of them is sufficient alone:
    DoxReloaded 9010, qora-redux 9020. Discovery probes 9007 only — probing a neighbor's port is
    exactly how a config ends up aimed at another project's editor.
 3. **The endpoint is asked who it is.** After the MCP handshake, `probe` and `configure` call
-   `Unity_ManageEditor GetProjectRoot`. `probe` always prints the answer; `configure` records it in
+   `editor_status` first, then `Unity_ManageEditor GetProjectRoot` as a fallback. `probe` always prints the answer; `configure` records it in
    `.env.local` as `UNITY_MCP_PROJECT_ROOT` on first success, and every later run verifies against
    it. A mismatch is a hard failure that names both projects and writes nothing.
 
 Comparison is normalized for separator direction, trailing separators, and case, because the
 container sees `/workspaces/...` while the editor reports `D:\Code\...`.
 
-Use `--any-project` to skip layer 3 when connecting to something else is the point.
+Use `--any-project` to skip the pinned-project comparison when connecting to another project is the point.
+The endpoint must still report a nonempty project identity, including during first setup.
 
 ## Failure statuses
 
@@ -129,16 +130,29 @@ Use `--any-project` to skip layer 3 when connecting to something else is the poi
 
 | Status             | Meaning                                                                                                                                              |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `unreachable`      | Nothing accepted a TCP connection                                                                                                                    |
-| `unauthorized`     | A bridge is running but rejected the bearer token                                                                                                    |
-| `http-error`       | Something answered that is not a streamable-HTTP MCP endpoint                                                                                        |
+| `unreachable`      | No TCP listener, or a probe request failed in transport                                                                                              |
+| `unauthorized`     | HTTP 401/403 rejected the client bearer token                                                                                                        |
+| `http-error`       | An HTTP request failed with a status other than 401/403                                                                                              |
+| `backend-error`    | A JSON-RPC or tool-result error rejected a backend request; includes bounded, credential-redacted context                                            |
 | `malformed`        | Answered, but produced no valid JSON-RPC `initialize` result                                                                                         |
 | `no-editor`        | Bridge is up and authenticating, but exposes no tools: no editor attached (relay), or the Pipeline package never loaded in the selected editor (cli) |
-| `unidentified`     | Handshook, but would not say which project it has open                                                                                               |
+| `unidentified`     | Handshook, but did not provide a nonempty project root; first setup and `--any-project` also fail                                                    |
 | `project-mismatch` | Healthy bridge, wrong editor — it names the project it actually serves                                                                               |
 
-`configure` refuses to write on `unauthorized`, `no-editor`, or `project-mismatch`. Both mean a real bridge is
-there and only the pairing is wrong, so overwriting the config would bake in the wrong answer.
+`configure` refuses to write or generate a token when a live bridge rejects authentication, exposes no tools,
+fails initialization or a backend request, cannot identify its project, or names a mismatched project.
+HTTP initialization errors, malformed replies, and unreadable response bodies also leave files unchanged.
+Offline generation remains available when no server responds; it does not verify an editor. Probe sessions close
+on success and failure. An unavailable tool-count method remains compatible when a valid project identity
+answers; a known registry error cannot pass as an unknown count. A known Pipeline identity failure cannot
+be hidden by a successful legacy identity fallback. Method-not-found and the SDK's exact missing-tool
+response for the requested identity tool permit that fallback; invalid arguments and disabled tools do not.
+
+`backend-error` is separate from HTTP bearer rejection. For an MCP error reporting backend authentication
+failure, check the host Unity backend's authentication and connection. Replacing the client's bearer token
+does not repair the backend, and the probe does not change credentials. `no-editor` preserves the backend's
+safe error context: CLI users receive Pipeline install/compile/status/list guidance, while relay users
+receive editor-connection guidance. These diagnostics identify the next check; they do not repair the host.
 
 ## Machine-local files
 
