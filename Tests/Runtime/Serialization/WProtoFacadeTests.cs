@@ -47,6 +47,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             CollectionAssert.AreEqual(stream.ToArray(), mine, typeof(T).Name);
         }
 
+        private static T DeserializeRequired<T>(byte[] bytes, bool concrete, bool limits)
+        {
+            if (concrete)
+            {
+                return limits
+                    ? WProtoFacade.DeserializeAs<T>(bytes, typeof(T), null)
+                    : WProtoFacade.DeserializeAs<T>(bytes, typeof(T));
+            }
+            return limits
+                ? WProtoFacade.Deserialize<T>(bytes, null)
+                : WProtoFacade.Deserialize<T>(bytes);
+        }
+
         [Test]
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void APortedTypeIsServedAndMatchesProtobufNetByteForByte()
@@ -78,6 +91,132 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsFalse(
                 WProtoFacade.TryDeserialize(new byte[] { 0x08, 0x01 }, out UnportedThing _)
             );
+        }
+
+        [Test]
+        public void ThrowingSerializeRejectsAnUnregisteredType()
+        {
+            SerializationTypeException exception = Assert.Throws<SerializationTypeException>(() =>
+                WProtoFacade.Serialize(new UnportedThing { Value = 1 })
+            );
+            Assert.AreEqual(typeof(UnportedThing), exception.DeclaredType);
+            Assert.AreEqual(SerializationOperation.Serialize, exception.Operation);
+            Assert.AreEqual(SerializationStage.TypeResolution, exception.Stage);
+            Assert.AreEqual(SerializationFormat.Protobuf, exception.Format);
+        }
+
+        [Test]
+        public void ThrowingSerializeRejectsAnUndeclaredSubtype()
+        {
+            Assert.Throws<SerializationTypeException>(() =>
+                WProtoFacade.Serialize<AbstractRandom>(new UndeclaredRandom())
+            );
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void ThrowingDeserializeRejectsAnUnregisteredType(bool concrete, bool limits)
+        {
+            SerializationTypeException exception = Assert.Throws<SerializationTypeException>(() =>
+                DeserializeRequired<UnportedThing>(new byte[] { 0x08, 0x01 }, concrete, limits)
+            );
+            Assert.AreEqual(typeof(UnportedThing), exception.DeclaredType);
+            Assert.AreEqual(SerializationOperation.Deserialize, exception.Operation);
+            Assert.AreEqual(SerializationStage.TypeResolution, exception.Stage);
+            Assert.AreEqual(SerializationFormat.Protobuf, exception.Format);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void ThrowingFacadeRoundTrips(bool concrete, bool limits)
+        {
+            FastVector3Int expected = new FastVector3Int(7, 8, 9);
+            byte[] bytes = WProtoFacade.Serialize(expected);
+            Assert.IsTrue(WProtoFacade.TrySerialize(expected, out byte[] dispatchBytes));
+            CollectionAssert.AreEqual(dispatchBytes, bytes);
+            Assert.AreEqual(expected, DeserializeRequired<FastVector3Int>(bytes, concrete, limits));
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void ThrowingDeserializeWrapsMalformedPayload(bool concrete, bool limits)
+        {
+            SerializationCorruptDataException exception =
+                Assert.Throws<SerializationCorruptDataException>(() =>
+                    DeserializeRequired<FastVector3Int>(new byte[] { 0x80 }, concrete, limits)
+                );
+            Assert.AreEqual(typeof(FastVector3Int), exception.DeclaredType);
+            Assert.AreEqual(SerializationOperation.Deserialize, exception.Operation);
+            Assert.AreEqual(SerializationStage.Decode, exception.Stage);
+            Assert.AreEqual(SerializationFormat.Protobuf, exception.Format);
+            Assert.IsInstanceOf<InvalidOperationException>(exception.InnerException);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ThrowingDeserializeEnforcesReadLimits(bool concrete)
+        {
+            byte[] bytes = WProtoFacade.Serialize(new FastVector3Int(1, 2, 3));
+            WProtoReadLimits limits = new WProtoReadLimits(maximumMessageBytes: 0);
+            Assert.Throws<SerializationCorruptDataException>(() =>
+            {
+                if (concrete)
+                {
+                    WProtoFacade.DeserializeAs<FastVector3Int>(
+                        bytes,
+                        typeof(FastVector3Int),
+                        limits
+                    );
+                }
+                else
+                {
+                    WProtoFacade.Deserialize<FastVector3Int>(bytes, limits);
+                }
+            });
+        }
+
+        [Test]
+        public void ThrowingFacadePreservesEmptyPayloadSemantics()
+        {
+            CollectionAssert.IsEmpty(WProtoFacade.Serialize<AbstractRandom>(null));
+            Assert.AreEqual(
+                default(FastVector3Int),
+                WProtoFacade.Deserialize<FastVector3Int>(Array.Empty<byte>())
+            );
+        }
+
+        [Test]
+        public void ThrowingSerializeWrapsFormatterFailure()
+        {
+            IWProtoFormatter<DefaultDispatchMarker> original = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<DefaultDispatchMarker> registered
+            )
+                ? registered
+                : null;
+            InvalidOperationException failure = new InvalidOperationException("Formatter failure");
+            try
+            {
+                WProtoFormatterProvider.Register<DefaultDispatchMarker>(
+                    new DefaultDispatchMarkerFormatter { Failure = failure }
+                );
+                SerializationCorruptDataException exception =
+                    Assert.Throws<SerializationCorruptDataException>(() =>
+                        WProtoFacade.Serialize(new DefaultDispatchMarker { Value = 1 })
+                    );
+                Assert.AreSame(failure, exception.InnerException);
+                Assert.AreEqual(SerializationOperation.Serialize, exception.Operation);
+                Assert.AreEqual(SerializationStage.Encode, exception.Stage);
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(original);
+            }
         }
 
         [Test]
@@ -288,6 +427,81 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ThrowingFacadePreservesTypedFormatterFailure(bool serialize)
+        {
+            IWProtoFormatter<DefaultDispatchMarker> original = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<DefaultDispatchMarker> registered
+            )
+                ? registered
+                : null;
+            SerializationConfigurationException failure = new SerializationConfigurationException(
+                SerializationFormat.Protobuf,
+                serialize ? SerializationOperation.Serialize : SerializationOperation.Deserialize,
+                typeof(DefaultDispatchMarker),
+                "formatter",
+                "Invalid formatter configuration."
+            );
+            try
+            {
+                WProtoFormatterProvider.Register<DefaultDispatchMarker>(
+                    new DefaultDispatchMarkerFormatter { Failure = failure }
+                );
+                SerializationConfigurationException observed =
+                    Assert.Throws<SerializationConfigurationException>(() =>
+                    {
+                        if (serialize)
+                        {
+                            WProtoFacade.Serialize(new DefaultDispatchMarker());
+                        }
+                        else
+                        {
+                            WProtoFacade.Deserialize<DefaultDispatchMarker>(Array.Empty<byte>());
+                        }
+                    });
+                Assert.AreSame(failure, observed);
+                if (!serialize)
+                {
+                    InvalidOperationException dispatchFailure =
+                        Assert.Throws<InvalidOperationException>(() =>
+                            WProtoFacade.TryDeserialize(
+                                Array.Empty<byte>(),
+                                out DefaultDispatchMarker _
+                            )
+                        );
+                    Assert.AreSame(failure, dispatchFailure.InnerException);
+                }
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(original);
+            }
+        }
+
+        [Test]
+        public void ThrowingFacadePreservesDeclaredSubtypeState()
+        {
+            AbstractRandom original = new PcgRandom(4242);
+            original.NextUint();
+            byte[] bytes = WProtoFacade.Serialize(original);
+            AbstractRandom restored = WProtoFacade.DeserializeAs<AbstractRandom>(
+                bytes,
+                typeof(PcgRandom)
+            );
+            Assert.IsInstanceOf<PcgRandom>(restored);
+            Assert.AreEqual(original.NextUint(), restored.NextUint());
+        }
+
+        [Test]
+        public void ThrowingDeserializeRejectsAnUndeclaredConcreteType()
+        {
+            byte[] bytes = WProtoFacade.Serialize<AbstractRandom>(new PcgRandom(4242));
+            Assert.Throws<SerializationTypeException>(() =>
+                WProtoFacade.DeserializeAs<AbstractRandom>(bytes, typeof(UndeclaredRandom))
+            );
+        }
+
         private sealed class UnportedThing
         {
             public int Value;
@@ -303,8 +517,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private sealed class DefaultDispatchMarkerFormatter
             : IWProtoFormatter<DefaultDispatchMarker>
         {
+            internal Exception Failure;
+
             public int Measure(in DefaultDispatchMarker value)
             {
+                if (Failure != null)
+                {
+                    throw Failure;
+                }
                 return WProtoSizes.TagSize(1) + WProtoSizes.Int32Size(value.Value);
             }
 
@@ -316,6 +536,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             public bool TryRead(ref WProtoReader reader, out DefaultDispatchMarker value)
             {
+                if (Failure != null)
+                {
+                    throw Failure;
+                }
                 value = new DefaultDispatchMarker();
                 while (reader.TryReadTag(out int fieldNumber, out int wireType))
                 {

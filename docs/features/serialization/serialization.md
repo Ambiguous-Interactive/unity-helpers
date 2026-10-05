@@ -2721,6 +2721,23 @@ zero. These limits do not bound total decoded memory or configure protobuf-net f
 They throw `InvalidOperationException` for malformed or over-budget handled payloads; `false` means
 an unhandled type. Reader methods return `false` and latch `Malformed`. Invalid UTF-8 is refused.
 
+For WProto-only callers, `WProtoFacade.Serialize(value)` returns an exactly sized `byte[]`,
+and `WProtoFacade.Deserialize<T>(bytes)` returns the decoded value. These methods require a
+registered formatter: an unsupported declared type, runtime subtype, or concrete-type request
+throws `SerializationTypeException`. Codec failures throw `SerializationCorruptDataException`,
+with the original error retained in the exception chain; neither method falls back to protobuf-net.
+Formatter errors already derived from `SerializationFailureException` propagate unchanged.
+
+`Deserialize<T>(bytes, limits)`, `DeserializeAs<T>(bytes, concreteType)`, and
+`DeserializeAs<T>(bytes, concreteType, limits)` offer the same behavior with explicit limits or
+concrete-type dispatch. A null concrete type selects the declared type. Empty spans remain valid
+for empty contracts; spans do not distinguish a null byte array from an empty one.
+
+The existing `TrySerialize`, `TryDeserialize`, `TryDeserializeAs`, and reusable-buffer
+`Serialize(value, ref buffer)` remain dispatch APIs. An unserved request returns `false` or an
+unserved `WProtoWriteResult`; a handled codec failure throws. Use them when selecting a fallback
+serializer, and use the value-returning methods when a missing formatter must fail explicitly.
+
 Custom formatters must consume the complete payload. Use `TryReadMessage` or
 `new WProtoReader(payload, in reader)` to preserve parent limits. For packed fields, use
 `TryReadPackedRun(wireType, out reader)` before allocating and decode with that wire type.

@@ -32,6 +32,7 @@
     <!-- The capacity limits live one directory up and are Unity-free; WProtoRectangular refuses a
          dimension through them, so the harness needs the real file rather than a stand-in. -->
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationCapacityLimits.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationFailureException.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoEnumFormatterTests.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoReadLimitsTests.cs" />
     <!-- SerializableValueTuple implements it explicitly, so the file is not optional here. This

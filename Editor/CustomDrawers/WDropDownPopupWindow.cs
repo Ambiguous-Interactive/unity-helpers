@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         public Action<int> OnSelectionChanged { get; set; }
 
         /// <summary>
-        /// Optional title for the popup window.
+        /// Optional popup title; blank titles use "Select".
         /// </summary>
         public string Title { get; set; } = string.Empty;
     }
@@ -125,9 +125,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             WDropDownPopupWindow window = CreateInstance<WDropDownPopupWindow>();
             window._data = data;
-            window.titleContent = new GUIContent(
-                string.IsNullOrEmpty(data.Title) ? "Select" : data.Title
-            );
+            window.titleContent = new GUIContent(ResolveTitle(data.Title));
 
             Vector2 windowSize = window.CalculateInitialWindowSize(
                 data.DisplayLabels.Length,
@@ -331,6 +329,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             Rect screenRect = GUIUtility.GUIToScreenRect(buttonRect);
             Show(screenRect, data);
+        }
+
+        internal static string ResolveTitle(string title)
+        {
+            return string.IsNullOrWhiteSpace(title) ? "Select" : title;
         }
 
         /// <summary>

@@ -1073,6 +1073,13 @@ same conversion with a local warning suppression and receives no analyzer diagno
 pin the boundary between advisory source checks and runtime ownership; they do not measure Unity
 player timing or allocation.
 
+A C# 9 `readonly ref struct` wrapper also compiles local assignment, by-value calls, repeated
+`Dispose`, and manual disposal inside `using` in both threading modes. The wrapper contains the
+actual shipped semaphore lease; it restricts heap escape but still copies ownership. These eight
+compiler controls show why a stack-only public lease cannot replace the runtime generation check.
+Changing the public lease itself to a ref struct would also break its existing asynchronous and
+interface-based APIs.
+
 The runtime sweep identified `DisposableScope`, `DisposableScope<TPrevious>`, `SemaphoreLease`,
 `PooledResource<T>`, and `PooledArray<T>` using shared `(slot, generation)` disposal leases.
 `RestorableGlobal<T>` and editor global scopes use owner-issued borrow identifiers, which also

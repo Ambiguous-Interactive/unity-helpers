@@ -320,7 +320,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 formatted = option.ToString();
             }
 
-            if (string.IsNullOrEmpty(formatted))
+            if (
+                string.IsNullOrEmpty(formatted)
+                || (!(option is string) && string.IsNullOrWhiteSpace(formatted))
+            )
             {
                 formatted = $"({option.GetType().Name})";
             }
