@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
     using System;
+    using System.Buffers;
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
     using NUnit.Framework;
@@ -12,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     [TestFixture]
     [Category("Fast")]
@@ -101,6 +103,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
+#if WALLSTOP_PROTO_ONLY
+        private static void AssertDeclaredRandomRootComparer<T>(
+            T original,
+            T equivalent,
+            T different
+        )
+            where T : IRandom
+        {
+            byte[] payload = Serializer.ProtoSerialize(original);
+            T restored = Serializer.ProtoDeserialize<T>(payload);
+            ArrayBufferWriter<byte> destination = new();
+            Assert.AreEqual(payload.Length, WProtoFacade.Serialize(original, destination));
+            CollectionAssert.AreEqual(payload, destination.WrittenSpan.ToArray());
+            IEqualityComparer<T> comparer = ProtoEqualityExtensions.GetProtoComparer<T>();
+            Assert.IsTrue(original.ProtoEquals(equivalent));
+            Assert.IsTrue(comparer.Equals(original, equivalent));
+            Assert.IsTrue(comparer.Equals(original, restored));
+            Assert.AreEqual(comparer.GetHashCode(original), comparer.GetHashCode(equivalent));
+            Assert.AreEqual(comparer.GetHashCode(original), comparer.GetHashCode(restored));
+            HashSet<T> retained = new(comparer) { original };
+            Assert.IsTrue(retained.Contains(equivalent));
+            Assert.IsTrue(retained.Contains(restored));
+            different.NextUint();
+            Assert.IsFalse(original.ProtoEquals(different));
+            Assert.IsFalse(comparer.Equals(original, different));
+            Assert.IsFalse(retained.Contains(different));
+        }
+#endif
+
         [SuppressMessage(
             "Performance",
             "WUH005",
@@ -184,6 +215,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
 #if WALLSTOP_PROTO_ONLY
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DeclaredRandomRootsRemainUsableByProtoComparers(bool abstractRoot)
+        {
+            SystemRandom original = new(3);
+            SystemRandom equivalent = new(3);
+            SystemRandom different = new(3);
+            if (abstractRoot)
+            {
+                AssertDeclaredRandomRootComparer<AbstractRandom>(original, equivalent, different);
+            }
+            else
+            {
+                AssertDeclaredRandomRootComparer<IRandom>(original, equivalent, different);
+            }
+        }
+
+        [Test]
+        public void UndeclaredObjectRootIsRejectedBySerializationAndProtoComparers()
+        {
+            object original = new SystemRandom(3);
+            object equivalent = new SystemRandom(3);
+            Assert.Throws<SerializationTypeException>(() => Serializer.ProtoSerialize(original));
+            ArrayBufferWriter<byte> destination = new();
+            Assert.Throws<SerializationTypeException>(() =>
+                WProtoFacade.Serialize(original, destination)
+            );
+            Assert.AreEqual(0, destination.WrittenCount);
+            Assert.Throws<SerializationTypeException>(() => original.ProtoEquals(equivalent));
+            IEqualityComparer<object> comparer = ProtoEqualityExtensions.GetProtoComparer<object>();
+            Assert.Throws<SerializationTypeException>(() => comparer.Equals(original, equivalent));
+            Assert.Throws<SerializationTypeException>(() => comparer.GetHashCode(original));
+        }
+
         [Test]
         public void MissingFormatterCannotReachTheLegacyBackend()
         {

@@ -363,30 +363,32 @@ for (const modes of [
   for (const cancelled of [false, true]) {
     for (const acquired of ["true", "false"]) {
       for (const head of ["success", "failure"]) {
-        for (const redaction of ["success", "failure"]) {
-          const context = {
-            cancelled,
-            needs: { "matrix-config": { outputs: { "test-modes": JSON.stringify(modes) } } },
-            steps: {
-              checkout: { outcome: "success" },
-              unity_lock: { outputs: { acquired } },
-              proto_only_head: { outcome: head },
-              run_proto_only: { outcome: "failure" },
-              redact_proto_only: { outcome: redaction }
-            }
-          };
-          const requested = modes.includes("standalone");
-          assert.deepEqual(
-            onlyPredicates.map((test) => test(context)),
-            [
-              requested && !cancelled && acquired === "true" && head === "success",
-              requested && !cancelled,
-              requested,
-              requested && redaction === "success",
-              requested && !cancelled
-            ]
-          );
-          onlyControls++;
+        for (const runOutcome of ["success", "failure", "skipped", "cancelled"]) {
+          for (const redaction of ["success", "failure"]) {
+            const context = {
+              cancelled,
+              needs: { "matrix-config": { outputs: { "test-modes": JSON.stringify(modes) } } },
+              steps: {
+                checkout: { outcome: "success" },
+                unity_lock: { outputs: { acquired } },
+                proto_only_head: { outcome: head },
+                run_proto_only: { outcome: runOutcome },
+                redact_proto_only: { outcome: redaction }
+              }
+            };
+            const requested = modes.includes("standalone");
+            assert.deepEqual(
+              onlyPredicates.map((test) => test(context)),
+              [
+                requested && !cancelled && acquired === "true" && head === "success",
+                requested && !cancelled && runOutcome !== "skipped",
+                requested,
+                requested && redaction === "success",
+                requested && !cancelled
+              ]
+            );
+            onlyControls++;
+          }
         }
       }
     }
