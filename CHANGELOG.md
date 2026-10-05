@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `DurableFile` replacements to preserve existing saves and report failure when atomic replacement is unsupported ([#946](https://github.com/Ambiguous-Interactive/unity-helpers/issues/946)).
 - Fix blank custom dropdown labels and popup titles while preserving literal string options ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix concurrent thread pool disposal returning before running work and handle cleanup finish ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix SINGLE_THREADED pool purges when callbacks rent, dispose or purge the same pool; selected entries receive cleanup once without stale list indices ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).

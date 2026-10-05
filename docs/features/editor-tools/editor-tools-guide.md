@@ -785,7 +785,7 @@ caller can inspect or remove it.
 - **Preview** plays a clip entry before you create anything.
 - **Configuration Persistence** saves the whole window state to `.animation-creator.json` in a source
   folder, so the next person to import that folder gets your settings. A staging failure keeps the
-  previous config; on platforms without `File.Replace`, a failed fallback swap can still lose it.
+  previous config. Unsupported `File.Replace` also refuses replacement and preserves that config.
   Null, empty, and whitespace-only config folders are rejected before file access; folders with
   spaces inside their names remain valid.
 
@@ -995,8 +995,8 @@ Transparency-based grid detection requires a threshold in `[0, 1)`.
 - **Dry Run** turns the extract button into `Dry Run: Preview N Sprite(s)` and writes nothing.
 - Per-sheet settings override the global ones; **Apply Global to All** pushes yours down, and
   **Save Config** writes a `<texture>.spritesheet.json` beside the sheet so a re-extraction is
-  reproducible. A staging failure keeps the previous config; on platforms without `File.Replace`, a
-  failed fallback swap can still lose it. A `Config Stale` badge appears when the texture has changed
+  reproducible. A staging failure keeps the previous config. Unsupported `File.Replace` also refuses
+  replacement and preserves that config. A `Config Stale` badge appears when the texture has changed
   since. Blank texture paths return before save, load, or automatic config lookup without changing
   entry settings. Nonblank paths, including filenames with spaces, retain their exact text. Saved
   whitespace hashes remain literal data and mark the config stale when they differ from the texture's
