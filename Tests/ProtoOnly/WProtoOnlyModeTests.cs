@@ -20,89 +20,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [Category("Serialization")]
     public sealed class WProtoOnlyModeTests
     {
-        private static IEnumerable<TestCaseData> Generators()
-        {
-            Guid seed = new Guid(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
-            yield return new TestCaseData((Func<IRandom>)(() => new SystemRandom(3))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(SystemRandom)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new SquirrelRandom(3))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(SquirrelRandom)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new UnityRandom(3))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(UnityRandom)
-            );
-
-            yield return new TestCaseData((Func<IRandom>)(() => new DotNetRandom(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(DotNetRandom)
-            );
-            yield return new TestCaseData(
-                (Func<IRandom>)(() => new Xoshiro256StarStar(seed))
-            ).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(Xoshiro256StarStar)
-            );
-            yield return new TestCaseData(
-                (Func<IRandom>)(() => new LinearCongruentialGenerator(seed))
-            ).SetName(
-                nameof(RandomContinuationSurvivesSaveReload)
-                    + "."
-                    + nameof(LinearCongruentialGenerator)
-            );
-            yield return new TestCaseData(
-                (Func<IRandom>)(() => new BlastCircuitRandom(seed))
-            ).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(BlastCircuitRandom)
-            );
-            yield return new TestCaseData(
-                (Func<IRandom>)(() => new PhotonSpinRandom(seed))
-            ).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(PhotonSpinRandom)
-            );
-            yield return new TestCaseData(
-                (Func<IRandom>)(() => new Xoshiro128StarStar(seed))
-            ).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(Xoshiro128StarStar)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new XorShiftRandom(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(XorShiftRandom)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new IllusionFlow(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(IllusionFlow)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new PcgRandom(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(PcgRandom)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new XoroShiroRandom(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(XoroShiroRandom)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new StormDropRandom(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(StormDropRandom)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new WyRandom(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(WyRandom)
-            );
-            yield return new TestCaseData(
-                (Func<IRandom>)(() => new FlurryBurstRandom(seed))
-            ).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(FlurryBurstRandom)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new RomuDuo(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(RomuDuo)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new Sfc64Random(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(Sfc64Random)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new SplitMix64(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(SplitMix64)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new WaveSplatRandom(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(WaveSplatRandom)
-            );
-            yield return new TestCaseData((Func<IRandom>)(() => new WDoomRandom(seed))).SetName(
-                nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(WDoomRandom)
-            );
-        }
-
 #if WALLSTOP_PROTO_ONLY
         private static void AssertDeclaredRandomRootComparer<T>(
             T original,
@@ -137,13 +54,131 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             "WUH005",
             Justification = "Tests the legacy UnityRandom contract and restores its shared engine state."
         )]
-        [TestCaseSource(nameof(Generators))]
-        public void RandomContinuationSurvivesSaveReload(Func<IRandom> create)
+        [TestCase(
+            nameof(SystemRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(SystemRandom)
+        )]
+        [TestCase(
+            nameof(SquirrelRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(SquirrelRandom)
+        )]
+        [TestCase(
+            nameof(UnityRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(UnityRandom)
+        )]
+        [TestCase(
+            nameof(DotNetRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(DotNetRandom)
+        )]
+        [TestCase(
+            nameof(Xoshiro256StarStar),
+            TestName = nameof(RandomContinuationSurvivesSaveReload)
+                + "."
+                + nameof(Xoshiro256StarStar)
+        )]
+        [TestCase(
+            nameof(LinearCongruentialGenerator),
+            TestName = nameof(RandomContinuationSurvivesSaveReload)
+                + "."
+                + nameof(LinearCongruentialGenerator)
+        )]
+        [TestCase(
+            nameof(BlastCircuitRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload)
+                + "."
+                + nameof(BlastCircuitRandom)
+        )]
+        [TestCase(
+            nameof(PhotonSpinRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(PhotonSpinRandom)
+        )]
+        [TestCase(
+            nameof(Xoshiro128StarStar),
+            TestName = nameof(RandomContinuationSurvivesSaveReload)
+                + "."
+                + nameof(Xoshiro128StarStar)
+        )]
+        [TestCase(
+            nameof(XorShiftRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(XorShiftRandom)
+        )]
+        [TestCase(
+            nameof(IllusionFlow),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(IllusionFlow)
+        )]
+        [TestCase(
+            nameof(PcgRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(PcgRandom)
+        )]
+        [TestCase(
+            nameof(XoroShiroRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(XoroShiroRandom)
+        )]
+        [TestCase(
+            nameof(StormDropRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(StormDropRandom)
+        )]
+        [TestCase(
+            nameof(WyRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(WyRandom)
+        )]
+        [TestCase(
+            nameof(FlurryBurstRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload)
+                + "."
+                + nameof(FlurryBurstRandom)
+        )]
+        [TestCase(
+            nameof(RomuDuo),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(RomuDuo)
+        )]
+        [TestCase(
+            nameof(Sfc64Random),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(Sfc64Random)
+        )]
+        [TestCase(
+            nameof(SplitMix64),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(SplitMix64)
+        )]
+        [TestCase(
+            nameof(WaveSplatRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(WaveSplatRandom)
+        )]
+        [TestCase(
+            nameof(WDoomRandom),
+            TestName = nameof(RandomContinuationSurvivesSaveReload) + "." + nameof(WDoomRandom)
+        )]
+        public void RandomContinuationSurvivesSaveReload(string generator)
         {
             UnityEngine.Random.State previous = UnityEngine.Random.state;
             try
             {
-                IRandom original = create();
+                Guid seed = new Guid(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+                IRandom original = generator switch
+                {
+                    nameof(SystemRandom) => new SystemRandom(3),
+                    nameof(SquirrelRandom) => new SquirrelRandom(3),
+                    nameof(UnityRandom) => new UnityRandom(3),
+                    nameof(DotNetRandom) => new DotNetRandom(seed),
+                    nameof(Xoshiro256StarStar) => new Xoshiro256StarStar(seed),
+                    nameof(LinearCongruentialGenerator) => new LinearCongruentialGenerator(seed),
+                    nameof(BlastCircuitRandom) => new BlastCircuitRandom(seed),
+                    nameof(PhotonSpinRandom) => new PhotonSpinRandom(seed),
+                    nameof(Xoshiro128StarStar) => new Xoshiro128StarStar(seed),
+                    nameof(XorShiftRandom) => new XorShiftRandom(seed),
+                    nameof(IllusionFlow) => new IllusionFlow(seed),
+                    nameof(PcgRandom) => new PcgRandom(seed),
+                    nameof(XoroShiroRandom) => new XoroShiroRandom(seed),
+                    nameof(StormDropRandom) => new StormDropRandom(seed),
+                    nameof(WyRandom) => new WyRandom(seed),
+                    nameof(FlurryBurstRandom) => new FlurryBurstRandom(seed),
+                    nameof(RomuDuo) => new RomuDuo(seed),
+                    nameof(Sfc64Random) => new Sfc64Random(seed),
+                    nameof(SplitMix64) => new SplitMix64(seed),
+                    nameof(WaveSplatRandom) => new WaveSplatRandom(seed),
+                    nameof(WDoomRandom) => new WDoomRandom(seed),
+                    _ => throw new ArgumentOutOfRangeException(nameof(generator), generator, null),
+                };
                 for (int index = 0; index < 17; ++index)
                 {
                     original.NextUint();
@@ -189,6 +224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 Assert.IsTrue(restored.TryGetValue(pair.Key, out string actual));
                 Assert.AreEqual(pair.Value, actual);
             }
+#if WALLSTOP_PROTO_ONLY
             Assert.IsTrue(original.ProtoEquals(restored));
             Assert.AreEqual(
                 ProtoEqualityExtensions
@@ -198,6 +234,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     .GetProtoComparer<SerializableDictionary<int, string>>()
                     .GetHashCode(restored)
             );
+#endif
         }
 
         [TestCase(0f)]

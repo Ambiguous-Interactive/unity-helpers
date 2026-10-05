@@ -422,7 +422,7 @@
     },
     {
       "name": "unity-devcontainer-testing",
-      "sha256": "1156137458f7eb0624ed3adf50b7ff362f571debadc6c240b5e55d1e3d1c798a",
+      "sha256": "e192dd8b1b82291fa140118668c0011e03adb93470a60d1c45a67ea39826034d",
       "parts": ["unity-devcontainer-testing-part-1.md", "unity-devcontainer-testing-part-2.md"],
       "routerSha256": "fa86a9af1341f30288b94f1f6fd4a2a39fde13e2a82ec7a148d4d6a88b15bcb6"
     },

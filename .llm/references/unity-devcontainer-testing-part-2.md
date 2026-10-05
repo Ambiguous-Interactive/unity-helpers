@@ -78,12 +78,14 @@ limit ([#568](https://github.com/Ambiguous-Interactive/unity-helpers/issues/568)
 
 ## Limitations
 
-- **The editmode legs run 26 of the 33 test assemblies, and no editor version changes that.** Unity's
+- **The editmode legs run only editor-only test assemblies, and no editor version changes that.** Unity's
   EditMode runner takes only assemblies flagged `EditorAssembly` -- an asmdef with
-  `"includePlatforms": ["Editor"]`. `WallstopStudios.UnityHelpers.Tests.Runtime` and its six
-  platform-neutral siblings are not, so **their fixtures run in playmode only**, whatever
-  `.github/unity-versions.json` says and whatever the editmode leg is handed. Measured on
-  `6000.4.6f1` with `CompilationPipeline.GetAssemblies(AssembliesType.Editor)`.
+  `"includePlatforms": ["Editor"]`. `WallstopStudios.UnityHelpers.Tests.Runtime` and its seven
+  current platform-neutral siblings are not, so **their fixtures run in playmode only**, whatever
+  `.github/unity-versions.json` says and whatever the editmode leg is handed. The historical
+  `6000.4.6f1` measurement with `CompilationPipeline.GetAssemblies(AssembliesType.Editor)` found
+  26 of 33 test assemblies flagged editor-only; the current inventory also includes the newer
+  platform-neutral `Tests.ProtoOnly` assembly.
 
   The consequence is a coverage hole with a specific shape: a `Runtime/` branch that only executes
   with `Application.isPlaying` **false** has no CI coverage at all unless a `Tests/Editor/**` fixture
@@ -92,11 +94,11 @@ limit ([#568](https://github.com/Ambiguous-Interactive/unity-helpers/issues/568)
   ([#569](https://github.com/Ambiguous-Interactive/unity-helpers/issues/569)). When a change touches
   an edit-mode branch of runtime code, the fixture belongs in an editor-only assembly.
 
-  The seven, named so nobody has to re-measure them:
-  `Tests.Core`, `Tests.Runtime`, `Tests.Runtime.Performance`, `Tests.Runtime.Random`,
+  The current eight, named so nobody has to re-measure them:
+  `Tests.Core`, `Tests.ProtoOnly`, `Tests.Runtime`, `Tests.Runtime.Performance`, `Tests.Runtime.Random`,
   `Tests.Runtime.Reflex`, `Tests.Runtime.VContainer` and `Tests.Runtime.Zenject`, all under the
   `WallstopStudios.UnityHelpers.` prefix. `scripts/tests/test-asmdef-discovery.js` holds that list
-  and fails if an eighth appears, and `defaultIncludeAssemblies({ target: "editmode" })` no longer
+  and fails if a ninth appears, and `defaultIncludeAssemblies({ target: "editmode" })` no longer
   returns any of them -- the list CI hands the editmode legs used to be a superset of what Unity
   would run, which is what made the gap invisible
   ([#570](https://github.com/Ambiguous-Interactive/unity-helpers/issues/570)).
