@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix protobuf dictionary equality and hashing to avoid unsupported IL2CPP tuple detection while retaining the legacy map encoding ([#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950)).
 - Fix direct texture settings API calls to ignore blank platform override names while preserving other settings ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank key labels in duplicate dictionary warnings for Unity objects with whitespace-only names; object references and literal string keys stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix `DurableFile` replacements to preserve existing saves and report failure when atomic replacement is unsupported ([#946](https://github.com/Ambiguous-Interactive/unity-helpers/issues/946)).

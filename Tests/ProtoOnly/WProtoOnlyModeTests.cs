@@ -49,6 +49,267 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 #endif
 
+#if !WALLSTOP_PROTO_ONLY
+        private static void AssertLegacyDictionaryComparer<T>(
+            int count,
+            string operation,
+            Func<T> create = null
+        )
+            where T : class, IDictionary<string, int>, new()
+        {
+            T original = create == null ? new T() : create();
+            T equivalent = create == null ? new T() : create();
+            T different = create == null ? new T() : create();
+            for (int i = 0; i < count; ++i)
+            {
+                string key =
+                    i == 0 ? " "
+                    : i == 1 ? "\u00a0"
+                    : i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                int value = i * 13;
+                original.Add(key, value);
+                equivalent.Add(key, value);
+                different.Add(key, value);
+            }
+            if (0 < count)
+            {
+                Assert.IsTrue(different.Remove(" "));
+                different.Add(" ", -1);
+            }
+            else
+            {
+                different.Add("changed", -1);
+            }
+            IEqualityComparer<T> comparer = ProtoEqualityExtensions.GetProtoComparer<T>();
+            switch (operation)
+            {
+                case nameof(ProtoEqualityExtensions.ProtoEquals):
+                    Assert.IsTrue(original.ProtoEquals(equivalent));
+                    Assert.IsFalse(original.ProtoEquals(different));
+                    Assert.IsTrue(original.ProtoEquals(original));
+                    Assert.IsFalse(original.ProtoEquals((T)null));
+                    Assert.IsTrue(((T)null).ProtoEquals(null));
+                    Assert.IsTrue(
+                        ProtoEqualityExtensions.ProtoEquals<IDictionary<string, int>>(
+                            original,
+                            equivalent
+                        )
+                    );
+                    Assert.IsFalse(
+                        ProtoEqualityExtensions.ProtoEquals<IDictionary<string, int>>(
+                            original,
+                            different
+                        )
+                    );
+                    break;
+                case nameof(object.Equals):
+                    Assert.IsTrue(comparer.Equals(original, equivalent));
+                    Assert.IsFalse(comparer.Equals(original, different));
+                    Assert.IsTrue(comparer.Equals(original, original));
+                    Assert.IsFalse(comparer.Equals(null, original));
+                    Assert.IsTrue(comparer.Equals(null, null));
+                    Assert.IsTrue(
+                        ProtoEqualityExtensions
+                            .GetProtoComparer<IDictionary<string, int>>()
+                            .Equals(original, equivalent)
+                    );
+                    Assert.IsFalse(
+                        ProtoEqualityExtensions
+                            .GetProtoComparer<IDictionary<string, int>>()
+                            .Equals(original, different)
+                    );
+                    Assert.IsTrue(
+                        ProtoEqualityExtensions
+                            .GetProtoComparer<object>()
+                            .Equals(original, equivalent)
+                    );
+                    break;
+                case nameof(object.GetHashCode):
+                    int hash = comparer.GetHashCode(original);
+                    Assert.AreEqual(-2128831035, comparer.GetHashCode(null));
+                    Assert.AreEqual(
+                        hash,
+                        ProtoEqualityExtensions
+                            .GetProtoComparer<IDictionary<string, int>>()
+                            .GetHashCode(original)
+                    );
+                    Assert.AreEqual(hash, comparer.GetHashCode(equivalent));
+                    Assert.AreEqual(
+                        hash,
+                        ProtoEqualityExtensions.GetProtoComparer<object>().GetHashCode(original)
+                    );
+                    HashSet<T> retained = new(comparer) { original };
+                    Assert.IsTrue(retained.Contains(equivalent));
+                    Assert.IsFalse(retained.Contains(different));
+                    break;
+                default:
+                    Assert.Fail("Unknown comparer operation.");
+                    break;
+            }
+            Assert.AreEqual(count, original.Count);
+            Assert.AreEqual(count, equivalent.Count);
+            if (0 < count)
+            {
+                Assert.IsTrue(original.TryGetValue(" ", out int blankValue));
+                Assert.AreEqual(0, blankValue);
+            }
+            if (1 < count)
+            {
+                Assert.IsTrue(original.TryGetValue("\u00a0", out int nonbreakingValue));
+                Assert.AreEqual(13, nonbreakingValue);
+            }
+        }
+
+        private static void AssertLegacyDictionaryHash<T>()
+            where T : class, IDictionary<string, int>, new()
+        {
+            T original = new();
+            original.Add(" ", 7);
+            original.Add("key", 42);
+            Assert.AreEqual(
+                60268007,
+                ProtoEqualityExtensions.GetProtoComparer<T>().GetHashCode(original)
+            );
+            T differentWhitespace = new();
+            differentWhitespace.Add("\u00a0", 7);
+            differentWhitespace.Add("key", 42);
+            IEqualityComparer<T> comparer = ProtoEqualityExtensions.GetProtoComparer<T>();
+            Assert.IsFalse(original.ProtoEquals(differentWhitespace));
+            Assert.IsFalse(comparer.Equals(original, differentWhitespace));
+            HashSet<T> retained = new(comparer) { original };
+            Assert.IsFalse(retained.Contains(differentWhitespace));
+        }
+#endif
+
+#if !WALLSTOP_PROTO_ONLY
+        [TestCase(0, 0, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(0, 0, nameof(object.Equals))]
+        [TestCase(0, 0, nameof(object.GetHashCode))]
+        [TestCase(0, 1, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(0, 1, nameof(object.Equals))]
+        [TestCase(0, 1, nameof(object.GetHashCode))]
+        [TestCase(0, 32, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(0, 32, nameof(object.Equals))]
+        [TestCase(0, 32, nameof(object.GetHashCode))]
+        [TestCase(0, 10000, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(0, 10000, nameof(object.Equals))]
+        [TestCase(0, 10000, nameof(object.GetHashCode))]
+        [TestCase(1, 0, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(1, 0, nameof(object.Equals))]
+        [TestCase(1, 0, nameof(object.GetHashCode))]
+        [TestCase(1, 1, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(1, 1, nameof(object.Equals))]
+        [TestCase(1, 1, nameof(object.GetHashCode))]
+        [TestCase(1, 32, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(1, 32, nameof(object.Equals))]
+        [TestCase(1, 32, nameof(object.GetHashCode))]
+        [TestCase(1, 10000, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(1, 10000, nameof(object.Equals))]
+        [TestCase(1, 10000, nameof(object.GetHashCode))]
+        [TestCase(2, 0, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(2, 0, nameof(object.Equals))]
+        [TestCase(2, 0, nameof(object.GetHashCode))]
+        [TestCase(2, 1, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(2, 1, nameof(object.Equals))]
+        [TestCase(2, 1, nameof(object.GetHashCode))]
+        [TestCase(2, 32, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(2, 32, nameof(object.Equals))]
+        [TestCase(2, 32, nameof(object.GetHashCode))]
+        [TestCase(2, 10000, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(2, 10000, nameof(object.Equals))]
+        [TestCase(2, 10000, nameof(object.GetHashCode))]
+        [TestCase(3, 0, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(3, 0, nameof(object.Equals))]
+        [TestCase(3, 0, nameof(object.GetHashCode))]
+        [TestCase(3, 1, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(3, 1, nameof(object.Equals))]
+        [TestCase(3, 1, nameof(object.GetHashCode))]
+        [TestCase(3, 32, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(3, 32, nameof(object.Equals))]
+        [TestCase(3, 32, nameof(object.GetHashCode))]
+        [TestCase(3, 10000, nameof(ProtoEqualityExtensions.ProtoEquals))]
+        [TestCase(3, 10000, nameof(object.Equals))]
+        [TestCase(3, 10000, nameof(object.GetHashCode))]
+        public void LegacyDictionaryComparerPreservesEntries(
+            int family,
+            int count,
+            string operation
+        )
+        {
+            switch (family)
+            {
+                case 0:
+                    AssertLegacyDictionaryComparer<SerializableDictionary<string, int>>(
+                        count,
+                        operation
+                    );
+                    break;
+                case 1:
+                    AssertLegacyDictionaryComparer<SerializableSortedDictionary<string, int>>(
+                        count,
+                        operation,
+                        static () =>
+                            new SerializableSortedDictionary<string, int>(
+                                new SortedDictionary<string, int>(StringComparer.Ordinal)
+                            )
+                    );
+                    break;
+                case 2:
+                    AssertLegacyDictionaryComparer<
+                        SerializableDictionary<string, int, SerializableDictionary.Cache<int>>
+                    >(count, operation);
+                    break;
+                case 3:
+                    AssertLegacyDictionaryComparer<
+                        SerializableSortedDictionary<string, int, SerializableDictionary.Cache<int>>
+                    >(
+                        count,
+                        operation,
+                        static () =>
+                            new SerializableSortedDictionary<
+                                string,
+                                int,
+                                SerializableDictionary.Cache<int>
+                            >(new SortedDictionary<string, int>(StringComparer.Ordinal))
+                    );
+                    break;
+                default:
+                    Assert.Fail("Unknown dictionary family.");
+                    break;
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void LegacyDictionaryHashRetainsPublishedMapEncoding(int family)
+        {
+            switch (family)
+            {
+                case 0:
+                    AssertLegacyDictionaryHash<SerializableDictionary<string, int>>();
+                    break;
+                case 1:
+                    AssertLegacyDictionaryHash<SerializableSortedDictionary<string, int>>();
+                    break;
+                case 2:
+                    AssertLegacyDictionaryHash<
+                        SerializableDictionary<string, int, SerializableDictionary.Cache<int>>
+                    >();
+                    break;
+                case 3:
+                    AssertLegacyDictionaryHash<
+                        SerializableSortedDictionary<string, int, SerializableDictionary.Cache<int>>
+                    >();
+                    break;
+                default:
+                    Assert.Fail("Unknown dictionary family.");
+                    break;
+            }
+        }
+#endif
+
         [SuppressMessage(
             "Performance",
             "WUH005",

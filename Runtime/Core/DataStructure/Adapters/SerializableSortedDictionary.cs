@@ -1331,7 +1331,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// }
     /// ]]></code>
     /// </example>
+    /// <remarks>Legacy protobuf comparison retains the dictionary map encoding.</remarks>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.ProtoContract]
+#endif
     public class SerializableSortedDictionary<TKey, TValue>
         : SerializableSortedDictionaryBase<TKey, TValue, TValue>
         where TKey : IComparable<TKey>
@@ -1388,7 +1392,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// catalog[1] = new RichValue { Name = "HealthPotion", Cost = 50 };
     /// ]]></code>
     /// </example>
+    /// <remarks>Legacy protobuf comparison retains the dictionary map encoding.</remarks>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.ProtoContract]
+#endif
     public class SerializableSortedDictionary<TKey, TValue, TValueCache>
         : SerializableSortedDictionaryBase<TKey, TValue, TValueCache>
         where TKey : IComparable<TKey>

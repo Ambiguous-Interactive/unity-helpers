@@ -69,6 +69,20 @@ can modify uncommitted span memory; a writer that fails while advancing controls
 The package cannot roll back arbitrary external writers. WProto-only proto equality and hashing
 use pooled writers rather than the reflection backend.
 
+### Protobuf equality and hashing
+
+Default-mode `ProtoEquals` and `GetProtoComparer<T>()` retain protobuf-net's direct encoding.
+For the two- and three-argument `SerializableDictionary` and `SerializableSortedDictionary`
+types, this is the map encoding, including literal whitespace keys. Their concrete legacy
+contracts avoid speculative tuple detection in IL2CPP without selecting a different encoding.
+The root save wrappers described below remain a separate path: comparer hashes are not hashes
+of `Serializer.ProtoSerialize` output. WProto-only builds use generated root encoding instead,
+so hashes are not portable between backend modes.
+
+For consumer dictionary subclasses, declare `[ProtoContract]` on the concrete type to avoid
+speculative tuple detection; protobuf-net does not inherit this contract metadata from the base.
+Use the existing save API for retained data rather than persisting comparer hashes.
+
 ### Protobuf (protobuf-net)
 
 **⭐ Killer Feature: Schema Evolution**: Players can load saves from older game versions without breaking! Add new fields, remove old ones, rename types, all while maintaining compatibility.

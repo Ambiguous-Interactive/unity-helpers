@@ -1670,7 +1670,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </example>
     /// <typeparam name="TKey">Dictionary key type.</typeparam>
     /// <typeparam name="TValue">Dictionary value type.</typeparam>
+    /// <remarks>Legacy protobuf comparison retains the dictionary map encoding.</remarks>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.ProtoContract]
+#endif
     public class SerializableDictionary<TKey, TValue>
         : SerializableDictionaryBase<TKey, TValue, TValue>
     {
@@ -1765,7 +1769,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// <typeparam name="TKey">Dictionary key type.</typeparam>
     /// <typeparam name="TValue">Dictionary value type.</typeparam>
     /// <typeparam name="TValueCache">Serialized value cache type.</typeparam>
+    /// <remarks>Legacy protobuf comparison retains the dictionary map encoding.</remarks>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.ProtoContract]
+#endif
     public class SerializableDictionary<TKey, TValue, TValueCache>
         : SerializableDictionaryBase<TKey, TValue, TValueCache>
         where TValueCache : SerializableDictionary.Cache<TValue>, new()
