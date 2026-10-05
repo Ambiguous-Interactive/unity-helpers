@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         }
 
         /// <summary>
-        /// Returns a cached option label, using the type name for Unity objects with blank names.
+        /// Returns a cached option label, using a type-name fallback for blank non-string labels.
         /// </summary>
         /// <param name="option">The option value to format.</param>
         /// <returns>The cached formatted string.</returns>
@@ -236,6 +236,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             else
             {
                 formatted = option.ToString();
+            }
+
+            if (!(option is string) && string.IsNullOrWhiteSpace(formatted))
+            {
+                formatted = $"({option.GetType().Name})";
             }
 
             FormattedOptionCache.Set(option, formatted);

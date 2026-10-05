@@ -49,7 +49,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             }
         }
 
-        private static CSharpCompilation CompileConsumer(string body, bool singleThreaded)
+        private static CSharpCompilation CompileConsumer(
+            string body,
+            bool singleThreaded,
+            bool stackOnly = false
+        )
         {
             DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
             while (
@@ -80,6 +84,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 "Threading",
                 "SemaphoreLease.cs"
             );
+            string leaseType = stackOnly ? "StackLease" : "SemaphoreLease";
+            string acquire = stackOnly
+                ? "new StackLease(semaphore.Acquire())"
+                : "semaphore.Acquire()";
+            string storage = stackOnly ? string.Empty : "public static SemaphoreLease Saved;";
+            const string stackLease =
+                "public readonly ref struct StackLease { private readonly SemaphoreLease inner; public StackLease(SemaphoreLease lease) { inner = lease; } public void Dispose() { inner.Dispose(); } }";
             SyntaxTree[] trees =
             {
                 CSharpSyntaxTree.ParseText(
@@ -93,9 +104,19 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                     semaphorePath
                 ),
                 CSharpSyntaxTree.ParseText(
-                    "using System; using System.Threading; using WallstopStudios.UnityHelpers.Core.Threading; public static class Consumer { public static SemaphoreLease Saved; public static void Run(SemaphoreSlim semaphore) { SemaphoreLease lease = semaphore.Acquire(); "
+                    "using System; using System.Threading; using WallstopStudios.UnityHelpers.Core.Threading; "
+                        + (stackOnly ? stackLease : string.Empty)
+                        + " public static class Consumer { "
+                        + storage
+                        + " public static void Run(SemaphoreSlim semaphore) { "
+                        + leaseType
+                        + " lease = "
+                        + acquire
+                        + "; "
                         + body
-                        + " } private static void DisposeCopy(SemaphoreLease lease) { lease.Dispose(); } }",
+                        + " } private static void DisposeCopy("
+                        + leaseType
+                        + " lease) { lease.Dispose(); } }",
                     parseOptions,
                     ConsumerSourcePath
                 ),
@@ -145,6 +166,22 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         )
         {
             Assert.That(Analyze(CompileConsumer(body, singleThreaded)), Is.Empty);
+        }
+
+        [TestCase(false, "StackLease copy = lease; lease.Dispose(); copy.Dispose();")]
+        [TestCase(true, "StackLease copy = lease; lease.Dispose(); copy.Dispose();")]
+        [TestCase(false, "DisposeCopy(lease); lease.Dispose();")]
+        [TestCase(true, "DisposeCopy(lease); lease.Dispose();")]
+        [TestCase(false, "lease.Dispose(); lease.Dispose();")]
+        [TestCase(true, "lease.Dispose(); lease.Dispose();")]
+        [TestCase(false, "using (lease) { lease.Dispose(); }")]
+        [TestCase(true, "using (lease) { lease.Dispose(); }")]
+        public void StackOnlyWrapperStillAllowsOwnershipCopiesAndRepeatedDisposal(
+            bool singleThreaded,
+            string body
+        )
+        {
+            Assert.That(Analyze(CompileConsumer(body, singleThreaded, stackOnly: true)), Is.Empty);
         }
 
         [TestCase(false)]

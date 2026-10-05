@@ -39,6 +39,7 @@ import {
   resolveOnPath,
   resolveOptions,
   runProbe,
+  runConfigure,
   sameProjectRoot,
   startBridge,
   unityCliCandidates
@@ -82,7 +83,22 @@ function startWebSocketOnlyServer() {
 }
 
 /** A stand-in bridge: MCP initialize, plus GetProjectRoot answering with the supplied root. */
-function startFakeBridge({ projectRoot, omitProjectRoot = false, toolCount = 1 }) {
+function startFakeBridge({
+  projectRoot,
+  omitProjectRoot = false,
+  toolCount = 1,
+  registryError,
+  identityError,
+  identityErrorTool,
+  identityStatus,
+  registryStatus,
+  unknownRegistry = false,
+  registryDisconnect = false,
+  identityIsError = false,
+  identityExtraText,
+  initializeStatus,
+  initializeError
+}) {
   const methods = [];
   const server = http.createServer((request, response) => {
     let body = "";
@@ -91,6 +107,7 @@ function startFakeBridge({ projectRoot, omitProjectRoot = false, toolCount = 1 }
     });
     request.on("end", () => {
       if (request.method === "DELETE") {
+        methods.push("DELETE");
         response.writeHead(200).end();
         return;
       }
@@ -98,7 +115,18 @@ function startFakeBridge({ projectRoot, omitProjectRoot = false, toolCount = 1 }
       const message = JSON.parse(body);
       methods.push(message.method);
       if (message.method === "initialize") {
-        response.writeHead(200, { "Content-Type": "application/json" });
+        if (initializeStatus || initializeError) {
+          response.writeHead(initializeStatus ?? 200, {
+            "Content-Type": "application/json",
+            "mcp-session-id": "failed-initialize-session"
+          });
+          response.end(JSON.stringify({ jsonrpc: "2.0", id: 1, error: initializeError }));
+          return;
+        }
+        response.writeHead(200, {
+          "Content-Type": "application/json",
+          "mcp-session-id": "probe-session"
+        });
         response.end(
           JSON.stringify({
             jsonrpc: "2.0",
@@ -110,6 +138,21 @@ function startFakeBridge({ projectRoot, omitProjectRoot = false, toolCount = 1 }
       }
 
       if (message.method === "tools/list") {
+        if (registryDisconnect) {
+          request.socket.destroy();
+          return;
+        }
+        if (registryError || registryStatus || unknownRegistry) {
+          response.writeHead(registryStatus ?? 200, { "Content-Type": "application/json" });
+          response.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: 3,
+              ...(registryError ? { error: registryError } : { result: {} })
+            })
+          );
+          return;
+        }
         // Unity registers Unity_* tools from inside the editor; none exist when it is detached.
         const tools = Array.from({ length: toolCount }, (unused, index) => ({
           name: `Unity_Tool${index}`
@@ -123,6 +166,27 @@ function startFakeBridge({ projectRoot, omitProjectRoot = false, toolCount = 1 }
       // catalog's `editor_status` carries `projectPath`; the Assistant relay's
       // `Unity_ManageEditor` carries `data.projectRoot`. Each identity parser must accept its own.
       const toolName = message.params?.name;
+      if (identityError && (!identityErrorTool || identityErrorTool === toolName)) {
+        response.writeHead(identityStatus ?? 200, { "Content-Type": "application/json" });
+        response.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: 2,
+            ...(identityIsError
+              ? {
+                  result: {
+                    isError: true,
+                    content: [
+                      { type: "text", text: identityError.message },
+                      ...(identityExtraText ? [{ type: "text", text: identityExtraText }] : [])
+                    ]
+                  }
+                }
+              : { error: identityError })
+          })
+        );
+        return;
+      }
       let payload;
       if (toolName === "editor_status") {
         payload = omitProjectRoot
@@ -166,6 +230,455 @@ function optionsFor(expectedProjectRoot, extra = {}) {
     anyProject: false,
     ...extra
   };
+}
+
+const backendUnauthorized = {
+  code: -32603,
+  message:
+    "Failed to get available commands: Unauthorized. Missing or invalid authentication token."
+};
+
+for (const extra of [{}, { expectedProjectRoot: "D:/Code/Packages" }, { anyProject: true }]) {
+  test(`backend authentication failure refuses probe ${JSON.stringify(extra)}`, async () => {
+    const { server, port, methods } = await startFakeBridge({
+      registryError: backendUnauthorized,
+      identityError: backendUnauthorized
+    });
+    try {
+      const result = await probeEndpoint(
+        { host: "127.0.0.1", port, endpointPath: "/mcp" },
+        optionsFor(undefined, extra)
+      );
+      assert.equal(result.ok, false);
+      assert.equal(result.status, "backend-error");
+      assert.match(result.detail, /tools\/list.*-32603.*Unauthorized/);
+      assert.equal(methods.filter((method) => method === "DELETE").length, 1);
+    } finally {
+      server.close();
+    }
+  });
+}
+
+for (const anyProject of [false, true]) {
+  test(`first setup requires identity with any-project=${anyProject}`, async () => {
+    const { server, port, methods } = await startFakeBridge({ omitProjectRoot: true });
+    try {
+      const result = await probeEndpoint(
+        { host: "127.0.0.1", port, endpointPath: "/mcp" },
+        optionsFor(undefined, { anyProject })
+      );
+      assert.equal(result.ok, false);
+      assert.equal(result.status, "unidentified");
+      assert.equal(methods.filter((method) => method === "DELETE").length, 1);
+    } finally {
+      server.close();
+    }
+  });
+}
+
+for (const registry of [
+  { unknownRegistry: true },
+  { registryError: { code: -32601, message: "Method not found" } }
+]) {
+  test(`unknown registry retains identified endpoint compatibility ${JSON.stringify(registry)}`, async () => {
+    const { server, port, methods } = await startFakeBridge({
+      projectRoot: "D:/Code/Packages",
+      ...registry
+    });
+    try {
+      const result = await probeEndpoint(
+        { host: "127.0.0.1", port, endpointPath: "/mcp" },
+        optionsFor(undefined)
+      );
+      assert.equal(result.ok, true);
+      assert.equal(result.toolCount, undefined);
+      assert.equal(result.projectRoot, "D:/Code/Packages");
+      assert.equal(methods.filter((method) => method === "DELETE").length, 1);
+    } finally {
+      server.close();
+    }
+  });
+}
+
+for (const identityIsError of [false, true]) {
+  test(`identity backend errors remain actionable isError=${identityIsError}`, async () => {
+    const { server, port } = await startFakeBridge({
+      identityError: backendUnauthorized,
+      identityIsError
+    });
+    try {
+      const result = await probeEndpoint(
+        { host: "127.0.0.1", port, endpointPath: "/mcp" },
+        optionsFor(undefined)
+      );
+      assert.equal(result.ok, false);
+      assert.equal(result.status, "backend-error");
+      assert.match(result.detail, /Unauthorized/);
+    } finally {
+      server.close();
+    }
+  });
+}
+
+for (const registryStatus of [401, 403]) {
+  test(`tool registry HTTP ${registryStatus} remains bearer rejection`, async () => {
+    const { server, port, methods } = await startFakeBridge({ registryStatus });
+    try {
+      const result = await probeEndpoint(
+        { host: "127.0.0.1", port, endpointPath: "/mcp" },
+        optionsFor(undefined)
+      );
+      assert.equal(result.ok, false);
+      assert.equal(result.status, "unauthorized");
+      assert.match(result.detail, new RegExp(`HTTP ${registryStatus}`));
+      assert.equal(methods.filter((method) => method === "DELETE").length, 1);
+    } finally {
+      server.close();
+    }
+  });
+}
+
+test("backend failure diagnostics redact credentials before bounding context", async () => {
+  const bearerToken = "client-credential-unique";
+  const message =
+    `Unauthorized Bearer ${bearerToken}; token=backend-credential-unique; password=private-password; Authorization: Basic private-basic-credential; ` +
+    "x".repeat(1000);
+  const { server, port } = await startFakeBridge({ registryError: { code: -32603, message } });
+  try {
+    const result = await probeEndpoint(
+      { host: "127.0.0.1", port, endpointPath: "/mcp" },
+      optionsFor(undefined, { bearerToken })
+    );
+    assert.equal(result.status, "backend-error");
+    assert.match(result.detail, /Unauthorized/);
+    assert.doesNotMatch(
+      result.detail,
+      /client-credential-unique|backend-credential-unique|private-password|private-basic-credential/
+    );
+    assert.ok(result.detail.length <= 320);
+  } finally {
+    server.close();
+  }
+});
+
+for (const initializeStatus of [200, 500]) {
+  test(`initialize HTTP ${initializeStatus} redacts credentials across snippet boundary`, async () => {
+    const bearerToken = "boundary-secret-12345";
+    const initializeError = {
+      code: -32603,
+      message: "x".repeat(55) + ` Authorization: Bearer ${bearerToken} password=private-password`
+    };
+    const { server, port, methods } = await startFakeBridge({ initializeStatus, initializeError });
+    try {
+      const result = await probeEndpoint(
+        { host: "127.0.0.1", port, endpointPath: "/mcp" },
+        optionsFor(undefined, { bearerToken })
+      );
+      assert.equal(result.ok, false);
+      assert.doesNotMatch(result.detail, /boundary-secret|private-password/);
+      assert.ok(result.detail.length <= 320);
+      assert.equal(methods.filter((method) => method === "DELETE").length, 1);
+    } finally {
+      server.close();
+    }
+  });
+}
+
+for (const failure of [
+  { registryError: backendUnauthorized, identityError: backendUnauthorized },
+  { omitProjectRoot: true },
+  { registryStatus: 500 },
+  { initializeStatus: 500 },
+  { initializeStatus: 200 }
+]) {
+  for (const existingConfigs of [false, true]) {
+    test(`configure writes nothing existing=${existingConfigs} ${JSON.stringify(failure)}`, async () => {
+      const repoRoot = newTempRepoRoot();
+      const { server, port } = await startFakeBridge(failure);
+      const environment = path.join(repoRoot, ".env.local");
+      fs.writeFileSync(environment, "UNCHANGED=value\n");
+      const before = fs.readFileSync(environment);
+      const configPaths = Object.values(clientConfigPaths(repoRoot));
+      if (existingConfigs) {
+        for (const configPath of configPaths) {
+          fs.mkdirSync(path.dirname(configPath), { recursive: true });
+          fs.writeFileSync(configPath, configPath.endsWith(".toml") ? "# unchanged\n" : "{}\n");
+        }
+      }
+      const originalConfigs = configPaths.map((configPath) =>
+        existingConfigs ? fs.readFileSync(configPath) : undefined
+      );
+      try {
+        await assert.rejects(
+          runConfigure(
+            optionsFor(undefined, {
+              repoRoot,
+              host: "127.0.0.1",
+              port,
+              endpointPath: "/mcp",
+              discover: false
+            })
+          ),
+          /Nothing was written/
+        );
+        assert.deepEqual(fs.readFileSync(environment), before);
+        for (const [index, configPath] of configPaths.entries()) {
+          if (existingConfigs) {
+            assert.deepEqual(fs.readFileSync(configPath), originalConfigs[index]);
+          } else {
+            assert.equal(fs.existsSync(configPath), false);
+          }
+        }
+      } finally {
+        server.close();
+        fs.rmSync(repoRoot, { recursive: true, force: true });
+      }
+    });
+  }
+}
+
+for (const identityFailure of [false, true, 401]) {
+  test(`known Pipeline failure cannot hide behind Assistant identity ${identityFailure}`, async () => {
+    const { server, port, methods } = await startFakeBridge({
+      projectRoot: "D:/Code/Packages",
+      identityError: backendUnauthorized,
+      identityErrorTool: "editor_status",
+      identityIsError: identityFailure === true,
+      identityStatus: identityFailure === 401 ? 401 : undefined
+    });
+    try {
+      const result = await probeEndpoint(
+        { host: "127.0.0.1", port, endpointPath: "/mcp" },
+        optionsFor(undefined)
+      );
+      assert.equal(result.ok, false);
+      assert.equal(result.status, identityFailure === 401 ? "unauthorized" : "backend-error");
+      assert.match(
+        result.detail,
+        identityFailure === 401 ? /editor_status.*HTTP 401/ : /editor_status.*Unauthorized/
+      );
+      assert.equal(methods.filter((method) => method === "DELETE").length, 1);
+    } finally {
+      server.close();
+    }
+  });
+}
+
+test("non-Error initialize fetch rejection remains a classified failure", async () => {
+  const { server, port } = await startFakeBridge({});
+  try {
+    const result = await probeEndpoint(
+      { host: "127.0.0.1", port, endpointPath: "/mcp" },
+      optionsFor(undefined),
+      async () => {
+        throw null;
+      }
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.status, "unreachable");
+  } finally {
+    server.close();
+  }
+});
+
+test("initialize body read rejection closes the session and prevents configure writes", async () => {
+  const { server, port, methods } = await startFakeBridge({ projectRoot: "D:/Code/Packages" });
+  const repoRoot = newTempRepoRoot();
+  const options = optionsFor(undefined, {
+    repoRoot,
+    host: "127.0.0.1",
+    port,
+    endpointPath: "/mcp",
+    discover: false
+  });
+  const fetchImpl = async (url, request) => {
+    const response = await fetch(url, request);
+    if (request.method === "POST" && JSON.parse(request.body).method === "initialize") {
+      await response.text();
+      return {
+        headers: response.headers,
+        status: response.status,
+        ok: response.ok,
+        text: async () => {
+          throw null;
+        }
+      };
+    }
+    return response;
+  };
+  try {
+    await assert.rejects(runConfigure(options, { fetchImpl }), /Nothing was written/);
+    assert.equal(fs.existsSync(path.join(repoRoot, ".env.local")), false);
+    for (const configPath of Object.values(clientConfigPaths(repoRoot))) {
+      assert.equal(fs.existsSync(configPath), false);
+    }
+    assert.equal(methods.filter((method) => method === "DELETE").length, 1);
+  } finally {
+    server.close();
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("genuinely unreachable endpoint retains offline configuration generation", async () => {
+  const { server, port } = await startFakeBridge({});
+  await new Promise((resolve) => server.close(resolve));
+  const repoRoot = newTempRepoRoot();
+  try {
+    await runConfigure(
+      optionsFor(undefined, {
+        repoRoot,
+        host: "127.0.0.1",
+        port,
+        endpointPath: "/mcp",
+        discover: false
+      })
+    );
+    const environment = fs.readFileSync(path.join(repoRoot, ".env.local"), "utf8");
+    assert.match(environment, /UNITY_MCP_BEARER_TOKEN=[a-f0-9]{64}/);
+    assert.doesNotMatch(environment, /UNITY_MCP_PROJECT_ROOT/);
+    for (const configPath of Object.values(clientConfigPaths(repoRoot))) {
+      assert.equal(fs.existsSync(configPath), true);
+    }
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+for (const [identityIsError, message, accepted, identityExtraText] of [
+  [false, "Tool editor_status not found", true],
+  [true, "Tool editor_status not found", true],
+  [false, "Invalid arguments for tool editor_status", false],
+  [true, "Tool editor_status disabled", false],
+  [true, "Tool editor_status not found", false, "Backend authentication failed"]
+]) {
+  test(`SDK identity error allows only exact missing tool isError=${identityIsError} extra=${Boolean(identityExtraText)} ${message}`, async () => {
+    const { server, port, methods } = await startFakeBridge({
+      projectRoot: "D:/Code/Packages",
+      identityError: { code: -32602, message },
+      identityErrorTool: "editor_status",
+      identityIsError,
+      identityExtraText
+    });
+    try {
+      const result = await probeEndpoint(
+        { host: "127.0.0.1", port, endpointPath: "/mcp" },
+        optionsFor("D:/Code/Packages")
+      );
+      assert.equal(result.ok, accepted);
+      assert.equal(result.status, accepted ? "ok" : "backend-error");
+      if (accepted) {
+        assert.equal(result.projectRoot, "D:/Code/Packages");
+        assert.equal(methods.filter((method) => method === "tools/call").length, 2);
+      }
+      assert.equal(methods.filter((method) => method === "DELETE").length, 1);
+    } finally {
+      server.close();
+    }
+  });
+}
+
+test("Assistant identity fallback remains usable after Pipeline method-not-found", async () => {
+  const { server, port, methods } = await startFakeBridge({
+    projectRoot: "D:/Code/Packages",
+    identityError: { code: -32601, message: "Method not found" },
+    identityErrorTool: "editor_status"
+  });
+  try {
+    const result = await probeEndpoint(
+      { host: "127.0.0.1", port, endpointPath: "/mcp" },
+      optionsFor("D:/Code/Packages")
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.projectRoot, "D:/Code/Packages");
+    assert.equal(methods.filter((method) => method === "tools/call").length, 2);
+    assert.equal(methods.filter((method) => method === "DELETE").length, 1);
+  } finally {
+    server.close();
+  }
+});
+
+for (const projectRoot of [undefined, "D:/Code/Packages"]) {
+  test(`registry transport failure distinguishes identity ${projectRoot ?? "absent"}`, async () => {
+    const { server, port, methods } = await startFakeBridge({
+      projectRoot,
+      registryDisconnect: true
+    });
+    try {
+      const result = await probeEndpoint(
+        { host: "127.0.0.1", port, endpointPath: "/mcp" },
+        optionsFor(undefined)
+      );
+      assert.equal(result.ok, projectRoot !== undefined);
+      assert.equal(result.status, projectRoot === undefined ? "unreachable" : "ok");
+      assert.equal(result.toolCount, undefined);
+      assert.equal(methods.filter((method) => method === "DELETE").length, 1);
+    } finally {
+      server.close();
+    }
+  });
+}
+
+test("a whitespace project root cannot establish identity", async () => {
+  const { server, port } = await startFakeBridge({ projectRoot: "  " });
+  try {
+    const result = await probeEndpoint(
+      { host: "127.0.0.1", port, endpointPath: "/mcp" },
+      optionsFor(undefined)
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.status, "unidentified");
+  } finally {
+    server.close();
+  }
+});
+
+for (const backend of ["cli", "relay"]) {
+  test(`no-editor retains safe registry context and ${backend} guidance`, async () => {
+    const bearerToken = "no-editor-client-secret";
+    const message =
+      backend === "cli"
+        ? `Pipeline package is not loaded; unity pipeline install --project-path D:/Code/Packages; Authorization: Bearer ${bearerToken}`
+        : `No Unity editor is attached; token=${bearerToken}`;
+    const { server, port, methods } = await startFakeBridge({
+      registryError: { code: -32002, message }
+    });
+    const options = optionsFor("D:/Code/Packages", {
+      backend,
+      bearerToken,
+      host: "127.0.0.1",
+      port,
+      endpointPath: "/mcp",
+      discover: false
+    });
+    try {
+      const result = await probeEndpoint(
+        { host: "127.0.0.1", port, endpointPath: "/mcp" },
+        options
+      );
+      assert.equal(result.ok, false);
+      assert.equal(result.status, "no-editor");
+      assert.equal(result.toolCount, 0);
+      assert.match(
+        result.detail,
+        backend === "cli" ? /Pipeline.*pipeline install/ : /No Unity editor is attached/
+      );
+      assert.doesNotMatch(result.detail, /no-editor-client-secret/);
+      await assert.rejects(runProbe(options), (error) => {
+        assert.match(
+          error.message,
+          backend === "cli" ? /unity status.*unity list/s : /approve the connection/
+        );
+        assert.doesNotMatch(error.message, /no-editor-client-secret/);
+        if (backend === "cli") {
+          assert.doesNotMatch(error.message, /approve the connection/);
+        }
+        return true;
+      });
+      assert.equal(methods.filter((method) => method === "DELETE").length, 2);
+    } finally {
+      server.close();
+    }
+  });
 }
 
 test("normalizeProjectRoot survives separators, trailing slashes, and case", () => {
@@ -282,7 +795,8 @@ test("the probe completes the lifecycle before asking for identity", async () =>
       "initialize",
       "notifications/initialized",
       "tools/list",
-      "tools/call"
+      "tools/call",
+      "DELETE"
     ]);
   } finally {
     server.close();

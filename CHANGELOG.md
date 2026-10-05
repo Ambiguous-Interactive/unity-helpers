@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add value-returning `WProtoFacade` serialize and read methods that reject unsupported types and report typed serialization failures ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Add `WPROTO050` to report generated deserialization constructors whose base has no accessible zero-argument constructor ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Add `WProtoMember.IsPacked = false` to write unpacked numeric and enum collections matching protobuf-net defaults, while preserving existing packed writes and both read forms ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Add `SystemArrayPool<T>.TryWithBuffer` for synchronous borrowed spans with explicit state, optional results, and reported callback or cleanup errors ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
@@ -29,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix blank custom dropdown labels and popup titles while preserving literal string options ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
+- Fix concurrent thread pool disposal returning before running work and handle cleanup finish ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix SINGLE_THREADED pool purges when callbacks rent, dispose or purge the same pool; selected entries receive cleanup once without stale list indices ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix singleton asset recreation after stale GUID cleanup by requesting synchronous cleanup and pausing batching during creation and import ([#942](https://github.com/Ambiguous-Interactive/unity-helpers/issues/942)).
 - Fix unexpected singleton asset creation failures blocking later attempts until a domain reload ([#936](https://github.com/Ambiguous-Interactive/unity-helpers/issues/936)).

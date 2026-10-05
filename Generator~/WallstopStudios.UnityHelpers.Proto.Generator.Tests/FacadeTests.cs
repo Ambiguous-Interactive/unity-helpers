@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System;
     using System.IO;
     using NUnit.Framework;
+    using UnityHelpers.Core.Serialization;
     using UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -24,6 +25,185 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ProtoBuf.Serializer.Serialize(stream, value);
 
             CollectionAssert.AreEqual(stream.ToArray(), mine, typeof(T).Name);
+        }
+
+        private static T ReadRequired<T>(byte[] bytes, bool concrete, bool limits)
+        {
+            if (concrete)
+            {
+                return limits
+                    ? WProtoFacade.DeserializeAs<T>(bytes, typeof(T), null)
+                    : WProtoFacade.DeserializeAs<T>(bytes, typeof(T));
+            }
+            return limits
+                ? WProtoFacade.Deserialize<T>(bytes, null)
+                : WProtoFacade.Deserialize<T>(bytes);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void RequiredReadRoundTripsAndPreservesExactWire(bool concrete, bool limits)
+        {
+            ScalarContract original = new ScalarContract { Int32 = 7, Text = "saved" };
+            byte[] bytes = WProtoFacade.Serialize(original);
+            Assert.IsTrue(WProtoFacade.TrySerialize(original, out byte[] expected));
+            CollectionAssert.AreEqual(expected, bytes);
+            ScalarContract restored = ReadRequired<ScalarContract>(bytes, concrete, limits);
+            Assert.AreEqual(original.Int32, restored.Int32);
+            Assert.AreEqual(original.Text, restored.Text);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void RequiredReadRejectsMissingFormatter(bool concrete, bool limits)
+        {
+            SerializationTypeException failure = Assert.Throws<SerializationTypeException>(() =>
+                ReadRequired<Type>(Array.Empty<byte>(), concrete, limits)
+            );
+            Assert.AreEqual(typeof(Type), failure.DeclaredType);
+            Assert.AreEqual(SerializationFormat.Protobuf, failure.Format);
+            Assert.AreEqual(SerializationOperation.Deserialize, failure.Operation);
+            Assert.AreEqual(SerializationStage.TypeResolution, failure.Stage);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void RequiredReadWrapsMalformedInput(bool concrete, bool limits)
+        {
+            SerializationCorruptDataException failure =
+                Assert.Throws<SerializationCorruptDataException>(() =>
+                    ReadRequired<ScalarContract>(new byte[] { 0x80 }, concrete, limits)
+                );
+            Assert.IsInstanceOf<InvalidOperationException>(failure.InnerException);
+            Assert.AreEqual(SerializationOperation.Deserialize, failure.Operation);
+            Assert.AreEqual(SerializationStage.Decode, failure.Stage);
+        }
+
+        [Test]
+        public void RequiredWriteRejectsMissingFormatter()
+        {
+            SerializationTypeException failure = Assert.Throws<SerializationTypeException>(() =>
+                WProtoFacade.Serialize(typeof(string))
+            );
+            Assert.AreEqual(typeof(Type), failure.DeclaredType);
+            Assert.AreEqual(SerializationOperation.Serialize, failure.Operation);
+        }
+
+        [Test]
+        public void RequiredWriteWrapsMeasureWriteMismatch()
+        {
+            WProtoFormatterProvider.Register<FacadeBrokenContract>(new BrokenFormatter());
+            try
+            {
+                SerializationCorruptDataException failure =
+                    Assert.Throws<SerializationCorruptDataException>(() =>
+                        WProtoFacade.Serialize(new FacadeBrokenContract())
+                    );
+                Assert.IsInstanceOf<InvalidOperationException>(failure.InnerException);
+                Assert.AreEqual(SerializationStage.Encode, failure.Stage);
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register<FacadeBrokenContract>(null);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RequiredReadHonorsLimits(bool concrete)
+        {
+            byte[] bytes = WProtoFacade.Serialize(new ScalarContract { Int32 = 7 });
+            WProtoReadLimits limits = new WProtoReadLimits(maximumMessageBytes: 0);
+            Assert.Throws<SerializationCorruptDataException>(() =>
+            {
+                if (concrete)
+                {
+                    WProtoFacade.DeserializeAs<ScalarContract>(
+                        bytes,
+                        typeof(ScalarContract),
+                        limits
+                    );
+                }
+                else
+                {
+                    WProtoFacade.Deserialize<ScalarContract>(bytes, limits);
+                }
+            });
+        }
+
+        [Test]
+        public void RequiredFacadePreservesNullEmptyAndPolymorphicRequests()
+        {
+            CollectionAssert.IsEmpty(WProtoFacade.Serialize<ScalarContract>(null));
+            Assert.AreEqual(0, WProtoFacade.Deserialize<ScalarContract>(Array.Empty<byte>()).Int32);
+            IncludeBase original = new IncludeAlpha { Id = 4, AlphaOnly = 7 };
+            byte[] bytes = WProtoFacade.Serialize(original);
+            IncludeBase restored = WProtoFacade.DeserializeAs<IncludeBase>(
+                bytes,
+                typeof(IncludeAlpha)
+            );
+            Assert.IsInstanceOf<IncludeAlpha>(restored);
+            Assert.AreEqual(7, ((IncludeAlpha)restored).AlphaOnly);
+            Assert.IsInstanceOf<IncludeAlpha>(WProtoFacade.DeserializeAs<IncludeBase>(bytes, null));
+            Assert.Throws<SerializationTypeException>(() =>
+                WProtoFacade.DeserializeAs<IncludeBase>(bytes, typeof(UndeclaredAlpha))
+            );
+            Assert.Throws<SerializationTypeException>(() =>
+                WProtoFacade.Serialize<IncludeBase>(new UndeclaredAlpha())
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RequiredFacadePreservesTypedFormatterErrors(bool serialize)
+        {
+            SerializationConfigurationException failure = new SerializationConfigurationException(
+                SerializationFormat.Protobuf,
+                serialize ? SerializationOperation.Serialize : SerializationOperation.Deserialize,
+                typeof(FacadeBrokenContract),
+                "formatter",
+                "Invalid formatter configuration."
+            );
+            WProtoFormatterProvider.Register<FacadeBrokenContract>(
+                new BrokenFormatter { Failure = failure }
+            );
+            try
+            {
+                SerializationConfigurationException observed =
+                    Assert.Throws<SerializationConfigurationException>(() =>
+                    {
+                        if (serialize)
+                        {
+                            WProtoFacade.Serialize(new FacadeBrokenContract());
+                        }
+                        else
+                        {
+                            WProtoFacade.Deserialize<FacadeBrokenContract>(Array.Empty<byte>());
+                        }
+                    });
+                Assert.AreSame(failure, observed);
+                if (!serialize)
+                {
+                    InvalidOperationException dispatchFailure =
+                        Assert.Throws<InvalidOperationException>(() =>
+                            WProtoFacade.TryDeserialize(
+                                Array.Empty<byte>(),
+                                out FacadeBrokenContract _
+                            )
+                        );
+                    Assert.AreSame(failure, dispatchFailure.InnerException);
+                }
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register<FacadeBrokenContract>(null);
+            }
         }
 
         [Test]
@@ -317,8 +497,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private sealed class BrokenFormatter : IWProtoFormatter<FacadeBrokenContract>
         {
+            internal Exception Failure;
+
             public int Measure(in FacadeBrokenContract value)
             {
+                if (Failure != null)
+                {
+                    throw Failure;
+                }
                 return 4;
             }
 
@@ -330,6 +516,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             public bool TryRead(ref WProtoReader reader, out FacadeBrokenContract value)
             {
                 value = null;
+                if (Failure != null)
+                {
+                    throw Failure;
+                }
                 return false;
             }
         }

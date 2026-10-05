@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <para>
     /// This is the facade swap of the design item, and it is deliberately <b>opt-in per type</b>
     /// rather than all-or-nothing. Each method answers "is there a generated formatter for exactly
-    /// this type", and returns <c>false</c> when there is not, so a contract that has been annotated
+    /// this type". The dispatch methods return an unserved result when there is not, so an annotated contract
     /// travels the reflection-free path while one that has not keeps working exactly as before.
     /// Porting the remaining contracts is therefore incremental and individually verifiable, instead
     /// of one change that moves every type at once and can only be tested in aggregate.
@@ -32,9 +32,125 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <see cref="IWProtoPolymorphicFormatter"/>; one that does not implement it serves its declared
     /// type only.
     /// </para>
+    /// <para>
+    /// The value-returning <c>Serialize</c>, <c>Deserialize</c>, and <c>DeserializeAs</c> methods
+    /// require a formatter and throw <see cref="SerializationTypeException"/> when unserved.
+    /// They wrap codec failures in <see cref="SerializationCorruptDataException"/>.
+    /// </para>
     /// </remarks>
     public static class WProtoFacade
     {
+        /// <summary>Serializes a registered type into an exactly sized payload.</summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="value">The value to serialize.</param>
+        /// <returns>The encoded payload, empty for a null root or empty contract.</returns>
+        /// <exception cref="SerializationTypeException">No formatter serves the value.</exception>
+        /// <exception cref="SerializationCorruptDataException">The formatter fails to encode the value.</exception>
+        public static byte[] Serialize<T>(T value)
+        {
+            try
+            {
+                if (TrySerialize(value, out byte[] bytes))
+                {
+                    return bytes;
+                }
+
+                SerializationFailureException.ThrowTypeResolution<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Serialize,
+                    "No WallstopProto formatter serves the declared type and runtime value."
+                );
+                return null;
+            }
+            catch (Exception exception) when (exception is not SerializationFailureException)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Serialize,
+                    -1,
+                    SerializationStage.Encode,
+                    exception
+                );
+                return null;
+            }
+        }
+
+        /// <summary>Deserializes a registered type from its encoded payload.</summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="data">The payload; empty is valid for an empty contract.</param>
+        /// <returns>The decoded value.</returns>
+        /// <exception cref="SerializationTypeException">No formatter serves the type.</exception>
+        /// <exception cref="SerializationCorruptDataException">The formatter refuses the payload.</exception>
+        public static T Deserialize<T>(ReadOnlySpan<byte> data)
+        {
+            return DeserializeAs<T>(data, typeof(T), null);
+        }
+
+        /// <summary>Deserializes a registered type using the supplied wire limits.</summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="data">The payload; empty is valid for an empty contract.</param>
+        /// <param name="limits">Per-region limits; null uses the default limits.</param>
+        /// <returns>The decoded value.</returns>
+        /// <exception cref="SerializationTypeException">No formatter serves the type.</exception>
+        /// <exception cref="SerializationCorruptDataException">The formatter refuses the payload or limits.</exception>
+        public static T Deserialize<T>(ReadOnlySpan<byte> data, WProtoReadLimits limits)
+        {
+            return DeserializeAs<T>(data, typeof(T), limits);
+        }
+
+        /// <summary>Deserializes a registered type with an explicit concrete-type request.</summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="data">The payload; empty is valid for an empty contract.</param>
+        /// <param name="concrete">The requested concrete type; null uses the declared type.</param>
+        /// <returns>The decoded value.</returns>
+        /// <exception cref="SerializationTypeException">No formatter serves the concrete-type request.</exception>
+        /// <exception cref="SerializationCorruptDataException">The formatter refuses the payload.</exception>
+        public static T DeserializeAs<T>(ReadOnlySpan<byte> data, Type concrete)
+        {
+            return DeserializeAs<T>(data, concrete, null);
+        }
+
+        /// <summary>Deserializes an explicit concrete-type request using the supplied wire limits.</summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="data">The payload; empty is valid for an empty contract.</param>
+        /// <param name="concrete">The requested concrete type; null uses the declared type.</param>
+        /// <param name="limits">Per-region limits; null uses the default limits.</param>
+        /// <returns>The decoded value.</returns>
+        /// <exception cref="SerializationTypeException">No formatter serves the concrete-type request.</exception>
+        /// <exception cref="SerializationCorruptDataException">The formatter refuses the payload or limits.</exception>
+        public static T DeserializeAs<T>(
+            ReadOnlySpan<byte> data,
+            Type concrete,
+            WProtoReadLimits limits
+        )
+        {
+            try
+            {
+                if (ReadAs(data, concrete, limits, true, out T value))
+                {
+                    return value;
+                }
+
+                SerializationFailureException.ThrowTypeResolution<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize,
+                    "No WallstopProto formatter serves the declared and requested concrete type."
+                );
+                return default;
+            }
+            catch (Exception exception) when (exception is not SerializationFailureException)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize,
+                    data.Length,
+                    SerializationStage.Decode,
+                    exception
+                );
+                return default;
+            }
+        }
+
         /// <summary>
         /// Serializes <paramref name="value"/> into <paramref name="buffer"/>, growing it only when
         /// what is already there is too small.
@@ -116,7 +232,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when WallstopProto served the request.</returns>
         /// <remarks>
         /// Allocates an array sized exactly to the payload. A caller that serializes repeatedly
-        /// should prefer <see cref="Serialize{T}"/>, which reuses a buffer it is given.
+        /// should prefer <see cref="Serialize{T}(T, ref byte[])"/>, which reuses a buffer it is given.
         /// </remarks>
         public static bool TrySerialize<T>(T value, out byte[] bytes)
         {
@@ -213,6 +329,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             out T value
         )
         {
+            return ReadAs(data, concrete, limits, false, out value);
+        }
+
+        private static bool ReadAs<T>(
+            ReadOnlySpan<byte> data,
+            Type concrete,
+            WProtoReadLimits limits,
+            bool preserveTypedFailures,
+            out T value
+        )
+        {
             if (!TryResolveForRead(concrete, out IWProtoFormatter<T> formatter))
             {
                 value = default;
@@ -236,6 +363,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 }
             }
             catch (Exception exception)
+                when (!preserveTypedFailures || exception is not SerializationFailureException)
             {
                 throw new InvalidOperationException(
                     $"WallstopProto could not read a '{typeof(T).FullName}' from {data.Length} byte(s): "

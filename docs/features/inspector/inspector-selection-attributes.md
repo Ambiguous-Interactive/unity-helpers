@@ -276,7 +276,10 @@ values remain literal data, including whitespace-only values and spaces inside l
 Unity object options with empty or whitespace-only names display their type name, including names
 containing only control or Unicode whitespace. The object name and selected reference remain
 unchanged. Nonblank object names keep their exact spacing, and whitespace-only string options
-keep their literal labels and serialized values.
+keep their literal labels and serialized values. Other custom options whose `ToString` or
+`IFormattable` output is null, empty, or whitespace-only display their type name in parentheses;
+nonblank output retains its exact spacing. Both cached formatters preserve the option itself.
+Blank popup titles use `Select`; nonblank titles retain their exact spacing.
 
 <!-- doc-sample: compiles -->
 
