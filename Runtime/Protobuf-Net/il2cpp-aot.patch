@@ -1,0 +1,37 @@
+diff --git a/src/protobuf-net.Core/Internal/TypeHelperT.cs b/src/protobuf-net.Core/Internal/TypeHelperT.cs
+index 577b0743..79539f0b 100644
+--- a/src/protobuf-net.Core/Internal/TypeHelperT.cs
++++ b/src/protobuf-net.Core/Internal/TypeHelperT.cs
+@@ -174,7 +174,7 @@ namespace ProtoBuf.Internal
+         public static readonly IValueChecker<T> ValueChecker =
+             SerializerCache<PrimaryTypeProvider>.InstanceField as IValueChecker<T>
+             ?? ReferenceValueChecker.Instance as IValueChecker<T>
+-            ?? (IValueChecker<T>)TypeHelper.GetValueTypeChecker(typeof(T));
++            ?? new FallbackValueChecker<T>();
+ 
+         public static readonly bool CanBePacked = !IsReferenceType && TypeHelper.CanBePacked(typeof(T));
+ 
+@@ -208,6 +208,11 @@ namespace ProtoBuf.Internal
+         /// </summary>
+         bool IValueChecker<object>.IsNull(object value) => value is null;
+     }
++    internal sealed class FallbackValueChecker<T> : IValueChecker<T>
++    {
++        bool IValueChecker<T>.HasNonTrivialValue(T value) => !TypeHelper<T>.CanBeNull || !value.Equals(null);
++        bool IValueChecker<T>.IsNull(T value) => TypeHelper<T>.CanBeNull && value.Equals(null);
++    }
+     internal sealed class StructValueChecker<T> : IValueChecker<T?>, IValueChecker<T>
+         where T : struct
+     {
+diff --git a/src/protobuf-net/Meta/ValueMember.cs b/src/protobuf-net/Meta/ValueMember.cs
+index e9fce7ba..6a43a7fb 100644
+--- a/src/protobuf-net/Meta/ValueMember.cs
++++ b/src/protobuf-net/Meta/ValueMember.cs
+@@ -606,6 +606,7 @@ namespace ProtoBuf.Meta
+             bool asReference, bool dynamicType, bool overwriteList, bool allowComplexTypes)
+         {
+             compatibilityLevel = ValueMember.GetEffectiveCompatibilityLevel(compatibilityLevel, dataFormat);
++            type = Nullable.GetUnderlyingType(type) ?? type;
+             type = DynamicStub.GetEffectiveType(type);
+             if (type.IsEnum)
+             {

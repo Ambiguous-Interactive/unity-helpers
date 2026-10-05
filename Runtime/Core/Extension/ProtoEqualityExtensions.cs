@@ -18,6 +18,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// Thread Safety: Thread-safe for value types. Reference types are safe if not modified during comparison.
     /// Performance: Requires full serialization of both objects for comparison - can be expensive for large objects.
     /// Use for deep equality where standard equality is insufficient (e.g., comparing complex object graphs).
+    /// Default-mode dictionary comparisons retain the bundled protobuf-net map encoding and its default-value policy.
     /// </remarks>
     public static class ProtoEqualityExtensions
     {

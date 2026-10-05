@@ -79,6 +79,11 @@ order, without discovering the adapter's map serializer at runtime. Consumer sub
 the existing protobuf-net dispatch and their own contract behavior. Stripped-player and nested
 collection compatibility remains tracked in
 [#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950).
+The bundled protobuf-net 3.2.56 assemblies include a small source patch for dictionary-entry
+value checkers and nullable member classification. They keep the upstream map encoder and
+default-value policy. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)
+include the exact patch and binary hashes. Fresh Unity 2021.3 stripped-player qualification of
+this patch remains required; newer-player success for the previous binaries does not prove it.
 The root save wrappers described below remain a separate path: comparer hashes are not hashes
 of `Serializer.ProtoSerialize` output. WProto-only builds use generated root encoding instead,
 so hashes are not portable between backend modes.
