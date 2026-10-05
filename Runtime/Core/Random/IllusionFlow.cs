@@ -21,8 +21,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Collections.Generic;
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// IllusionFlow: a five-word 32-bit generator -- a Weyl counter gating a rotate/xor/add mix, with a carry-in reseed step every 2^32 draws.
@@ -80,8 +82,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     // Skip constructor seeding so an omitted default state does not invent a new stream.
-
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(SkipConstructor = true)]
+#endif
     [WProtoContract(SkipConstructor = true)]
     [WProtoSubtype(typeof(AbstractRandom), 111)]
     public sealed partial class IllusionFlow : AbstractRandom
@@ -109,23 +112,33 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         private uint _a;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [WProtoMember(7)]
         private uint _b;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(8)]
+#endif
         [WProtoMember(8)]
         private uint _c;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(9)]
+#endif
         [WProtoMember(9)]
         private uint _d;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(10)]
+#endif
         [WProtoMember(10)]
         private uint _e;
 

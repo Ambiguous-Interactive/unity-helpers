@@ -23,6 +23,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private const string Root = "Assets/Temp/TextureSettingsApplierAPITests";
 
+        private static IEnumerable<TestCaseData> BlankPlatformOverrideCases()
+        {
+            KeyValuePair<string, string>[] names =
+            {
+                new("Null", null),
+                new("Empty", string.Empty),
+                new("Space", "   "),
+                new("Control", "\t\r\n"),
+                new("Unicode", "\u2003\u00a0"),
+            };
+            foreach (KeyValuePair<string, string> name in names)
+            {
+                foreach (bool validOverride in new[] { false, true })
+                {
+                    foreach (bool generalSettings in new[] { false, true })
+                    {
+                        yield return new TestCaseData(
+                            name.Value,
+                            validOverride,
+                            generalSettings
+                        ).SetName(
+                            $"{nameof(BlankPlatformOverridesAreIgnored)}.{name.Key}.ValidOverride{validOverride}.GeneralSettings{generalSettings}"
+                        );
+                    }
+                }
+            }
+        }
+
         private static string RelToFull(string rel)
         {
             return Path.Combine(
@@ -333,10 +361,89 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse((AssetImporter.GetAtPath(secondPath) as TextureImporter).isReadable);
         }
 
+        [TestCaseSource(nameof(BlankPlatformOverrideCases))]
+        public void BlankPlatformOverridesAreIgnored(
+            string blankName,
+            bool validOverride,
+            bool generalSettings
+        )
+        {
+            string texPath = (Root + "/blank_platform.png").SanitizePath();
+            CreatePng(texPath, 32, 32, Color.white);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            TextureImporter before = AssetImporter.GetAtPath(texPath) as TextureImporter;
+            Assert.IsTrue(before != null);
+            string standaloneName = nameof(BuildTargetGroup.Standalone);
+            int defaultMax = before.GetDefaultPlatformTextureSettings().maxTextureSize;
+            TextureImporterPlatformSettings originalStandalone = before.GetPlatformTextureSettings(
+                standaloneName
+            );
+            int standaloneMax = originalStandalone.maxTextureSize;
+            bool standaloneOverridden = originalStandalone.overridden;
+            bool readable = before.isReadable;
+            bool dirty = EditorUtility.IsDirty(before);
+            int requestedStandaloneMax = standaloneMax == 128 ? 256 : 128;
+            TextureSettingsApplierAPI.PlatformOverride blank = new()
+            {
+                name = blankName,
+                applyMaxTextureSize = true,
+                maxTextureSize = defaultMax == 64 ? 128 : 64,
+            };
+            TextureSettingsApplierAPI.PlatformOverride valid = new()
+            {
+                name = standaloneName,
+                applyMaxTextureSize = true,
+                maxTextureSize = requestedStandaloneMax,
+            };
+            TextureSettingsApplierAPI.Config config = new()
+            {
+                applyReadWriteEnabled = generalSettings,
+                readWriteEnabled = !readable,
+                platformOverrides = validOverride ? new[] { blank, valid } : new[] { blank },
+            };
+            bool expectedChange = validOverride || generalSettings;
+
+            bool predictedChange = TextureSettingsApplierAPI.WillTextureSettingsChange(
+                texPath,
+                in config
+            );
+            Assert.AreEqual(dirty, EditorUtility.IsDirty(before));
+            Assert.AreEqual(
+                expectedChange,
+                TextureSettingsApplierAPI.TryUpdateTextureSettings(
+                    texPath,
+                    in config,
+                    out TextureImporter after
+                )
+            );
+            Assert.AreEqual(expectedChange, predictedChange);
+            Assert.IsTrue(after != null);
+            if (expectedChange)
+            {
+                after.SaveAndReimport();
+            }
+            else
+            {
+                Assert.AreEqual(dirty, EditorUtility.IsDirty(after));
+            }
+
+            TextureImporterPlatformSettings standalone = after.GetPlatformTextureSettings(
+                standaloneName
+            );
+            Assert.AreEqual(defaultMax, after.GetDefaultPlatformTextureSettings().maxTextureSize);
+            Assert.AreEqual(
+                validOverride ? requestedStandaloneMax : standaloneMax,
+                standalone.maxTextureSize
+            );
+            Assert.AreEqual(validOverride || standaloneOverridden, standalone.overridden);
+            Assert.AreEqual(generalSettings ? !readable : readable, after.isReadable);
+            Assert.AreEqual(blankName, config.platformOverrides[0].name);
+        }
+
         private void CreatePng(string relPath, int w, int h, Color c)
         {
             EnsureFolder(Path.GetDirectoryName(relPath).SanitizePath());
-            Texture2D t = new(w, h, TextureFormat.RGBA32, false);
+            Texture2D t = Track(new Texture2D(w, h, TextureFormat.RGBA32, false));
             Color[] pix = new Color[w * h];
             for (int i = 0; i < pix.Length; ++i)
             {

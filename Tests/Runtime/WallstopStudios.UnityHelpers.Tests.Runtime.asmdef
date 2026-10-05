@@ -23,7 +23,7 @@
     "Sirenix.OdinInspector.Attributes.dll"
   ],
   "autoReferenced": false,
-  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "!WALLSTOP_PROTO_ONLY"],
   "versionDefines": [
     {
       "name": "odininspector",

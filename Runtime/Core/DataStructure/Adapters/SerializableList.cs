@@ -7,11 +7,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Collections;
     using System.Collections.Generic;
     using System.Text.Json.Serialization;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Unity-serializable box around a <see cref="List{T}"/>, for use as the element or value type of
@@ -59,7 +61,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </para>
     /// </remarks>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     [JsonConverter(typeof(SerializableListConverterFactory))]
     public sealed partial class SerializableList<T> : IList<T>, IReadOnlyList<T>
@@ -105,7 +109,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         [WProtoMember(1, OverwriteList = true)]
         private List<T> _items = new();
 
@@ -151,7 +157,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         static SerializableList()
         {
+#if !WALLSTOP_PROTO_ONLY
             ProtobufUnityModel.EnsureInitialized();
+#endif
         }
 
         /// <summary>

@@ -7,9 +7,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections;
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// A sparse set data structure optimized for fast O(1) add, remove, contains, and dense iteration.
@@ -29,7 +31,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     [Serializable]
 #pragma warning disable WPROTO030 // Served at the root through SparseSetProtoWrapper.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(IgnoreListHandling = true)]
+#endif
 #pragma warning restore WPROTO030
     public sealed class SparseSet : IReadOnlyList<int>
     {
@@ -66,15 +70,21 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         private int[] _sparse;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         private int[] _dense;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         private int _count;
 
         /// <summary>

@@ -157,6 +157,8 @@
       All four branches ship, so all four have to compile.
     -->
     <WallstopProto Condition="'$(WallstopProto)' == ''">true</WallstopProto>
+    <DefineConstants Condition="'$(WallstopProtoOnly)' == 'true'"
+      >$(DefineConstants);WALLSTOP_PROTO_ONLY</DefineConstants>
     <DefineConstants Condition="'$(WallstopProto)' == 'true'"
       >$(DefineConstants);WALLSTOP_PROTO</DefineConstants>
     <!-- The configuration #347 is about. See the header. -->
@@ -200,10 +202,10 @@
       <Private>false</Private>
     </Reference>
     <!-- The same vendored binaries the package ships to Unity. -->
-    <Reference Include="protobuf-net">
+    <Reference Include="protobuf-net" Condition="'$(WallstopProtoOnly)' != 'true'">
       <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</HintPath>
     </Reference>
-    <Reference Include="protobuf-net.Core">
+    <Reference Include="protobuf-net.Core" Condition="'$(WallstopProtoOnly)' != 'true'">
       <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</HintPath>
     </Reference>
     <Reference Include="System.Collections.Immutable">

@@ -10,12 +10,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Runtime.Serialization;
     using System.Text.Json;
     using System.Text.Json.Serialization;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Unity-serializable alternative to <see cref="Nullable{T}"/> that supports ProtoBuf and JSON.
@@ -38,7 +40,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </example>
     /// <typeparam name="T">The underlying value type.</typeparam>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     [JsonConverter(typeof(SerializableNullableJsonConverterFactory))]
     public partial struct SerializableNullable<T>
@@ -74,12 +78,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         internal bool _hasValue;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2, IsRequired = false)]
+#endif
         [WProtoMember(2, IsRequired = false)]
         [WShowIf(nameof(_hasValue))]
         internal T _value;

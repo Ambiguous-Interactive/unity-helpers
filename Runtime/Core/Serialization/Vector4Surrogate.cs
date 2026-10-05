@@ -3,34 +3,47 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization
 {
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
+
 #if UNITY_5_3_OR_NEWER
     using UnityEngine;
 #endif
 
     /// <summary>Carries the protobuf wire shape of Vector4.</summary>
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct Vector4Surrogate
     {
         /// <summary>The x component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public float x;
 
         /// <summary>The y component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float y;
 
         /// <summary>The z component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float z;
 
         /// <summary>The w component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public float w;
 

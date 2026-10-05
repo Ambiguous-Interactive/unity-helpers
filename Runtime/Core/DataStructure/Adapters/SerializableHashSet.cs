@@ -9,11 +9,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Globalization;
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
+
 #if UNITY_EDITOR
     using UnityEditor;
 #endif
@@ -82,7 +85,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </example>
     [Serializable]
 #pragma warning disable WPROTO030 // Served through the set root wrappers.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(IgnoreListHandling = true)]
+#endif
 #pragma warning restore WPROTO030
     public abstract class SerializableSetBase<T, TSet>
         : ISet<T>,
@@ -123,11 +128,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         bool ICollection<T>.IsReadOnly => _set.IsReadOnly;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         [JsonInclude]
         protected internal T[] _items;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         protected internal TSet _set;
 
         [NonSerialized]
@@ -186,7 +195,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         static SerializableSetBase()
         {
+#if !WALLSTOP_PROTO_ONLY
             ProtobufUnityModel.EnsureInitialized();
+#endif
         }
 
         private static bool TypeSupportsNullReferences(Type type)
@@ -1010,13 +1021,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return this.ToJson();
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoBeforeSerialization]
+#endif
         protected internal void OnProtoBeforeSerialization()
         {
             OnBeforeSerialize();
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterSerialization]
+#endif
         protected internal void OnProtoAfterSerialization()
         {
             if (_preserveSerializedEntries)
@@ -1027,7 +1042,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _items = null;
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterDeserialization]
+#endif
         protected internal void OnProtoAfterDeserialization()
         {
             // A deserializer can leave the ignored backing set null without running a constructor.

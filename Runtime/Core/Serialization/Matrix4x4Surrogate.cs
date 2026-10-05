@@ -3,94 +3,131 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization
 {
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
+
 #if UNITY_5_3_OR_NEWER
     using UnityEngine;
 #endif
 
     /// <summary>Carries the protobuf wire shape of Matrix4x4.</summary>
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct Matrix4x4Surrogate
     {
         /// <summary>The m00 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public float m00;
 
         /// <summary>The m10 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float m10;
 
         /// <summary>The m20 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float m20;
 
         /// <summary>The m30 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public float m30;
 
         /// <summary>The m01 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(5)]
+#endif
         [WProtoMember(5)]
         public float m01;
 
         /// <summary>The m11 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         public float m11;
 
         /// <summary>The m21 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [WProtoMember(7)]
         public float m21;
 
         /// <summary>The m31 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(8)]
+#endif
         [WProtoMember(8)]
         public float m31;
 
         /// <summary>The m02 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(9)]
+#endif
         [WProtoMember(9)]
         public float m02;
 
         /// <summary>The m12 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(10)]
+#endif
         [WProtoMember(10)]
         public float m12;
 
         /// <summary>The m22 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(11)]
+#endif
         [WProtoMember(11)]
         public float m22;
 
         /// <summary>The m32 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(12)]
+#endif
         [WProtoMember(12)]
         public float m32;
 
         /// <summary>The m03 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(13)]
+#endif
         [WProtoMember(13)]
         public float m03;
 
         /// <summary>The m13 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(14)]
+#endif
         [WProtoMember(14)]
         public float m13;
 
         /// <summary>The m23 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(15)]
+#endif
         [WProtoMember(15)]
         public float m23;
 
         /// <summary>The m33 component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(16)]
+#endif
         [WProtoMember(16)]
         public float m33;
 

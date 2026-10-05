@@ -36,6 +36,39 @@ Human-readable; ideal for settings, debug, modding, and Git diffs.
   - System.Type (type metadata)
 - Profiles: Normal, Pretty, Fast, FastPOCO (see below)
 
+### WProto-only builds
+
+Add `WALLSTOP_PROTO_ONLY` to the scripting define symbols for each player target when all
+protobuf models have moved to WallstopProto. Package protobuf-net attributes, reflection-model
+initialization and fallback serialization are excluded. The two protobuf-net plugins are disabled
+by their import constraints, and their linker entries allow those assemblies to be absent.
+JSON and trusted legacy SystemBinary APIs retain their existing behavior.
+Remove or conditionally exclude consumer `ProtoBuf` imports, attributes and explicit assembly
+references before enabling the symbol. A legacy consumer script still requires its backend even
+when the package has generated formatters for every shipped model.
+
+`Serializer.ProtoSerialize` and both `ProtoDeserialize` shapes use registered generated
+formatters in this mode. Missing formatters report `SerializationTypeException`; a rejected
+payload reports the typed serialization failure. Runtime `RegisterProtobufRoot` is unavailable
+and reports `SerializationConfigurationException`. Declare generated roots with
+`WProtoDeclaredRootAttribute` instead. Turning this mode on does not migrate schemas or convert
+existing saves. Verify every retained model and wire contract before removing its legacy backend.
+
+The package's legacy-oracle test assemblies and their dependent assemblies are excluded in this
+mode because they explicitly require protobuf-net. The separate `Tests.ProtoOnly` assembly
+covers generated writes, retained collections, Unity values and RNG continuation. The normal
+mode retains the complete legacy test assemblies; a WProto-only result does not replace that
+validation. `npm run typecheck:unity:proto-only` compiles Runtime and Editor without either
+protobuf-net reference, separately from native editor/player testing.
+
+`WProtoFacade.Serialize(value, IBufferWriter<byte>)` appends a measured payload to a writer
+without allocating an intermediate payload array. Its `TrySerialize` overload returns a byte
+count through `out` and reports typed failures as `false`. Encoding finishes before the writer's
+`Advance` call. Empty payloads do not request or advance a destination span. A failed formatter
+can modify uncommitted span memory; a writer that fails while advancing controls its own state.
+The package cannot roll back arbitrary external writers. WProto-only proto equality and hashing
+use pooled writers rather than the reflection backend.
+
 ### Protobuf (protobuf-net)
 
 **⭐ Killer Feature: Schema Evolution**: Players can load saves from older game versions without breaking! Add new fields, remove old ones, rename types, all while maintaining compatibility.

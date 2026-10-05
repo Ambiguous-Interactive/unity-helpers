@@ -16,6 +16,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// Programmatic API for applying generic texture importer settings (non-sprite specific)
     /// with support for selective fields and default-platform overrides.
     /// </summary>
+    /// <remarks>
+    /// Null, empty and whitespace-only platform override names are ignored.
+    /// Nonblank names are passed unchanged to Unity.
+    /// </remarks>
     public static class TextureSettingsApplierAPI
     {
         /// <summary>Applies texture settings to explicit asset paths and persists changed importers.</summary>
@@ -191,7 +195,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 foreach (PlatformOverride po in config.platformOverrides)
                 {
-                    if (string.IsNullOrEmpty(po.name))
+                    if (string.IsNullOrWhiteSpace(po.name))
                     {
                         continue;
                     }
@@ -361,7 +365,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 foreach (PlatformOverride po in config.platformOverrides)
                 {
-                    if (string.IsNullOrEmpty(po.name))
+                    if (string.IsNullOrWhiteSpace(po.name))
                     {
                         continue;
                     }

@@ -15,9 +15,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Text.Json.Serialization;
     using Extension;
     using Helper;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// FlurryBurst32: a six-word ARX-style generator offering high quality and excellent parallel sequencing.
@@ -67,7 +69,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(SkipConstructor = true)]
+#endif
     [WProtoContract(SkipConstructor = true)]
     [WProtoSubtype(typeof(AbstractRandom), 112)]
     public sealed partial class FlurryBurstRandom
@@ -108,27 +112,39 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         private uint _a;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [WProtoMember(7)]
         private uint _b;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(8)]
+#endif
         [WProtoMember(8)]
         private uint _c;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(9)]
+#endif
         [WProtoMember(9)]
         private uint _d;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(10)]
+#endif
         [WProtoMember(10)]
         private uint _e;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(11)]
+#endif
         [WProtoMember(11)]
         private uint _f;
 

@@ -13,13 +13,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Text.Json.Serialization;
     using System.Text.RegularExpressions;
     using System.Threading;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Unity serializable wrapper for <see cref="Type"/> that survives JSON, ProtoBuf, and Unity serialization by storing normalized assembly-qualified names.
@@ -38,7 +40,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// ]]></code>
     /// </example>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     [JsonConverter(typeof(SerializableTypeJsonConverter))]
     public partial struct SerializableType
@@ -140,7 +144,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public Type Value => GetResolvedType();
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         [StringInList(
             typeof(SerializableTypeCatalog),
@@ -149,13 +155,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         private string _assemblyQualifiedName;
 
         [NonSerialized]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         [WProtoIgnore]
         [JsonIgnore]
         private Type _cachedType;
 
         [NonSerialized]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         [WProtoIgnore]
         [JsonIgnore]
         private bool _resolutionAttempted;

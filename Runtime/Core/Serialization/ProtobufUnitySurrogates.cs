@@ -6,26 +6,37 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using System;
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
-    using ProtoBuf;
-    using ProtoBuf.Meta;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf.Meta;
+#endif
+
 #if UNITY_5_3_OR_NEWER
     using UnityEngine;
 #endif
 
 #if UNITY_5_3_OR_NEWER
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct Vector2Surrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public float x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float y;
 
@@ -34,19 +45,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static implicit operator Vector2(Vector2Surrogate s) => new(s.x, s.y);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct Vector3Surrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public float x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float y;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float z;
 
@@ -61,23 +80,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static implicit operator Vector3(Vector3Surrogate s) => new(s.x, s.y, s.z);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct QuaternionSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public float x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float y;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float z;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public float w;
 
@@ -94,23 +123,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             new(s.x, s.y, s.z, s.w);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct ColorSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public float r;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float g;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float b;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public float a;
 
@@ -126,23 +165,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static implicit operator Color(ColorSurrogate s) => new(s.r, s.g, s.b, s.a);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct Color32Surrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public byte r;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public byte g;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public byte b;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public byte a;
 
@@ -158,23 +207,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static implicit operator Color32(Color32Surrogate s) => new(s.r, s.g, s.b, s.a);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct RectSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public float x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float y;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float width;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public float height;
 
@@ -190,23 +249,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static implicit operator Rect(RectSurrogate s) => new(s.x, s.y, s.width, s.height);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct RectIntSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public int x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int y;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public int width;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public int height;
 
@@ -223,31 +292,45 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             new(s.x, s.y, s.width, s.height);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct BoundsSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public float cx;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float cy;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float cz;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public float sx;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(5)]
+#endif
         [WProtoMember(5)]
         public float sy;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         public float sz;
 
@@ -266,31 +349,45 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             new(new Vector3(s.cx, s.cy, s.cz), new Vector3(s.sx, s.sy, s.sz));
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct BoundsIntSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public int px;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int py;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public int pz;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public int sx;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(5)]
+#endif
         [WProtoMember(5)]
         public int sy;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         public int sz;
 
@@ -309,15 +406,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             new(new Vector3Int(s.px, s.py, s.pz), new Vector3Int(s.sx, s.sy, s.sz));
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct Vector2IntSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public int x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int y;
 
@@ -327,19 +430,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static implicit operator Vector2Int(Vector2IntSurrogate s) => new(s.x, s.y);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct Vector3IntSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public int x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int y;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public int z;
 
@@ -354,19 +465,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static implicit operator Vector3Int(Vector3IntSurrogate s) => new(s.x, s.y, s.z);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct ResolutionSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public int width;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int height;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public int refreshRate;
 
@@ -393,24 +512,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     // Mutable surrogates avoid protobuf-net reflection paths that cannot construct readonly structs on AOT.
 
     // Keep legacy int32 tags readable and emit sint32 on new tags; reusing a tag would silently reinterpret old coordinates.
-
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     internal partial struct FastVector2IntSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(5, DataFormat = DataFormat.ZigZag)]
+#endif
         [WProtoMember(5, DataFormat = WProtoDataFormat.ZigZag)]
         public int x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6, DataFormat = DataFormat.ZigZag)]
+#endif
         [WProtoMember(6, DataFormat = WProtoDataFormat.ZigZag)]
         public int y;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public int legacyX;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int legacyY;
 
@@ -423,32 +551,45 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     // Legacy z stays at tag 4 because tag 3 previously stored the hash.
-
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     internal partial struct FastVector3IntSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(5, DataFormat = DataFormat.ZigZag)]
+#endif
         [WProtoMember(5, DataFormat = WProtoDataFormat.ZigZag)]
         public int x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6, DataFormat = DataFormat.ZigZag)]
+#endif
         [WProtoMember(6, DataFormat = WProtoDataFormat.ZigZag)]
         public int y;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7, DataFormat = DataFormat.ZigZag)]
+#endif
         [WProtoMember(7, DataFormat = WProtoDataFormat.ZigZag)]
         public int z;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public int legacyX;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int legacyY;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public int legacyZ;
 
@@ -464,23 +605,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             new(s.x != 0 ? s.x : s.legacyX, s.y != 0 ? s.y : s.legacyY, s.z != 0 ? s.z : s.legacyZ);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct ParabolaSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public float length;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float a;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float b;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public float maxHeight;
 
@@ -498,15 +649,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             new(s.maxHeight, s.length, s.a, s.b);
     }
 
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct ImmutableBitSetSurrogate
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public ulong[] bits;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int capacity;
 
@@ -524,11 +681,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// <summary>
     /// Protobuf wrapper for SerializableHashSet that avoids IEnumerable collection detection.
     /// </summary>
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     internal sealed partial class SerializableHashSetProtoWrapper<T>
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         [WProtoMember(1, OverwriteList = true)]
         public T[] Items;
     }
@@ -536,11 +697,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// <summary>
     /// Protobuf wrapper for SerializableSortedSet that avoids IEnumerable collection detection.
     /// </summary>
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     internal sealed partial class SerializableSortedSetProtoWrapper<T>
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         [WProtoMember(1, OverwriteList = true)]
         public T[] Items;
     }
@@ -548,15 +713,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// <summary>
     /// Protobuf wrapper for SerializableDictionary that avoids IEnumerable collection detection.
     /// </summary>
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     internal sealed partial class SerializableDictionaryProtoWrapper<TKey, TValue>
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         [WProtoMember(1, OverwriteList = true)]
         public TKey[] Keys;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2, OverwriteList = true)]
+#endif
         [WProtoMember(2, OverwriteList = true)]
         public TValue[] Values;
     }
@@ -564,15 +735,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// <summary>
     /// Protobuf wrapper for SerializableSortedDictionary that avoids IEnumerable collection detection.
     /// </summary>
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     internal sealed partial class SerializableSortedDictionaryProtoWrapper<TKey, TValue>
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         [WProtoMember(1, OverwriteList = true)]
         public TKey[] Keys;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2, OverwriteList = true)]
+#endif
         [WProtoMember(2, OverwriteList = true)]
         public TValue[] Values;
     }
@@ -582,15 +759,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// <summary>
     /// Protobuf wrapper for <see cref="Deque{T}"/>: ordered items (front to back) plus capacity.
     /// </summary>
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     internal sealed partial class DequeProtoWrapper<T>
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         [WProtoMember(1, OverwriteList = true)]
         public T[] Items;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int Capacity;
     }
@@ -598,15 +781,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// <summary>
     /// Protobuf wrapper for <see cref="CyclicBuffer{T}"/>: ordered items (oldest to newest) plus capacity.
     /// </summary>
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     internal sealed partial class CyclicBufferProtoWrapper<T>
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         [WProtoMember(1, OverwriteList = true)]
         public T[] Items;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int Capacity;
     }
@@ -614,15 +803,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// <summary>
     /// Protobuf wrapper for <see cref="SparseSet"/>: dense elements plus universe size (capacity).
     /// </summary>
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     internal sealed partial class SparseSetProtoWrapper
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         [WProtoMember(1, OverwriteList = true)]
         public int[] Elements;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public int Capacity;
 
@@ -670,6 +865,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
     }
 
+#if !WALLSTOP_PROTO_ONLY
     internal static class ProtobufUnityModel
     {
         /// <summary>
@@ -800,4 +996,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
     }
+#endif
 }

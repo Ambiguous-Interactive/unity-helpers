@@ -8,7 +8,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text;
     using System.Text.Json.Serialization;
+#if !WALLSTOP_PROTO_ONLY
     using ProtoBuf;
+#endif
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -74,7 +76,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     [WProtoSubtype(typeof(AbstractRandom), 105)]
     public sealed partial class UnityRandom : AbstractRandom
@@ -113,11 +117,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         // Capture engine state at serialization time because other callers can advance the shared generator.
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [WProtoMember(7)]
         internal string _engineState;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         private readonly int? _seed;
 

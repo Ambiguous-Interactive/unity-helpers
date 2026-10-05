@@ -593,6 +593,49 @@ jobs:
             -ArtifactsPath ".artifacts/unity/$env:UH_UNITY_VERSION-acceptance" `
             -TemporaryRoot $env:RUNNER_TEMP
 
+      - name: Require current PR head before WProto-only Standalone
+        id: proto_only_head
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@84b8d875ab1968716ef95b5b56d10307609237ca # v1.16.0
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run WProto-only Standalone tests
+        id: run_proto_only
+        if: >-
+          ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true'
+          && steps.proto_only_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        continue-on-error: true
+        timeout-minutes: 60
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_STREAM_TEST_RESULTS: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-no-active-unity-editor.ps1
+          ./scripts/unity/run-ci-tests.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -TestMode 'standalone' `
+            -AssemblyNames 'WallstopStudios.UnityHelpers.Tests.ProtoOnly' `
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-standalone-proto-only' `
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
+            -ProjectScope 'proto-only' `
+            -AdditionalScriptingDefines WALLSTOP_PROTO_ONLY `
+            -ReleaseCodeOptimization `
+            -ReleasePlayerBuild `
+            -ManagedStrippingLevel 'High' `
+            -Il2CppCompilerConfiguration 'Release'
+
       - name: Return Unity license
         id: return_unity_license
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
@@ -791,6 +834,58 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-standalone
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Verify WProto-only Standalone tests actually ran
+        id: verify_proto_only
+        if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.run_proto_only.outcome != 'skipped' }}
+        continue-on-error: true
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone-proto-only
+          label: Unity ${{ matrix.unity-version }} WProto-only standalone
+          required-test-name: WallstopStudios.UnityHelpers.Tests.Serialization.WProtoOnlyModeTests.MissingFormatterCannotReachTheLegacyBackend
+          expected-empty: false
+
+      - name: Redact credentials from WProto-only Standalone artifacts
+        id: redact_proto_only
+        if: ${{ steps.checkout.outcome == 'success' && always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/unity/${{ matrix.unity-version }}-standalone-proto-only
+
+      - name: Upload WProto-only Standalone artifacts
+        id: upload_proto_only
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.redact_proto_only.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unity-${{ matrix.unity-version }}-standalone-proto-only
+          path: .artifacts/unity/${{ matrix.unity-version }}-standalone-proto-only
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require WProto-only Standalone acceptance
+        if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        shell: pwsh
+        env:
+          SELECTED_MODES: '["standalone"]'
+          EDITMODE_RUN: "skipped"
+          EDITMODE_VERIFY: "skipped"
+          EDITMODE_REDACT: "skipped"
+          EDITMODE_UPLOAD: "skipped"
+          PLAYMODE_RUN: "skipped"
+          PLAYMODE_VERIFY: "skipped"
+          PLAYMODE_REDACT: "skipped"
+          PLAYMODE_UPLOAD: "skipped"
+          STANDALONE_RUN: ${{ steps.run_proto_only.outcome }}
+          STANDALONE_VERIFY: ${{ steps.verify_proto_only.outcome }}
+          STANDALONE_REDACT: ${{ steps.redact_proto_only.outcome }}
+          STANDALONE_UPLOAD: ${{ steps.upload_proto_only.outcome }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-test-mode-outcomes.ps1
 
       - name: Verify additional native acceptance
         id: verify_acceptance

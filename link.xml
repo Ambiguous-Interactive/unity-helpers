@@ -10,8 +10,8 @@
   wrapper types and the AOT hint references survive linking.
 -->
 <linker>
-  <assembly fullname="protobuf-net" preserve="all" />
-  <assembly fullname="protobuf-net.Core" preserve="all" />
+  <assembly fullname="protobuf-net" preserve="all" ignoreIfMissing="true" />
+  <assembly fullname="protobuf-net.Core" preserve="all" ignoreIfMissing="true" />
   <assembly fullname="System.Text.Json" preserve="all" />
   <assembly fullname="System.Collections.Immutable" preserve="all" />
   <assembly fullname="WallstopStudios.UnityHelpers" preserve="all" />

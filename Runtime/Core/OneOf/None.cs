@@ -5,11 +5,15 @@ namespace WallstopStudios.UnityHelpers.Core.OneOf
 {
     using System;
     using System.Runtime.CompilerServices;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public readonly partial struct None : IEquatable<None>
     {

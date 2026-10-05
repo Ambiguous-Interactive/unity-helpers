@@ -7,11 +7,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
     using PbSerializer = ProtoBuf.Serializer;
+#endif
 
     /// <summary>
-    /// Provides extensions and equality comparers that use protobuf-net serialization output
+    /// Provides extensions and equality comparers that use protobuf serialization output
     /// to compare values for equality, avoiding intermediate byte[] allocations.
     /// </summary>
     /// <remarks>
@@ -23,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     {
         /// <summary>
         /// Compares two instances for equality by serializing them via protobuf and comparing the resulting bytes.
-        /// This implementation writes to reusable MemoryStreams and compares their backing buffers without ToArray().
+        /// Uses pooled generated buffer writers in WProto-only builds and legacy streams otherwise.
         /// </summary>
         /// <typeparam name="T">The type of objects to compare (must be protobuf-serializable).</typeparam>
         /// <param name="self">The first object to compare.</param>
@@ -55,6 +58,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
+#if WALLSTOP_PROTO_ONLY
+            using PooledResource<PooledArrayBufferWriter> aLease = PooledArrayBufferWriter.Rent(
+                out PooledArrayBufferWriter a
+            );
+            using PooledResource<PooledArrayBufferWriter> bLease = PooledArrayBufferWriter.Rent(
+                out PooledArrayBufferWriter b
+            );
+            WProtoFacade.Serialize(self, a);
+            WProtoFacade.Serialize(other, b);
+            return a.WrittenSpan.SequenceEqual(b.WrittenSpan);
+#else
             using PooledResource<PooledBufferStream> aLease = PooledBufferStream.Rent(
                 out PooledBufferStream a
             );
@@ -81,6 +95,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return ProtoBufferComparer.StreamContentEquals(a, b);
+#endif
         }
 
         /// <summary>
@@ -151,6 +166,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
+#if WALLSTOP_PROTO_ONLY
+            return x.ProtoEquals(y);
+#else
             using PooledResource<PooledBufferStream> aLease = PooledBufferStream.Rent(
                 out PooledBufferStream a
             );
@@ -176,6 +194,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return ProtoBufferComparer.StreamContentEquals(a, b);
+#endif
         }
 
         /// <summary>
@@ -193,6 +212,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         public int GetHashCode(T obj)
         {
+#if WALLSTOP_PROTO_ONLY
+            using PooledResource<PooledArrayBufferWriter> lease = PooledArrayBufferWriter.Rent(
+                out PooledArrayBufferWriter writer
+            );
+            WProtoFacade.Serialize(obj, writer);
+            return ProtoBufferComparer.Fnv1A32(writer.WrittenSpan);
+#else
             using PooledResource<PooledBufferStream> sLease = PooledBufferStream.Rent(
                 out PooledBufferStream s
             );
@@ -213,6 +239,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return ProtoBufferComparer.Fnv1A32(s);
+#endif
         }
     }
 
@@ -275,12 +302,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Fnv1A32(PooledBufferStream s)
         {
+            return Fnv1A32(s.GetWrittenSegment().AsSpan());
+        }
+
+        /// <summary>Hashes the encoded payload using FNV-1a.</summary>
+        public static int Fnv1A32(ReadOnlySpan<byte> payload)
+        {
             const uint fnvOffset = 2166136261;
             const uint fnvPrime = 16777619;
             uint hash = fnvOffset;
-
-            ArraySegment<byte> seg = s.GetWrittenSegment();
-            foreach (byte element in seg)
+            foreach (byte element in payload)
             {
                 hash ^= element;
                 hash *= fnvPrime;

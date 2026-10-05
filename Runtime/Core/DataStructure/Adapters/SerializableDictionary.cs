@@ -12,11 +12,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Collections.Generic;
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
+
 #if UNITY_EDITOR
     using UnityEditor;
 #endif
@@ -249,7 +252,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// <typeparam name="TValueCache">Serialized value cache type.</typeparam>
     [Serializable]
 #pragma warning disable WPROTO030 // Served through SerializableDictionaryProtoWrapper.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(IgnoreListHandling = true)]
+#endif
 #pragma warning restore WPROTO030
     public abstract class SerializableDictionaryBase<TKey, TValue, TValueCache>
         : SerializableDictionaryBase,
@@ -285,16 +290,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         bool ISerializableDictionaryBoxedValues.UsesBoxedValues => RequiresBoxedValues;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         [JsonIgnore]
         protected internal Dictionary<TKey, TValue> _dictionary;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         protected internal TKey[] _keys;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2, OverwriteList = true)]
+#endif
         protected internal TValueCache[] _values;
 
         /// <summary>
@@ -313,7 +324,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// directly and neither has the nesting restriction.
         /// </remarks>
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         [JsonIgnore]
         protected internal SerializableDictionary.Cache<TValueCache>[] _boxedValues;
 
@@ -1273,13 +1286,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _dictionary.GetObjectData(info, context);
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoBeforeSerialization]
+#endif
         protected internal void OnProtoBeforeSerialization()
         {
             OnBeforeSerialize();
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterSerialization]
+#endif
         protected internal void OnProtoAfterSerialization()
         {
             if (_preserveSerializedEntries)
@@ -1292,7 +1309,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _boxedValues = null;
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterDeserialization]
+#endif
         protected internal void OnProtoAfterDeserialization()
         {
             OnAfterDeserializeInternal(suppressWarnings: false, rehydrateBoxedValues: false);
@@ -1614,11 +1633,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     public static partial class SerializableDictionary
     {
         [Serializable]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoContract]
+#endif
         [WProtoContract]
         public partial class Cache<T> : SerializableDictionaryBase.Cache
         {
+#if !WALLSTOP_PROTO_ONLY
             [ProtoMember(1)]
+#endif
             [WProtoMember(1)]
             public T Data;
         }

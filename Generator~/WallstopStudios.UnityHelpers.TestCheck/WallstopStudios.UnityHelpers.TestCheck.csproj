@@ -169,6 +169,7 @@
       Include="$(RepoRoot)/Tests/Core/**/*.cs"
       Exclude="$(RepoRoot)/Tests/Core/TestUtils/CiTestResultStreamLogger.cs;$(RepoRoot)/Tests/Core/Editor/**/*.cs"
     />
+    <Compile Include="$(RepoRoot)/Tests/ProtoOnly/**/*.cs" />
     <Compile
       Include="$(RepoRoot)/Tests/Runtime/**/*.cs"
       Exclude="$(RepoRoot)/Tests/Runtime/Integrations/**/*.cs;$(RepoRoot)/Tests/Runtime/Visuals/EnhancedImageTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteAdditionalTests.cs;$(RepoRoot)/Tests/Runtime/Extensions/UnityExtensionsComprehensiveTests.cs"

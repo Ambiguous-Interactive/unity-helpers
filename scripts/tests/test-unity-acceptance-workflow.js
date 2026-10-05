@@ -346,3 +346,76 @@ console.log(`${diagnosticSubjects} local action checkout dependencies checked.`)
 console.log(
   `${controls} optional acceptance workflow predicate, provisioning and outcome controls passed.`
 );
+
+const onlyRun = identified("run_proto_only");
+const onlyVerify = identified("verify_proto_only");
+const onlyRedact = identified("redact_proto_only");
+const onlyUpload = identified("upload_proto_only");
+const onlyGate = named("Require WProto-only Standalone acceptance");
+const onlyPredicates = [onlyRun, onlyVerify, onlyRedact, onlyUpload, onlyGate].map(predicate);
+let onlyControls = 0;
+for (const modes of [
+  ["editmode"],
+  ["playmode"],
+  ["standalone"],
+  ["editmode", "playmode", "standalone"]
+]) {
+  for (const cancelled of [false, true]) {
+    for (const acquired of ["true", "false"]) {
+      for (const head of ["success", "failure"]) {
+        for (const redaction of ["success", "failure"]) {
+          const context = {
+            cancelled,
+            needs: { "matrix-config": { outputs: { "test-modes": JSON.stringify(modes) } } },
+            steps: {
+              checkout: { outcome: "success" },
+              unity_lock: { outputs: { acquired } },
+              proto_only_head: { outcome: head },
+              run_proto_only: { outcome: "failure" },
+              redact_proto_only: { outcome: redaction }
+            }
+          };
+          const requested = modes.includes("standalone");
+          assert.deepEqual(
+            onlyPredicates.map((test) => test(context)),
+            [
+              requested && !cancelled && acquired === "true" && head === "success",
+              requested && !cancelled,
+              requested,
+              requested && redaction === "success",
+              requested && !cancelled
+            ]
+          );
+          onlyControls++;
+        }
+      }
+    }
+  }
+}
+assert.match(onlyRun, /-ProjectScope 'proto-only'/);
+assert.match(onlyRun, /-AdditionalScriptingDefines WALLSTOP_PROTO_ONLY/);
+assert.match(onlyRun, /-AssemblyNames 'WallstopStudios\.UnityHelpers\.Tests\.ProtoOnly'/);
+assert.match(onlyRun, /-ReleasePlayerBuild/);
+assert.match(onlyRun, /-ManagedStrippingLevel 'High'/);
+assert.match(onlyRun, /-Il2CppCompilerConfiguration 'Release'/);
+assert.match(
+  onlyVerify,
+  /required-test-name: WallstopStudios\.UnityHelpers\.Tests\.Serialization\.WProtoOnlyModeTests\.MissingFormatterCannotReachTheLegacyBackend/
+);
+assert.match(onlyUpload, /if-no-files-found: error/);
+assert.match(onlyGate, /assert-test-mode-outcomes\.ps1/);
+for (const mode of ["EDITMODE", "PLAYMODE"]) {
+  for (const stage of ["RUN", "VERIFY", "REDACT", "UPLOAD"]) {
+    assert.match(onlyGate, new RegExp(`^          ${mode}_${stage}: "skipped"$`, "m"));
+  }
+}
+for (const stage of ["RUN", "VERIFY", "REDACT", "UPLOAD"]) {
+  assert.match(
+    onlyGate,
+    new RegExp(
+      `^          STANDALONE_${stage}: \\$\\{\\{ steps\\.\\w+_proto_only\\.outcome \\}\\}$`,
+      "m"
+    )
+  );
+}
+console.log(`${onlyControls} WProto-only player workflow controls passed.`);
