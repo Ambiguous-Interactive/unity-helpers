@@ -28,6 +28,11 @@ const { runChecks, runRegistry } = require("./check-runner");
 
 /** A check whose `run` is executed with `bash -c` from the repository root. */
 const CHECKS = [
+  {
+    id: "durable-file",
+    name: "Durable file unsupported-replacement preservation",
+    run: "npm run test:durable-file"
+  },
   // Test-suite and source hygiene.
   {
     id: "csharp-syntax",

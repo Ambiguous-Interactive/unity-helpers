@@ -30,9 +30,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// ones. It <b>does</b> serialize concurrent operations on the same path within this process.
     /// It is <b>not</b> full crash safety — .NET cannot flush a <i>directory</i>, so a filesystem
     /// may still reorder the rename behind the data write. On platforms without
-    /// <c>File.Replace</c>, the delete-then-move fallback briefly exposes an absent destination
-    /// and can lose it if the move fails. A second process using the public write, append, or delete
-    /// APIs cannot take ownership of the same destination while one of them is active; its operation
+    /// <c>File.Replace</c>, replacement reports failure and preserves the existing destination.
+    /// Creating an absent destination remains supported. A second process using the public write,
+    /// append, or delete APIs cannot take ownership of the same destination while one of them is active; its operation
     /// reports failure instead. This is ownership isolation, not a cross-process transaction or a
     /// multi-file lock. Do not describe consumers of this type as crash-safe.
     /// </para>
@@ -1360,12 +1360,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (FileNotFoundException)
             {
-                File.Move(temporaryPath, path);
-            }
-            catch (NotSupportedException)
-            {
-                // Platforms without File.Replace use delete-then-move, which briefly exposes an absent destination.
-                File.Delete(path);
                 File.Move(temporaryPath, path);
             }
         }

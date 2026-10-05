@@ -1876,7 +1876,7 @@ into a player -- gets `WPROTO041` as an **error**, and `WProtoSubtypeTagBuildGat
 
 **Commit the manifest.** It is the wire contract, exactly as a `[WProtoMember]` number is, and it has
 to survive a clean checkout and a different machine. If staging fails, the previous manifest stays
-intact; on platforms without `File.Replace`, a failed fallback swap can still lose it. Three rules
+intact. Unsupported `File.Replace` also refuses replacement and preserves the previous manifest. Three rules
 make add / remove / re-add safe, and
 the tool enforces all three:
 
@@ -2383,7 +2383,7 @@ outside the project. An invalid package or path is refused before any file is wr
 When `surrogates` is null, `Export` discovers the registered surrogates in loaded assemblies; pass a
 map to replace that set explicitly. A discovery failure stops the export before writing.
 Each schema file is staged before replacement, so a staging failure leaves the previous file intact.
-On platforms without `File.Replace`, a failed fallback swap can still lose the previous file.
+Unsupported `File.Replace` refuses replacement and preserves the previous file.
 In a multi-file export, earlier files may already have been replaced when a later write fails;
 `WrittenPaths` names those completed files.
 

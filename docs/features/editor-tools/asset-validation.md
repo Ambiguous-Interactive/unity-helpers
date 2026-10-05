@@ -420,7 +420,7 @@ replacement at the same prefab path cannot be distinguished by that check. Prefa
 previous bytes before replacement, so a staging failure leaves the current prefab intact. The byte
 comparison and replacement share a lock with cooperating staged-replacement `DurableFile` writers.
 Other tools can still edit the prefab after the check and before replacement. On platforms without
-`File.Replace`, a failed fallback swap can still lose it. Importer and prefab restoration perform
+`File.Replace`, restoration reports failure and preserves the current prefab. Importer and prefab restoration perform
 a new import; they do not reverse unrelated side effects caused by other import processors. A mixed
 batch's toast excludes scene removals and says to use Edit > Undo for those changes.
 

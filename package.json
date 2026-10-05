@@ -370,7 +370,8 @@
     "unity:test:playmode": "bash scripts/unity/run-tests.sh --mode playmode",
     "unity:test:all": "bash scripts/unity/run-tests.sh --mode all",
     "unity:generate-activation": "bash scripts/unity/generate-activation.sh",
-    "unity:retry-license": "bash scripts/unity/retry-license.sh"
+    "unity:retry-license": "bash scripts/unity/retry-license.sh",
+    "test:durable-file": "dotnet test \"Generator~/WallstopStudios.UnityHelpers.DurableFile.Tests/WallstopStudios.UnityHelpers.DurableFile.Tests.csproj\" -c Release --nologo"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.30.1",
