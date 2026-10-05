@@ -88,10 +88,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 + "which carries the annotation.",
             ["SerializableSortedDictionaryBase`3"] =
                 "As SerializableDictionaryBase, through SerializableSortedDictionaryProtoWrapper.",
+            ["SerializableDictionary`2"] =
+                "The plain legacy contract retains Mono direct map encoding; stripped IL2CPP "
+                + "compatibility remains unresolved. Serializer and WProto use SerializableDictionaryProtoWrapper instead.",
+            ["SerializableDictionary`3"] =
+                "The cached dictionary's plain metadata describes the legacy map contract; it has "
+                + "no built-in generated root marshal, so adding a generated message would change its bytes.",
+            ["SerializableSortedDictionary`2"] =
+                "As SerializableDictionary, through SerializableSortedDictionaryProtoWrapper.",
+            ["SerializableSortedDictionary`3"] =
+                "The cached sorted dictionary's plain metadata describes the legacy map contract; "
+                + "it has no built-in generated root marshal, so adding a generated message would change its bytes.",
             ["SerializableSetBase`2"] =
                 "Serializer marshals SerializableHashSet and SerializableSortedSet through "
                 + "SerializableHashSetProtoWrapper and SerializableSortedSetProtoWrapper.",
         };
+
+        private static readonly IReadOnlyDictionary<string, string> LegacyMapContracts =
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["SerializableDictionary`2"] = "SerializableDictionaryBase<TKey,TValue,TValue>",
+                ["SerializableDictionary`3"] =
+                    "SerializableDictionaryBase<TKey,TValue,TValueCache>",
+                ["SerializableSortedDictionary`2"] =
+                    "SerializableSortedDictionaryBase<TKey,TValue,TValue>",
+                ["SerializableSortedDictionary`3"] =
+                    "SerializableSortedDictionaryBase<TKey,TValue,TValueCache>",
+            };
 
         private static readonly string[] MemberHookNames =
         {
@@ -159,7 +182,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         );
                     }
 
-                    if (!contract.HasMigrationSuppression)
+                    if (LegacyMapContracts.TryGetValue(contract.Name, out string expectedBase))
+                    {
+                        if (
+                            contract.ProtoContractArguments.Count != 0
+                            || contract.Members.Count != 0
+                            || contract.ProtoIncludes.Count != 0
+                            || contract.WProtoIncludes.Count != 0
+                            || contract.Subtypes.Count != 0
+                            || contract.HasMigrationSuppression
+                            || contract.BaseTypes.Count
+                                != (contract.BaseTypes.Contains("ILegacyProtobufMap") ? 2 : 1)
+                            || !contract.BaseTypes.Contains(expectedBase)
+                        )
+                        {
+                            failures.Add(
+                                contract.Where
+                                    + $"'{contract.Name}' must retain a plain legacy map contract "
+                                    + "without members, includes or migration suppression, on "
+                                    + expectedBase
+                                    + "."
+                            );
+                        }
+                    }
+                    else if (!contract.HasMigrationSuppression)
                     {
                         failures.Add(
                             contract.Where
@@ -301,6 +347,37 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     {
                         yield return data.ConstructorArguments[0].Value.ToString();
                     }
+                }
+            }
+        }
+
+        private static IEnumerable<TestCaseData> LegacyMapMarkerCases()
+        {
+            string[] changes =
+            {
+                "Plain",
+                "TypedMapBridge",
+                "IgnoreListHandling",
+                "Member",
+                "Include",
+                "GeneratedContract",
+                "GeneratedInclude",
+                "Subtype",
+                "Base",
+                "AdditionalBase",
+                "Suppression",
+            };
+            foreach (string name in LegacyMapContracts.Keys)
+            {
+                foreach (string change in changes)
+                {
+                    yield return new TestCaseData(name, change).SetName(
+                        nameof(LegacyMapMarkersRequireTheirOriginalEncoding)
+                            + "."
+                            + name
+                            + "."
+                            + change
+                    );
                 }
             }
         }
@@ -548,6 +625,95 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             IReadOnlyList<string> failures = Mismatches(RuntimeContracts(), NotMirrored);
 
             Assert.That(failures, Is.Empty, string.Join(Environment.NewLine, failures));
+        }
+
+        [TestCaseSource(nameof(LegacyMapMarkerCases))]
+        public void LegacyMapMarkersRequireTheirOriginalEncoding(string name, string change)
+        {
+            int aritySeparator = name.IndexOf('`');
+            string typeName = name.Substring(0, aritySeparator);
+            string parameters = name.EndsWith("2", StringComparison.Ordinal)
+                ? "<TKey,TValue>"
+                : "<TKey,TValue,TValueCache>";
+            string contract = string.Equals(change, "IgnoreListHandling", StringComparison.Ordinal)
+                ? "[ProtoContract(IgnoreListHandling = true)]"
+                : "[ProtoContract]";
+            string member = string.Equals(change, "Member", StringComparison.Ordinal)
+                ? "[ProtoMember(1)] public int Value;"
+                : "";
+            string include = string.Equals(change, "Include", StringComparison.Ordinal)
+                ? "[ProtoInclude(1, typeof(Child))]"
+                : "";
+            string generatedInclude = string.Equals(
+                change,
+                "GeneratedInclude",
+                StringComparison.Ordinal
+            )
+                ? "[WProtoInclude(1, typeof(Child))]"
+                : "";
+            string subtype = string.Equals(change, "Subtype", StringComparison.Ordinal)
+                ? "[WProtoSubtype(typeof(Parent), 1)]"
+                : "";
+            string generated = string.Equals(change, "GeneratedContract", StringComparison.Ordinal)
+                ? "[WProtoContract]"
+                : "";
+            Assert.IsTrue(LegacyMapContracts.TryGetValue(name, out string originalBase));
+            string baseType = string.Equals(change, "Base", StringComparison.Ordinal)
+                ? "DifferentBase"
+                : originalBase;
+            if (string.Equals(change, "TypedMapBridge", StringComparison.Ordinal))
+            {
+                baseType += ",ILegacyProtobufMap";
+            }
+            if (string.Equals(change, "AdditionalBase", StringComparison.Ordinal))
+            {
+                baseType += ",IDisposable";
+            }
+            string suppression = string.Equals(change, "Suppression", StringComparison.Ordinal)
+                ? "#pragma warning disable WPROTO030\n"
+                : "";
+            IReadOnlyList<string> failures = Mismatches(
+                Parse(
+                    suppression
+                        + contract
+                        + include
+                        + generatedInclude
+                        + subtype
+                        + generated
+                        + " class "
+                        + typeName
+                        + parameters
+                        + " : "
+                        + baseType
+                        + " { "
+                        + member
+                        + " }"
+                ),
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    [name] = "Legacy map marker.",
+                }
+            );
+
+            if (
+                string.Equals(change, "Plain", StringComparison.Ordinal)
+                || string.Equals(change, "TypedMapBridge", StringComparison.Ordinal)
+            )
+            {
+                Assert.That(failures, Is.Empty);
+            }
+            else
+            {
+                Assert.That(
+                    failures,
+                    Has.Exactly(1)
+                        .Contains(
+                            string.Equals(change, "GeneratedContract", StringComparison.Ordinal)
+                                ? "listed as not mirrored but carries [WProtoContract]"
+                                : "must retain a plain legacy map contract"
+                        )
+                );
+            }
         }
 
         /// <summary>
@@ -929,6 +1095,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             internal string Where { get; private set; }
 
+            internal IReadOnlyCollection<string> BaseTypes { get; private set; }
+
             internal bool HasProtoContract { get; private set; }
 
             internal bool HasWProtoContract { get; private set; }
@@ -982,6 +1150,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 {
                     Name = NameWithArity(type),
                     Where = Location(file, type),
+                    BaseTypes =
+                        type.BaseList == null
+                            ? Array.Empty<string>()
+                            : type
+                                .BaseList.Types.Select(baseType =>
+                                    Normalize(baseType.Type.ToString())
+                                )
+                                .ToArray(),
                     HasProtoContract = proto != null,
                     HasWProtoContract = wproto != null,
                     HasMigrationSuppression = IsMigrationSuppressed(type, proto),

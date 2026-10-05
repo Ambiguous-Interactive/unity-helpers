@@ -9,9 +9,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
-#if !WALLSTOP_PROTO_ONLY
-    using PbSerializer = ProtoBuf.Serializer;
-#endif
 
     /// <summary>
     /// Provides extensions and equality comparers that use protobuf serialization output
@@ -83,16 +80,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 forceRuntimeType: false
             );
 
-            if (useRuntime)
-            {
-                PbSerializer.NonGeneric.Serialize(a, self);
-                PbSerializer.NonGeneric.Serialize(b, other);
-            }
-            else
-            {
-                PbSerializer.Serialize(a, self);
-                PbSerializer.Serialize(b, other);
-            }
+            LegacyProtoComparerSerializer.Serialize(a, self, useRuntime);
+            LegacyProtoComparerSerializer.Serialize(b, other, useRuntime);
 
             return ProtoBufferComparer.StreamContentEquals(a, b);
 #endif
@@ -182,16 +171,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 x,
                 forceRuntimeType: false
             );
-            if (useRuntime)
-            {
-                PbSerializer.NonGeneric.Serialize(a, x);
-                PbSerializer.NonGeneric.Serialize(b, y);
-            }
-            else
-            {
-                PbSerializer.Serialize(a, x);
-                PbSerializer.Serialize(b, y);
-            }
+            LegacyProtoComparerSerializer.Serialize(a, x, useRuntime);
+            LegacyProtoComparerSerializer.Serialize(b, y, useRuntime);
 
             return ProtoBufferComparer.StreamContentEquals(a, b);
 #endif
@@ -229,14 +210,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 obj,
                 forceRuntimeType: false
             );
-            if (useRuntime)
-            {
-                PbSerializer.NonGeneric.Serialize(s, obj);
-            }
-            else
-            {
-                PbSerializer.Serialize(s, obj);
-            }
+            LegacyProtoComparerSerializer.Serialize(s, obj, useRuntime);
 
             return ProtoBufferComparer.Fnv1A32(s);
 #endif

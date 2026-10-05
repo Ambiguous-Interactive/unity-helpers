@@ -73,14 +73,24 @@ use pooled writers rather than the reflection backend.
 
 Default-mode `ProtoEquals` and `GetProtoComparer<T>()` retain protobuf-net's direct encoding.
 For the two- and three-argument `SerializableDictionary` and `SerializableSortedDictionary`
-types, this is the map encoding, including literal whitespace keys. Their concrete legacy
-contracts avoid speculative tuple detection in IL2CPP without selecting a different encoding.
+types, comparison writes the backing map through a typed protobuf-net map serializer. This
+preserves the bundled protobuf-net 3 encoding, including literal whitespace keys and enumeration
+order, without discovering the adapter's map serializer at runtime. Consumer subclasses retain
+the existing protobuf-net dispatch and their own contract behavior. Stripped-player and nested
+collection compatibility remains tracked in
+[#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950).
 The root save wrappers described below remain a separate path: comparer hashes are not hashes
 of `Serializer.ProtoSerialize` output. WProto-only builds use generated root encoding instead,
 so hashes are not portable between backend modes.
+They are also not portable between protobuf-net majors: version 2 writes zero integer map
+keys and values that version 3 omits. This difference predates the typed map writer.
+
+Built-in dictionary root marshals cover the two-argument types. Cached three-argument types
+require a consumer formatter or marshal in WProto-only builds.
 
 For consumer dictionary subclasses, declare `[ProtoContract]` on the concrete type to avoid
 speculative tuple detection; protobuf-net does not inherit this contract metadata from the base.
+This metadata alone does not establish stripped IL2CPP compatibility.
 Use the existing save API for retained data rather than persisting comparer hashes.
 
 ### Protobuf (protobuf-net)

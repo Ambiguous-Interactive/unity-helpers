@@ -17,7 +17,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 #if !WALLSTOP_PROTO_ONLY
+    using System.IO;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
 #endif
 
 #if UNITY_EDITOR
@@ -1677,6 +1679,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 #endif
     public class SerializableDictionary<TKey, TValue>
         : SerializableDictionaryBase<TKey, TValue, TValue>
+#if !WALLSTOP_PROTO_ONLY
+            ,
+            ILegacyProtobufMap
+#endif
     {
         /// <summary>
         /// Initializes an empty serializable dictionary whose values can be written directly to Unity serialization.
@@ -1723,6 +1729,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             cache[index] = value;
         }
+
+#if !WALLSTOP_PROTO_ONLY
+        bool ILegacyProtobufMap.TrySerialize(Stream destination)
+        {
+            if (GetType() != typeof(SerializableDictionary<TKey, TValue>))
+            {
+                return false;
+            }
+
+            LegacyProtoComparerSerializer.SerializeMap<Dictionary<TKey, TValue>, TKey, TValue>(
+                destination,
+                _dictionary
+            );
+            return true;
+        }
+#endif
     }
 
     internal static class SerializableDictionarySerializedPropertyNames
@@ -1776,6 +1798,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 #endif
     public class SerializableDictionary<TKey, TValue, TValueCache>
         : SerializableDictionaryBase<TKey, TValue, TValueCache>
+#if !WALLSTOP_PROTO_ONLY
+            ,
+            ILegacyProtobufMap
+#endif
         where TValueCache : SerializableDictionary.Cache<TValue>, new()
     {
         /// <summary>
@@ -1823,5 +1849,21 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             cache[index] = new TValueCache { Data = value };
         }
+
+#if !WALLSTOP_PROTO_ONLY
+        bool ILegacyProtobufMap.TrySerialize(Stream destination)
+        {
+            if (GetType() != typeof(SerializableDictionary<TKey, TValue, TValueCache>))
+            {
+                return false;
+            }
+
+            LegacyProtoComparerSerializer.SerializeMap<Dictionary<TKey, TValue>, TKey, TValue>(
+                destination,
+                _dictionary
+            );
+            return true;
+        }
+#endif
     }
 }

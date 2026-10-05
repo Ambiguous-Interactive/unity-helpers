@@ -11,7 +11,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Utils;
 #if !WALLSTOP_PROTO_ONLY
+    using System.IO;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
 #endif
 
 #if UNITY_EDITOR
@@ -1338,6 +1340,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 #endif
     public class SerializableSortedDictionary<TKey, TValue>
         : SerializableSortedDictionaryBase<TKey, TValue, TValue>
+#if !WALLSTOP_PROTO_ONLY
+            ,
+            ILegacyProtobufMap
+#endif
         where TKey : IComparable<TKey>
     {
         /// <summary>
@@ -1367,6 +1373,23 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             cache[index] = value;
         }
+
+#if !WALLSTOP_PROTO_ONLY
+        bool ILegacyProtobufMap.TrySerialize(Stream destination)
+        {
+            if (GetType() != typeof(SerializableSortedDictionary<TKey, TValue>))
+            {
+                return false;
+            }
+
+            LegacyProtoComparerSerializer.SerializeMap<
+                SortedDictionary<TKey, TValue>,
+                TKey,
+                TValue
+            >(destination, _dictionary);
+            return true;
+        }
+#endif
     }
 
     /// <summary>
@@ -1399,6 +1422,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 #endif
     public class SerializableSortedDictionary<TKey, TValue, TValueCache>
         : SerializableSortedDictionaryBase<TKey, TValue, TValueCache>
+#if !WALLSTOP_PROTO_ONLY
+            ,
+            ILegacyProtobufMap
+#endif
         where TKey : IComparable<TKey>
         where TValueCache : SerializableDictionary.Cache<TValue>, new()
     {
@@ -1429,5 +1456,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             cache[index] = new TValueCache { Data = value };
         }
+
+#if !WALLSTOP_PROTO_ONLY
+        bool ILegacyProtobufMap.TrySerialize(Stream destination)
+        {
+            if (GetType() != typeof(SerializableSortedDictionary<TKey, TValue, TValueCache>))
+            {
+                return false;
+            }
+
+            LegacyProtoComparerSerializer.SerializeMap<
+                SortedDictionary<TKey, TValue>,
+                TKey,
+                TValue
+            >(destination, _dictionary);
+            return true;
+        }
+#endif
     }
 }
