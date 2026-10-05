@@ -4677,6 +4677,149 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
+        [TestCase("", nameof(GameObject))]
+        [TestCase(" ", nameof(GameObject))]
+        [TestCase(" \t\r\n", nameof(GameObject))]
+        [TestCase("\u00a0", nameof(GameObject))]
+        [TestCase("\u2003", nameof(GameObject))]
+        [TestCase("\u3000", nameof(GameObject))]
+        [TestCase("Visible", "Visible")]
+        [TestCase(" Visible ", " Visible ")]
+        [TestCase("\u200b", "\u200b")]
+        public void DuplicateObjectKeyWarningsUseVisibleNamesWithoutChangingIdentity(
+            string objectName,
+            string expectedDisplay
+        )
+        {
+            UnityObjectDictionaryHost host = CreateScriptableObject<UnityObjectDictionaryHost>();
+            GameObject duplicate = NewGameObject(objectName);
+            GameObject distinct = NewGameObject(objectName);
+            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
+            serializedObject.Update();
+            SerializedProperty dictionaryProperty = serializedObject.FindProperty(
+                nameof(UnityObjectDictionaryHost.dictionary)
+            );
+            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+            keysProperty.arraySize = 3;
+            valuesProperty.arraySize = 3;
+            keysProperty.GetArrayElementAtIndex(0).objectReferenceValue = duplicate;
+            keysProperty.GetArrayElementAtIndex(1).objectReferenceValue = duplicate;
+            keysProperty.GetArrayElementAtIndex(2).objectReferenceValue = distinct;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            serializedObject.Update();
+
+            SerializableDictionaryPropertyDrawer drawer = new();
+            AssignDictionaryFieldInfo(
+                drawer,
+                typeof(UnityObjectDictionaryHost),
+                nameof(UnityObjectDictionaryHost.dictionary)
+            );
+            string cacheKey = drawer.GetListKey(dictionaryProperty);
+            SerializableDictionaryPropertyDrawer.DuplicateKeyState state =
+                drawer.RefreshDuplicateState(cacheKey, keysProperty, typeof(GameObject));
+
+            Assert.IsTrue(state.HasDuplicates);
+            StringAssert.Contains(
+                $"Duplicate key {expectedDisplay} at entries 1, 2",
+                state.SummaryTooltip
+            );
+            Assert.IsTrue(
+                state.TryGetInfo(0, out SerializableDictionaryPropertyDrawer.DuplicateKeyInfo first)
+            );
+            Assert.IsTrue(
+                state.TryGetInfo(
+                    1,
+                    out SerializableDictionaryPropertyDrawer.DuplicateKeyInfo second
+                )
+            );
+            StringAssert.Contains($"\"{expectedDisplay}\"", first.tooltip);
+            Assert.AreEqual(first.tooltip, second.tooltip);
+            Assert.IsTrue(first.isPrimary);
+            Assert.IsFalse(second.isPrimary);
+            Assert.IsFalse(state.TryGetInfo(2, out _));
+            Assert.AreSame(duplicate, keysProperty.GetArrayElementAtIndex(0).objectReferenceValue);
+            Assert.AreSame(duplicate, keysProperty.GetArrayElementAtIndex(1).objectReferenceValue);
+            Assert.AreSame(distinct, keysProperty.GetArrayElementAtIndex(2).objectReferenceValue);
+            Assert.AreEqual(objectName, duplicate.name);
+            Assert.AreEqual(objectName, distinct.name);
+            Assert.IsFalse(serializedObject.hasModifiedProperties);
+        }
+
+        [TestCase("", "<empty>")]
+        [TestCase(" ", "<empty>")]
+        [TestCase(" \t\r\n", "<empty>")]
+        [TestCase("\u00a0", "<empty>")]
+        [TestCase("\u2003", "<empty>")]
+        [TestCase("\u3000", "<empty>")]
+        [TestCase("Visible", "Visible")]
+        [TestCase(" Visible ", " Visible ")]
+        [TestCase("\u200b", "\u200b")]
+        public void DuplicateStringKeyWarningsPreserveLiteralKeyIdentity(
+            string literalKey,
+            string expectedDisplay
+        )
+        {
+            StringDictionaryHost host = CreateScriptableObject<StringDictionaryHost>();
+            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
+            serializedObject.Update();
+            SerializedProperty dictionaryProperty = serializedObject.FindProperty(
+                nameof(StringDictionaryHost.dictionary)
+            );
+            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+            string distinctKey = literalKey + " ";
+            keysProperty.arraySize = 3;
+            valuesProperty.arraySize = 3;
+            keysProperty.GetArrayElementAtIndex(0).stringValue = literalKey;
+            keysProperty.GetArrayElementAtIndex(1).stringValue = literalKey;
+            keysProperty.GetArrayElementAtIndex(2).stringValue = distinctKey;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            serializedObject.Update();
+
+            SerializableDictionaryPropertyDrawer drawer = new();
+            AssignDictionaryFieldInfo(
+                drawer,
+                typeof(StringDictionaryHost),
+                nameof(StringDictionaryHost.dictionary)
+            );
+            string cacheKey = drawer.GetListKey(dictionaryProperty);
+            SerializableDictionaryPropertyDrawer.DuplicateKeyState state =
+                drawer.RefreshDuplicateState(cacheKey, keysProperty, typeof(string));
+
+            Assert.IsTrue(state.HasDuplicates);
+            StringAssert.Contains(
+                $"Duplicate key {expectedDisplay} at entries 1, 2",
+                state.SummaryTooltip
+            );
+            Assert.IsTrue(
+                state.TryGetInfo(0, out SerializableDictionaryPropertyDrawer.DuplicateKeyInfo first)
+            );
+            Assert.IsTrue(
+                state.TryGetInfo(
+                    1,
+                    out SerializableDictionaryPropertyDrawer.DuplicateKeyInfo second
+                )
+            );
+            StringAssert.Contains($"\"{expectedDisplay}\"", first.tooltip);
+            Assert.AreEqual(first.tooltip, second.tooltip);
+            Assert.IsTrue(first.isPrimary);
+            Assert.IsFalse(second.isPrimary);
+            Assert.IsFalse(state.TryGetInfo(2, out _));
+            Assert.AreEqual(literalKey, keysProperty.GetArrayElementAtIndex(0).stringValue);
+            Assert.AreEqual(literalKey, keysProperty.GetArrayElementAtIndex(1).stringValue);
+            Assert.AreEqual(distinctKey, keysProperty.GetArrayElementAtIndex(2).stringValue);
+            Assert.IsFalse(serializedObject.hasModifiedProperties);
+        }
+
         [Test]
         public void DuplicateDetectionHandlesWhitespaceOnlyStringKeys()
         {

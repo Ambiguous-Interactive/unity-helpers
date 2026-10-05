@@ -85,7 +85,7 @@ function Get-ConcurrentDictionaryNames {
 # defined. Tracks #if/#elif/#else/#endif nesting; $null means "this conditional says nothing about
 # SINGLE_THREADED", which #else must preserve rather than invert.
 function Test-SingleThreadedBranch {
-    param([Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Collections.ArrayList]$Stack)
+    param([Parameter(Mandatory = $true)][AllowNull()][AllowEmptyCollection()][System.Collections.ArrayList]$Stack)
 
     foreach ($entry in $Stack) {
         if ($entry -eq $true) { return $true }

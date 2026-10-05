@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix direct texture settings API calls to ignore blank platform override names while preserving other settings ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
+- Fix blank key labels in duplicate dictionary warnings for Unity objects with whitespace-only names; object references and literal string keys stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix `DurableFile` replacements to preserve existing saves and report failure when atomic replacement is unsupported ([#946](https://github.com/Ambiguous-Interactive/unity-helpers/issues/946)).
 - Fix blank custom dropdown labels and popup titles while preserving literal string options ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix concurrent thread pool disposal returning before running work and handle cleanup finish ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).

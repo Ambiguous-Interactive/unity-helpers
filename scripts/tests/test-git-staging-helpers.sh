@@ -132,6 +132,176 @@ else
     fail "helper cleanup preserves stderr" "stderr probe was suppressed"
 fi
 
+assert_staging_cleanup() {
+    if ( : >&200 ) 2>descriptor-probe; then
+        printf 'descriptor 200 remains open\n' >&2
+        return 1
+    fi
+    local flock_path
+    flock_path="$(type -P flock || true)"
+    if [[ -n "$flock_path" ]]; then
+        "$flock_path" -n "$GIT_HELPERS_LOCK_FILE" true || return 1
+    fi
+    printf '__STDERR_AFTER_STAGING__\n' >&2
+}
+
+run_test
+if (
+    repo_path="$TMP_DIR/missing-path"
+    create_repo "$repo_path"
+    cd "$repo_path" || exit 1
+    export GIT_HELPERS_LOCK_FILE="$repo_path/staging.lock"
+    export GIT_LOCK_MAX_ATTEMPTS=1
+    # shellcheck disable=SC1090
+    source "$HELPERS_PATH"
+    printf 'staged sentinel\n' > sentinel.txt
+    git_add_with_retry sentinel.txt || exit 1
+    cp .git/index index-before || exit 1
+    direct_status=0
+    command git add -- missing-path >direct-stdout 2>direct-stderr || direct_status=$?
+    helper_status=0
+    git_add_with_retry missing-path >helper-stdout 2>helper-stderr || helper_status=$?
+    printf 'direct=%s helper=%s\n' "$direct_status" "$helper_status"
+    [[ "$direct_status" -ne 0 && "$helper_status" -eq "$direct_status" ]] || exit 1
+    [[ "$(cat helper-stderr)" == *"pathspec 'missing-path' did not match any files"* ]] || exit 1
+    cmp index-before .git/index || exit 1
+    assert_staging_cleanup || exit 1
+) >"$TMP_DIR/missing-path-output" 2>&1; then
+    pass "Missing path returns Git's exact failure and preserves the staged index"
+else
+    fail "Missing path returns Git's exact failure and preserves the staged index" "$(cat "$TMP_DIR/missing-path-output")"
+fi
+
+run_test
+repo_path="$TMP_DIR/strict-failure"
+create_repo "$repo_path"
+strict_status=0
+bash -c '
+    set -euo pipefail
+    cd "$1"
+    export GIT_HELPERS_LOCK_FILE="$1/staging.lock"
+    export GIT_LOCK_MAX_ATTEMPTS=1
+    source "$2"
+    git_add_with_retry missing-path
+    printf "unexpected continuation\n" > caller-continued
+' bash "$repo_path" "$HELPERS_PATH" >"$TMP_DIR/strict-failure-output" 2>&1 || strict_status=$?
+if [[ "$strict_status" -eq 128 && ! -e "$repo_path/caller-continued" ]]; then
+    pass "A strict-shell caller stops at the missing-path staging failure"
+else
+    fail "A strict-shell caller stops at the missing-path staging failure" "status=$strict_status $(cat "$TMP_DIR/strict-failure-output")"
+fi
+
+for scenario in nonretry-1 nonretry-2 nonretry-37 retry-code retry-message exhausted-code exhausted-message failed-flock-success failed-flock-error failed-flock-no-executable; do
+    run_test
+    if (
+        repo_path="$TMP_DIR/$scenario"
+        create_repo "$repo_path"
+        cd "$repo_path" || exit 1
+        export GIT_HELPERS_LOCK_FILE="$repo_path/staging.lock"
+        export GIT_LOCK_MAX_ATTEMPTS=3
+        export GIT_LOCK_INITIAL_DELAY_MS=1
+        export GIT_LOCK_MAX_DELAY_MS=1
+        # shellcheck disable=SC1090
+        source "$HELPERS_PATH"
+        flock_wait_attempts=0
+        flock_reacquire_attempts=0
+        if [[ "$scenario" == failed-flock-no-executable ]]; then
+            type() {
+                if [[ "$*" == '-P flock' ]]; then
+                    return 1
+                fi
+                builtin type "$@"
+            }
+        fi
+        if [[ "$scenario" == failed-flock-* ]]; then
+            flock() {
+                if [[ "${1:-}" == -w ]]; then
+                    flock_wait_attempts=$((flock_wait_attempts + 1))
+                    return 1
+                fi
+                if [[ "$scenario" == failed-flock-no-executable ]]; then
+                    flock_reacquire_attempts=$((flock_reacquire_attempts + 1))
+                    return 127
+                fi
+                command flock "$@"
+            }
+        fi
+        printf 'stage after recovery\n' > sample.txt
+        add_attempts=0
+        git() {
+            if [[ "${1:-}" != add ]]; then
+                command git "$@"
+                return $?
+            fi
+            add_attempts=$((add_attempts + 1))
+            case "$scenario" in
+                failed-flock-error)
+                    printf 'controlled staging failure after flock timeout\n' >&2
+                    return 37
+                    ;;
+                nonretry-*)
+                    printf 'controlled nonretry failure\n' >&2
+                    return "${scenario#nonretry-}"
+                    ;;
+                retry-code|exhausted-code)
+                    if [[ "$scenario" == exhausted-code || "$add_attempts" -eq 1 ]]; then
+                        printf 'controlled retry status\n' >&2
+                        return 128
+                    fi
+                    ;;
+                retry-message|exhausted-message)
+                    if [[ "$scenario" == exhausted-message || "$add_attempts" -eq 1 ]]; then
+                        printf 'controlled index.lock contention\n' >&2
+                        return 7
+                    fi
+                    ;;
+            esac
+            command git "$@"
+        }
+        helper_status=0
+        git_add_with_retry sample.txt || helper_status=$?
+        printf 'scenario=%s attempts=%s status=%s\n' "$scenario" "$add_attempts" "$helper_status"
+        case "$scenario" in
+            failed-flock-success|failed-flock-no-executable)
+                [[ "$flock_wait_attempts" -eq 1 ]] || exit 1
+                [[ "$helper_status" -eq 0 && "$add_attempts" -eq 1 ]] || exit 1
+                [[ "$(command git show :sample.txt)" == 'stage after recovery' ]] || exit 1
+                ;;
+            failed-flock-error)
+                [[ "$flock_wait_attempts" -eq 1 ]] || exit 1
+                [[ "$helper_status" -eq 37 && "$add_attempts" -eq 1 ]] || exit 1
+                [[ -z "$(command git diff --cached --name-only)" ]] || exit 1
+                ;;
+            nonretry-*)
+                [[ "$helper_status" -eq "${scenario#nonretry-}" && "$add_attempts" -eq 1 ]] || exit 1
+                [[ -z "$(command git diff --cached --name-only)" ]] || exit 1
+                ;;
+            retry-*)
+                [[ "$helper_status" -eq 0 && "$add_attempts" -eq 2 ]] || exit 1
+                [[ "$(command git show :sample.txt)" == 'stage after recovery' ]] || exit 1
+                ;;
+            exhausted-*)
+                expected_status=128
+                [[ "$scenario" != exhausted-message ]] || expected_status=7
+                [[ "$helper_status" -eq "$expected_status" && "$add_attempts" -eq 3 ]] || exit 1
+                [[ -z "$(command git diff --cached --name-only)" ]] || exit 1
+                ;;
+        esac
+        assert_staging_cleanup || exit 1
+        if [[ "$scenario" == failed-flock-no-executable ]]; then
+            [[ "$flock_reacquire_attempts" -eq 0 ]] || exit 1
+        fi
+    ) >"$TMP_DIR/$scenario-output" 2>&1; then
+        if [[ "$(cat "$TMP_DIR/$scenario-output")" == *"__STDERR_AFTER_STAGING__"* ]]; then
+            pass "$scenario preserves status, attempt bounds, flock cleanup and stderr"
+        else
+            fail "$scenario preserves status, attempt bounds, flock cleanup and stderr" "stderr was suppressed"
+        fi
+    else
+        fail "$scenario preserves status, attempt bounds, flock cleanup and stderr" "$(cat "$TMP_DIR/$scenario-output")"
+    fi
+done
+
 export STAGING_HELPERS_ROOT="$REPO_ROOT"
 for helper_shell in bash powershell; do
     for commit_kind in ordinary partial alternate; do

@@ -225,6 +225,16 @@ public class PrefabRegistry : MonoBehaviour
 - Null value highlighting
 - Pagination for large dictionaries
 
+Duplicate warnings show the type name when a Unity object's name is empty or contains only
+whitespace. Padded object names keep their exact text. The display fallback preserves object
+references and literal string keys; distinct keys remain distinct even when their warning labels match.
+
+These captures use the same object twice, with a whitespace-only name:
+
+| Before                                                                                                         | After                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| ![Duplicate warning with a blank object key label](../../images/serialization/duplicate-object-key-before.png) | ![Duplicate warning identifying the GameObject key](../../images/serialization/duplicate-object-key-after.png) |
+
 ![Dictionary pagination controls](../../images/serialization/serialized-dictionary-pagination.gif)
 
 ---

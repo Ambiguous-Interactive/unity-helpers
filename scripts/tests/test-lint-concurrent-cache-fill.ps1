@@ -57,7 +57,10 @@ function Write-Info($msg) {
 # The linter derives its repo root from its own location, so a fixture repo is a tempdir with the
 # script copied into scripts/ and the source under Runtime/.
 function Invoke-LintOnSource {
-    param([Parameter(Mandatory = $true)][string]$Source)
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [switch]$Cli
+    )
 
     $root = Join-Path $tempRoot "repo-$(Get-Random)"
     New-Item -ItemType Directory -Path (Join-Path $root 'scripts') -Force | Out-Null
@@ -66,6 +69,30 @@ function Invoke-LintOnSource {
     Set-Content -LiteralPath (Join-Path $root 'Runtime/Fixture.cs') -Value $Source -NoNewline
 
     $lintCopy = Join-Path $root 'scripts/lint-concurrent-cache-fill.ps1'
+    if ($Cli) {
+        $process = [System.Diagnostics.Process]::new()
+        try {
+            $process.StartInfo.FileName = (Get-Command pwsh -ErrorAction Stop).Source
+            $process.StartInfo.UseShellExecute = $false
+            $process.StartInfo.RedirectStandardOutput = $true
+            $process.StartInfo.RedirectStandardError = $true
+            foreach ($argument in @('-NoProfile', '-File', $lintCopy, '-VerboseOutput')) {
+                $process.StartInfo.ArgumentList.Add($argument)
+            }
+            [void]$process.Start()
+            $stdout = $process.StandardOutput.ReadToEndAsync()
+            $stderr = $process.StandardError.ReadToEndAsync()
+            $process.WaitForExit()
+            return @{
+                ExitCode = $process.ExitCode
+                Output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
+            }
+        }
+        finally {
+            $process.Dispose()
+        }
+    }
+
     $runner = [System.Management.Automation.PowerShell]::Create()
     try {
         $null = $runner.AddCommand($lintCopy).AddParameter('VerboseOutput', $true)
@@ -92,16 +119,20 @@ function Assert-Lint {
     param(
         [Parameter(Mandatory = $true)][string]$TestName,
         [Parameter(Mandatory = $true)][string]$Source,
-        [Parameter(Mandatory = $true)][int]$ExpectedExitCode
+        [Parameter(Mandatory = $true)][int]$ExpectedExitCode,
+        [switch]$Cli,
+        [string]$ExpectedDiagnostic = ''
     )
 
-    $result = Invoke-LintOnSource -Source $Source
-    if ($result.ExitCode -eq $ExpectedExitCode) {
+    $result = Invoke-LintOnSource -Source $Source -Cli:$Cli
+    $diagnosticMatches = [string]::IsNullOrEmpty($ExpectedDiagnostic) -or $result.Output.Contains($ExpectedDiagnostic)
+    if ($result.ExitCode -eq $ExpectedExitCode -and $diagnosticMatches) {
         Write-Host "  [PASS] $TestName" -ForegroundColor Green
         $script:TestsPassed++
     } else {
         Write-Host "  [FAIL] $TestName" -ForegroundColor Red
         Write-Host "         expected exit $ExpectedExitCode, got $($result.ExitCode)" -ForegroundColor Yellow
+        Write-Host "         required diagnostic: $ExpectedDiagnostic" -ForegroundColor Yellow
         Write-Host "         $($result.Output)" -ForegroundColor Yellow
         $script:TestsFailed++
     }
@@ -475,6 +506,50 @@ try {
     Assert-Lint -TestName 'Static cache factory passes' -Source $staticFactory -ExpectedExitCode 0
     Assert-Lint -TestName 'Nested lambda inside the value is not a factory' -Source $nestedLambdaInValue -ExpectedExitCode 0
     Assert-Lint -TestName 'Comma inside a generic value type is not an argument split' -Source $genericCommaInValueType -ExpectedExitCode 0
+
+    $directiveFrames = @(
+        @{ Name = 'unrelated if'; Template = "#if WALLSTOP_PROTO_ONLY`n__SOURCE__`n#endif" },
+        @{ Name = 'unrelated else'; Template = "#if WALLSTOP_PROTO_ONLY`n#else`n__SOURCE__`n#endif" },
+        @{ Name = 'unrelated elif'; Template = "#if UNITY_EDITOR`n#elif WALLSTOP_PROTO_ONLY`n__SOURCE__`n#endif" },
+        @{ Name = 'nested unrelated directives'; Template = "#if WALLSTOP_PROTO_ONLY`n#if UNITY_EDITOR`n#elif UNITY_STANDALONE`n#else`n__SOURCE__`n#endif`n#endif" }
+    )
+    $indexerDiagnostic = "'Names' is a ConcurrentDictionary filled through its indexer"
+    foreach ($frame in $directiveFrames) {
+        Assert-Lint -TestName "CLI $($frame.Name) preserves marked writes" `
+            -Source $frame.Template.Replace('__SOURCE__', $markedOverwrite) -ExpectedExitCode 0 -Cli `
+            -ExpectedDiagnostic '1 deliberate overwrite(s) exempted'
+        Assert-Lint -TestName "CLI $($frame.Name) still rejects unmarked writes" `
+            -Source $frame.Template.Replace('__SOURCE__', $indexerFill) -ExpectedExitCode 1 -Cli `
+            -ExpectedDiagnostic $indexerDiagnostic
+    }
+
+    Assert-Lint -TestName 'CLI unrelated outer directive preserves SINGLE_THREADED exemption' `
+        -Source "#if WALLSTOP_PROTO_ONLY`n$singleThreadedBranch`n#endif" -ExpectedExitCode 0 -Cli `
+        -ExpectedDiagnostic 'skipped 1 write(s) inside SINGLE_THREADED branches'
+    Assert-Lint -TestName 'CLI unrelated outer directive preserves concurrent else rejection' `
+        -Source "#if WALLSTOP_PROTO_ONLY`n$elseBranchFill`n#endif" -ExpectedExitCode 1 -Cli `
+        -ExpectedDiagnostic $indexerDiagnostic
+
+    $nestedSingleThreaded = $singleThreadedBranch.Replace(
+        'Names[type] = cached;',
+        "#if WALLSTOP_PROTO_ONLY`nNames[type] = cached;`n#elif UNITY_EDITOR`nNames[type] = cached;`n#else`nNames[type] = cached;`n#endif"
+    )
+    $nestedConcurrent = $elseBranchFill.Replace(
+        'Names[type] = type.FullName;',
+        "#if WALLSTOP_PROTO_ONLY`nNames[type] = type.FullName;`n#elif UNITY_EDITOR`nNames[type] = type.FullName;`n#else`nNames[type] = type.FullName;`n#endif"
+    )
+    Assert-Lint -TestName 'CLI unrelated inner if elif else retains SINGLE_THREADED exemption' `
+        -Source $nestedSingleThreaded -ExpectedExitCode 0 -Cli `
+        -ExpectedDiagnostic 'skipped 3 write(s) inside SINGLE_THREADED branches'
+    Assert-Lint -TestName 'CLI unrelated inner if elif else cannot exempt concurrent writes' `
+        -Source $nestedConcurrent -ExpectedExitCode 1 -Cli -ExpectedDiagnostic $indexerDiagnostic
+
+    Assert-Lint -TestName 'CLI SINGLE_THREADED elif after unrelated if still exempts writes' `
+        -Source $singleThreadedBranch.Replace('#if SINGLE_THREADED', "#if WALLSTOP_PROTO_ONLY`n#elif SINGLE_THREADED") `
+        -ExpectedExitCode 0 -Cli -ExpectedDiagnostic 'skipped 1 write(s) inside SINGLE_THREADED branches'
+    Assert-Lint -TestName 'CLI else after SINGLE_THREADED elif still rejects concurrent writes' `
+        -Source $elseBranchFill.Replace('#if SINGLE_THREADED', "#if WALLSTOP_PROTO_ONLY`n#elif SINGLE_THREADED") `
+        -ExpectedExitCode 1 -Cli -ExpectedDiagnostic $indexerDiagnostic
 
     Write-Host "[test-lint-concurrent-cache-fill] $script:TestsPassed passed, $script:TestsFailed failed." -ForegroundColor Cyan
     if ($script:TestsFailed -gt 0) { exit 1 }

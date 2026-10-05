@@ -572,6 +572,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         }
     }
 
+    /// <summary>
+    /// Draws dictionary entries with duplicate and null-key warnings.
+    /// </summary>
+    /// <remarks>
+    /// Duplicate warnings use the type name for Unity objects with blank names and preserve serialized keys.
+    /// </remarks>
     [CustomPropertyDrawer(typeof(SerializableDictionary<,>), true)]
     // The three-argument cache derives from SerializableDictionaryBase, so the generic dictionary registration cannot reach it.
 
@@ -2665,7 +2671,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     return "<missing object>";
                 }
 
-                return string.IsNullOrEmpty(unityObject.name)
+                return string.IsNullOrWhiteSpace(unityObject.name)
                     ? unityObject.GetType().Name
                     : unityObject.name;
             }

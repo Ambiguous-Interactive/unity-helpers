@@ -225,7 +225,7 @@ ensure_no_index_lock() {
 #
 # Returns:
 #   0 on success
-#   128 on failure after max attempts
+#   Git's exit status when staging fails
 #
 # Features:
 #   - Waits for existing lock before attempting
@@ -261,6 +261,7 @@ git_add_with_retry() {
                 flock_acquired=1
                 log_verbose "Acquired cross-process flock"
             else
+                { exec 200>&-; } 2>/dev/null || true
                 log_verbose "Could not acquire flock (timeout or unavailable), proceeding without"
             fi
         fi
@@ -293,14 +294,16 @@ git_add_with_retry() {
         local git_stderr_file
         git_stderr_file=$(mktemp 2>/dev/null || echo "/tmp/git_add_stderr_$$")
 
+        local exit_code
         if git add -- "${files[@]}" 2>"$git_stderr_file"; then
             log_verbose "git add succeeded on attempt $attempt"
             rm -f "$git_stderr_file" 2>/dev/null || true
             cleanup_flock
             return 0
+        else
+            exit_code=$?
         fi
 
-        local exit_code=$?
         local git_stderr
         git_stderr=$(cat "$git_stderr_file" 2>/dev/null || true)
         rm -f "$git_stderr_file" 2>/dev/null || true
