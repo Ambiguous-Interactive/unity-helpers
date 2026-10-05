@@ -1043,6 +1043,8 @@ cancelled append may have written part of its new record.
 **What it promises:**
 
 - On platforms with `File.Replace`, a reader sees either complete old or complete new contents.
+- Unsupported `File.Replace` reports failure and preserves the existing destination. Creating an absent
+  destination still uses a move; subsequent replacements require platform support.
 - The data is forced out of the page cache before the swap makes it live.
 - Concurrent writes to the same path from your game are serialized.
 - A second process using the public `DurableFile` write, append, or delete APIs cannot change the same
@@ -1052,8 +1054,6 @@ cancelled append may have written part of its new record.
 
 - It is **not** full crash safety. .NET cannot flush a directory, so a filesystem may still reorder the
   rename behind the data write.
-- On platforms without `File.Replace`, the delete-then-move fallback briefly exposes an absent file and
-  can lose the old file if the move fails.
 - The ownership applies to one destination at a time. It is not a transaction across several files.
 - Tools that do not use `DurableFile` do not share this ownership and can still edit a destination.
 - An internal compare-then-replace operation checks a file before staging its replacement, but

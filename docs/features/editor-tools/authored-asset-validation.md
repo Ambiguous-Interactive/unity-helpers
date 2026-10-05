@@ -195,8 +195,8 @@ the asset. If the file differs from the rewrite snapshot when rollback checks, r
 replace it and reports that manual recovery is needed. The comparison and replacement share a lock
 with cooperating staged-replacement `DurableFile` writers; edits by other tools can still race with
 that lock, and an edit made before the snapshot cannot be distinguished from the rewrite. On
-platforms without `File.Replace`, a failed fallback swap can still lose the asset. Commit or stash
-first.
+platforms without `File.Replace`, rollback reports failure and preserves the current asset. Commit
+or stash first.
 
 The rewrite is covered, not just the refusals: a fixture authors a plain asset, an asset whose
 content lives in sub-objects, and a prefab, leaves a key no field claims in each, repairs them, and
