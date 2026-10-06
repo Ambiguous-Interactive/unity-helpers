@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix cached enum display labels to use the declared member name when an `InspectorName` contains only whitespace; nonblank labels retain their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix legacy dictionary comparison and nullable message fields while retaining bundled protobuf-net map encoding ([#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950)).
 - Fix direct texture settings API calls to ignore blank platform override names while preserving other settings ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank key labels in duplicate dictionary warnings for Unity objects with whitespace-only names; object references and literal string keys stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).

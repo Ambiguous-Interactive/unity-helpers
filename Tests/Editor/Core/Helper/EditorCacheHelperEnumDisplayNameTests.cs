@@ -19,6 +19,100 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class EditorCacheHelperEnumDisplayNameTests
     {
+        [TestCase(
+            EnumDisplayLabelSample.NullLabel,
+            nameof(EnumDisplayLabelSample.NullLabel),
+            false
+        )]
+        [TestCase(EnumDisplayLabelSample.NullLabel, nameof(EnumDisplayLabelSample.NullLabel), true)]
+        [TestCase(
+            EnumDisplayLabelSample.EmptyLabel,
+            nameof(EnumDisplayLabelSample.EmptyLabel),
+            false
+        )]
+        [TestCase(
+            EnumDisplayLabelSample.EmptyLabel,
+            nameof(EnumDisplayLabelSample.EmptyLabel),
+            true
+        )]
+        [TestCase(
+            EnumDisplayLabelSample.SpaceLabel,
+            nameof(EnumDisplayLabelSample.SpaceLabel),
+            false
+        )]
+        [TestCase(
+            EnumDisplayLabelSample.SpaceLabel,
+            nameof(EnumDisplayLabelSample.SpaceLabel),
+            true
+        )]
+        [TestCase(
+            EnumDisplayLabelSample.ControlLabel,
+            nameof(EnumDisplayLabelSample.ControlLabel),
+            false
+        )]
+        [TestCase(
+            EnumDisplayLabelSample.ControlLabel,
+            nameof(EnumDisplayLabelSample.ControlLabel),
+            true
+        )]
+        [TestCase(
+            EnumDisplayLabelSample.UnicodeSpaceLabel,
+            nameof(EnumDisplayLabelSample.UnicodeSpaceLabel),
+            false
+        )]
+        [TestCase(
+            EnumDisplayLabelSample.UnicodeSpaceLabel,
+            nameof(EnumDisplayLabelSample.UnicodeSpaceLabel),
+            true
+        )]
+        [TestCase(EnumDisplayLabelSample.PaddedLabel, "  Custom Label  ", false)]
+        [TestCase(EnumDisplayLabelSample.PaddedLabel, "  Custom Label  ", true)]
+        [TestCase(EnumDisplayLabelSample.ZeroWidthLabel, "\u200b", false)]
+        [TestCase(EnumDisplayLabelSample.ZeroWidthLabel, "\u200b", true)]
+        [TestCase(EnumDisplayLabelSample.DecoratedLabel, "Custom Label", false)]
+        [TestCase(EnumDisplayLabelSample.DecoratedLabel, "Custom Label", true)]
+        public void AttributeLabelsAgreeAcrossCachedLookupOrders(
+            EnumDisplayLabelSample value,
+            string expected,
+            bool valueFirst
+        )
+        {
+            EditorCacheHelper.ClearAllCaches();
+            try
+            {
+                string first = valueFirst ? EditorCacheHelper.GetEnumDisplayName(value) : null;
+                string[] names = EditorCacheHelper.GetEnumDisplayNames(
+                    typeof(EnumDisplayLabelSample)
+                );
+                string label = EditorCacheHelper.GetEnumDisplayName(value);
+                Assert.AreEqual(expected, label);
+                Assert.AreEqual(expected, names[(int)value]);
+                Assert.AreSame(label, names[(int)value]);
+                Assert.AreSame(
+                    names,
+                    EditorCacheHelper.GetEnumDisplayNames(typeof(EnumDisplayLabelSample))
+                );
+                Assert.AreSame(label, EditorCacheHelper.GetEnumDisplayName(value));
+                if (valueFirst)
+                {
+                    Assert.AreSame(first, label);
+                }
+
+                EditorCacheHelper.ClearAllCaches();
+                Assert.AreEqual(expected, EditorCacheHelper.GetEnumDisplayName(value));
+                Assert.AreEqual(
+                    expected,
+                    EditorCacheHelper.GetEnumDisplayNames(typeof(EnumDisplayLabelSample))[
+                        (int)value
+                    ]
+                );
+            }
+            finally
+            {
+                EditorCacheHelper.ClearAllCaches();
+            }
+        }
+
         [Test]
         public void UsesTheInspectorNameAttribute()
         {
