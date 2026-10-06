@@ -1,3 +1,39 @@
+diff --git a/global.json b/global.json
+index 200bcace..c4b99eef 100644
+--- a/global.json
++++ b/global.json
+@@ -1,7 +1 @@
+-{
+-  "sdk": {
+-    "version": "8.0.100",
+-    "rollForward": "latestPatch",
+-    "allowPrerelease": false
+-  }
+-}
+\ No newline at end of file
++{"sdk":{"version":"9.0.306","rollForward":"disable","allowPrerelease":false}}
+diff --git a/src/protobuf-net.Core/Internal/KeyValuePairSerializer.cs b/src/protobuf-net.Core/Internal/KeyValuePairSerializer.cs
+index 69dab594..7ced634d 100644
+--- a/src/protobuf-net.Core/Internal/KeyValuePairSerializer.cs
++++ b/src/protobuf-net.Core/Internal/KeyValuePairSerializer.cs
+@@ -80,11 +80,15 @@ namespace ProtoBuf.Internal
+         public void Write(ref ProtoWriter.State state, KeyValuePair<TKey, TValue> value)
+         {
+             // this deals with nulls and implicit zeros
+-            if (TypeHelper<TKey>.ValueChecker.HasNonTrivialValue(value.Key))
++            if (TypeHelper<TKey>.CanBeNull && !TypeHelper<TKey>.IsReferenceType
++                ? !TypeHelper<TKey>.ValueChecker.IsNull(value.Key)
++                : TypeHelper<TKey>.ValueChecker.HasNonTrivialValue(value.Key))
+                 state.WriteAny(1, _keyFeatures, value.Key, _keySerializer);
+ 
+             // this deals with nulls and implicit zeros
+-            if (TypeHelper<TValue>.ValueChecker.HasNonTrivialValue(value.Value))
++            if (TypeHelper<TValue>.CanBeNull && !TypeHelper<TValue>.IsReferenceType
++                ? !TypeHelper<TValue>.ValueChecker.IsNull(value.Value)
++                : TypeHelper<TValue>.ValueChecker.HasNonTrivialValue(value.Value))
+                 state.WriteAny(2, _valueFeatures, value.Value, _valueSerializer);
+         }
+     }
 diff --git a/src/protobuf-net.Core/Internal/TypeHelperT.cs b/src/protobuf-net.Core/Internal/TypeHelperT.cs
 index 577b0743..79539f0b 100644
 --- a/src/protobuf-net.Core/Internal/TypeHelperT.cs
@@ -427,10 +463,196 @@ index 527bc447..33930e11 100644
              // for most types we'll enforce that you need readonly, because that is what protobuf-net
              // always did historically; but: if you smell so much like a Tuple that it is *in your name*,
 diff --git a/src/protobuf-net/Meta/RuntimeTypeModel.cs b/src/protobuf-net/Meta/RuntimeTypeModel.cs
-index 4f7ef715..14aed545 100644
+index 4f7ef715..f435909b 100644
 --- a/src/protobuf-net/Meta/RuntimeTypeModel.cs
 +++ b/src/protobuf-net/Meta/RuntimeTypeModel.cs
-@@ -2257,6 +2257,13 @@ namespace ProtoBuf.Meta
+@@ -972,8 +972,55 @@ namespace ProtoBuf.Meta
+ 
+         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+         private object GetServices<T>(CompatibilityLevel ambient)
+-            => (_serviceCache[typeof(T)] ?? GetServicesSlow(typeof(T), ambient));
++        {
++            object service = _serviceCache[typeof(T)] ?? GetServicesSlow(typeof(T), ambient);
++            if (service is ISerializer<T>) return service;
++            Type underlying = Nullable.GetUnderlyingType(typeof(T));
++            if (underlying is not null && !underlying.IsEnum)
++            {
++                IProtoTypeSerializer contract = service as IProtoTypeSerializer;
++                if (contract is null)
++                {
++                    int index = FindOrAddAuto(underlying, false, true, false, ambient);
++                    if (index >= 0) contract = ((MetaType)types[index]).Serializer;
++                }
++                if (contract is null || contract.ExpectedType != underlying) return service;
++                ISerializer<T> nullable = new NullableContractSerializer<T>(contract);
++                lock (_serviceCache)
++                {
++                    if (_serviceCache[typeof(T)] is ISerializer<T> existing) return existing;
++                    _serviceCache[typeof(T)] = nullable;
++                }
++                return nullable;
++            }
++            return service;
++        }
++
++        private readonly HashSet<Type> nullableContractTypes = new HashSet<Type>();
++
++        internal void NoteNullableContract(Type type, CompatibilityLevel compatibilityLevel)
++        {
++            Type underlying = Nullable.GetUnderlyingType(type);
++            if (underlying is null || underlying.IsEnum) return;
++            if (ValueMember.TryGetCoreSerializer(this, DataFormat.Default, compatibilityLevel, underlying,
++                out _, false, false, false, false) is not null) return;
++            if (FindOrAddAuto(underlying, false, true, false, compatibilityLevel) < 0) return;
++            lock (_serviceCache)
++            {
++                nullableContractTypes.Add(type);
++            }
++        }
++
+ 
++        internal void NoteNullableEnum(Type type, CompatibilityLevel compatibilityLevel)
++        {
++            RepeatedSerializerStub repeated = TryGetRepeatedProvider(type, compatibilityLevel);
++            Type underlying = Nullable.GetUnderlyingType(repeated is null ? type : repeated.ItemType);
++            if (underlying is not null && underlying.IsEnum)
++            {
++                FindOrAddAuto(underlying, true, false, true, compatibilityLevel);
++            }
++        }
+ 
+         private readonly Hashtable _serviceCache = [];
+         internal void ResetServiceCache(Type type)
+@@ -983,6 +1030,10 @@ namespace ProtoBuf.Meta
+                 lock (_serviceCache)
+                 {
+                     _serviceCache.Remove(type);
++                    if (type.IsValueType && Nullable.GetUnderlyingType(type) is null)
++                    {
++                        _serviceCache.Remove(typeof(Nullable<>).MakeGenericType(type));
++                    }
+                 }
+             }
+         }
+@@ -1024,7 +1075,18 @@ namespace ProtoBuf.Meta
+ 
+                 // rule out repeated (this has an internal cache etc)
+                 var repeated = model.TryGetRepeatedProvider(type); // this handles ignores, etc
+-                if (repeated is not null) return repeated.Serializer;
++                if (repeated is not null)
++                {
++                    if (repeated.IsMap)
++                    {
++                        repeated.ResolveMapTypes(out Type keyType, out Type valueType);
++                        model.NoteNullableEnum(keyType, ambient);
++                        model.NoteNullableEnum(valueType, ambient);
++                        model.NoteNullableContract(keyType, ambient);
++                        model.NoteNullableContract(valueType, ambient);
++                    }
++                    return repeated.Serializer;
++                }
+ 
+                 int typeIndex = model.FindOrAddAuto(type, false, true, false, ambient);
+                 if (typeIndex >= 0)
+@@ -1456,7 +1518,9 @@ namespace ProtoBuf.Meta
+                 }
+                 else if (ShouldEmitCustomSerializerProxy(metaType.SerializerType))
+                 {
+-                    AddProxy(type, runtimeType, metaType.SerializerType, false);
++                    bool includeNullable = runtimeType.IsValueType
++                        && HasNullableExternalService(metaType, typeof(Nullable<>).MakeGenericType(runtimeType));
++                    AddProxy(type, runtimeType, metaType.SerializerType, includeNullable);
+                 }
+                 else if ((repeated = TryGetRepeatedProvider(runtimeType)) is not null)
+                 {
+@@ -1522,6 +1586,10 @@ namespace ProtoBuf.Meta
+             return repeated;
+         }
+ 
++        private static bool HasNullableExternalService(MetaType metaType, Type nullableType)
++            => metaType.Serializer is IExternalSerializer external
++                && typeof(ISerializer<>).MakeGenericType(nullableType).IsInstanceOfType(external.Service);
++
+         private static void AddProxy(TypeBuilder building, Type proxying, MemberInfo provider, bool includeNullable)
+         {
+             provider = GetUnderlyingProvider(provider, proxying);
+@@ -1539,6 +1607,7 @@ namespace ProtoBuf.Meta
+                     building.AddInterfaceImplementation(iType);
+                     il = CompilerContextScope.Implement(building, iType, "get_" + nameof(ISerializerProxy<string>.Serializer));
+                     EmitProvider(provider, il);
++                    il.Emit(OpCodes.Castclass, typeof(ISerializer<>).MakeGenericType(typeof(Nullable<>).MakeGenericType(proxying)));
+                     il.Emit(OpCodes.Ret);
+                 }
+             }
+@@ -1564,6 +1633,50 @@ namespace ProtoBuf.Meta
+                 return method;
+             }
+ 
++            void WriteNullableSerializer(MetaType metaType, IProtoTypeSerializer serializer)
++            {
++                Type runtimeType = metaType.Type;
++                if (runtimeType.IsValueType)
++                {
++                    Type nullableType = typeof(Nullable<>).MakeGenericType(runtimeType);
++                    bool needsNullableService;
++                    lock (_serviceCache)
++                    {
++                        needsNullableService = nullableContractTypes.Contains(nullableType);
++                    }
++                    if (needsNullableService
++                        && (metaType.SerializerType is null
++                            || !HasNullableExternalService(metaType, nullableType)))
++                    {
++                        Type nullableService = typeof(ISerializer<>).MakeGenericType(nullableType);
++                        type.AddInterfaceImplementation(nullableService);
++                        ILGenerator nullableReader = CompilerContextScope.Implement(type, nullableService, nameof(ISerializer<string>.Read));
++                        using (CompilerContext context = new CompilerContext(scope, nullableReader, false,
++                            CompilerContext.SignatureType.ReaderScope_Input, this, nullableType, nameof(ISerializer<string>.Read)))
++                        {
++                            using Local underlyingValue = new Local(context, runtimeType);
++                            context.LoadAddress(context.InputValue, nullableType);
++                            context.EmitCall(nullableType.GetMethod(nameof(Nullable<int>.GetValueOrDefault), Type.EmptyTypes));
++                            context.StoreValue(underlyingValue);
++                            serializer.EmitRead(context, underlyingValue);
++                            context.LoadValue(underlyingValue);
++                            context.EmitCtor(nullableType, runtimeType);
++                            context.Return();
++                        }
++                        ILGenerator nullableWriter = CompilerContextScope.Implement(type, nullableService, nameof(ISerializer<string>.Write));
++                        using (CompilerContext context = new CompilerContext(scope, nullableWriter, false,
++                            CompilerContext.SignatureType.WriterScope_Input, this, nullableType, nameof(ISerializer<string>.Write)))
++                        {
++                            context.WriteNullCheckedTail(nullableType, serializer, context.InputValue);
++                            context.Return();
++                        }
++                        type.DefineMethodOverride(GetFeaturesMethod(serializer.Features),
++                            nullableService.GetProperty(nameof(ISerializer<string>.Features)).GetGetMethod());
++                    }
++                }
++
++            }
++
+             for (int index = 0; index < types.Count; index++)
+             {
+                 var metaType = (MetaType)types[index];
+@@ -1573,6 +1686,7 @@ namespace ProtoBuf.Meta
+                 metaType.Validate();
+                 if (runtimeType.IsEnum || metaType.SerializerType is not null || TryGetRepeatedProvider(metaType.Type) is not null)
+                 {   // we don't implement these
++                    if (metaType.SerializerType is not null) WriteNullableSerializer(metaType, serializer);
+                     continue;
+                 }
+                 if (!IsFullyPublic(runtimeType, out var problem))
+@@ -1612,6 +1726,8 @@ namespace ProtoBuf.Meta
+                 var featuresGetter = serType.GetProperty(nameof(ISerializer<string>.Features)).GetGetMethod();
+                 type.DefineMethodOverride(GetFeaturesMethod(serializer.Features), featuresGetter);
+ 
++                WriteNullableSerializer(metaType, serializer);
++
+                 // and we emit the sub-type serializer whenever inheritance is involved
+                 if (serializer.HasInheritance)
+                 {
+@@ -2257,6 +2373,13 @@ namespace ProtoBuf.Meta
                  return value.Method;
              }
          }
@@ -445,10 +667,21 @@ index 4f7ef715..14aed545 100644
          /// <summary>
          /// Add an externally defined serializer
 diff --git a/src/protobuf-net/Meta/ValueMember.cs b/src/protobuf-net/Meta/ValueMember.cs
-index e9fce7ba..6a43a7fb 100644
+index e9fce7ba..fbb4da99 100644
 --- a/src/protobuf-net/Meta/ValueMember.cs
 +++ b/src/protobuf-net/Meta/ValueMember.cs
-@@ -606,6 +606,7 @@ namespace ProtoBuf.Meta
+@@ -433,6 +433,10 @@ namespace ProtoBuf.Meta
+             var valueCompatibilityLevel = GetEffectiveCompatibilityLevel(compatibilityLevel, valueFormat);
+ 
+             repeated.ResolveMapTypes(out var keyType, out var valueType);
++            model.NoteNullableEnum(keyType, keyCompatibilityLevel);
++            model.NoteNullableEnum(valueType, valueCompatibilityLevel);
++            model.NoteNullableContract(keyType, keyCompatibilityLevel);
++            model.NoteNullableContract(valueType, valueCompatibilityLevel);
+             _ = TryGetCoreSerializer(model, keyFormat, keyCompatibilityLevel, FlattenRepeated(model, keyType), out var keyWireType, false, false, false, true);
+             _ = TryGetCoreSerializer(model, valueFormat, valueCompatibilityLevel, FlattenRepeated(model, valueType), out var valueWireType, asReference, dynamicType, false, true);
+ 
+@@ -606,6 +610,7 @@ namespace ProtoBuf.Meta
              bool asReference, bool dynamicType, bool overwriteList, bool allowComplexTypes)
          {
              compatibilityLevel = ValueMember.GetEffectiveCompatibilityLevel(compatibilityLevel, dataFormat);
@@ -623,9 +856,6 @@ index e54a2ff3..3b821f09 100644
          private sealed class Registration
          {
              public MemberInfo Resolve(Type root, Type current)
-diff --git a/src/protobuf-net.Core/ISerializationWriteScope.cs b/src/protobuf-net.Core/ISerializationWriteScope.cs
-new file mode 100644
-index 00000000..161f05cb
 --- /dev/null
 +++ b/src/protobuf-net.Core/ISerializationWriteScope.cs
 @@ -0,0 +1,12 @@
@@ -641,9 +871,6 @@ index 00000000..161f05cb
 +        void EndSerialization();
 +    }
 +}
-diff --git a/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs b/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs
-new file mode 100644
-index 00000000..91a318c0
 --- /dev/null
 +++ b/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs
 @@ -0,0 +1,20 @@
@@ -667,9 +894,6 @@ index 00000000..91a318c0
 +            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat);
 +    }
 +}
-diff --git a/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs b/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs
-new file mode 100644
-index 00000000..30f9b147
 --- /dev/null
 +++ b/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs
 @@ -0,0 +1,12 @@
@@ -683,5 +907,40 @@ index 00000000..30f9b147
 +    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 +    public sealed class TypedRepeatedProviderAttribute : Attribute
 +    {
++    }
++}
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/NullableContractSerializer.cs
+@@ -0,0 +1,32 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using ProtoBuf.Serializers;
++
++    internal sealed class NullableContractSerializer<TNullable> : ISerializer<TNullable>
++    {
++        private readonly IProtoTypeSerializer contract;
++
++        internal NullableContractSerializer(IProtoTypeSerializer contract)
++        {
++            this.contract = contract;
++        }
++
++        public SerializerFeatures Features => contract.Features;
++
++        public TNullable Read(ref ProtoReader.State state, TNullable value)
++        {
++            return TypeHelper<TNullable>.FromObject(contract.Read(ref state, value));
++        }
++
++        public void Write(ref ProtoWriter.State state, TNullable value)
++        {
++            if (!TypeHelper<TNullable>.ValueChecker.IsNull(value))
++            {
++                contract.Write(ref state, value);
++            }
++        }
 +    }
 +}

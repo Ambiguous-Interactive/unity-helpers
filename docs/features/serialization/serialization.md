@@ -99,7 +99,7 @@ setter inspection; ordinary tuples and index-free init-only contracts keep their
 classification. Init-only setter inspection still uses the original custom-modifier API.
 Nested dictionary fields use the existing typed map serializer and the active model's key/value
 policies without a reflected generic map-decorator constructor. Compiled models retain the
-original typed emitter. Map encoding and default-value policy remain unchanged. Runtime repeated
+original typed emitter. Nonnullable map encoding and default omission remain unchanged; nullable map defaults retain explicit presence. Runtime repeated
 providers use typed registrations for intrinsic scalar lists and arrays, while owned generic set,
 deque and cyclic-buffer static constructors register their actual serializers before metadata
 lookup or explicit model registration. The opted-in base collection is initialized without
@@ -124,6 +124,38 @@ For consumer dictionary subclasses, declare `[ProtoContract]` on the concrete ty
 speculative tuple detection; protobuf-net does not inherit this contract metadata from the base.
 This metadata alone does not establish stripped IL2CPP compatibility.
 Use the existing save API for retained data rather than persisting comparer hashes.
+
+### Nullable map presence
+
+Legacy protobuf map writes distinguish a missing key, a null value, a present default value,
+and a nondefault value. Nullable primitive, enum and contract values keep their presence;
+nullable keys keep a present default key where the dictionary type permits it. The owned
+sorted dictionaries retain their `IComparable<TKey>` constraint, which excludes nullable keys.
+Consumer-supplied nullable serializers retain precedence over underlying-value serializers.
+
+Present nullable defaults require a value field. For a root `Dictionary<int, int?>` containing
+key `3` with value `0`, the new bytes are `0A 04 08 03 10 00`; a null value retains
+`0A 02 08 03`. A present default contract struct uses an empty message, such as
+`0A 04 08 03 12 00`. Field numbers, nonnullable default omission and explicitly wrapped
+reference encodings keep their existing behavior.
+
+Public root calls for `SerializableDictionary<TKey, TValue>` and
+`SerializableSortedDictionary<TKey, TValue>` use parallel-array wrappers. Null-free values
+retain their existing wrapper bytes. When nullable values contain null slots, field 1 keeps
+the keys, field 2 contains only present values, and field 3 carries one presence bit per key.
+For keys `2, 3, 4` with values `null, 0, 7`, the legacy wrapper bytes are
+`08 02 08 03 08 04 10 00 10 07 1A 01 06`. Reads validate the bitmap and dense values before
+restoring their alignment. If field 3 repeats, its final occurrence supplies the bitmap.
+Existing wrapper payloads remain readable. Older package versions
+cannot read the new null-containing wrapper encoding correctly; upgrade every reader before
+writing those payloads.
+
+Older writers could omit both null and present-default values. Such payloads still decode
+the omitted nullable field as null; the missing presence cannot be reconstructed. New writes
+preserve the distinction, so legacy comparer hashes for nullable maps can change. Use the save
+API for retained data rather than persisting comparer hashes. Generated nullable collection
+support remains separate from this legacy fix. Fresh stripped-player qualification remains tracked in
+[#953](https://github.com/Ambiguous-Interactive/unity-helpers/issues/953).
 
 ### Protobuf (protobuf-net)
 

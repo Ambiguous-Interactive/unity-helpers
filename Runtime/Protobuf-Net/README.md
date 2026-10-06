@@ -6,7 +6,7 @@ The annotated tag object is `421b80a9b128be779036e600b996efb9e48b9f92`.
 Upstream source and license: [protobuf-net](https://github.com/protobuf-net/protobuf-net/tree/dfdfce61a739cfd76f05fcdacf8a4b3b9e94e684)
 and [bundled license](./Licence.txt).
 
-[The source patch](./il2cpp-aot.patch) changes six runtime behaviors:
+[The source patch](./il2cpp-aot.patch) changes eight runtime behaviors:
 
 - Construct fallback value checkers directly, avoiding reflected closed generic constructors.
   Primary primitive checkers keep their original default-value policy. Nonnullable structs
@@ -42,7 +42,15 @@ and [bundled license](./Licence.txt).
   Value types cannot implement this scope. Entry must fail atomically and exit must not throw.
   Owned deque and cyclic buffer scratch state supports nested writes of the same instance.
 
-Map serialization, field numbers and default omission retain upstream behavior.
+- Preserve present nullable defaults in map keys and values. Only null nullable slots are omitted;
+  primary checker policies and nonnullable default omission keep their existing behavior.
+- Register underlying nullable enum and contract serializers during root and member map discovery.
+  Model-local nullable contract services delegate to the existing serializer, with matching emitted
+  services for compiled models. Provider-supplied nullable services keep precedence, including
+  factory-returned services. Recompiling an underlying contract invalidates its cached nullable service.
+
+Field numbers and nonnullable default omission retain upstream behavior. Nullable map defaults
+now carry explicit presence bytes; old omitted fields cannot recover a lost default value.
 The additive `RuntimeTypeModel.RegisterRepeatedSerializer<TCollection, TItem>` API registers an
 existing provider without initializing or freezing a model. It rejects mismatched item types,
 map providers and conflicting registrations. It does not make arbitrary dynamic consumer
@@ -63,7 +71,8 @@ upstream versioning computes the assembly file version from it.
 ```bash
 package_root="$PWD"
 source_root="$(mktemp -d)"
-git clone --branch 3.2.56 https://github.com/protobuf-net/protobuf-net.git "$source_root"
+git -c core.autocrlf=false clone --branch 3.2.56 https://github.com/protobuf-net/protobuf-net.git "$source_root"
+git -C "$source_root" config core.autocrlf false
 git -C "$source_root" checkout dfdfce61a739cfd76f05fcdacf8a4b3b9e94e684
 git -C "$source_root" apply "$package_root/Runtime/Protobuf-Net/il2cpp-aot.patch"
 cat > "$source_root/global.json" <<'JSON'
@@ -92,5 +101,5 @@ the .NET Standard 2.1 target. Check the hashes before replacing the shipped file
 
 | File                  | SHA256                                                             |
 | --------------------- | ------------------------------------------------------------------ |
-| protobuf-net.dll      | `032b3f09371b0a42b455f0e29afa654625e559cfe9de20afeedc42b3c736b7be` |
-| protobuf-net.Core.dll | `afd81d94f0140ef01527c96a3e5ed57084a0f1d2897a9dde928242643669dda0` |
+| protobuf-net.dll      | `cd6af62ed6956a648301f04971fd423ed517e9efe2b02ed1b6a3f467fd4a916d` |
+| protobuf-net.Core.dll | `7c994ca2572374b691c4ee1db3c58d08e443751b1d683a83f57ab1827be0ccd1` |

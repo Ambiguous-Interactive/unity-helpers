@@ -146,11 +146,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             SerializableDictionary<TKey, TValue> value
         )
         {
-            return new SerializableDictionaryProtoWrapper<TKey, TValue>
+            SerializableDictionaryProtoWrapper<TKey, TValue> wrapper = new()
             {
                 Keys = value.SerializedKeys,
                 Values = value.SerializedValues,
             };
+            ((INullableDictionaryWrapper)wrapper).PrepareNullableValues();
+            return wrapper;
         }
 
         /// <inheritdoc />
@@ -192,6 +194,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
+            if (!((INullableDictionaryWrapper)wrapper).TryRestoreNullableValues())
+            {
+                value = default;
+                return false;
+            }
+
             SerializableDictionary<TKey, TValue> restored =
                 new SerializableDictionary<TKey, TValue>();
             restored._keys = wrapper.Keys;
@@ -219,11 +227,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             SerializableSortedDictionary<TKey, TValue> value
         )
         {
-            return new SerializableSortedDictionaryProtoWrapper<TKey, TValue>
+            SerializableSortedDictionaryProtoWrapper<TKey, TValue> wrapper = new()
             {
                 Keys = value.SerializedKeys,
                 Values = value.SerializedValues,
             };
+            ((INullableDictionaryWrapper)wrapper).PrepareNullableValues();
+            return wrapper;
         }
 
         /// <inheritdoc />
@@ -269,6 +279,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     out SerializableSortedDictionaryProtoWrapper<TKey, TValue> wrapper
                 )
             )
+            {
+                value = default;
+                return false;
+            }
+
+            if (!((INullableDictionaryWrapper)wrapper).TryRestoreNullableValues())
             {
                 value = default;
                 return false;

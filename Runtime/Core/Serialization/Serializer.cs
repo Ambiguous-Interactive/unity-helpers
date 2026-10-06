@@ -1500,6 +1500,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 setWrapperValues?.Invoke(wrapper, values);
             }
 
+            if (wrapper is INullableDictionaryWrapper nullableWrapper)
+            {
+                nullableWrapper.PrepareNullableValues();
+            }
             return wrapper;
         }
 
@@ -1565,6 +1569,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             using MemoryStream ms = new(data, writable: false);
             object wrapper = ProtoBuf.Serializer.NonGeneric.Deserialize(wrapperType, ms);
+            if (
+                wrapper is INullableDictionaryWrapper nullableWrapper
+                && !nullableWrapper.TryRestoreNullableValues()
+            )
+            {
+                throw new InvalidDataException(
+                    "Nullable dictionary presence bitmap does not match its arrays."
+                );
+            }
 
             object result = Activator.CreateInstance(type);
             if (isSet)
@@ -1852,6 +1865,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// of. The bytes are the same either way.
         /// <paramref name="forceRuntimeType"/> does not disable that: a generated formatter already
         /// dispatches on the runtime type.
+        /// Legacy map writes preserve present nullable defaults instead of omitting their fields.
+        /// Older payloads that omitted those fields still decode the nullable value as null.
+        /// Root dictionary wrappers preserve null slots with presence data that older readers do not support.
         /// </remarks>
         /// <example>
         /// <code>

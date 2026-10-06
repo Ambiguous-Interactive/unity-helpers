@@ -149,6 +149,58 @@
       fullname="WallstopStudios.UnityHelpers.Tests.Serialization.CollectionScratchCallbackState"
       preserve="all"
     />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapContainer`1"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapEnum"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapValue"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.WrappedNullableMapContainer`1"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapCallbackValue"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapCallbackState"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapUnderlyingProvider"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapDualService"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapDualProvider"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapFactoryProvider"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapScalarSurrogateValue"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapMessageSurrogateValue"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.NullableMapMessageSurrogate"
+      preserve="all"
+    />
   </assembly>
   <!-- The legacy model also reads attribute property getters through reflection. -->
   <assembly fullname="protobuf-net.Core">
