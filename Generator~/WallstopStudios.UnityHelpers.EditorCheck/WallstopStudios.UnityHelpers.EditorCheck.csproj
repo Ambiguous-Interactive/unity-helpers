@@ -92,13 +92,16 @@
      10. IL2CPP and behaviour. A green build here is necessary and NOT sufficient; the Unity legs
          remain the real proof.
 
-    TWO NoWarn entries are harness artifacts rather than judgments about the sources, and each is
+    THREE NoWarn entries are harness artifacts rather than judgments about the sources, and each is
     a specific diagnostic rather than a category:
 
       * CS1701: `UnityEditor.dll` names `UnityEngine 0.0.0.0` and binds to the facade above.
       * NU1701: `Unity3D.SDK` publishes a bare `lib/` folder with no target framework, so restoring
         it into a netstandard2.1 project is a framework mismatch by construction. Scoped to that one
         PackageReference as well as here.
+      * CS0436: `Shims/UnityLinkerProcessorShim.cs` replaces the 2021.1 linker interface with the
+        source-confirmed 2021.3 signature. This keeps the real callback and its fixtures compiled;
+        the old assembly requires removed before/after methods. Real Unity verifies the interface.
 
     Like TypeCheck, this project lives under `Generator~`, which Unity ignores by the trailing-tilde
     convention, and ships to nobody.
@@ -144,9 +147,9 @@
     -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612;CS1591;CS1573</NoWarn>
-    <!-- The two harness artifacts enumerated at the top of this file. Each is one diagnostic with
+    <!-- The three harness artifacts enumerated at the top of this file. Each is one diagnostic with
          one named cause, not a category swept under the rug. -->
-    <NoWarn>$(NoWarn);CS1701;NU1701</NoWarn>
+    <NoWarn>$(NoWarn);CS1701;NU1701;CS0436</NoWarn>
     <!-- Same split as TypeCheck: EPS01 is at zero and is escalated, the rest of the family is
          silenced because measured most of it is wrong about Span. Inventory on #517. -->
     <NoWarn>$(NoWarn);EPS02;EPS03;EPS04;EPS05;EPS06;EPS07;EPS08;EPS09;EPS10;EPS11;EPS12</NoWarn>

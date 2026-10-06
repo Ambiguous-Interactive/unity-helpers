@@ -570,6 +570,21 @@ Protobuf uses reflection internally to serialize/deserialize types. Unity's IL2C
 
 ### Solution: Create a link.xml file
 
+Unity Helpers supplies its own linker descriptor during player builds when installed through
+UPM. The editor build callback resolves the installed package's absolute location and submits
+the existing `link.xml`; it creates no project assets. Assets-based installations use Unity's
+normal descriptor discovery. A UPM installation with a missing descriptor
+stops the build with a reinstall diagnostic.
+
+The descriptor preserves `WallstopStudios.UnityHelpers`, `System.Text.Json`,
+`System.Collections.Immutable`, and the two optional protobuf-net assemblies. This retains
+private serialization fields and callbacks, and can increase player size. Preservation does
+not generate missing closed generic AOT methods or establish support for arbitrary runtime
+models. Test the exact collection types and configured models in a stripped Release player.
+Consumer contracts in other assemblies still need their own preservation rules. Unity does
+not automatically consume package-contained descriptors; see the
+[Unity managed stripping manual](https://docs.unity3d.com/2021.3/Documentation/Manual/ManagedCodeStripping.html).
+
 In your `Assets` folder (or any subfolder), create `link.xml` to preserve your Protobuf types:
 
 ```xml
@@ -590,11 +605,6 @@ In your `Assets` folder (or any subfolder), create `link.xml` to preserve your P
     <namespace fullname="MyGame.Shared.Protocol" preserve="all"/>
   </assembly>
 
-  <!-- Preserve Unity Helpers if needed -->
-  <assembly fullname="WallstopStudios.UnityHelpers">
-    <!-- Usually not needed, but if you see errors: -->
-    <type fullname="WallstopStudios.UnityHelpers.Core.Serialization.Serializer" preserve="all"/>
-  </assembly>
 </linker>
 ```
 
