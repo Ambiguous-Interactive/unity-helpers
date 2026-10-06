@@ -24,6 +24,15 @@ Unity Helpers includes a suite of inspector attributes and serialization types t
 
 ## Feature Categories
 
+### Cached Enum Labels for Custom Editor Tools
+
+`EditorCacheHelper.GetEnumDisplayName` and `GetEnumDisplayNames` share cached labels.
+An `InspectorName` attribute containing null, an empty string, or only whitespace uses
+the declared member name. Nonblank custom labels retain their exact text, including
+leading and trailing spaces. Members without an attribute use Unity's formatted name.
+This fallback applies to these helper APIs; Unity's built-in enum inspector controls
+have their own label handling.
+
 ### 1. Layout & Organization
 
 Control how fields are grouped and organized in the inspector:

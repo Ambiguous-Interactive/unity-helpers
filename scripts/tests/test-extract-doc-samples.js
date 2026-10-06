@@ -560,7 +560,27 @@ runTest("the repository's own corpus is not empty", () => {
     300 <= Number(match[1]),
     `the corpus shrank to ${match[1]} samples; a gate that checks a handful is not the gate #611 asked for`
   );
-  const extracted = path.join(repoRoot, "artifacts", "doc-samples");
+  const output = /^\[doc-samples\] Output: (.+)$/m.exec(result.stdout);
+  assert.ok(output, "the extractor must report its actual output directory");
+  const relativeOutput = output[1].trim();
+  assert.ok(
+    relativeOutput.split(/[\\/]/).some((segment) => segment.endsWith("~")),
+    "default generated sources must live in a Unity-ignored directory"
+  );
+  const extracted = path.resolve(repoRoot, relativeOutput);
+  const project = fs.readFileSync(
+    path.join(
+      repoRoot,
+      "Generator~",
+      "WallstopStudios.UnityHelpers.DocSamplesCheck",
+      "WallstopStudios.UnityHelpers.DocSamplesCheck.csproj"
+    ),
+    "utf8"
+  );
+  const compilerOutput =
+    /<DocSamplesDir\b[^>]*>\s*\$\(RepoRoot\)\/([^<]+)\s*<\/DocSamplesDir>/.exec(project);
+  assert.ok(compilerOutput, "the compile project must declare its default sample directory");
+  assert.strictEqual(extracted, path.resolve(repoRoot, compilerOutput[1].trim()));
   const samples = [
     ...fs.readdirSync(extracted).filter((name) => name.endsWith(".cs")),
     ...fs

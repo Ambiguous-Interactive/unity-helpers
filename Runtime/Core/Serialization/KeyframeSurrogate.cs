@@ -3,49 +3,68 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization
 {
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
+
 #if UNITY_5_3_OR_NEWER
     using UnityEngine;
 #endif
 
     /// <summary>Carries the protobuf wire shape of Keyframe.</summary>
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct KeyframeSurrogate
     {
         /// <summary>The time component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public float time;
 
         /// <summary>The value component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float value;
 
         /// <summary>The inTangent component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float inTangent;
 
         /// <summary>The outTangent component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public float outTangent;
 
         /// <summary>The inWeight component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(5)]
+#endif
         [WProtoMember(5)]
         public float inWeight;
 
         /// <summary>The outWeight component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         public float outWeight;
 
         /// <summary>The weightedMode component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [WProtoMember(7)]
         public int weightedMode;
 

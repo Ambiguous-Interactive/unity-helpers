@@ -13,8 +13,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Text.Json.Serialization;
     using Extension;
     using Helper;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// An index-into-array generator: a 1024-entry table of 32-bit values read one at a time by an
@@ -73,8 +75,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Serializable]
     [DataContract]
     // Skip seeding during deserialization so an omitted default index does not invent a new stream.
-
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(SkipConstructor = true)]
+#endif
     [WProtoContract(SkipConstructor = true)]
     [WProtoSubtype(typeof(AbstractRandom), 117)]
     public sealed partial class WDoomRandom
@@ -97,7 +100,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override RandomState InternalState => BuildState((ulong)_index);
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         internal int _index;
 

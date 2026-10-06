@@ -7,8 +7,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections;
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Helper;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Immutable value-type snapshot of a <see cref="BitSet"/> that exposes read-only bit access without allocating.
@@ -26,7 +28,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     [Serializable]
 #pragma warning disable WPROTO030 // Served through ImmutableBitSetSurrogate by both serializers.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(IgnoreListHandling = true)]
+#endif
 #pragma warning restore WPROTO030
     public readonly struct ImmutableBitSet : IEquatable<ImmutableBitSet>
     {
@@ -59,10 +63,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public bool this[int index] => TryGet(index, out bool value) && value;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         private readonly ulong[] _bits;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         private readonly int _capacity;
 
         /// <summary>

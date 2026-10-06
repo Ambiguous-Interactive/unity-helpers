@@ -7,8 +7,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Runtime.CompilerServices;
     using System.Text.Json.Serialization;
     using Helper;
-    using ProtoBuf;
     using UnityEngine;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Lightweight alternative to Unity's <see cref="Vector3Int"/> that caches its hash to accelerate dictionary and set lookups.
@@ -25,7 +27,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </example>
     [Serializable]
 #pragma warning disable WPROTO030 // Served by a hand-written formatter and protobuf-net surrogate.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
 #pragma warning restore WPROTO030
     public readonly partial struct FastVector3Int
         : IEquatable<FastVector3Int>,
@@ -119,15 +123,21 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [JsonPropertyName("z")]
         public int Z => z;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [JsonIgnore]
         public readonly int x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [JsonIgnore]
         public readonly int y;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [JsonIgnore]
         public readonly int z;
 

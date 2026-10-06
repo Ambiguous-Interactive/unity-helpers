@@ -14,8 +14,8 @@
  *
  * Two halves, both asserted:
  *   1. Synthetic fixtures, where the classifier is driven in both directions.
- *   2. This repository, where the seven platform-neutral test assemblies are named so the next
- *      reader does not have to re-measure them, and so an eighth cannot appear unnoticed.
+ *   2. This repository, where the eight platform-neutral test assemblies are named so the next
+ *      reader does not have to re-measure them, and so a ninth cannot appear unnoticed.
  */
 
 const assert = require("assert");
@@ -29,15 +29,19 @@ const discovery = require(path.join(repoRoot, "scripts", "unity", "lib", "asmdef
 /**
  * Measured on 6000.4.6f1 through the MCP bridge:
  * `CompilationPipeline.GetAssemblies(AssembliesType.Editor)` flags 26 of the 33 test assemblies
- * the editor compiles, and the seven it does not are exactly these. Confirmed independently in
+ * the editor compiled, leaving seven platform-neutral assemblies. Confirmed independently in
  * CI: the 2021.3.45f1 editmode leg's log mentions `Tests.Runtime.Random` three times -- the
  * assembly list being echoed -- against 2,375 times in the playmode leg.
+ *
+ * That historical measurement predates Tests.ProtoOnly, which adds an eighth platform-neutral
+ * test assembly to the current inventory below.
  *
  * A fixture for an edit-mode branch of runtime code belongs in an editor-only assembly. Adding a
  * name here is a decision to give up EditMode coverage for everything in it.
  */
 const PLAYMODE_ONLY_TEST_ASSEMBLIES = [
   "WallstopStudios.UnityHelpers.Tests.Core",
+  "WallstopStudios.UnityHelpers.Tests.ProtoOnly",
   "WallstopStudios.UnityHelpers.Tests.Runtime",
   "WallstopStudios.UnityHelpers.Tests.Runtime.Performance",
   "WallstopStudios.UnityHelpers.Tests.Runtime.Random",
@@ -181,7 +185,7 @@ test("EveryEditmodeAssemblyIsEditorOnly", () => {
   );
 });
 
-test("PlaymodeOnlyAssembliesAreExactlyTheDeclaredSeven", () => {
+test("PlaymodeOnlyAssembliesAreExactlyTheDeclaredEight", () => {
   const playmode = discovery.defaultIncludeAssemblies(repoRoot, {
     target: "playmode",
     includePerf: true,
@@ -192,7 +196,7 @@ test("PlaymodeOnlyAssembliesAreExactlyTheDeclaredSeven", () => {
     PLAYMODE_ONLY_TEST_ASSEMBLIES.slice().sort(),
     "The set of test assemblies Unity runs in PlayMode only has changed. A fixture for an " +
       "edit-mode branch of runtime code cannot run in any of them; update " +
-      "PLAYMODE_ONLY_TEST_ASSEMBLIES and .llm/skills/unity-devcontainer-testing.md deliberately."
+      "PLAYMODE_ONLY_TEST_ASSEMBLIES and .llm/references/unity-devcontainer-testing-part-2.md deliberately."
   );
 });
 

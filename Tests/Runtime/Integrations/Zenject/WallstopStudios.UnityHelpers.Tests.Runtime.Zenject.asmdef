@@ -20,7 +20,7 @@
     "Sirenix.Serialization.dll"
   ],
   "autoReferenced": false,
-  "defineConstraints": ["UNITY_INCLUDE_TESTS", "ZENJECT_PRESENT"],
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "ZENJECT_PRESENT", "!WALLSTOP_PROTO_ONLY"],
   "versionDefines": [
     {
       "name": "com.extenject.zenject",

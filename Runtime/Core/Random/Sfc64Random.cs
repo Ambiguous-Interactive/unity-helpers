@@ -18,8 +18,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Text.Json.Serialization;
     using Extension;
     using Helper;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// An sfc64 generator: three 64-bit state words plus a draw counter, a current-generation
@@ -86,7 +88,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(SkipConstructor = true)]
+#endif
     [WProtoContract(SkipConstructor = true)]
     [WProtoSubtype(typeof(AbstractRandom), 120)]
     public sealed partial class Sfc64Random
@@ -119,19 +123,27 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         internal ulong _a;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [WProtoMember(7)]
         internal ulong _b;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(8)]
+#endif
         [WProtoMember(8)]
         internal ulong _c;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(9)]
+#endif
         [WProtoMember(9)]
         internal ulong _counter;
 

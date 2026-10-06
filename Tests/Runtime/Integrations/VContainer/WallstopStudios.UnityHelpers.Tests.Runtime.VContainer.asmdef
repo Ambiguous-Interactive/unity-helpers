@@ -16,7 +16,7 @@
   "overrideReferences": true,
   "precompiledReferences": ["nunit.framework.dll", "Sirenix.Serialization.dll"],
   "autoReferenced": false,
-  "defineConstraints": ["UNITY_INCLUDE_TESTS", "VCONTAINER_PRESENT"],
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "VCONTAINER_PRESENT", "!WALLSTOP_PROTO_ONLY"],
   "versionDefines": [
     {
       "name": "jp.cysharp.vcontainer",

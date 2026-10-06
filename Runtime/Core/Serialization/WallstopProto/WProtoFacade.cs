@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+    using System.Buffers;
 
     /// <summary>
     /// The seam <see cref="Serializer"/> uses to serve a type through WallstopProto instead of
@@ -19,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// of one change that moves every type at once and can only be tested in aggregate.
     /// </para>
     /// <para>
-    /// <see cref="Serializer"/> only calls this when <c>WALLSTOP_PROTO</c> is defined. The methods
+    /// <see cref="Serializer"/> calls this when <c>WALLSTOP_PROTO</c> or <c>WALLSTOP_PROTO_ONLY</c> is defined. The methods
     /// themselves compile unconditionally so they can be tested without a second compilation.
     /// </para>
     /// <para>
@@ -72,6 +73,103 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     exception
                 );
                 return null;
+            }
+        }
+
+        /// <summary>Serializes a registered type into a caller-owned buffer writer.</summary>
+        /// <remarks>The destination advances only after the complete payload is encoded.</remarks>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The caller-owned destination.</param>
+        /// <returns>The appended byte count, zero for a null root or empty contract.</returns>
+        /// <exception cref="SerializationConfigurationException">The destination is null.</exception>
+        /// <exception cref="SerializationTypeException">No formatter serves the value.</exception>
+        /// <exception cref="SerializationCorruptDataException">Encoding or the destination fails.</exception>
+        public static int Serialize<T>(T value, IBufferWriter<byte> destination)
+        {
+            try
+            {
+                if (destination == null)
+                {
+                    SerializationFailureException.ThrowConfiguration<T>(
+                        SerializationFormat.Protobuf,
+                        SerializationOperation.Serialize,
+                        "The buffer writer is null."
+                    );
+                }
+                if (!TryResolve(value, out IWProtoFormatter<T> formatter))
+                {
+                    SerializationFailureException.ThrowTypeResolution<T>(
+                        SerializationFormat.Protobuf,
+                        SerializationOperation.Serialize,
+                        "No WallstopProto formatter serves the declared type and runtime value."
+                    );
+                }
+                if (TypeShape<T>.IsReferenceType && value == null)
+                {
+                    return 0;
+                }
+                using WProtoSizes.SizePlanScope sizePlanScope = WProtoSizes.BeginSizePlan();
+                int size = formatter.Measure(value);
+                ReadOnlySpan<int> sizePlan = sizePlanScope.Freeze();
+                Span<byte> span =
+                    size == 0 ? Span<byte>.Empty : destination.GetSpan(size).Slice(0, size);
+                WProtoWriter writer = new WProtoWriter(span, sizePlan);
+                if (
+                    !formatter.Write(ref writer, value)
+                    || writer.Faulted
+                    || writer.Position != size
+                )
+                {
+                    SerializationFailureException.ThrowCorrupt<T>(
+                        SerializationFormat.Protobuf,
+                        SerializationOperation.Serialize,
+                        size,
+                        SerializationStage.Encode,
+                        null,
+                        "The formatter did not write its measured payload."
+                    );
+                }
+                if (size != 0)
+                {
+                    destination.Advance(size);
+                }
+                return size;
+            }
+            catch (Exception exception) when (exception is not SerializationFailureException)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Serialize,
+                    -1,
+                    SerializationStage.Encode,
+                    exception
+                );
+                return 0;
+            }
+        }
+
+        /// <summary>Attempts to encode a registered type into a caller-owned buffer writer.</summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The caller-owned destination.</param>
+        /// <param name="written">The appended byte count, zero on failure.</param>
+        /// <returns>Whether encoding and destination advancement succeeded.</returns>
+        public static bool TrySerialize<T>(
+            T value,
+            IBufferWriter<byte> destination,
+            out int written
+        )
+        {
+            try
+            {
+                written = Serialize(value, destination);
+                return true;
+            }
+            catch (SerializationFailureException)
+            {
+                written = 0;
+                return false;
             }
         }
 
@@ -168,7 +266,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <remarks>
         /// <para>
         /// The allocation-free entry point, and the one a caller serializing every frame should use.
-        /// <see cref="TrySerialize{T}"/> hands back an array sized exactly to the payload, which
+        /// <see cref="TrySerialize{T}(T, out byte[])"/> hands back an array sized exactly to the payload, which
         /// means a fresh allocation per call; this one lets a caller keep a single scratch buffer for
         /// the lifetime of the program.
         /// </para>

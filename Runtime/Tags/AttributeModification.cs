@@ -7,9 +7,11 @@ namespace WallstopStudios.UnityHelpers.Tags
     using System.Text.Json.Serialization;
     using Core.Extension;
     using Core.Helper;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Declarative change applied to an <see cref="Attribute"/>.
@@ -51,7 +53,9 @@ namespace WallstopStudios.UnityHelpers.Tags
     /// </list>
     /// </remarks>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct AttributeModification
         : IEquatable<AttributeModification>,
@@ -84,14 +88,18 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// The name of the attribute to modify. This should match a field name in an <see cref="AttributesComponent"/> subclass.
         /// </summary>
         [StringInList(typeof(AttributeUtilities), nameof(AttributeUtilities.GetAllAttributeNames))]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public string attribute;
 
         /// <summary>
         /// The type of modification action to perform (Addition, Multiplication, or Override).
         /// </summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public ModificationAction action;
 
@@ -101,7 +109,9 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <para>- Multiplication: The multiplier to apply (e.g., 1.5 for +50%, 0.5 for -50%)</para>
         /// <para>- Override: The new absolute value to set</para>
         /// </summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float value;
 

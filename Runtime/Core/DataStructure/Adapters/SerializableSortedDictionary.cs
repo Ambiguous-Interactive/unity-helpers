@@ -8,9 +8,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Collections.Generic;
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using System.IO;
+    using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
+#endif
+
 #if UNITY_EDITOR
     using UnityEditor;
 #endif
@@ -55,7 +60,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </example>
     [Serializable]
 #pragma warning disable WPROTO030 // Served through SerializableSortedDictionaryProtoWrapper.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(IgnoreListHandling = true)]
+#endif
 #pragma warning restore WPROTO030
     public abstract class SerializableSortedDictionaryBase<TKey, TValue, TValueCache>
         : IDictionary<TKey, TValue>,
@@ -130,12 +137,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values => _dictionary.Values;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
+#endif
         [JsonInclude]
         protected internal TKey[] _keys;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2, OverwriteList = true)]
+#endif
         [JsonInclude]
         protected internal TValueCache[] _values;
 
@@ -146,11 +157,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <see cref="_values"/> and its existing YAML.
         /// </summary>
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         [JsonIgnore]
         protected internal SerializableDictionary.Cache<TValueCache>[] _boxedValues;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         [JsonIgnore]
         protected internal SortedDictionary<TKey, TValue> _dictionary;
 
@@ -1202,13 +1217,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             ((IDictionary)_dictionary).CopyTo(array, index);
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoBeforeSerialization]
+#endif
         protected internal void OnProtoBeforeSerialization()
         {
             OnBeforeSerialize();
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterSerialization]
+#endif
         protected internal void OnProtoAfterSerialization()
         {
             if (_preserveSerializedEntries)
@@ -1221,7 +1240,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _boxedValues = null;
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterDeserialization]
+#endif
         protected internal void OnProtoAfterDeserialization()
         {
             OnAfterDeserialize();
@@ -1312,9 +1333,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// }
     /// ]]></code>
     /// </example>
+    /// <remarks>Legacy protobuf comparison retains the dictionary map encoding.</remarks>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.ProtoContract]
+#endif
     public class SerializableSortedDictionary<TKey, TValue>
         : SerializableSortedDictionaryBase<TKey, TValue, TValue>
+#if !WALLSTOP_PROTO_ONLY
+            ,
+            ILegacyProtobufMap
+#endif
         where TKey : IComparable<TKey>
     {
         /// <summary>
@@ -1344,6 +1373,23 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             cache[index] = value;
         }
+
+#if !WALLSTOP_PROTO_ONLY
+        bool ILegacyProtobufMap.TrySerialize(Stream destination)
+        {
+            if (GetType() != typeof(SerializableSortedDictionary<TKey, TValue>))
+            {
+                return false;
+            }
+
+            LegacyProtoComparerSerializer.SerializeMap<
+                SortedDictionary<TKey, TValue>,
+                TKey,
+                TValue
+            >(destination, _dictionary);
+            return true;
+        }
+#endif
     }
 
     /// <summary>
@@ -1369,9 +1415,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// catalog[1] = new RichValue { Name = "HealthPotion", Cost = 50 };
     /// ]]></code>
     /// </example>
+    /// <remarks>Legacy protobuf comparison retains the dictionary map encoding.</remarks>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.ProtoContract]
+#endif
     public class SerializableSortedDictionary<TKey, TValue, TValueCache>
         : SerializableSortedDictionaryBase<TKey, TValue, TValueCache>
+#if !WALLSTOP_PROTO_ONLY
+            ,
+            ILegacyProtobufMap
+#endif
         where TKey : IComparable<TKey>
         where TValueCache : SerializableDictionary.Cache<TValue>, new()
     {
@@ -1402,5 +1456,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             cache[index] = new TValueCache { Data = value };
         }
+
+#if !WALLSTOP_PROTO_ONLY
+        bool ILegacyProtobufMap.TrySerialize(Stream destination)
+        {
+            if (GetType() != typeof(SerializableSortedDictionary<TKey, TValue, TValueCache>))
+            {
+                return false;
+            }
+
+            LegacyProtoComparerSerializer.SerializeMap<
+                SortedDictionary<TKey, TValue>,
+                TKey,
+                TValue
+            >(destination, _dictionary);
+            return true;
+        }
+#endif
     }
 }

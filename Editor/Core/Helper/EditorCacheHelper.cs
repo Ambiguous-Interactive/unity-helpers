@@ -262,6 +262,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         /// <summary>
         /// Gets all cached display names for an enum type.
         /// </summary>
+        /// <remarks>Blank InspectorName attributes use the declared member name; other custom labels are preserved.</remarks>
         /// <param name="enumType">The enum type to get display names for.</param>
         /// <returns>An array of display names corresponding to each enum value, or an empty array if enumType is invalid.</returns>
         public static string[] GetEnumDisplayNames(Type enumType)
@@ -303,7 +304,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                         InspectorNameAttribute attr =
                             inspectorNameAttributes[0] as InspectorNameAttribute;
 
-                        if (attr != null && !string.IsNullOrEmpty(attr.displayName))
+                        if (attr != null && !string.IsNullOrWhiteSpace(attr.displayName))
                         {
                             displayName = attr.displayName;
                         }

@@ -65,3 +65,6 @@ _includes/*.html       text eol=lf
 *.unitypackage binary
 *.fbx          binary
 *.blend        binary
+
+# Preserve upstream source line endings inside the dependency patch hunks.
+Runtime/Protobuf-Net/il2cpp-aot.patch -text whitespace=-blank-at-eol,cr-at-eol

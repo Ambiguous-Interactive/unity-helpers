@@ -5,9 +5,11 @@ namespace WallstopStudios.UnityHelpers.Tags
 {
     using System;
     using System.Collections.Generic;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Authoring data for a periodic modifier bundle that executes on a cadence while an effect is active.
@@ -72,14 +74,18 @@ namespace WallstopStudios.UnityHelpers.Tags
     /// </para>
     /// </example>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public sealed partial class PeriodicEffectDefinition
     {
         /// <summary>
         /// Optional label shown in tooling to help distinguish multiple periodic definitions.
         /// </summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public string name;
 
@@ -87,7 +93,9 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Time (seconds) before the first tick fires after the effect is applied.
         /// </summary>
         [Min(0f)]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public float initialDelay;
 
@@ -95,7 +103,9 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Interval (seconds) between ticks once the first tick has executed.
         /// </summary>
         [Min(0.01f)]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public float interval = 1f;
 
@@ -103,14 +113,18 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Maximum number of ticks to execute. Zero or negative means unlimited ticks.
         /// </summary>
         [Min(0)]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public int maxTicks;
 
         /// <summary>
         /// Attribute modifications applied each time the tick fires.
         /// </summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(5)]
+#endif
         [WProtoMember(5)]
         public List<AttributeModification> modifications = new();
     }

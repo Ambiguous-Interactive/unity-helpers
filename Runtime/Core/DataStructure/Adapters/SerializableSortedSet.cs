@@ -30,6 +30,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// at runtime, far from the declaration that caused it.
     /// </remarks>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
+#endif
     public class SerializableSortedSet<T> : SerializableSetBase<T, SortedSet<T>>
         where T : IComparable<T>
     {
@@ -44,6 +47,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public T Max => Set.Max;
 
         protected override bool SupportsSorting => true;
+
+#if !WALLSTOP_PROTO_ONLY
+        static SerializableSortedSet()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer(
+                ProtoBuf.Serializers.RepeatedSerializer.CreateEnumerable<
+                    SerializableSortedSet<T>,
+                    T
+                >()
+            );
+        }
+#endif
 
         /// <summary>
         /// Initializes an empty sorted set that can participate in Unity and ProtoBuf serialization.

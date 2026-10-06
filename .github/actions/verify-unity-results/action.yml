@@ -20,6 +20,10 @@ inputs:
       skip (notice + success) instead of failing with "tests did not run".
     required: false
     default: "false"
+  required-test-name:
+    description: "Require exactly one passed leaf case with this full name; empty disables the check."
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -47,6 +51,7 @@ runs:
         UH_EXPECTED_EMPTY: ${{ inputs.expected-empty }}
         UH_RESULTS_DIR: ${{ inputs.results-dir }}
         UH_LABEL: ${{ inputs.label }}
+        UH_REQUIRED_TEST_NAME: ${{ inputs.required-test-name }}
       run: |
         $repoRoot = if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE } else { (Get-Location).Path }
         . (Join-Path $repoRoot 'scripts/unity/lib/credential-redaction.ps1')
@@ -672,6 +677,17 @@ runs:
           Write-Host "::error::No NUnit results.xml (with a <test-run> element) under $dir -- tests did not run for $label"
           exit 1
         }
+        function Assert-RequiredNativeTest {
+          param([xml]$Doc, [string]$RequiredTestName)
+          if ([string]::IsNullOrEmpty($RequiredTestName)) { return }
+          $cases = @($Doc.SelectNodes('//test-case') | Where-Object {
+            $_.GetAttribute('fullname') -ceq $RequiredTestName
+          })
+          if ($cases.Count -ne 1 -or $cases[0].GetAttribute('result') -cne 'Passed') {
+            throw "Required native test '$RequiredTestName' must have exactly one passed result."
+          }
+        }
+
         [xml]$doc = Get-Content -LiteralPath $xml.FullName
         $run = $doc.SelectSingleNode('//test-run')
         $total = [int]($run.total)
@@ -697,4 +713,5 @@ runs:
           Write-Host "::error::$label reported $failureCountForMessage failed test(s); see $($xml.FullName)"
           exit 1
         }
+        Assert-RequiredNativeTest -Doc $doc -RequiredTestName $env:UH_REQUIRED_TEST_NAME
         Write-Host "::notice::${label}: total=$total passed=$passed failed=$failed skipped=$skipped"

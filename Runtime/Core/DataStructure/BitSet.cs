@@ -7,11 +7,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections;
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Compact, dynamically resizable bit set that stores dense boolean flags using a single bit per entry.
@@ -25,7 +27,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// ]]></code>
     /// </example>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(IgnoreListHandling = true)]
+#endif
     [WProtoContract(IgnoreListHandling = true)]
     public sealed partial class BitSet : IReadOnlyList<bool>
     {
@@ -62,12 +66,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         private ulong[] _bits;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         private int _capacity;
 
@@ -597,7 +605,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         // Capacity is an untrusted claim; only delivered words contain readable bits.
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterDeserialization]
+#endif
         [WProtoAfterDeserialization]
         private void ClampCapacityToDeliveredWords()
         {

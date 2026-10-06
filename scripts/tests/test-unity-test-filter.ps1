@@ -26,6 +26,34 @@ foreach ($diagnosticSource in @($source, $verifier)) {
     }
 }
 
+$requiredStart = $verifier.IndexOf('function Assert-RequiredNativeTest {')
+if ($requiredStart -lt 0) { throw 'Missing required native-test gate.' }
+$requiredAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $verifier.Substring($requiredStart), [ref]$tokens, [ref]$parseErrors)
+$requiredFunction = $requiredAst.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Assert-RequiredNativeTest'
+    }, $true)
+if ($null -eq $requiredFunction) { throw 'The native positive-control gate must parse.' }
+Invoke-Expression $requiredFunction.Extent.Text
+foreach ($fixture in @(
+        @{ Required = ''; Body = ''; Pass = $true },
+        @{ Required = 'Control'; Body = '<test-case fullname="Control" result="Passed" />'; Pass = $true },
+        @{ Required = 'Control'; Body = ''; Pass = $false },
+        @{ Required = 'Control'; Body = '<test-case fullname="control" result="Passed" />'; Pass = $false },
+        @{ Required = 'Control'; Body = '<test-case fullname="Control" result="Skipped" />'; Pass = $false },
+        @{ Required = 'Control'; Body = '<test-case fullname="Control" result="Failed" />'; Pass = $false },
+        @{ Required = 'Control'; Body = '<test-case fullname="Control" result="Inconclusive" />'; Pass = $false },
+        @{ Required = 'Control'; Body = '<test-case fullname="Control" result="Passed" /><test-case fullname="Control" result="Passed" />'; Pass = $false }
+    )) {
+    [xml]$requiredXml = '<test-run>' + $fixture.Body + '</test-run>'
+    $accepted = $true
+    try { Assert-RequiredNativeTest -Doc $requiredXml -RequiredTestName $fixture.Required }
+    catch { $accepted = $false }
+    if ($accepted -ne $fixture.Pass) { throw 'Required native-test positive/negative control mismatch.' }
+}
+
 # Diagnostics are not the subject; the actual XML gate and invocation sites are.
 function Write-CiError { param([string]$Message) }
 function Write-CiNotice { param([string]$Message) }

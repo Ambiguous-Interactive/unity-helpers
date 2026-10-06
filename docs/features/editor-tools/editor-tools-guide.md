@@ -322,6 +322,9 @@ changes and reports `canceled`; an error can also leave earlier textures changed
 importer for the caller to reimport. The default-platform name string is
 `"DefaultTexturePlatform"`.
 
+Direct API calls ignore null, empty and whitespace-only platform override names. Nonblank names
+remain exact; other overrides and general import settings still apply.
+
 > **Visual Reference**
 >
 > ![Texture Settings Applier window showing configuration options](../../images/editor-tools/texture-settings-applier.png)

@@ -9,8 +9,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using Helper;
-    using ProtoBuf;
     using UnityEngine;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Immutable wrapper around <see cref="Guid"/> that stores a normalized version-4 GUID using two longs for faster Unity serialization.
@@ -33,7 +35,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
     [DataContract]
 #pragma warning disable WPROTO030 // Served by WGuidWProtoFormatter.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
 #pragma warning restore WPROTO030
     public partial struct WGuid
         : IEquatable<WGuid>,
@@ -118,11 +122,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [DataMember]
         private string Guid => ToString();
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [SerializeField]
         private long _low;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [SerializeField]
         private long _high;
 

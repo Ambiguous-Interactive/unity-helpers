@@ -24,12 +24,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using System.Text.Json.Serialization;
     using System.Threading.Tasks;
     using JsonConverters;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
     using TypeConverter = JsonConverters.TypeConverter;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     internal static class SerializerEncoding
     {
@@ -258,7 +260,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     }
 
     /// <summary>
-    /// Unified serialization helpers for JSON, protobuf‑net, and legacy BinaryFormatter.
+    /// Unified serialization helpers for JSON, generated or legacy protobuf, and BinaryFormatter.
     /// </summary>
     /// <remarks>
     /// Highlights
@@ -301,6 +303,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     public static class Serializer
     {
         // Small payloads use protobuf-net buffer access; larger reads avoid repeated stream allocation.
+#if !WALLSTOP_PROTO_ONLY
         private const int ProtobufMemoryStreamThreshold = 4096;
 
         internal static readonly ConcurrentDictionary<Type, Type> ProtobufRootCache = new();
@@ -361,6 +364,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             Func<byte[], object>
         > SpecialCollectionDeserializerFactory = BuildSpecialCollectionDeserializer;
 
+#endif
 #pragma warning disable UAC0023 // Intentional legacy, trusted-only compatibility API; see SystemBinary docs.
         private static readonly Utils.WallstopGenericPool<BinaryFormatter> BinaryFormatterPool =
             new(() => new BinaryFormatter());
@@ -375,8 +379,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             onDisposal: stream => stream.Dispose()
         );
 
+        /// <summary>
+        /// Every runtime type this writer has already resolved, per options instance. The options
+        /// hold the converter list the answer depends on, and System.Text.Json makes an options
+        /// instance read-only the first time it is used to serialize, so an answer cannot go stale
+        /// under a caller who adds a converter later. The table holds the options weakly, so a
+        /// caller who builds options per call does not leak them.
+        /// </summary>
+        private static readonly ConditionalWeakTable<
+            JsonSerializerOptions,
+            ConcurrentDictionary<Type, Type>
+        > RuntimeWriteTypeCache = new();
+
         static Serializer()
         {
+#if !WALLSTOP_PROTO_ONLY
             // Serialization initialization must not depend on accessing JSON options first.
             ProtobufUnityModel.EnsureInitialized();
             try
@@ -449,6 +466,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
             catch { }
+#endif
         }
 
         /// <summary>
@@ -517,7 +535,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// changes the model.
         /// </para>
         /// <para>
-        /// Under IL2CPP this always reports ready. protobuf-net builds its serializers by
+        /// Under IL2CPP or WALLSTOP_PROTO_ONLY this always reports ready. protobuf-net builds its serializers by
         /// reflection, which an AOT compiler cannot emit, so these types are encoded by
         /// WallstopProto there and a refused registration changes nothing you can observe.
         /// </para>
@@ -536,8 +554,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static bool ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes)
         {
             // Wake the registering static constructor before reporting its failures.
+#if !WALLSTOP_PROTO_ONLY
             ProtobufUnityModel.EnsureInitialized();
-#if ENABLE_IL2CPP
+#endif
+#if ENABLE_IL2CPP || WALLSTOP_PROTO_ONLY
             refusedTypes = Array.Empty<string>();
             return true;
 #else
@@ -547,7 +567,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         /// <summary>
-        /// Registers a concrete or abstract protobuf root type for a declared interface/abstract/object type.
+        /// Registers a legacy protobuf root unless WALLSTOP_PROTO_ONLY disables that backend.
         /// The root must be assignable to <paramref name="declared"/> and annotated with [ProtoContract].
         /// Subsequent deserializations to the declared type will use the registered root.
         /// </summary>
@@ -566,8 +586,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <exception cref="ArgumentNullException">If declared or root is null.</exception>
         /// <exception cref="ArgumentException">If root is not assignable to declared or missing [ProtoContract].</exception>
         /// <exception cref="InvalidOperationException">If a conflicting root is already registered.</exception>
+        /// <exception cref="SerializationConfigurationException">WALLSTOP_PROTO_ONLY disables legacy root registration.</exception>
         public static void RegisterProtobufRoot(Type declared, Type root)
         {
+#if WALLSTOP_PROTO_ONLY
+            SerializationFailureException.ThrowConfiguration<object>(
+                SerializationFormat.Protobuf,
+                SerializationOperation.Deserialize,
+                "Legacy root registration is disabled by WALLSTOP_PROTO_ONLY. Use WProtoDeclaredRootAttribute for generated root dispatch."
+            );
+#else
             if (declared == null)
             {
                 throw new ArgumentNullException(nameof(declared));
@@ -604,6 +632,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             // Both serializers must agree on the declared root; payload bytes do not identify their contract.
             WallstopProto.WProtoDeclaredRootProvider.Claim(declared, root);
+#endif
         }
 
         /// <summary>
@@ -929,7 +958,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         ///   <c>[ProtoContract]</c> and <c>[ProtoInclude]</c> for all subtypes (e.g.,
         ///   <c>AbstractRandom</c> in the random package) or by a previously registered mapping via
         ///   <see cref="RegisterProtobufRoot{TDeclared, TRoot}()"/>. If no unique root is found, a
-        ///   <see cref="ProtoException"/> is thrown to avoid ambiguous heuristics.
+        ///   <c>ProtoBuf.ProtoException</c> is thrown to avoid ambiguous heuristics.
         ///
         /// Examples
         /// <code><![CDATA[
@@ -952,7 +981,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </remarks>
         public static T ProtoDeserialize<T>(byte[] data)
         {
-#if WALLSTOP_PROTO
+#if WALLSTOP_PROTO || WALLSTOP_PROTO_ONLY
             if (data != null && TryWallstopProtoDeserialize(data, typeof(T), out T wproto))
             {
                 return wproto;
@@ -966,6 +995,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     SerializationOperation.Deserialize
                 );
             }
+
+#if WALLSTOP_PROTO_ONLY
+            SerializationFailureException.ThrowTypeResolution<T>(
+                SerializationFormat.Protobuf,
+                SerializationOperation.Deserialize,
+                "No generated formatter serves this request. Legacy protobuf-net fallback is disabled by WALLSTOP_PROTO_ONLY."
+            );
+            return default;
+#else
             // Handle wrappers before empty-input checks: an empty collection legitimately encodes to zero bytes.
             Type declared = typeof(T);
             if (CollectionShape<T>.IsSerializableCollection)
@@ -1152,8 +1190,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
                 return default;
             }
+#endif
         }
 
+#if !WALLSTOP_PROTO_ONLY
         internal static bool ShouldUseRuntimeTypeForProtobuf<T>(
             Type declared,
             T instance,
@@ -1629,65 +1669,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             stream.ToArrayExact(ref buffer);
             return buffer;
         }
-
-#if WALLSTOP_PROTO
-        /// <summary>
-        /// Asks WallstopProto for <paramref name="data"/>, reporting a refusal as this package's own
-        /// corrupt-data failure rather than as the facade's.
-        /// </summary>
-        /// <typeparam name="T">The declared type.</typeparam>
-        /// <param name="data">The payload.</param>
-        /// <param name="concrete">The type the caller named, or <typeparamref name="T"/>.</param>
-        /// <param name="value">Receives the value when WallstopProto served the request.</param>
-        /// <returns><c>true</c> when WallstopProto served it; <c>false</c> when it is not its type.</returns>
-        /// <remarks>
-        /// <para>
-        /// The facade throws <see cref="InvalidOperationException"/> for a payload its formatter
-        /// refused, deliberately: "no formatter for this type" and "this type's formatter rejected
-        /// these bytes" are different answers, and passing the second on to protobuf-net would give a
-        /// rejected payload a second, differently-implemented decode.
-        /// </para>
-        /// <para>
-        /// This is the boundary where that becomes the wrong exception. <see cref="TryProtoDeserialize
-        /// {T}(byte[], out T)"/> promises <c>false</c> for a corrupt payload and catches only
-        /// <see cref="SerializationFailureException"/>s, so an <see cref="InvalidOperationException"/>
-        /// escaping here turns a Try API into a throwing one -- and a caller handling the documented
-        /// exceptions would miss the failure entirely.
-        /// </para>
-        /// </remarks>
-        private static bool TryWallstopProtoDeserialize<T>(byte[] data, Type concrete, out T value)
-        {
-            try
-            {
-                return WallstopProto.WProtoFacade.TryDeserializeAs(data, concrete, out value);
-            }
-            catch (InvalidOperationException e)
-            {
-                SerializationFailureException.ThrowCorrupt<T>(
-                    SerializationFormat.Protobuf,
-                    SerializationOperation.Deserialize,
-                    data.Length,
-                    SerializationStage.Decode,
-                    e,
-                    "WallstopProto rejected the payload."
-                );
-                value = default;
-                return false;
-            }
-        }
 #endif
-
-        /// <summary>
-        /// Every runtime type this writer has already resolved, per options instance. The options
-        /// hold the converter list the answer depends on, and System.Text.Json makes an options
-        /// instance read-only the first time it is used to serialize, so an answer cannot go stale
-        /// under a caller who adds a converter later. The table holds the options weakly, so a
-        /// caller who builds options per call does not leak them.
-        /// </summary>
-        private static readonly ConditionalWeakTable<
-            JsonSerializerOptions,
-            ConcurrentDictionary<Type, Type>
-        > RuntimeWriteTypeCache = new();
 
         /// <summary>
         /// Attempts to deserialize a protobuf payload. Returns <see langword="false"/> and sets
@@ -1721,7 +1703,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         /// <summary>
-        /// Deserializes protobuf‑net bytes into the provided <paramref name="type"/>.
+        /// Deserializes generated or legacy protobuf into the provided <paramref name="type"/>.
         /// </summary>
         /// <typeparam name="T">Expected return type after cast.</typeparam>
         /// <param name="data">Encoded protobuf payload.</param>
@@ -1729,6 +1711,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <returns>The decoded instance cast to <typeparamref name="T"/>.</returns>
         public static T ProtoDeserialize<T>(byte[] data, Type type)
         {
+#if !WALLSTOP_PROTO_ONLY
             if (
                 type == typeof(T)
                 && (IsSerializableCollectionType(type) || IsSpecialCollectionType(type))
@@ -1737,7 +1720,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return ProtoDeserialize<T>(data);
             }
 
-#if WALLSTOP_PROTO
+#endif
+#if WALLSTOP_PROTO || WALLSTOP_PROTO_ONLY
             // Accept a requested runtime type only when the registered formatter declares that contract or subtype.
             if (
                 data != null
@@ -1766,6 +1750,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
             }
 
+#if WALLSTOP_PROTO_ONLY
+            SerializationFailureException.ThrowTypeResolution<T>(
+                SerializationFormat.Protobuf,
+                SerializationOperation.Deserialize,
+                "No generated formatter serves this request. Legacy protobuf-net fallback is disabled by WALLSTOP_PROTO_ONLY."
+            );
+            return default;
+#else
             try
             {
                 if (type == typeof(SparseSet))
@@ -1820,6 +1812,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
                 return default;
             }
+#endif
         }
 
         /// <summary>
@@ -1847,7 +1840,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         /// <summary>
-        /// Serializes an instance to protobuf‑net bytes.
+        /// Serializes an instance using generated protobuf with optional legacy fallback.
         /// </summary>
         /// <typeparam name="T">Declared type.</typeparam>
         /// <param name="input">The instance to serialize.</param>
@@ -1870,7 +1863,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </example>
         public static byte[] ProtoSerialize<T>(T input, bool forceRuntimeType = false)
         {
-#if WALLSTOP_PROTO
+#if WALLSTOP_PROTO_ONLY
+            return WallstopProto.WProtoFacade.Serialize(input);
+#else
+
+#if WALLSTOP_PROTO || WALLSTOP_PROTO_ONLY
             // Generated formatters already dispatch runtime subtypes; forceRuntimeType must not divert AOT calls to reflection.
             if (WallstopProto.WProtoFacade.TrySerialize(input, out byte[] wproto))
             {
@@ -1909,10 +1906,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             byte[] buffer = null;
             stream.ToArrayExact(ref buffer);
             return buffer;
+
+#endif
         }
 
         /// <summary>
-        /// Serializes an instance to protobuf‑net bytes into a caller-provided buffer.
+        /// Serializes generated or legacy protobuf into a caller-provided buffer.
         /// </summary>
         /// <typeparam name="T">Declared type.</typeparam>
         /// <param name="input">The instance to serialize.</param>
@@ -1925,7 +1924,38 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             bool forceRuntimeType = false
         )
         {
-#if WALLSTOP_PROTO
+#if WALLSTOP_PROTO_ONLY
+            try
+            {
+                WallstopProto.WProtoWriteResult result = WallstopProto.WProtoFacade.Serialize(
+                    input,
+                    ref buffer
+                );
+                if (result.Served)
+                {
+                    return result.Length;
+                }
+                SerializationFailureException.ThrowTypeResolution<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Serialize,
+                    "No generated formatter serves this request. Legacy protobuf-net fallback is disabled by WALLSTOP_PROTO_ONLY."
+                );
+                return 0;
+            }
+            catch (Exception exception) when (exception is not SerializationFailureException)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Serialize,
+                    -1,
+                    SerializationStage.Encode,
+                    exception
+                );
+                return 0;
+            }
+#else
+
+#if WALLSTOP_PROTO || WALLSTOP_PROTO_ONLY
             // The caller-buffer overload must use the same generated formatter dispatch as the allocating overload.
             WallstopProto.WProtoWriteResult wproto = WallstopProto.WProtoFacade.Serialize(
                 input,
@@ -1970,6 +2000,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 ProtoBuf.Serializer.Serialize(stream, input);
             }
             return stream.ToArrayExact(ref buffer);
+
+#endif
         }
 
         /// <summary>
@@ -2775,6 +2807,54 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         // Require an explicit root when the declared contract and its includes cannot identify one unambiguously.
+#if WALLSTOP_PROTO || WALLSTOP_PROTO_ONLY
+        /// <summary>
+        /// Asks WallstopProto for <paramref name="data"/>, reporting a refusal as this package's own
+        /// corrupt-data failure rather than as the facade's.
+        /// </summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="data">The payload.</param>
+        /// <param name="concrete">The type the caller named, or <typeparamref name="T"/>.</param>
+        /// <param name="value">Receives the value when WallstopProto served the request.</param>
+        /// <returns><c>true</c> when WallstopProto served it; <c>false</c> when it is not its type.</returns>
+        /// <remarks>
+        /// <para>
+        /// The facade throws <see cref="InvalidOperationException"/> for a payload its formatter
+        /// refused, deliberately: "no formatter for this type" and "this type's formatter rejected
+        /// these bytes" are different answers, and passing the second on to protobuf-net would give a
+        /// rejected payload a second, differently-implemented decode.
+        /// </para>
+        /// <para>
+        /// This is the boundary where that becomes the wrong exception. <see cref="TryProtoDeserialize
+        /// {T}(byte[], out T)"/> promises <c>false</c> for a corrupt payload and catches only
+        /// <see cref="SerializationFailureException"/>s, so an <see cref="InvalidOperationException"/>
+        /// escaping here turns a Try API into a throwing one -- and a caller handling the documented
+        /// exceptions would miss the failure entirely.
+        /// </para>
+        /// </remarks>
+        private static bool TryWallstopProtoDeserialize<T>(byte[] data, Type concrete, out T value)
+        {
+            try
+            {
+                return WallstopProto.WProtoFacade.TryDeserializeAs(data, concrete, out value);
+            }
+            catch (InvalidOperationException e)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Deserialize,
+                    data.Length,
+                    SerializationStage.Decode,
+                    e,
+                    "WallstopProto rejected the payload."
+                );
+                value = default;
+                return false;
+            }
+        }
+#endif
+
+#if !WALLSTOP_PROTO_ONLY
         private static Type ResolveProtobufRootType(Type declared)
         {
             if (declared == null)
@@ -2867,6 +2947,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             return NoRootMarker;
         }
+#endif
 
         private static void WriteJsonToStream<T>(
             T input,
@@ -3448,6 +3529,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
+#if !WALLSTOP_PROTO_ONLY
         /// <summary>
         /// The collection-shape answers for one closed <typeparamref name="T"/>.
         /// </summary>
@@ -3735,8 +3817,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             > WrapperAccessors = new();
         }
-
         // Cycle detection uses reference identity so distinct value-equal nodes are still written.
+
+#endif
+
         private sealed class ReferenceComparer : IEqualityComparer<object>
         {
             internal static readonly ReferenceComparer Instance = new();

@@ -7,8 +7,10 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using Helper;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Inclusive Range [min,max] with configurable endpoint inclusivity.
@@ -23,7 +25,9 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     /// </example>
     [Serializable]
     [DataContract]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct Range<T> : IEquatable<Range<T>>, IComparable<Range<T>>
         where T : IEquatable<T>, IComparable<T>
@@ -46,25 +50,33 @@ namespace WallstopStudios.UnityHelpers.Core.Math
 
         [DataMember]
         [JsonInclude]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public T min;
 
         [DataMember]
         [JsonInclude]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public T max;
 
         [DataMember]
         [JsonInclude]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         public bool startInclusive;
 
         [DataMember]
         [JsonInclude]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         public bool endInclusive;
 
