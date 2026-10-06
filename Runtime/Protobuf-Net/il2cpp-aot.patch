@@ -209,3 +209,21 @@ index 00000000..91a318c0
 +            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat);
 +    }
 +}
+diff --git a/src/protobuf-net/Meta/MetaType.cs b/src/protobuf-net/Meta/MetaType.cs
+index 527bc447..73bdb122 100644
+--- a/src/protobuf-net/Meta/MetaType.cs
++++ b/src/protobuf-net/Meta/MetaType.cs
+@@ -987,6 +987,13 @@ namespace ProtoBuf.Meta
+             if (ctors.Length == 0 || (ctors.Length == 1 && ctors[0].GetParameters().Length == 0)) return null;
+ 
+             MemberInfo[] fieldsPropsUnfiltered = Helpers.GetInstanceFieldsAndProperties(type, true);
++            foreach (MemberInfo member in fieldsPropsUnfiltered)
++            {
++                if (member is PropertyInfo property && property.GetIndexParameters().Length != 0)
++                {
++                    return null;
++                }
++            }
+             var memberList = new List<MemberInfo>();
+             // for most types we'll enforce that you need readonly, because that is what protobuf-net
+             // always did historically; but: if you smell so much like a Tuple that it is *in your name*,

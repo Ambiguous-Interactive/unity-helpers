@@ -80,7 +80,10 @@ the existing protobuf-net dispatch and their own contract behavior. Stripped-pla
 collection compatibility remains tracked in
 [#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950).
 The bundled protobuf-net 3.2.56 assemblies include source patches for dictionary-entry value
-checkers, nullable member classification and runtime construction of nested map serializers.
+checkers, nullable member classification, runtime construction of nested map serializers and
+indexed collection classification. Indexed properties are rejected before speculative tuple
+setter inspection; ordinary tuples and index-free init-only contracts keep their existing
+classification. Init-only setter inspection still uses the original custom-modifier API.
 Nested dictionary fields use the existing typed map serializer and the active model's key/value
 policies without a reflected generic map-decorator constructor. Compiled models retain the
 original typed emitter. Map encoding and default-value policy remain unchanged. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)
