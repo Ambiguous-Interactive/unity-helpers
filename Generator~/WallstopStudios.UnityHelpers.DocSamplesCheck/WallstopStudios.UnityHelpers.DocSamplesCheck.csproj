@@ -14,7 +14,7 @@
     keyed on `Type.Member` reported `Serializer.ProtoDeserialize` as missing 17 times, because it
     cannot see a generic method, an extension method, or an overload set. Roslyn can, so resolution
     is left to it. `scripts/extract-doc-samples.js` writes the marked samples into
-    `artifacts/doc-samples`, one namespace each, and this project compiles them against the real
+    `artifacts/doc-samples~`, one namespace each, and this project compiles them against the real
     `Runtime/**` and `Editor/**`: the same sources TypeCheck and EditorCheck judge, referenced as
     their outputs rather than recompiled. The runtime leg preserves player-branch sample coverage;
     the editor leg includes all runtime samples plus the editor-only ones.
@@ -54,7 +54,7 @@
       >$(DefineConstants);UNITY_EDITOR</DefineConstants>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
     <DocSamplesDir Condition="'$(DocSamplesDir)' == ''"
-      >$(RepoRoot)/artifacts/doc-samples</DocSamplesDir>
+      >$(RepoRoot)/artifacts/doc-samples~</DocSamplesDir>
     <!--
       A documentation sample is prose. It declares fields nothing assigns, locals nothing reads, and
       types nothing constructs, and every one of those is correct in an example. The gate's subject

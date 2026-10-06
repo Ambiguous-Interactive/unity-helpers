@@ -141,7 +141,7 @@ const UNDECLARED_BY_DESIGN = new Map([
 const UNGOVERNED_BY_DESIGN = new Map([
   [
     "WallstopStudios.UnityHelpers.DocSamplesCheck",
-    "compiles the extracted samples under artifacts/doc-samples, which no asmdef owns (#611)"
+    "compiles the extracted samples under artifacts/doc-samples~, which no asmdef owns (#611)"
   ],
   [
     "WallstopStudios.UnityHelpers.EditorCheck",
