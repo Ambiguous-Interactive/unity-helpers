@@ -396,6 +396,11 @@ Samples~/**/*.rsp.meta
 Generator~/**/bin/**
 Generator~/**/obj/**
 
+# Independent consumer CI templates. The trailing ~ prevents package Unity imports;
+# these sources must remain tracked for fresh-checkout floor/latest acceptance.
+!Acceptance~/
+!Acceptance~/**
+
 # The TestU01 stream driver. Same reason as Generator~ one rule up: the trailing ~ is what keeps
 # Unity from compiling it, because a `.c` anywhere in this package is native plugin source and
 # IL2CPP then fails the standalone player build on includes that only exist next to a TestU01

@@ -1,0 +1,13 @@
+{
+  "name": "NestedOnly.Consumer.Editor",
+  "rootNamespace": "NestedOnlyConsumer.Editor",
+  "references": ["NestedOnly.Consumer"],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

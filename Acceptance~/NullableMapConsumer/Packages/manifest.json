@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "com.wallstop-studios.unity-helpers": "file:__CANDIDATE_PACKAGE__",
+    "com.unity.modules.jsonserialize": "1.0.0"
+  }
+}

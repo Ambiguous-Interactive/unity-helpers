@@ -1,0 +1,9 @@
+<linker>
+  <assembly fullname="NestedOnly.Consumer">
+    <type fullname="NestedOnlyConsumer.Doc" preserve="all" />
+    <type fullname="NestedOnlyConsumer.OwnedMessage" preserve="all" />
+    <type fullname="NestedOnlyConsumer.PresenceDoc" preserve="all" />
+    <type fullname="NestedOnlyConsumer.PresenceValue" preserve="all" />
+    <type fullname="NestedOnlyConsumer.PresenceEnum" preserve="all" />
+  </assembly>
+</linker>
