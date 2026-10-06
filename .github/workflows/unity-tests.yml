@@ -598,7 +598,7 @@ jobs:
         if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
         continue-on-error: true
         timeout-minutes: 2
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@84b8d875ab1968716ef95b5b56d10307609237ca # v1.16.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@c5463a9e0d09e5089c7172f41425bf09b7752da2 # v1.16.1
         with:
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
