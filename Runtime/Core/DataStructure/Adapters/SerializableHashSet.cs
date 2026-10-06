@@ -1308,6 +1308,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <inheritdoc />
         protected override IEqualityComparer<T> SetComparer => Set.Comparer;
 
+#if !WALLSTOP_PROTO_ONLY
+        static SerializableHashSet()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer(
+                ProtoBuf.Serializers.RepeatedSerializer.CreateEnumerable<
+                    SerializableHashSet<T>,
+                    T
+                >()
+            );
+        }
+#endif
+
         /// <summary>
         /// Initializes an empty hash set compatible with Unity and ProtoBuf serialization.
         /// </summary>

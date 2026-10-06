@@ -127,6 +127,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 #endif
         private int _serializedCapacity;
 
+#if !WALLSTOP_PROTO_ONLY
+        static Deque()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer(
+                ProtoBuf.Serializers.RepeatedSerializer.CreateList<T>()
+            );
+        }
+#endif
+
         /// <summary>
         /// Constructs an empty deque with the specified capacity.
         /// </summary>

@@ -86,7 +86,12 @@ setter inspection; ordinary tuples and index-free init-only contracts keep their
 classification. Init-only setter inspection still uses the original custom-modifier API.
 Nested dictionary fields use the existing typed map serializer and the active model's key/value
 policies without a reflected generic map-decorator constructor. Compiled models retain the
-original typed emitter. Map encoding and default-value policy remain unchanged. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)
+original typed emitter. Map encoding and default-value policy remain unchanged. Runtime repeated
+providers use typed registrations for intrinsic scalar lists and arrays, while owned generic set,
+deque and cyclic-buffer constructors register their actual serializers. The cache checks the
+original provider identity and directly constructs the original repeated decorator, preserving
+custom-provider precedence and compiled models. Dynamic
+consumer collection contracts still require their own AOT qualification. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)
 include the exact patch and binary hashes. Fresh Unity 2021.3 stripped-player qualification of
 this patch remains required; newer-player success for the previous binaries does not prove it.
 The root save wrappers described below remain a separate path: comparer hashes are not hashes

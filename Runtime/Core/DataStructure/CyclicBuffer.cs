@@ -84,6 +84,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 #endif
         private int _position;
 
+#if !WALLSTOP_PROTO_ONLY
+        static CyclicBuffer()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer(
+                ProtoBuf.Serializers.RepeatedSerializer.CreateList<T>()
+            );
+        }
+#endif
+
         public CyclicBuffer(int capacity, IEnumerable<T> initialContents = null)
         {
             if (capacity < 0)

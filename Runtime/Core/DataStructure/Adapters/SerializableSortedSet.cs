@@ -45,6 +45,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         protected override bool SupportsSorting => true;
 
+#if !WALLSTOP_PROTO_ONLY
+        static SerializableSortedSet()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer(
+                ProtoBuf.Serializers.RepeatedSerializer.CreateEnumerable<
+                    SerializableSortedSet<T>,
+                    T
+                >()
+            );
+        }
+#endif
+
         /// <summary>
         /// Initializes an empty sorted set that can participate in Unity and ProtoBuf serialization.
         /// </summary>

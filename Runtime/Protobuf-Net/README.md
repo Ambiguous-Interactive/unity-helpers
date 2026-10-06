@@ -6,7 +6,7 @@ The annotated tag object is `421b80a9b128be779036e600b996efb9e48b9f92`.
 Upstream source and license: [protobuf-net](https://github.com/protobuf-net/protobuf-net/tree/dfdfce61a739cfd76f05fcdacf8a4b3b9e94e684)
 and [bundled license](./Licence.txt).
 
-[The source patch](./il2cpp-aot.patch) changes four internal behaviors:
+[The source patch](./il2cpp-aot.patch) changes five runtime behaviors:
 
 - Construct fallback value checkers directly, avoiding reflected closed generic constructors.
   Primary primitive checkers keep their original default-value policy. Nonnullable structs
@@ -22,11 +22,22 @@ and [bundled license](./Licence.txt).
   tuple serializer; ordinary tuples, key/value pairs and index-free init-only contracts keep
   their existing classification.
 
-Map serialization, field numbers, default omission and public APIs retain upstream behavior.
+- Register real typed list and vector providers for intrinsic scalar types, including nullable
+  scalars and repeated bytes. Owned generic set and callback-backed collection constructors
+  register their actual providers. Runtime lookup checks the original provider identity before
+  using a registered instance and constructing its original typed repeated decorator directly;
+  custom provider precedence and compiled emitters remain intact.
+  These factories construct their singleton serializers directly.
+
+Map serialization, field numbers and default omission retain upstream behavior.
+The additive `RuntimeTypeModel.RegisterRepeatedSerializer<TCollection, TItem>` API registers an
+existing provider without initializing or freezing a model. It rejects mismatched item types,
+map providers and conflicting registrations. It does not make arbitrary dynamic consumer
+contracts AOT compatible.
 The original strong-name key, assembly versions and target framework are preserved.
 These are modified upstream binaries, rather than unmodified NuGet artifacts. The patches
 address the observed dictionary-entry, nullable-member, reflected map-constructor and indexed
-tuple-classification failures;
+tuple-classification and repeated-provider factory failures;
 other dynamic protobuf-net
 contracts still require their own IL2CPP qualification. See
 [serialization compatibility](../../docs/features/serialization/serialization.md#protobuf-equality-and-hashing).
@@ -68,5 +79,5 @@ the .NET Standard 2.1 target. Check the hashes before replacing the shipped file
 
 | File                  | SHA256                                                             |
 | --------------------- | ------------------------------------------------------------------ |
-| protobuf-net.dll      | `cc04f018f1a637c77c38f7d20de6fb57f99ce2b04d2a89f56e71d39d617c19d5` |
-| protobuf-net.Core.dll | `b5a43e5c4e84e69bcd3eb4055e78e4667756f195fb3e86b9b54e066036e97c8c` |
+| protobuf-net.dll      | `71232ba46a0a78cfc1913155b1231f57ff5c49b97e1e94526ae7b6d2a845e096` |
+| protobuf-net.Core.dll | `b144107221dea2b29af2c94d840db2bf548a1f62b6e0dc9955e5b3b55ec04325` |
