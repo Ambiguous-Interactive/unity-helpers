@@ -56,7 +56,7 @@ foreach ($relative in $configs) {
     Require-Hash (Join-Path $repoPath $relative) $rows[$label]
 }
 if (@($rows.Keys | Where-Object { $_.StartsWith('acceptance-config/',[StringComparison]::Ordinal) }).Count -ne $configs.Count) { throw 'Current acceptance configuration inventory differs' }
-$template = Join-Path $repoPath 'Acceptance~/NullableMapConsumer'
+$template = Join-Path $repoPath 'Tests/Acceptance~/NullableMapConsumer'
 $goldens = @(Get-ChildItem -LiteralPath (Join-Path $template 'Goldens~') -File)
 foreach ($file in $goldens) {
     $label = 'acceptance-goldens/'+$file.Name

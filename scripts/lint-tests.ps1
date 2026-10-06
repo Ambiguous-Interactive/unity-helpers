@@ -1356,6 +1356,7 @@ $filesToScan = $filesToScanList | Sort-Object -Unique
 foreach ($file in $filesToScan) {
   if ($file -like '*.meta') { continue }
   $rel = Get-RelativePath $file
+  if ($rel -match '(^|/)[^/]*~/') { continue }
   if (Is-AllowlistedFile $rel) { continue }
 
   # ReadAllLines rather than Get-Content: it always answers a string[], so the array

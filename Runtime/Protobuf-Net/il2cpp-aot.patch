@@ -281,14 +281,18 @@ index 55b741a6..7956d400 100644
                  new object[] { fieldNumber, features, compatibilityLevel, dataFormat, stub });
          }
 diff --git a/src/protobuf-net/Internal/Serializers/TypeSerializer.cs b/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
-index 6363686d..27dc8dc8 100644
 --- a/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
 +++ b/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
-@@ -12,9 +12,26 @@ namespace ProtoBuf.Internal.Serializers
+@@ -12,11 +12,33 @@
  {
      internal abstract class TypeSerializer
      {
 +        private static readonly Dictionary<Type, Func<TypeSerializer>> s_typedFactories = new Dictionary<Type, Func<TypeSerializer>>();
++
++        protected static ISerializationWriteScope ResolveWriteScope(object value)
++        {
++            return value as ISerializationWriteScope;
++        }
 +
 +        internal static void Register<T>()
 +        {
@@ -310,18 +314,30 @@ index 6363686d..27dc8dc8 100644
 +            }
 +            var obj = factoryForType is not null ? factoryForType() : (TypeSerializer)(rootType is not null
                  ? Activator.CreateInstance(typeof(InheritanceTypeSerializer<,>).MakeGenericType(rootType, forType), nonPublic: true)
-                 : Activator.CreateInstance(typeof(TypeSerializer<>).MakeGenericType(forType), nonPublic: true));
+-                : Activator.CreateInstance(typeof(TypeSerializer<>).MakeGenericType(forType), nonPublic: true));
++                : new RuntimeTypeSerializer(forType));
              
-@@ -189,6 +206,8 @@ namespace ProtoBuf.Internal.Serializers
+             obj.Init(fieldNumbers, serializers, baseCtorCallbacks, isRootType, useConstructor, assertKnownType, callbacks, constructType, factory, features);
+             return (IProtoTypeSerializer)obj;
+@@ -147,7 +169,7 @@
+         }
+ 
+         private Type constructType;
+-        public Type ExpectedType => typeof(T);
++        public virtual Type ExpectedType => typeof(T);
+ 
+         internal virtual Type BaseType => typeof(T);
+         Type IProtoTypeSerializer.BaseType => BaseType;
+@@ -189,6 +211,8 @@
              bool isRootType, bool useConstructor, bool assertKnownType,
              CallbackSet callbacks, Type constructType, MethodInfo factory, SerializerFeatures features)
          {
-+            if (typeof(T).IsValueType && typeof(ISerializationWriteScope).IsAssignableFrom(typeof(T)))
++            if (ExpectedType.IsValueType && typeof(ISerializationWriteScope).IsAssignableFrom(ExpectedType))
 +                throw new NotSupportedException("Serialization write scope ownership requires a reference type contract.");
              Debug.Assert(fieldNumbers is not null);
              Debug.Assert(serializers is not null);
              Debug.Assert(fieldNumbers.Length == serializers.Length);
-@@ -330,37 +349,47 @@ namespace ProtoBuf.Internal.Serializers
+@@ -330,37 +354,47 @@
  
          protected void SerializeImpl(ref ProtoWriter.State state, T value)
          {
@@ -329,36 +345,47 @@ index 6363686d..27dc8dc8 100644
 -
 -            // write inheritance first
 -            if (CanHaveInheritance)
-+            ISerializationWriteScope scope = GetFlag(StateFlags.IsRootType) && !typeof(T).IsValueType
-+                ? value as ISerializationWriteScope : null;
-+            scope?.BeginSerialization();
-+            try
-             {
+-            {
 -                IRuntimeProtoSerializerNode next = GetMoreSpecificSerializer(value);
 -                if (next is object) next.Write(ref state, value);
 -            }
-+                Callback(ref value, TypeModel.CallbackType.BeforeSerialize, state.Context);
- 
+-
 -            // write all actual fields
 -            //Debug.WriteLine(">> Writing fields for " + forType.FullName);
 -            for (int i = 0; i < serializers.Length; i++)
 -            {
 -                IRuntimeProtoSerializerNode ser = serializers[i];
 -                if (!(ser is IProtoTypeSerializer ts && ts.IsSubType))
-+                // write inheritance first
-+                if (CanHaveInheritance)
-                 {
+-                {
 -                    //Debug.WriteLine(": " + ser.ToString());
 -                    ser.Write(ref state, value);
-+                    IRuntimeProtoSerializerNode next = GetMoreSpecificSerializer(value);
-+                    if (next is object) next.Write(ref state, value);
-                 }
+-                }
 -            }
 -            //Debug.WriteLine("<< Writing fields for " + forType.FullName);
- 
+-
 -            if (UseTypedExtensible)
 -            {
 -                state.AppendExtensionData((ITypedExtensible)value, ExpectedType);
+-            }
+-            else if (GetFlag(StateFlags.IsExtensible))
+-            {
+-                state.AppendExtensionData((IExtensible)value);
+-            }
+-            Callback(ref value, TypeModel.CallbackType.AfterSerialize, state.Context);
++            ISerializationWriteScope scope = GetFlag(StateFlags.IsRootType) && !ExpectedType.IsValueType
++                ? ResolveWriteScope(value) : null;
++            scope?.BeginSerialization();
++            try
++            {
++                Callback(ref value, TypeModel.CallbackType.BeforeSerialize, state.Context);
++
++                // write inheritance first
++                if (CanHaveInheritance)
++                {
++                    IRuntimeProtoSerializerNode next = GetMoreSpecificSerializer(value);
++                    if (next is object) next.Write(ref state, value);
++                }
++
 +                // write all actual fields
 +                //Debug.WriteLine(">> Writing fields for " + forType.FullName);
 +                for (int i = 0; i < serializers.Length; i++)
@@ -381,18 +408,15 @@ index 6363686d..27dc8dc8 100644
 +                    state.AppendExtensionData((IExtensible)value);
 +                }
 +                Callback(ref value, TypeModel.CallbackType.AfterSerialize, state.Context);
-             }
--            else if (GetFlag(StateFlags.IsExtensible))
++            }
 +            finally
-             {
--                state.AppendExtensionData((IExtensible)value);
++            {
 +                scope?.EndSerialization();
-             }
--            Callback(ref value, TypeModel.CallbackType.AfterSerialize, state.Context);
++            }
          }
  
          protected Action<T, ISerializationContext> _subTypeOnBeforeDeserialize;
-@@ -553,6 +582,23 @@ namespace ProtoBuf.Internal.Serializers
+@@ -553,6 +587,23 @@
          {
              Type expected = ExpectedType;
              using Compiler.Local loc = ctx.GetLocalWithValue(expected, valueFrom);
@@ -416,7 +440,16 @@ index 6363686d..27dc8dc8 100644
              // pre-callbacks
              EmitCallbackIfNeeded(ctx, loc, TypeModel.CallbackType.BeforeSerialize);
  
-@@ -646,6 +692,18 @@ namespace ProtoBuf.Internal.Serializers
+@@ -566,7 +617,7 @@
+                 {
+                     ctx.LoadValue(loc);
+                     ctx.EmitCall(typeof(TypeModel).GetMethod(nameof(TypeModel.IsSubType), BindingFlags.Static | BindingFlags.Public)
+-                        .MakeGenericMethod(typeof(T)));
++                        .MakeGenericMethod(ExpectedType));
+                     ctx.BranchIfFalse(startFields, false);
+ 
+                     for (int i = 0; i < serializers.Length; i++)
+@@ -646,6 +697,18 @@
  
              // post-callbacks
              EmitCallbackIfNeeded(ctx, loc, TypeModel.CallbackType.AfterSerialize);
@@ -463,14 +496,14 @@ index 527bc447..33930e11 100644
              // for most types we'll enforce that you need readonly, because that is what protobuf-net
              // always did historically; but: if you smell so much like a Tuple that it is *in your name*,
 diff --git a/src/protobuf-net/Meta/RuntimeTypeModel.cs b/src/protobuf-net/Meta/RuntimeTypeModel.cs
-index 4f7ef715..f435909b 100644
 --- a/src/protobuf-net/Meta/RuntimeTypeModel.cs
 +++ b/src/protobuf-net/Meta/RuntimeTypeModel.cs
-@@ -972,8 +972,55 @@ namespace ProtoBuf.Meta
+@@ -972,8 +972,65 @@
  
          [MethodImpl(MethodImplOptions.AggressiveInlining)]
          private object GetServices<T>(CompatibilityLevel ambient)
 -            => (_serviceCache[typeof(T)] ?? GetServicesSlow(typeof(T), ambient));
+-
 +        {
 +            object service = _serviceCache[typeof(T)] ?? GetServicesSlow(typeof(T), ambient);
 +            if (service is ISerializer<T>) return service;
@@ -492,6 +525,16 @@ index 4f7ef715..f435909b 100644
 +                }
 +                return nullable;
 +            }
++            if (service is RuntimeTypeSerializer runtimeContract && runtimeContract.ExpectedType == typeof(T))
++            {
++                ISerializer<T> typed = new RuntimeContractSerializer<T>(runtimeContract);
++                lock (_serviceCache)
++                {
++                    if (_serviceCache[typeof(T)] is ISerializer<T> existing) return existing;
++                    _serviceCache[typeof(T)] = typed;
++                }
++                return typed;
++            }
 +            return service;
 +        }
 +
@@ -510,7 +553,7 @@ index 4f7ef715..f435909b 100644
 +            }
 +        }
 +
- 
++
 +        internal void NoteNullableEnum(Type type, CompatibilityLevel compatibilityLevel)
 +        {
 +            RepeatedSerializerStub repeated = TryGetRepeatedProvider(type, compatibilityLevel);
@@ -523,7 +566,7 @@ index 4f7ef715..f435909b 100644
  
          private readonly Hashtable _serviceCache = [];
          internal void ResetServiceCache(Type type)
-@@ -983,6 +1030,10 @@ namespace ProtoBuf.Meta
+@@ -983,6 +1040,10 @@
                  lock (_serviceCache)
                  {
                      _serviceCache.Remove(type);
@@ -534,7 +577,7 @@ index 4f7ef715..f435909b 100644
                  }
              }
          }
-@@ -1024,7 +1075,18 @@ namespace ProtoBuf.Meta
+@@ -1024,7 +1085,18 @@
  
                  // rule out repeated (this has an internal cache etc)
                  var repeated = model.TryGetRepeatedProvider(type); // this handles ignores, etc
@@ -554,7 +597,7 @@ index 4f7ef715..f435909b 100644
  
                  int typeIndex = model.FindOrAddAuto(type, false, true, false, ambient);
                  if (typeIndex >= 0)
-@@ -1456,7 +1518,9 @@ namespace ProtoBuf.Meta
+@@ -1456,7 +1528,9 @@
                  }
                  else if (ShouldEmitCustomSerializerProxy(metaType.SerializerType))
                  {
@@ -565,7 +608,7 @@ index 4f7ef715..f435909b 100644
                  }
                  else if ((repeated = TryGetRepeatedProvider(runtimeType)) is not null)
                  {
-@@ -1522,6 +1586,10 @@ namespace ProtoBuf.Meta
+@@ -1522,6 +1596,10 @@
              return repeated;
          }
  
@@ -576,7 +619,7 @@ index 4f7ef715..f435909b 100644
          private static void AddProxy(TypeBuilder building, Type proxying, MemberInfo provider, bool includeNullable)
          {
              provider = GetUnderlyingProvider(provider, proxying);
-@@ -1539,6 +1607,7 @@ namespace ProtoBuf.Meta
+@@ -1539,6 +1617,7 @@
                      building.AddInterfaceImplementation(iType);
                      il = CompilerContextScope.Implement(building, iType, "get_" + nameof(ISerializerProxy<string>.Serializer));
                      EmitProvider(provider, il);
@@ -584,7 +627,7 @@ index 4f7ef715..f435909b 100644
                      il.Emit(OpCodes.Ret);
                  }
              }
-@@ -1564,6 +1633,50 @@ namespace ProtoBuf.Meta
+@@ -1564,6 +1643,50 @@
                  return method;
              }
  
@@ -635,7 +678,7 @@ index 4f7ef715..f435909b 100644
              for (int index = 0; index < types.Count; index++)
              {
                  var metaType = (MetaType)types[index];
-@@ -1573,6 +1686,7 @@ namespace ProtoBuf.Meta
+@@ -1573,6 +1696,7 @@
                  metaType.Validate();
                  if (runtimeType.IsEnum || metaType.SerializerType is not null || TryGetRepeatedProvider(metaType.Type) is not null)
                  {   // we don't implement these
@@ -643,16 +686,16 @@ index 4f7ef715..f435909b 100644
                      continue;
                  }
                  if (!IsFullyPublic(runtimeType, out var problem))
-@@ -1612,6 +1726,8 @@ namespace ProtoBuf.Meta
+@@ -1611,6 +1735,8 @@
+ 
                  var featuresGetter = serType.GetProperty(nameof(ISerializer<string>.Features)).GetGetMethod();
                  type.DefineMethodOverride(GetFeaturesMethod(serializer.Features), featuresGetter);
- 
-+                WriteNullableSerializer(metaType, serializer);
 +
++                WriteNullableSerializer(metaType, serializer);
+ 
                  // and we emit the sub-type serializer whenever inheritance is involved
                  if (serializer.HasInheritance)
-                 {
-@@ -2257,6 +2373,13 @@ namespace ProtoBuf.Meta
+@@ -2257,6 +2383,13 @@
                  return value.Method;
              }
          }
@@ -941,6 +984,92 @@ index e54a2ff3..3b821f09 100644
 +            {
 +                contract.Write(ref state, value);
 +            }
++        }
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/RuntimeTypeSerializer.cs b/src/protobuf-net/Internal/Serializers/RuntimeTypeSerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/RuntimeTypeSerializer.cs
+@@ -0,0 +1,42 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using System;
++    using System.Runtime.CompilerServices;
++
++    internal sealed class RuntimeTypeSerializer : TypeSerializer<object>
++    {
++        public override Type ExpectedType => expectedType;
++
++        internal override Type BaseType => expectedType;
++
++        private readonly Type expectedType;
++
++        internal RuntimeTypeSerializer(Type expectedType)
++        {
++            this.expectedType = expectedType;
++        }
++
++        public override void Write(ref ProtoWriter.State state, object value)
++        {
++            if (expectedType.IsValueType && value is not null)
++            {
++                value = RuntimeHelpers.GetObjectValue(value);
++            }
++            base.Write(ref state, value);
++        }
++
++        public override object Read(ref ProtoReader.State state, object value)
++        {
++            if (expectedType.IsValueType)
++            {
++                value = value is null
++                    ? BclHelpers.GetUninitializedObject(expectedType)
++                    : RuntimeHelpers.GetObjectValue(value);
++            }
++            return base.Read(ref state, value);
++        }
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/RuntimeContractSerializer.cs b/src/protobuf-net/Internal/Serializers/RuntimeContractSerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/RuntimeContractSerializer.cs
+@@ -0,0 +1,34 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using ProtoBuf.Serializers;
++
++    internal sealed class RuntimeContractSerializer<T> : ISerializer<T>, IFactory<T>
++    {
++        public SerializerFeatures Features => contract.Features;
++
++        private readonly IProtoTypeSerializer contract;
++
++        internal RuntimeContractSerializer(IProtoTypeSerializer contract)
++        {
++            this.contract = contract;
++        }
++
++        public T Read(ref ProtoReader.State state, T value)
++        {
++            return TypeHelper<T>.FromObject(contract.Read(ref state, value));
++        }
++
++        public void Write(ref ProtoWriter.State state, T value)
++        {
++            contract.Write(ref state, value);
++        }
++
++        public T Create(ISerializationContext context)
++        {
++            return TypeHelper<T>.FromObject(contract.CreateInstance(context));
 +        }
 +    }
 +}

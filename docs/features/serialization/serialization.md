@@ -107,7 +107,10 @@ running an unrelated consumer subclass initializer. The cache checks the
 original provider identity and directly constructs the original repeated decorator, preserving
 custom-provider precedence and compiled models.
 Registration supplies a direct item-contract serializer factory with separate member state
-for each model. Item reflection metadata must still be preserved, and inheritance and other
+for each model. Ordinary unregistered runtime contracts use a nongeneric metadata node and
+typed service bridge, retaining their declared type, callbacks, factories and boxed-value copy
+behavior. This removes a reflected generic contract constructor; it does not supply every
+missing generic map, enum or external serializer method. Item reflection metadata must still be preserved, and inheritance and other
 consumer collection contracts still require their own AOT qualification. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)
 include the exact patch and binary hashes. Qualify each binary change in a fresh Unity 2021.3
 stripped player; success with another binary or a newer editor does not prove compatibility.

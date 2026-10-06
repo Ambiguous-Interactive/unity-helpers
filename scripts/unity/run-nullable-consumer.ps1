@@ -22,7 +22,7 @@ $token = [Guid]::NewGuid().ToString('N')
 $project = Join-Path ([IO.Path]::GetFullPath($TemporaryRoot)) "nullable-independent-$UnityVersion-$token"
 if (Test-Path $project) { throw 'Independent consumer project must be fresh' }
 New-Item -ItemType Directory -Path $project, $artifactRoot | Out-Null
-$template = Join-Path $repoPath 'Acceptance~/NullableMapConsumer'
+$template = Join-Path $repoPath 'Tests/Acceptance~/NullableMapConsumer'
 foreach ($folder in @('Assets', 'Packages', 'ProjectSettings')) {
     Copy-Item -LiteralPath (Join-Path $template $folder) -Destination $project -Recurse
 }

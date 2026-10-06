@@ -84,9 +84,6 @@ logs_*.zip.meta
 /package-lock.json
 /package-lock.json.meta
 
-# Repository-only independent consumer CI templates
-/Acceptance~/
-
 # Tests (not needed in published Unity package)
 # Use leading slash to match only root-level Tests, not scripts/tests
 /Tests/

@@ -42,7 +42,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             const string expectedAssemblyVersion = "3.0.0.0";
             const string expectedInformationalVersion = "3.2.56+dfdfce61a7";
             const string expectedSha256 =
-                "cd6af62ed6956a648301f04971fd423ed517e9efe2b02ed1b6a3f467fd4a916d";
+                "d72a9de006e289d8127c1942247200369f0c6a2f7cd5140ff07f445d759fbabb";
             const string expectedCoreSha256 =
                 "7c994ca2572374b691c4ee1db3c58d08e443751b1d683a83f57ab1827be0ccd1";
 #endif

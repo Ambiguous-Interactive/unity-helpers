@@ -6,7 +6,7 @@ The annotated tag object is `421b80a9b128be779036e600b996efb9e48b9f92`.
 Upstream source and license: [protobuf-net](https://github.com/protobuf-net/protobuf-net/tree/dfdfce61a739cfd76f05fcdacf8a4b3b9e94e684)
 and [bundled license](./Licence.txt).
 
-[The source patch](./il2cpp-aot.patch) changes eight runtime behaviors:
+[The source patch](./il2cpp-aot.patch) changes nine runtime behaviors:
 
 - Construct fallback value checkers directly, avoiding reflected closed generic constructors.
   Primary primitive checkers keep their original default-value policy. Nonnullable structs
@@ -32,13 +32,21 @@ and [bundled license](./Licence.txt).
   custom provider precedence and compiled emitters remain intact.
   These factories construct their singleton serializers directly.
   Registration also supplies a direct item-contract serializer factory. Each model receives
-  a fresh item serializer; models do not share member or callback state. Inheritance and
-  unregistered contract construction retain the upstream path.
+  a fresh item serializer; models do not share member or callback state. Registered typed
+  factories and inherited contract construction retain their existing paths.
+
+- Construct ordinary unregistered runtime contract metadata through a nongeneric node.
+  The node retains the actual declared type, constructor, factory, callbacks and member rules.
+  Typed services bridge reads, writes and instance creation to that node. Boxed value types
+  retain copy isolation, including zero-initialized values for missing input. Custom providers
+  retain precedence; inherited contracts and compiled emitters retain their existing behavior.
 
 - Wrap reference-type contract writes implementing `ISerializationWriteScope` in an ownership
   scope, including interpreted and emitted serializers. Entry precedes callbacks; exit runs
   in `finally` after successful entry. Inherited contracts enter once, and consumer
   after-serialization callbacks still run only when their original write succeeds.
+  The interpreted interface cast runs in a nongeneric helper; the root and reference-type
+  guards remain in the caller.
   Value types cannot implement this scope. Entry must fail atomically and exit must not throw.
   Owned deque and cyclic buffer scratch state supports nested writes of the same instance.
 
@@ -101,5 +109,5 @@ the .NET Standard 2.1 target. Check the hashes before replacing the shipped file
 
 | File                  | SHA256                                                             |
 | --------------------- | ------------------------------------------------------------------ |
-| protobuf-net.dll      | `cd6af62ed6956a648301f04971fd423ed517e9efe2b02ed1b6a3f467fd4a916d` |
+| protobuf-net.dll      | `d72a9de006e289d8127c1942247200369f0c6a2f7cd5140ff07f445d759fbabb` |
 | protobuf-net.Core.dll | `7c994ca2572374b691c4ee1db3c58d08e443751b1d683a83f57ab1827be0ccd1` |

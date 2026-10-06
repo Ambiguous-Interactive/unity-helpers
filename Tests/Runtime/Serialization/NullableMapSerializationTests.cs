@@ -246,6 +246,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             input.Add(3, default(TValue));
             input.Add(4, nondefault);
             byte[] bytes = EncodeMap(model, mode, nested, input);
+            if (typeof(TValue) == typeof(NullableMapValue))
+            {
+                TMap nondefaultOnly = new TMap();
+                nondefaultOnly.Add(4, nondefault);
+                bool rootStructWrapper =
+                    mode == PackageFacade
+                    && !nested
+                    && (
+                        typeof(TMap) == typeof(SerializableDictionary<int, TValue?>)
+                        || typeof(TMap) == typeof(SerializableSortedDictionary<int, TValue?>)
+                    );
+                byte[] fixedBytes = Convert.FromBase64String(
+                    rootStructWrapper ? "CAQSAggH"
+                    : nested ? "OgYIBBICCAc="
+                    : "CgYIBBICCAc="
+                );
+                CollectionAssert.AreEqual(
+                    fixedBytes,
+                    EncodeMap(model, mode, nested, nondefaultOnly)
+                );
+                TMap fixedRestored = DecodeMap<TMap>(model, mode, nested, fixedBytes);
+                Assert.IsTrue(fixedRestored.TryGetValue(4, out TValue? fixedValue));
+                Assert.IsTrue(fixedValue.HasValue);
+                Assert.AreEqual(
+                    ((NullableMapValue)(object)nondefault).Number,
+                    ((NullableMapValue)(object)fixedValue.Value).Number
+                );
+            }
             TMap restored = DecodeMap<TMap>(model, mode, nested, bytes);
             Assert.AreEqual(3, restored.Count);
             Assert.IsTrue(restored.TryGetValue(2, out TValue? absent));
@@ -310,6 +338,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             TMap input = new TMap();
             input.Add(default(TKey), 11);
             input.Add(nondefault, 19);
+            if (typeof(TKey) == typeof(NullableMapValue))
+            {
+                TMap nondefaultOnly = new TMap();
+                nondefaultOnly.Add(nondefault, 19);
+                bool rootStructWrapper =
+                    mode == PackageFacade
+                    && !nested
+                    && typeof(TMap) == typeof(SerializableDictionary<TKey?, int>);
+                byte[] fixedBytes = Convert.FromBase64String(
+                    rootStructWrapper ? "CgIIBxAT"
+                    : nested ? "OgYKAggHEBM="
+                    : "CgYKAggHEBM="
+                );
+                CollectionAssert.AreEqual(
+                    fixedBytes,
+                    EncodeMap(model, mode, nested, nondefaultOnly)
+                );
+                TMap fixedRestored = DecodeMap<TMap>(model, mode, nested, fixedBytes);
+                Assert.AreEqual(1, fixedRestored.Count);
+                foreach (KeyValuePair<TKey?, int> entry in fixedRestored)
+                {
+                    Assert.IsTrue(entry.Key.HasValue);
+                    Assert.AreEqual(
+                        ((NullableMapValue)(object)nondefault).Number,
+                        ((NullableMapValue)(object)entry.Key.Value).Number
+                    );
+                    Assert.AreEqual(19, entry.Value);
+                }
+            }
             TMap restored = DecodeMap<TMap>(
                 model,
                 mode,
