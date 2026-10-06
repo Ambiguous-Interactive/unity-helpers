@@ -20,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     {
         private static void VerifyColdRoot<TCollection, TItem>(
             byte[] wire,
+            byte[] independentWire,
             bool metadataFirst,
             Func<TItem, int> number
         )
@@ -42,11 +43,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             using MemoryStream destination = new();
             model.Serialize(destination, restored);
             CollectionAssert.AreEqual(wire, destination.ToArray());
-            VerifyIndependentItemModel(model, restored, wire, number);
+            VerifyIndependentItemModel<TCollection, TItem>(model, restored, wire, independentWire);
         }
 
         private static void VerifyNullParent<TCollection, TItem>(
             byte[] wire,
+            byte[] independentWire,
             Func<TItem, int> number
         )
             where TCollection : class, IReadOnlyCollection<TItem>
@@ -69,22 +71,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             using MemoryStream destination = new();
             model.Serialize(destination, restored);
             CollectionAssert.AreEqual(wire, destination.ToArray());
-            VerifyIndependentItemModel(model, restored, wire, number);
+            VerifyIndependentItemModel<Parent<TCollection>, TItem>(
+                model,
+                restored,
+                wire,
+                independentWire
+            );
         }
 
         private static void VerifyIndependentItemModel<TCollection, TItem>(
             RuntimeTypeModel original,
             TCollection restored,
             byte[] wire,
-            Func<TItem, int> number
+            byte[] independentWire
         )
         {
             RuntimeTypeModel independent = RuntimeTypeModel.Create();
             independent.AutoCompile = false;
             independent.Add(typeof(TItem), false).Add(2, nameof(ColdHashItem.Number));
-            using MemoryStream source = new(new byte[] { 16, 9 });
-            TItem item = (TItem)independent.Deserialize(source, null, typeof(TItem));
-            Assert.AreEqual(9, number(item));
+            using MemoryStream destination = new();
+            independent.Serialize(destination, restored);
+            CollectionAssert.AreEqual(independentWire, destination.ToArray());
             using MemoryStream retained = new();
             original.Serialize(retained, restored);
             CollectionAssert.AreEqual(wire, retained.ToArray());
@@ -116,6 +123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             VerifyColdRoot<SerializableHashSet<ColdHashItem>, ColdHashItem>(
                 new byte[] { 10, 2, 8, 7 },
+                new byte[] { 10, 2, 16, 7 },
                 false,
                 item => item.Number
             );
@@ -126,6 +134,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             VerifyNullParent<SerializableHashSet<ParentHashItem>, ParentHashItem>(
                 new byte[] { 58, 2, 8, 7 },
+                new byte[] { 58, 2, 16, 7 },
                 item => item.Number
             );
         }
@@ -135,6 +144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             VerifyColdRoot<SerializableSortedSet<ColdSortedItem>, ColdSortedItem>(
                 new byte[] { 10, 2, 8, 7 },
+                new byte[] { 10, 2, 16, 7 },
                 false,
                 item => item.Number
             );
@@ -145,6 +155,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             VerifyNullParent<SerializableSortedSet<ParentSortedItem>, ParentSortedItem>(
                 new byte[] { 58, 2, 8, 7 },
+                new byte[] { 58, 2, 16, 7 },
                 item => item.Number
             );
         }
@@ -154,6 +165,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             VerifyColdRoot<Deque<ColdDequeItem>, ColdDequeItem>(
                 new byte[] { 10, 2, 8, 7, 24, 1, 32, 1, 40, 16 },
+                new byte[] { 10, 2, 16, 7, 24, 1, 32, 1, 40, 16 },
                 false,
                 item => item.Number
             );
@@ -164,6 +176,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             VerifyNullParent<Deque<ParentDequeItem>, ParentDequeItem>(
                 new byte[] { 58, 10, 10, 2, 8, 7, 24, 1, 32, 1, 40, 16 },
+                new byte[] { 58, 10, 10, 2, 16, 7, 24, 1, 32, 1, 40, 16 },
                 item => item.Number
             );
         }
@@ -173,6 +186,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             VerifyColdRoot<Deque<ExplicitDequeItem>, ExplicitDequeItem>(
                 new byte[] { 10, 2, 8, 7, 24, 1, 32, 1, 40, 16 },
+                new byte[] { 10, 2, 16, 7, 24, 1, 32, 1, 40, 16 },
                 true,
                 item => item.Number
             );
@@ -183,6 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             VerifyColdRoot<CyclicBuffer<ColdCyclicItem>, ColdCyclicItem>(
                 new byte[] { 8, 2, 16, 1, 26, 2, 8, 7, 32, 1 },
+                new byte[] { 8, 2, 16, 1, 26, 2, 16, 7, 32, 1 },
                 false,
                 item => item.Number
             );
@@ -193,6 +208,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             VerifyNullParent<CyclicBuffer<ParentCyclicItem>, ParentCyclicItem>(
                 new byte[] { 58, 10, 8, 2, 16, 1, 26, 2, 8, 7, 32, 1 },
+                new byte[] { 58, 10, 8, 2, 16, 1, 26, 2, 16, 7, 32, 1 },
                 item => item.Number
             );
         }
@@ -202,6 +218,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             VerifyColdRoot<CyclicBuffer<ExplicitCyclicItem>, ExplicitCyclicItem>(
                 new byte[] { 8, 2, 16, 1, 26, 2, 8, 7, 32, 1 },
+                new byte[] { 8, 2, 16, 1, 26, 2, 16, 7, 32, 1 },
                 true,
                 item => item.Number
             );
