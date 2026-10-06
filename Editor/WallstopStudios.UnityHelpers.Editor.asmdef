@@ -14,6 +14,11 @@
       "name": "odininspector",
       "expression": "0.0.1",
       "define": "WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR"
+    },
+    {
+      "name": "com.unity.test-framework",
+      "expression": "0.0.1",
+      "define": "WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK"
     }
   ],
   "noEngineReferences": false

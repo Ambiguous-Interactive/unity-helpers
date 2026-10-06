@@ -23,6 +23,8 @@ finishes it when the run ends, so a poller always sees either a run in flight or
 This is complementary to the [Failed Tests Exporter](./failed-tests-exporter.md), which reports
 failures after a run somebody else started.
 
+The reporter requires Unity Test Framework (`com.unity.test-framework`). Its menus are available when that package is installed. Projects without the test framework can still import Unity Helpers.
+
 ## Menu items
 
 | Menu item                                                                      | What it does                                       |

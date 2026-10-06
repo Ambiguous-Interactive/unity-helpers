@@ -3416,6 +3416,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                 )
                             )
                             {
+#if WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK
                                 EditorGUILayout.HelpBox(
                                     FailedTestsExporterHelpText,
                                     MessageType.Info
@@ -3430,6 +3431,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     }
                                 );
                                 dataChanged |= changed;
+#else
+                                EditorGUILayout.HelpBox(
+                                    "Failed test export requires Unity Test Framework.",
+                                    MessageType.Info
+                                );
+#endif
                                 return true;
                             }
 

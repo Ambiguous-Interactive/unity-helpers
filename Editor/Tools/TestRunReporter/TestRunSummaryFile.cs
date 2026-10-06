@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Tools
 {
-#if UNITY_EDITOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK
     using System;
     using System.IO;
     using UnityEditor.TestTools.TestRunner.Api;
