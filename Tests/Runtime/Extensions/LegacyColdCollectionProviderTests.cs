@@ -181,14 +181,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [ProtoContract]
-        public sealed class ColdHashItem : IComparable<ColdHashItem>
+        public struct ColdHashItem : IComparable<ColdHashItem>
         {
             [ProtoMember(1)]
             public int Number;
 
             public int CompareTo(ColdHashItem other)
             {
-                return other == null ? 1 : Number.CompareTo(other.Number);
+                return Number.CompareTo(other.Number);
             }
         }
 
@@ -205,14 +205,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [ProtoContract]
-        public sealed class ColdSortedItem : IComparable<ColdSortedItem>
+        public struct ColdSortedItem : IComparable<ColdSortedItem>
         {
             [ProtoMember(1)]
             public int Number;
 
             public int CompareTo(ColdSortedItem other)
             {
-                return other == null ? 1 : Number.CompareTo(other.Number);
+                return Number.CompareTo(other.Number);
             }
         }
 
@@ -229,14 +229,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [ProtoContract]
-        public sealed class ColdDequeItem : IComparable<ColdDequeItem>
+        public struct ColdDequeItem : IComparable<ColdDequeItem>
         {
             [ProtoMember(1)]
             public int Number;
 
             public int CompareTo(ColdDequeItem other)
             {
-                return other == null ? 1 : Number.CompareTo(other.Number);
+                return Number.CompareTo(other.Number);
             }
         }
 
@@ -265,14 +265,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [ProtoContract]
-        public sealed class ColdCyclicItem : IComparable<ColdCyclicItem>
+        public struct ColdCyclicItem : IComparable<ColdCyclicItem>
         {
             [ProtoMember(1)]
             public int Number;
 
             public int CompareTo(ColdCyclicItem other)
             {
-                return other == null ? 1 : Number.CompareTo(other.Number);
+                return Number.CompareTo(other.Number);
             }
         }
 
