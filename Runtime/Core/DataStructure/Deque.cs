@@ -36,6 +36,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [ProtoContract(IgnoreListHandling = true)]
 #endif
 #pragma warning restore WPROTO030
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
+#endif
     public sealed class Deque<T> : IReadOnlyList<T>
     {
         public const int DefaultCapacity = 16;

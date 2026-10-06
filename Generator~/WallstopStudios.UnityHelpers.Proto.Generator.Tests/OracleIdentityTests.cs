@@ -42,9 +42,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             const string expectedAssemblyVersion = "3.0.0.0";
             const string expectedInformationalVersion = "3.2.56+dfdfce61a7";
             const string expectedSha256 =
-                "71232ba46a0a78cfc1913155b1231f57ff5c49b97e1e94526ae7b6d2a845e096";
+                "85bec1db9aae482bdc01135dbce1c9b3313c73d97181b1e53e18f5f8aaaafcb5";
             const string expectedCoreSha256 =
-                "b144107221dea2b29af2c94d840db2bf548a1f62b6e0dc9955e5b3b55ec04325";
+                "1bc895f8eb9223b9c58e39cc75567e8dd275f00f0f02da979110f726203e382b";
 #endif
 
             Assembly oracle = typeof(ProtoBuf.Serializer).Assembly;

@@ -34,6 +34,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [ProtoContract(IgnoreListHandling = true)]
 #endif
 #pragma warning restore WPROTO030
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
+#endif
     public sealed class CyclicBuffer<T> : IReadOnlyList<T>
     {
 #if !WALLSTOP_PROTO_ONLY

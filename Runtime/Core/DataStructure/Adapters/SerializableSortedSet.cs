@@ -30,6 +30,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// at runtime, far from the declaration that caused it.
     /// </remarks>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
+#endif
     public class SerializableSortedSet<T> : SerializableSetBase<T, SortedSet<T>>
         where T : IComparable<T>
     {

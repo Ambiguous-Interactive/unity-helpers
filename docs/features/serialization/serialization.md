@@ -88,7 +88,9 @@ Nested dictionary fields use the existing typed map serializer and the active mo
 policies without a reflected generic map-decorator constructor. Compiled models retain the
 original typed emitter. Map encoding and default-value policy remain unchanged. Runtime repeated
 providers use typed registrations for intrinsic scalar lists and arrays, while owned generic set,
-deque and cyclic-buffer constructors register their actual serializers. The cache checks the
+deque and cyclic-buffer static constructors register their actual serializers before metadata
+lookup or explicit model registration. The opted-in base collection is initialized without
+running an unrelated consumer subclass initializer. The cache checks the
 original provider identity and directly constructs the original repeated decorator, preserving
 custom-provider precedence and compiled models. Dynamic
 consumer collection contracts still require their own AOT qualification. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)

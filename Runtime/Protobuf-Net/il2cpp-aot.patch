@@ -151,6 +151,24 @@ index 25ff5127..57bc5167 100644
          protected override T[] Initialize(T[] values, ISerializationContext context)
              => values ?? Array.Empty<T>();
          protected override T[] Clear(T[] values, ISerializationContext context)
+diff --git a/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs b/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs
+new file mode 100644
+index 00000000..30f9b147
+--- /dev/null
++++ b/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs
+@@ -0,0 +1,12 @@
++using System;
++
++namespace ProtoBuf.Serializers
++{
++    /// <summary>
++    /// Opts a collection into initializing its typed repeated providers before serializer metadata is built.
++    /// </summary>
++    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
++    public sealed class TypedRepeatedProviderAttribute : Attribute
++    {
++    }
++}
 diff --git a/src/protobuf-net/Internal/Serializers/MapDecorator.cs b/src/protobuf-net/Internal/Serializers/MapDecorator.cs
 index 197e0a54..634a3c8b 100644
 --- a/src/protobuf-net/Internal/Serializers/MapDecorator.cs
@@ -271,10 +289,19 @@ index 55b741a6..7956d400 100644
                  new object[] { fieldNumber, features, compatibilityLevel, dataFormat, stub });
          }
 diff --git a/src/protobuf-net/Meta/MetaType.cs b/src/protobuf-net/Meta/MetaType.cs
-index 527bc447..73bdb122 100644
+index 527bc447..33930e11 100644
 --- a/src/protobuf-net/Meta/MetaType.cs
 +++ b/src/protobuf-net/Meta/MetaType.cs
-@@ -987,6 +987,13 @@ namespace ProtoBuf.Meta
+@@ -416,6 +416,8 @@ namespace ProtoBuf.Meta
+             if (model is null) throw new ArgumentNullException(nameof(model));
+             if (type is null) throw new ArgumentNullException(nameof(type));
+ 
++            RepeatedSerializers.EnsureTypedProviderInitialized(type);
++
+             IRuntimeProtoSerializerNode coreSerializer = model.TryGetBasicTypeSerializer(type);
+             if (coreSerializer is object)
+             {
+@@ -987,6 +989,13 @@ namespace ProtoBuf.Meta
              if (ctors.Length == 0 || (ctors.Length == 1 && ctors[0].GetParameters().Length == 0)) return null;
  
              MemberInfo[] fieldsPropsUnfiltered = Helpers.GetInstanceFieldsAndProperties(type, true);
@@ -329,7 +356,7 @@ index 501d2518..7ac94ae2 100644
                  {
                      FieldInfo field when field.IsStatic => field.GetValue(null),
 diff --git a/src/protobuf-net/Serializers/RepeatedSerializers.cs b/src/protobuf-net/Serializers/RepeatedSerializers.cs
-index e54a2ff3..e023acbc 100644
+index e54a2ff3..3b821f09 100644
 --- a/src/protobuf-net/Serializers/RepeatedSerializers.cs
 +++ b/src/protobuf-net/Serializers/RepeatedSerializers.cs
 @@ -16,6 +16,7 @@ namespace ProtoBuf.Serializers
@@ -438,7 +465,31 @@ index e54a2ff3..e023acbc 100644
          }
  
          public static void Add(Type type, Func<Type, Type, Type[], MemberInfo> implementation, bool exactOnly = true, Hashtable externalProviders = null)
-@@ -305,6 +397,19 @@ namespace ProtoBuf.Serializers
+@@ -121,9 +213,23 @@ namespace ProtoBuf.Serializers
+             }
+         }
+ 
++        internal static void EnsureTypedProviderInitialized(Type type)
++        {
++            if (type is null || type.ContainsGenericParameters) return;
++            for (Type current = type; current is not null; current = current.BaseType)
++            {
++                if (current.IsDefined(typeof(TypedRepeatedProviderAttribute), false))
++                {
++                    System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(current.TypeHandle);
++                    return;
++                }
++            }
++        }
++
+         internal static RepeatedSerializerStub TryGetRepeatedProvider(Type type, Hashtable externalProvders = null)
+         {
+             if (type is null || type == typeof(string)) return null;
++            EnsureTypedProviderInitialized(type);
+ 
+             var known = (RepeatedSerializerStub)s_knownTypes[type];
+             if (known is null)
+@@ -305,6 +411,19 @@ namespace ProtoBuf.Serializers
              return true;
          }
  

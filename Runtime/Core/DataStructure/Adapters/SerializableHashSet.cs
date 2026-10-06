@@ -1298,6 +1298,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// ]]></code>
     /// </example>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
+#endif
     public class SerializableHashSet<T> : SerializableSetBase<T, HashSet<T>>
     {
         /// <summary>

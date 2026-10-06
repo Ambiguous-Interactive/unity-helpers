@@ -23,8 +23,11 @@ and [bundled license](./Licence.txt).
   their existing classification.
 
 - Register real typed list and vector providers for intrinsic scalar types, including nullable
-  scalars and repeated bytes. Owned generic set and callback-backed collection constructors
-  register their actual providers. Runtime lookup checks the original provider identity before
+  scalars and repeated bytes. Owned generic set and callback-backed collection static constructors
+  register their actual providers before metadata lookup or explicit model registration.
+  They opt in through `TypedRepeatedProviderAttribute`; metadata discovery initializes the base type
+  that declares this attribute without running unrelated consumer subclass initializers. Runtime
+  lookup checks the original provider identity before
   using a registered instance and constructing its original typed repeated decorator directly;
   custom provider precedence and compiled emitters remain intact.
   These factories construct their singleton serializers directly.
@@ -79,5 +82,5 @@ the .NET Standard 2.1 target. Check the hashes before replacing the shipped file
 
 | File                  | SHA256                                                             |
 | --------------------- | ------------------------------------------------------------------ |
-| protobuf-net.dll      | `71232ba46a0a78cfc1913155b1231f57ff5c49b97e1e94526ae7b6d2a845e096` |
-| protobuf-net.Core.dll | `b144107221dea2b29af2c94d840db2bf548a1f62b6e0dc9955e5b3b55ec04325` |
+| protobuf-net.dll      | `85bec1db9aae482bdc01135dbce1c9b3313c73d97181b1e53e18f5f8aaaafcb5` |
+| protobuf-net.Core.dll | `1bc895f8eb9223b9c58e39cc75567e8dd275f00f0f02da979110f726203e382b` |
