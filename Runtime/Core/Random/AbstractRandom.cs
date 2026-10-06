@@ -9,9 +9,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using DataStructure.Adapters;
     using Helper;
-    using ProtoBuf;
     using Utils;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
+
 #if UNITY_5_3_OR_NEWER
     using UnityEngine;
 #endif
@@ -72,33 +75,76 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </remarks>
     [Serializable]
     [DataContract]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     // protobuf-net requires subtype declarations on the base; keep their tags aligned with WProtoSubtype.
-
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(100, typeof(DotNetRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(101, typeof(PcgRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(102, typeof(XorShiftRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(103, typeof(WyRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(104, typeof(XoroShiroRandom))]
+#endif
 #if UNITY_5_3_OR_NEWER
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(105, typeof(UnityRandom))]
 #endif
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(106, typeof(SystemRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(107, typeof(LinearCongruentialGenerator))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(108, typeof(SquirrelRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(109, typeof(RomuDuo))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(110, typeof(SplitMix64))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(111, typeof(IllusionFlow))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(112, typeof(FlurryBurstRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(113, typeof(PhotonSpinRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(114, typeof(StormDropRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(115, typeof(BlastCircuitRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(116, typeof(WaveSplatRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(117, typeof(WDoomRandom))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(118, typeof(Xoshiro128StarStar))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(119, typeof(Xoshiro256StarStar))]
+#endif
+#if !WALLSTOP_PROTO_ONLY
     [ProtoInclude(120, typeof(Sfc64Random))]
+#endif
     public abstract partial class AbstractRandom : IRandom
     {
         protected const float MagicFloat = 5.960465E-008F;
@@ -111,24 +157,34 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public abstract RandomState InternalState { get; }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         protected double? _cachedGaussian;
 
         // Serialize bit and byte reservoirs to preserve exact stream continuation.
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         protected uint _bitBuffer;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         protected int _bitCount;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [WProtoMember(4)]
         protected uint _byteBuffer;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(5)]
+#endif
         [WProtoMember(5)]
         protected int _byteCount;
 
@@ -1480,7 +1536,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             };
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterDeserialization]
+#endif
         [WProtoAfterDeserialization]
         private void OnProtoDeserialize()
         {
@@ -1488,7 +1546,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             OnAfterDeserialization();
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoBeforeSerialization]
+#endif
         [WProtoBeforeSerialization]
         private void OnProtoSerialize()
         {

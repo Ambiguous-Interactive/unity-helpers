@@ -15,8 +15,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Text.Json.Serialization;
     using Extension;
     using Helper;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// A member of the ROMU family (RomuDuo) emphasizing high speed and good statistical quality on modern CPUs.
@@ -64,7 +66,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(SkipConstructor = true)]
+#endif
     [WProtoContract(SkipConstructor = true)]
     [WProtoSubtype(typeof(AbstractRandom), 109)]
     public sealed partial class RomuDuo
@@ -76,11 +80,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public static RomuDuo Instance => ThreadLocalRandom<RomuDuo>.Instance;
         public override RandomState InternalState => BuildState(_x, _y);
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         internal ulong _x;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [WProtoMember(7)]
         internal ulong _y;
 

@@ -5,10 +5,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
     using System.Collections.Generic;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// A disjoint-set (union-find) data structure with path compression and union by rank.
@@ -24,7 +26,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// ]]></code>
     /// </example>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public sealed partial class DisjointSet
     {
@@ -39,17 +43,23 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public int SetCount => _setCount;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         private int[] _parent = Array.Empty<int>();
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         private int[] _rank = Array.Empty<int>();
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [WProtoMember(3)]
         private int _setCount;
 

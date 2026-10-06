@@ -2,6 +2,50 @@
 <linker>
   <assembly fullname="WallstopStudios.UnityHelpers.Tests.Runtime">
     <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/Parent`1"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/ColdHashItem"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/ColdSortedItem"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/ColdDequeItem"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/ColdCyclicItem"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/ParentHashItem"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/ParentSortedItem"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/ParentDequeItem"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/ParentCyclicItem"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/ExplicitDequeItem"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Extensions.LegacyColdCollectionProviderTests/ExplicitCyclicItem"
+      preserve="all"
+    />
+    <type
       fullname="WallstopStudios.UnityHelpers.Tests.Extensions.ProtoEqualityPolymorphismTests/AnimalBase"
       preserve="all"
     />

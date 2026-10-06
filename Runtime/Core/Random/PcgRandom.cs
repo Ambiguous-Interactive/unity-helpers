@@ -11,8 +11,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using Helper;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// A high-quality, small-state pseudo-random number generator based on the PCG family.
@@ -111,7 +113,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(SkipConstructor = true)]
+#endif
     [WProtoContract(SkipConstructor = true)]
     [WProtoSubtype(typeof(AbstractRandom), 101)]
     public sealed partial class PcgRandom
@@ -124,11 +128,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override RandomState InternalState => BuildState(_state, _increment);
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         internal ulong _increment;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [WProtoMember(7)]
         internal ulong _state;
 

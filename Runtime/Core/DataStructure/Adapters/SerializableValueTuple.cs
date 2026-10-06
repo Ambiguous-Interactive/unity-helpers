@@ -5,9 +5,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 {
     using System;
     using System.Collections.Generic;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Unity-serializable stand-in for <see cref="ValueTuple{T1, T2}"/>.
@@ -37,7 +39,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// ]]></code>
     /// </example>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct SerializableValueTuple<T1, T2>
         : IEquatable<SerializableValueTuple<T1, T2>>,
@@ -67,12 +71,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>The first component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, IsRequired = true)]
+#endif
         [WProtoMember(1, IsRequired = true)]
         public T1 Item1;
 
         /// <summary>The second component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2, IsRequired = true)]
+#endif
         [WProtoMember(2, IsRequired = true)]
         public T2 Item2;
 
@@ -165,7 +173,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// <typeparam name="T2">The second component's type.</typeparam>
     /// <typeparam name="T3">The third component's type.</typeparam>
     [Serializable]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public partial struct SerializableValueTuple<T1, T2, T3>
         : IEquatable<SerializableValueTuple<T1, T2, T3>>,
@@ -195,17 +205,23 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>The first component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, IsRequired = true)]
+#endif
         [WProtoMember(1, IsRequired = true)]
         public T1 Item1;
 
         /// <summary>The second component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2, IsRequired = true)]
+#endif
         [WProtoMember(2, IsRequired = true)]
         public T2 Item2;
 
         /// <summary>The third component.</summary>
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3, IsRequired = true)]
+#endif
         [WProtoMember(3, IsRequired = true)]
         public T3 Item3;
 

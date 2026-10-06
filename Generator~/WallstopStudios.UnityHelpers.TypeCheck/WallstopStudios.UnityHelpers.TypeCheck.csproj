@@ -56,6 +56,8 @@
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)../CheckProjects.ruleset</CodeAnalysisRuleSet>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
     <WallstopProto Condition="'$(WallstopProto)' == ''">true</WallstopProto>
+    <DefineConstants Condition="'$(WallstopProtoOnly)' == 'true'"
+      >$(DefineConstants);WALLSTOP_PROTO_ONLY</DefineConstants>
     <!-- WyRandom uses a pointer for its state mixing. -->
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <!-- Unassigned-field and unused-local warnings are about fields Unity assigns through the
@@ -147,10 +149,10 @@
   </ItemGroup>
   <ItemGroup>
     <!-- The same vendored binaries the package ships to Unity. -->
-    <Reference Include="protobuf-net">
+    <Reference Include="protobuf-net" Condition="'$(WallstopProtoOnly)' != 'true'">
       <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</HintPath>
     </Reference>
-    <Reference Include="protobuf-net.Core">
+    <Reference Include="protobuf-net.Core" Condition="'$(WallstopProtoOnly)' != 'true'">
       <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</HintPath>
     </Reference>
     <Reference Include="System.Collections.Immutable">

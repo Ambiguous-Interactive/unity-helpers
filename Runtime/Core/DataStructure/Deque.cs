@@ -7,11 +7,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections;
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// A highly optimized double-ended queue (deque) implemented with a circular array.
@@ -30,8 +32,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// <typeparam name="T">The type of elements in the deque.</typeparam>
     [Serializable]
 #pragma warning disable WPROTO030 // Served at the root through DequeProtoWrapper.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(IgnoreListHandling = true)]
+#endif
 #pragma warning restore WPROTO030
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
+#endif
     public sealed class Deque<T> : IReadOnlyList<T>
     {
         public const int DefaultCapacity = 16;
@@ -84,30 +91,53 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         private T[] _items;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         private List<T> _serializedItems;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         private PooledResource<List<T>> _serializedItemsLease;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         private int _head;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         private int _tail;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         private int _count;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(5)]
+#endif
         private int _serializedCapacity;
+
+#if !WALLSTOP_PROTO_ONLY
+        static Deque()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer(
+                ProtoBuf.Serializers.RepeatedSerializer.CreateList<T>()
+            );
+        }
+#endif
 
         /// <summary>
         /// Constructs an empty deque with the specified capacity.
@@ -433,7 +463,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return new DequeEnumerator(_items, _head, _count, _items.Length);
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoBeforeSerialization]
+#endif
         private void OnProtoSerialize()
         {
             _serializedCapacity = _items.Length;
@@ -457,14 +489,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _serializedItems = buffer;
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterSerialization]
+#endif
         private void OnProtoSerialized()
         {
             _serializedItemsLease.Dispose();
             _serializedItems = null;
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterDeserialization]
+#endif
         private void OnProtoDeserialized()
         {
             int itemCount = _serializedItems?.Count ?? 0;

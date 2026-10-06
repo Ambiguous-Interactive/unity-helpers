@@ -14,8 +14,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Text.Json.Serialization;
     using Extension;
     using Helper;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// A 128-bit state, natively 32-bit xoshiro128** generator whose every output bit passes the
@@ -78,7 +80,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(SkipConstructor = true)]
+#endif
     [WProtoContract(SkipConstructor = true)]
     [WProtoSubtype(typeof(AbstractRandom), 118)]
     public sealed partial class Xoshiro128StarStar
@@ -94,19 +98,27 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override RandomState InternalState =>
             BuildState(((ulong)_s0 << UintBitCount) | _s1, ((ulong)_s2 << UintBitCount) | _s3);
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         internal uint _s0;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [WProtoMember(7)]
         internal uint _s1;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(8)]
+#endif
         [WProtoMember(8)]
         internal uint _s2;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(9)]
+#endif
         [WProtoMember(9)]
         internal uint _s3;
 

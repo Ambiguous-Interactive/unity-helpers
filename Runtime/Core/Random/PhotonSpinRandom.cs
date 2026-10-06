@@ -12,10 +12,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using Extension;
-    using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// PhotonSpin32: a 20-word ring-buffer generator inspired by SHISHUA, tuned for high throughput and large period.
@@ -65,7 +67,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(SkipConstructor = true)]
+#endif
     [WProtoContract(SkipConstructor = true)]
     [WProtoSubtype(typeof(AbstractRandom), 113)]
     public sealed partial class PhotonSpinRandom
@@ -109,27 +113,39 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [WProtoMember(6)]
         private uint[] _elements = new uint[BlockSize];
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [WProtoMember(7)]
         private uint _a;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(8)]
+#endif
         [WProtoMember(8)]
         private uint _b;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(9)]
+#endif
         [WProtoMember(9)]
         private uint _c;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(10)]
+#endif
         [WProtoMember(10)]
         private int _index;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(11)]
+#endif
         [WProtoMember(11)]
         private bool _hasPrimed;
 

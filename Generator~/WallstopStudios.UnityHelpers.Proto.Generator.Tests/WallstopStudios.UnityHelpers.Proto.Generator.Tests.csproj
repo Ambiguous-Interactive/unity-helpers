@@ -84,6 +84,8 @@
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoExplicitDefaultTests.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/ConsumerMigration/*.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConsumerMigrationTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/ProtoOnly/WProtoBufferWriter*.cs" />
+    <Compile Include="$(RepoRoot)/Tests/ProtoOnly/WProtoFaultBufferWriter.cs" />
     <Compile Include="*.cs" />
     <Compile
       Include="$(RepoRoot)/Tests/Core/DictionaryAssertions.cs"

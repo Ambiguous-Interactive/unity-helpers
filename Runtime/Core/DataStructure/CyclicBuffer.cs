@@ -8,9 +8,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using Helper;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Fixed-capacity ring buffer that overwrites old entries when full, ideal for rolling logs, recent inputs, or telemetry windows.
@@ -28,15 +30,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     [Serializable]
 #pragma warning disable WPROTO030 // Served at the root through CyclicBufferProtoWrapper.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract(IgnoreListHandling = true)]
+#endif
 #pragma warning restore WPROTO030
+#if !WALLSTOP_PROTO_ONLY
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
+#endif
     public sealed class CyclicBuffer<T> : IReadOnlyList<T>
     {
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [field: SerializeField]
         public int Capacity { get; private set; }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [field: SerializeField]
         public int Count { get; private set; }
 
@@ -54,19 +65,36 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         private PooledResource<List<T>> _serializedItemsLease;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         private List<T> _serializedItems;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoIgnore]
+#endif
         private List<T> _buffer;
 
         [SerializeField]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         private int _position;
+
+#if !WALLSTOP_PROTO_ONLY
+        static CyclicBuffer()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer(
+                ProtoBuf.Serializers.RepeatedSerializer.CreateList<T>()
+            );
+        }
+#endif
 
         public CyclicBuffer(int capacity, IEnumerable<T> initialContents = null)
         {
@@ -344,7 +372,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _position = Count < Capacity ? Count : 0;
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoBeforeSerialization]
+#endif
         private void OnProtoSerialize()
         {
             if (Count == 0)
@@ -365,14 +395,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _serializedItems = buffer;
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterSerialization]
+#endif
         private void OnProtoSerialized()
         {
             _serializedItemsLease.Dispose();
             _serializedItems = null;
         }
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoAfterDeserialization]
+#endif
         private void OnProtoDeserialized()
         {
             int itemCount = _serializedItems?.Count ?? 0;

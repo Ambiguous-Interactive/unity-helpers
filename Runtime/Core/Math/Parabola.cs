@@ -7,7 +7,9 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using Helper;
+#if !WALLSTOP_PROTO_ONLY
     using ProtoBuf;
+#endif
 
     /// <summary>
     /// Represents a parabola defined by y = A*x^2 + B*x, with x-intercepts at 0 and Length.
@@ -22,7 +24,9 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     [DataContract]
     [Serializable]
 #pragma warning disable WPROTO030 // Served through ParabolaSurrogate by both serializers.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
 #pragma warning restore WPROTO030
     public readonly struct Parabola : IEquatable<Parabola>
     {
@@ -55,28 +59,36 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// The distance between the two x-intercepts (at x=0 and x=Length).
         /// </summary>
         [DataMember]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         public readonly float Length;
 
         /// <summary>
         /// The coefficient of x^2 in the parabola equation y = A*x^2 + B*x.
         /// </summary>
         [DataMember]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         public readonly float A;
 
         /// <summary>
         /// The coefficient of x in the parabola equation y = A*x^2 + B*x.
         /// </summary>
         [DataMember]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         public readonly float B;
 
         /// <summary>
         /// The maximum height of the parabola (y-value at the vertex).
         /// </summary>
         [DataMember]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         public readonly float MaxHeight;
 
         /// <summary>

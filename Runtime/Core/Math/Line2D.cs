@@ -8,10 +8,12 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     using System.Text.Json.Serialization;
     using DataStructure;
     using Extension;
-    using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     /// <summary>
     /// Represents a line segment defined by two endpoints in 2D space.
@@ -25,7 +27,9 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     /// </example>
     [Serializable]
     [DataContract]
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
     [WProtoContract]
     public readonly partial struct Line2D : IEquatable<Line2D>
     {
@@ -80,7 +84,9 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// The starting point of the line segment.
         /// </summary>
         [DataMember]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [WProtoMember(1)]
         public readonly Vector2 from;
 
@@ -88,7 +94,9 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// The ending point of the line segment.
         /// </summary>
         [DataMember]
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [WProtoMember(2)]
         public readonly Vector2 to;
 

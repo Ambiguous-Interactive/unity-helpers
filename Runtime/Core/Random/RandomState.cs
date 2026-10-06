@@ -9,13 +9,17 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Text.Json.Serialization;
     using Extension;
     using Helper;
-    using ProtoBuf;
     using Utils;
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+#endif
 
     [Serializable]
     [DataContract]
 #pragma warning disable WPROTO030 // Served by RandomStateWProtoFormatter.
+#if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
+#endif
 #pragma warning restore WPROTO030
     public readonly partial struct RandomState : IEquatable<RandomState>
     {
@@ -58,43 +62,63 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [JsonInclude]
         public int ByteCount => _byteCount;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(5)]
+#endif
         [JsonIgnore]
         internal readonly byte[] _payload;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
+#endif
         [JsonIgnore]
         private readonly ulong _state1;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(2)]
+#endif
         [JsonIgnore]
         private readonly ulong _state2;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(3)]
+#endif
         [JsonIgnore]
         private readonly bool _hasGaussian;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(4)]
+#endif
         [JsonIgnore]
         private readonly double _gaussian;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]
+#endif
         [JsonIgnore]
         private readonly uint _bitBuffer;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(7)]
+#endif
         [JsonIgnore]
         private readonly int _bitCount;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(8)]
+#endif
         [JsonIgnore]
         private readonly uint _byteBuffer;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(9)]
+#endif
         [JsonIgnore]
         private readonly int _byteCount;
 
+#if !WALLSTOP_PROTO_ONLY
         [ProtoMember(10)]
+#endif
         [JsonIgnore]
         private readonly int _hashCode;
 

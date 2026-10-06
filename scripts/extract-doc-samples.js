@@ -78,7 +78,7 @@ const REQUIRE_BOTH_CORPORA =
   SCAN_ROOT === REPO_ROOT || process.env.DOC_SAMPLES_REQUIRE_BOTH === "1";
 const OUTPUT_DIR = process.env.DOC_SAMPLES_OUT
   ? path.resolve(process.env.DOC_SAMPLES_OUT)
-  : path.join(REPO_ROOT, "artifacts", "doc-samples");
+  : path.join(REPO_ROOT, "artifacts", "doc-samples~");
 
 /** Where documentation is read from. */
 const DOC_ROOTS = ["docs"];

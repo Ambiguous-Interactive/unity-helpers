@@ -36,6 +36,82 @@ Human-readable; ideal for settings, debug, modding, and Git diffs.
   - System.Type (type metadata)
 - Profiles: Normal, Pretty, Fast, FastPOCO (see below)
 
+### WProto-only builds
+
+Add `WALLSTOP_PROTO_ONLY` to the scripting define symbols for each player target when all
+protobuf models have moved to WallstopProto. Package protobuf-net attributes, reflection-model
+initialization and fallback serialization are excluded. The two protobuf-net plugins are disabled
+by their import constraints, and their linker entries allow those assemblies to be absent.
+JSON and trusted legacy SystemBinary APIs retain their existing behavior.
+Remove or conditionally exclude consumer `ProtoBuf` imports, attributes and explicit assembly
+references before enabling the symbol. A legacy consumer script still requires its backend even
+when the package has generated formatters for every shipped model.
+
+`Serializer.ProtoSerialize` and both `ProtoDeserialize` shapes use registered generated
+formatters in this mode. Missing formatters report `SerializationTypeException`; a rejected
+payload reports the typed serialization failure. Runtime `RegisterProtobufRoot` is unavailable
+and reports `SerializationConfigurationException`. Declare generated roots with
+`WProtoDeclaredRootAttribute` instead. Turning this mode on does not migrate schemas or convert
+existing saves. Verify every retained model and wire contract before removing its legacy backend.
+
+The package's legacy-oracle test assemblies and their dependent assemblies are excluded in this
+mode because they explicitly require protobuf-net. The separate `Tests.ProtoOnly` assembly
+covers generated writes, retained collections, Unity values and RNG continuation. The normal
+mode retains the complete legacy test assemblies; a WProto-only result does not replace that
+validation. `npm run typecheck:unity:proto-only` compiles Runtime and Editor without either
+protobuf-net reference, separately from native editor/player testing.
+
+`WProtoFacade.Serialize(value, IBufferWriter<byte>)` appends a measured payload to a writer
+without allocating an intermediate payload array. Its `TrySerialize` overload returns a byte
+count through `out` and reports typed failures as `false`. Encoding finishes before the writer's
+`Advance` call. Empty payloads do not request or advance a destination span. A failed formatter
+can modify uncommitted span memory; a writer that fails while advancing controls its own state.
+The package cannot roll back arbitrary external writers. WProto-only proto equality and hashing
+use pooled writers rather than the reflection backend.
+
+### Protobuf equality and hashing
+
+Default-mode `ProtoEquals` and `GetProtoComparer<T>()` retain protobuf-net's direct encoding.
+For the two- and three-argument `SerializableDictionary` and `SerializableSortedDictionary`
+types, comparison writes the backing map through a typed protobuf-net map serializer. This
+preserves the bundled protobuf-net 3 encoding, including literal whitespace keys and enumeration
+order, without discovering the adapter's map serializer at runtime. Consumer subclasses retain
+the existing protobuf-net dispatch and their own contract behavior. Stripped-player and nested
+collection compatibility remains tracked in
+[#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950).
+The bundled protobuf-net 3.2.56 assemblies include source patches for dictionary-entry value
+checkers, nullable member classification, runtime construction of nested map serializers and
+indexed collection classification. Indexed properties are rejected before speculative tuple
+setter inspection; ordinary tuples and index-free init-only contracts keep their existing
+classification. Init-only setter inspection still uses the original custom-modifier API.
+Nested dictionary fields use the existing typed map serializer and the active model's key/value
+policies without a reflected generic map-decorator constructor. Compiled models retain the
+original typed emitter. Map encoding and default-value policy remain unchanged. Runtime repeated
+providers use typed registrations for intrinsic scalar lists and arrays, while owned generic set,
+deque and cyclic-buffer static constructors register their actual serializers before metadata
+lookup or explicit model registration. The opted-in base collection is initialized without
+running an unrelated consumer subclass initializer. The cache checks the
+original provider identity and directly constructs the original repeated decorator, preserving
+custom-provider precedence and compiled models.
+Registration supplies a direct item-contract serializer factory with separate member state
+for each model. Item reflection metadata must still be preserved, and inheritance and other
+consumer collection contracts still require their own AOT qualification. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)
+include the exact patch and binary hashes. Qualify each binary change in a fresh Unity 2021.3
+stripped player; success with another binary or a newer editor does not prove compatibility.
+The root save wrappers described below remain a separate path: comparer hashes are not hashes
+of `Serializer.ProtoSerialize` output. WProto-only builds use generated root encoding instead,
+so hashes are not portable between backend modes.
+They are also not portable between protobuf-net majors: version 2 writes zero integer map
+keys and values that version 3 omits. This difference predates the typed map writer.
+
+Built-in dictionary root marshals cover the two-argument types. Cached three-argument types
+require a consumer formatter or marshal in WProto-only builds.
+
+For consumer dictionary subclasses, declare `[ProtoContract]` on the concrete type to avoid
+speculative tuple detection; protobuf-net does not inherit this contract metadata from the base.
+This metadata alone does not establish stripped IL2CPP compatibility.
+Use the existing save API for retained data rather than persisting comparer hashes.
+
 ### Protobuf (protobuf-net)
 
 **⭐ Killer Feature: Schema Evolution**: Players can load saves from older game versions without breaking! Add new fields, remove old ones, rename types, all while maintaining compatibility.
@@ -506,6 +582,21 @@ Protobuf uses reflection internally to serialize/deserialize types. Unity's IL2C
 
 ### Solution: Create a link.xml file
 
+Unity Helpers supplies its own linker descriptor during player builds when installed through
+UPM. The editor build callback resolves the installed package's absolute location and submits
+the existing `link.xml`; it creates no project assets. Assets-based installations use Unity's
+normal descriptor discovery. A UPM installation with a missing descriptor
+stops the build with a reinstall diagnostic.
+
+The descriptor preserves `WallstopStudios.UnityHelpers`, `System.Text.Json`,
+`System.Collections.Immutable`, and the two optional protobuf-net assemblies. This retains
+private serialization fields and callbacks, and can increase player size. Preservation does
+not generate missing closed generic AOT methods or establish support for arbitrary runtime
+models. Test the exact collection types and configured models in a stripped Release player.
+Consumer contracts in other assemblies still need their own preservation rules. Unity does
+not automatically consume package-contained descriptors; see the
+[Unity managed stripping manual](https://docs.unity3d.com/2021.3/Documentation/Manual/ManagedCodeStripping.html).
+
 In your `Assets` folder (or any subfolder), create `link.xml` to preserve your Protobuf types:
 
 ```xml
@@ -526,11 +617,6 @@ In your `Assets` folder (or any subfolder), create `link.xml` to preserve your P
     <namespace fullname="MyGame.Shared.Protocol" preserve="all"/>
   </assembly>
 
-  <!-- Preserve Unity Helpers if needed -->
-  <assembly fullname="WallstopStudios.UnityHelpers">
-    <!-- Usually not needed, but if you see errors: -->
-    <type fullname="WallstopStudios.UnityHelpers.Core.Serialization.Serializer" preserve="all"/>
-  </assembly>
 </linker>
 ```
 
