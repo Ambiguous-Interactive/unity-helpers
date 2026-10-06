@@ -110,6 +110,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
             CollectionAssert.AreEqual(expected, bytes);
         }
+
+        [Test, Combinatorial]
+        public void OrdinaryRepeatedRootsRetainValuesAndFieldFraming(
+            [Values(false, true)] bool list,
+            [Values(false, true)] bool reflection
+        )
+        {
+            object value = list ? new List<int> { -1, 0, 42 } : new int[] { -1, 0, 42 };
+            RuntimeTypeModel model = reflection
+                ? RuntimeTypeModel.Create()
+                : RuntimeTypeModel.Default;
+            if (reflection)
+            {
+                model.AutoCompile = false;
+            }
+            TestContext.WriteLine(
+                $"Contract={value.GetType()}; Reflection={reflection}; AutoCompile={model.AutoCompile}; DefaultAutoCompile={RuntimeTypeModel.Default.AutoCompile}"
+            );
+            byte[] expected = { 8, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 8, 0, 8, 42 };
+            using MemoryStream destination = new();
+            if (reflection)
+            {
+                model.Serialize(destination, value);
+            }
+            else
+            {
+                ProtoBuf.Serializer.NonGeneric.Serialize(destination, value);
+            }
+            byte[] bytes = destination.ToArray();
+            TestContext.WriteLine(
+                $"Contract={value.GetType()}; Bytes={BitConverter.ToString(bytes)}"
+            );
+            CollectionAssert.AreEqual(expected, bytes);
+        }
     }
 #endif
 }
