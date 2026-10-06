@@ -6,7 +6,7 @@ The annotated tag object is `421b80a9b128be779036e600b996efb9e48b9f92`.
 Upstream source and license: [protobuf-net](https://github.com/protobuf-net/protobuf-net/tree/dfdfce61a739cfd76f05fcdacf8a4b3b9e94e684)
 and [bundled license](./Licence.txt).
 
-[The source patch](./il2cpp-aot.patch) changes five runtime behaviors:
+[The source patch](./il2cpp-aot.patch) changes six runtime behaviors:
 
 - Construct fallback value checkers directly, avoiding reflected closed generic constructors.
   Primary primitive checkers keep their original default-value policy. Nonnullable structs
@@ -34,6 +34,13 @@ and [bundled license](./Licence.txt).
   Registration also supplies a direct item-contract serializer factory. Each model receives
   a fresh item serializer; models do not share member or callback state. Inheritance and
   unregistered contract construction retain the upstream path.
+
+- Wrap reference-type contract writes implementing `ISerializationWriteScope` in an ownership
+  scope, including interpreted and emitted serializers. Entry precedes callbacks; exit runs
+  in `finally` after successful entry. Inherited contracts enter once, and consumer
+  after-serialization callbacks still run only when their original write succeeds.
+  Value types cannot implement this scope. Entry must fail atomically and exit must not throw.
+  Owned deque and cyclic buffer scratch state supports nested writes of the same instance.
 
 Map serialization, field numbers and default omission retain upstream behavior.
 The additive `RuntimeTypeModel.RegisterRepeatedSerializer<TCollection, TItem>` API registers an
@@ -85,5 +92,5 @@ the .NET Standard 2.1 target. Check the hashes before replacing the shipped file
 
 | File                  | SHA256                                                             |
 | --------------------- | ------------------------------------------------------------------ |
-| protobuf-net.dll      | `7697aaec8b86257c81a85777e199422376e59572d3535f3fa0c1badb9e5e301a` |
-| protobuf-net.Core.dll | `1bc895f8eb9223b9c58e39cc75567e8dd275f00f0f02da979110f726203e382b` |
+| protobuf-net.dll      | `032b3f09371b0a42b455f0e29afa654625e559cfe9de20afeedc42b3c736b7be` |
+| protobuf-net.Core.dll | `afd81d94f0140ef01527c96a3e5ed57084a0f1d2897a9dde928242643669dda0` |

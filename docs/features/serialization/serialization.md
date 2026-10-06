@@ -69,6 +69,19 @@ can modify uncommitted span memory; a writer that fails while advancing controls
 The package cannot roll back arbitrary external writers. WProto-only proto equality and hashing
 use pooled writers rather than the reflection backend.
 
+### Collection serialization cleanup
+
+The bundled protobuf-net serializers return `Deque<T>` and `CyclicBuffer<T>` scratch
+buffers when a write succeeds or throws, including direct protobuf-net calls and legacy
+facade fallback. Nested serialization of the same instance restores the outer write
+scratch state. Consumer callbacks retain protobuf-net's original success and exception behavior;
+cleanup does not turn a failed write into an after-serialization callback. Field numbers,
+item order, and serialized bytes remain unchanged.
+
+These collections are not thread safe, and serialization does not provide an immutable
+snapshot against consumer mutations. The ownership scope does not remove protobuf-net's
+existing standalone `Compile()` restrictions on private fields and callbacks.
+
 ### Protobuf equality and hashing
 
 Default-mode `ProtoEquals` and `GetProtoComparer<T>()` retain protobuf-net's direct encoding.

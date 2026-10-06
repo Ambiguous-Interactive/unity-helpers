@@ -1,29 +1,3 @@
-diff --git a/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs b/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs
-new file mode 100644
-index 00000000..91a318c0
---- /dev/null
-+++ b/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs
-@@ -0,0 +1,20 @@
-+namespace ProtoBuf.Internal
-+{
-+    using System;
-+    using ProtoBuf.Serializers;
-+
-+    internal interface IMapSerializerBridge
-+    {
-+        Type CollectionType { get; }
-+        Type KeyType { get; }
-+        Type ValueType { get; }
-+
-+        object ReadMap(ref ProtoReader.State state, object value, SerializerFeatures features,
-+            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
-+            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat);
-+
-+        void WriteMap(ref ProtoWriter.State state, object value, int fieldNumber, SerializerFeatures features,
-+            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
-+            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat);
-+    }
-+}
 diff --git a/src/protobuf-net.Core/Internal/TypeHelperT.cs b/src/protobuf-net.Core/Internal/TypeHelperT.cs
 index 577b0743..79539f0b 100644
 --- a/src/protobuf-net.Core/Internal/TypeHelperT.cs
@@ -151,24 +125,6 @@ index 25ff5127..57bc5167 100644
          protected override T[] Initialize(T[] values, ISerializationContext context)
              => values ?? Array.Empty<T>();
          protected override T[] Clear(T[] values, ISerializationContext context)
-diff --git a/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs b/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs
-new file mode 100644
-index 00000000..30f9b147
---- /dev/null
-+++ b/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs
-@@ -0,0 +1,12 @@
-+using System;
-+
-+namespace ProtoBuf.Serializers
-+{
-+    /// <summary>
-+    /// Opts a collection into initializing its typed repeated providers before serializer metadata is built.
-+    /// </summary>
-+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-+    public sealed class TypedRepeatedProviderAttribute : Attribute
-+    {
-+    }
-+}
 diff --git a/src/protobuf-net/Internal/Serializers/MapDecorator.cs b/src/protobuf-net/Internal/Serializers/MapDecorator.cs
 index 197e0a54..634a3c8b 100644
 --- a/src/protobuf-net/Internal/Serializers/MapDecorator.cs
@@ -289,7 +245,7 @@ index 55b741a6..7956d400 100644
                  new object[] { fieldNumber, features, compatibilityLevel, dataFormat, stub });
          }
 diff --git a/src/protobuf-net/Internal/Serializers/TypeSerializer.cs b/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
-index 6363686d..09070636 100644
+index 6363686d..27dc8dc8 100644
 --- a/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
 +++ b/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
 @@ -12,9 +12,26 @@ namespace ProtoBuf.Internal.Serializers
@@ -320,6 +276,129 @@ index 6363686d..09070636 100644
                  ? Activator.CreateInstance(typeof(InheritanceTypeSerializer<,>).MakeGenericType(rootType, forType), nonPublic: true)
                  : Activator.CreateInstance(typeof(TypeSerializer<>).MakeGenericType(forType), nonPublic: true));
              
+@@ -189,6 +206,8 @@ namespace ProtoBuf.Internal.Serializers
+             bool isRootType, bool useConstructor, bool assertKnownType,
+             CallbackSet callbacks, Type constructType, MethodInfo factory, SerializerFeatures features)
+         {
++            if (typeof(T).IsValueType && typeof(ISerializationWriteScope).IsAssignableFrom(typeof(T)))
++                throw new NotSupportedException("Serialization write scope ownership requires a reference type contract.");
+             Debug.Assert(fieldNumbers is not null);
+             Debug.Assert(serializers is not null);
+             Debug.Assert(fieldNumbers.Length == serializers.Length);
+@@ -330,37 +349,47 @@ namespace ProtoBuf.Internal.Serializers
+ 
+         protected void SerializeImpl(ref ProtoWriter.State state, T value)
+         {
+-            Callback(ref value, TypeModel.CallbackType.BeforeSerialize, state.Context);
+-
+-            // write inheritance first
+-            if (CanHaveInheritance)
++            ISerializationWriteScope scope = GetFlag(StateFlags.IsRootType) && !typeof(T).IsValueType
++                ? value as ISerializationWriteScope : null;
++            scope?.BeginSerialization();
++            try
+             {
+-                IRuntimeProtoSerializerNode next = GetMoreSpecificSerializer(value);
+-                if (next is object) next.Write(ref state, value);
+-            }
++                Callback(ref value, TypeModel.CallbackType.BeforeSerialize, state.Context);
+ 
+-            // write all actual fields
+-            //Debug.WriteLine(">> Writing fields for " + forType.FullName);
+-            for (int i = 0; i < serializers.Length; i++)
+-            {
+-                IRuntimeProtoSerializerNode ser = serializers[i];
+-                if (!(ser is IProtoTypeSerializer ts && ts.IsSubType))
++                // write inheritance first
++                if (CanHaveInheritance)
+                 {
+-                    //Debug.WriteLine(": " + ser.ToString());
+-                    ser.Write(ref state, value);
++                    IRuntimeProtoSerializerNode next = GetMoreSpecificSerializer(value);
++                    if (next is object) next.Write(ref state, value);
+                 }
+-            }
+-            //Debug.WriteLine("<< Writing fields for " + forType.FullName);
+ 
+-            if (UseTypedExtensible)
+-            {
+-                state.AppendExtensionData((ITypedExtensible)value, ExpectedType);
++                // write all actual fields
++                //Debug.WriteLine(">> Writing fields for " + forType.FullName);
++                for (int i = 0; i < serializers.Length; i++)
++                {
++                    IRuntimeProtoSerializerNode ser = serializers[i];
++                    if (!(ser is IProtoTypeSerializer ts && ts.IsSubType))
++                    {
++                        //Debug.WriteLine(": " + ser.ToString());
++                        ser.Write(ref state, value);
++                    }
++                }
++                //Debug.WriteLine("<< Writing fields for " + forType.FullName);
++
++                if (UseTypedExtensible)
++                {
++                    state.AppendExtensionData((ITypedExtensible)value, ExpectedType);
++                }
++                else if (GetFlag(StateFlags.IsExtensible))
++                {
++                    state.AppendExtensionData((IExtensible)value);
++                }
++                Callback(ref value, TypeModel.CallbackType.AfterSerialize, state.Context);
+             }
+-            else if (GetFlag(StateFlags.IsExtensible))
++            finally
+             {
+-                state.AppendExtensionData((IExtensible)value);
++                scope?.EndSerialization();
+             }
+-            Callback(ref value, TypeModel.CallbackType.AfterSerialize, state.Context);
+         }
+ 
+         protected Action<T, ISerializationContext> _subTypeOnBeforeDeserialize;
+@@ -553,6 +582,23 @@ namespace ProtoBuf.Internal.Serializers
+         {
+             Type expected = ExpectedType;
+             using Compiler.Local loc = ctx.GetLocalWithValue(expected, valueFrom);
++            bool ownsScope = GetFlag(StateFlags.IsRootType) && !expected.IsValueType
++                && (typeof(ISerializationWriteScope).IsAssignableFrom(expected) || !expected.IsSealed);
++            using Compiler.Local scope = ownsScope ? new Compiler.Local(ctx, typeof(ISerializationWriteScope)) : null;
++            Compiler.CodeLabel scopeEnd = default;
++            if (ownsScope)
++            {
++                ctx.LoadValue(loc);
++                ctx.TryCast(typeof(ISerializationWriteScope));
++                ctx.StoreValue(scope);
++                Compiler.CodeLabel noScope = ctx.DefineLabel();
++                ctx.LoadValue(scope);
++                ctx.BranchIfFalse(noScope, false);
++                ctx.LoadValue(scope);
++                ctx.EmitCall(typeof(ISerializationWriteScope).GetMethod(nameof(ISerializationWriteScope.BeginSerialization)));
++                ctx.MarkLabel(noScope);
++                scopeEnd = ctx.BeginTry();
++            }
+             // pre-callbacks
+             EmitCallbackIfNeeded(ctx, loc, TypeModel.CallbackType.BeforeSerialize);
+ 
+@@ -646,6 +692,18 @@ namespace ProtoBuf.Internal.Serializers
+ 
+             // post-callbacks
+             EmitCallbackIfNeeded(ctx, loc, TypeModel.CallbackType.AfterSerialize);
++            if (ownsScope)
++            {
++                ctx.EndTry(scopeEnd, false);
++                ctx.BeginFinally();
++                Compiler.CodeLabel noScope = ctx.DefineLabel();
++                ctx.LoadValue(scope);
++                ctx.BranchIfFalse(noScope, false);
++                ctx.LoadValue(scope);
++                ctx.EmitCall(typeof(ISerializationWriteScope).GetMethod(nameof(ISerializationWriteScope.EndSerialization)));
++                ctx.MarkLabel(noScope);
++                ctx.EndFinally();
++            }
+         }
+ 
+         private bool UseTypedExtensible => GetFlag(StateFlags.IsTypedExtensible) && (HasInheritance || !GetFlag(StateFlags.IsExtensible));
 diff --git a/src/protobuf-net/Meta/MetaType.cs b/src/protobuf-net/Meta/MetaType.cs
 index 527bc447..33930e11 100644
 --- a/src/protobuf-net/Meta/MetaType.cs
@@ -544,3 +623,65 @@ index e54a2ff3..3b821f09 100644
          private sealed class Registration
          {
              public MemberInfo Resolve(Type root, Type current)
+diff --git a/src/protobuf-net.Core/ISerializationWriteScope.cs b/src/protobuf-net.Core/ISerializationWriteScope.cs
+new file mode 100644
+index 00000000..161f05cb
+--- /dev/null
++++ b/src/protobuf-net.Core/ISerializationWriteScope.cs
+@@ -0,0 +1,12 @@
++namespace ProtoBuf
++{
++    /// <summary>Owns temporary resources for one reference type contract write, including callbacks.</summary>
++    public interface ISerializationWriteScope
++    {
++        /// <summary>Begins one write scope; nested writes must preserve the enclosing scope.</summary>
++        void BeginSerialization();
++
++        /// <summary>Releases the current scope and restores its enclosing scope without throwing.</summary>
++        void EndSerialization();
++    }
++}
+diff --git a/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs b/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs
+new file mode 100644
+index 00000000..91a318c0
+--- /dev/null
++++ b/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs
+@@ -0,0 +1,20 @@
++namespace ProtoBuf.Internal
++{
++    using System;
++    using ProtoBuf.Serializers;
++
++    internal interface IMapSerializerBridge
++    {
++        Type CollectionType { get; }
++        Type KeyType { get; }
++        Type ValueType { get; }
++
++        object ReadMap(ref ProtoReader.State state, object value, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat);
++
++        void WriteMap(ref ProtoWriter.State state, object value, int fieldNumber, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat);
++    }
++}
+diff --git a/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs b/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs
+new file mode 100644
+index 00000000..30f9b147
+--- /dev/null
++++ b/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs
+@@ -0,0 +1,12 @@
++using System;
++
++namespace ProtoBuf.Serializers
++{
++    /// <summary>
++    /// Opts a collection into initializing its typed repeated providers before serializer metadata is built.
++    /// </summary>
++    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
++    public sealed class TypedRepeatedProviderAttribute : Attribute
++    {
++    }
++}

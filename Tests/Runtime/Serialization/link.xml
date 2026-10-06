@@ -137,6 +137,18 @@
       fullname="WallstopStudios.UnityHelpers.Tests.Serialization.SerializerTryApiTests/Unregistered"
       preserve="all"
     />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.CollectionScratchItem"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.CollectionScratchParent"
+      preserve="all"
+    />
+    <type
+      fullname="WallstopStudios.UnityHelpers.Tests.Serialization.CollectionScratchCallbackState"
+      preserve="all"
+    />
   </assembly>
   <!-- The legacy model also reads attribute property getters through reflection. -->
   <assembly fullname="protobuf-net.Core">

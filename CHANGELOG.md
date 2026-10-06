@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix deque and cyclic buffer serialization retaining pooled scratch buffers after failed writes, including nested serialization of the same instance ([#952](https://github.com/wallstop/unity-helpers/issues/952)).
 - Fix package-installed player builds losing private serialization fields and callbacks to code stripping ([#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950)).
 - Fix cached enum display labels to use the declared member name when an `InspectorName` contains only whitespace; nonblank labels retain their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix legacy dictionary comparisons and nullable fields, avoid dynamic map, repeated-provider and registered item serializer constructors, and exclude indexers from tuple classification ([#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950)).
