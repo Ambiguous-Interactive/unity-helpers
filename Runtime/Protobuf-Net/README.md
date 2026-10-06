@@ -6,7 +6,7 @@ The annotated tag object is `421b80a9b128be779036e600b996efb9e48b9f92`.
 Upstream source and license: [protobuf-net](https://github.com/protobuf-net/protobuf-net/tree/dfdfce61a739cfd76f05fcdacf8a4b3b9e94e684)
 and [bundled license](./Licence.txt).
 
-[The source patch](./il2cpp-aot.patch) changes two internal paths:
+[The source patch](./il2cpp-aot.patch) changes three internal paths:
 
 - Construct fallback value checkers directly, avoiding reflected closed generic constructors.
   Primary primitive checkers keep their original default-value policy. Nonnullable structs
@@ -15,10 +15,15 @@ and [bundled license](./Licence.txt).
 - Unwrap nullable member types before effective-type classification, so primitive nullable
   members do not depend on reflective dynamic-stub construction.
 
+- Construct runtime map decorators without closing a generic constructor through reflection.
+  An internal interface delegates reads and writes to the existing typed map serializer with
+  the same key/value options and active model. Compiled models keep the original typed emitter.
+
 Map serialization, field numbers, default omission and public APIs retain upstream behavior.
 The original strong-name key, assembly versions and target framework are preserved.
 These are modified upstream binaries, rather than unmodified NuGet artifacts. The patches
-address the observed dictionary-entry and nullable-member failures; other dynamic protobuf-net
+address the observed dictionary-entry, nullable-member and reflected map-constructor failures;
+other dynamic protobuf-net
 contracts still require their own IL2CPP qualification. See
 [serialization compatibility](../../docs/features/serialization/serialization.md#protobuf-equality-and-hashing).
 
@@ -59,5 +64,5 @@ the .NET Standard 2.1 target. Check the hashes before replacing the shipped file
 
 | File                  | SHA256                                                             |
 | --------------------- | ------------------------------------------------------------------ |
-| protobuf-net.dll      | `78b2b328cab561e9db45b127f2862d8641b81bb22b161cd9e5b217665fece3e5` |
-| protobuf-net.Core.dll | `d14eeba59814700aee7f596086bc974c7bf12de80545ee156ac4affed44d1cf6` |
+| protobuf-net.dll      | `cafb0817134eef64be7aa64f0b09565e8b1f0b4f00e0783254c6fb47144e6539` |
+| protobuf-net.Core.dll | `b5a43e5c4e84e69bcd3eb4055e78e4667756f195fb3e86b9b54e066036e97c8c` |

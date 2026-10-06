@@ -19,6 +19,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// Performance: Requires full serialization of both objects for comparison - can be expensive for large objects.
     /// Use for deep equality where standard equality is insufficient (e.g., comparing complex object graphs).
     /// Default-mode dictionary comparisons retain the bundled protobuf-net map encoding and its default-value policy.
+    /// Nested dictionary fields use the active protobuf model's key and value serializers.
     /// </remarks>
     public static class ProtoEqualityExtensions
     {

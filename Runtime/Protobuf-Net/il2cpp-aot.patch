@@ -23,6 +23,154 @@ index 577b0743..79539f0b 100644
      internal sealed class StructValueChecker<T> : IValueChecker<T?>, IValueChecker<T>
          where T : struct
      {
+diff --git a/src/protobuf-net.Core/Serializers/MapSerializer.cs b/src/protobuf-net.Core/Serializers/MapSerializer.cs
+index 7e5212d4..f9b08ead 100644
+--- a/src/protobuf-net.Core/Serializers/MapSerializer.cs
++++ b/src/protobuf-net.Core/Serializers/MapSerializer.cs
+@@ -33,7 +33,7 @@ namespace ProtoBuf.Serializers
+     /// <summary>
+     /// Base class for dictionary-like collection serializers
+     /// </summary>
+-    public abstract class MapSerializer<TCollection, [DynamicallyAccessedMembers(DynamicAccess.ContractType)] TKey, [DynamicallyAccessedMembers(DynamicAccess.ContractType)] TValue> : IRepeatedSerializer<TCollection>, IFactory<TCollection>
++    public abstract class MapSerializer<TCollection, [DynamicallyAccessedMembers(DynamicAccess.ContractType)] TKey, [DynamicallyAccessedMembers(DynamicAccess.ContractType)] TValue> : IRepeatedSerializer<TCollection>, IFactory<TCollection>, IMapSerializerBridge
+     {
+         SerializerFeatures ISerializer<TCollection>.Features => SerializerFeatures.CategoryRepeated;
+ 
+@@ -54,6 +54,28 @@ namespace ProtoBuf.Serializers
+         TCollection IRepeatedSerializer<TCollection>.ReadRepeated(ref ProtoReader.State state, SerializerFeatures features, TCollection values)
+             => ReadMap(ref state, features, values, default, default, default, default);
+ 
++        Type IMapSerializerBridge.CollectionType => typeof(TCollection);
++        Type IMapSerializerBridge.KeyType => typeof(TKey);
++        Type IMapSerializerBridge.ValueType => typeof(TValue);
++
++        object IMapSerializerBridge.ReadMap(ref ProtoReader.State state, object value, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat)
++        {
++            return ReadMap(ref state, features, (TCollection)value, keyFeatures, valueFeatures,
++                TypeModel.GetInbuiltSerializer<TKey>(keyCompatibilityLevel, keyDataFormat),
++                TypeModel.GetInbuiltSerializer<TValue>(valueCompatibilityLevel, valueDataFormat));
++        }
++
++        void IMapSerializerBridge.WriteMap(ref ProtoWriter.State state, object value, int fieldNumber, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat)
++        {
++            WriteMap(ref state, fieldNumber, features, (TCollection)value, keyFeatures, valueFeatures,
++                TypeModel.GetInbuiltSerializer<TKey>(keyCompatibilityLevel, keyDataFormat),
++                TypeModel.GetInbuiltSerializer<TValue>(valueCompatibilityLevel, valueDataFormat));
++        }
++
+         static KeyValuePairSerializer<TKey, TValue> GetSerializer(
+             TypeModel model, SerializerFeatures keyFeatures, SerializerFeatures valueFeatures, ISerializer<TKey> keySerializer, ISerializer<TValue> valueSerializer)
+         {
+diff --git a/src/protobuf-net/Internal/Serializers/MapDecorator.cs b/src/protobuf-net/Internal/Serializers/MapDecorator.cs
+index 197e0a54..634a3c8b 100644
+--- a/src/protobuf-net/Internal/Serializers/MapDecorator.cs
++++ b/src/protobuf-net/Internal/Serializers/MapDecorator.cs
+@@ -5,21 +5,94 @@ using System;
+ 
+ namespace ProtoBuf.Internal.Serializers
+ {
+-    internal static class MapDecorator
++    internal sealed class MapDecorator : IRuntimeProtoSerializerNode, ICompiledSerializer
+     {
++        private readonly RepeatedSerializerStub _provider;
++        private readonly Type _keyType, _valueType;
++        private readonly int _fieldNumber;
++        private readonly SerializerFeatures _features, _keyFeatures, _valueFeatures;
++        private readonly CompatibilityLevel _keyCompatibilityLevel, _valueCompatibilityLevel;
++        private readonly DataFormat _keyDataFormat, _valueDataFormat;
++
++        private MapDecorator(RepeatedSerializerStub provider, Type keyType, Type valueType,
++            int fieldNumber, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat)
++        {
++            _provider = provider;
++            _keyType = keyType;
++            _valueType = valueType;
++            _fieldNumber = fieldNumber;
++            _features = features;
++            _keyFeatures = keyFeatures;
++            _keyCompatibilityLevel = keyCompatibilityLevel;
++            _keyDataFormat = keyDataFormat;
++            _valueFeatures = valueFeatures;
++            _valueCompatibilityLevel = valueCompatibilityLevel;
++            _valueDataFormat = valueDataFormat;
++        }
++
+         public static IRuntimeProtoSerializerNode Create(RepeatedSerializerStub provider, Type keyType, Type valueType,
+             int fieldNumber, SerializerFeatures features,
+             SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
+             SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat)
+         {
+             if (provider is null) ThrowHelper.ThrowArgumentNullException(nameof(provider));
+-            _ = provider.Serializer; // primes and validates
++            _ = provider.Serializer;
++            return new MapDecorator(provider, keyType, valueType, fieldNumber, features,
++                keyFeatures, keyCompatibilityLevel, keyDataFormat,
++                valueFeatures, valueCompatibilityLevel, valueDataFormat);
++        }
++
++        public Type ExpectedType => _provider.ForType;
++        bool IRuntimeProtoSerializerNode.IsScalar => false;
++        bool IRuntimeProtoSerializerNode.ReturnsValue => true;
++        public bool RequiresOldValue => true;
++        private IMapSerializerBridge Serializer
++        {
++            get
++            {
++                IMapSerializerBridge serializer = (IMapSerializerBridge)_provider.Serializer;
++                if (serializer.CollectionType != ExpectedType || serializer.KeyType != _keyType || serializer.ValueType != _valueType)
++                {
++                    throw new InvalidCastException();
++                }
++                return serializer;
++            }
++        }
++
++        public object Read(ref ProtoReader.State state, object value)
++        {
++            return Serializer.ReadMap(ref state, value, _features,
++                _keyFeatures, _keyCompatibilityLevel, _keyDataFormat,
++                _valueFeatures, _valueCompatibilityLevel, _valueDataFormat);
++        }
++
++        public void Write(ref ProtoWriter.State state, object value)
++        {
++            Serializer.WriteMap(ref state, value, _fieldNumber, _features,
++                _keyFeatures, _keyCompatibilityLevel, _keyDataFormat,
++                _valueFeatures, _valueCompatibilityLevel, _valueDataFormat);
++        }
++
++        private IRuntimeProtoSerializerNode CreateEmitter()
++        {
+             return (IRuntimeProtoSerializerNode)Activator.CreateInstance(
+-                typeof(MapDecorator<,,>).MakeGenericType(provider.ForType, keyType, valueType),
+-                new object[] { fieldNumber, features,
+-                    keyFeatures, keyCompatibilityLevel, keyDataFormat,
+-                    valueFeatures, valueCompatibilityLevel, valueDataFormat,
+-                    provider });
++                typeof(MapDecorator<,,>).MakeGenericType(ExpectedType, _keyType, _valueType),
++                new object[] { _fieldNumber, _features,
++                    _keyFeatures, _keyCompatibilityLevel, _keyDataFormat,
++                    _valueFeatures, _valueCompatibilityLevel, _valueDataFormat,
++                    _provider });
++        }
++
++        public void EmitWrite(CompilerContext ctx, Local valueFrom)
++        {
++            CreateEmitter().EmitWrite(ctx, valueFrom);
++        }
++
++        public void EmitRead(CompilerContext ctx, Local valueFrom)
++        {
++            CreateEmitter().EmitRead(ctx, valueFrom);
+         }
+     }
+     internal class MapDecorator<TCollection, TKey, TValue> : IRuntimeProtoSerializerNode, ICompiledSerializer
 diff --git a/src/protobuf-net/Meta/ValueMember.cs b/src/protobuf-net/Meta/ValueMember.cs
 index e9fce7ba..6a43a7fb 100644
 --- a/src/protobuf-net/Meta/ValueMember.cs
@@ -35,3 +183,29 @@ index e9fce7ba..6a43a7fb 100644
              type = DynamicStub.GetEffectiveType(type);
              if (type.IsEnum)
              {
+diff --git a/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs b/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs
+new file mode 100644
+index 00000000..91a318c0
+--- /dev/null
++++ b/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs
+@@ -0,0 +1,20 @@
++namespace ProtoBuf.Internal
++{
++    using System;
++    using ProtoBuf.Serializers;
++
++    internal interface IMapSerializerBridge
++    {
++        Type CollectionType { get; }
++        Type KeyType { get; }
++        Type ValueType { get; }
++
++        object ReadMap(ref ProtoReader.State state, object value, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat);
++
++        void WriteMap(ref ProtoWriter.State state, object value, int fieldNumber, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat);
++    }
++}
