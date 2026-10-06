@@ -142,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         internal static RuntimeTypeModel CreateModel(int mode)
         {
-            if (mode >= ForeignSerializer)
+            if (ForeignSerializer <= mode)
             {
                 return RuntimeTypeModel.Default;
             }
@@ -373,12 +373,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
             PoolStatistics before = Buffers<CollectionScratchItem>.List.GetStatistics();
             using Stream output =
-                phase >= 2
+                2 <= phase
                     ? (Stream)new CollectionScratchFailureStream(state.Failure)
                     : new MemoryStream();
             Exception failure = Assert.Catch(() => Write(mode, model, values, deque, output));
             Assert.AreSame(state.Failure, Innermost(failure));
-            if (phase >= 2)
+            if (2 <= phase)
             {
                 Assert.AreSame(state.Failure, failure, "Stream exceptions retain their identity.");
             }
@@ -555,7 +555,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             };
             PoolStatistics before = Buffers<CollectionScratchItem>.List.GetStatistics();
             using Stream output =
-                phase >= 2
+                2 <= phase
                     ? (Stream)new CollectionScratchFailureStream(state.Failure)
                     : new MemoryStream();
             Exception failure = Assert.Catch(() => Write(mode, model, parent, true, output));

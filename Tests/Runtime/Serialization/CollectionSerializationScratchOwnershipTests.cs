@@ -95,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     --currentDepth;
                 }
             };
-            state.BeforeAction = writeDepth > 1 ? nestedWrite : null;
+            state.BeforeAction = 1 < writeDepth ? nestedWrite : null;
             state.FailBefore = innerFailure && writeDepth == 1;
             PoolStatistics itemBefore = Buffers<CollectionScratchItem>.List.GetStatistics();
             PoolStatistics frameBefore = Buffers<
