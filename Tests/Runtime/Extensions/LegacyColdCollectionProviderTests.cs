@@ -18,6 +18,79 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [Category("Serialization")]
     public sealed class LegacyColdCollectionProviderTests
     {
+        private static void VerifyColdRoot<TCollection, TItem>(
+            byte[] wire,
+            bool metadataFirst,
+            Func<TItem, int> number
+        )
+            where TCollection : class, IReadOnlyCollection<TItem>
+        {
+            RuntimeTypeModel model = RuntimeTypeModel.Create();
+            model.AutoCompile = false;
+            if (metadataFirst)
+            {
+                model.Add(typeof(TCollection), true);
+#if !ENABLE_IL2CPP
+                model.CompileInPlace();
+#endif
+            }
+            using MemoryStream source = new(wire);
+            TCollection restored = (TCollection)
+                model.Deserialize(source, null, typeof(TCollection));
+            AssertItemMetadata<TItem>(model);
+            AssertSingle(restored, number);
+            using MemoryStream destination = new();
+            model.Serialize(destination, restored);
+            CollectionAssert.AreEqual(wire, destination.ToArray());
+        }
+
+        private static void VerifyNullParent<TCollection, TItem>(
+            byte[] wire,
+            Func<TItem, int> number
+        )
+            where TCollection : class, IReadOnlyCollection<TItem>
+        {
+            RuntimeTypeModel model = RuntimeTypeModel.Create();
+            model.AutoCompile = false;
+            model.Add(typeof(Parent<TCollection>), true);
+#if !ENABLE_IL2CPP
+            model.CompileInPlace();
+#endif
+            using MemoryStream empty = new();
+            model.Serialize(empty, new Parent<TCollection>());
+            Assert.AreEqual(0, empty.Length);
+            using MemoryStream source = new(wire);
+            Parent<TCollection> restored =
+                (Parent<TCollection>)model.Deserialize(source, null, typeof(Parent<TCollection>));
+            Assert.IsTrue(restored != null);
+            AssertItemMetadata<TItem>(model);
+            AssertSingle(restored.Values, number);
+            using MemoryStream destination = new();
+            model.Serialize(destination, restored);
+            CollectionAssert.AreEqual(wire, destination.ToArray());
+        }
+
+        private static void AssertItemMetadata<TItem>(RuntimeTypeModel model)
+        {
+            ValueMember[] fields = model[typeof(TItem)].GetFields();
+            Assert.AreEqual(1, fields.Length);
+            Assert.AreEqual(1, fields[0].FieldNumber);
+            Assert.AreEqual(typeof(int), fields[0].MemberType);
+        }
+
+        private static void AssertSingle<TItem>(
+            IReadOnlyCollection<TItem> restored,
+            Func<TItem, int> number
+        )
+        {
+            Assert.IsTrue(restored != null);
+            Assert.AreEqual(1, restored.Count);
+            using IEnumerator<TItem> items = restored.GetEnumerator();
+            Assert.IsTrue(items.MoveNext());
+            Assert.AreEqual(7, number(items.Current));
+            Assert.IsFalse(items.MoveNext());
+        }
+
         [Test]
         public void FirstDeserializationInitializesHashProvider()
         {
@@ -112,65 +185,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 true,
                 item => item.Number
             );
-        }
-
-        private static void VerifyColdRoot<TCollection, TItem>(
-            byte[] wire,
-            bool metadataFirst,
-            Func<TItem, int> number
-        )
-            where TCollection : class, IReadOnlyCollection<TItem>
-        {
-            RuntimeTypeModel model = RuntimeTypeModel.Create();
-            model.AutoCompile = false;
-            if (metadataFirst)
-            {
-                model.Add(typeof(TCollection), true);
-                model.CompileInPlace();
-            }
-            using MemoryStream source = new(wire);
-            TCollection restored = (TCollection)
-                model.Deserialize(source, null, typeof(TCollection));
-            AssertSingle(restored, number);
-            using MemoryStream destination = new();
-            model.Serialize(destination, restored);
-            CollectionAssert.AreEqual(wire, destination.ToArray());
-        }
-
-        private static void VerifyNullParent<TCollection, TItem>(
-            byte[] wire,
-            Func<TItem, int> number
-        )
-            where TCollection : class, IReadOnlyCollection<TItem>
-        {
-            RuntimeTypeModel model = RuntimeTypeModel.Create();
-            model.AutoCompile = false;
-            model.Add(typeof(Parent<TCollection>), true);
-            model.CompileInPlace();
-            using MemoryStream empty = new();
-            model.Serialize(empty, new Parent<TCollection>());
-            Assert.AreEqual(0, empty.Length);
-            using MemoryStream source = new(wire);
-            Parent<TCollection> restored =
-                (Parent<TCollection>)model.Deserialize(source, null, typeof(Parent<TCollection>));
-            Assert.IsTrue(restored != null);
-            AssertSingle(restored.Values, number);
-            using MemoryStream destination = new();
-            model.Serialize(destination, restored);
-            CollectionAssert.AreEqual(wire, destination.ToArray());
-        }
-
-        private static void AssertSingle<TItem>(
-            IReadOnlyCollection<TItem> restored,
-            Func<TItem, int> number
-        )
-        {
-            Assert.IsTrue(restored != null);
-            Assert.AreEqual(1, restored.Count);
-            using IEnumerator<TItem> items = restored.GetEnumerator();
-            Assert.IsTrue(items.MoveNext());
-            Assert.AreEqual(7, number(items.Current));
-            Assert.IsFalse(items.MoveNext());
         }
 
         [ProtoContract]
