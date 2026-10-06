@@ -288,6 +288,38 @@ index 55b741a6..7956d400 100644
              return (IRuntimeProtoSerializerNode)Activator.CreateInstance(typeof(RepeatedDecorator<,>).MakeGenericType(stub.ForType, stub.ItemType),
                  new object[] { fieldNumber, features, compatibilityLevel, dataFormat, stub });
          }
+diff --git a/src/protobuf-net/Internal/Serializers/TypeSerializer.cs b/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
+index 6363686d..09070636 100644
+--- a/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
++++ b/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
+@@ -12,9 +12,26 @@ namespace ProtoBuf.Internal.Serializers
+ {
+     internal abstract class TypeSerializer
+     {
++        private static readonly Dictionary<Type, Func<TypeSerializer>> s_typedFactories = new Dictionary<Type, Func<TypeSerializer>>();
++
++        internal static void Register<T>()
++        {
++            lock (s_typedFactories)
++            {
++                if (!s_typedFactories.ContainsKey(typeof(T)))
++                    s_typedFactories.Add(typeof(T), () => new TypeSerializer<T>());
++            }
++        }
++
+         public static IProtoTypeSerializer Create(Type forType, int[] fieldNumbers, IRuntimeProtoSerializerNode[] serializers, MethodInfo[] baseCtorCallbacks, bool isRootType, bool useConstructor, bool assertKnownType, CallbackSet callbacks, Type constructType, MethodInfo factory, Type rootType, SerializerFeatures features)
+         {
+-            var obj = (TypeSerializer)(rootType is not null
++            Func<TypeSerializer> factoryForType = null;
++            if (rootType is null)
++            {
++                lock (s_typedFactories)
++                    s_typedFactories.TryGetValue(forType, out factoryForType);
++            }
++            var obj = factoryForType is not null ? factoryForType() : (TypeSerializer)(rootType is not null
+                 ? Activator.CreateInstance(typeof(InheritanceTypeSerializer<,>).MakeGenericType(rootType, forType), nonPublic: true)
+                 : Activator.CreateInstance(typeof(TypeSerializer<>).MakeGenericType(forType), nonPublic: true));
+             
 diff --git a/src/protobuf-net/Meta/MetaType.cs b/src/protobuf-net/Meta/MetaType.cs
 index 527bc447..33930e11 100644
 --- a/src/protobuf-net/Meta/MetaType.cs
@@ -316,16 +348,19 @@ index 527bc447..33930e11 100644
              // for most types we'll enforce that you need readonly, because that is what protobuf-net
              // always did historically; but: if you smell so much like a Tuple that it is *in your name*,
 diff --git a/src/protobuf-net/Meta/RuntimeTypeModel.cs b/src/protobuf-net/Meta/RuntimeTypeModel.cs
-index 4f7ef715..91f09d64 100644
+index 4f7ef715..14aed545 100644
 --- a/src/protobuf-net/Meta/RuntimeTypeModel.cs
 +++ b/src/protobuf-net/Meta/RuntimeTypeModel.cs
-@@ -2257,6 +2257,10 @@ namespace ProtoBuf.Meta
+@@ -2257,6 +2257,13 @@ namespace ProtoBuf.Meta
                  return value.Method;
              }
          }
 +        /// <summary>Registers an existing typed repeated provider for runtime AOT serialization.</summary>
 +        public static void RegisterRepeatedSerializer<TCollection, TItem>(RepeatedSerializer<TCollection, TItem> serializer)
-+            => RepeatedSerializers.Register(serializer);
++        {
++            RepeatedSerializers.Register(serializer);
++            TypeSerializer.Register<TItem>();
++        }
 +
          private Hashtable _externalProviders = null;
          /// <summary>

@@ -92,10 +92,12 @@ deque and cyclic-buffer static constructors register their actual serializers be
 lookup or explicit model registration. The opted-in base collection is initialized without
 running an unrelated consumer subclass initializer. The cache checks the
 original provider identity and directly constructs the original repeated decorator, preserving
-custom-provider precedence and compiled models. Dynamic
+custom-provider precedence and compiled models.
+Registration supplies a direct item-contract serializer factory with separate member state
+for each model. Item reflection metadata must still be preserved, and inheritance and other
 consumer collection contracts still require their own AOT qualification. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)
-include the exact patch and binary hashes. Fresh Unity 2021.3 stripped-player qualification of
-this patch remains required; newer-player success for the previous binaries does not prove it.
+include the exact patch and binary hashes. Qualify each binary change in a fresh Unity 2021.3
+stripped player; success with another binary or a newer editor does not prove compatibility.
 The root save wrappers described below remain a separate path: comparer hashes are not hashes
 of `Serializer.ProtoSerialize` output. WProto-only builds use generated root encoding instead,
 so hashes are not portable between backend modes.

@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix package-installed player builds losing private serialization fields and callbacks to code stripping ([#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950)).
 - Fix cached enum display labels to use the declared member name when an `InspectorName` contains only whitespace; nonblank labels retain their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
-- Fix legacy dictionary comparison and nullable message fields, avoid dynamic map constructors and repeated-provider factories (including metadata-first collection registration), and exclude indexers from speculative tuple classification ([#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950)).
+- Fix legacy dictionary comparisons and nullable fields, avoid dynamic map, repeated-provider and registered item serializer constructors, and exclude indexers from tuple classification ([#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950)).
 - Fix direct texture settings API calls to ignore blank platform override names while preserving other settings ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank key labels in duplicate dictionary warnings for Unity objects with whitespace-only names; object references and literal string keys stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix `DurableFile` replacements to preserve existing saves and report failure when atomic replacement is unsupported ([#946](https://github.com/Ambiguous-Interactive/unity-helpers/issues/946)).

@@ -42,6 +42,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             using MemoryStream destination = new();
             model.Serialize(destination, restored);
             CollectionAssert.AreEqual(wire, destination.ToArray());
+            VerifyIndependentItemModel(model, restored, wire, number);
         }
 
         private static void VerifyNullParent<TCollection, TItem>(
@@ -68,6 +69,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             using MemoryStream destination = new();
             model.Serialize(destination, restored);
             CollectionAssert.AreEqual(wire, destination.ToArray());
+            VerifyIndependentItemModel(model, restored, wire, number);
+        }
+
+        private static void VerifyIndependentItemModel<TCollection, TItem>(
+            RuntimeTypeModel original,
+            TCollection restored,
+            byte[] wire,
+            Func<TItem, int> number
+        )
+        {
+            RuntimeTypeModel independent = RuntimeTypeModel.Create();
+            independent.AutoCompile = false;
+            independent.Add(typeof(TItem), false).Add(2, nameof(ColdHashItem.Number));
+            using MemoryStream source = new(new byte[] { 16, 9 });
+            TItem item = (TItem)independent.Deserialize(source, null, typeof(TItem));
+            Assert.AreEqual(9, number(item));
+            using MemoryStream retained = new();
+            original.Serialize(retained, restored);
+            CollectionAssert.AreEqual(wire, retained.ToArray());
         }
 
         private static void AssertItemMetadata<TItem>(RuntimeTypeModel model)
