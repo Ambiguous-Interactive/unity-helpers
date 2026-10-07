@@ -258,9 +258,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// </summary>
         private sealed class BlockState
         {
-            private readonly object gate = new object();
-            private readonly List<Binding> bindings = new List<Binding>();
-            private readonly List<ReadSite> reads = new List<ReadSite>();
+            private readonly object _gate = new object();
+            private readonly List<Binding> _bindings = new List<Binding>();
+            private readonly List<ReadSite> _reads = new List<ReadSite>();
 
             public void OnInvocation(OperationAnalysisContext context)
             {
@@ -328,9 +328,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     return;
                 }
 
-                lock (gate)
+                lock (_gate)
                 {
-                    reads.Add(
+                    _reads.Add(
                         new ReadSite(
                             symbol,
                             reference.Syntax.Span.Start,
@@ -344,10 +344,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             {
                 List<Binding> written;
                 List<ReadSite> ordered;
-                lock (gate)
+                lock (_gate)
                 {
-                    written = new List<Binding>(bindings);
-                    ordered = new List<ReadSite>(reads);
+                    written = new List<Binding>(_bindings);
+                    ordered = new List<ReadSite>(_reads);
                 }
 
                 bool anyUntested = false;
@@ -429,9 +429,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
             private void Add(Binding binding)
             {
-                lock (gate)
+                lock (_gate)
                 {
-                    bindings.Add(binding);
+                    _bindings.Add(binding);
                 }
             }
         }

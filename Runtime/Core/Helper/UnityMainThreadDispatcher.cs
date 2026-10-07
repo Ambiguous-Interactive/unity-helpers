@@ -169,6 +169,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+#if UNITY_EDITOR
+            if (EditorUtility.IsPersistent(dispatcher))
+            {
+                return false;
+            }
+#endif
+
             GameObject dispatcherObject = dispatcher.gameObject;
             if (dispatcherObject == null)
             {
@@ -704,6 +711,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <remarks>
         /// The scope records the previous <see cref="AutoCreationEnabled"/> value, switches to the desired state, and restores the original value on dispose.
         /// It also exposes knobs for destroying existing dispatcher GameObjects immediately (ideal for EditMode tests) or on dispose.
+        /// Cleanup preserves loaded prefab assets and their dispatcher components.
         /// </remarks>
         /// <example>
         /// <code>

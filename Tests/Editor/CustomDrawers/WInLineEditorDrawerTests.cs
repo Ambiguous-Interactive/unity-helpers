@@ -2381,26 +2381,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
         private sealed class InlineEditorFoldoutBehaviorScope : IDisposable
         {
-            private readonly UnityHelpersSettings.InlineEditorFoldoutBehavior originalValue;
-            private bool disposed;
+            private readonly UnityHelpersSettings.InlineEditorFoldoutBehavior _originalValue;
+            private bool _disposed;
 
             public InlineEditorFoldoutBehaviorScope(
                 UnityHelpersSettings.InlineEditorFoldoutBehavior behavior
             )
             {
-                originalValue = UnityHelpersSettings.GetInlineEditorFoldoutBehavior();
+                _originalValue = UnityHelpersSettings.GetInlineEditorFoldoutBehavior();
                 UnityHelpersSettings.SetInlineEditorFoldoutBehavior(behavior);
             }
 
             public void Dispose()
             {
-                if (disposed)
+                if (_disposed)
                 {
                     return;
                 }
 
-                disposed = true;
-                UnityHelpersSettings.SetInlineEditorFoldoutBehavior(originalValue);
+                _disposed = true;
+                UnityHelpersSettings.SetInlineEditorFoldoutBehavior(_originalValue);
             }
         }
     }

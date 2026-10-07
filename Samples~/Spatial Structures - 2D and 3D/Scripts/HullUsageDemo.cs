@@ -20,6 +20,7 @@ namespace Samples.UnityHelpers.SpatialStructures
         [Header("Gridless (Vector2)")]
         [SerializeField]
 #pragma warning disable WPROTO028 // Inspector-only sample input; this component is not a proto contract.
+
         private Vector2 gridlessBounds = new Vector2(10f, 5f);
 #pragma warning restore WPROTO028
 
@@ -33,6 +34,7 @@ namespace Samples.UnityHelpers.SpatialStructures
 
         [SerializeField]
 #pragma warning disable WPROTO028 // Inspector-only sample input; this component is not a proto contract.
+
         private Vector2Int gridFootprint = new Vector2Int(6, 4);
 #pragma warning restore WPROTO028
 

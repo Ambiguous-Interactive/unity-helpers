@@ -12,18 +12,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class BuffersWaitInstructionTests
     {
-        private IDisposable waitInstructionScope;
+        private IDisposable _waitInstructionScope;
 
         [SetUp]
         public void SetUp()
         {
-            waitInstructionScope = new WaitInstructionCacheScope();
+            _waitInstructionScope = new WaitInstructionCacheScope();
         }
 
         [TearDown]
         public void TearDown()
         {
-            waitInstructionScope?.Dispose();
+            _waitInstructionScope?.Dispose();
         }
 
         [Test]

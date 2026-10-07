@@ -538,16 +538,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         private sealed class PhysicalOdinMigrationScanContext : IOdinMigrationScanContext
         {
-            private readonly string projectRoot;
+            private readonly string _projectRoot;
 
             internal PhysicalOdinMigrationScanContext(string projectRoot)
             {
-                this.projectRoot = projectRoot;
+                _projectRoot = projectRoot;
             }
 
             public string GetFullPath(string assetPath)
             {
-                return Path.GetFullPath(Path.Combine(projectRoot, assetPath));
+                return Path.GetFullPath(Path.Combine(_projectRoot, assetPath));
             }
 
             public byte[] ReadAllBytes(string fullPath)

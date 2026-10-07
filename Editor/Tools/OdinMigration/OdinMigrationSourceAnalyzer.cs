@@ -1288,7 +1288,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         private sealed class LineMap
         {
-            private readonly int[] lineStarts;
+            private readonly int[] _lineStarts;
 
             internal LineMap(string source)
             {
@@ -1309,25 +1309,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         starts.Add(index + 1);
                     }
                 }
-                lineStarts = starts.ToArray();
+                _lineStarts = starts.ToArray();
             }
 
             internal int GetLine(int position)
             {
-                int index = Array.BinarySearch(lineStarts, Math.Max(0, position));
+                int index = Array.BinarySearch(_lineStarts, Math.Max(0, position));
                 return 0 <= index ? index + 1 : ~index;
             }
         }
 
         private sealed class SourceContext
         {
-            private readonly bool[] compilationUnit;
-            private readonly bool[] directTypeBody;
+            private readonly bool[] _compilationUnit;
+            private readonly bool[] _directTypeBody;
 
             internal SourceContext(string source)
             {
-                compilationUnit = new bool[source.Length + 1];
-                directTypeBody = new bool[source.Length + 1];
+                _compilationUnit = new bool[source.Length + 1];
+                _directTypeBody = new bool[source.Length + 1];
                 List<bool> braceKinds = new List<bool>();
                 bool headerDeclaresType = false;
                 bool headerHasParentheses = false;
@@ -1340,8 +1340,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     bool atCompilationUnit = braceCount == 0;
                     bool atDirectTypeBody =
                         0 < braceCount && braceKinds[braceCount - 1] && parenthesisDepth == 0;
-                    compilationUnit[index] = atCompilationUnit;
-                    directTypeBody[index] = atDirectTypeBody;
+                    _compilationUnit[index] = atCompilationUnit;
+                    _directTypeBody[index] = atDirectTypeBody;
 
                     if (
                         IsIdentifierStart(source[index])
@@ -1368,8 +1368,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         }
                         for (int fill = index + 1; fill < end; ++fill)
                         {
-                            compilationUnit[fill] = atCompilationUnit;
-                            directTypeBody[fill] = atDirectTypeBody;
+                            _compilationUnit[fill] = atCompilationUnit;
+                            _directTypeBody[fill] = atDirectTypeBody;
                         }
                         index = end;
                         continue;
@@ -1420,8 +1420,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     ++index;
                 }
                 int finalBraceCount = braceKinds.Count;
-                compilationUnit[source.Length] = finalBraceCount == 0;
-                directTypeBody[source.Length] =
+                _compilationUnit[source.Length] = finalBraceCount == 0;
+                _directTypeBody[source.Length] =
                     0 < finalBraceCount && braceKinds[finalBraceCount - 1] && parenthesisDepth == 0;
             }
 
@@ -1445,15 +1445,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             internal bool IsCompilationUnit(int position)
             {
                 return 0 <= position
-                    && position < compilationUnit.Length
-                    && compilationUnit[position];
+                    && position < _compilationUnit.Length
+                    && _compilationUnit[position];
             }
 
             internal bool IsDirectTypeBody(int position)
             {
                 return 0 <= position
-                    && position < directTypeBody.Length
-                    && directTypeBody[position];
+                    && position < _directTypeBody.Length
+                    && _directTypeBody[position];
             }
         }
     }

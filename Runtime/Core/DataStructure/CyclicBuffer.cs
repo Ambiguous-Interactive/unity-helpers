@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 #if !WALLSTOP_PROTO_ONLY
         [NonSerialized]
         [ProtoIgnore]
-        private SerializationScratchScope<T> serializationScratchScope;
+        private SerializationScratchScope<T> _serializationScratchScope;
 #endif
 
         [SerializeField]
@@ -388,7 +388,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 #if !WALLSTOP_PROTO_ONLY
         void ISerializationWriteScope.BeginSerialization()
         {
-            serializationScratchScope.Begin(
+            _serializationScratchScope.Begin(
                 ref _serializedItems,
                 ref _serializedItemsLease,
                 Capacity
@@ -398,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         void ISerializationWriteScope.EndSerialization()
         {
             int capacity = Capacity;
-            serializationScratchScope.End(
+            _serializationScratchScope.End(
                 ref _serializedItems,
                 ref _serializedItemsLease,
                 ref capacity

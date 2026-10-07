@@ -151,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 Keys = value.SerializedKeys,
                 Values = value.SerializedValues,
             };
-            ((INullableDictionaryWrapper)wrapper).PrepareNullableValues();
+            ((INullableCollectionWrapper)wrapper).PrepareNullableItems();
             return wrapper;
         }
 
@@ -194,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
-            if (!((INullableDictionaryWrapper)wrapper).TryRestoreNullableValues())
+            if (!((INullableCollectionWrapper)wrapper).TryRestoreNullableItems())
             {
                 value = default;
                 return false;
@@ -232,7 +232,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 Keys = value.SerializedKeys,
                 Values = value.SerializedValues,
             };
-            ((INullableDictionaryWrapper)wrapper).PrepareNullableValues();
+            ((INullableCollectionWrapper)wrapper).PrepareNullableItems();
             return wrapper;
         }
 
@@ -284,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
-            if (!((INullableDictionaryWrapper)wrapper).TryRestoreNullableValues())
+            if (!((INullableCollectionWrapper)wrapper).TryRestoreNullableItems())
             {
                 value = default;
                 return false;

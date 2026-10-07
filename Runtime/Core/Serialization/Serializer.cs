@@ -1500,9 +1500,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 setWrapperValues?.Invoke(wrapper, values);
             }
 
-            if (wrapper is INullableDictionaryWrapper nullableWrapper)
+            if (wrapper is INullableCollectionWrapper nullableWrapper)
             {
-                nullableWrapper.PrepareNullableValues();
+                nullableWrapper.PrepareNullableItems();
             }
             return wrapper;
         }
@@ -1570,8 +1570,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             using MemoryStream ms = new(data, writable: false);
             object wrapper = ProtoBuf.Serializer.NonGeneric.Deserialize(wrapperType, ms);
             if (
-                wrapper is INullableDictionaryWrapper nullableWrapper
-                && !nullableWrapper.TryRestoreNullableValues()
+                wrapper is INullableCollectionWrapper nullableWrapper
+                && !nullableWrapper.TryRestoreNullableItems()
             )
             {
                 throw new InvalidDataException(

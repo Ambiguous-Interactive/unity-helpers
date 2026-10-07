@@ -718,7 +718,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #endif
     [WProtoContract]
     internal sealed partial class SerializableDictionaryProtoWrapper<TKey, TValue>
-        : INullableDictionaryWrapper
+        : INullableCollectionWrapper
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
@@ -738,18 +738,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         [WProtoMember(3, OverwriteList = true)]
         public byte[] NullableValuePresence;
 
-        void INullableDictionaryWrapper.PrepareNullableValues()
+        void INullableCollectionWrapper.PrepareNullableItems()
         {
-            NullableArrayPresence<TValue>.Prepare(
+            NullableCollectionPresence<TValue>.Prepare(
                 Keys?.Length ?? 0,
                 ref Values,
                 ref NullableValuePresence
             );
         }
 
-        bool INullableDictionaryWrapper.TryRestoreNullableValues()
+        bool INullableCollectionWrapper.TryRestoreNullableItems()
         {
-            return NullableArrayPresence<TValue>.TryRestore(
+            return NullableCollectionPresence<TValue>.TryRestore(
                 Keys?.Length ?? 0,
                 ref Values,
                 NullableValuePresence
@@ -765,7 +765,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #endif
     [WProtoContract]
     internal sealed partial class SerializableSortedDictionaryProtoWrapper<TKey, TValue>
-        : INullableDictionaryWrapper
+        : INullableCollectionWrapper
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
@@ -785,18 +785,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         [WProtoMember(3, OverwriteList = true)]
         public byte[] NullableValuePresence;
 
-        void INullableDictionaryWrapper.PrepareNullableValues()
+        void INullableCollectionWrapper.PrepareNullableItems()
         {
-            NullableArrayPresence<TValue>.Prepare(
+            NullableCollectionPresence<TValue>.Prepare(
                 Keys?.Length ?? 0,
                 ref Values,
                 ref NullableValuePresence
             );
         }
 
-        bool INullableDictionaryWrapper.TryRestoreNullableValues()
+        bool INullableCollectionWrapper.TryRestoreNullableItems()
         {
-            return NullableArrayPresence<TValue>.TryRestore(
+            return NullableCollectionPresence<TValue>.TryRestore(
                 Keys?.Length ?? 0,
                 ref Values,
                 NullableValuePresence

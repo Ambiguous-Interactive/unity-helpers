@@ -87,11 +87,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 return descriptors;
             }
 
-            string[] asmdefFiles = Directory.GetFiles(
-                testsPath,
-                "*.asmdef",
-                SearchOption.AllDirectories
-            );
+            return DiscoverTestAsmdefs(testsPath);
+        }
+
+        private static List<TestAsmdefDescriptor> DiscoverTestAsmdefs(string testsPath)
+        {
+            List<TestAsmdefDescriptor> descriptors = new();
+            string[] asmdefFiles = DiscoverImportedAsmdefPaths(testsPath);
 
             foreach (string asmdefPath in asmdefFiles)
             {
@@ -110,6 +112,79 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
 
             return descriptors;
+        }
+
+        /* Unity ignores these names below the import root. Check relative
+         * entries, not physical parent folders outside the package's Tests tree.
+         * https://docs.unity3d.com/2022.3/Documentation/Manual/SpecialFolders.html */
+        private static bool IsUnityIgnoredName(string name)
+        {
+            return name.StartsWith(".", StringComparison.Ordinal)
+                || name.EndsWith("~", StringComparison.Ordinal)
+                || string.Equals(name, "cvs", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string[] DiscoverImportedAsmdefPaths(string testsPath)
+        {
+            List<string> paths = new();
+            Stack<string> pending = new();
+            pending.Push(testsPath);
+            while (pending.TryPop(out string directory))
+            {
+                foreach (string path in Directory.GetFiles(directory, "*.asmdef"))
+                {
+                    if (!IsUnityIgnoredName(Path.GetFileName(path)))
+                    {
+                        paths.Add(path);
+                    }
+                }
+                foreach (string child in Directory.GetDirectories(directory))
+                {
+                    if (!IsUnityIgnoredName(Path.GetFileName(child)))
+                    {
+                        pending.Push(child);
+                    }
+                }
+            }
+            string[] result = paths.ToArray();
+            Array.Sort(result, StringComparer.Ordinal);
+            return result;
+        }
+
+        private static void CollectTestAssemblyLoadIssues(
+            IReadOnlyList<TestAsmdefDescriptor> asmdefs,
+            List<string> failedAssemblies,
+            List<string> skippedAssemblies
+        )
+        {
+            foreach (TestAsmdefDescriptor asmdef in asmdefs)
+            {
+                string assemblyName = asmdef.AssemblyName;
+                try
+                {
+                    Assembly assembly = GetLoadedAssembly(assemblyName);
+                    if (assembly == null)
+                    {
+                        if (asmdef.IsOptionalWhenUnloaded)
+                        {
+                            skippedAssemblies.Add(
+                                $"{assemblyName}: Optional test assembly not compiled because one or more define constraints are absent"
+                            );
+                        }
+                        else
+                        {
+                            failedAssemblies.Add(
+                                $"{assemblyName}: Assembly not found in loaded assemblies. "
+                                    + "This may indicate a missing asmdef or broken assembly references."
+                            );
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failedAssemblies.Add($"{assemblyName}: {ex.Message}");
+                }
+            }
         }
 
         private static Assembly GetLoadedAssembly(string assemblyName)
@@ -337,6 +412,85 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return root;
         }
 
+        [TestCase("Hidden~/Fixture.asmdef", false)]
+        [TestCase("Visible/DeepHidden~/Nested/Fixture.asmdef", false)]
+        [TestCase("Visible~Archive/Fixture.asmdef", true)]
+        [TestCase("Visible/Fixture.asmdef", true)]
+        [TestCase(".Hidden/Fixture.asmdef", false)]
+        [TestCase("Visible/.Hidden.asmdef", false)]
+        [TestCase("CVS/Fixture.asmdef", false)]
+        [TestCase("Visible.tmp/Fixture.asmdef", true)]
+        public void ImportedAsmdefDiscoveryPreservesVisibleMissingAssemblyFailures(
+            string relativePath,
+            bool imported
+        )
+        {
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                "unity-asmdef-discovery-" + Guid.NewGuid().ToString("N")
+            );
+            const string AssemblyName = "PackageValidation.VisibleMissingAssembly";
+            try
+            {
+                string path = Path.Combine(root, relativePath);
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(
+                    path,
+                    "{\n\"name\":\""
+                        + AssemblyName
+                        + "\",\"defineConstraints\":[\"UNITY_INCLUDE_TESTS\"],\"references\":[\"UnityEngine.TestRunner\"]}"
+                );
+                List<TestAsmdefDescriptor> descriptors = DiscoverTestAsmdefs(root);
+                Assert.That(descriptors.Count, Is.EqualTo(imported ? 1 : 0));
+                List<string> failed = new();
+                List<string> skipped = new();
+                CollectTestAssemblyLoadIssues(descriptors, failed, skipped);
+                Assert.That(failed.Count, Is.EqualTo(imported ? 1 : 0));
+                Assert.That(skipped, Is.Empty);
+                if (imported)
+                {
+                    StringAssert.Contains(AssemblyName, failed[0]);
+                    StringAssert.Contains("Assembly not found", failed[0]);
+                }
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Test]
+        public void ImportedAsmdefDiscoveryPreservesOptionalDefineBehavior()
+        {
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                "unity-asmdef-discovery-" + Guid.NewGuid().ToString("N")
+            );
+            try
+            {
+                Directory.CreateDirectory(root);
+                File.WriteAllText(
+                    Path.Combine(root, "Optional.asmdef"),
+                    "{\n\"name\":\"PackageValidation.OptionalMissingAssembly\",\"defineConstraints\":[\"OPTIONAL_DEPENDENCY\"]}"
+                );
+                List<TestAsmdefDescriptor> descriptors = DiscoverTestAsmdefs(root);
+                Assert.That(descriptors.Count, Is.EqualTo(1));
+                List<string> failed = new();
+                List<string> skipped = new();
+                CollectTestAssemblyLoadIssues(descriptors, failed, skipped);
+                Assert.That(failed, Is.Empty);
+                Assert.That(skipped.Count, Is.EqualTo(1));
+                StringAssert.Contains("Optional test assembly", skipped[0]);
+            }
+            finally
+            {
+                Directory.Delete(root, true);
+            }
+        }
+
         /// <summary>
         /// Verifies all production assemblies can be loaded.
         /// </summary>
@@ -394,34 +548,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             List<string> failedAssemblies = new();
             List<string> skippedAssemblies = new();
 
-            foreach (TestAsmdefDescriptor asmdef in DiscoverTestAsmdefs())
-            {
-                string assemblyName = asmdef.AssemblyName;
-                try
-                {
-                    Assembly assembly = GetLoadedAssembly(assemblyName);
-                    if (assembly == null)
-                    {
-                        if (asmdef.IsOptionalWhenUnloaded)
-                        {
-                            skippedAssemblies.Add(
-                                $"{assemblyName}: Optional test assembly not compiled because one or more define constraints are absent"
-                            );
-                        }
-                        else
-                        {
-                            failedAssemblies.Add(
-                                $"{assemblyName}: Assembly not found in loaded assemblies. "
-                                    + "This may indicate a missing asmdef or broken assembly references."
-                            );
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    failedAssemblies.Add($"{assemblyName}: {ex.Message}");
-                }
-            }
+            CollectTestAssemblyLoadIssues(
+                DiscoverTestAsmdefs(),
+                failedAssemblies,
+                skippedAssemblies
+            );
 
             if (0 < skippedAssemblies.Count)
             {
@@ -695,11 +826,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 return;
             }
 
-            string[] asmdefFiles = Directory.GetFiles(
-                testsPath,
-                "*.asmdef",
-                SearchOption.AllDirectories
-            );
+            string[] asmdefFiles = DiscoverImportedAsmdefPaths(testsPath);
             Assert.IsTrue(0 < asmdefFiles.Length, $"No asmdef was found under {testsPath}.");
 
             List<string> issues = new();
@@ -1091,11 +1218,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
 
             string testsPath = Path.Combine(packagePath, "Tests");
-            string[] asmdefFiles = Directory.GetFiles(
-                testsPath,
-                "*.asmdef",
-                SearchOption.AllDirectories
-            );
+            string[] asmdefFiles = DiscoverImportedAsmdefPaths(testsPath);
             List<string> issues = new();
 
             foreach (string asmdefPath in asmdefFiles)

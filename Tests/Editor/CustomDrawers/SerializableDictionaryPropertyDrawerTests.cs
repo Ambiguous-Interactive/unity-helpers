@@ -5526,49 +5526,49 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
         private sealed class DictionaryTweenDisabledScope : IDisposable
         {
-            private readonly bool originalValue;
-            private bool disposed;
+            private readonly bool _originalValue;
+            private bool _disposed;
 
             public DictionaryTweenDisabledScope()
             {
-                originalValue = UnityHelpersSettings.ShouldTweenSerializableDictionaryFoldouts();
+                _originalValue = UnityHelpersSettings.ShouldTweenSerializableDictionaryFoldouts();
                 UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(false);
             }
 
             public void Dispose()
             {
-                if (disposed)
+                if (_disposed)
                 {
                     return;
                 }
 
-                disposed = true;
-                UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(originalValue);
+                _disposed = true;
+                UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(_originalValue);
             }
         }
 
         private sealed class SortedDictionaryTweenDisabledScope : IDisposable
         {
-            private readonly bool originalValue;
-            private bool disposed;
+            private readonly bool _originalValue;
+            private bool _disposed;
 
             public SortedDictionaryTweenDisabledScope()
             {
-                originalValue =
+                _originalValue =
                     UnityHelpersSettings.ShouldTweenSerializableSortedDictionaryFoldouts();
                 UnityHelpersSettings.SetSerializableSortedDictionaryFoldoutTweenEnabled(false);
             }
 
             public void Dispose()
             {
-                if (disposed)
+                if (_disposed)
                 {
                     return;
                 }
 
-                disposed = true;
+                _disposed = true;
                 UnityHelpersSettings.SetSerializableSortedDictionaryFoldoutTweenEnabled(
-                    originalValue
+                    _originalValue
                 );
             }
         }

@@ -11,13 +11,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
     internal sealed class HullRegressionRecorder
     {
-        private readonly string testName;
-        private readonly string outputDirectory;
+        private readonly string _testName;
+        private readonly string _outputDirectory;
 
         public HullRegressionRecorder(string testName)
         {
-            this.testName = testName;
-            outputDirectory = Path.Combine(Application.dataPath, "HullRegressionSnapshots");
+            _testName = testName;
+            _outputDirectory = Path.Combine(Application.dataPath, "HullRegressionSnapshots");
         }
 
         private static SerializableFastVector3Int[] ToSerializable(
@@ -56,13 +56,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             try
             {
-                Directory.CreateDirectory(outputDirectory);
+                Directory.CreateDirectory(_outputDirectory);
                 string fileName =
-                    $"{testName}_{mode}_seed{seed}_{DateTime.UtcNow:yyyyMMddHHmmssfff}.json";
-                string fullPath = Path.Combine(outputDirectory, fileName);
+                    $"{_testName}_{mode}_seed{seed}_{DateTime.UtcNow:yyyyMMddHHmmssfff}.json";
+                string fullPath = Path.Combine(_outputDirectory, fileName);
                 HullSnapshot payload = new HullSnapshot
                 {
-                    test = testName,
+                    test = _testName,
                     mode = mode,
                     seed = seed,
                     timestampUtc = DateTime.UtcNow.ToString("o"),

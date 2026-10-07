@@ -1820,17 +1820,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             public string Label { get; }
 
-            private readonly Func<int[]> factory;
+            private readonly Func<int[]> _factory;
 
             public SortDataset(string label, Func<int[]> factory)
             {
                 Label = label;
-                this.factory = factory;
+                _factory = factory;
             }
 
             public int[] Create()
             {
-                return factory();
+                return _factory();
             }
         }
     }

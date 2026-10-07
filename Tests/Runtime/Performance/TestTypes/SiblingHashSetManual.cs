@@ -9,15 +9,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
     internal sealed class SiblingHashSetManual : MonoBehaviour
     {
-        private readonly HashSet<BoxCollider> siblingColliders = new();
+        private readonly HashSet<BoxCollider> _siblingColliders = new();
 
         public void Assign()
         {
             BoxCollider[] buffer = GetComponents<BoxCollider>();
-            siblingColliders.Clear();
+            _siblingColliders.Clear();
             foreach (UnityEngine.BoxCollider bufferElement in buffer)
             {
-                siblingColliders.Add(bufferElement);
+                _siblingColliders.Add(bufferElement);
             }
         }
     }

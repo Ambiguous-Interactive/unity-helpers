@@ -88,6 +88,21 @@ npm run lint:csharp-naming
 | Parameters        | camelCase                | `itemCount`     |
 | Type parameters   | `T` or `T` + PascalCase  | `T`, `TValue`   |
 
+The naming gate checks method names for underscores and enforces `_camelCase` on
+all owned private instance fields, including readonly and implicit-private fields,
+under `Runtime`, `Editor`, `Tests`, `Generator~`, `Samples~`, `Styles`, `URP`,
+and `Shaders`. It excludes only the vendored `Runtime/Utils/SevenZip` tree
+and generated build/cache directories. PowerShell's bundled Roslyn parser checks
+every assignment of each file's conditional symbols; malformed syntax or more
+than 12 conditional symbols fails the gate instead of skipping a file. Static and
+constant field policies stay separate in `.editorconfig`. Its C# section also
+activates the existing event, interface, local, public-field, static-field, and
+type-parameter IDE naming warnings that were previously scoped to HTML. Existing serialized field
+names remain unchanged through explicit historical exceptions in the naming gate. Unity's
+`FormerlySerializedAs` does not preserve old raw JSON keys, so style renames must not change them. Staged
+checks read the actual index blobs, fail on git errors, and do not auto-fix the
+working tree.
+
 ## YAML Linter
 
 ### Command

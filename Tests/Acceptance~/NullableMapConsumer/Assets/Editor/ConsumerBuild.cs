@@ -101,8 +101,8 @@ namespace NestedOnlyConsumer.Editor
             )
             {
                 if (
-                    assembly.name.IndexOf(".Tests", StringComparison.Ordinal) >= 0
-                    || assembly.name.IndexOf("ConsumerMigration", StringComparison.Ordinal) >= 0
+                    0 <= assembly.name.IndexOf(".Tests", StringComparison.Ordinal)
+                    || 0 <= assembly.name.IndexOf("ConsumerMigration", StringComparison.Ordinal)
                 )
                 {
                     throw new InvalidOperationException(

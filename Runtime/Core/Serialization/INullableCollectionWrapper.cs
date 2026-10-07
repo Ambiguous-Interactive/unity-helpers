@@ -3,10 +3,10 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization
 {
-    internal interface INullableDictionaryWrapper
+    internal interface INullableCollectionWrapper
     {
-        void PrepareNullableValues();
+        void PrepareNullableItems();
 
-        bool TryRestoreNullableValues();
+        bool TryRestoreNullableItems();
     }
 }

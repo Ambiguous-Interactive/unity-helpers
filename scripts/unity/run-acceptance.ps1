@@ -69,6 +69,7 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Upstream
     $migrationDefinition.name = $migrationNamespace
     $migrationDefinition.rootNamespace = $migrationNamespace
     $migrationDefinition.autoReferenced = $true
+    $migrationDefinition.defineConstraints = @()
     $migrationDefinition | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $migrationDirectory 'MigrationContracts.asmdef')
     foreach ($contract in Get-ChildItem -LiteralPath (Join-Path $Repository 'Tests/Runtime/Serialization/ConsumerMigration') -Filter '*.cs' -File) {
         $source = [IO.File]::ReadAllText($contract.FullName).Replace('WallstopStudios.UnityHelpers.Tests.Serialization.ConsumerMigration', $migrationNamespace)

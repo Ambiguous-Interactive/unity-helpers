@@ -368,17 +368,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             public string Label { get; }
 
-            private readonly Func<int, int[]> generator;
+            private readonly Func<int, int[]> _generator;
 
             public DatasetState(string label, Func<int, int[]> generator)
             {
                 Label = label;
-                this.generator = generator;
+                _generator = generator;
             }
 
             public int[] CreateData(int count)
             {
-                return generator(count);
+                return _generator(count);
             }
         }
 

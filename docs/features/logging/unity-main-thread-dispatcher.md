@@ -205,6 +205,7 @@ using UnityMainThreadDispatcher.AutoCreationScope scope =
 
 - On enter, the scope captures the previous `AutoCreationEnabled` value, switches to the desired state, and optionally destroys any existing dispatcher instances.
 - On dispose, the scope restores the original toggle and (when requested) destroys any dispatcher that may have been created during the scoped work, ensuring follow-up tests inherit a clean slate.
+- Cleanup preserves loaded prefab assets and their dispatcher components. It destroys scene instances only.
 
 ## Test Bootstrap Workflow
 

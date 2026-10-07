@@ -164,10 +164,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             int?[] original = { 0, 7 };
             int?[] values = original;
             byte[] presence = null;
-            NullableArrayPresence<int?>.Prepare(2, ref values, ref presence);
+            NullableCollectionPresence<int?>.Prepare(2, ref values, ref presence);
             Assert.AreSame(original, values);
             Assert.IsTrue(presence == null);
-            Assert.IsTrue(NullableArrayPresence<int?>.TryRestore(2, ref values, presence));
+            Assert.IsTrue(NullableCollectionPresence<int?>.TryRestore(2, ref values, presence));
             Assert.AreSame(original, values);
         }
 
@@ -177,11 +177,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             int?[] original = { null, 0, 7 };
             int?[] values = original;
             byte[] presence = null;
-            NullableArrayPresence<int?>.Prepare(3, ref values, ref presence);
+            NullableCollectionPresence<int?>.Prepare(3, ref values, ref presence);
             CollectionAssert.AreEqual(new int?[] { null, 0, 7 }, original);
             CollectionAssert.AreEqual(new int?[] { 0, 7 }, values);
             CollectionAssert.AreEqual(new byte[] { 6 }, presence);
-            Assert.IsTrue(NullableArrayPresence<int?>.TryRestore(3, ref values, presence));
+            Assert.IsTrue(NullableCollectionPresence<int?>.TryRestore(3, ref values, presence));
             CollectionAssert.AreEqual(original, values);
         }
 
@@ -189,7 +189,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void AllNullValuesRestoreFromOmittedDenseArray()
         {
             int?[] values = null;
-            Assert.IsTrue(NullableArrayPresence<int?>.TryRestore(3, ref values, new byte[] { 0 }));
+            Assert.IsTrue(
+                NullableCollectionPresence<int?>.TryRestore(3, ref values, new byte[] { 0 })
+            );
             CollectionAssert.AreEqual(new int?[] { null, null, null }, values);
         }
 
@@ -198,7 +200,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             int?[] values = { 0 };
             Assert.IsTrue(
-                NullableArrayPresence<int?>.TryRestore(9, ref values, new byte[] { 0, 1 })
+                NullableCollectionPresence<int?>.TryRestore(9, ref values, new byte[] { 0, 1 })
             );
             Assert.AreEqual(9, values.Length);
             for (int i = 0; i < 8; ++i)
@@ -214,7 +216,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             int?[] original = { null };
             int?[] values = original;
-            Assert.IsFalse(NullableArrayPresence<int?>.TryRestore(1, ref values, new byte[] { 1 }));
+            Assert.IsFalse(
+                NullableCollectionPresence<int?>.TryRestore(1, ref values, new byte[] { 1 })
+            );
             Assert.AreSame(original, values);
         }
 
@@ -223,7 +227,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             int?[] values = null;
             Assert.IsFalse(
-                NullableArrayPresence<int?>.TryRestore(int.MaxValue, ref values, new byte[] { 0 })
+                NullableCollectionPresence<int?>.TryRestore(
+                    int.MaxValue,
+                    ref values,
+                    new byte[] { 0 }
+                )
             );
             Assert.IsTrue(values == null);
         }
@@ -233,7 +241,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             int?[] original = { 0, 7 };
             int?[] values = original;
-            Assert.IsTrue(NullableArrayPresence<int?>.TryRestore(4, ref values, null));
+            Assert.IsTrue(NullableCollectionPresence<int?>.TryRestore(4, ref values, null));
             Assert.AreSame(original, values);
         }
 
@@ -242,7 +250,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             int?[] values = null;
             Assert.IsTrue(
-                NullableArrayPresence<int?>.TryRestore(0, ref values, Array.Empty<byte>())
+                NullableCollectionPresence<int?>.TryRestore(0, ref values, Array.Empty<byte>())
             );
             Assert.IsTrue(values == null);
         }
@@ -253,9 +261,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             int?[] original = { 0, null, 7, null, null, 0, null, 7, null, 0 };
             int?[] values = original;
             byte[] presence = null;
-            NullableArrayPresence<int?>.Prepare(original.Length, ref values, ref presence);
+            NullableCollectionPresence<int?>.Prepare(original.Length, ref values, ref presence);
             Assert.IsTrue(
-                NullableArrayPresence<int?>.TryRestore(original.Length, ref values, presence)
+                NullableCollectionPresence<int?>.TryRestore(original.Length, ref values, presence)
             );
             CollectionAssert.AreEqual(original, values);
         }

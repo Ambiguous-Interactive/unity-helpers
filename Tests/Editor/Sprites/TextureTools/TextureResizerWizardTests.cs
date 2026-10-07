@@ -617,11 +617,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             public bool IsReadOnly => true;
 
-            private readonly Texture2D texture;
+            private readonly Texture2D _texture;
 
             public InflatedTextureCollection(Texture2D texture)
             {
-                this.texture = texture;
+                _texture = texture;
             }
 
             public void Add(Texture2D item)
@@ -636,7 +636,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             public bool Contains(Texture2D item)
             {
-                return item == texture;
+                return item == _texture;
             }
 
             public void CopyTo(Texture2D[] array, int arrayIndex)
@@ -646,7 +646,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             public IEnumerator<Texture2D> GetEnumerator()
             {
-                yield return texture;
+                yield return _texture;
             }
 
             public bool Remove(Texture2D item)

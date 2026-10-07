@@ -18,18 +18,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             set => throw new NotSupportedException();
         }
 
-        private readonly Exception failure;
+        private readonly Exception _failure;
 
         internal CollectionScratchFailureStream(Exception failure)
         {
-            this.failure = failure;
+            _failure = failure;
         }
 
         public override void Flush() { }
 
         public override void Write(byte[] buffer, int offset, int count)
         {
-            throw failure;
+            throw _failure;
         }
 
         public override int Read(byte[] buffer, int offset, int count)

@@ -149,6 +149,10 @@ the keys, field 2 contains only present values, and field 3 carries one presence
 For keys `2, 3, 4` with values `null, 0, 7`, the legacy wrapper bytes are
 `08 02 08 03 08 04 10 00 10 07 1A 01 06`. Reads validate the bitmap and dense values before
 restoring their alignment. If field 3 repeats, its final occurrence supplies the bitmap.
+The internal presence codec accepts ordered indexed collections, including lists and read-only
+lists, and shares its bitmap algorithm with a thin array adapter used by these wrappers. A valid
+delivered slot count is required before reconstruction; unchanged collections need no replacement
+array. This reuse does not add a new list or set wire format.
 Existing wrapper payloads remain readable. Older package versions
 cannot read the new null-containing wrapper encoding correctly; upgrade every reader before
 writing those payloads.

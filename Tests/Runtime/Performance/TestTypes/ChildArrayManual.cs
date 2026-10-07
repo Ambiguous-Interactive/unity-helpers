@@ -9,18 +9,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
     internal sealed class ChildArrayManual : MonoBehaviour
     {
-        private BoxCollider[] childColliders;
+        private BoxCollider[] _childColliders;
 
         public void Assign()
         {
             BoxCollider[] buffer = GetComponentsInChildren<BoxCollider>();
             if (buffer.Length == 0)
             {
-                childColliders = Array.Empty<BoxCollider>();
+                _childColliders = Array.Empty<BoxCollider>();
             }
             else
             {
-                childColliders = buffer;
+                _childColliders = buffer;
             }
         }
     }

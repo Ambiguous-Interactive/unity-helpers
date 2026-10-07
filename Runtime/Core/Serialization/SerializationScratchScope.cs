@@ -9,10 +9,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     internal struct SerializationScratchScope<T>
     {
-        private SerializationScratchFrame<T> first;
-        private List<SerializationScratchFrame<T>> overflow;
-        private PooledResource<List<SerializationScratchFrame<T>>> overflowLease;
-        private int depth;
+        private SerializationScratchFrame<T> _first;
+        private List<SerializationScratchFrame<T>> _overflow;
+        private PooledResource<List<SerializationScratchFrame<T>>> _overflowLease;
+        private int _depth;
 
         private static void Release<TResource>(PooledResource<TResource> resource)
         {
@@ -33,11 +33,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 lease,
                 capacity
             );
-            if (depth == 0)
+            if (_depth == 0)
             {
-                first = frame;
+                _first = frame;
             }
-            else if (overflow == null)
+            else if (_overflow == null)
             {
                 PooledResource<List<SerializationScratchFrame<T>>> rented = Buffers<
                     SerializationScratchFrame<T>
@@ -51,41 +51,41 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     Release(rented);
                     throw;
                 }
-                overflow = frames;
-                overflowLease = rented;
+                _overflow = frames;
+                _overflowLease = rented;
             }
             else
             {
-                overflow.Add(frame);
+                _overflow.Add(frame);
             }
-            ++depth;
+            ++_depth;
             items = null;
             lease = default;
         }
 
         internal void End(ref List<T> items, ref PooledResource<List<T>> lease, ref int capacity)
         {
-            if (depth == 0)
+            if (_depth == 0)
             {
                 return;
             }
             PooledResource<List<T>> completedLease = lease;
             PooledResource<List<SerializationScratchFrame<T>>> completedOverflow = default;
             SerializationScratchFrame<T> frame;
-            --depth;
-            if (depth == 0)
+            --_depth;
+            if (_depth == 0)
             {
-                frame = first;
-                first = default;
-                completedOverflow = overflowLease;
-                overflowLease = default;
-                overflow = null;
+                frame = _first;
+                _first = default;
+                completedOverflow = _overflowLease;
+                _overflowLease = default;
+                _overflow = null;
             }
             else
             {
-                int index = overflow.Count - 1;
-                frame = overflow[index];
-                overflow.RemoveAt(index);
+                int index = _overflow.Count - 1;
+                frame = _overflow[index];
+                _overflow.RemoveAt(index);
             }
             items = frame.Items;
             lease = frame.Lease;
