@@ -188,6 +188,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <c>true</c> when written; <c>false</c> when the key is a reserved marker, in which case
         /// nothing was stored.
         /// </returns>
+        /// <remarks>Replacing an existing value preserves the table storage, even at the occupancy limit.</remarks>
         public bool TrySet(int key, TValue value)
         {
             if (key < MinimumAllowedKey)
@@ -303,12 +304,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void SetInternal(int key, TValue value)
         {
-            // Count tombstones toward occupancy so unsuccessful probes remain bounded.
-            if (_keys.Length <= (_count + _tombstones) * 2)
-            {
-                Resize();
-            }
-
             uint hash = Mix(key);
 
             int slot = SlotFor(hash);
@@ -332,6 +327,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
                 else if (stored == EmptySlot)
                 {
+                    if (_keys.Length <= (_count + _tombstones) * 2)
+                    {
+                        Resize();
+                        SetInternal(key, value);
+                        return;
+                    }
+
                     Fill(slot, key, value, reuseSlot);
                     return;
                 }

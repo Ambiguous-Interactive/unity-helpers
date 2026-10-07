@@ -1748,6 +1748,13 @@ bytes (the array and the contract, and nothing else) against 1,744 before, and a
 protobuf-net's 560 for the same graph. An **unpacked** run, which is what protobuf-net writes, is a
 sequence of separate fields whose length is not knowable until it ends, and still grows as it did.
 
+Polymorphic collection members wait until the final subtype is known before appending constructor
+values. When that destination is a `List<T>` with no seed, or `OverwriteList` replaces the seed,
+the reader transfers its decoded list directly instead of allocating and filling another list.
+Concrete `List<T>` constructor members retain their identity and entries; appending reserves space once for
+the observed elements. Include tags may arrive before or after the collection. Absent fields retain
+constructor values, while present empty packed runs still produce an empty replacement list.
+
 **A capacity is not sized from the payload at all.** The wrappers for `Deque`, `SparseSet` and the
 bit sets carry a capacity, and a capacity, unlike a length prefix, has nothing behind it: six
 bytes claiming `int.MaxValue` used to allocate 8 GB. `SerializationCapacityLimits` bounds it now,

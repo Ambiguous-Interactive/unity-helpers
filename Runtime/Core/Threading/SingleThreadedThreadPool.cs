@@ -39,6 +39,8 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// </example>
     public sealed class SingleThreadedThreadPool : IDisposable
     {
+        private static readonly TimeSpan DefaultNoWorkWaitTime = TimeSpan.FromSeconds(1);
+
         private static readonly TimeSpan DrainPollInterval = TimeSpan.FromMilliseconds(1);
 
         /// <summary>
@@ -80,7 +82,8 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// </param>
         /// <param name="noWorkWaitTime">
         /// How long the idle worker waits for a signal before re-checking the queue. Defaults to
-        /// one second.
+        /// one second. Delays outside SemaphoreSlim's supported integer-millisecond range use
+        /// that default; valid fractional delays and Timeout.InfiniteTimeSpan remain supported.
         /// </param>
         public SingleThreadedThreadPool(
             bool runInBackground = true,
@@ -90,7 +93,12 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             _work = new ConcurrentQueue<WorkItem>();
             _exceptions = new ConcurrentQueue<Exception>();
             _workAvailable = new SemaphoreSlim(0);
-            _noWorkWaitTime = noWorkWaitTime ?? TimeSpan.FromSeconds(1);
+            TimeSpan requestedWaitTime = noWorkWaitTime ?? DefaultNoWorkWaitTime;
+            long waitMilliseconds = (long)requestedWaitTime.TotalMilliseconds;
+            _noWorkWaitTime =
+                waitMilliseconds < Timeout.Infinite || int.MaxValue < waitMilliseconds
+                    ? DefaultNoWorkWaitTime
+                    : requestedWaitTime;
             _cancellationTokenSource = new CancellationTokenSource();
 
             _workerTask = runInBackground
@@ -236,6 +244,11 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
 
+        internal Task<bool> WaitForWorkAsync(CancellationToken cancellationToken)
+        {
+            return _workAvailable.WaitAsync(_noWorkWaitTime, cancellationToken);
+        }
+
         private async Task DisposeWorkerAsync()
         {
             _cancellationTokenSource.Cancel();
@@ -335,9 +348,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
                     {
                         try
                         {
-                            await _workAvailable
-                                .WaitAsync(_noWorkWaitTime, cancellationToken)
-                                .ConfigureAwait(false);
+                            await WaitForWorkAsync(cancellationToken).ConfigureAwait(false);
                         }
                         catch (OperationCanceledException)
                         {

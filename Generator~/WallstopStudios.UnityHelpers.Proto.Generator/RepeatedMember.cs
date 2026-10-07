@@ -85,6 +85,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private string PendingType => ListType + "<" + _elementQualified + ">";
 
+        private bool UsesPendingList =>
+            string.Equals(AccumulatorType, PendingType, StringComparison.Ordinal);
+
         private string SeenFlag => "seen" + Tag;
 
         /// <summary>The type the read loop accumulates into before committing it.</summary>
@@ -785,7 +788,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                  * entries.
                  */
                 writer.Line(AccumulatorType + " " + Accumulator + " = " + DeferredSeed() + ";");
-                if (_form.AccumulatesAside)
+                if (UsesPendingList)
+                {
+                    writer.Line(
+                        "if (!object.ReferenceEquals("
+                            + Accumulator
+                            + ", "
+                            + Pending
+                            + "))"
+                            + Writer.Open
+                    );
+                    writer.Indent();
+                    writer.Line(
+                        Proto
+                            + ".WProtoRepeated.Reserve("
+                            + Accumulator
+                            + ", "
+                            + Pending
+                            + ".Count);"
+                    );
+                    writer.Line(Accumulator + ".AddRange(" + Pending + ");");
+                    Close(writer);
+                }
+                else if (_form.AccumulatesAside)
                 {
                     writer.Line(Accumulator + "." + _form.BulkAddMethod + "(" + Pending + ");");
                 }
@@ -1337,7 +1362,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </summary>
         private string DeferredSeed()
         {
-            string fresh = "new " + AccumulatorType + "()";
+            // A deferred list already owns decoded elements; transfer it when no seed needs appending.
+            string fresh = UsesPendingList ? Pending : "new " + AccumulatorType + "()";
 
             /*
              * Immutable reads append to constructor seeds when an instance exists; Fresh collection forms
