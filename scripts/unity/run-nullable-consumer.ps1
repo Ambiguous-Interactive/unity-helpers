@@ -121,14 +121,33 @@ try {
     $env:CONSUMER_OUTPUT = $executable
     $start = [Diagnostics.ProcessStartInfo]::new([IO.Path]::GetFullPath($UnityEditorPath))
     $start.UseShellExecute = $false
-    foreach ($argument in @('-batchmode', '-nographics', '-quit', '-buildTarget', 'StandaloneWindows64', '-projectPath', $project, '-executeMethod', 'NestedOnlyConsumer.Editor.ConsumerBuild.Build', '-logFile', $editorLog)) { $start.ArgumentList.Add($argument) }
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    foreach ($argument in @('-batchmode', '-nographics', '-quit', '-buildTarget', 'StandaloneWindows64', '-projectPath', $project, '-executeMethod', 'NestedOnlyConsumer.Editor.ConsumerBuild.Build', '-logFile', '-')) { $start.ArgumentList.Add($argument) }
     $process = [Diagnostics.Process]::new()
+    $buildStdout = $null
+    $buildStderr = $null
+    $stdoutFile = $null
+    $stderrFile = $null
     try {
         $process.StartInfo = $start
+        $stdoutFile = [IO.File]::Create($editorLog)
+        $stderrFile = [IO.File]::Create((Join-Path $artifactRoot 'editor-build.stderr.log'))
         if (-not $process.Start()) { throw 'Independent Unity build did not start' }
+        $buildStdout = $process.StandardOutput.BaseStream.CopyToAsync($stdoutFile)
+        $buildStderr = $process.StandardError.BaseStream.CopyToAsync($stderrFile)
         if (-not $process.WaitForExit(7200000)) { $process.Kill($true); $process.WaitForExit(); throw 'Independent build watchdog expired' }
         if ($process.ExitCode -ne 0 -or -not (Test-Path $executable)) { throw 'Independent build failed or player missing' }
-    } finally { $process.Dispose() }
+    } finally {
+        try {
+            $drains = [Threading.Tasks.Task[]]@(@($buildStdout, $buildStderr) | Where-Object { $null -ne $_ })
+            if ($drains.Count -ne 0 -and -not [Threading.Tasks.Task]::WhenAll($drains).Wait(30000)) { throw 'Independent build stdout/stderr drain timed out; partial logs retained' }
+        } finally {
+            try { $process.Dispose() } finally {
+                try { if ($null -ne $stdoutFile) { $stdoutFile.Dispose() } } finally { if ($null -ne $stderrFile) { $stderrFile.Dispose() } }
+            }
+        }
+    }
 } finally { $env:CONSUMER_OUTPUT = $oldOutput }
 foreach ($entry in $packageHashes.GetEnumerator()) {
     if ((Get-FileHash -LiteralPath $entry.Key -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.Value) { throw "Candidate input changed during build: $($entry.Key)" }
@@ -149,40 +168,28 @@ foreach ($file in $consumerAfter) {
 if ((Get-FileHash $bindingPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $bindingSHA) { throw 'Generated binding changed during build' }
 $provenanceRoot = Join-Path $artifactRoot 'actual-tool-inputs'
 New-Item -ItemType Directory -Path $provenanceRoot | Out-Null
-$toolTexts = [Collections.Generic.List[string]]::new()
-$toolTexts.Add([IO.File]::ReadAllText($editorLog))
+. (Join-Path $PSScriptRoot 'lib/il2cpp-conversion-inputs.ps1')
+$linkerInputs = @(Get-UnityLinkerInputs -CommandLines ([IO.File]::ReadAllLines($editorLog)) -Project $project)
+if ($linkerInputs.Count -eq 0) { throw 'Actual UnityLinker invocation inputs were not captured; acceptance remains unproven' }
+$linkerInputs | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $provenanceRoot 'unity-linker-invocations.json')
 $actualResponses = [Collections.Generic.List[object]]::new()
-foreach ($folder in @('Library', 'Temp')) {
-    $directory = Join-Path $project $folder
-    if (-not (Test-Path $directory)) { continue }
-    foreach ($file in (Get-ChildItem -LiteralPath $directory -File -Recurse -Filter '*.rsp')) {
-        $text = [IO.File]::ReadAllText($file.FullName)
-        if ($text -notmatch 'include-link-xml|convert-to-cpp|--directory|--managed-directory') { continue }
-        $sha = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-        Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $provenanceRoot "$sha.rsp")
-        $actualResponses.Add(@{ inputPath = $file.FullName; sha256 = $sha; text = $text })
-        $toolTexts.Add($text)
-    }
-}
-$linkerInputs = @($actualResponses | Where-Object { $_.text -match 'include-link-xml' })
-if ($linkerInputs.Count -eq 0) { throw 'Actual UnityLinker response input was not captured; acceptance remains unproven' }
-$linkerInputs | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $provenanceRoot 'unity-linker-response-inputs.json')
 $actualXml = [Collections.Generic.List[object]]::new()
-foreach ($response in $linkerInputs) {
-    foreach ($match in [regex]::Matches($response.text, '--include-link-xml(?:=|\s+)(?:"([^"]+)"|([^\s]+))')) {
-        $path = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
-        if (-not [IO.Path]::IsPathFullyQualified($path)) { $path = Join-Path $project $path }
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Actual linker XML input missing: $path" }
-        $sha = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+foreach ($invocation in $linkerInputs) {
+    foreach ($response in $invocation.responseChain) {
+        Copy-Item -LiteralPath $response.path -Destination (Join-Path $provenanceRoot "$($response.sha256).linker.rsp")
+        $actualResponses.Add(@{ commandSHA256 = $invocation.commandSHA256; inputPath = $response.path; sha256 = $response.sha256 })
+    }
+    foreach ($path in $invocation.xmlInputPaths) {
+        $sha = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
         $content = [IO.File]::ReadAllText($path)
         Copy-Item -LiteralPath $path -Destination (Join-Path $provenanceRoot "$sha.xml")
-        $actualXml.Add(@{ responseSHA256 = $response.sha256; actualInputPath = $path; sha256 = $sha; includesConsumerPresence = $content.Contains('NestedOnlyConsumer.PresenceDoc') })
+        $actualXml.Add(@{ commandSHA256 = $invocation.commandSHA256; actualInputPath = $path; sha256 = $sha; includesConsumerPresence = $content.Contains('NestedOnlyConsumer.PresenceDoc') })
     }
 }
+ConvertTo-Json -InputObject @($actualResponses.ToArray()) -Depth 5 | Set-Content (Join-Path $provenanceRoot 'unity-linker-response-inputs.json')
 if (@($actualXml | Where-Object { $_.includesConsumerPresence }).Count -eq 0) { throw 'Actual UnityLinker input did not include preserved consumer PresenceDoc' }
 $actualXml | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $provenanceRoot 'actual-linker-xml-inputs.json')
 
-. (Join-Path $PSScriptRoot 'lib/il2cpp-conversion-inputs.ps1')
 $conversions = @(Get-Il2CppConversionInputs -CommandLines ([IO.File]::ReadAllLines($editorLog)) -Project $project)
 $qualifiedConversions = @(Get-QualifiedConversionModules -Conversions $conversions)
 if ($qualifiedConversions.Count -eq 0) { throw 'No single actual converter input set contains all four required managed modules' }
@@ -190,15 +197,16 @@ foreach ($conversion in $qualifiedConversions) {
     $moduleRoot = Join-Path $provenanceRoot ("converter-inputs/" + $conversion.invocation.commandSHA256)
     New-Item -ItemType Directory -Force -Path $moduleRoot | Out-Null
     foreach ($module in $conversion.modules) {
-        if ($module.module -notin @('NestedOnly.Consumer.dll', 'WallstopStudios.UnityHelpers.dll', 'protobuf-net.dll', 'protobuf-net.Core.dll')) { continue }
-        Copy-Item -LiteralPath (Join-Path $conversion.invocation.inputDirectory $module.module) -Destination (Join-Path $moduleRoot $module.module)
+        Copy-Item -LiteralPath $module.inputPath -Destination (Join-Path $moduleRoot $module.module)
     }
     foreach ($response in $conversion.invocation.responseChain) {
         Copy-Item -LiteralPath $response.path -Destination (Join-Path $provenanceRoot "$($response.sha256).converter.rsp")
     }
 }
 $qualifiedConversions | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $provenanceRoot 'il2cpp-conversion-modules.json')
-@{ commit = $commit; sourceManifest = $sourceSHA; generatedBindingSHA256 = $bindingSHA; unityVersion = $UnityVersion; runToken = $token; project = $project; executableSHA256 = (Get-FileHash $executable -Algorithm SHA256).Hash.ToLowerInvariant(); actualLinkerInputCount = $linkerInputs.Count; actualLinkerXmlInputCount = $actualXml.Count; packageWorktreeStatus = @(& git -C $repoPath status --porcelain -- Runtime "Generator~" package.json) } | ConvertTo-Json | Set-Content (Join-Path $artifactRoot 'declaration.json')
+$playerManifestPath = Join-Path $artifactRoot 'player-tree.json'
+$playerManifestSHA256 = New-Il2CppPlayerManifest -PlayerRoot $buildRoot -ManifestPath $playerManifestPath
+@{ playerManifestSHA256 = $playerManifestSHA256; commit = $commit; sourceManifest = $sourceSHA; generatedBindingSHA256 = $bindingSHA; unityVersion = $UnityVersion; runToken = $token; project = $project; executableSHA256 = (Get-FileHash $executable -Algorithm SHA256).Hash.ToLowerInvariant(); actualLinkerInvocationCount = $linkerInputs.Count; actualLinkerInputCount = $actualResponses.Count; actualLinkerXmlInputCount = $actualXml.Count; packageWorktreeStatus = @(& git -C $repoPath status --porcelain -- Runtime "Generator~" package.json) } | ConvertTo-Json | Set-Content (Join-Path $artifactRoot 'declaration.json')
 $goldenArchive = Join-Path $artifactRoot 'goldens'
 Copy-Item -LiteralPath (Join-Path $template 'Goldens~') -Destination $goldenArchive -Recurse
-& (Join-Path $PSScriptRoot 'run-nullable-consumer-player-matrix.ps1') -Executable $executable -GoldenDirectory $goldenArchive -ResultDirectory (Join-Path $artifactRoot 'fresh-processes') -ExpectedUnityVersion $UnityVersion -CandidateCommit $commit -SourceManifest $sourceSHA -RunToken $token
+& (Join-Path $PSScriptRoot 'run-nullable-consumer-player-matrix.ps1') -Executable $executable -GoldenDirectory $goldenArchive -ResultDirectory (Join-Path $artifactRoot 'fresh-processes') -ExpectedUnityVersion $UnityVersion -CandidateCommit $commit -SourceManifest $sourceSHA -RunToken $token -PlayerManifestPath $playerManifestPath -PlayerManifestSHA256 $playerManifestSHA256

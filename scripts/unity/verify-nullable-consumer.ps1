@@ -8,6 +8,7 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'lib/il2cpp-conversion-inputs.ps1')
 function Require-Hash {
     param([string]$Path,[string]$Expected)
     if ($Expected -notmatch '^[0-9a-f]{64}$' -or (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Expected) { throw "Acceptance artifact hash differs: $Path" }
@@ -94,40 +95,77 @@ foreach ($module in $moduleConfiguration.modules.PSObject.Properties) { $current
 $archivedDependencies = Get-Content -LiteralPath (Join-Path $consumerArchive 'Packages/manifest.json') -Raw | ConvertFrom-Json
 if (($currentDependencies | ConvertTo-Json -Depth 10 -Compress) -ne ($archivedDependencies | ConvertTo-Json -Depth 10 -Compress)) { throw 'Current consumer dependency manifest differs' }
 $playerRoot = Join-Path $root 'player'
+Assert-Il2CppPlayerManifest -PlayerRoot $playerRoot -ManifestPath (Join-Path $root 'player-tree.json') -ExpectedSHA256 $declaration.playerManifestSHA256
 Require-Hash (Join-Path $playerRoot 'IndependentConsumer.exe') $declaration.executableSHA256
 $settings = [IO.File]::ReadAllText((Join-Path $playerRoot 'settings.txt'))
 foreach ($line in @("unity=$UnityVersion",'backend=IL2CPP','stripping=High','compiler=Release','development=False')) {
     if ($settings -notmatch ('(?m)^'+[regex]::Escape($line)+'$')) { throw "Independent player setting missing: $line" }
 }
 $toolRoot = Join-Path $root 'actual-tool-inputs'
+$editorLines = [IO.File]::ReadAllLines((Join-Path $root 'editor-build.log'))
+$editorCommands = [Collections.Generic.HashSet[string]]::new($editorLines, [StringComparer]::Ordinal)
+function Assert-RecordedCommand {
+    param([object]$Invocation)
+    $commandSHA = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($Invocation.command))).ToLowerInvariant()
+    if ($commandSHA -ne $Invocation.commandSHA256 -or -not $editorCommands.Contains([string]$Invocation.command)) { throw 'Recorded tool command does not match actual editor log' }
+}
+$linkers = @(Get-Content -LiteralPath (Join-Path $toolRoot 'unity-linker-invocations.json') -Raw | ConvertFrom-Json)
+if ($linkers.Count -eq 0 -or $linkers.Count -ne $declaration.actualLinkerInvocationCount) { throw 'Actual linker invocation count differs' }
 $responses = @(Get-Content -LiteralPath (Join-Path $toolRoot 'unity-linker-response-inputs.json') -Raw | ConvertFrom-Json)
-if ($responses.Count -eq 0 -or $responses.Count -ne $declaration.actualLinkerInputCount) { throw 'Actual linker response count differs' }
-foreach ($response in $responses) { Require-Hash (Join-Path $toolRoot "$($response.sha256).rsp") $response.sha256 }
+if ($responses.Count -ne $declaration.actualLinkerInputCount) { throw 'Actual linker response count differs' }
 $xmlInputs = @(Get-Content -LiteralPath (Join-Path $toolRoot 'actual-linker-xml-inputs.json') -Raw | ConvertFrom-Json)
 if ($xmlInputs.Count -eq 0 -or $xmlInputs.Count -ne $declaration.actualLinkerXmlInputCount) { throw 'Actual linker XML count differs' }
 $presenceFound = $false
-foreach ($xmlInput in $xmlInputs) {
-    if (@($responses | Where-Object { $_.sha256 -eq $xmlInput.responseSHA256 }).Count -eq 0) { throw 'Linker descriptor has no corresponding actual response' }
-    Require-Hash (Join-Path $toolRoot "$($xmlInput.sha256).xml") $xmlInput.sha256
-    $content = [IO.File]::ReadAllText((Join-Path $toolRoot "$($xmlInput.sha256).xml"))
-    if ($content.Contains('NestedOnlyConsumer.PresenceDoc')) { $presenceFound = $true }
+$seenCommands = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$expectedResponses = 0
+$expectedXml = 0
+foreach ($invocation in $linkers) {
+    Assert-RecordedCommand $invocation
+    if (-not $seenCommands.Add($invocation.commandSHA256)) { throw 'Duplicated linker invocation' }
+    $replayed = @(Get-UnityLinkerInputs -CommandLines @($invocation.command) -Project $declaration.project -ArchivedRoot $toolRoot -ResponseRecords @($invocation.responseChain))
+    if ($replayed.Count -ne 1 -or $replayed[0].executable -ne $invocation.executable -or $replayed[0].xmlInputPaths.Count -ne $invocation.xmlInputPaths.Count) { throw 'Actual linker invocation replay differs' }
+    $expectedResponses += $invocation.responseChain.Count
+    foreach ($response in $invocation.responseChain) {
+        $associated = @($responses | Where-Object { $_.commandSHA256 -eq $invocation.commandSHA256 -and $_.inputPath -eq $response.path -and $_.sha256 -eq $response.sha256 })
+        if ($associated.Count -ne 1) { throw 'Linker response association differs' }
+        Require-Hash (Join-Path $toolRoot "$($response.sha256).linker.rsp") $response.sha256
+    }
+    $expectedXml += $replayed[0].xmlInputPaths.Count
+    foreach ($path in $replayed[0].xmlInputPaths) {
+        if ($path -notin $invocation.xmlInputPaths) { throw 'Linker XML command path differs' }
+        $associated = @($xmlInputs | Where-Object { $_.commandSHA256 -eq $invocation.commandSHA256 -and $_.actualInputPath -eq $path })
+        if ($associated.Count -ne 1) { throw 'Linker descriptor has no exact actual command association' }
+        $xmlInput = $associated[0]
+        Require-Hash (Join-Path $toolRoot "$($xmlInput.sha256).xml") $xmlInput.sha256
+        [xml]$descriptor = [IO.File]::ReadAllText((Join-Path $toolRoot "$($xmlInput.sha256).xml"))
+        if ($descriptor.SelectNodes('/linker/assembly[@fullname="NestedOnly.Consumer"]/type[@fullname="NestedOnlyConsumer.PresenceDoc"][@preserve="all"]').Count -ne 0) { $presenceFound = $true }
+    }
 }
+if ($expectedResponses -ne $responses.Count -or $expectedXml -ne $xmlInputs.Count) { throw 'Actual linker input inventory differs from command declarations' }
 if (-not $presenceFound) { throw 'Actual linker descriptor did not preserve consumer contract' }
 $conversions = @(Get-Content -LiteralPath (Join-Path $toolRoot 'il2cpp-conversion-modules.json') -Raw | ConvertFrom-Json)
 if ($conversions.Count -eq 0) { throw 'Actual converter input set missing' }
 $required = @('NestedOnly.Consumer.dll','WallstopStudios.UnityHelpers.dll','protobuf-net.dll','protobuf-net.Core.dll')
+$seenCommands.Clear()
 foreach ($conversion in $conversions) {
     $invocation = $conversion.invocation
-    if ($invocation.executable -notmatch '(?:^|[\\/])il2cpp(?:\.exe)?$') { throw 'Recorded invocation is not the converter executable' }
-    $commandSHA = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($invocation.command))).ToLowerInvariant()
-    if ($commandSHA -ne $invocation.commandSHA256) { throw 'Actual converter command hash differs' }
-    foreach ($response in $invocation.responseChain) { Require-Hash (Join-Path $toolRoot "$($response.sha256).converter.rsp") $response.sha256 }
-    $moduleRoot = Join-Path $toolRoot ("converter-inputs/"+$commandSHA)
-    foreach ($module in $required) {
-        $entries = @($conversion.modules | Where-Object { $_.module -eq $module })
-        if ($entries.Count -ne 1) { throw 'Required module absent/duplicated in single actual conversion input set' }
-        Require-Hash (Join-Path $moduleRoot $module) $entries[0].sha256
+    Assert-RecordedCommand $invocation
+    if (-not $seenCommands.Add($invocation.commandSHA256)) { throw 'Duplicated converter invocation' }
+    $replayed = @(Get-Il2CppConversionInputs -CommandLines @($invocation.command) -Project $declaration.project -ArchivedRoot $toolRoot -ResponseRecords @($invocation.responseChain))
+    if ($replayed.Count -ne 1 -or $replayed[0].executable -ne $invocation.executable -or $replayed[0].inputDirectory -ne $invocation.inputDirectory -or $replayed[0].inputMode -ne $invocation.inputMode -or $replayed[0].explicitInputPaths.Count -ne $invocation.explicitInputPaths.Count) { throw 'Actual converter invocation replay differs' }
+    foreach ($path in $replayed[0].explicitInputPaths) {
+        if ($path -notin $invocation.explicitInputPaths) { throw 'Converter declared assembly path differs' }
     }
+    $moduleRoot = Join-Path $toolRoot ("converter-inputs/"+$invocation.commandSHA256)
+    $moduleNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($module in $conversion.modules) {
+        if (-not $moduleNames.Add($module.module) -or [IO.Path]::GetFileName($module.inputPath) -ne $module.module -or [IO.Path]::GetDirectoryName($module.inputPath) -ne $invocation.inputDirectory) { throw 'Converter module does not belong to its one input set' }
+        if ($invocation.inputMode -eq 'assemblies' -and $module.inputPath -notin $replayed[0].explicitInputPaths) { throw 'Converter module was not declared in actual assembly arguments' }
+        Require-Hash (Join-Path $moduleRoot $module.module) $module.sha256
+    }
+    if ($invocation.inputMode -eq 'assemblies' -and $moduleNames.Count -ne $replayed[0].explicitInputPaths.Count) { throw 'Converter declared assembly inventory differs' }
+    if (@($required | Where-Object { -not $moduleNames.Contains($_) }).Count -ne 0) { throw 'Required module absent from single actual conversion input set' }
+    if (@(Get-ChildItem -LiteralPath $moduleRoot -File -Recurse -Force).Count -ne $moduleNames.Count) { throw 'Archived converter module inventory differs' }
 }
 $expected = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 foreach ($shape in @('null','empty','populated')) {
@@ -144,10 +182,10 @@ foreach ($case in $matrix) {
     $exact = "Passed|$($case.mode)|$($case.shape)|$UnityVersion|IL2CPP=True|commit=$Commit|source=$($declaration.sourceManifest)|run=$($declaration.runToken)"
     $stem = "$($case.mode)-$($case.shape)"
     $actual = [IO.File]::ReadAllText((Join-Path $root "fresh-processes/$stem.result.txt"))
-    if ($case.record -ne $exact -or $actual -ne $exact -or $case.executableSHA256 -ne $declaration.executableSHA256 -or $case.sourceManifest -ne $declaration.sourceManifest -or $case.candidateCommit -ne $Commit -or $case.runToken -ne $declaration.runToken -or $case.unityVersion -ne $UnityVersion) { throw 'Fresh-process record does not bind exact requested player' }
+    if ($case.record -ne $exact -or $actual -ne $exact -or $case.executableSHA256 -ne $declaration.executableSHA256 -or $case.playerManifestSHA256 -ne $declaration.playerManifestSHA256 -or $case.sourceManifest -ne $declaration.sourceManifest -or $case.candidateCommit -ne $Commit -or $case.runToken -ne $declaration.runToken -or $case.unityVersion -ne $UnityVersion) { throw 'Fresh-process record does not bind exact requested player' }
     foreach ($suffix in @('stdout.txt','stderr.txt','player.log')) {
         if (-not (Test-Path -LiteralPath (Join-Path $root "fresh-processes/$stem.$suffix") -PathType Leaf)) { throw 'Fresh-process raw log missing' }
     }
     Require-Hash (Join-Path $root "goldens/$($case.shape).base64") $case.goldenSHA256.ToLowerInvariant()
 }
-@{ nullableconsumer = 'passed'; processes = 22; commit = $Commit; unityVersion = $UnityVersion; sourceManifest = $declaration.sourceManifest; verifiedCheckoutCommit = $currentCommit; verifiedPackageInputs = $expectedPackage.Count; verifiedAcceptanceTools = $tools.Count; verifiedGoldens = $goldens.Count; executableSHA256 = $declaration.executableSHA256; converterInputSets = $conversions.Count } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'acceptance-summary.json')
+@{ nullableconsumer = 'passed'; processes = 22; commit = $Commit; unityVersion = $UnityVersion; sourceManifest = $declaration.sourceManifest; verifiedCheckoutCommit = $currentCommit; verifiedPackageInputs = $expectedPackage.Count; verifiedAcceptanceTools = $tools.Count; verifiedGoldens = $goldens.Count; executableSHA256 = $declaration.executableSHA256; playerManifestSHA256 = $declaration.playerManifestSHA256; converterInputSets = $conversions.Count } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'acceptance-summary.json')

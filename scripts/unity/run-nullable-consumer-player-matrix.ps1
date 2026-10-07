@@ -9,10 +9,13 @@ param(
     [Parameter(Mandatory)][string]$ExpectedUnityVersion,
     [Parameter(Mandatory)][string]$CandidateCommit,
     [Parameter(Mandatory)][string]$SourceManifest,
-    [Parameter(Mandatory)][string]$RunToken
+    [Parameter(Mandatory)][string]$RunToken,
+    [Parameter(Mandatory)][string]$PlayerManifestPath,
+    [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{64}$')][string]$PlayerManifestSHA256
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'lib/il2cpp-conversion-inputs.ps1')
 $exePath = [IO.Path]::GetFullPath($Executable)
 $goldPath = [IO.Path]::GetFullPath($GoldenDirectory)
 $resultPath = [IO.Path]::GetFullPath($ResultDirectory)
@@ -33,6 +36,7 @@ $cases.Add(@{ mode = 'merge'; shape = 'populated' })
 foreach ($mode in @('presence-typed-hash', 'presence-object-hash', 'presence-typed-equality', 'presence-object-equality', 'presence-serialize-read', 'presence-foreign')) { $cases.Add(@{ mode = $mode; shape = 'presence' }) }
 $results = [Collections.Generic.List[object]]::new()
 foreach ($case in $cases) {
+    Assert-Il2CppPlayerManifest -PlayerRoot $buildRoot -ManifestPath $PlayerManifestPath -ExpectedSHA256 $PlayerManifestSHA256
     $stem = "$($case.mode)-$($case.shape)"
     $record = Join-Path $resultPath "$stem.result.txt"
     if ([IO.File]::Exists($record)) { throw "Refusing stale result: $record" }
@@ -63,8 +67,12 @@ foreach ($case in $cases) {
         if ((Get-FileHash $exePath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $executableSHA256) { throw 'Player executable changed during matrix' }
         $golden = Join-Path $goldPath "$($case.shape).base64"
         if (-not [IO.File]::Exists($golden)) { throw "Golden not captured: $golden" }
-        $results.Add(@{ mode = $case.mode; shape = $case.shape; record = $text; goldenSHA256 = (Get-FileHash $golden -Algorithm SHA256).Hash; executableSHA256 = $executableSHA256; candidateCommit = $CandidateCommit; sourceManifest = $SourceManifest; runToken = $RunToken; unityVersion = $ExpectedUnityVersion })
-    } finally { $process.Dispose() }
+        $results.Add(@{ mode = $case.mode; shape = $case.shape; record = $text; goldenSHA256 = (Get-FileHash $golden -Algorithm SHA256).Hash; executableSHA256 = $executableSHA256; playerManifestSHA256 = $PlayerManifestSHA256; candidateCommit = $CandidateCommit; sourceManifest = $SourceManifest; runToken = $RunToken; unityVersion = $ExpectedUnityVersion })
+    } finally {
+        try { $process.Dispose() } finally {
+            Assert-Il2CppPlayerManifest -PlayerRoot $buildRoot -ManifestPath $PlayerManifestPath -ExpectedSHA256 $PlayerManifestSHA256
+        }
+    }
 }
 $expected = 22
 if ($results.Count -ne $expected) { throw "Expected $expected actual processes, got $($results.Count)" }
