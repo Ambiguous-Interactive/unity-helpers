@@ -330,3 +330,12 @@ foreach ($case in ($env:MODE_GATE_CASES | ConvertFrom-Json)) {
 }
 
 console.log(`Grouped Unity mode controls passed: ${cases}`);
+
+const provision = spawnSync(
+  "pwsh",
+  ["-NoProfile", "-File", path.join(repoRoot, "scripts/tests/test-standalone-scene-provision.ps1")],
+  { cwd: repoRoot, encoding: "utf8" }
+);
+assert.ifError(provision.error);
+assert.equal(provision.status, 0, provision.stdout + provision.stderr);
+process.stdout.write(provision.stdout);
