@@ -350,6 +350,11 @@ const CHECKS = [
     run: "npm run test:unity-grouped-modes"
   },
   {
+    id: "standalone-scene-provision",
+    name: "Standalone packed-scene build provision controls",
+    run: "npm run test:standalone-scene-provision"
+  },
+  {
     id: "build-lock-action-inputs",
     name: "Build-lock action inputs",
     run: "npm run test:build-lock-action-inputs"
