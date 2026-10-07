@@ -11,7 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     internal sealed class SiblingListRelational : MonoBehaviour
     {
         [SiblingComponent]
-        private List<BoxCollider> siblingColliders = new();
+        private List<BoxCollider> _siblingColliders = new();
 
         public void Assign()
         {

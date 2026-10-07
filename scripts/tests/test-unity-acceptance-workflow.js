@@ -15,7 +15,7 @@ assert.match(option, /^        default: "none"$/m);
 assert.match(option, /^        type: choice$/m);
 assert.deepEqual(
   [...option.matchAll(/^          - (\w+)$/gm)].map((match) => match[1]),
-  ["none", "sentinel", "intmap", "serialization", "all"]
+  ["none", "sentinel", "intmap", "serialization", "nullableconsumer", "all"]
 );
 const job = workflow.match(/^  unity-tests:\n([\s\S]*?)(?=^  [\w-]+:\n)/m)?.[1];
 assert.ok(job, "Default licensed job must exist");
@@ -89,7 +89,14 @@ assert.equal((workflow.match(/UH_PERF_DIAGNOSTICS:/g) || []).length, 1);
 const diagnosticMode = expression(diagnosticEnvironment);
 let diagnosticControls = 0;
 for (const event of ["pull_request", "push", "workflow_dispatch"]) {
-  for (const acceptance of ["none", "sentinel", "intmap", "serialization", "all"]) {
+  for (const acceptance of [
+    "none",
+    "sentinel",
+    "intmap",
+    "serialization",
+    "nullableconsumer",
+    "all"
+  ]) {
     for (const requested of [undefined, false, true]) {
       assert.equal(
         diagnosticMode({
@@ -110,42 +117,56 @@ const selectedSteps = [run, verify, redact, upload, gate];
 const predicates = selectedSteps.map(predicate);
 let controls = diagnosticControls;
 for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
-  for (const acceptance of ["", "none", "sentinel", "intmap", "serialization", "all"]) {
-    for (const cancelled of [false, true]) {
-      for (const acquired of ["true", "false", ""]) {
-        for (const redaction of ["success", "failure", "skipped"]) {
-          const context = {
-            github: { event_name: event },
-            inputs: { acceptance },
-            // Acceptance runs once in each selected version job after its
-            // standard modes; the editor gate verifies StandaloneWindowsIl2Cpp.
-            matrix: {},
-            cancelled,
-            success: false,
-            steps: {
-              checkout: { outcome: "success" },
-              unity_lock: { outputs: { acquired } },
-              redact_acceptance: { outcome: redaction }
-            }
-          };
-          const requested =
-            event === "workflow_dispatch" &&
-            ["sentinel", "intmap", "serialization", "all"].includes(acceptance);
-          const expected = [
-            requested && !cancelled && acquired === "true",
-            requested && !cancelled,
-            requested,
-            requested && redaction === "success",
-            requested && !cancelled
-          ];
-          predicates.forEach((test, index) =>
-            assert.equal(
-              Boolean(test(context)),
-              expected[index],
-              `Wrong predicate for ${["run", "verify", "redact", "upload", "gate"][index]}: ${JSON.stringify(context)}`
-            )
-          );
-          controls += predicates.length;
+  for (const acceptance of [
+    "",
+    "none",
+    "sentinel",
+    "intmap",
+    "serialization",
+    "nullableconsumer",
+    "all"
+  ]) {
+    for (const unityVersion of ["2021.3.45f1", "2022.3.45f1", "6000.6.0f1"]) {
+      for (const cancelled of [false, true]) {
+        for (const acquired of ["true", "false", ""]) {
+          for (const redaction of ["success", "failure", "skipped"]) {
+            const context = {
+              github: { event_name: event },
+              inputs: { acceptance },
+              // Acceptance runs once in each selected version job after its
+              // standard modes; the editor gate verifies StandaloneWindowsIl2Cpp.
+              matrix: { "unity-version": unityVersion },
+              cancelled,
+              success: false,
+              steps: {
+                checkout: { outcome: "success" },
+                unity_lock: { outputs: { acquired } },
+                redact_acceptance: { outcome: redaction }
+              }
+            };
+            const requested =
+              event === "workflow_dispatch" &&
+              ["sentinel", "intmap", "serialization", "nullableconsumer", "all"].includes(
+                acceptance
+              ) &&
+              (acceptance !== "nullableconsumer" ||
+                ["2021.3.45f1", "6000.6.0f1"].includes(unityVersion));
+            const expected = [
+              requested && !cancelled && acquired === "true",
+              requested && !cancelled,
+              requested,
+              requested && redaction === "success",
+              requested && !cancelled
+            ];
+            predicates.forEach((test, index) =>
+              assert.equal(
+                Boolean(test(context)),
+                expected[index],
+                `Wrong predicate for ${["run", "verify", "redact", "upload", "gate"][index]}: ${JSON.stringify(context)}`
+              )
+            );
+            controls += predicates.length;
+          }
         }
       }
     }
@@ -302,7 +323,11 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
             github: { event_name: "workflow_dispatch" },
             inputs: { acceptance: "all" },
             needs: {
-              "matrix-config": { outputs: { "test-modes": '["editmode","playmode","standalone"]' } }
+              "matrix-config": {
+                outputs: {
+                  "test-modes": '["editmode","playmode","standalone"]'
+                }
+              }
             },
             matrix: {},
             success: status === "success",
@@ -311,7 +336,9 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
             steps: new Proxy(
               {},
               {
-                get: (_, id) => ({ outcome: id === "checkout" ? checkoutOutcome : status })
+                get: (_, id) => ({
+                  outcome: id === "checkout" ? checkoutOutcome : status
+                })
               }
             )
           };
@@ -367,7 +394,11 @@ for (const modes of [
           for (const redaction of ["success", "failure"]) {
             const context = {
               cancelled,
-              needs: { "matrix-config": { outputs: { "test-modes": JSON.stringify(modes) } } },
+              needs: {
+                "matrix-config": {
+                  outputs: { "test-modes": JSON.stringify(modes) }
+                }
+              },
               steps: {
                 checkout: { outcome: "success" },
                 unity_lock: { outputs: { acquired } },

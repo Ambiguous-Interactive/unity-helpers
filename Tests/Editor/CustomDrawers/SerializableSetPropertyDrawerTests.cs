@@ -6,7 +6,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEditorInternal;
@@ -124,6 +126,46 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
 
             return $"[{string.Join(", ", indices)}]";
+        }
+
+        private static void RewriteLegacyYamlKeyAndReimport(
+            string assetPath,
+            string currentKey,
+            string legacyKey
+        )
+        {
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string physicalPath = Path.Combine(projectRoot, assetPath);
+            string metaPath = physicalPath + ".meta";
+            byte[] originalMeta = File.ReadAllBytes(metaPath);
+            string originalGuid = AssetDatabase.AssetPathToGUID(assetPath);
+            Assert.That(originalGuid, Is.Not.Empty);
+            string yaml = File.ReadAllText(physicalPath);
+            Assert.That(yaml, Does.StartWith("%YAML"));
+            string pattern = "(?m)^([ \t]*(?:-[ \t]+)?)" + Regex.Escape(currentKey) + "(?=:)";
+            Assert.That(
+                Regex.Matches(yaml, pattern).Count,
+                Is.EqualTo(1),
+                "Unexpected YAML representation for "
+                    + currentKey
+                    + ":\n"
+                    + yaml.Substring(0, Math.Min(yaml.Length, 8192))
+            );
+            string legacyYaml = Regex.Replace(yaml, pattern, "$1" + legacyKey);
+            string legacyPattern = "(?m)^([ \t]*(?:-[ \t]+)?)" + Regex.Escape(legacyKey) + "(?=:)";
+            Assert.That(Regex.Matches(legacyYaml, legacyPattern).Count, Is.EqualTo(1));
+            Assert.That(
+                Regex.Replace(legacyYaml, legacyPattern, "$1" + currentKey),
+                Is.EqualTo(yaml)
+            );
+            File.WriteAllText(physicalPath, legacyYaml);
+            Assert.That(File.ReadAllText(physicalPath), Is.EqualTo(legacyYaml));
+            AssetDatabase.ImportAsset(
+                assetPath,
+                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
+            );
+            Assert.That(AssetDatabase.AssetPathToGUID(assetPath), Is.EqualTo(originalGuid));
+            CollectionAssert.AreEqual(originalMeta, File.ReadAllBytes(metaPath));
         }
 
         [SetUp]
@@ -1383,6 +1425,230 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.IsTrue(pending.value != null);
             Assert.IsInstanceOf<PrivateCtorElement>(pending.value);
+        }
+
+        [Test]
+        public void RenamedPrivateConstructorElementReadsLegacyUnityJson()
+        {
+            PrivateCtorElement element = JsonUtility.FromJson<PrivateCtorElement>(
+                "{\"magnitude\":37}"
+            );
+            Assert.That(element.Magnitude, Is.EqualTo(37));
+        }
+
+        [Test]
+        public void RenamedPendingWrapperReadsLegacyManagedReferenceJson()
+        {
+            PrivateCtorElement element = JsonUtility.FromJson<PrivateCtorElement>(
+                "{\"magnitude\":41}"
+            );
+            Assert.That(element.Magnitude, Is.EqualTo(41));
+            PendingValueWrapper source = CreateScriptableObject<PendingValueWrapper>();
+            source.SetValue(element);
+            string json = EditorJsonUtility.ToJson(source);
+            string currentKey = "\"" + PendingValueWrapper.PropertyName + "\":";
+            Assert.That(json, Does.Contain(currentKey));
+            const string LegacyKey = "\"boxedValue\":";
+            Assert.That(json, Does.Contain(LegacyKey));
+            string legacyJson = json;
+            PendingValueWrapper restored = CreateScriptableObject<PendingValueWrapper>();
+            EditorJsonUtility.FromJsonOverwrite(legacyJson, restored);
+            Assert.That(restored.GetValue(), Is.InstanceOf<PrivateCtorElement>());
+            Assert.That(((PrivateCtorElement)restored.GetValue()).Magnitude, Is.EqualTo(41));
+        }
+
+        [Test]
+        public void PendingWrapperReadsCurrentManagedReferenceJson()
+        {
+            PrivateCtorElement element = JsonUtility.FromJson<PrivateCtorElement>(
+                "{\"magnitude\":41}"
+            );
+            Assert.That(element.Magnitude, Is.EqualTo(41));
+            PendingValueWrapper source = CreateScriptableObject<PendingValueWrapper>();
+            source.SetValue(element);
+            string json = EditorJsonUtility.ToJson(source);
+            Assert.That(json, Does.Contain("\"" + PendingValueWrapper.PropertyName + "\":"));
+            PendingValueWrapper restored = CreateScriptableObject<PendingValueWrapper>();
+            EditorJsonUtility.FromJsonOverwrite(json, restored);
+            Assert.That(restored.GetValue(), Is.InstanceOf<PrivateCtorElement>());
+            Assert.That(((PrivateCtorElement)restored.GetValue()).Magnitude, Is.EqualTo(41));
+        }
+
+        [Test]
+        public void PrivateConstructorElementReadsLegacyAssetYaml()
+        {
+            ExecuteWithTextAssetImport(() =>
+            {
+                PrivateCtorElement element = JsonUtility.FromJson<PrivateCtorElement>(
+                    "{\"magnitude\":37}"
+                );
+                Assert.That(element.Magnitude, Is.EqualTo(37));
+                PrivateCtorSetHost source = CreateScriptableObject<PrivateCtorSetHost>();
+                source.set.Add(element);
+                string assetPath = CreateMigrationAssetPath("PrivateConstructor.asset");
+                AssetDatabase.CreateAsset(source, assetPath);
+                EditorUtility.SetDirty(source);
+                AssetDatabase.SaveAssets();
+                Assert.That(source.set.Single().Magnitude, Is.EqualTo(37));
+                Resources.UnloadAsset(source);
+                PrivateCtorSetHost current = AssetDatabase.LoadAssetAtPath<PrivateCtorSetHost>(
+                    assetPath
+                );
+                Assert.IsTrue(current != null);
+                Assert.That(current.set.Count, Is.EqualTo(1));
+                Assert.That(current.set.Single().Magnitude, Is.EqualTo(37));
+                Resources.UnloadAsset(current);
+                RewriteLegacyYamlKeyAndReimport(assetPath, "magnitude", "magnitude");
+                PrivateCtorSetHost restored = AssetDatabase.LoadAssetAtPath<PrivateCtorSetHost>(
+                    assetPath
+                );
+                Assert.IsTrue(restored != null);
+                Assert.That(restored.set.Count, Is.EqualTo(1));
+                Assert.That(restored.set.Single().Magnitude, Is.EqualTo(37));
+            });
+        }
+
+        [Test]
+        public void PendingWrapperReadsLegacyManagedReferenceAssetYaml()
+        {
+            ExecuteWithTextAssetImport(() =>
+            {
+                PrivateCtorElement element = JsonUtility.FromJson<PrivateCtorElement>(
+                    "{\"magnitude\":41}"
+                );
+                Assert.That(element.Magnitude, Is.EqualTo(41));
+                PendingValueWrapper source = CreateScriptableObject<PendingValueWrapper>();
+                source.SetValue(element);
+                string assetPath = CreateMigrationAssetPath("PendingWrapper.asset");
+                AssetDatabase.CreateAsset(source, assetPath);
+                EditorUtility.SetDirty(source);
+                AssetDatabase.SaveAssets();
+                Assert.That(((PrivateCtorElement)source.GetValue()).Magnitude, Is.EqualTo(41));
+                Resources.UnloadAsset(source);
+                PendingValueWrapper current = AssetDatabase.LoadAssetAtPath<PendingValueWrapper>(
+                    assetPath
+                );
+                Assert.IsTrue(current != null);
+                Assert.That(current.GetValue(), Is.InstanceOf<PrivateCtorElement>());
+                Assert.That(((PrivateCtorElement)current.GetValue()).Magnitude, Is.EqualTo(41));
+                Resources.UnloadAsset(current);
+                RewriteLegacyYamlKeyAndReimport(
+                    assetPath,
+                    PendingValueWrapper.PropertyName,
+                    "boxedValue"
+                );
+                RewriteLegacyYamlKeyAndReimport(assetPath, "magnitude", "magnitude");
+                PendingValueWrapper restored = AssetDatabase.LoadAssetAtPath<PendingValueWrapper>(
+                    assetPath
+                );
+                Assert.IsTrue(restored != null);
+                Assert.That(restored.GetValue(), Is.InstanceOf<PrivateCtorElement>());
+                Assert.That(((PrivateCtorElement)restored.GetValue()).Magnitude, Is.EqualTo(41));
+            });
+        }
+
+        [Test]
+        public void PendingActionLimitReadsLegacyPrefabYaml()
+        {
+            ExecuteWithTextAssetImport(() =>
+            {
+                GameObject source = Track(new GameObject("DispatcherMigration"));
+                source.SetActive(false);
+                UnityMainThreadDispatcher dispatcher =
+                    source.AddComponent<UnityMainThreadDispatcher>();
+                dispatcher.PendingActionLimit = 37;
+                string assetPath = CreateMigrationAssetPath("Dispatcher.prefab");
+                GameObject prefab = PrefabUtility.SaveAsPrefabAsset(source, assetPath);
+                Assert.IsTrue(prefab != null);
+                Assert.That(
+                    prefab.GetComponent<UnityMainThreadDispatcher>().PendingActionLimit,
+                    Is.EqualTo(37)
+                );
+                /* Prefab assets cannot be unloaded with Resources.UnloadAsset. A prefab content
+                 * load after synchronous reimport reads the rewritten asset from disk. */
+                RewriteLegacyYamlKeyAndReimport(
+                    assetPath,
+                    "maxPendingActions",
+                    "maxPendingActions"
+                );
+                GameObject restored = PrefabUtility.LoadPrefabContents(assetPath);
+                try
+                {
+                    Assert.That(
+                        restored.GetComponent<UnityMainThreadDispatcher>().PendingActionLimit,
+                        Is.EqualTo(37)
+                    );
+                }
+                finally
+                {
+                    PrefabUtility.UnloadPrefabContents(restored);
+                }
+            });
+        }
+
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        public void DispatcherScopePreservesLoadedPrefabAndDestroysSceneInstance(
+            bool destroyOnEnter,
+            bool destroyOnDispose
+        )
+        {
+            ExecuteWithTextAssetImport(() =>
+            {
+                GameObject template = Track(new GameObject("PersistentDispatcherTemplate"));
+                template.SetActive(false);
+                UnityMainThreadDispatcher templateDispatcher =
+                    template.AddComponent<UnityMainThreadDispatcher>();
+                templateDispatcher.PendingActionLimit = 37;
+                string assetPath = CreateMigrationAssetPath("PersistentDispatcher.prefab");
+                GameObject prefab = PrefabUtility.SaveAsPrefabAsset(template, assetPath);
+                Assert.IsTrue(prefab != null);
+                UnityMainThreadDispatcher persistentDispatcher =
+                    prefab.GetComponent<UnityMainThreadDispatcher>();
+                Assert.IsTrue(persistentDispatcher != null);
+                Assert.IsTrue(EditorUtility.IsPersistent(persistentDispatcher));
+                string originalGuid = AssetDatabase.AssetPathToGUID(assetPath);
+                Assert.That(originalGuid, Is.Not.Empty);
+                string physicalPath = Path.Combine(
+                    Path.GetDirectoryName(Application.dataPath),
+                    assetPath
+                );
+                byte[] originalYaml = File.ReadAllBytes(physicalPath);
+                byte[] originalMeta = File.ReadAllBytes(physicalPath + ".meta");
+                GameObject sceneObject = Track(new GameObject("SceneDispatcherToDestroy"));
+                UnityMainThreadDispatcher sceneDispatcher =
+                    sceneObject.AddComponent<UnityMainThreadDispatcher>();
+                Assert.IsFalse(EditorUtility.IsPersistent(sceneDispatcher));
+                using (
+                    UnityMainThreadDispatcher.AutoCreationScope scope =
+                        UnityMainThreadDispatcher.AutoCreationScope.Disabled(
+                            destroyExistingInstanceOnEnter: destroyOnEnter,
+                            destroyInstancesOnDispose: destroyOnDispose,
+                            destroyImmediate: true
+                        )
+                )
+                {
+                    Assert.That(sceneObject == null, Is.EqualTo(destroyOnEnter));
+                    Assert.IsTrue(prefab != null);
+                    Assert.IsTrue(persistentDispatcher != null);
+                    Assert.That(persistentDispatcher.PendingActionLimit, Is.EqualTo(37));
+                }
+
+                Assert.IsTrue(sceneObject == null);
+                Assert.IsTrue(sceneDispatcher == null);
+                Assert.IsTrue(prefab != null);
+                Assert.IsTrue(persistentDispatcher != null);
+                Assert.That(persistentDispatcher.PendingActionLimit, Is.EqualTo(37));
+                Assert.That(AssetDatabase.AssetPathToGUID(assetPath), Is.EqualTo(originalGuid));
+                CollectionAssert.AreEqual(originalYaml, File.ReadAllBytes(physicalPath));
+                CollectionAssert.AreEqual(originalMeta, File.ReadAllBytes(physicalPath + ".meta"));
+                GameObject reloadedPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+                Assert.IsTrue(reloadedPrefab != null);
+                Assert.That(
+                    reloadedPrefab.GetComponent<UnityMainThreadDispatcher>().PendingActionLimit,
+                    Is.EqualTo(37)
+                );
+            });
         }
 
         [Test]
@@ -5375,6 +5641,48 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
         }
 
+        private void ExecuteWithTextAssetImport(Action action)
+        {
+            ExecuteWithImmediateImport(() =>
+            {
+                SerializationMode previousMode = EditorSettings.serializationMode;
+                int initialTrackedPathCount = _trackedAssetPaths.Count;
+                try
+                {
+                    EditorSettings.serializationMode = SerializationMode.ForceText;
+                    action();
+                }
+                finally
+                {
+                    try
+                    {
+                        int trackedPathCount = _trackedAssetPaths.Count;
+                        for (int index = initialTrackedPathCount; index < trackedPathCount; ++index)
+                        {
+                            string assetPath = _trackedAssetPaths[index];
+                            if (!string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(assetPath)))
+                            {
+                                Assert.IsTrue(AssetDatabase.DeleteAsset(assetPath));
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        EditorSettings.serializationMode = previousMode;
+                    }
+                }
+            });
+        }
+
+        private string CreateMigrationAssetPath(string fileName)
+        {
+            const string Folder = "Assets/Temp/SerializedFieldMigration";
+            EnsureFolder(Folder);
+            string assetPath = AssetDatabase.GenerateUniqueAssetPath(Folder + "/" + fileName);
+            TrackAssetPath(assetPath);
+            return assetPath;
+        }
+
         /// <summary>
         /// Resets the shared host state between tests to ensure test isolation.
         /// </summary>
@@ -5410,47 +5718,47 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
         private sealed class SetTweenDisabledScope : IDisposable
         {
-            private readonly bool originalValue;
-            private bool disposed;
+            private readonly bool _originalValue;
+            private bool _disposed;
 
             public SetTweenDisabledScope()
             {
-                originalValue = UnityHelpersSettings.ShouldTweenSerializableSetFoldouts();
+                _originalValue = UnityHelpersSettings.ShouldTweenSerializableSetFoldouts();
                 UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(false);
             }
 
             public void Dispose()
             {
-                if (disposed)
+                if (_disposed)
                 {
                     return;
                 }
 
-                disposed = true;
-                UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(originalValue);
+                _disposed = true;
+                UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(_originalValue);
             }
         }
 
         private sealed class SortedSetTweenDisabledScope : IDisposable
         {
-            private readonly bool originalValue;
-            private bool disposed;
+            private readonly bool _originalValue;
+            private bool _disposed;
 
             public SortedSetTweenDisabledScope()
             {
-                originalValue = UnityHelpersSettings.ShouldTweenSerializableSortedSetFoldouts();
+                _originalValue = UnityHelpersSettings.ShouldTweenSerializableSortedSetFoldouts();
                 UnityHelpersSettings.SetSerializableSortedSetFoldoutTweenEnabled(false);
             }
 
             public void Dispose()
             {
-                if (disposed)
+                if (_disposed)
                 {
                     return;
                 }
 
-                disposed = true;
-                UnityHelpersSettings.SetSerializableSortedSetFoldoutTweenEnabled(originalValue);
+                _disposed = true;
+                UnityHelpersSettings.SetSerializableSortedSetFoldoutTweenEnabled(_originalValue);
             }
         }
     }

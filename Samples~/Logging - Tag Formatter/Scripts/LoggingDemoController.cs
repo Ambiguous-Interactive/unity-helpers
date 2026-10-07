@@ -37,14 +37,15 @@ namespace Samples.UnityHelpers.Logging
 
         [SerializeField]
 #pragma warning disable WPROTO028 // Inspector-only sample input; this component is not a proto contract.
+
         private Vector2 sectorRange = new Vector2(1f, 6f);
 #pragma warning restore WPROTO028
 
-        private bool localLoggingEnabled = true;
+        private bool _localLoggingEnabled = true;
 
         private void Awake()
         {
-            localLoggingEnabled = !startMuted;
+            _localLoggingEnabled = !startMuted;
             if (startMuted)
             {
                 this.DisableLogging();
@@ -117,14 +118,14 @@ namespace Samples.UnityHelpers.Logging
 
         private void HandleLocalToggle()
         {
-            bool nextLocal = GUILayout.Toggle(localLoggingEnabled, "Component logging enabled");
-            if (nextLocal == localLoggingEnabled)
+            bool nextLocal = GUILayout.Toggle(_localLoggingEnabled, "Component logging enabled");
+            if (nextLocal == _localLoggingEnabled)
             {
                 return;
             }
 
-            localLoggingEnabled = nextLocal;
-            if (localLoggingEnabled)
+            _localLoggingEnabled = nextLocal;
+            if (_localLoggingEnabled)
             {
                 this.EnableLogging();
             }

@@ -11,7 +11,7 @@ Procedural skills are in the [skills/](./skills/) directory.
 **Repository**: <https://github.com/wallstop/unity-helpers>
 **Root Namespace**: `WallstopStudios.UnityHelpers`
 
-**Design Principles**: Zero boilerplate, performance-proven (15,000+ tests, IL2CPP/WebGL compatible), DRY architecture, self-documenting code (minimal comments, descriptive names).
+**Design Principles**: Zero boilerplate, performance-proven (16,000+ tests, IL2CPP/WebGL compatible), DRY architecture, self-documenting code (minimal comments, descriptive names).
 
 ---
 
@@ -130,16 +130,19 @@ Read [technical rules](./references/context-technical-rules.md) when changing ru
 
 ## Naming Conventions
 
-| Element               | Convention  | Example                     |
-| --------------------- | ----------- | --------------------------- |
-| Types, public members | PascalCase  | `SerializableDictionary`    |
-| Fields, locals        | camelCase   | `keyValue`, `itemCount`     |
-| Interfaces            | `I` prefix  | `IResolver`, `ISpatialTree` |
-| Type parameters       | `T` prefix  | `TKey`, `TValue`            |
-| Events                | `On` prefix | `OnValueChanged`            |
-| Constants (public)    | PascalCase  | `DefaultCapacity`           |
+| Element                    | Convention   | Example                     |
+| -------------------------- | ------------ | --------------------------- |
+| Types, public members      | PascalCase   | `SerializableDictionary`    |
+| Non-private fields, locals | camelCase    | `keyValue`, `itemCount`     |
+| Private instance fields    | `_camelCase` | `_itemCount`                |
+| Interfaces                 | `I` prefix   | `IResolver`, `ISpatialTree` |
+| Type parameters            | `T` prefix   | `TKey`, `TValue`            |
+| Events                     | `On` prefix  | `OnValueChanged`            |
+| Constants (public)         | PascalCase   | `DefaultCapacity`           |
 
 - C# files: 4 spaces indentation; config files (`.json`, `.yaml`, `.asmdef`): 2 spaces
+- Preserve existing serialized field names and raw Unity JSON keys. The naming gate carries explicit
+  historical field exceptions; a style rename must not change persisted data.
 - Line endings: CRLF for most files; YAML/`.github/**`/Markdown/Jekyll includes use LF
 - Encoding: UTF-8 (no BOM)
 

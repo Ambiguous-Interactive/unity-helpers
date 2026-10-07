@@ -14,17 +14,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         public int Advanced { get; private set; }
 
-        private readonly int failure;
-        private readonly byte[] buffer = new byte[256];
+        private readonly int _failure;
+        private readonly byte[] _buffer = new byte[256];
 
         public WProtoFaultBufferWriter(int failure)
         {
-            this.failure = failure;
+            _failure = failure;
         }
 
         public void Advance(int count)
         {
-            if (failure == AdvanceFailure)
+            if (_failure == AdvanceFailure)
             {
                 throw new InvalidOperationException("Advance failed.");
             }
@@ -33,20 +33,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         public Memory<byte> GetMemory(int sizeHint = 0)
         {
-            if (failure == SpanFailure)
+            if (_failure == SpanFailure)
             {
                 throw new InvalidOperationException("GetMemory failed.");
             }
-            return failure == ShortSpan ? Memory<byte>.Empty : buffer.AsMemory();
+            return _failure == ShortSpan ? Memory<byte>.Empty : _buffer.AsMemory();
         }
 
         public Span<byte> GetSpan(int sizeHint = 0)
         {
-            if (failure == SpanFailure)
+            if (_failure == SpanFailure)
             {
                 throw new InvalidOperationException("GetSpan failed.");
             }
-            return failure == ShortSpan ? Span<byte>.Empty : buffer.AsSpan();
+            return _failure == ShortSpan ? Span<byte>.Empty : _buffer.AsSpan();
         }
     }
 }

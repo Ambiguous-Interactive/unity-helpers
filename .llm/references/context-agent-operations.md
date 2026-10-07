@@ -54,6 +54,12 @@
 - For CI/CD bash scripts, use POSIX-compliant tools (see [validate-before-commit](../skills/validate-before-commit.md#portable-shell-scripting-in-workflows-critical))
 - **Never commit** `Library/`, `obj/`, secrets, tokens, or root `progress/`; never force-add ignored
   progress. Put durable evidence in issues or commit bodies. **Do commit** asset `.meta` files.
+- Store raw probe source and binaries outside the package or under a dot-prefixed or
+  `~`-suffixed directory such as `progress/.artifacts/`. Git-ignored paths remain visible to
+  Unity: imported probe DLLs can trigger API Updater dialogs and duplicate assemblies. Keep
+  readable notes under `progress/`; ZIP archives can preserve executable evidence there.
+  Before a Unity refresh, check that no raw executable evidence is visible to its importer
+  ([#958](https://github.com/Ambiguous-Interactive/unity-helpers/issues/958)).
 - **Verify `.asmdef` references** when adding new namespaces
 - Commits: short, imperative summaries (e.g., "Fix JSON serialization for FastVector"); group related changes
 - **User-facing copy is STE-simple.** PRs, titles, commits, comments, ship summaries -- anything a

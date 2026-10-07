@@ -26,9 +26,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             @"
 namespace Upstream {
     [WProtoContract, ProtoBuf.ProtoContract, WProtoInclude(100, typeof(Melee)), ProtoBuf.ProtoInclude(100, typeof(Melee))]
-    public partial class Weapon {        public int Damage { get => damage; set => damage = value; }
+    public partial class Weapon {        public int Damage { get => _damage; set => _damage = value; }
 
-        [WProtoMember(1), ProtoBuf.ProtoMember(1)] private int damage;
+        [WProtoMember(1), ProtoBuf.ProtoMember(1)] private int _damage;
     }
     [WProtoContract, ProtoBuf.ProtoContract] public sealed partial class Melee : Weapon {
         [WProtoMember(1), ProtoBuf.ProtoMember(1)] public int Sharpness;
@@ -195,10 +195,10 @@ namespace Consumer {
             string upstreamSource =
                 @"
 namespace Upstream {
-    [WProtoContract, ProtoBuf.ProtoContract] public partial class Weapon {        public int Damage { get => damage; set => damage = value; }
+    [WProtoContract, ProtoBuf.ProtoContract] public partial class Weapon {        public int Damage { get => _damage; set => _damage = value; }
         [WProtoMember(2), ProtoBuf.ProtoMember(2)] public int Energy;
 
-        [WProtoMember(1), ProtoBuf.ProtoMember(1)] private int damage;
+        [WProtoMember(1), ProtoBuf.ProtoMember(1)] private int _damage;
     }
     [WProtoContract, ProtoBuf.ProtoContract] public sealed partial class Inventory {
         [WProtoMember(1), ProtoBuf.ProtoMember(1)] public Weapon Selected = new Weapon { Damage = 17 };
@@ -275,7 +275,7 @@ namespace Consumer {
         {
             string upstreamSource = Upstream.Replace(
                 "public int Damage",
-                "[WProtoBeforeDeserialization] private void BeforeRead() { damage = -100; } [WProtoAfterDeserialization] private void AfterRead() { if (damage < 0) throw new InvalidOperationException(); } public int Damage"
+                "[WProtoBeforeDeserialization] private void BeforeRead() { _damage = -100; } [WProtoAfterDeserialization] private void AfterRead() { if (_damage < 0) throw new InvalidOperationException(); } public int Damage"
             );
             byte[] upstream = Emit(
                 Generate(
@@ -321,7 +321,7 @@ namespace Consumer {
             }
         }
 
-        [TestCase(1, "damage")]
+        [TestCase(1, "_damage")]
         [TestCase(100, "Melee")]
         public void ConsumerCollisionNamesTheUpstreamOwner(int tag, string owner)
         {

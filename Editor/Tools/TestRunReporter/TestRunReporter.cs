@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Tools
 {
-#if UNITY_EDITOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     /// <summary>
     ///     Starts a test run from a menu item and writes a pollable summary file, for a process
     ///     driving an editor it does not own.
+    ///     Requires the Unity Test Framework package.
     /// </summary>
     internal sealed class TestRunReporter : ICallbacks
     {

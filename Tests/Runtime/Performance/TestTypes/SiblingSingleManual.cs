@@ -8,11 +8,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
     internal sealed class SiblingSingleManual : MonoBehaviour
     {
-        private BoxCollider siblingCollider;
+        private BoxCollider _siblingCollider;
 
         public void Assign()
         {
-            siblingCollider = GetComponent<BoxCollider>();
+            _siblingCollider = GetComponent<BoxCollider>();
         }
     }
 }

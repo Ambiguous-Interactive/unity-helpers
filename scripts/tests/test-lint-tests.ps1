@@ -195,6 +195,33 @@ try {
   Write-TestResult "UNH002.DetectsUntrackedAlloc" $false "Exception: $_"
 }
 
+Write-Host "`n  Section: Unity hidden consumer projects" -ForegroundColor White
+
+$hiddenRoot = Join-Path $tempDir 'hidden-project-controls'
+foreach ($relative in @('Tests/Acceptance~/Assets/UntrackedTest.cs', 'Tests/Nested/Consumer~/Assets/UntrackedTest.cs', 'Tests/Consumer~Visible/UntrackedTest.cs')) {
+  $fixture = Join-Path $hiddenRoot $relative
+  New-Item -ItemType Directory -Path (Split-Path $fixture -Parent) -Force | Out-Null
+  Set-Content -LiteralPath $fixture -Value $unh002Content -NoNewline
+  Push-Location $hiddenRoot
+  try {
+    $output = & $lintScriptPath -Paths $relative *>&1
+    $exitCode = $LASTEXITCODE
+    $hidden = $relative -notlike '*Consumer~Visible*'
+    $passed = if ($hidden) { $exitCode -eq 0 } else { $exitCode -ne 0 -and ($output | Out-String) -match 'UNH002' }
+    Write-TestResult "HiddenProject.Explicit.$relative" $passed "Exit: $exitCode, Output: $($output | Out-String)"
+  } finally {
+    Pop-Location
+  }
+}
+Remove-Item -LiteralPath (Join-Path $hiddenRoot 'Tests/Consumer~Visible') -Recurse -Force
+Push-Location $hiddenRoot
+try {
+  $output = & $lintScriptPath *>&1
+  Write-TestResult 'HiddenProject.Discovery' ($LASTEXITCODE -eq 0) ($output | Out-String)
+} finally {
+  Pop-Location
+}
+
 # ── Test 5: UNH003 detected (missing CommonTestBase) ────────────────────────
 Write-Host "`n  Section: UNH003 detection" -ForegroundColor White
 

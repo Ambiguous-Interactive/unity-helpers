@@ -8,6 +8,10 @@ This is especially useful for CI/CD pipelines where you need a machine-readable 
 
 ## Setup
 
+Install Unity Test Framework (`com.unity.test-framework`) through Package Manager to use the exporter. Without that package, the exporter menus are unavailable and its settings show the dependency requirement. Unity Helpers imports without the test framework; installing it restores the exporter and preserves its saved settings.
+
+Unity detects the installed test framework through the editor assembly’s Version Define. You do not add a scripting symbol. The setting controls callback registration after compilation; switching it off cannot replace missing Test Runner APIs during compilation.
+
 The Failed Tests Exporter is **disabled by default**. To enable it:
 
 1. Open **Project Settings** (`Edit > Project Settings`)

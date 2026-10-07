@@ -42,6 +42,7 @@ on:
           - sentinel
           - intmap
           - serialization
+          - nullableconsumer
           - all
       intmap-diagnostics:
         description: "Capture IntMap slot diagnostics; diagnostic records cannot pass acceptance."
@@ -567,7 +568,8 @@ jobs:
         # version job's editor gate already verifies StandaloneWindowsIl2Cpp.
         if: >-
           ${{ !cancelled() && github.event_name == 'workflow_dispatch'
-          && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.unity_lock.outputs.acquired == 'true' }}
+          && inputs.acceptance != '' && inputs.acceptance != 'none'
+          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') && steps.unity_lock.outputs.acquired == 'true' }}
         continue-on-error: true
         timeout-minutes: 120
         shell: pwsh
@@ -889,7 +891,9 @@ jobs:
 
       - name: Verify additional native acceptance
         id: verify_acceptance
-        if: ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        if: >-
+          ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none'
+          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') }}
         continue-on-error: true
         shell: pwsh
         env:
@@ -908,7 +912,8 @@ jobs:
         if: >-
           ${{ steps.checkout.outcome == 'success' && (always()
           && github.event_name == 'workflow_dispatch'
-          && inputs.acceptance != '' && inputs.acceptance != 'none') }}
+          && inputs.acceptance != '' && inputs.acceptance != 'none'
+          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')) }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -919,7 +924,8 @@ jobs:
         id: upload_acceptance
         if: >-
           ${{ always() && github.event_name == 'workflow_dispatch'
-          && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.redact_acceptance.outcome == 'success' }}
+          && inputs.acceptance != '' && inputs.acceptance != 'none'
+          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') && steps.redact_acceptance.outcome == 'success' }}
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -929,7 +935,9 @@ jobs:
           retention-days: 30
 
       - name: Require requested native acceptance
-        if: ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        if: >-
+          ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none'
+          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') }}
         shell: pwsh
         env:
           ACCEPTANCE_RUN: ${{ steps.run_acceptance.outcome }}

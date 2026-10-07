@@ -9,11 +9,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
     internal sealed class ChildListManual : MonoBehaviour
     {
-        private readonly List<BoxCollider> childColliders = new();
+        private readonly List<BoxCollider> _childColliders = new();
 
         public void Assign()
         {
-            GetComponentsInChildren(childColliders);
+            GetComponentsInChildren(_childColliders);
         }
     }
 }

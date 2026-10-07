@@ -13,13 +13,13 @@ namespace Samples.UnityHelpers.Relational.Basic
     public sealed class RelationalBasicConsumer : MonoBehaviour
     {
         [SiblingComponent]
-        private Transform siblingTransform;
+        private Transform _siblingTransform;
 
         [ChildComponent]
-        private Collider childCollider;
+        private Collider _childCollider;
 
         [ParentComponent(OnlyAncestors = true, MaxDepth = 1)]
-        private Transform directParent;
+        private Transform _directParent;
 
         private void Awake()
         {
@@ -28,9 +28,9 @@ namespace Samples.UnityHelpers.Relational.Basic
 
         private void Start()
         {
-            string parentName = directParent != null ? directParent.name : "<none>";
-            string siblingName = siblingTransform != null ? siblingTransform.name : "<none>";
-            string childName = childCollider != null ? childCollider.name : "<none>";
+            string parentName = _directParent != null ? _directParent.name : "<none>";
+            string siblingName = _siblingTransform != null ? _siblingTransform.name : "<none>";
+            string childName = _childCollider != null ? _childCollider.name : "<none>";
             Debug.Log(
                 $"Relational assigned → parent={parentName}, sibling={siblingName}, child={childName}",
                 this

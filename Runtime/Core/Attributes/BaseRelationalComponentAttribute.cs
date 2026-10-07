@@ -877,9 +877,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         internal readonly struct FieldMetadata<TAttribute>
             where TAttribute : BaseRelationalComponentAttribute
         {
-            public bool HasFilters => filters.RequiresPostProcessing;
+            public bool HasFilters => _filters.RequiresPostProcessing;
 
-            public FilterParameters Filters => filters;
+            public FilterParameters Filters => _filters;
 
             public readonly FieldInfo field;
             public readonly TAttribute attribute;
@@ -891,8 +891,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             public readonly Action<object, object> hashSetAdder;
             public readonly Action<object> hashSetClearer;
             public readonly bool isInterface;
-            private readonly FieldAccessor accessor;
-            private readonly FilterParameters filters;
+            private readonly FieldAccessor _accessor;
+            private readonly FilterParameters _filters;
 
             public FieldMetadata(
                 FieldInfo field,
@@ -911,8 +911,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             {
                 this.field = field;
                 this.attribute = attribute;
-                this.accessor = accessor ?? FieldAccessor.Null;
-                this.filters = filters;
+                _accessor = accessor ?? FieldAccessor.Null;
+                _filters = filters;
                 this.kind = kind;
                 this.elementType = elementType;
                 this.arrayCreator = arrayCreator;
@@ -926,13 +926,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public object GetValue(Component component)
             {
-                return accessor.Get(component);
+                return _accessor.Get(component);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void SetValue(Component component, object value)
             {
-                accessor.Set(component, value);
+                _accessor.Set(component, value);
             }
         }
 
@@ -957,13 +957,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         private sealed class FieldAccessor<TComponent, TValue> : FieldAccessor
             where TComponent : Component
         {
-            private readonly FieldSetter<TComponent, TValue> setter;
-            private readonly Func<TComponent, TValue> getter;
+            private readonly FieldSetter<TComponent, TValue> _setter;
+            private readonly Func<TComponent, TValue> _getter;
 
             public FieldAccessor(FieldInfo field)
             {
-                setter = ReflectionHelpers.GetFieldSetter<TComponent, TValue>(field);
-                getter = ReflectionHelpers.GetFieldGetter<TComponent, TValue>(field);
+                _setter = ReflectionHelpers.GetFieldSetter<TComponent, TValue>(field);
+                _getter = ReflectionHelpers.GetFieldGetter<TComponent, TValue>(field);
             }
 
             public override object Get(Component component)
@@ -974,7 +974,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
 
                 TComponent typedComponent = (TComponent)component;
-                return getter(typedComponent);
+                return _getter(typedComponent);
             }
 
             public override void Set(Component component, object value)
@@ -986,7 +986,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
                 TComponent typedComponent = (TComponent)component;
                 TValue typedValue = value != null ? (TValue)value : default;
-                setter(ref typedComponent, typedValue);
+                _setter(ref typedComponent, typedValue);
             }
         }
     }

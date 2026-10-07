@@ -9,9 +9,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using System.IO;
     using System.Reflection;
     using NUnit.Framework;
+    using ProtoBuf;
     using ProtoBuf.Meta;
     using ProtoBuf.Serializers;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Utils;
 
     [TestFixture]
     [Category("Fast")]
@@ -73,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             MetaType metadata = model.Add(collectionType, true);
             ValueMember[] members = metadata.GetFields();
             TestContext.WriteLine(
-                $"Contract={collectionType}; Members={members.Length}; Before={metadata.Callbacks.BeforeSerialize != null}; After={metadata.Callbacks.AfterSerialize != null}"
+                $"Contract={collectionType}; Members={members.Length}; Before={metadata.Callbacks.BeforeSerialize != null}; After={metadata.Callbacks.AfterSerialize != null}; Deserialized={metadata.Callbacks.AfterDeserialize != null}"
             );
             bool itemMemberFound = false;
             foreach (ValueMember member in members)
@@ -86,7 +88,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
             Assert.AreEqual(memberCount, members.Length);
             Assert.IsTrue(metadata.Callbacks.BeforeSerialize != null);
-            Assert.IsTrue(metadata.Callbacks.AfterSerialize != null);
+            Assert.IsTrue(
+                metadata.Callbacks.AfterSerialize == null,
+                "Serialization cleanup belongs to the write scope."
+            );
+            Assert.IsTrue(metadata.Callbacks.AfterDeserialize != null);
             Assert.IsTrue(itemMemberFound);
         }
 
@@ -99,11 +105,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             object value = cyclic
                 ? new CyclicBuffer<int>(2, new[] { 42 })
                 : new Deque<int>(new[] { 42 });
+            Assert.IsTrue(value is ISerializationWriteScope);
             byte[] expected = cyclic
                 ? new byte[] { 8, 2, 16, 1, 24, 42, 32, 1 }
                 : new byte[] { 8, 42, 24, 1, 32, 1, 40, 16 };
             using MemoryStream destination = new();
+            PoolStatistics before = Buffers<int>.List.GetStatistics();
             model.Serialize(destination, value);
+            PoolStatistics after = Buffers<int>.List.GetStatistics();
+            Assert.AreEqual(1, after.RentCount - before.RentCount);
+            Assert.AreEqual(1, after.ReturnCount - before.ReturnCount);
             byte[] bytes = destination.ToArray();
             TestContext.WriteLine(
                 $"Contract={value.GetType()}; Bytes={BitConverter.ToString(bytes)}"

@@ -718,6 +718,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #endif
     [WProtoContract]
     internal sealed partial class SerializableDictionaryProtoWrapper<TKey, TValue>
+        : INullableCollectionWrapper
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
@@ -730,6 +731,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #endif
         [WProtoMember(2, OverwriteList = true)]
         public TValue[] Values;
+
+#if !WALLSTOP_PROTO_ONLY
+        [ProtoMember(3, OverwriteList = true)]
+#endif
+        [WProtoMember(3, OverwriteList = true)]
+        public byte[] NullableValuePresence;
+
+        void INullableCollectionWrapper.PrepareNullableItems()
+        {
+            NullableCollectionPresence<TValue>.Prepare(
+                Keys?.Length ?? 0,
+                ref Values,
+                ref NullableValuePresence
+            );
+        }
+
+        bool INullableCollectionWrapper.TryRestoreNullableItems()
+        {
+            return NullableCollectionPresence<TValue>.TryRestore(
+                Keys?.Length ?? 0,
+                ref Values,
+                NullableValuePresence
+            );
+        }
     }
 
     /// <summary>
@@ -740,6 +765,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #endif
     [WProtoContract]
     internal sealed partial class SerializableSortedDictionaryProtoWrapper<TKey, TValue>
+        : INullableCollectionWrapper
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1, OverwriteList = true)]
@@ -752,6 +778,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #endif
         [WProtoMember(2, OverwriteList = true)]
         public TValue[] Values;
+
+#if !WALLSTOP_PROTO_ONLY
+        [ProtoMember(3, OverwriteList = true)]
+#endif
+        [WProtoMember(3, OverwriteList = true)]
+        public byte[] NullableValuePresence;
+
+        void INullableCollectionWrapper.PrepareNullableItems()
+        {
+            NullableCollectionPresence<TValue>.Prepare(
+                Keys?.Length ?? 0,
+                ref Values,
+                ref NullableValuePresence
+            );
+        }
+
+        bool INullableCollectionWrapper.TryRestoreNullableItems()
+        {
+            return NullableCollectionPresence<TValue>.TryRestore(
+                Keys?.Length ?? 0,
+                ref Values,
+                NullableValuePresence
+            );
+        }
     }
 
     // Plain wrappers avoid building the original collection models through unsupported AOT reflection.

@@ -21,28 +21,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
     [NUnit.Framework.Category("Fast")]
     public sealed class RelationalComponentsZenjectTests : CommonTestBase
     {
-        private DiContainer Container;
+        private DiContainer _container;
 
         [SetUp]
         public override void BaseSetUp()
         {
             base.BaseSetUp();
             ReflexTestSupport.EnsureReflexSettings();
-            Container = new DiContainer();
+            _container = new DiContainer();
         }
 
         [Test]
         public void ContainerConstructsAssignerSingleton()
         {
             AttributeMetadataCache cache = CreateCacheFor(typeof(ZenjectRelationalTester));
-            Container.BindInstance(cache);
-            Container
+            _container.BindInstance(cache);
+            _container
                 .Bind<IRelationalComponentAssigner>()
                 .To<RelationalComponentAssigner>()
                 .AsSingle();
 
-            IRelationalComponentAssigner first = Container.Resolve<IRelationalComponentAssigner>();
-            IRelationalComponentAssigner second = Container.Resolve<IRelationalComponentAssigner>();
+            IRelationalComponentAssigner first = _container.Resolve<IRelationalComponentAssigner>();
+            IRelationalComponentAssigner second =
+                _container.Resolve<IRelationalComponentAssigner>();
             Assert.That(first, Is.TypeOf<RelationalComponentAssigner>());
             Assert.That(second, Is.SameAs(first));
 
@@ -56,11 +57,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         public void ContainerExtensionsUseBoundAssigner()
         {
             RecordingAssigner assigner = new();
-            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            _container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
 
             ZenjectRelationalTester tester = CreateHierarchy();
 
-            Container.AssignRelationalComponents(tester);
+            _container.AssignRelationalComponents(tester);
 
             Assert.That(
                 assigner.CallCount,
@@ -87,7 +88,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         {
             ZenjectRelationalTester tester = CreateHierarchy();
 
-            Container.AssignRelationalComponents(tester);
+            _container.AssignRelationalComponents(tester);
 
             Assert.IsTrue(
                 tester.parentBody != null,
@@ -103,11 +104,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         public System.Collections.IEnumerator SceneInitializerAssignsActiveSceneComponents()
         {
             AttributeMetadataCache cache = CreateCacheFor(typeof(ZenjectRelationalTester));
-            Container.BindInstance(cache);
+            _container.BindInstance(cache);
             RecordingAssigner assigner = new();
-            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
-            Container.BindInstance(RelationalSceneAssignmentOptions.Default);
-            Container.BindInterfacesTo<RelationalComponentSceneInitializer>().AsSingle();
+            _container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            _container.BindInstance(RelationalSceneAssignmentOptions.Default);
+            _container.BindInterfacesTo<RelationalComponentSceneInitializer>().AsSingle();
 
             Scene scene = CreateTempScene("ZenjectTestScene_Active");
             ZenjectRelationalTester tester = CreateHierarchy();
@@ -115,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
             SceneManager.MoveGameObjectToScene(root, scene);
             yield return null;
 
-            IInitializable initializer = Container.Resolve<IInitializable>();
+            IInitializable initializer = _container.Resolve<IInitializable>();
             initializer.Initialize();
             yield return null;
 
@@ -135,11 +136,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         public System.Collections.IEnumerator SceneInitializerSkipsInactiveWhenOptionDisabled()
         {
             AttributeMetadataCache cache = CreateCacheFor(typeof(ZenjectRelationalTester));
-            Container.BindInstance(cache);
+            _container.BindInstance(cache);
             RecordingAssigner assigner = new();
-            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
-            Container.BindInstance(new RelationalSceneAssignmentOptions(false));
-            Container.BindInterfacesTo<RelationalComponentSceneInitializer>().AsSingle();
+            _container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            _container.BindInstance(new RelationalSceneAssignmentOptions(false));
+            _container.BindInterfacesTo<RelationalComponentSceneInitializer>().AsSingle();
 
             Scene scene = CreateTempScene("ZenjectTestScene_InactiveFalse");
             ZenjectRelationalTester tester = CreateHierarchy();
@@ -148,7 +149,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
             SceneManager.MoveGameObjectToScene(root, scene);
             yield return null;
 
-            IInitializable initializer = Container.Resolve<IInitializable>();
+            IInitializable initializer = _container.Resolve<IInitializable>();
             initializer.Initialize();
             yield return null;
 
@@ -163,11 +164,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         public System.Collections.IEnumerator SceneInitializerIncludesInactiveWhenOptionEnabled()
         {
             AttributeMetadataCache cache = CreateCacheFor(typeof(ZenjectRelationalTester));
-            Container.BindInstance(cache);
+            _container.BindInstance(cache);
             RecordingAssigner assigner = new();
-            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
-            Container.BindInstance(new RelationalSceneAssignmentOptions(true));
-            Container.BindInterfacesTo<RelationalComponentSceneInitializer>().AsSingle();
+            _container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            _container.BindInstance(new RelationalSceneAssignmentOptions(true));
+            _container.BindInterfacesTo<RelationalComponentSceneInitializer>().AsSingle();
 
             Scene scene = CreateTempScene("ZenjectTestScene_InactiveTrue");
             ZenjectRelationalTester tester = CreateHierarchy();
@@ -176,7 +177,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
             SceneManager.MoveGameObjectToScene(root, scene);
             yield return null;
 
-            IInitializable initializer = Container.Resolve<IInitializable>();
+            IInitializable initializer = _container.Resolve<IInitializable>();
             initializer.Initialize();
             yield return null;
 
@@ -196,20 +197,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         public System.Collections.IEnumerator SceneInitializerUsesMultiPassWhenConfigured()
         {
             AttributeMetadataCache cache = CreateCacheFor(typeof(ZenjectRelationalTester));
-            Container.BindInstance(cache);
+            _container.BindInstance(cache);
             RecordingAssigner assigner = new();
-            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
-            Container.BindInstance(
+            _container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            _container.BindInstance(
                 new RelationalSceneAssignmentOptions(true, useSinglePassScan: false)
             );
-            Container.BindInterfacesTo<RelationalComponentSceneInitializer>().AsSingle();
+            _container.BindInterfacesTo<RelationalComponentSceneInitializer>().AsSingle();
 
             Scene scene = CreateTempScene("ZenjectMultiPassScene");
             ZenjectRelationalTester tester = CreateHierarchy();
             SceneManager.MoveGameObjectToScene(tester.transform.root.gameObject, scene);
             yield return null;
 
-            IInitializable initializer = Container.Resolve<IInitializable>();
+            IInitializable initializer = _container.Resolve<IInitializable>();
             initializer.Initialize();
             yield return null;
 
@@ -234,11 +235,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
                 includeInactive: true,
                 useSinglePassScan: true
             );
-            Container.BindInstance(cache);
-            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
-            Container.BindInstance(options);
-            Container.BindInterfacesAndSelfTo<RelationalSceneLoadListener>().AsSingle();
-            RelationalSceneLoadListener listener = Container.Resolve<RelationalSceneLoadListener>();
+            _container.BindInstance(cache);
+            _container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            _container.BindInstance(options);
+            _container.BindInterfacesAndSelfTo<RelationalSceneLoadListener>().AsSingle();
+            RelationalSceneLoadListener listener =
+                _container.Resolve<RelationalSceneLoadListener>();
             listener.Initialize();
             TrackDisposable(listener);
 
@@ -272,11 +274,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
                 includeInactive: true,
                 useSinglePassScan: false
             );
-            Container.BindInstance(cache);
-            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
-            Container.BindInstance(options);
-            Container.BindInterfacesAndSelfTo<RelationalSceneLoadListener>().AsSingle();
-            RelationalSceneLoadListener listener = Container.Resolve<RelationalSceneLoadListener>();
+            _container.BindInstance(cache);
+            _container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            _container.BindInstance(options);
+            _container.BindInterfacesAndSelfTo<RelationalSceneLoadListener>().AsSingle();
+            RelationalSceneLoadListener listener =
+                _container.Resolve<RelationalSceneLoadListener>();
             listener.Initialize();
             TrackDisposable(listener);
 
@@ -305,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         public void ContainerAssignRelationalHierarchyAssignsFields()
         {
             ZenjectRelationalTester tester = CreateHierarchy();
-            Container.AssignRelationalHierarchy(tester.gameObject, includeInactiveChildren: false);
+            _container.AssignRelationalHierarchy(tester.gameObject, includeInactiveChildren: false);
             Assert.IsTrue(
                 tester.parentBody != null,
                 "AssignRelationalHierarchy should assign parentBody"
@@ -321,10 +324,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         {
             AttributeMetadataCache cache = CreateCacheFor(typeof(ZenjectRelationalTester));
             RecordingAssigner assigner = new();
-            Container.BindInstance(cache);
-            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
-            Container.BindInstance(new RelationalSceneAssignmentOptions(true));
-            Container.BindInterfacesTo<RelationalComponentSceneInitializer>().AsSingle();
+            _container.BindInstance(cache);
+            _container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            _container.BindInstance(new RelationalSceneAssignmentOptions(true));
+            _container.BindInterfacesTo<RelationalComponentSceneInitializer>().AsSingle();
 
             Scene active = CreateTempScene("ZenjectActiveScene_Sep");
             ZenjectRelationalTester testerA = CreateHierarchy();
@@ -335,7 +338,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
             SceneManager.MoveGameObjectToScene(testerB.transform.root.gameObject, secondary);
             yield return null;
 
-            IInitializable initializer = Container.Resolve<IInitializable>();
+            IInitializable initializer = _container.Resolve<IInitializable>();
             initializer.Initialize();
             yield return null;
 
@@ -366,7 +369,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
 
             subTesterGO.SetActive(false);
 
-            Container.AssignRelationalHierarchy(
+            _container.AssignRelationalHierarchy(
                 rootTester.gameObject,
                 includeInactiveChildren: false
             );
@@ -387,7 +390,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
                 "Inactive sub tester should be skipped when includeInactiveChildren is false"
             );
 
-            Container.AssignRelationalHierarchy(
+            _container.AssignRelationalHierarchy(
                 rootTester.gameObject,
                 includeInactiveChildren: true
             );
@@ -405,9 +408,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         public void ContainerAssignRelationalHierarchyUsesBoundAssigner()
         {
             RecordingAssigner assigner = new();
-            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            _container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
             ZenjectRelationalTester tester = CreateHierarchy();
-            Container.AssignRelationalHierarchy(tester.gameObject, includeInactiveChildren: true);
+            _container.AssignRelationalHierarchy(tester.gameObject, includeInactiveChildren: true);
             Assert.That(
                 assigner.HierarchyCallCount,
                 Is.EqualTo(1),
@@ -419,14 +422,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         public void InstantiateWithRelationsAssignsWhenAssignerBound()
         {
             RecordingAssigner assigner = new();
-            Container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
+            _container.Bind<IRelationalComponentAssigner>().FromInstance(assigner);
 
             ZenjectRelationalTester prefab = CreatePrefabTesterHierarchy(rootHasRigidbody: false);
 
             GameObject overrideParent = Track(new GameObject("ZenjectOverrideParent_Bound"));
             overrideParent.AddComponent<Rigidbody>();
 
-            ZenjectRelationalTester instance = Container.InstantiateComponentWithRelations(
+            ZenjectRelationalTester instance = _container.InstantiateComponentWithRelations(
                 prefab,
                 overrideParent.transform
             );
@@ -460,7 +463,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
             GameObject overrideParent = Track(new GameObject("ZenjectOverrideParent_NoAssigner"));
             overrideParent.AddComponent<Rigidbody>();
 
-            ZenjectRelationalTester instance = Container.InstantiateComponentWithRelations(
+            ZenjectRelationalTester instance = _container.InstantiateComponentWithRelations(
                 prefab,
                 overrideParent.transform
             );
@@ -484,7 +487,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
             GameObject overrideParent = Track(new GameObject("ZenjectOverrideParent"));
             overrideParent.AddComponent<Rigidbody>();
 
-            ZenjectRelationalTester instance = Container.InstantiateComponentWithRelations(
+            ZenjectRelationalTester instance = _container.InstantiateComponentWithRelations(
                 prefab,
                 overrideParent.transform
             );
@@ -504,7 +507,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         public void InstantiateWithRelationsThrowsOnNullPrefab()
         {
             Assert.That(
-                () => Container.InstantiateComponentWithRelations<ZenjectRelationalTester>(null),
+                () => _container.InstantiateComponentWithRelations<ZenjectRelationalTester>(null),
                 Throws.ArgumentNullException
             );
         }

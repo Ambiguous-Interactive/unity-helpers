@@ -8,11 +8,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
     internal sealed class ParentSingleManual : MonoBehaviour
     {
-        private BoxCollider parentCollider;
+        private BoxCollider _parentCollider;
 
         public void Assign()
         {
-            parentCollider = GetComponentInParent<BoxCollider>();
+            _parentCollider = GetComponentInParent<BoxCollider>();
         }
     }
 }

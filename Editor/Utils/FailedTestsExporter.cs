@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Utils
 {
-#if UNITY_EDITOR
+#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK
     using System;
     using System.Collections.Generic;
     using System.Globalization;
@@ -19,6 +19,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     /// <summary>
     ///     Hooks into the Unity Test Runner API to capture failed tests and export
     ///     their details to a timestamped text file in the project root.
+    ///     Requires the Unity Test Framework package.
     /// </summary>
     /// <remarks>
     ///     Registration is gated by <see cref="UnityHelpersSettings"/> via the

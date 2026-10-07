@@ -214,6 +214,47 @@ test("BenchmarkAssembliesRunInPlaymode", () => {
   }
 });
 
+// Use an owned test assembly name so owner filtering cannot conceal a broken walk.
+for (const [relativeDirectory, imported] of [
+  ["Hidden~", false],
+  ["Visible/DeepHidden~/Nested", false],
+  ["Visible~Archive", true],
+  ["Visible", true],
+  [".Hidden", false],
+  ["CVS", false],
+  ["Visible.tmp", true]
+]) {
+  test(`ImportedPath.${relativeDirectory}.Discovered${imported}`, () => {
+    const root = fixture([]);
+    const directory = path.join(root, "Tests", relativeDirectory);
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(
+      path.join(directory, `${EDITOR_ONLY}.asmdef`),
+      JSON.stringify({
+        name: EDITOR_ONLY,
+        includePlatforms: ["Editor"],
+        references: ["UnityEngine.TestRunner"]
+      })
+    );
+    assert.deepStrictEqual(
+      discovery.defaultIncludeAssemblies(root, { target: "editmode" }),
+      imported ? [EDITOR_ONLY] : []
+    );
+  });
+}
+test("ImportedPath.HiddenAsmdefFileIsExcluded", () => {
+  const root = fixture([]);
+  fs.writeFileSync(
+    path.join(root, "Tests", ".Hidden.asmdef"),
+    JSON.stringify({
+      name: EDITOR_ONLY,
+      includePlatforms: ["Editor"],
+      references: ["UnityEngine.TestRunner"]
+    })
+  );
+  assert.deepStrictEqual(discovery.defaultIncludeAssemblies(root, { target: "editmode" }), []);
+});
+
 for (const root of fixtureRoots) {
   fs.rmSync(root, { recursive: true, force: true });
 }

@@ -479,6 +479,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             LogAssert.NoUnexpectedReceived();
         }
 
+        [Test]
+        public void RenamedPendingActionLimitReadsLegacyUnityJson()
+        {
+            UnityMainThreadDispatcher dispatcher = UnityMainThreadDispatcher.Instance;
+            dispatcher.PendingActionLimit = 1;
+            JsonUtility.FromJsonOverwrite("{\"maxPendingActions\":37}", dispatcher);
+            Assert.That(dispatcher.PendingActionLimit, Is.EqualTo(37));
+        }
+
         [UnityTest]
         public IEnumerator QueueOverflowDropsExcessActions()
         {

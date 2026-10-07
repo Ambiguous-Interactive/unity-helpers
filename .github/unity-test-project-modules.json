@@ -29,5 +29,12 @@
     "com.unity.modules.ui": "Transitive base of com.unity.ugui (UnityEngine.UIModule: Canvas/CanvasRenderer); declared explicitly for the test project.",
     "com.unity.modules.uielements": "Runtime/Visuals/UIToolkit/MultiFileSelectorElement.cs (VisualElement, ListView)",
     "com.unity.ugui": "Runtime/Visuals/UGUI/EnhancedImage.cs, Runtime/Core/Serialization/JsonConverters/ColorBlockConverter.cs (UnityEngine.UI: Image, ColorBlock)"
-  }
+  },
+  "nullableConsumerDependencies": {
+    "2021.3.45f1": {
+      "com.unity.toolchain.win-x86_64-linux-x86_64": "2.0.11"
+    },
+    "6000.6.0f1": {}
+  },
+  "_note_nullableConsumerDependencies": "Independent nullable-consumer projects author these exact per-version dependencies before Unity preparation. The floor toolchain pin reproduces the dependency Unity 2021.3.45f1 otherwise adds during preparation; it does not change the normal test-project modules or claim that this toolchain executes the Windows converter."
 }

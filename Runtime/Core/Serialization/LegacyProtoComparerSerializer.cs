@@ -49,7 +49,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 writer.SerializeRoot(
                     value,
-                    MapSerializer.CreateDictionary<TCollection, TKey, TValue>()
+                    RuntimeTypeModel.Default.AdaptDictionarySerializerForRuntimeEnums(
+                        MapSerializer.CreateDictionary<TCollection, TKey, TValue>()
+                    )
                 );
                 writer.Close();
             }

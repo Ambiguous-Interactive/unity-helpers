@@ -69,6 +69,19 @@ can modify uncommitted span memory; a writer that fails while advancing controls
 The package cannot roll back arbitrary external writers. WProto-only proto equality and hashing
 use pooled writers rather than the reflection backend.
 
+### Collection serialization cleanup
+
+The bundled protobuf-net serializers return `Deque<T>` and `CyclicBuffer<T>` scratch
+buffers when a write succeeds or throws, including direct protobuf-net calls and legacy
+facade fallback. Nested serialization of the same instance restores the outer write
+scratch state. Consumer callbacks retain protobuf-net's original success and exception behavior;
+cleanup does not turn a failed write into an after-serialization callback. Field numbers,
+item order, and serialized bytes remain unchanged.
+
+These collections are not thread safe, and serialization does not provide an immutable
+snapshot against consumer mutations. The ownership scope does not remove protobuf-net's
+existing standalone `Compile()` restrictions on private fields and callbacks.
+
 ### Protobuf equality and hashing
 
 Default-mode `ProtoEquals` and `GetProtoComparer<T>()` retain protobuf-net's direct encoding.
@@ -86,7 +99,7 @@ setter inspection; ordinary tuples and index-free init-only contracts keep their
 classification. Init-only setter inspection still uses the original custom-modifier API.
 Nested dictionary fields use the existing typed map serializer and the active model's key/value
 policies without a reflected generic map-decorator constructor. Compiled models retain the
-original typed emitter. Map encoding and default-value policy remain unchanged. Runtime repeated
+original typed emitter. Nonnullable map encoding and default omission remain unchanged; nullable map defaults retain explicit presence. Runtime repeated
 providers use typed registrations for intrinsic scalar lists and arrays, while owned generic set,
 deque and cyclic-buffer static constructors register their actual serializers before metadata
 lookup or explicit model registration. The opted-in base collection is initialized without
@@ -94,10 +107,26 @@ running an unrelated consumer subclass initializer. The cache checks the
 original provider identity and directly constructs the original repeated decorator, preserving
 custom-provider precedence and compiled models.
 Registration supplies a direct item-contract serializer factory with separate member state
-for each model. Item reflection metadata must still be preserved, and inheritance and other
+for each model. Ordinary unregistered runtime contracts use a nongeneric metadata node and
+typed service bridge, retaining their declared type, callbacks, factories and boxed-value copy
+behavior. This removes a reflected generic contract constructor; it does not supply every
+missing generic map, enum or external serializer method. Item reflection metadata must still be preserved, and inheritance and other
 consumer collection contracts still require their own AOT qualification. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)
 include the exact patch and binary hashes. Qualify each binary change in a fresh Unity 2021.3
 stripped player; success with another binary or a newer editor does not prove compatibility.
+Runtime map slots and surrogate nodes retain the active model's actual services, wire policies,
+merge behavior and conversion failures. Owned plain and sorted dictionary wrappers register
+typed codecs before their first read, validate nullable presence data against parallel arrays before owner construction, and
+retain their existing protobuf fields and nullable presence data. Runtime enum map decorators
+reuse the original serializer by reference identity and resolve services for each operation.
+
+The generator emits startup factories for accessible closed external serializer providers,
+including assemblies that declare providers without generated contracts. Existing
+`MetaType.SerializerType` registrations continue to select the same services; a proxy's actual
+nullable service takes precedence. Registration does not construct providers. Access before
+generated startup and inaccessible or runtime-only providers still need separate qualification.
+The managed provider checks do not establish stripped-player support for arbitrary consumer types.
+
 The root save wrappers described below remain a separate path: comparer hashes are not hashes
 of `Serializer.ProtoSerialize` output. WProto-only builds use generated root encoding instead,
 so hashes are not portable between backend modes.
@@ -111,6 +140,42 @@ For consumer dictionary subclasses, declare `[ProtoContract]` on the concrete ty
 speculative tuple detection; protobuf-net does not inherit this contract metadata from the base.
 This metadata alone does not establish stripped IL2CPP compatibility.
 Use the existing save API for retained data rather than persisting comparer hashes.
+
+### Nullable map presence
+
+Legacy protobuf map writes distinguish a missing key, a null value, a present default value,
+and a nondefault value. Nullable primitive, enum and contract values keep their presence;
+nullable keys keep a present default key where the dictionary type permits it. The owned
+sorted dictionaries retain their `IComparable<TKey>` constraint, which excludes nullable keys.
+Consumer-supplied nullable serializers retain precedence over underlying-value serializers.
+
+Present nullable defaults require a value field. For a root `Dictionary<int, int?>` containing
+key `3` with value `0`, the new bytes are `0A 04 08 03 10 00`; a null value retains
+`0A 02 08 03`. A present default contract struct uses an empty message, such as
+`0A 04 08 03 12 00`. Field numbers, nonnullable default omission and explicitly wrapped
+reference encodings keep their existing behavior.
+
+Public root calls for `SerializableDictionary<TKey, TValue>` and
+`SerializableSortedDictionary<TKey, TValue>` use parallel-array wrappers. Null-free values
+retain their existing wrapper bytes. When nullable values contain null slots, field 1 keeps
+the keys, field 2 contains only present values, and field 3 carries one presence bit per key.
+For keys `2, 3, 4` with values `null, 0, 7`, the legacy wrapper bytes are
+`08 02 08 03 08 04 10 00 10 07 1A 01 06`. Reads validate the bitmap and dense values before
+restoring their alignment. If field 3 repeats, its final occurrence supplies the bitmap.
+The internal presence codec accepts ordered indexed collections, including lists and read-only
+lists, and shares its bitmap algorithm with a thin array adapter used by these wrappers. A valid
+delivered slot count is required before reconstruction; unchanged collections need no replacement
+array. This reuse does not add a new list or set wire format.
+Existing wrapper payloads remain readable. Older package versions
+cannot read the new null-containing wrapper encoding correctly; upgrade every reader before
+writing those payloads.
+
+Older writers could omit both null and present-default values. Such payloads still decode
+the omitted nullable field as null; the missing presence cannot be reconstructed. New writes
+preserve the distinction, so legacy comparer hashes for nullable maps can change. Use the save
+API for retained data rather than persisting comparer hashes. Generated nullable collection
+support remains separate from this legacy fix. Fresh stripped-player qualification remains tracked in
+[#953](https://github.com/Ambiguous-Interactive/unity-helpers/issues/953).
 
 ### Protobuf (protobuf-net)
 

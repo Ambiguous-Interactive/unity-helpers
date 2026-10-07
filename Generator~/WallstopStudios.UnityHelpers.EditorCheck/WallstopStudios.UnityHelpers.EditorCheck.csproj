@@ -178,6 +178,9 @@
       without these symbols would compile a configuration nobody runs.
     -->
     <UnityVersionDefines>UNITY_2021;UNITY_2021_3;UNITY_2021_3_OR_NEWER;UNITY_2021_2_OR_NEWER;UNITY_2021_1_OR_NEWER;UNITY_2020_3_OR_NEWER;UNITY_2020_2_OR_NEWER;UNITY_2020_1_OR_NEWER;UNITY_2019_4_OR_NEWER;UNITY_2019_1_OR_NEWER;UNITY_2018_1_OR_NEWER;UNITY_5_3_OR_NEWER</UnityVersionDefines>
+    <WallstopTestFramework Condition="'$(WallstopTestFramework)' == ''">true</WallstopTestFramework>
+    <DefineConstants Condition="'$(WallstopTestFramework)' == 'true'"
+      >$(DefineConstants);WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK</DefineConstants>
     <DefineConstants>$(DefineConstants);UNITY_EDITOR;$(UnityVersionDefines)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
@@ -246,7 +249,11 @@
     />
     <!-- The editor-only gaps: UI Toolkit drag events, the Test Runner API, the prefab-stage types
          that moved namespace in 2021.2, and the ValidationShared stand-in. -->
-    <Compile Include="Shims/*.cs" />
+    <Compile Include="Shims/*.cs" Exclude="Shims/TestRunnerApiShim.cs" />
+    <Compile
+      Include="Shims/TestRunnerApiShim.cs"
+      Condition="'$(WallstopTestFramework)' == 'true'"
+    />
     <!-- Inert without the define, so it is included only where it is meaningful. -->
     <Compile Include="ShimsOdin/*.cs" Condition="'$(WallstopOdin)' == 'true'" />
     <!-- The runtime is compiled as the editor assembly's dependency, with TypeCheck's exclusions.

@@ -54,6 +54,15 @@ function walkFiles(dir, options) {
       return;
     }
     for (const dirent of entries) {
+      // Unity ignores names beginning with a dot, ending in a tilde, or named CVS.
+      // Apply this before descending so ignored trees contribute no asmdefs.
+      if (
+        dirent.name.startsWith(".") ||
+        dirent.name.endsWith("~") ||
+        dirent.name.toLowerCase() === "cvs"
+      ) {
+        continue;
+      }
       const full = path.join(current, dirent.name);
       if (dirent.isDirectory()) {
         recurse(full);

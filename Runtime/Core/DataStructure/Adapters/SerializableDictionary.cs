@@ -116,9 +116,23 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </summary>
         internal abstract void EditorSyncSerializedArrays();
 
+#if !WALLSTOP_PROTO_ONLY
+        [ProtoBuf.Serializers.TypedRepeatedProvider]
+#endif
         protected internal class Dictionary<TKey, TValue>
             : System.Collections.Generic.Dictionary<TKey, TValue>
         {
+#if !WALLSTOP_PROTO_ONLY
+            static Dictionary()
+            {
+                ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer<
+                    Dictionary<TKey, TValue>,
+                    TKey,
+                    TValue
+                >(() => new Dictionary<TKey, TValue>());
+            }
+#endif
+
             /// <summary>
             /// Creates an empty runtime dictionary that uses the default equality comparer.
             /// </summary>
@@ -1676,6 +1690,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
 #if !WALLSTOP_PROTO_ONLY
     [ProtoBuf.ProtoContract]
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
 #endif
     public class SerializableDictionary<TKey, TValue>
         : SerializableDictionaryBase<TKey, TValue, TValue>
@@ -1684,6 +1699,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             ILegacyProtobufMap
 #endif
     {
+#if !WALLSTOP_PROTO_ONLY
+        static SerializableDictionary()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterCollectionWrapperSerializer(
+                new SerializableDictionaryCollectionWrapper<TKey, TValue>()
+            );
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer<
+                SerializableDictionary<TKey, TValue>,
+                TKey,
+                TValue
+            >(() => new SerializableDictionary<TKey, TValue>());
+        }
+#endif
+
         /// <summary>
         /// Initializes an empty serializable dictionary whose values can be written directly to Unity serialization.
         /// </summary>
@@ -1795,6 +1824,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
 #if !WALLSTOP_PROTO_ONLY
     [ProtoBuf.ProtoContract]
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
 #endif
     public class SerializableDictionary<TKey, TValue, TValueCache>
         : SerializableDictionaryBase<TKey, TValue, TValueCache>
@@ -1804,6 +1834,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 #endif
         where TValueCache : SerializableDictionary.Cache<TValue>, new()
     {
+#if !WALLSTOP_PROTO_ONLY
+        static SerializableDictionary()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer<
+                SerializableDictionary<TKey, TValue, TValueCache>,
+                TKey,
+                TValue
+            >(() => new SerializableDictionary<TKey, TValue, TValueCache>());
+        }
+#endif
+
         /// <summary>
         /// Initializes an empty serializable dictionary whose values are stored in cache objects.
         /// </summary>

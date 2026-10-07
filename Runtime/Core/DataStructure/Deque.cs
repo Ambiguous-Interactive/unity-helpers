@@ -20,6 +20,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// Supports efficient O(1) insertion and removal from both front and back.
     /// Ideal for BFS algorithms, undo/redo systems, and sliding window problems.
     /// </summary>
+    /// <remarks>
+    /// Protobuf writes release pooled scratch state on success or failure and preserve outer scratch state during nested writes.
+    /// </remarks>
     /// <example>
     /// <code><![CDATA[
     /// Deque<Vector3> patrolPoints = new Deque<Vector3>();
@@ -40,6 +43,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [ProtoBuf.Serializers.TypedRepeatedProvider]
 #endif
     public sealed class Deque<T> : IReadOnlyList<T>
+#if !WALLSTOP_PROTO_ONLY
+            , ISerializationWriteScope
+#endif
     {
         public const int DefaultCapacity = 16;
 
@@ -105,6 +111,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [ProtoIgnore]
 #endif
         private PooledResource<List<T>> _serializedItemsLease;
+
+#if !WALLSTOP_PROTO_ONLY
+        [NonSerialized]
+        [ProtoIgnore]
+        private SerializationScratchScope<T> _serializationScratchScope;
+#endif
 
         [SerializeField]
 #if !WALLSTOP_PROTO_ONLY
@@ -464,6 +476,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
 #if !WALLSTOP_PROTO_ONLY
+        void ISerializationWriteScope.BeginSerialization()
+        {
+            _serializationScratchScope.Begin(
+                ref _serializedItems,
+                ref _serializedItemsLease,
+                _serializedCapacity
+            );
+        }
+
+        void ISerializationWriteScope.EndSerialization()
+        {
+            _serializationScratchScope.End(
+                ref _serializedItems,
+                ref _serializedItemsLease,
+                ref _serializedCapacity
+            );
+        }
+#endif
+
+#if !WALLSTOP_PROTO_ONLY
         [ProtoBeforeSerialization]
 #endif
         private void OnProtoSerialize()
@@ -472,12 +504,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             if (_count == 0)
             {
-                _serializedItemsLease.Dispose();
                 _serializedItems = null;
                 return;
             }
-
-            _serializedItemsLease.Dispose();
 
             _serializedItemsLease = Buffers<T>.List.Get(out List<T> buffer);
             for (int i = 0; i < _count; ++i)
@@ -487,15 +516,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             _serializedItems = buffer;
-        }
-
-#if !WALLSTOP_PROTO_ONLY
-        [ProtoAfterSerialization]
-#endif
-        private void OnProtoSerialized()
-        {
-            _serializedItemsLease.Dispose();
-            _serializedItems = null;
         }
 
 #if !WALLSTOP_PROTO_ONLY

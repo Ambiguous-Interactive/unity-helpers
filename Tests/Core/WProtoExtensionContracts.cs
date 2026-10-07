@@ -12,12 +12,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     {
         public int Damage
         {
-            get => damage;
-            set => damage = value;
+            get => _damage;
+            set => _damage = value;
         }
 
         [WProtoMember(1)]
-        private int damage;
+        private int _damage;
     }
 
     [WProtoContract]

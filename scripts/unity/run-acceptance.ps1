@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('sentinel', 'intmap', 'serialization', 'all')]
+    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'all')]
     [string]$Acceptance,
     [Parameter(Mandatory = $true)]
     [string]$UnityVersion,
@@ -69,6 +69,7 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Upstream
     $migrationDefinition.name = $migrationNamespace
     $migrationDefinition.rootNamespace = $migrationNamespace
     $migrationDefinition.autoReferenced = $true
+    $migrationDefinition.defineConstraints = @()
     $migrationDefinition | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $migrationDirectory 'MigrationContracts.asmdef')
     foreach ($contract in Get-ChildItem -LiteralPath (Join-Path $Repository 'Tests/Runtime/Serialization/ConsumerMigration') -Filter '*.cs' -File) {
         $source = [IO.File]::ReadAllText($contract.FullName).Replace('WallstopStudios.UnityHelpers.Tests.Serialization.ConsumerMigration', $migrationNamespace)
@@ -247,6 +248,10 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Sibling
     }
 }
 
+if ($Acceptance -eq 'nullableconsumer') {
+    & (Join-Path $PSScriptRoot 'run-nullable-consumer.ps1') -UnityVersion $UnityVersion -UnityEditorPath $env:UNITY_EDITOR_PATH -Repository $Repository -TemporaryRoot $TemporaryRoot -ArtifactsPath $ArtifactsPath
+    return
+}
 $failures = [System.Collections.Generic.List[string]]::new()
 $selected = if ($Acceptance -eq 'all') { @('sentinel', 'capture', 'intmap', 'serialization', 'owners') } elseif ($Acceptance -eq 'serialization') { @('serialization', 'owners') } elseif ($Acceptance -eq 'sentinel') { @('sentinel', 'capture') } else { @($Acceptance) }
 foreach ($kind in $selected) {

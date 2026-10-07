@@ -2,18 +2,23 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('sentinel', 'intmap', 'serialization', 'all')]
+    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'all')]
     [string]$Acceptance,
     [Parameter(Mandatory = $true)]
     [string]$ArtifactsPath,
     [Parameter(Mandatory = $true)]
     [string]$Commit,
     [Parameter(Mandatory = $true)]
-    [string]$UnityVersion
+    [string]$UnityVersion,
+    [string]$Repository = (Join-Path $PSScriptRoot '../..')
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($Acceptance -eq 'nullableconsumer') {
+    & (Join-Path $PSScriptRoot 'verify-nullable-consumer.ps1') -ArtifactsPath $ArtifactsPath -Commit $Commit -UnityVersion $UnityVersion -Repository $Repository
+    return
+}
 $selected = if ($Acceptance -eq 'all') { @('sentinel', 'capture', 'intmap', 'serialization', 'owners') } elseif ($Acceptance -eq 'serialization') { @('serialization', 'owners') } elseif ($Acceptance -eq 'sentinel') { @('sentinel', 'capture') } else { @($Acceptance) }
 $names = @{
     capture = 'WallstopStudios.UnityHelpers.Tests.Editor.Validation.SentinelSurfaceCaptureTests.CaptureBothActualEditorSkins'

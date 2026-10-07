@@ -372,8 +372,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private sealed class BlockState
         {
-            private readonly object gate = new object();
-            private readonly List<ComparerEvent> events = new List<ComparerEvent>();
+            private readonly object _gate = new object();
+            private readonly List<ComparerEvent> _events = new List<ComparerEvent>();
 
             private static int ConstructorEnd(IObjectCreationOperation creation)
             {
@@ -577,9 +577,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             public void Flush(OperationBlockAnalysisContext context)
             {
                 List<ComparerEvent> ordered;
-                lock (gate)
+                lock (_gate)
                 {
-                    ordered = new List<ComparerEvent>(events);
+                    ordered = new List<ComparerEvent>(_events);
                 }
 
                 ordered.Sort(
@@ -778,9 +778,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
             private void Add(ComparerEvent comparerEvent)
             {
-                lock (gate)
+                lock (_gate)
                 {
-                    events.Add(comparerEvent);
+                    _events.Add(comparerEvent);
                 }
             }
         }

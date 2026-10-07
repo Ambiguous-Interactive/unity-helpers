@@ -10,7 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     internal sealed class ParentSingleRelational : MonoBehaviour
     {
         [ParentComponent]
-        private BoxCollider parentCollider;
+        private BoxCollider _parentCollider;
 
         public void Assign()
         {
