@@ -233,12 +233,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 #endif
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static WeakReference CreateUnrootedPayload()
-        {
-            return new WeakReference(new object());
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static (Task task, WeakReference payload) QueueCapturedAsync(
             UnityMainThreadDispatcher dispatcher,
             CancellationToken token
@@ -254,6 +248,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 token
             );
             return (task, new WeakReference(payload));
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static WeakReference CreateUnrootedPayload()
+        {
+            return new WeakReference(new object());
         }
 
         [TestCase(0)]

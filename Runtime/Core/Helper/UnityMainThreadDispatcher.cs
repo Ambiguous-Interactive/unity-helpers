@@ -680,18 +680,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             lock (_queueGate)
             {
-                retired = _retired || !_initialized;
-                if (retired)
+                if (_retired || !_initialized)
                 {
+                    retired = true;
                     return false;
                 }
                 int newCount = Interlocked.Increment(ref _pendingActionCount);
                 if (0 < maxPendingActions && maxPendingActions < newCount)
                 {
                     Interlocked.Decrement(ref _pendingActionCount);
+                    retired = false;
                     return false;
                 }
                 _actions.Enqueue(queued);
+                retired = false;
                 return true;
             }
         }
