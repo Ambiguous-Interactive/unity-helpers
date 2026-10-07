@@ -169,7 +169,14 @@ if ((Get-FileHash $bindingPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $b
 $provenanceRoot = Join-Path $artifactRoot 'actual-tool-inputs'
 New-Item -ItemType Directory -Path $provenanceRoot | Out-Null
 . (Join-Path $PSScriptRoot 'lib/il2cpp-conversion-inputs.ps1')
-$linkerInputs = @(Get-UnityLinkerInputs -CommandLines ([IO.File]::ReadAllLines($editorLog)) -Project $project)
+$lifecycleRoot = Join-Path $artifactRoot 'linker-lifecycle'
+$lifecycleInputs = @()
+$lifecycleManifestSHA = ''
+if ($UnityVersion -eq '2021.3.45f1') {
+    $lifecycleInputs = @(Get-LinkerLifecycleInputs -CaptureRoot $lifecycleRoot)
+    $lifecycleManifestSHA = (Get-FileHash -LiteralPath (Join-Path $lifecycleRoot 'source-paths.SHA256SUMS') -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+$linkerInputs = @(Get-UnityLinkerInputs -CommandLines ([IO.File]::ReadAllLines($editorLog)) -Project $project -CapturedXmlInputs $lifecycleInputs)
 if ($linkerInputs.Count -eq 0) { throw 'Actual UnityLinker invocation inputs were not captured; acceptance remains unproven' }
 $linkerInputs | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $provenanceRoot 'unity-linker-invocations.json')
 $actualResponses = [Collections.Generic.List[object]]::new()
@@ -180,9 +187,10 @@ foreach ($invocation in $linkerInputs) {
         $actualResponses.Add(@{ commandSHA256 = $invocation.commandSHA256; inputPath = $response.path; sha256 = $response.sha256 })
     }
     foreach ($path in $invocation.xmlInputPaths) {
-        $sha = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
-        $content = [IO.File]::ReadAllText($path)
-        Copy-Item -LiteralPath $path -Destination (Join-Path $provenanceRoot "$sha.xml")
+        $contentPath = Get-LinkerXmlContentPath -Path $path -CapturedXmlInputs $lifecycleInputs
+        $sha = (Get-FileHash -LiteralPath $contentPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $content = [IO.File]::ReadAllText($contentPath)
+        Copy-Item -LiteralPath $contentPath -Destination (Join-Path $provenanceRoot "$sha.xml")
         $actualXml.Add(@{ commandSHA256 = $invocation.commandSHA256; actualInputPath = $path; sha256 = $sha; includesConsumerPresence = $content.Contains('NestedOnlyConsumer.PresenceDoc') })
     }
 }
@@ -206,7 +214,7 @@ foreach ($conversion in $qualifiedConversions) {
 $qualifiedConversions | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $provenanceRoot 'il2cpp-conversion-modules.json')
 $playerManifestPath = Join-Path $artifactRoot 'player-tree.json'
 $playerManifestSHA256 = New-Il2CppPlayerManifest -PlayerRoot $buildRoot -ManifestPath $playerManifestPath
-@{ playerManifestSHA256 = $playerManifestSHA256; commit = $commit; sourceManifest = $sourceSHA; generatedBindingSHA256 = $bindingSHA; unityVersion = $UnityVersion; runToken = $token; project = $project; executableSHA256 = (Get-FileHash $executable -Algorithm SHA256).Hash.ToLowerInvariant(); actualLinkerInvocationCount = $linkerInputs.Count; actualLinkerInputCount = $actualResponses.Count; actualLinkerXmlInputCount = $actualXml.Count; packageWorktreeStatus = @(& git -C $repoPath status --porcelain -- Runtime "Generator~" package.json) } | ConvertTo-Json | Set-Content (Join-Path $artifactRoot 'declaration.json')
+@{ linkerLifecycleManifestSHA256 = $lifecycleManifestSHA; playerManifestSHA256 = $playerManifestSHA256; commit = $commit; sourceManifest = $sourceSHA; generatedBindingSHA256 = $bindingSHA; unityVersion = $UnityVersion; runToken = $token; project = $project; executableSHA256 = (Get-FileHash $executable -Algorithm SHA256).Hash.ToLowerInvariant(); actualLinkerInvocationCount = $linkerInputs.Count; actualLinkerInputCount = $actualResponses.Count; actualLinkerXmlInputCount = $actualXml.Count; packageWorktreeStatus = @(& git -C $repoPath status --porcelain -- Runtime "Generator~" package.json) } | ConvertTo-Json | Set-Content (Join-Path $artifactRoot 'declaration.json')
 $goldenArchive = Join-Path $artifactRoot 'goldens'
 Copy-Item -LiteralPath (Join-Path $template 'Goldens~') -Destination $goldenArchive -Recurse
 & (Join-Path $PSScriptRoot 'run-nullable-consumer-player-matrix.ps1') -Executable $executable -GoldenDirectory $goldenArchive -ResultDirectory (Join-Path $artifactRoot 'fresh-processes') -ExpectedUnityVersion $UnityVersion -CandidateCommit $commit -SourceManifest $sourceSHA -RunToken $token -PlayerManifestPath $playerManifestPath -PlayerManifestSHA256 $playerManifestSHA256

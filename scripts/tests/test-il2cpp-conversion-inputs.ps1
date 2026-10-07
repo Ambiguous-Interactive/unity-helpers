@@ -174,6 +174,43 @@ try {
         Require (@(Get-Il2CppConversionInputs -CommandLines @($prefix + $assemblyCommand) -Project $root).Count -eq 0) ('converter-mentioned-after-' + $prefix.Trim().Replace(' ', '-') + '-rejected')
         Require (@(Get-UnityLinkerInputs -CommandLines @($prefix + $linkerCommand) -Project $root).Count -eq 0) ('linker-mentioned-after-' + $prefix.Trim().Replace(' ', '-') + '-rejected')
     }
+    $lifecycle = Join-Path $root 'linker-lifecycle'
+    New-Item -ItemType Directory -Path $lifecycle | Out-Null
+    $source = Join-Path $root 'TypesInScenes.xml'
+    [IO.File]::WriteAllText($source, '<linker />')
+    $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
+    $snapshot = Join-Path $lifecycle "$sourceHash.xml"
+    Copy-Item -LiteralPath $source -Destination $snapshot
+    $sourceManifest = Join-Path $lifecycle 'source-paths.SHA256SUMS'
+    $originalRows = "$sourceHash  $source"
+    [IO.File]::WriteAllText($sourceManifest, $originalRows)
+    $captured = @(Get-LinkerLifecycleInputs -CaptureRoot $lifecycle)
+    Require ($captured.Count -eq 1 -and (Get-LinkerXmlContentPath -Path $source -CapturedXmlInputs $captured) -eq $snapshot) 'live-generated-linker-input-matches-lifecycle-copy'
+    Remove-Item -LiteralPath $source
+    $capturedLinker = @(Get-UnityLinkerInputs -CommandLines @("UnityLinker.exe --include-link-xml=`"$source`"") -Project $root -CapturedXmlInputs $captured)
+    Require ($capturedLinker.Count -eq 1 -and $capturedLinker[0].xmlInputPaths[0] -eq $source) 'deleted-generated-linker-input-retains-original-command-path'
+    Require-PlayerRejection { Get-UnityLinkerInputs -CommandLines @("UnityLinker.exe --include-link-xml=`"$source`"") -Project $root } 'Actual linker XML input missing:' 'deleted-generated-input-without-snapshot-rejected'
+    $differentSource = Join-Path $first 'TypesInScenes.xml'
+    Require-PlayerRejection { Get-LinkerXmlContentPath -Path $differentSource -CapturedXmlInputs $captured } 'Actual linker XML input missing:' 'same-basename-is-not-lifecycle-association'
+    [IO.File]::WriteAllText($source, '<linker changed="true" />')
+    Require-PlayerRejection { Get-LinkerXmlContentPath -Path $source -CapturedXmlInputs $captured } 'source changed after lifecycle capture' 'changed-live-source-rejected'
+    Remove-Item -LiteralPath $source
+    [IO.File]::WriteAllText($snapshot, 'corrupt captured content')
+    Require-PlayerRejection { Get-LinkerLifecycleInputs -CaptureRoot $lifecycle } 'captured content hash differs' 'corrupt-lifecycle-content-rejected'
+    [IO.File]::WriteAllText($snapshot, '<linker />')
+    [IO.File]::WriteAllText($sourceManifest, $originalRows + "`n" + $originalRows)
+    Require-PlayerRejection { Get-LinkerLifecycleInputs -CaptureRoot $lifecycle } 'Duplicated or nonabsolute' 'duplicate-lifecycle-source-rejected'
+    [IO.File]::WriteAllText($sourceManifest, "$sourceHash  relative.xml")
+    Require-PlayerRejection { Get-LinkerLifecycleInputs -CaptureRoot $lifecycle } 'Duplicated or nonabsolute' 'relative-lifecycle-source-rejected'
+    [IO.File]::WriteAllText($sourceManifest, '')
+    Require-PlayerRejection { Get-LinkerLifecycleInputs -CaptureRoot $lifecycle } 'Empty linker lifecycle' 'empty-lifecycle-manifest-rejected'
+    [IO.File]::WriteAllText($sourceManifest, $originalRows)
+    [IO.File]::WriteAllText((Join-Path $lifecycle 'unreferenced.xml'), '<linker />')
+    Require-PlayerRejection { Get-LinkerLifecycleInputs -CaptureRoot $lifecycle } 'snapshot file inventory differs' 'unreferenced-lifecycle-file-rejected'
+    Remove-Item -LiteralPath (Join-Path $lifecycle 'unreferenced.xml')
+    Require-PlayerRejection { Get-LinkerXmlContentPath -Path $source -CapturedXmlInputs @($captured[0], $captured[0]) } 'Duplicated linker lifecycle source association' 'duplicate-resolver-association-rejected'
+    Require ((Get-LinkerXmlContentPath -Path $source -CapturedXmlInputs @(Get-LinkerLifecycleInputs -CaptureRoot $lifecycle)) -eq $snapshot) 'restored-lifecycle-snapshot-accepted'
+
     $optionalControls = 0
     $link = Join-Path $player 'linked-native.bin'
     $linkCreated = $false
@@ -183,6 +220,30 @@ try {
             Require-PlayerRejection { Assert-Il2CppPlayerManifest -PlayerRoot $player -ManifestPath $manifest -ExpectedSHA256 $manifestHash } 'Player inventory cannot contain linked paths' 'actual-filesystem-player-symlink-rejected'
             ++$optionalControls
         } finally { Remove-Item -LiteralPath $link -Force }
+    }
+    $captureLink = Join-Path $root 'linked-lifecycle-root'
+    $captureLinkCreated = $false
+    try { New-Item -ItemType SymbolicLink -Path $captureLink -Target $lifecycle -ErrorAction Stop | Out-Null; $captureLinkCreated = $true } catch { Write-Output 'Lifecycle-root symlink creation unavailable; qualified control only.' }
+    if ($captureLinkCreated) {
+        try {
+            Require-PlayerRejection { Get-LinkerLifecycleInputs -CaptureRoot $captureLink } 'Linked linker lifecycle snapshot root' 'actual-filesystem-lifecycle-root-symlink-rejected'
+            ++$optionalControls
+        } finally { Remove-Item -LiteralPath $captureLink -Force }
+    }
+    $linkedSnapshot = Join-Path $lifecycle "$sourceHash.xml"
+    $snapshotOriginal = [IO.File]::ReadAllBytes($linkedSnapshot)
+    Remove-Item -LiteralPath $linkedSnapshot
+    $linkedSnapshotCreated = $false
+    [IO.File]::WriteAllBytes($source, $snapshotOriginal)
+    try { New-Item -ItemType SymbolicLink -Path $linkedSnapshot -Target $source -ErrorAction Stop | Out-Null; $linkedSnapshotCreated = $true } catch { Write-Output 'Lifecycle-content symlink creation unavailable; qualified control only.' }
+    try {
+        if ($linkedSnapshotCreated) {
+            Require-PlayerRejection { Get-LinkerLifecycleInputs -CaptureRoot $lifecycle } 'Unexpected or linked linker lifecycle snapshot file' 'actual-filesystem-lifecycle-content-symlink-rejected'
+            ++$optionalControls
+        }
+    } finally {
+        if ($linkedSnapshotCreated) { Remove-Item -LiteralPath $linkedSnapshot -Force }
+        [IO.File]::WriteAllBytes($linkedSnapshot, $snapshotOriginal)
     }
     if ($IsLinux) {
         $fake = Join-Path $root 'fake-unity'
@@ -238,8 +299,8 @@ try {
     }
 
     $results | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $root 'parser-results.json')
-    if ($results.Count -ne (64 + $optionalControls)) { throw 'Parser controls silently omitted cases' }
-    "Original parser10, player provenance28, inline/archive26, optional filesystem/process$optionalControls controls passed; synthetic files are not Unity evidence."
+    if ($results.Count -ne (76 + $optionalControls)) { throw 'Parser controls silently omitted cases' }
+    "Original parser10, player provenance28, inline/archive26, lifecycle12, optional filesystem/process$optionalControls controls passed; synthetic files are not Unity evidence."
 
 } finally {
     if ($usesTemporaryDirectory) {

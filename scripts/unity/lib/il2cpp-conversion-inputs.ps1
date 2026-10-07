@@ -58,8 +58,45 @@ function Get-ManagedToolInvocations {
         @{ executable = $tokens[0]; command = $line; commandSHA256 = $sha; arguments = $resolved.arguments; responseChain = $resolved.responses }
     }
 }
+function Get-LinkerLifecycleInputs {
+    param([Parameter(Mandatory)][string]$CaptureRoot)
+    if (((Get-Item -LiteralPath $CaptureRoot -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Linked linker lifecycle snapshot root' }
+    $manifest = Join-Path $CaptureRoot 'source-paths.SHA256SUMS'
+    $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $files = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $files.Add('source-paths.SHA256SUMS') | Out-Null
+    $rows = [Collections.Generic.List[object]]::new()
+    foreach ($line in [IO.File]::ReadAllLines($manifest)) {
+        if ($line -notmatch '^([0-9a-f]{64})  ([^\r\n]+)$') { throw 'Malformed linker lifecycle snapshot' }
+        $hash = $Matches[1]; $path = $Matches[2]
+        if (-not [IO.Path]::IsPathFullyQualified($path) -or [IO.Path]::GetFullPath($path) -ne $path -or -not $paths.Add($path)) { throw 'Duplicated or nonabsolute linker lifecycle source path' }
+        $captured = Join-Path $CaptureRoot "$hash.xml"
+        if ((Get-FileHash -LiteralPath $captured -Algorithm SHA256).Hash.ToLowerInvariant() -ne $hash) { throw 'Linker lifecycle captured content hash differs' }
+        $files.Add("$hash.xml") | Out-Null
+        $rows.Add(@{ path = $path; sha256 = $hash; capturedPath = $captured })
+    }
+    if ($rows.Count -eq 0) { throw 'Empty linker lifecycle snapshot' }
+    $actual = @(Get-ChildItem -LiteralPath $CaptureRoot -Recurse -Force)
+    if ($actual.Count -ne $files.Count) { throw 'Linker lifecycle snapshot file inventory differs' }
+    foreach ($item in $actual) {
+        if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or -not $files.Contains($item.Name)) { throw 'Unexpected or linked linker lifecycle snapshot file' }
+    }
+    $rows.ToArray()
+}
+function Get-LinkerXmlContentPath {
+    param([Parameter(Mandatory)][string]$Path, [object[]]$CapturedXmlInputs = @())
+    $record = @($CapturedXmlInputs | Where-Object { $null -ne $_ -and [string]::Equals($_.path, $Path, [StringComparison]::OrdinalIgnoreCase) })
+    if ($record.Count -gt 1) { throw 'Duplicated linker lifecycle source association' }
+    if ($record.Count -eq 1) {
+        if ((Get-FileHash -LiteralPath $record[0].capturedPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $record[0].sha256) { throw 'Linker lifecycle captured content hash differs' }
+        if ((Test-Path -LiteralPath $Path -PathType Leaf) -and (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $record[0].sha256) { throw 'Linker XML source changed after lifecycle capture' }
+        return $record[0].capturedPath
+    }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Actual linker XML input missing: $Path" }
+    $Path
+}
 function Get-UnityLinkerInputs {
-    param([string[]]$CommandLines, [string]$Project, [string]$ArchivedRoot, [object[]]$ResponseRecords)
+    param([string[]]$CommandLines, [string]$Project, [string]$ArchivedRoot, [object[]]$ResponseRecords, [object[]]$CapturedXmlInputs = @())
     foreach ($invocation in (Get-ManagedToolInvocations -CommandLines $CommandLines -Project $Project -Tool UnityLinker -ArchivedRoot $ArchivedRoot -ResponseRecords $ResponseRecords)) {
         $xml = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         for ($index = 0; $index -lt $invocation.arguments.Count; ++$index) {
@@ -73,7 +110,7 @@ function Get-UnityLinkerInputs {
             if ($null -eq $path) { continue }
             if (-not [IO.Path]::IsPathFullyQualified($path)) { $path = Join-Path $Project $path }
             $path = [IO.Path]::GetFullPath($path)
-            if ([string]::IsNullOrWhiteSpace($ArchivedRoot) -and -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Actual linker XML input missing: $path" }
+            if ([string]::IsNullOrWhiteSpace($ArchivedRoot)) { Get-LinkerXmlContentPath -Path $path -CapturedXmlInputs $CapturedXmlInputs | Out-Null }
             if (-not $xml.Add($path)) { throw 'Duplicated linker XML argument' }
         }
         if ($xml.Count -eq 0) { continue }

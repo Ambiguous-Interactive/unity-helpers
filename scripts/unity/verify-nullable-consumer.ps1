@@ -102,6 +102,17 @@ foreach ($line in @("unity=$UnityVersion",'backend=IL2CPP','stripping=High','com
     if ($settings -notmatch ('(?m)^'+[regex]::Escape($line)+'$')) { throw "Independent player setting missing: $line" }
 }
 $toolRoot = Join-Path $root 'actual-tool-inputs'
+$lifecycleRoot = Join-Path $root 'linker-lifecycle'
+$lifecycleInputs = @()
+$stagingRoot = [IO.Path]::GetFullPath((Join-Path $declaration.project 'Temp/StagingArea/Data/Managed'))
+$consumedLifecyclePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+if ($UnityVersion -eq '2021.3.45f1') {
+    Require-Hash (Join-Path $lifecycleRoot 'source-paths.SHA256SUMS') $declaration.linkerLifecycleManifestSHA256
+    $lifecycleInputs = @(Get-LinkerLifecycleInputs -CaptureRoot $lifecycleRoot)
+    foreach ($snapshot in $lifecycleInputs) {
+        if ([IO.Path]::GetDirectoryName($snapshot.path) -ne $stagingRoot) { throw 'Linker lifecycle snapshot is outside actual staging inputs' }
+    }
+} elseif ($declaration.linkerLifecycleManifestSHA256 -ne '') { throw 'Unexpected linker lifecycle snapshot for latest consumer' }
 $editorLines = [IO.File]::ReadAllLines((Join-Path $root 'editor-build.log'))
 $editorCommands = [Collections.Generic.HashSet[string]]::new($editorLines, [StringComparer]::Ordinal)
 function Assert-RecordedCommand {
@@ -136,12 +147,17 @@ foreach ($invocation in $linkers) {
         $associated = @($xmlInputs | Where-Object { $_.commandSHA256 -eq $invocation.commandSHA256 -and $_.actualInputPath -eq $path })
         if ($associated.Count -ne 1) { throw 'Linker descriptor has no exact actual command association' }
         $xmlInput = $associated[0]
+        $captured = @($lifecycleInputs | Where-Object { [string]::Equals($_.path, $path, [StringComparison]::OrdinalIgnoreCase) })
+        if ($UnityVersion -eq '2021.3.45f1' -and [IO.Path]::GetDirectoryName($path) -eq $stagingRoot -and $captured.Count -ne 1) { throw 'Actual staging linker input has no lifecycle snapshot' }
+        if ($captured.Count -gt 1 -or ($captured.Count -eq 1 -and $captured[0].sha256 -ne $xmlInput.sha256)) { throw 'Linker descriptor differs from its lifecycle snapshot' }
+        if ($captured.Count -eq 1) { $consumedLifecyclePaths.Add($path) | Out-Null }
         Require-Hash (Join-Path $toolRoot "$($xmlInput.sha256).xml") $xmlInput.sha256
         [xml]$descriptor = [IO.File]::ReadAllText((Join-Path $toolRoot "$($xmlInput.sha256).xml"))
         if ($descriptor.SelectNodes('/linker/assembly[@fullname="NestedOnly.Consumer"]/type[@fullname="NestedOnlyConsumer.PresenceDoc"][@preserve="all"]').Count -ne 0) { $presenceFound = $true }
     }
 }
 if ($expectedResponses -ne $responses.Count -or $expectedXml -ne $xmlInputs.Count) { throw 'Actual linker input inventory differs from command declarations' }
+if ($UnityVersion -eq '2021.3.45f1' -and -not $consumedLifecyclePaths.Contains((Join-Path $stagingRoot 'TypesInScenes.xml'))) { throw 'Actual generated scene linker input was not lifecycle captured' }
 if (-not $presenceFound) { throw 'Actual linker descriptor did not preserve consumer contract' }
 $conversions = @(Get-Content -LiteralPath (Join-Path $toolRoot 'il2cpp-conversion-modules.json') -Raw | ConvertFrom-Json)
 if ($conversions.Count -eq 0) { throw 'Actual converter input set missing' }
