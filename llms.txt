@@ -4,7 +4,7 @@
 >
 > - Professional inspector tooling, spatial data structures, PRNGs, serialization utilities
 > - Effects systems, relational components, and 30+ editor tools
-> - 15,000+ tests, IL2CPP/WebGL compatible, shipped in commercial games
+> - 16,000+ tests, IL2CPP/WebGL compatible, shipped in commercial games
 
 ## Key Information
 
