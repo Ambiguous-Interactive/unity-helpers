@@ -180,7 +180,29 @@ function verify(options) {
 
   if (fix) {
     for (const name of [...missing, ...stale]) {
-      fs.copyFileSync(path.join(scratchDirectory, name), path.join(shippedDirectory, name));
+      let stagingDirectory;
+      let failed = false;
+      try {
+        stagingDirectory = fs.mkdtempSync(path.join(shippedDirectory, ".refresh-"));
+        const staged = path.join(stagingDirectory, name);
+        fs.copyFileSync(path.join(scratchDirectory, name), staged);
+        fs.renameSync(staged, path.join(shippedDirectory, name));
+      } catch (error) {
+        failed = true;
+        logError(`[shipped-analyzers] Could not refresh ${name}: ${error.message}`);
+      } finally {
+        if (stagingDirectory) {
+          try {
+            fs.rmSync(stagingDirectory, { recursive: true, force: true });
+          } catch (error) {
+            failed = true;
+            logError(`[shipped-analyzers] Could not remove ${stagingDirectory}: ${error.message}`);
+          }
+        }
+      }
+      if (failed) {
+        return 1;
+      }
     }
     log(
       `[shipped-analyzers] Refreshed ${missing.length + stale.length} shipped analyzer file(s); stage them with the source change:`
