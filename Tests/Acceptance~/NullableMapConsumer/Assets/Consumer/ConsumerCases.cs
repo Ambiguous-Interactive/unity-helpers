@@ -261,7 +261,6 @@ namespace NestedOnlyConsumer
             SortedDictionary<Guid, OwnedMessage> backing = new SortedDictionary<Guid, OwnedMessage>(
                 policy
             );
-            backing.Add(FirstKey, new OwnedMessage { Number = -1 });
             backing.Add(OtherKey, new OwnedMessage { Number = 99 });
             Doc target = new Doc
             {
@@ -294,6 +293,62 @@ namespace NestedOnlyConsumer
                         "Custom comparator order lost"
                     );
                 }
+            }
+            CheckMergeRejectsOverlappingKey(incoming);
+        }
+
+        private static void CheckMergeRejectsOverlappingKey(byte[] incoming)
+        {
+            SortedDictionary<Guid, OwnedMessage> backing = new SortedDictionary<Guid, OwnedMessage>(
+                new ReverseGuidComparer()
+            );
+            OwnedMessage existing = new OwnedMessage { Number = -1 };
+            OwnedMessage retained = new OwnedMessage { Number = 99 };
+            backing.Add(FirstKey, existing);
+            backing.Add(OtherKey, retained);
+            Doc target = new Doc
+            {
+                Sorted = new SerializableSortedDictionary<Guid, OwnedMessage>(backing),
+            };
+            SerializableSortedDictionary<Guid, OwnedMessage> original = target.Sorted;
+            bool rejected = false;
+            using (MemoryStream stream = new MemoryStream(incoming))
+            {
+                try
+                {
+                    ProtoBuf.Serializer.Merge(stream, target);
+                }
+                catch (ArgumentException failure)
+                {
+                    Require(
+                        failure.GetType() == typeof(ArgumentException),
+                        "Overlapping merge exception changed"
+                    );
+                    rejected = true;
+                }
+            }
+            Require(rejected, "Overlapping merge accepted a duplicate key");
+            Require(ReferenceEquals(target.Sorted, original), "Rejected merge replaced identity");
+            Require(
+                original.Count == 2
+                    && original.TryGetValue(FirstKey, out OwnedMessage unchanged)
+                    && ReferenceEquals(unchanged, existing)
+                    && unchanged.Number == -1
+                    && original.TryGetValue(OtherKey, out OwnedMessage other)
+                    && ReferenceEquals(other, retained)
+                    && other.Number == 99,
+                "Rejected merge changed existing sorted entries"
+            );
+            using (IEnumerator<Guid> order = original.Keys.GetEnumerator())
+            {
+                Require(
+                    order.MoveNext()
+                        && order.Current == OtherKey
+                        && order.MoveNext()
+                        && order.Current == FirstKey
+                        && !order.MoveNext(),
+                    "Rejected merge lost comparator order"
+                );
             }
         }
     }
