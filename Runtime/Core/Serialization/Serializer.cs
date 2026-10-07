@@ -3573,17 +3573,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </remarks>
         private static class CollectionShape<T>
         {
-            internal static readonly bool IsSerializableCollection = IsSerializableCollectionType(
-                typeof(T)
-            );
-            internal static readonly bool IsSpecialCollection = IsSpecialCollectionType(typeof(T));
-            internal static readonly bool IsSerializableList = IsSerializableListType(typeof(T));
-
             // Wrapper construction depends only on T; cache it instead of repeating generic reflection per call.
             internal static Type WrapperType => LegacyCollectionWrapper<T>.WrapperType;
 
             internal static Func<object> WrapperFactory =>
                 LegacyCollectionWrapper<T>.WrapperFactory;
+
+            internal static readonly bool IsSerializableCollection = IsSerializableCollectionType(
+                typeof(T)
+            );
+            internal static readonly bool IsSpecialCollection = IsSpecialCollectionType(typeof(T));
+            internal static readonly bool IsSerializableList = IsSerializableListType(typeof(T));
         }
 
         private static class LegacyCollectionWrapper<T>

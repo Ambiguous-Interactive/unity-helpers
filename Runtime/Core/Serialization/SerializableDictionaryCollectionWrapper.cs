@@ -19,10 +19,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         )
         {
             collection.OnBeforeSerialize();
-            keys = collection.SerializedKeys;
-            values = collection.SerializedValues;
-            presence = null;
-            NullableCollectionPresence<TValue>.Prepare(keys?.Length ?? 0, ref values, ref presence);
+            TKey[] preparedKeys = collection.SerializedKeys;
+            TValue[] preparedValues = collection.SerializedValues;
+            byte[] preparedPresence = null;
+            NullableCollectionPresence<TValue>.Prepare(
+                preparedKeys?.Length ?? 0,
+                ref preparedValues,
+                ref preparedPresence
+            );
+            keys = preparedKeys;
+            values = preparedValues;
+            presence = preparedPresence;
         }
 
         protected override SerializableDictionary<TKey, TValue> Restore(
