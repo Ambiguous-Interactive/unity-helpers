@@ -144,6 +144,15 @@ namespace NestedOnlyConsumer
 
         public static void Run(string mode, string shape, byte[] expected)
         {
+            if (string.Equals(mode, "serialize-read", StringComparison.Ordinal))
+            {
+                Doc cold = Serializer.ProtoDeserialize<Doc>(expected);
+                CheckLogical(cold, shape);
+                Require(
+                    Serializer.ProtoSerialize(cold).AsSpan().SequenceEqual(expected),
+                    "Cold read/write bytes changed"
+                );
+            }
             Doc first = Create(shape);
             Doc equivalent = Create(shape);
             Doc different = Create(shape, true);

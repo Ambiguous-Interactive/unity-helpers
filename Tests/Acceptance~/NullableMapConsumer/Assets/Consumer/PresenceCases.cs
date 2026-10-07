@@ -178,6 +178,15 @@ namespace NestedOnlyConsumer
 
         public static void Run(string mode, byte[] expected)
         {
+            if (string.Equals(mode, "presence-serialize-read", StringComparison.Ordinal))
+            {
+                PresenceDoc cold = Serializer.ProtoDeserialize<PresenceDoc>(expected);
+                Check(cold);
+                ConsumerCases.Require(
+                    Serializer.ProtoSerialize(cold).AsSpan().SequenceEqual(expected),
+                    "Cold presence read/write bytes changed"
+                );
+            }
             PresenceDoc first = Create();
             PresenceDoc equivalent = Create();
             PresenceDoc different = Create(true);
