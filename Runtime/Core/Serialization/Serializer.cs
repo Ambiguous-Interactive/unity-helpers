@@ -1244,11 +1244,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </summary>
         internal static int SerializeCollectionWithWrapper<T>(T input, ref byte[] buffer)
         {
-            object wrapper = BuildCollectionWrapper(input);
-
             using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
                 out PooledBufferStream stream
             );
+            if (ProtoBuf.Meta.RuntimeTypeModel.Default.TrySerializeCollectionWrapper(stream, input))
+            {
+                return stream.ToArrayExact(ref buffer);
+            }
+            object wrapper = BuildCollectionWrapper(input);
             ProtoBuf.Serializer.NonGeneric.Serialize(stream, wrapper);
             return stream.ToArrayExact(ref buffer);
         }
@@ -1509,6 +1512,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         private static object DeserializeCollectionFromWrapper(byte[] data, Type type)
         {
+            using MemoryStream typedStream = new(data, writable: false);
+            if (
+                ProtoBuf.Meta.RuntimeTypeModel.Default.TryDeserializeCollectionWrapper(
+                    type,
+                    typedStream,
+                    out object typedCollection
+                )
+            )
+            {
+                return typedCollection;
+            }
             Type genericDef = type.GetGenericTypeDefinition();
             bool isSet =
                 genericDef == typeof(SerializableHashSet<>)
@@ -3566,7 +3580,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             internal static readonly bool IsSerializableList = IsSerializableListType(typeof(T));
 
             // Wrapper construction depends only on T; cache it instead of repeating generic reflection per call.
-            internal static readonly Type WrapperType = IsSerializableCollection
+            internal static Type WrapperType => LegacyCollectionWrapper<T>.WrapperType;
+
+            internal static Func<object> WrapperFactory =>
+                LegacyCollectionWrapper<T>.WrapperFactory;
+        }
+
+        private static class LegacyCollectionWrapper<T>
+        {
+            internal static readonly Type WrapperType = IsSerializableCollectionType(typeof(T))
                 ? ResolveCollectionWrapperType(typeof(T))
                 : null;
 
@@ -3574,6 +3596,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 WrapperType == null
                     ? null
                     : ReflectionHelpers.GetParameterlessConstructor(WrapperType);
+
+            static LegacyCollectionWrapper() { }
         }
 
         /// <summary>

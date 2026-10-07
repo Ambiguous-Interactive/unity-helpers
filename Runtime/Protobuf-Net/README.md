@@ -6,7 +6,7 @@ The annotated tag object is `421b80a9b128be779036e600b996efb9e48b9f92`.
 Upstream source and license: [protobuf-net](https://github.com/protobuf-net/protobuf-net/tree/dfdfce61a739cfd76f05fcdacf8a4b3b9e94e684)
 and [bundled license](./Licence.txt).
 
-[The source patch](./il2cpp-aot.patch) changes nine runtime behaviors:
+[The source patch](./il2cpp-aot.patch) changes runtime behavior:
 
 - Construct fallback value checkers directly, avoiding reflected closed generic constructors.
   Primary primitive checkers keep their original default-value policy. Nonnullable structs
@@ -15,9 +15,9 @@ and [bundled license](./Licence.txt).
 - Unwrap nullable member types before effective-type classification, so primitive nullable
   members do not depend on reflective dynamic-stub construction.
 
-- Construct runtime map decorators without closing a generic constructor through reflection.
-  An internal interface delegates reads and writes to the existing typed map serializer with
-  the same key/value options and active model. Compiled models keep the original typed emitter.
+- Read and write runtime map entries through nongeneric slot nodes when dynamic code is unavailable.
+  The nodes retain the active model, actual key/value services, wire options, factories and merge
+  behavior. Compiled models keep the original typed emitter.
 - Reject indexed properties before inspecting tuple setters. Indexers cannot be read by the
   tuple serializer; ordinary tuples, key/value pairs and index-free init-only contracts keep
   their existing classification.
@@ -56,6 +56,23 @@ and [bundled license](./Licence.txt).
   Model-local nullable contract services delegate to the existing serializer, with matching emitted
   services for compiled models. Provider-supplied nullable services keep precedence, including
   factory-returned services. Recompiling an underlying contract invalidates its cached nullable service.
+
+- Construct runtime surrogate nodes without a reflected generic constructor. Typed surrogate
+  services retain their actual feature flags, conversion failures and provider precedence.
+- Register typed codecs and factories for the owned plain and sorted dictionary wrappers.
+  Reads validate nullable presence data against parallel arrays before constructing the owner;
+  writes retain the existing fields, tags and callback behavior. Nontrivial default instances
+  initialize lazily and retain their cached identity. Failed initialization identifies the
+  dedicated default holder.
+- Reuse runtime enum map decorators by the original serializer's reference identity. Each
+  operation resolves services from its active model; custom factories and compiled services
+  retain precedence.
+- Register functional factories for accessible closed external serializer providers through
+  generated startup code. Type-only model registrations retain their existing services,
+  including factory-returned nullable services and original constructor/proxy failures.
+  Registration does not construct providers or share model state. Earlier access before
+  generated startup, inaccessible providers and arbitrary consumer AOT contracts require
+  separate qualification.
 
 Field numbers and nonnullable default omission retain upstream behavior. Nullable map defaults
 now carry explicit presence bytes; old omitted fields cannot recover a lost default value.
@@ -109,5 +126,5 @@ the .NET Standard 2.1 target. Check the hashes before replacing the shipped file
 
 | File                  | SHA256                                                             |
 | --------------------- | ------------------------------------------------------------------ |
-| protobuf-net.dll      | `d72a9de006e289d8127c1942247200369f0c6a2f7cd5140ff07f445d759fbabb` |
-| protobuf-net.Core.dll | `7c994ca2572374b691c4ee1db3c58d08e443751b1d683a83f57ab1827be0ccd1` |
+| protobuf-net.dll      | `01c0eb2062c70f3eb27b1c662288247514741391f82b549c63c68ffa7d672630` |
+| protobuf-net.Core.dll | `be800dd4484bddada630bde8e7a7ea753022bba2856e8d8cf378a6a768424f04` |

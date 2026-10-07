@@ -1337,6 +1337,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
 #if !WALLSTOP_PROTO_ONLY
     [ProtoBuf.ProtoContract]
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
 #endif
     public class SerializableSortedDictionary<TKey, TValue>
         : SerializableSortedDictionaryBase<TKey, TValue, TValue>
@@ -1346,6 +1347,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 #endif
         where TKey : IComparable<TKey>
     {
+#if !WALLSTOP_PROTO_ONLY
+        static SerializableSortedDictionary()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterCollectionWrapperSerializer(
+                new SerializableSortedDictionaryCollectionWrapper<TKey, TValue>()
+            );
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer<
+                SerializableSortedDictionary<TKey, TValue>,
+                TKey,
+                TValue
+            >(() => new SerializableSortedDictionary<TKey, TValue>());
+        }
+#endif
+
         /// <summary>
         /// Initializes an empty sorted dictionary compatible with Unity and ProtoBuf serialization.
         /// </summary>
@@ -1419,6 +1434,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
 #if !WALLSTOP_PROTO_ONLY
     [ProtoBuf.ProtoContract]
+    [ProtoBuf.Serializers.TypedRepeatedProvider]
 #endif
     public class SerializableSortedDictionary<TKey, TValue, TValueCache>
         : SerializableSortedDictionaryBase<TKey, TValue, TValueCache>
@@ -1429,6 +1445,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         where TKey : IComparable<TKey>
         where TValueCache : SerializableDictionary.Cache<TValue>, new()
     {
+#if !WALLSTOP_PROTO_ONLY
+        static SerializableSortedDictionary()
+        {
+            ProtoBuf.Meta.RuntimeTypeModel.RegisterRepeatedSerializer<
+                SerializableSortedDictionary<TKey, TValue, TValueCache>,
+                TKey,
+                TValue
+            >(() => new SerializableSortedDictionary<TKey, TValue, TValueCache>());
+        }
+#endif
+
         /// <summary>
         /// Initializes an empty sorted dictionary whose values are stored through cache entries.
         /// </summary>

@@ -114,6 +114,19 @@ missing generic map, enum or external serializer method. Item reflection metadat
 consumer collection contracts still require their own AOT qualification. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)
 include the exact patch and binary hashes. Qualify each binary change in a fresh Unity 2021.3
 stripped player; success with another binary or a newer editor does not prove compatibility.
+Runtime map slots and surrogate nodes retain the active model's actual services, wire policies,
+merge behavior and conversion failures. Owned plain and sorted dictionary wrappers register
+typed codecs before their first read, validate nullable presence data against parallel arrays before owner construction, and
+retain their existing protobuf fields and nullable presence data. Runtime enum map decorators
+reuse the original serializer by reference identity and resolve services for each operation.
+
+The generator emits startup factories for accessible closed external serializer providers,
+including assemblies that declare providers without generated contracts. Existing
+`MetaType.SerializerType` registrations continue to select the same services; a proxy's actual
+nullable service takes precedence. Registration does not construct providers. Access before
+generated startup and inaccessible or runtime-only providers still need separate qualification.
+The managed provider checks do not establish stripped-player support for arbitrary consumer types.
+
 The root save wrappers described below remain a separate path: comparer hashes are not hashes
 of `Serializer.ProtoSerialize` output. WProto-only builds use generated root encoding instead,
 so hashes are not portable between backend modes.

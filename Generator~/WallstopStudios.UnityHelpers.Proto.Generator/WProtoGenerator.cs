@@ -4244,7 +4244,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return;
             }
 
+            List<TypeDeclarationSyntax> externalProviders = new List<TypeDeclarationSyntax>(
+                receiver.Types
+            );
+            externalProviders.AddRange(receiver.Derived);
             bool disableModuleInitializer = DisableModuleInitializer(context);
+            bool externalProviderRegistrar = ExternalProviderRegistrations.Emit(
+                context,
+                externalProviders,
+                disableModuleInitializer
+            );
 
             List<INamedTypeSymbol> contracts = new List<INamedTypeSymbol>();
             HashSet<INamedTypeSymbol> seen = new HashSet<INamedTypeSymbol>(
@@ -4578,7 +4587,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 || 0 < declaredRoots.Count
                 || 0 < jsonRegistrations.Count;
             if (
-                hasRegistrar
+                (hasRegistrar || externalProviderRegistrar)
                 && !disableModuleInitializer
                 && (
                     context.ParseOptions == null
