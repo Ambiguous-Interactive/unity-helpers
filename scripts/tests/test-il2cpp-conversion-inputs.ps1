@@ -13,6 +13,86 @@ $root = if ($usesTemporaryDirectory) {
 if (Test-Path $root) { throw 'Refusing existing parser control directory' }
 New-Item -ItemType Directory -Path $root | Out-Null
 try {
+    $results = [Collections.Generic.List[object]]::new()
+    function Require {
+        param([bool]$Valid, [string]$Name)
+        if (-not $Valid) { throw "Parser control failed: $Name" }
+        $results.Add(@{ control = $Name; passed = $true })
+    }
+    # Dependency recipes are synthetic inputs; the literal floor manifest retains observed package resolution.
+    $templateJson = '{"dependencies":{"com.wallstop-studios.unity-helpers":"file:__CANDIDATE_PACKAGE__","com.unity.modules.jsonserialize":"1.0.0"}}'
+    $configurationJson = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/unity-test-project-modules.json') -Raw
+    $repositoryInput = 'D:/actions-runner/_work/unity-helpers/unity-helpers'
+    $floorManifest = New-NullableConsumerManifest -TemplateJson $templateJson -ConfigurationJson $configurationJson -Repository $repositoryInput -UnityVersion '2021.3.45f1'
+    $latestManifest = New-NullableConsumerManifest -TemplateJson $templateJson -ConfigurationJson $configurationJson -Repository $repositoryInput -UnityVersion '6000.6.0f1'
+    $floorDependencies = (ConvertFrom-Json -InputObject $floorManifest -AsHashtable)['dependencies']
+    $latestDependencies = (ConvertFrom-Json -InputObject $latestManifest -AsHashtable)['dependencies']
+    Require ($floorDependencies['com.unity.toolchain.win-x86_64-linux-x86_64'] -ceq '2.0.11' -and $floorDependencies.Count -eq 14) 'dependency-floor-authors-exact-toolchain-before-preparation'
+    Require (-not $latestDependencies.Contains('com.unity.toolchain.win-x86_64-linux-x86_64') -and $latestDependencies.Count -eq 13) 'dependency-latest-retains-no-toolchain'
+    $observedFloorManifest = @'
+{
+  "dependencies": {
+    "com.unity.toolchain.win-x86_64-linux-x86_64": "2.0.11",
+    "com.unity.ugui": "1.0.0",
+    "com.wallstop-studios.unity-helpers": "file:D:/actions-runner/_work/unity-helpers/unity-helpers",
+    "com.unity.modules.animation": "1.0.0",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.modules.imageconversion": "1.0.0",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.particlesystem": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.physics2d": "1.0.0",
+    "com.unity.modules.tilemap": "1.0.0",
+    "com.unity.modules.ui": "1.0.0",
+    "com.unity.modules.uielements": "1.0.0"
+  }
+}
+'@
+    Require (Test-NullableConsumerManifest -ExpectedJson $floorManifest -ActualJson $observedFloorManifest) 'dependency-observed-floor-reordered-manifest-matches-complete-recipe'
+    $orderedLatest = ConvertFrom-Json -InputObject $latestManifest -AsHashtable
+    $reversedLatest = [ordered]@{ dependencies = [ordered]@{} }
+    $keys = @($orderedLatest['dependencies'].Keys)
+    [array]::Reverse($keys)
+    foreach ($key in $keys) { $reversedLatest.dependencies[$key] = $orderedLatest['dependencies'][$key] }
+    Require (Test-NullableConsumerManifest -ExpectedJson $latestManifest -ActualJson (ConvertTo-Json -InputObject $reversedLatest -Depth 10)) 'dependency-latest-object-property-order-only-is-ignored'
+    Require (Test-NullableConsumerManifest -ExpectedJson '{"a":{"Y":[null,true,false,1,"x"],"Z":{}},"b":[]}' -ActualJson '{"b":[],"a":{"Z":{},"Y":[null,true,false,1,"x"]}}') 'dependency-nested-object-order-preserves-json-kinds'
+    Require (Test-NullableConsumerManifest -ExpectedJson '{"a":1,"A":2}' -ActualJson '{"A":2,"a":1}') 'dependency-case-distinct-object-keys-are-not-collapsed'
+    $jsonNegativeControls = @(
+        @('root-extra', '{"dependencies":{}}', '{"dependencies":{},"extra":null}'),
+        @('root-missing', '{"dependencies":{}}', '{}'),
+        @('root-key-case', '{"dependencies":{}}', '{"Dependencies":{}}'),
+        @('dependency-extra', '{"dependencies":{"a":"1"}}', '{"dependencies":{"a":"1","b":"1"}}'),
+        @('dependency-missing', '{"dependencies":{"a":"1"}}', '{"dependencies":{}}'),
+        @('dependency-key-case', '{"dependencies":{"a":"1"}}', '{"dependencies":{"A":"1"}}'),
+        @('dependency-version', '{"dependencies":{"a":"2.0.11"}}', '{"dependencies":{"a":"2.0.12"}}'),
+        @('string-case', '{"a":"X"}', '{"a":"x"}'),
+        @('string-number', '{"a":"1"}', '{"a":1}'),
+        @('string-boolean', '{"a":"true"}', '{"a":true}'),
+        @('string-null', '{"a":"null"}', '{"a":null}'),
+        @('boolean-value', '{"a":true}', '{"a":false}'),
+        @('object-array', '{"a":{}}', '{"a":[]}'),
+        @('array-order', '{"a":[1,2]}', '{"a":[2,1]}'),
+        @('array-length', '{"a":[1]}', '{"a":[1,2]}'),
+        @('number-value', '{"a":1}', '{"a":2}'),
+        @('duplicate-key', '{"a":1}', '{"a":1,"a":1}'),
+        @('nested-extra-key', '{"a":{"b":1}}', '{"a":{"b":1,"c":1}}')
+    )
+    foreach ($control in $jsonNegativeControls) {
+        Require (-not (Test-NullableConsumerManifest -ExpectedJson $control[1] -ActualJson $control[2])) ('dependency-rejects-' + $control[0])
+    }
+    Require (-not (Test-NullableConsumerManifest -ExpectedJson $floorManifest -ActualJson $observedFloorManifest.Replace($repositoryInput, 'D:/different/package')) ) 'dependency-rejects-changed-package-uri'
+    $malformedRejected = $false
+    try { Test-NullableConsumerManifest -ExpectedJson '{}' -ActualJson '{' | Out-Null } catch { $malformedRejected = $true }
+    Require $malformedRejected 'dependency-malformed-json-fails-closed'
+    $producerSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '../unity/run-nullable-consumer.ps1'))
+    $verifierSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '../unity/verify-nullable-consumer.ps1'))
+    Require ($producerSource.IndexOf('New-NullableConsumerManifest', [StringComparison]::Ordinal) -ge 0 -and $producerSource.IndexOf('New-NullableConsumerManifest', [StringComparison]::Ordinal) -lt $producerSource.IndexOf('$prepareStart =', [StringComparison]::Ordinal)) 'dependency-producer-uses-shared-recipe-before-unity-launch'
+    Require ($verifierSource.Contains('New-NullableConsumerManifest', [StringComparison]::Ordinal) -and $verifierSource.Contains('Test-NullableConsumerManifest -ExpectedJson $currentDependencies -ActualJson $archivedDependencies', [StringComparison]::Ordinal)) 'dependency-verifier-uses-shared-recipe-and-typed-comparator'
+    $nonStringRejected = $false
+    try { New-NullableConsumerManifest -TemplateJson $templateJson -ConfigurationJson $configurationJson.Replace('"2.0.11"', '2') -Repository $repositoryInput -UnityVersion '2021.3.45f1' | Out-Null } catch { $nonStringRejected = $true }
+    Require $nonStringRejected 'dependency-recipe-rejects-nonstring-version'
+
     $complete = Join-Path $root 'managed stripped'
     $first = Join-Path $root 'partial-a'
     $second = Join-Path $root 'partial-b'
@@ -21,12 +101,6 @@ try {
     foreach ($name in $required) { [IO.File]::WriteAllText((Join-Path $complete $name), "SYNTHETIC PARSER CONTROL $name") }
     foreach ($name in $required[0..1]) { [IO.File]::WriteAllText((Join-Path $first $name), "SYNTHETIC PARSER CONTROL $name") }
     foreach ($name in $required[2..3]) { [IO.File]::WriteAllText((Join-Path $second $name), "SYNTHETIC PARSER CONTROL $name") }
-    $results = [Collections.Generic.List[object]]::new()
-    function Require {
-        param([bool]$Valid, [string]$Name)
-        if (-not $Valid) { throw "Parser control failed: $Name" }
-        $results.Add(@{ control = $Name; passed = $true })
-    }
     $direct = @(Get-Il2CppConversionInputs -CommandLines @("`"/Editor/il2cpp/build/deploy/il2cpp.exe`" --convert-to-cpp --directory=`"$complete`"") -Project $root)
     Require ($direct.Count -eq 1 -and @(Get-QualifiedConversionModules -Conversions $direct).Count -eq 1) 'actual-converter-direct-one-complete-input-set'
     $linker = @(Get-Il2CppConversionInputs -CommandLines @("`"/Editor/il2cpp/build/deploy/UnityLinker.exe`" --directory=`"$complete`" --include-link-xml=descriptor.xml") -Project $root)
@@ -299,8 +373,8 @@ try {
     }
 
     $results | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $root 'parser-results.json')
-    if ($results.Count -ne (76 + $optionalControls)) { throw 'Parser controls silently omitted cases' }
-    "Original parser10, player provenance28, inline/archive26, lifecycle12, optional filesystem/process$optionalControls controls passed; synthetic files are not Unity evidence."
+    if ($results.Count -ne (105 + $optionalControls)) { throw 'Parser controls silently omitted cases' }
+    "Original parser10, player provenance28, inline/archive26, lifecycle12, dependency29, optional filesystem/process$optionalControls controls passed; synthetic files are not Unity evidence."
 
 } finally {
     if ($usesTemporaryDirectory) {

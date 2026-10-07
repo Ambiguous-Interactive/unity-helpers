@@ -9,6 +9,7 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'lib/il2cpp-conversion-inputs.ps1')
 $repoPath = [IO.Path]::GetFullPath($Repository)
 $artifactRoot = [IO.Path]::GetFullPath($ArtifactsPath)
 if (Test-Path $artifactRoot) { throw 'Refusing pre-existing acceptance artifacts' }
@@ -27,11 +28,8 @@ foreach ($folder in @('Assets', 'Packages', 'ProjectSettings')) {
     Copy-Item -LiteralPath (Join-Path $template $folder) -Destination $project -Recurse
 }
 $manifestPath = Join-Path $project 'Packages/manifest.json'
-$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-$manifest.dependencies.'com.wallstop-studios.unity-helpers' = 'file:' + $repoPath.Replace('\', '/')
-$moduleConfiguration = Get-Content -LiteralPath (Join-Path $repoPath '.github/unity-test-project-modules.json') -Raw | ConvertFrom-Json
-foreach ($module in $moduleConfiguration.modules.PSObject.Properties) { $manifest.dependencies | Add-Member -NotePropertyName $module.Name -NotePropertyValue $module.Value -Force }
-$manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $manifestPath
+$manifest = New-NullableConsumerManifest -TemplateJson (Get-Content -LiteralPath $manifestPath -Raw) -ConfigurationJson (Get-Content -LiteralPath (Join-Path $repoPath '.github/unity-test-project-modules.json') -Raw) -Repository $repoPath -UnityVersion $UnityVersion
+$manifest | Set-Content -LiteralPath $manifestPath
 "m_EditorVersion: $UnityVersion" | Set-Content -LiteralPath (Join-Path $project 'ProjectSettings/ProjectVersion.txt')
 $prepareLog = Join-Path $artifactRoot 'editor-prepare.log'
 $prepareStart = [Diagnostics.ProcessStartInfo]::new([IO.Path]::GetFullPath($UnityEditorPath))
@@ -168,7 +166,6 @@ foreach ($file in $consumerAfter) {
 if ((Get-FileHash $bindingPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $bindingSHA) { throw 'Generated binding changed during build' }
 $provenanceRoot = Join-Path $artifactRoot 'actual-tool-inputs'
 New-Item -ItemType Directory -Path $provenanceRoot | Out-Null
-. (Join-Path $PSScriptRoot 'lib/il2cpp-conversion-inputs.ps1')
 $lifecycleRoot = Join-Path $artifactRoot 'linker-lifecycle'
 $lifecycleInputs = @()
 $lifecycleManifestSHA = ''

@@ -222,3 +222,81 @@ function New-Il2CppPlayerManifest {
     Assert-Il2CppPlayerManifest -PlayerRoot $root -ManifestPath $path -ExpectedSHA256 $hash
     $hash
 }
+
+# The producer and verifier share this recipe; Unity-added dependencies are not ignored.
+function New-NullableConsumerManifest {
+    param(
+        [Parameter(Mandatory)][string]$TemplateJson,
+        [Parameter(Mandatory)][string]$ConfigurationJson,
+        [Parameter(Mandatory)][string]$Repository,
+        [Parameter(Mandatory)][ValidateSet('2021.3.45f1', '6000.6.0f1')][string]$UnityVersion
+    )
+    $manifest = ConvertFrom-Json -InputObject $TemplateJson -AsHashtable
+    $configuration = ConvertFrom-Json -InputObject $ConfigurationJson -AsHashtable
+    if ($manifest -isnot [Collections.IDictionary] -or $manifest['dependencies'] -isnot [Collections.IDictionary] -or
+        $configuration -isnot [Collections.IDictionary] -or $configuration['modules'] -isnot [Collections.IDictionary] -or
+        $configuration['nullableConsumerDependencies'] -isnot [Collections.IDictionary] -or
+        -not $configuration['nullableConsumerDependencies'].Contains($UnityVersion) -or
+        $configuration['nullableConsumerDependencies'][$UnityVersion] -isnot [Collections.IDictionary]) {
+        throw 'Invalid nullable consumer dependency recipe'
+    }
+    $manifest['dependencies']['com.wallstop-studios.unity-helpers'] = 'file:' + $Repository.Replace('\', '/')
+    foreach ($dependencies in @($configuration['modules'], $configuration['nullableConsumerDependencies'][$UnityVersion])) {
+        foreach ($entry in $dependencies.GetEnumerator()) {
+            if ($entry.Value -isnot [string]) { throw 'Nullable consumer dependency versions must be strings' }
+            $manifest['dependencies'][$entry.Key] = $entry.Value
+        }
+    }
+    return ConvertTo-Json -InputObject $manifest -Depth 100
+}
+
+# JsonElement preserves ordinal names and JSON kinds; PowerShell scalar equality does not.
+function Test-NullableConsumerJsonValue {
+    param([System.Text.Json.JsonElement]$Expected, [System.Text.Json.JsonElement]$Actual)
+    if ($Expected.ValueKind -ne $Actual.ValueKind) { return $false }
+    switch ($Expected.ValueKind.ToString()) {
+        'Object' {
+            $expectedProperties = [Collections.Generic.Dictionary[string,System.Text.Json.JsonElement]]::new([StringComparer]::Ordinal)
+            $actualProperties = [Collections.Generic.Dictionary[string,System.Text.Json.JsonElement]]::new([StringComparer]::Ordinal)
+            foreach ($property in $Expected.EnumerateObject()) {
+                if (-not $expectedProperties.TryAdd($property.Name, $property.Value)) { return $false }
+            }
+            foreach ($property in $Actual.EnumerateObject()) {
+                if (-not $actualProperties.TryAdd($property.Name, $property.Value)) { return $false }
+            }
+            if ($expectedProperties.Count -ne $actualProperties.Count) { return $false }
+            foreach ($entry in $expectedProperties.GetEnumerator()) {
+                if (-not $actualProperties.ContainsKey($entry.Key) -or
+                    -not (Test-NullableConsumerJsonValue -Expected $entry.Value -Actual $actualProperties[$entry.Key])) { return $false }
+            }
+            return $true
+        }
+        'Array' {
+            if ($Expected.GetArrayLength() -ne $Actual.GetArrayLength()) { return $false }
+            for ($index = 0; $index -lt $Expected.GetArrayLength(); ++$index) {
+                if (-not (Test-NullableConsumerJsonValue -Expected $Expected[$index] -Actual $Actual[$index])) { return $false }
+            }
+            return $true
+        }
+        'String' { return [string]::Equals($Expected.GetString(), $Actual.GetString(), [StringComparison]::Ordinal) }
+        'Number' { return [string]::Equals($Expected.GetRawText(), $Actual.GetRawText(), [StringComparison]::Ordinal) }
+        'True' { return $true }
+        'False' { return $true }
+        'Null' { return $true }
+        default { return $false }
+    }
+}
+
+function Test-NullableConsumerManifest {
+    param([Parameter(Mandatory)][string]$ExpectedJson, [Parameter(Mandatory)][string]$ActualJson)
+    $expectedDocument = $null
+    $actualDocument = $null
+    try {
+        $expectedDocument = [System.Text.Json.JsonDocument]::Parse($ExpectedJson)
+        $actualDocument = [System.Text.Json.JsonDocument]::Parse($ActualJson)
+        return Test-NullableConsumerJsonValue -Expected $expectedDocument.RootElement -Actual $actualDocument.RootElement
+    } finally {
+        if ($null -ne $actualDocument) { $actualDocument.Dispose() }
+        if ($null -ne $expectedDocument) { $expectedDocument.Dispose() }
+    }
+}

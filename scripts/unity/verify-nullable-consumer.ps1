@@ -88,12 +88,9 @@ foreach ($label in $rows.Keys) {
 $currentBinding = [IO.File]::ReadAllText((Join-Path $template 'Assets/Consumer/ConsumerBinding.cs')).Replace('__UNITY__',$UnityVersion).Replace('__COMMIT__',$Commit).Replace('__SOURCE__',$declaration.sourceManifest).Replace('__TOKEN__',$declaration.runToken)
 $currentBindingSHA = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($currentBinding))).ToLowerInvariant()
 if ($currentBindingSHA -ne $declaration.generatedBindingSHA256) { throw 'Current generated-binding recipe differs' }
-$currentDependencies = (Get-Content -LiteralPath (Join-Path $template 'Packages/manifest.json') -Raw | ConvertFrom-Json)
-$currentDependencies.dependencies.'com.wallstop-studios.unity-helpers' = 'file:' + $repoPath.Replace('\','/')
-$moduleConfiguration = Get-Content -LiteralPath (Join-Path $repoPath '.github/unity-test-project-modules.json') -Raw | ConvertFrom-Json
-foreach ($module in $moduleConfiguration.modules.PSObject.Properties) { $currentDependencies.dependencies | Add-Member -NotePropertyName $module.Name -NotePropertyValue $module.Value -Force }
-$archivedDependencies = Get-Content -LiteralPath (Join-Path $consumerArchive 'Packages/manifest.json') -Raw | ConvertFrom-Json
-if (($currentDependencies | ConvertTo-Json -Depth 10 -Compress) -ne ($archivedDependencies | ConvertTo-Json -Depth 10 -Compress)) { throw 'Current consumer dependency manifest differs' }
+$currentDependencies = New-NullableConsumerManifest -TemplateJson (Get-Content -LiteralPath (Join-Path $template 'Packages/manifest.json') -Raw) -ConfigurationJson (Get-Content -LiteralPath (Join-Path $repoPath '.github/unity-test-project-modules.json') -Raw) -Repository $repoPath -UnityVersion $UnityVersion
+$archivedDependencies = Get-Content -LiteralPath (Join-Path $consumerArchive 'Packages/manifest.json') -Raw
+if (-not (Test-NullableConsumerManifest -ExpectedJson $currentDependencies -ActualJson $archivedDependencies)) { throw 'Current consumer dependency manifest differs' }
 $playerRoot = Join-Path $root 'player'
 Assert-Il2CppPlayerManifest -PlayerRoot $playerRoot -ManifestPath (Join-Path $root 'player-tree.json') -ExpectedSHA256 $declaration.playerManifestSHA256
 Require-Hash (Join-Path $playerRoot 'IndependentConsumer.exe') $declaration.executableSHA256
