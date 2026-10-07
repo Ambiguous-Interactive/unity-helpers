@@ -65,6 +65,20 @@ cancelled the work, so a caller racing its own timeout against an unrelated one 
 Queue rejection is a fault, not a hang: when the dispatcher's queue is full the returned task
 completes with an `InvalidOperationException` naming the limit.
 
+### Dispatcher Lifetime
+
+Destroying a dispatcher cancels its queued `RunAsync` and `Post<T>` tasks without executing their
+callbacks. An asynchronous delegate that has already started completes normally, including its
+original exception or cancellation token. Calls through a destroyed reference return canceled tasks;
+`TryRunOnMainThread` returns false and plain `RunOnMainThread` drops the work without an overflow warning.
+
+A dispatcher on a never-active GameObject cannot receive Unity's destruction callback. It rejects
+submissions until `Awake` or `OnEnable` initializes it. After that, disabling it pauses execution but
+still allows queuing. Re-enable it to resume work, or destroy it to cancel pending tasks. Keep a live
+reference for the operation and handle `OperationCanceledException` when a scene transition retires
+that dispatcher. Caller-owned tasks wrapped manually around plain `RunOnMainThread` callbacks are
+outside this cancellation contract; use `RunAsync` or `Post<T>` for awaited work.
+
 ### Use Cases
 
 ```csharp

@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix queued dispatcher tasks hanging after destruction. Cancel abandoned work, reject uninitialized or destroyed dispatchers, and preserve running task completion ([#961](https://github.com/Ambiguous-Interactive/unity-helpers/issues/961)).
 - Fix dispatcher scope cleanup attempting to destroy loaded prefab assets; scene instances still receive cleanup ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix editor imports in projects without Unity Test Framework; test reporting tools activate when the framework is installed ([#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950)).
 - Fix legacy protobuf maps losing present nullable defaults, while preserving null values and historical nonnullable bytes ([#953](https://github.com/Ambiguous-Interactive/unity-helpers/issues/953)).
