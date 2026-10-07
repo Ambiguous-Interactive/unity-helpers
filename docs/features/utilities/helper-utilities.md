@@ -1110,22 +1110,50 @@ string[] buildScenes = SceneHelper.GetScenesInBuild();
 Constructing `SceneHelper.SceneLoadScope` with a null, empty, or whitespace-only path does nothing:
 it loads no scene, invokes no callback, and completes disposal immediately.
 
-**Load scene, extract data, auto-unload:**
+Call retrieval and `SceneLoadScope` construction on Unity's main thread. Retrieval accepts
+loaded scene names or paths, including nonactive scenes, and returns inactive objects too.
+Already loaded scenes are borrowed: disposing a result preserves their objects, active scene,
+and loaded scene count. Name matches are checked before resolving Build Settings aliases.
+
+In players, new loads use scenes available to Unity, including packed Build Settings scenes;
+they do not require `.unity` source files on disk. Editor tools may also load scene assets
+outside Build Settings. Blank or unavailable inputs return empty/default results.
+
+**Load scene, extract data, unload owned scenes:**
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
+using WallstopStudios.UnityHelpers.Utils;
 
-// RAII pattern - scene unloaded when disposed
-using (var scope = SceneHelper.GetObjectOfTypeInScene<LevelConfig>("Scenes/LevelData"))
+DeferredDisposalResult<LevelConfig> result =
+    await SceneHelper.GetObjectOfTypeInScene<LevelConfig>("Scenes/LevelData");
+try
 {
-    if (scope.HasObject)
+    LevelConfig config = result.result;
+    if (config != null)
     {
-        LevelConfig config = scope.Object;
-        // Use config data
+        // Read configuration before disposing an owned scene.
     }
-    // Scene automatically unloaded here
+}
+finally
+{
+    await result.DisposeAsync();
 }
 ```
+
+Retrieval disposal runs immediately on the calling main thread or posts to the Unity
+synchronization context captured during retrieval. It does not depend on dispatcher delivery.
+Await disposal before considering cleanup complete; a missing context or an unload failure
+faults the returned operation.
+
+A direct `SceneLoadScope` exposes `LoadTask` for the loaded scene or load/callback failure.
+Its disposal must run on Unity's main thread. Disposal during loading suppresses the user
+callback, waits for loading, then unloads the exact scene owned by that scope. Multiple loads
+of the same path retain distinct scene handles. Repeated disposal awaits the same cleanup,
+and callback failures remain observable while cleanup still unloads the owned scene.
+Scene-loaded subscriptions and callback captures are released after completion or failure.
+These helpers retain Unity's synchronous scene-loading API, which can stall a frame; they do
+not provide a streaming-performance guarantee.
 
 **Use for:**
 

@@ -5,17 +5,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
     using System.Collections;
     using System.Linq;
-    using System.Text.RegularExpressions;
     using System.Threading.Tasks;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
     using WallstopStudios.UnityHelpers.Utils;
 #if UNITY_EDITOR
+    using UnityEditor;
     using UnityEditor.SceneManagement;
 #endif
 
@@ -23,42 +24,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class SceneHelperTests : CommonTestBase
     {
-        private static string TestScenePath => _testScenePath ??= ResolveScenePath();
-        private static string _testScenePath;
+        private const string TestScenePath =
+            "Packages/com.wallstop-studios.unity-helpers/Tests/Runtime/Scenes/Test1.unity";
 
-        /// <summary>
-        /// Marks the calling test inconclusive when the additive test scene cannot be loaded in this
-        /// build. In the editor scenes load from disk; in a standalone player a scene must be baked
-        /// into Build Settings, and the ephemeral CI player build includes none -- so additive
-        /// loading of Test1.unity cannot succeed there. This is an environment precondition (no scene
-        /// in the build), not a product defect, so skip rather than fail. <c>true</c> means the test
-        /// should stop.
-        /// </summary>
-        private static bool TestSceneUnavailable()
+        private static void EnsureTestSceneAvailable()
         {
-            if (Application.CanStreamedLevelBeLoaded(TestScenePath))
-            {
-                return false;
-            }
-
-            Assert.Inconclusive(
-                "Additive test scene is not loadable in this build (not in the player's Build "
-                    + "Settings); scene-loading coverage requires the test scene to be baked in."
+#if UNITY_EDITOR
+            Assert.AreEqual(
+                typeof(SceneAsset),
+                AssetDatabase.GetMainAssetTypeAtPath(TestScenePath),
+                "The package test scene must resolve through Unity's asset database."
             );
-            return true;
-        }
-
-        private static string ResolveScenePath()
-        {
-            string relativePath = DirectoryHelper.FindAbsolutePathToDirectory(
-                "Tests/Runtime/Scenes/Test1.unity"
+#else
+            Assert.IsTrue(
+                Application.CanStreamedLevelBeLoaded(TestScenePath),
+                "The package test scene must be baked into standalone tests."
             );
-            if (string.IsNullOrWhiteSpace(relativePath))
-            {
-                Assert.Fail("Unable to resolve test scene path.");
-            }
-
-            return relativePath;
+#endif
         }
 
         [TestCase(null, TestName = "LoadedScene.Null.ReturnsFalse")]
@@ -139,10 +121,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator GetObjectOfTypeInScene()
         {
-            if (TestSceneUnavailable())
-            {
-                yield break;
-            }
+            EnsureTestSceneAvailable();
 
             ValueTask<DeferredDisposalResult<SpriteRenderer>> task =
                 SceneHelper.GetObjectOfTypeInScene<SpriteRenderer>(TestScenePath);
@@ -160,10 +139,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator GetAllObjectOfTypeInScene()
         {
-            if (TestSceneUnavailable())
-            {
-                yield break;
-            }
+            EnsureTestSceneAvailable();
 
             ValueTask<DeferredDisposalResult<SpriteRenderer[]>> task =
                 SceneHelper.GetAllObjectsOfTypeInScene<SpriteRenderer>(TestScenePath);
@@ -207,10 +183,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator SceneLoadScopeLoadsAndDisposesScene()
         {
-            if (TestSceneUnavailable())
-            {
-                yield break;
-            }
+            EnsureTestSceneAvailable();
 
             int initialSceneCount = SceneManager.sceneCount;
             bool callbackInvoked = false;
@@ -226,6 +199,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 }
             );
 
+            TrackAsyncDisposal(scope.DisposeAsync);
             float timeout = Time.time + 5f;
             while (!callbackInvoked && Time.time < timeout)
             {
@@ -276,6 +250,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.Inconclusive($"Scene '{TestScenePath}' must exist to run this test.");
                 yield break;
             }
+            TrackAsyncDisposal(() => SceneHelperTestsUtilities.DisposeSceneAsync(loadedScene));
             yield return null;
             Scene previousActive = SceneManager.GetActiveScene();
             SceneManager.SetActiveScene(loadedScene);
@@ -328,46 +303,71 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         private static class SceneHelperTestsUtilities
         {
-            public static bool TryEnsureSceneLoaded(
-                string scenePath,
-                out Scene scene,
-                bool expectError = false
-            )
+            public static bool TryEnsureSceneLoaded(string scenePath, out Scene scene)
             {
 #if UNITY_EDITOR
-                try
+                if (!Application.isPlaying)
                 {
-                    scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
-                    return scene.IsValid();
+                    Scene opened = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
+                    bool valid = opened.IsValid();
+                    scene = opened;
+                    return valid;
                 }
-                catch { }
-#endif
-                if (SceneUtility.GetBuildIndexByScenePath(scenePath) < 0)
+                Scene loading = EditorSceneManager.LoadSceneInPlayMode(
+                    scenePath,
+                    new LoadSceneParameters(LoadSceneMode.Additive)
+                );
+#else
+                if (!Application.CanStreamedLevelBeLoaded(scenePath))
                 {
-                    if (expectError)
-                    {
-                        LogAssert.Expect(
-                            LogType.Error,
-                            new Regex("couldn't be loaded.*Build Settings", RegexOptions.IgnoreCase)
-                        );
-                    }
                     scene = default;
                     return false;
                 }
-                SceneManager.LoadScene(scenePath, LoadSceneMode.Additive);
-                scene = SceneManager.GetSceneByPath(scenePath);
-                return scene.IsValid() && scene.isLoaded;
+                Scene loading = SceneManager.LoadScene(
+                    scenePath,
+                    new LoadSceneParameters(LoadSceneMode.Additive)
+                );
+#endif
+                bool started = loading.IsValid();
+                scene = loading;
+                return started;
+            }
+
+            public static async ValueTask DisposeSceneAsync(Scene scene)
+            {
+                if (!scene.IsValid() || !scene.isLoaded)
+                {
+                    return;
+                }
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                {
+                    Assert.IsTrue(EditorSceneManager.CloseScene(scene, true));
+                    return;
+                }
+#endif
+                AsyncOperation unload = SceneManager.UnloadSceneAsync(scene);
+                Assert.IsTrue(unload != null);
+                await unload;
             }
 
             public static IEnumerator UnloadSceneAsync(string scenePath)
             {
 #if UNITY_EDITOR
-                if (EditorSceneManager.CloseScene(SceneManager.GetSceneByPath(scenePath), true))
+                if (
+                    !Application.isPlaying
+                    && EditorSceneManager.CloseScene(SceneManager.GetSceneByPath(scenePath), true)
+                )
                 {
                     yield break;
                 }
 #endif
-                AsyncOperation unload = SceneManager.UnloadSceneAsync(scenePath);
+                Scene loaded = SceneManager.GetSceneByPath(scenePath);
+                if (!loaded.IsValid() || !loaded.isLoaded)
+                {
+                    yield break;
+                }
+                AsyncOperation unload = SceneManager.UnloadSceneAsync(loaded);
                 while (unload != null && !unload.isDone)
                 {
                     yield return null;

@@ -1774,6 +1774,20 @@ public sealed class UhCiStandaloneBuildModifier : ITestPlayerBuildModifier, IPos
 
     public BuildPlayerOptions ModifyOptions(BuildPlayerOptions playerOptions)
     {
+        const string testScene = "Packages/com.wallstop-studios.unity-helpers/Tests/Runtime/Scenes/Test1.unity";
+        if (AssetDatabase.LoadAssetAtPath<SceneAsset>(testScene) == null)
+        {
+            throw new InvalidOperationException("Required standalone test scene is missing: " + testScene);
+        }
+        string[] scenes = playerOptions.scenes ?? Array.Empty<string>();
+        if (Array.IndexOf(scenes, testScene) < 0)
+        {
+            string[] provisioned = new string[scenes.Length + 1];
+            Array.Copy(scenes, provisioned, scenes.Length);
+            provisioned[scenes.Length] = testScene;
+            playerOptions.scenes = provisioned;
+        }
+        Debug.Log("UH standalone test scene: " + testScene);
         playerOptions.options &= ~BuildOptions.AutoRunPlayer;
         playerOptions.options &= ~BuildOptions.ConnectToHost;
         playerOptions.options &= ~BuildOptions.ConnectWithProfiler;

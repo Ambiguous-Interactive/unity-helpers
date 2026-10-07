@@ -144,11 +144,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
 
                 while (
-                    0 < remainingActionBudget && dispatcher._actions.TryDequeue(out Action action)
+                    0 < remainingActionBudget
+                    && dispatcher.TryDequeueQueuedAction(
+                        out UnityMainThreadDispatcher.QueuedAction queued
+                    )
                 )
                 {
                     --remainingActionBudget;
-                    dispatcher.ExecuteQueuedAction(action);
+                    dispatcher.ExecuteQueuedAction(queued);
                 }
             }
 

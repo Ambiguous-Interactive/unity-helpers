@@ -20,13 +20,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// </summary>
     /// <remarks>
     /// Works in both edit mode and play mode. Use for marshalling callbacks from tasks/threads to main thread.
+    /// Queued task operations are canceled on destruction; started operations complete normally.
+    /// Submissions before initialization or after destruction are rejected.
     /// </remarks>
     [ExecuteAlways]
     public sealed class UnityMainThreadDispatcher : RuntimeSingleton<UnityMainThreadDispatcher>
     {
         private const int DefaultQueueLimit = 4096;
 
-        internal readonly ConcurrentQueue<Action> _actions = new();
+        private readonly ConcurrentQueue<QueuedAction> _actions = new();
+        private readonly object _queueGate = new();
+        private bool _retired;
+        private bool _initialized;
         private int _pendingActionCount;
         private int _lastOverflowFrame = -1;
 #if UNITY_EDITOR
@@ -79,8 +84,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
-            dispatcher.RunOnMainThread(action);
-            return true;
+            return dispatcher.TryRunOnMainThread(action);
         }
 
         internal static int GetLiveDispatcherCount()
@@ -403,10 +407,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         taskCompletionSource.TrySetException(e);
                     }
                 },
-                logOverflow: true
+                logOverflow: true,
+                onDiscard: () => taskCompletionSource.TrySetCanceled()
             );
 
-            if (!queued)
+            if (!queued && !taskCompletionSource.Task.IsCompleted)
             {
                 taskCompletionSource.TrySetException(
                     new InvalidOperationException(BuildOverflowMessage())
@@ -513,15 +518,30 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         TaskScheduler.Default
                     );
                 },
-                logOverflow: true
+                logOverflow: true,
+                onDiscard: () =>
+                {
+                    registration.Dispose();
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        taskCompletionSource.TrySetCanceled(cancellationToken);
+                    }
+                    else
+                    {
+                        taskCompletionSource.TrySetCanceled();
+                    }
+                }
             );
 
             if (!queued)
             {
                 registration.Dispose();
-                taskCompletionSource.TrySetException(
-                    new InvalidOperationException(BuildOverflowMessage())
-                );
+                if (!taskCompletionSource.Task.IsCompleted)
+                {
+                    taskCompletionSource.TrySetException(
+                        new InvalidOperationException(BuildOverflowMessage())
+                    );
+                }
             }
 
             return taskCompletionSource.Task;
@@ -554,10 +574,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         taskCompletionSource.TrySetException(e);
                     }
                 },
-                logOverflow: true
+                logOverflow: true,
+                onDiscard: () => taskCompletionSource.TrySetCanceled()
             );
 
-            if (!queued)
+            if (!queued && !taskCompletionSource.Task.IsCompleted)
             {
                 taskCompletionSource.TrySetException(
                     new InvalidOperationException(BuildOverflowMessage())
@@ -567,8 +588,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return taskCompletionSource.Task;
         }
 
+        protected override void Awake()
+        {
+            base.Awake();
+            InitializeQueue();
+        }
+
         protected override void OnDestroy()
         {
+            lock (_queueGate)
+            {
+                _retired = true;
+            }
+            while (_actions.TryDequeue(out QueuedAction queued))
+            {
+                try
+                {
+                    queued.onDiscard?.Invoke();
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _pendingActionCount);
+                }
+            }
 #if UNITY_EDITOR
             if (_attachedEditorUpdate)
             {
@@ -581,11 +623,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             base.OnDestroy();
         }
 
-        internal void ExecuteQueuedAction(Action action)
+        internal bool TryDequeueQueuedAction(out QueuedAction queued)
+        {
+            lock (_queueGate)
+            {
+                if (_retired || !_initialized)
+                {
+                    queued = default;
+                    return false;
+                }
+                return _actions.TryDequeue(out queued);
+            }
+        }
+
+        internal void ExecuteQueuedAction(QueuedAction queued)
         {
             try
             {
-                action();
+                queued.action();
             }
             catch (Exception e)
             {
@@ -597,15 +652,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private bool Enqueue(Action action, bool logOverflow)
+        private bool Enqueue(Action action, bool logOverflow, Action onDiscard = null)
         {
             if (action == null)
             {
                 throw new ArgumentNullException(nameof(action));
             }
 
-            if (!TryEnqueueInternal(action))
+            if (!TryEnqueueInternal(new QueuedAction(action, onDiscard), out bool retired))
             {
+                if (retired)
+                {
+                    onDiscard?.Invoke();
+                    return false;
+                }
                 if (logOverflow)
                 {
                     LogOverflow();
@@ -616,17 +676,26 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return true;
         }
 
-        private bool TryEnqueueInternal(Action action)
+        private bool TryEnqueueInternal(QueuedAction queued, out bool retired)
         {
-            int newCount = Interlocked.Increment(ref _pendingActionCount);
-            if (0 < maxPendingActions && maxPendingActions < newCount)
+            lock (_queueGate)
             {
-                Interlocked.Decrement(ref _pendingActionCount);
-                return false;
+                if (_retired || !_initialized)
+                {
+                    retired = true;
+                    return false;
+                }
+                int newCount = Interlocked.Increment(ref _pendingActionCount);
+                if (0 < maxPendingActions && maxPendingActions < newCount)
+                {
+                    Interlocked.Decrement(ref _pendingActionCount);
+                    retired = false;
+                    return false;
+                }
+                _actions.Enqueue(queued);
+                retired = false;
+                return true;
             }
-
-            _actions.Enqueue(action);
-            return true;
         }
 
         private void LogOverflow()
@@ -663,8 +732,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return $"UnityMainThreadDispatcher queue overflow (limit {limit}). Dropping action. Pending count: {pending}.";
         }
 
+        private void InitializeQueue()
+        {
+            lock (_queueGate)
+            {
+                _initialized = !_retired;
+            }
+        }
+
         private void OnEnable()
         {
+            InitializeQueue();
 #if UNITY_EDITOR
             if (!_attachedEditorUpdate && !Application.isPlaying)
             {
@@ -688,9 +766,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private void Update()
         {
-            while (_actions.TryDequeue(out Action action))
+            while (TryDequeueQueuedAction(out QueuedAction queued))
             {
-                ExecuteQueuedAction(action);
+                ExecuteQueuedAction(queued);
             }
         }
 
@@ -829,6 +907,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     DestroyExistingDispatcher(_destroyImmediate);
                 }
+            }
+        }
+
+        internal readonly struct QueuedAction
+        {
+            internal readonly Action action;
+            internal readonly Action onDiscard;
+
+            internal QueuedAction(Action action, Action onDiscard)
+            {
+                this.action = action;
+                this.onDiscard = onDiscard;
             }
         }
     }

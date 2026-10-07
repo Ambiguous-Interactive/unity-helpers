@@ -238,6 +238,10 @@ withCase((fixture) => {
 
   const after = run(fixture);
   check("  ...leaving a tree the unfixed gate passes", after.code === 0, after.output);
+  check(
+    "successful refresh removes hidden staging directories",
+    !fs.readdirSync(fixture.shippedDirectory).some((name) => name.startsWith(".refresh-"))
+  );
 });
 
 withCase((fixture) => {
@@ -248,5 +252,106 @@ withCase((fixture) => {
   );
   check("--fix does not conjure a missing shipped directory", code === 1, `exit ${code}`);
 });
+
+console.log("Section: failed refresh preserves payloads");
+
+for (const operation of ["copyFileSync", "renameSync"]) {
+  withCase((fixture) => {
+    const assembly = ANALYZERS[0].assembly;
+    const target = path.join(fixture.shippedDirectory, assembly);
+    const metadata = `${target}.meta`;
+    fs.writeFileSync(target, "previous payload");
+    fs.writeFileSync(metadata, "previous importer");
+    const original = fs[operation];
+    let invoked = false;
+    fs[operation] = (source, destination) => {
+      invoked = true;
+      if (operation === "copyFileSync") {
+        fs.writeFileSync(destination, "partial payload");
+        fs.rmSync(destination);
+      }
+      const error = new Error("injected publication failure");
+      error.code = "EPERM";
+      throw error;
+    };
+    let result;
+    try {
+      result = run(fixture, { fix: true });
+    } finally {
+      fs[operation] = original;
+    }
+    check(`${operation} failure was exercised`, invoked);
+    check(`${operation} failure returns one`, result.code === 1, result.output);
+    check(
+      `${operation} failure preserves the previous payload`,
+      fs.existsSync(target) && fs.readFileSync(target, "utf8") === "previous payload"
+    );
+    check(
+      `${operation} failure preserves importer metadata`,
+      fs.readFileSync(metadata, "utf8") === "previous importer"
+    );
+    check(
+      `${operation} failure cleans temporary files`,
+      !fs.readdirSync(fixture.shippedDirectory).some((name) => name.startsWith(".refresh-"))
+    );
+    const retry = run(fixture, { fix: true });
+    check(`${operation} failure permits a successful retry`, retry.code === 0, retry.output);
+    check(
+      `${operation} retry publishes the complete payload`,
+      fs.readFileSync(target, "utf8") === `fresh bytes of ${assembly}`
+    );
+  });
+}
+
+if (process.platform !== "win32" && process.getuid() !== 0) {
+  console.log("Section: real filesystem denial on shared workspace");
+  for (const operation of ["copyFileSync", "renameSync"]) {
+    const root = fs.mkdtempSync(path.join(REPO_ROOT, ".analyzer-refresh-test-"));
+    const fixture = {
+      root,
+      shippedDirectory: path.join(root, "shipped"),
+      scratchDirectory: path.join(root, "scratch")
+    };
+    fs.mkdirSync(fixture.shippedDirectory);
+    for (const { assembly } of ANALYZERS) {
+      fs.writeFileSync(path.join(fixture.shippedDirectory, assembly), `fresh bytes of ${assembly}`);
+    }
+    const target = path.join(fixture.shippedDirectory, ANALYZERS[0].assembly);
+    fs.writeFileSync(target, "retained payload");
+    fs.writeFileSync(`${target}.meta`, "retained importer");
+    const original = fs[operation];
+    let denied = false;
+    fs[operation] = (source, destination) => {
+      const parent = path.dirname(destination);
+      const mode = fs.statSync(parent).mode & 0o777;
+      fs.chmodSync(parent, 0o500);
+      try {
+        return original(source, destination);
+      } catch (error) {
+        denied = error.code === "EACCES" || error.code === "EPERM";
+        throw error;
+      } finally {
+        fs.chmodSync(parent, mode);
+      }
+    };
+    try {
+      const result = run(fixture, { fix: true });
+      check(`${operation} reaches a real permission denial`, denied, result.output);
+      check(`${operation} real denial returns one`, result.code === 1, result.output);
+      check(
+        `${operation} real denial retains DLL and metadata bytes`,
+        fs.readFileSync(target, "utf8") === "retained payload" &&
+          fs.readFileSync(`${target}.meta`, "utf8") === "retained importer"
+      );
+      check(
+        `${operation} real denial cleans hidden staging`,
+        !fs.readdirSync(fixture.shippedDirectory).some((name) => name.startsWith(".refresh-"))
+      );
+    } finally {
+      fs[operation] = original;
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }
+}
 
 console.log(`\n${passed} passed, 0 failed.`);
