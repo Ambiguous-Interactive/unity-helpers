@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix first-save initialization so failed writes leave the save path free for retry and competing creators keep their complete files ([#964](https://github.com/Ambiguous-Interactive/unity-helpers/issues/964)).
+- Fix WallstopProto map entries losing earlier members when one entry repeats its message value; separate entries for the same key still replace the value. Reject malformed fragments across message boundaries ([#970](https://github.com/Ambiguous-Interactive/unity-helpers/issues/970)).
+- Fix weighted caches losing entries when storage fills, exceeding their budget on replacement or overflow, and changing existing values after a failed weight calculation ([#969](https://github.com/Ambiguous-Interactive/unity-helpers/issues/969)).
 - Fix completed `ValueTask` coroutine adapters retaining pooled source resources when no result callback is supplied; completed cancellation is now propagated in those paths ([#967](https://github.com/Ambiguous-Interactive/unity-helpers/issues/967)).
 - Fix invalid background-worker idle timeouts stranding queued save jobs; supported fractional and infinite waits retain their behavior ([#965](https://github.com/Ambiguous-Interactive/unity-helpers/issues/965)).
 - Fix extra allocations during WProto polymorphic list reads by reusing unseeded and replacement lists; preserve constructor list identity and append order ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).

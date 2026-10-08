@@ -2,6 +2,12 @@
 
 ## Agent-Specific Rules
 
+- For issue-debt delivery, implement substantive player-facing fixes across multiple pain points;
+  inventory, documentation and green-main checks alone are not delivery. Aim to fully close at
+  least three issues against their original acceptance criteria. Respect the user's session limit
+  (two hours for the current campaign), reserve time for validation and PR closeout, and retain
+  unfinished acceptance actions without counting partial work as closed issues.
+
 - Keep changes minimal and focused; respect folder boundaries (Runtime vs Editor)
 - Treat every failed test or CI job as unresolved until its cause is classified and fixed. A
   passing rerun only adds evidence; follow [investigate-test-failures](../skills/investigate-test-failures.md)

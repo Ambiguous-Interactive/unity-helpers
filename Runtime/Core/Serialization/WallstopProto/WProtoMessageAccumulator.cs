@@ -59,13 +59,28 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return int.MaxValue < doubled ? int.MaxValue : (int)doubled;
         }
 
+        private static bool IsCompleteMessage(ReadOnlySpan<byte> payload)
+        {
+            WProtoReader reader = new WProtoReader(payload);
+            while (reader.TryReadTag(out int fieldNumber, out int wireType))
+            {
+                if (!reader.TrySkipField(fieldNumber, wireType))
+                {
+                    return false;
+                }
+            }
+
+            return !reader.Malformed && reader.End;
+        }
+
         /// <summary>
         /// Adds one occurrence of the field.
         /// </summary>
         /// <param name="occurrence">The sub-message payload, without its key or length prefix.</param>
         /// <returns>
-        /// <c>true</c> when the occurrence was accumulated; <c>false</c> only when the total would
-        /// exceed what a single span can address.
+        /// True when accumulated; false when repeated occurrences have incomplete wire fields
+        /// or the total exceeds what a single span can address. A single occurrence is validated
+        /// by its formatter when decoded.
         /// </returns>
         public bool TryAdd(ReadOnlySpan<byte> occurrence)
         {
@@ -74,6 +89,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _seen = true;
                 _payload = occurrence;
                 return true;
+            }
+
+            if ((_buffer == null && !IsCompleteMessage(_payload)) || !IsCompleteMessage(occurrence))
+            {
+                return false;
             }
 
             long required = (long)(_buffer == null ? _payload.Length : _length) + occurrence.Length;

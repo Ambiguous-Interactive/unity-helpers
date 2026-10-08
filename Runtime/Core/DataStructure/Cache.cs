@@ -165,7 +165,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 options.ProtectedRatio = CacheOptions<TKey, TValue>.DefaultProtectedRatio;
             }
 
-            if (options.GrowthFactor <= 1f)
+            if (!float.IsFinite(options.GrowthFactor) || options.GrowthFactor <= 1f)
             {
                 options.GrowthFactor = CacheOptions<TKey, TValue>.DefaultGrowthFactor;
             }
@@ -407,7 +407,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Adds or updates an entry in the cache with a custom TTL.
         /// </summary>
-        /// <remarks>A failing custom lifetime function preserves existing values, expiration schedules, and cache storage.</remarks>
+        /// <remarks>
+        /// Failing weight or lifetime functions preserve existing values, expiration schedules, and storage.
+        /// Negative weights and values exceeding the weight budget are rejected without callbacks.
+        /// </remarks>
         /// <param name="key">The key of the entry.</param>
         /// <param name="value">The value to cache.</param>
         /// <param name="ttlSeconds">Custom TTL in seconds. If null, uses default expiration.</param>
@@ -843,6 +846,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void SetUnlocked(TKey key, TValue value, float? ttlSeconds = null)
         {
+            long weight = _options.Weigher != null ? _options.Weigher(key, value) : 0;
+            if (_options.Weigher != null && (weight < 0 || _options.MaximumWeight < weight))
+            {
+                return;
+            }
+
             float currentTime = _timeProvider();
             double expirationDuration = ComputeExpirationDuration(
                 key,
@@ -857,6 +866,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 TValue oldValue = _entries[existingIndex].Value;
                 long oldWeight = _options.Weigher != null ? _entries[existingIndex].Weight : 0;
 
+                if (_options.Weigher != null)
+                {
+                    while (_options.MaximumWeight - weight < _currentWeight - oldWeight)
+                    {
+                        int victim = SelectVictim(existingIndex);
+                        if (victim < 0)
+                        {
+                            return;
+                        }
+                        EvictEntry(victim, EvictionReason.Capacity);
+                        ++_recentEvictionCount;
+                    }
+                }
+
                 _entries[existingIndex].Value = value;
                 _entries[existingIndex].ExpirationStartedAt = currentTime;
                 _entries[existingIndex].AccessTime = currentTime;
@@ -866,9 +889,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
                 if (_options.Weigher != null)
                 {
-                    long newWeight = _options.Weigher(key, value);
-                    _entries[existingIndex].Weight = newWeight;
-                    _currentWeight = _currentWeight - oldWeight + newWeight;
+                    _entries[existingIndex].Weight = weight;
+                    _currentWeight = _currentWeight - oldWeight + weight;
                 }
 
                 OnAccess(existingIndex, currentTime);
@@ -880,24 +902,29 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            long weight = _options.Weigher != null ? _options.Weigher(key, value) : 0;
-
-            while (
-                _options.Weigher != null
-                && _options.MaximumWeight < _currentWeight + weight
-                && 0 < _count
-            )
+            if (_options.Weigher != null)
             {
-                if (_options.AllowGrowth && ShouldGrow())
+                if (_freeListHead < 0 && _currentWeight <= _options.MaximumWeight - weight)
                 {
-                    Grow();
-                    break;
+                    GrowTowardsMaximumSize(int.MaxValue);
+                    if (_freeListHead < 0)
+                    {
+                        return;
+                    }
                 }
 
-                EvictOne(EvictionReason.Capacity);
+                while (_options.MaximumWeight - weight < _currentWeight)
+                {
+                    int victim = SelectVictim();
+                    if (victim < 0)
+                    {
+                        return;
+                    }
+                    EvictEntry(victim, EvictionReason.Capacity);
+                    ++_recentEvictionCount;
+                }
             }
-
-            if (_options.Weigher == null)
+            else
             {
                 EnsureCapacity();
             }
@@ -1073,30 +1100,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void EnsureCapacity()
         {
-            EnsureCapacityForWeight(0);
-        }
-
-        private void EnsureCapacityForWeight(long incomingWeight)
-        {
-            if (_options.Weigher == null && _capacity <= _count && _capacity < _maximumSize)
+            if (_capacity <= _count && _capacity < _maximumSize)
             {
-                GrowTowardsMaximumSize();
-            }
-
-            if (_options.Weigher != null)
-            {
-                if (_options.MaximumWeight < _currentWeight + incomingWeight)
-                {
-                    if (_options.AllowGrowth && ShouldGrow())
-                    {
-                        Grow();
-                    }
-                    else
-                    {
-                        EvictOne(EvictionReason.Capacity);
-                    }
-                }
-                return;
+                GrowTowardsMaximumSize(_maximumSize);
             }
 
             if (_maximumSize <= _count)
@@ -1112,12 +1118,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private void GrowTowardsMaximumSize()
+        private void GrowTowardsMaximumSize(int maximumCapacity)
         {
-            int newCapacity = Math.Min((int)(_capacity * _options.GrowthFactor), _maximumSize);
+            int newCapacity = ComputeGrowthCapacity(maximumCapacity);
             if (newCapacity <= _capacity)
             {
-                newCapacity = Math.Min(_capacity + 1, _maximumSize);
+                newCapacity = _capacity < maximumCapacity ? _capacity + 1 : _capacity;
             }
 
             if (newCapacity <= _capacity)
@@ -1161,13 +1167,21 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return _options.ThrashThresholdEvictionsPerSecond <= evictionsPerSecond;
         }
 
+        private int ComputeGrowthCapacity(int maximumCapacity)
+        {
+            float growthFactor =
+                _options.Weigher != null
+                    ? CacheOptions<TKey, TValue>.DefaultGrowthFactor
+                    : _options.GrowthFactor;
+            double proposedCapacity = (double)_capacity * growthFactor;
+            return maximumCapacity <= proposedCapacity ? maximumCapacity : (int)proposedCapacity;
+        }
+
         private void Grow()
         {
-            int newCapacity = (int)(_capacity * _options.GrowthFactor);
-            if (0 < _options.MaxGrowthSize)
-            {
-                newCapacity = Math.Min(newCapacity, _options.MaxGrowthSize);
-            }
+            int maximumCapacity =
+                0 < _options.MaxGrowthSize ? _options.MaxGrowthSize : int.MaxValue;
+            int newCapacity = ComputeGrowthCapacity(maximumCapacity);
 
             if (newCapacity <= _capacity)
             {
@@ -1262,13 +1276,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private int SelectVictim()
+        private int SelectVictim(int excludedIndex = InvalidIndex)
         {
             float currentTime = _timeProvider();
             int entriesLength = _entries.Length;
             for (int i = 0; i < entriesLength; ++i)
             {
-                if (_entries[i].IsAlive && IsExpired(i, currentTime))
+                if (i != excludedIndex && _entries[i].IsAlive && IsExpired(i, currentTime))
                 {
                     return i;
                 }
@@ -1277,21 +1291,35 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             switch (_options.Policy)
             {
                 case EvictionPolicy.Lru:
-                    return _lruTail;
+                    return _lruTail == excludedIndex && 0 <= _lruTail
+                        ? _entries[_lruTail].PrevIndex
+                        : _lruTail;
                 case EvictionPolicy.Slru:
-                    return _probationTail != InvalidIndex ? _probationTail : _protectedTail;
+                    int probationVictim =
+                        _probationTail == excludedIndex && 0 <= _probationTail
+                            ? _entries[_probationTail].PrevIndex
+                            : _probationTail;
+                    if (0 <= probationVictim)
+                    {
+                        return probationVictim;
+                    }
+                    return _protectedTail == excludedIndex && 0 <= _protectedTail
+                        ? _entries[_protectedTail].PrevIndex
+                        : _protectedTail;
                 case EvictionPolicy.Lfu:
-                    return SelectLfuVictim();
+                    return SelectLfuVictim(excludedIndex);
                 case EvictionPolicy.Fifo:
-                    return _fifoHead;
+                    return _fifoHead == excludedIndex && 0 <= _fifoHead
+                        ? _entries[_fifoHead].NextIndex
+                        : _fifoHead;
                 case EvictionPolicy.Random:
-                    return SelectRandomVictim();
+                    return SelectRandomVictim(excludedIndex);
                 default:
                     return InvalidIndex;
             }
         }
 
-        private int SelectLfuVictim()
+        private int SelectLfuVictim(int excludedIndex)
         {
             int victim = InvalidIndex;
             int minFrequency = int.MaxValue;
@@ -1301,7 +1329,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             for (int i = 0; i < entriesLength; ++i)
             {
                 ref CacheEntry entry = ref _entries[i];
-                if (!entry.IsAlive)
+                if (i == excludedIndex || !entry.IsAlive)
                 {
                     continue;
                 }
@@ -1320,20 +1348,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return victim;
         }
 
-        private int SelectRandomVictim()
+        private int SelectRandomVictim(int excludedIndex)
         {
-            if (_count == 0)
+            if (_count == 0 || (0 <= excludedIndex && _count == 1))
             {
                 return InvalidIndex;
             }
 
-            int targetCount = Random.Next(0, _count);
+            int targetCount = Random.Next(0, _count - (0 <= excludedIndex ? 1 : 0));
             int current = 0;
 
             int entriesLength = _entries.Length;
             for (int i = 0; i < entriesLength; ++i)
             {
-                if (_entries[i].IsAlive)
+                if (i != excludedIndex && _entries[i].IsAlive)
                 {
                     if (current == targetCount)
                     {
@@ -1708,7 +1736,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void UpdateProtectedCapacity()
         {
-            _protectedCapacity = (int)(Math.Min(_capacity, _maximumSize) * _options.ProtectedRatio);
+            _protectedCapacity = (int)(
+                (_options.Weigher != null ? _capacity : Math.Min(_capacity, _maximumSize))
+                * _options.ProtectedRatio
+            );
         }
 
         private void UpdateProtectedCapacityForAdaptiveGrowth()

@@ -1644,6 +1644,259 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             _currentTime = 1f;
         }
 
+        [TestCase(EvictionPolicy.Lru)]
+        [TestCase(EvictionPolicy.Slru)]
+        [TestCase(EvictionPolicy.Lfu)]
+        [TestCase(EvictionPolicy.Fifo)]
+        [TestCase(EvictionPolicy.Random)]
+        public void WeightedAdmissionPreservesBoundsAndReplacementAcrossPolicies(
+            EvictionPolicy policy
+        )
+        {
+            List<string> released = new List<string>();
+            using Cache<string, long> cache = CacheBuilder<string, long>
+                .NewBuilder()
+                .MaximumSize(16)
+                .InitialCapacity(16)
+                .MaximumWeight(10)
+                .Weigher(static (key, value) => value)
+                .EvictionPolicy(policy)
+                .OnEviction((key, value, reason) => released.Add(key))
+                .TimeProvider(TimeProvider)
+                .Build();
+
+            cache.Set("a", 2);
+            cache.Set("b", 3);
+            cache.Set("c", 4);
+            Assert.That(cache.Count, Is.EqualTo(3));
+            Assert.That(cache.Size, Is.EqualTo(9));
+            Assert.That(released, Is.Empty);
+
+            cache.Set("a", 9);
+            Assert.That(cache.TryGet("a", out long replacement), Is.True);
+            Assert.That(replacement, Is.EqualTo(9));
+            Assert.That(cache.Count, Is.EqualTo(1));
+            Assert.That(cache.Size, Is.EqualTo(9));
+            Assert.That(released, Has.Count.EqualTo(3));
+
+            cache.Set("a", 11);
+            cache.Set("invalid", -1);
+            Assert.That(cache.TryGet("a", out replacement), Is.True);
+            Assert.That(replacement, Is.EqualTo(9));
+            Assert.That(cache.Count, Is.EqualTo(1));
+            Assert.That(cache.Size, Is.EqualTo(9));
+            Assert.That(released, Has.Count.EqualTo(3));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void WeightedOverflowEvictsWithoutExceedingBudget(bool adaptiveGrowth)
+        {
+            using Cache<int, long> cache = CacheBuilder<int, long>
+                .NewBuilder()
+                .MaximumWeight(long.MaxValue)
+                .Weigher(static (key, value) => value)
+                .AllowGrowth(adaptiveGrowth ? 2f : 0f)
+                .ThrashThreshold(0.001f)
+                .TimeProvider(TimeProvider)
+                .Build();
+            cache.Set(1, long.MaxValue - 1);
+            cache.Set(2, 2);
+            Assert.That(cache.Size, Is.EqualTo(2));
+            Assert.That(cache.Count, Is.EqualTo(1));
+            Assert.That(cache.ContainsKey(1), Is.False);
+            cache.Set(3, long.MaxValue);
+            Assert.That(cache.Size, Is.EqualTo(long.MaxValue));
+            Assert.That(cache.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void WeightedFailurePreservesValueLifetimeAndOwnership()
+        {
+            int releases = 0;
+            using Cache<string, long> cache = CacheBuilder<string, long>
+                .NewBuilder()
+                .MaximumWeight(10)
+                .Weigher(
+                    static (key, value) =>
+                        value == 7 ? throw new InvalidOperationException() : value
+                )
+                .ExpireAfterWrite(10)
+                .OnEviction((key, value, reason) => ++releases)
+                .TimeProvider(TimeProvider)
+                .Build();
+            cache.Set("a", 2);
+            _currentTime = 6;
+            Assert.Throws<InvalidOperationException>(() => cache.Set("a", 7));
+            Assert.That(cache.TryGet("a", out long value), Is.True);
+            Assert.That(value, Is.EqualTo(2));
+            Assert.That(cache.Size, Is.EqualTo(2));
+            Assert.That(releases, Is.Zero);
+            _currentTime = 11;
+            Assert.That(cache.TryGet("a", out _), Is.False);
+            Assert.That(releases, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void WeightedZeroWeightStorageGrowsBeyondEntryLimit()
+        {
+            using Cache<int, long> cache = CacheBuilder<int, long>
+                .NewBuilder()
+                .MaximumSize(1)
+                .InitialCapacity(1)
+                .MaximumWeight(1)
+                .Weigher(static (key, value) => value)
+                .TimeProvider(TimeProvider)
+                .Build();
+            for (int index = 0; index < 128; ++index)
+            {
+                cache.Set(index, 0);
+            }
+            Assert.That(cache.Count, Is.EqualTo(128));
+            Assert.That(cache.Size, Is.Zero);
+            for (int index = 0; index < 128; ++index)
+            {
+                Assert.That(cache.TryGet(index, out long value), Is.True);
+                Assert.That(value, Is.Zero);
+            }
+        }
+
+        [TestCase(-1L, false)]
+        [TestCase(11L, false)]
+        [TestCase(long.MinValue, false)]
+        [TestCase(long.MaxValue, false)]
+        [TestCase(-1L, true)]
+        [TestCase(11L, true)]
+        [TestCase(long.MinValue, true)]
+        [TestCase(long.MaxValue, true)]
+        public void WeightedRejectedValuesPreserveLifetimeCallbacksAndStorage(
+            long rejectedWeight,
+            bool replacing
+        )
+        {
+            int releases = 0;
+            int sets = 0;
+            int lifetimes = 0;
+            using Cache<int, long> cache = CacheBuilder<int, long>
+                .NewBuilder()
+                .MaximumWeight(10)
+                .Weigher(static (key, value) => value)
+                .ExpireAfter(
+                    (key, value) =>
+                    {
+                        ++lifetimes;
+                        return 10;
+                    }
+                )
+                .OnSet((key, value) => ++sets)
+                .OnEviction((key, value, reason) => ++releases)
+                .TimeProvider(TimeProvider)
+                .Build();
+            cache.Set(1, 2);
+            int capacity = cache.Capacity;
+            _currentTime = 6;
+            cache.Set(replacing ? 1 : 2, rejectedWeight);
+            Assert.That(cache.TryGet(1, out long value), Is.True);
+            Assert.That(value, Is.EqualTo(2));
+            Assert.That(cache.Count, Is.EqualTo(1));
+            Assert.That(cache.Size, Is.EqualTo(2));
+            Assert.That(cache.Capacity, Is.EqualTo(capacity));
+            Assert.That(sets, Is.EqualTo(1));
+            Assert.That(lifetimes, Is.EqualTo(1));
+            Assert.That(releases, Is.Zero);
+            _currentTime = 11;
+            Assert.That(cache.TryGet(1, out _), Is.False);
+            Assert.That(releases, Is.EqualTo(1));
+        }
+
+        [TestCase(EvictionPolicy.Lru)]
+        [TestCase(EvictionPolicy.Slru)]
+        [TestCase(EvictionPolicy.Lfu)]
+        [TestCase(EvictionPolicy.Fifo)]
+        [TestCase(EvictionPolicy.Random)]
+        public void WeightedReplacementRefreshesExpiredTargetAndReleasesEachValueOnce(
+            EvictionPolicy policy
+        )
+        {
+            List<long> released = new List<long>();
+            List<EvictionReason> reasons = new List<EvictionReason>();
+            using Cache<int, long> cache = CacheBuilder<int, long>
+                .NewBuilder()
+                .MaximumWeight(10)
+                .Weigher(static (key, value) => value)
+                .EvictionPolicy(policy)
+                .OnEviction(
+                    (key, value, reason) =>
+                    {
+                        released.Add(value);
+                        reasons.Add(reason);
+                    }
+                )
+                .TimeProvider(TimeProvider)
+                .Build();
+            cache.Set(1, 2, 1);
+            cache.Set(2, 3, 20);
+            cache.Set(3, 4, 20);
+            _currentTime = 3;
+            cache.Set(1, 9, 10);
+            Assert.That(cache.TryGet(1, out long value), Is.True);
+            Assert.That(value, Is.EqualTo(9));
+            Assert.That(cache.Count, Is.EqualTo(1));
+            Assert.That(cache.Size, Is.EqualTo(9));
+            CollectionAssert.AreEquivalent(new long[] { 2, 3, 4 }, released);
+            Assert.That(
+                reasons.FindAll(static reason => reason == EvictionReason.Replaced),
+                Has.Count.EqualTo(1)
+            );
+            Assert.That(
+                reasons.FindAll(static reason => reason == EvictionReason.Capacity),
+                Has.Count.EqualTo(2)
+            );
+            _currentTime = 13;
+            Assert.That(cache.TryGet(1, out _), Is.False);
+            Assert.That(released, Has.Count.EqualTo(4));
+            Assert.That(released[3], Is.EqualTo(9));
+            Assert.That(reasons[3], Is.EqualTo(EvictionReason.Expired));
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.MaxValue)]
+        public void WeightedStorageGrowthIgnoresAdaptiveGrowthFactorAndUsesPhysicalSlruQuota(
+            float growthFactor
+        )
+        {
+            using Cache<int, long> cache = new Cache<int, long>(
+                new CacheOptions<int, long>
+                {
+                    MaximumSize = 1,
+                    InitialCapacity = 1,
+                    MaximumWeight = 1,
+                    Weigher = static (key, value) => value,
+                    Policy = EvictionPolicy.Slru,
+                    ProtectedRatio = 0.8f,
+                    AllowGrowth = true,
+                    GrowthFactor = growthFactor,
+                    TimeProvider = TimeProvider,
+                }
+            );
+            for (int index = 0; index < 32; ++index)
+            {
+                cache.Set(index, 0);
+            }
+            Assert.That(cache.Count, Is.EqualTo(32));
+            Assert.That(cache.Capacity, Is.LessThan(64));
+            Assert.That(cache._protectedCapacity, Is.EqualTo((int)(cache.Capacity * 0.8f)));
+            for (int index = 0; index < 32; ++index)
+            {
+                Assert.That(cache.TryGet(index, out _), Is.True);
+            }
+            Assert.That(
+                cache._protectedCount,
+                Is.EqualTo(Math.Min(cache.Count, cache._protectedCapacity))
+            );
+        }
+
         [Test]
         public void WeightedCacheUsesMaximumWeight()
         {

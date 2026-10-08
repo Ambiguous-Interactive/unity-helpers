@@ -28,7 +28,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// Reading an entry with no key or value yields that type's protobuf default. In particular,
     /// a missing string half is <see cref="string.Empty"/> rather than <c>null</c>. A repeated key is
     /// last-wins -- the entry is applied through the indexer rather than <c>Add</c>, which would throw
-    /// on the second occurrence of a key a hostile payload repeated.
+    /// on the second occurrence of a key a hostile payload repeated. Repeated message values within
+    /// one entry merge before that entry replaces any earlier value for its key.
     /// </para>
     /// </remarks>
     internal sealed class MapMember : Member
@@ -496,6 +497,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + (_valueIsString ? "string.Empty" : "default(" + _valueQualified + ")")
                     + ";"
             );
+            if (_value.IsMessage)
+            {
+                writer.Line(
+                    Proto + ".WProtoMessageAccumulator entryOccurrences" + Tag + " = default;"
+                );
+            }
             writer.Blank();
             writer.Line(
                 "while ("
@@ -542,6 +549,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             EmitReadFailure(writer, qualifiedContract);
             Close(writer);
             writer.Blank();
+
+            if (_value.IsMessage)
+            {
+                writer.Line("if (entryOccurrences" + Tag + ".HasValue)" + Writer.Open);
+                writer.Indent();
+                writer.Line(
+                    "if (!"
+                        + entry
+                        + ".TryReadMessage(entryOccurrences"
+                        + Tag
+                        + ".Payload, "
+                        + _value.ReadFormatter
+                        + ", out "
+                        + _value.ReadLocalType
+                        + " "
+                        + decodedValue
+                        + "))"
+                        + Writer.Open
+                );
+                writer.Indent();
+                EmitReadFailure(writer, qualifiedContract);
+                Close(writer);
+                writer.Line(
+                    valueLocal + " = " + Shape.Fill(_value.AssignExpression, decodedValue) + ";"
+                );
+                Close(writer);
+                writer.Blank();
+            }
 
             // Indexer assignment preserves last-wins behavior without throwing on repeated payload keys.
             if (Deferred)
@@ -744,6 +779,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + Writer.Open
             );
             writer.Indent();
+            if (tag == 2 && shape.IsMessage)
+            {
+                writer.Line(
+                    "if (!"
+                        + entry
+                        + ".TryReadBytes(out global::System.ReadOnlySpan<byte> "
+                        + decoded
+                        + ") || !entryOccurrences"
+                        + Tag
+                        + ".TryAdd("
+                        + decoded
+                        + "))"
+                        + Writer.Open
+                );
+                writer.Indent();
+                EmitReadFailure(writer, qualifiedContract);
+                Close(writer);
+                writer.Line("break;");
+                Close(writer);
+                return;
+            }
             writer.Line(
                 "if (!"
                     + entry

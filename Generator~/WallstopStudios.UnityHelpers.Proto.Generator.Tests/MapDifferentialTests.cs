@@ -164,6 +164,231 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 #endif
 
+#if !PROTOBUF_NET_ORACLE_V2
+        [Test]
+        public void SeparateMalformedMapMessageFragmentsCannotRepairEachOther()
+        {
+            byte[] payload = Parse("12080801120108120107");
+            using MemoryStream stream = new MemoryStream(payload);
+            Assert.Catch(() => ProtoBuf.Serializer.Deserialize<MapContract>(stream));
+            Assert.Throws<InvalidOperationException>(() =>
+                WProtoFacade.TryDeserialize(payload, out MapContract _)
+            );
+        }
+
+        [Test]
+        public void SeparateMalformedScalarMessageFragmentsCannotRepairEachOther()
+        {
+            byte[] payload = Parse("120108120107");
+            ProtoBuf.Meta.RuntimeTypeModel model = ProtoBuf.Meta.RuntimeTypeModel.Create();
+            model.Add(typeof(HookedContract), false).Add(1, nameof(HookedContract.Value));
+            model.Add(typeof(NestingContract), false).Add(2, nameof(NestingContract.Child));
+            using MemoryStream stream = new MemoryStream(payload);
+            Assert.Catch(() => model.Deserialize(stream, null, typeof(NestingContract)));
+            Assert.Throws<InvalidOperationException>(() =>
+                WProtoFacade.TryDeserialize(payload, out NestingContract _)
+            );
+        }
+
+        [TestCase("12090801120208071201")]
+        [TestCase("1209080112020807120108")]
+        [TestCase("120A08011202080712020000")]
+        [TestCase("120B08011202080712041080")]
+        public void MalformedMessageMapValuesAreRefused(string hex)
+        {
+            byte[] payload = Parse(hex);
+            WProtoReader reader = new WProtoReader(payload);
+            Assert.IsFalse(
+                WProtoFormatterProvider
+                    .Get<MapContract>()
+                    .TryRead(ref reader, out MapContract direct)
+            );
+            Assert.IsNull(direct);
+            Assert.Throws<InvalidOperationException>(() =>
+                WProtoFacade.TryDeserialize(payload, out MapContract _)
+            );
+        }
+
+        [TestCase(0, false)]
+        [TestCase(1, false)]
+        [TestCase(2, true)]
+        public void MessageMapMergingChargesBothEntryAndValueDepth(int maximumDepth, bool expected)
+        {
+            byte[] payload = Parse("120A08011202080712021009");
+            WProtoReader reader = new WProtoReader(
+                payload,
+                new WProtoReadLimits(maximumNestingDepth: maximumDepth)
+            );
+            Assert.AreEqual(
+                expected,
+                WProtoFormatterProvider.Get<MapContract>().TryRead(ref reader, out MapContract read)
+            );
+            if (expected)
+            {
+                Assert.IsTrue(read != null);
+                Assert.AreEqual(7, read.ById.ValueFor(1).X);
+                Assert.AreEqual(9, read.ById.ValueFor(1).Y);
+                Assert.IsFalse(reader.Malformed);
+                Assert.IsTrue(reader.End);
+            }
+            else
+            {
+                Assert.IsNull(read);
+            }
+        }
+
+        [TestCaseSource(nameof(MessageMapEntryCases))]
+        public void MessageMapEntryFieldsMergeWithoutMergingSeparateEntries(
+            string hex,
+            int key,
+            int expectedX,
+            int expectedY,
+            bool facade
+        )
+        {
+            byte[] payload = Parse(hex);
+            using MemoryStream stream = new MemoryStream(payload);
+            MapContract oracle = ProtoBuf.Serializer.Deserialize<MapContract>(stream);
+            Assert.AreEqual(1, oracle.ById.Count);
+            Assert.AreEqual(expectedX, oracle.ById.ValueFor(key).X, "Oracle X");
+            Assert.AreEqual(expectedY, oracle.ById.ValueFor(key).Y, "Oracle Y");
+            MapContract read;
+            if (facade)
+            {
+                Assert.IsTrue(WProtoFacade.TryDeserialize(payload, out read));
+            }
+            else
+            {
+                WProtoReader reader = new WProtoReader(payload);
+                Assert.IsTrue(
+                    WProtoFormatterProvider.Get<MapContract>().TryRead(ref reader, out read)
+                );
+                Assert.IsFalse(reader.Malformed);
+                Assert.IsTrue(reader.End);
+            }
+            Assert.AreEqual(1, read.ById.Count);
+            Assert.AreEqual(expectedX, read.ById.ValueFor(key).X);
+            Assert.AreEqual(expectedY, read.ById.ValueFor(key).Y);
+        }
+#endif
+
+        [TestCase("0A080801120208071200", 7, false, TestName = "ReferenceEntry.EmptyLast.Direct")]
+        [TestCase("0A080801120208071200", 7, true, TestName = "ReferenceEntry.EmptyLast.Facade")]
+        [TestCase("0A080801120012020807", 7, false, TestName = "ReferenceEntry.EmptyFirst.Direct")]
+        [TestCase("0A080801120012020807", 7, true, TestName = "ReferenceEntry.EmptyFirst.Facade")]
+        [TestCase(
+            "0A0A08011202080712020809",
+            9,
+            false,
+            TestName = "ReferenceEntry.LaterScalar.Direct"
+        )]
+        [TestCase(
+            "0A0A08011202080712020809",
+            9,
+            true,
+            TestName = "ReferenceEntry.LaterScalar.Facade"
+        )]
+        public void ReferenceMessageEntryMergeMatchesBothOracleMajors(
+            string hex,
+            int expected,
+            bool facade
+        )
+        {
+            ProtoBuf.Meta.RuntimeTypeModel model = ProtoBuf.Meta.RuntimeTypeModel.Create();
+            model.Add(typeof(HookedContract), false).Add(1, nameof(HookedContract.Value));
+            model.Add(typeof(HookedMapContract), false).Add(1, nameof(HookedMapContract.ById));
+            byte[] payload = Parse(hex);
+            using MemoryStream stream = new MemoryStream(payload);
+            HookedMapContract oracle = (HookedMapContract)
+                model.Deserialize(stream, null, typeof(HookedMapContract));
+            Assert.AreEqual(1, oracle.ById.Count);
+            Assert.AreEqual(
+                expected,
+                oracle.ById.ValueFor(1).Value,
+                "Independent explicit oracle model"
+            );
+            HookedMapContract read;
+            if (facade)
+            {
+                Assert.IsTrue(WProtoFacade.TryDeserialize(payload, out read));
+            }
+            else
+            {
+                WProtoReader reader = new WProtoReader(payload);
+                Assert.IsTrue(
+                    WProtoFormatterProvider.Get<HookedMapContract>().TryRead(ref reader, out read)
+                );
+                Assert.IsFalse(reader.Malformed);
+                Assert.IsTrue(reader.End);
+            }
+            Assert.AreEqual(1, read.ById.Count);
+            Assert.AreEqual(expected, read.ById.ValueFor(1).Value);
+        }
+
+        /// <summary>Preserves WallstopProto's last-entry-wins map contract.</summary>
+        /// <remarks>
+        /// The explicit legacy oracle model reads this dictionary as repeated pairs and uses Add,
+        /// rejecting duplicate keys. It is used only for within-entry message merging above;
+        /// the annotated version-three map oracle independently covers last-entry replacement.
+        /// </remarks>
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SeparateReferenceMapEntriesReplaceTheEarlierValue(bool facade)
+        {
+            byte[] payload = Parse("0A060801120208070A0408011200");
+            HookedMapContract read;
+            if (facade)
+            {
+                Assert.IsTrue(WProtoFacade.TryDeserialize(payload, out read));
+            }
+            else
+            {
+                WProtoReader reader = new WProtoReader(payload);
+                Assert.IsTrue(
+                    WProtoFormatterProvider.Get<HookedMapContract>().TryRead(ref reader, out read)
+                );
+                Assert.IsFalse(reader.Malformed);
+                Assert.IsTrue(reader.End);
+            }
+            Assert.AreEqual(1, read.ById.Count);
+            Assert.AreEqual(0, read.ById.ValueFor(1).Value);
+        }
+
+        [TestCase("0A070A016110071009", 9, false, TestName = "ScalarEntry.LastValue.Direct")]
+        [TestCase("0A070A016110071009", 9, true, TestName = "ScalarEntry.LastValue.Facade")]
+        [TestCase("0A030A0161", 0, false, TestName = "ScalarEntry.AbsentValue.Direct")]
+        [TestCase("0A030A0161", 0, true, TestName = "ScalarEntry.AbsentValue.Facade")]
+        public void ScalarMapEntryFieldsRetainLastValueAndAbsentDefaults(
+            string hex,
+            int expected,
+            bool facade
+        )
+        {
+            byte[] payload = Parse(hex);
+            using MemoryStream stream = new MemoryStream(payload);
+            V2CompatibleMapContract oracle =
+                ProtoBuf.Serializer.Deserialize<V2CompatibleMapContract>(stream);
+            Assert.AreEqual(expected, oracle.Values.ValueFor("a"));
+            V2CompatibleMapContract read;
+            if (facade)
+            {
+                Assert.IsTrue(WProtoFacade.TryDeserialize(payload, out read));
+            }
+            else
+            {
+                WProtoReader reader = new WProtoReader(payload);
+                Assert.IsTrue(
+                    WProtoFormatterProvider
+                        .Get<V2CompatibleMapContract>()
+                        .TryRead(ref reader, out read)
+                );
+                Assert.IsFalse(reader.Malformed);
+                Assert.IsTrue(reader.End);
+            }
+            Assert.AreEqual(1, read.Values.Count);
+            Assert.AreEqual(expected, read.Values.ValueFor("a"));
+        }
+
         [Test]
         public void AnEntryIsAMessageWithTheKeyAtOneAndTheValueAtTwo()
         {
@@ -556,6 +781,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void RepeatedMessageMapValuesRunDeserializationHooksOnce()
+        {
+            HookedContract.AfterDeserializationRuns = 0;
+            Assert.IsTrue(
+                WProtoFacade.TryDeserialize(
+                    Parse("0A0A08011202080712020809"),
+                    out HookedMapContract read
+                )
+            );
+            HookedContract value = read.ById.ValueFor(1);
+            Assert.AreEqual(9, value.Value);
+            Assert.AreEqual(1, HookedContract.AfterDeserializationRuns);
+            Assert.AreEqual(2, value.Trace.Count);
+        }
+
+        [Test]
         public void AHookedMapValueRunsItsSerializationHookOnce()
         {
             /*
@@ -658,6 +899,72 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(
                 "220408011002",
                 Encode(new ExoticKeyContract { ByBool = new Dictionary<bool, int> { { true, 2 } } })
+            );
+        }
+
+        private static IEnumerable<TestCaseData> MessageMapEntryCases()
+        {
+            yield return new TestCaseData("120A08011202080712021009", 1, 7, 9, false).SetName(
+                "MessageEntry.SplitFields.Direct"
+            );
+            yield return new TestCaseData("120A08011202080712021009", 1, 7, 9, true).SetName(
+                "MessageEntry.SplitFields.Facade"
+            );
+            yield return new TestCaseData("120A08011202100912020807", 1, 7, 9, false).SetName(
+                "MessageEntry.ReversedFields.Direct"
+            );
+            yield return new TestCaseData("120A08011202100912020807", 1, 7, 9, true).SetName(
+                "MessageEntry.ReversedFields.Facade"
+            );
+            yield return new TestCaseData("12080801120208071200", 1, 7, 0, false).SetName(
+                "MessageEntry.EmptyLast.Direct"
+            );
+            yield return new TestCaseData("12080801120208071200", 1, 7, 0, true).SetName(
+                "MessageEntry.EmptyLast.Facade"
+            );
+            yield return new TestCaseData("12080801120012020807", 1, 7, 0, false).SetName(
+                "MessageEntry.EmptyFirst.Direct"
+            );
+            yield return new TestCaseData("12080801120012020807", 1, 7, 0, true).SetName(
+                "MessageEntry.EmptyFirst.Facade"
+            );
+            yield return new TestCaseData("120C080112020807180412021009", 1, 7, 9, false).SetName(
+                "MessageEntry.UnknownInterleaved.Direct"
+            );
+            yield return new TestCaseData("120C080112020807180412021009", 1, 7, 9, true).SetName(
+                "MessageEntry.UnknownInterleaved.Facade"
+            );
+            yield return new TestCaseData("120C080112040807100912020805", 1, 5, 9, false).SetName(
+                "MessageEntry.LaterScalarWins.Direct"
+            );
+            yield return new TestCaseData("120C080112040807100912020805", 1, 5, 9, true).SetName(
+                "MessageEntry.LaterScalarWins.Facade"
+            );
+            yield return new TestCaseData(
+                "12060801120208071206080112021009",
+                1,
+                0,
+                9,
+                false
+            ).SetName("MessageEntry.LaterEntryReplaces.Direct");
+            yield return new TestCaseData(
+                "12060801120208071206080112021009",
+                1,
+                0,
+                9,
+                true
+            ).SetName("MessageEntry.LaterEntryReplaces.Facade");
+            yield return new TestCaseData("12020801", 1, 0, 0, false).SetName(
+                "MessageEntry.AbsentValue.Direct"
+            );
+            yield return new TestCaseData("12020801", 1, 0, 0, true).SetName(
+                "MessageEntry.AbsentValue.Facade"
+            );
+            yield return new TestCaseData("1200", 0, 0, 0, false).SetName(
+                "MessageEntry.AbsentKeyAndValue.Direct"
+            );
+            yield return new TestCaseData("1200", 0, 0, 0, true).SetName(
+                "MessageEntry.AbsentKeyAndValue.Facade"
             );
         }
     }

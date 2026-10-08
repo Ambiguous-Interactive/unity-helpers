@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
-    using System.IO;
     using System.Threading;
     using System.Threading.Tasks;
 
@@ -17,47 +16,19 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     public static class FileHelper
     {
         /// <summary>
-        /// Creates a file at the specified path if it does not exist, optionally writing initial contents.
+        /// Creates an absent file only after its initial contents have been staged and flushed.
         /// </summary>
+        /// <remarks>
+        /// Failed staging leaves the destination absent so initialization can be retried. Platforms or
+        /// filesystems without atomic publication that preserves competing creators return false.
+        /// Owned temporary files are removed on a best-effort basis; process interruption may leave one.
+        /// </remarks>
         /// <param name="path">Absolute or relative file path; blank paths are refused.</param>
         /// <param name="contents">Optional initial contents (defaults to empty).</param>
         /// <returns>True if the file was created; false if it already existed or creation failed.</returns>
         public static bool InitializePath(string path, byte[] contents = null)
         {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return false;
-            }
-
-            try
-            {
-                string directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrWhiteSpace(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                using FileStream fileStream = new(
-                    path,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None
-                );
-                contents ??= Array.Empty<byte>();
-                fileStream.Write(contents, 0, contents.Length);
-                return true;
-            }
-            catch (Exception exception)
-                when (exception
-                        is IOException
-                            or UnauthorizedAccessException
-                            or ArgumentException
-                            or NotSupportedException
-                            or System.Security.SecurityException
-                )
-            {
-                return false;
-            }
+            return DurableFile.TryInitializeAllBytes(path, contents);
         }
 
         /// <summary>
