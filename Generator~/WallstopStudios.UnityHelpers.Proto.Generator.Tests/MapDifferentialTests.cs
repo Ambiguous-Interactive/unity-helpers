@@ -858,50 +858,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 #endif
 
-        [Test]
-        public void KeysTheSpecForbidsMatchTheOracleRatherThanBeingRefused()
-        {
-            /*
-             * protobuf-net accepts float, double, and enum keys beyond the protobuf map specification;
-             * compatibility requires their encoding.
-             */
-            Assert.AreEqual(
-                "0A070D0000C03F1002",
-                Encode(
-                    new ExoticKeyContract { ByFloat = new Dictionary<float, int> { { 1.5f, 2 } } }
-                )
-            );
-            Assert.AreEqual(
-                "0A021002",
-                Encode(new ExoticKeyContract { ByFloat = new Dictionary<float, int> { { 0f, 2 } } })
-            );
-            Assert.AreEqual(
-                "120B09000000000000F83F1002",
-                Encode(
-                    new ExoticKeyContract { ByDouble = new Dictionary<double, int> { { 1.5, 2 } } }
-                )
-            );
-            Assert.AreEqual(
-                "12021002",
-                Encode(
-                    new ExoticKeyContract { ByDouble = new Dictionary<double, int> { { 0d, 2 } } }
-                )
-            );
-            Assert.AreEqual(
-                "1A0408071002",
-                Encode(
-                    new ExoticKeyContract
-                    {
-                        ByEnum = new Dictionary<MapKeyKind, int> { { MapKeyKind.Other, 2 } },
-                    }
-                )
-            );
-            Assert.AreEqual(
-                "220408011002",
-                Encode(new ExoticKeyContract { ByBool = new Dictionary<bool, int> { { true, 2 } } })
-            );
-        }
-
         private static IEnumerable<TestCaseData> MessageMapEntryCases()
         {
             yield return new TestCaseData("120A08011202080712021009", 1, 7, 9, false).SetName(
@@ -965,6 +921,50 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             yield return new TestCaseData("1200", 0, 0, 0, true).SetName(
                 "MessageEntry.AbsentKeyAndValue.Facade"
+            );
+        }
+
+        [Test]
+        public void KeysTheSpecForbidsMatchTheOracleRatherThanBeingRefused()
+        {
+            /*
+             * protobuf-net accepts float, double, and enum keys beyond the protobuf map specification;
+             * compatibility requires their encoding.
+             */
+            Assert.AreEqual(
+                "0A070D0000C03F1002",
+                Encode(
+                    new ExoticKeyContract { ByFloat = new Dictionary<float, int> { { 1.5f, 2 } } }
+                )
+            );
+            Assert.AreEqual(
+                "0A021002",
+                Encode(new ExoticKeyContract { ByFloat = new Dictionary<float, int> { { 0f, 2 } } })
+            );
+            Assert.AreEqual(
+                "120B09000000000000F83F1002",
+                Encode(
+                    new ExoticKeyContract { ByDouble = new Dictionary<double, int> { { 1.5, 2 } } }
+                )
+            );
+            Assert.AreEqual(
+                "12021002",
+                Encode(
+                    new ExoticKeyContract { ByDouble = new Dictionary<double, int> { { 0d, 2 } } }
+                )
+            );
+            Assert.AreEqual(
+                "1A0408071002",
+                Encode(
+                    new ExoticKeyContract
+                    {
+                        ByEnum = new Dictionary<MapKeyKind, int> { { MapKeyKind.Other, 2 } },
+                    }
+                )
+            );
+            Assert.AreEqual(
+                "220408011002",
+                Encode(new ExoticKeyContract { ByBool = new Dictionary<bool, int> { { true, 2 } } })
             );
         }
     }

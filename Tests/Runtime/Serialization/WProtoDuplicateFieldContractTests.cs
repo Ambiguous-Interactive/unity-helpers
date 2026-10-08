@@ -23,6 +23,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoDuplicateFieldContractTests
     {
+        private static byte[] Parse(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; ++index)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static T Decode<T>(string hex)
+        {
+            WProtoReader reader = new(Parse(hex));
+            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T value), hex);
+            return value;
+        }
+
         [TestCase("08")]
         [TestCase("0880")]
         [TestCase("0D010203")]
@@ -84,24 +102,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(accumulator.TryAdd(occurrence));
             occurrence[1] = 7;
             Assert.AreEqual(7, accumulator.Payload[1]);
-        }
-
-        private static byte[] Parse(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; ++index)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
-        }
-
-        private static T Decode<T>(string hex)
-        {
-            WProtoReader reader = new(Parse(hex));
-            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T value), hex);
-            return value;
         }
 
         [Test]

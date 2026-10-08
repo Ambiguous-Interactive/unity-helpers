@@ -87,6 +87,72 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             return restored;
         }
 
+        private static IEnumerable<TestCaseData> MessageMapEntryCases()
+        {
+            yield return new TestCaseData("120A08011202080712021009", 1, 7, 9, false).SetName(
+                "MessageEntry.SplitFields.Direct"
+            );
+            yield return new TestCaseData("120A08011202080712021009", 1, 7, 9, true).SetName(
+                "MessageEntry.SplitFields.Facade"
+            );
+            yield return new TestCaseData("120A08011202100912020807", 1, 7, 9, false).SetName(
+                "MessageEntry.ReversedFields.Direct"
+            );
+            yield return new TestCaseData("120A08011202100912020807", 1, 7, 9, true).SetName(
+                "MessageEntry.ReversedFields.Facade"
+            );
+            yield return new TestCaseData("12080801120208071200", 1, 7, 0, false).SetName(
+                "MessageEntry.EmptyLast.Direct"
+            );
+            yield return new TestCaseData("12080801120208071200", 1, 7, 0, true).SetName(
+                "MessageEntry.EmptyLast.Facade"
+            );
+            yield return new TestCaseData("12080801120012020807", 1, 7, 0, false).SetName(
+                "MessageEntry.EmptyFirst.Direct"
+            );
+            yield return new TestCaseData("12080801120012020807", 1, 7, 0, true).SetName(
+                "MessageEntry.EmptyFirst.Facade"
+            );
+            yield return new TestCaseData("120C080112020807180412021009", 1, 7, 9, false).SetName(
+                "MessageEntry.UnknownInterleaved.Direct"
+            );
+            yield return new TestCaseData("120C080112020807180412021009", 1, 7, 9, true).SetName(
+                "MessageEntry.UnknownInterleaved.Facade"
+            );
+            yield return new TestCaseData("120C080112040807100912020805", 1, 5, 9, false).SetName(
+                "MessageEntry.LaterScalarWins.Direct"
+            );
+            yield return new TestCaseData("120C080112040807100912020805", 1, 5, 9, true).SetName(
+                "MessageEntry.LaterScalarWins.Facade"
+            );
+            yield return new TestCaseData(
+                "12060801120208071206080112021009",
+                1,
+                0,
+                9,
+                false
+            ).SetName("MessageEntry.LaterEntryReplaces.Direct");
+            yield return new TestCaseData(
+                "12060801120208071206080112021009",
+                1,
+                0,
+                9,
+                true
+            ).SetName("MessageEntry.LaterEntryReplaces.Facade");
+            yield return new TestCaseData("12020801", 1, 0, 0, false).SetName(
+                "MessageEntry.AbsentValue.Direct"
+            );
+            yield return new TestCaseData("12020801", 1, 0, 0, true).SetName(
+                "MessageEntry.AbsentValue.Facade"
+            );
+            yield return new TestCaseData("1200", 0, 0, 0, false).SetName(
+                "MessageEntry.AbsentKeyAndValue.Direct"
+            );
+            yield return new TestCaseData("1200", 0, 0, 0, true).SetName(
+                "MessageEntry.AbsentKeyAndValue.Facade"
+            );
+        }
+
         [TestCase("12080801120108120107")]
         [TestCase("12090801120208071201")]
         [TestCase("1209080112020807120108")]
@@ -469,72 +535,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         WProtoButtonDirection.Left | WProtoButtonDirection.Right
                     )
                 ]
-            );
-        }
-
-        private static IEnumerable<TestCaseData> MessageMapEntryCases()
-        {
-            yield return new TestCaseData("120A08011202080712021009", 1, 7, 9, false).SetName(
-                "MessageEntry.SplitFields.Direct"
-            );
-            yield return new TestCaseData("120A08011202080712021009", 1, 7, 9, true).SetName(
-                "MessageEntry.SplitFields.Facade"
-            );
-            yield return new TestCaseData("120A08011202100912020807", 1, 7, 9, false).SetName(
-                "MessageEntry.ReversedFields.Direct"
-            );
-            yield return new TestCaseData("120A08011202100912020807", 1, 7, 9, true).SetName(
-                "MessageEntry.ReversedFields.Facade"
-            );
-            yield return new TestCaseData("12080801120208071200", 1, 7, 0, false).SetName(
-                "MessageEntry.EmptyLast.Direct"
-            );
-            yield return new TestCaseData("12080801120208071200", 1, 7, 0, true).SetName(
-                "MessageEntry.EmptyLast.Facade"
-            );
-            yield return new TestCaseData("12080801120012020807", 1, 7, 0, false).SetName(
-                "MessageEntry.EmptyFirst.Direct"
-            );
-            yield return new TestCaseData("12080801120012020807", 1, 7, 0, true).SetName(
-                "MessageEntry.EmptyFirst.Facade"
-            );
-            yield return new TestCaseData("120C080112020807180412021009", 1, 7, 9, false).SetName(
-                "MessageEntry.UnknownInterleaved.Direct"
-            );
-            yield return new TestCaseData("120C080112020807180412021009", 1, 7, 9, true).SetName(
-                "MessageEntry.UnknownInterleaved.Facade"
-            );
-            yield return new TestCaseData("120C080112040807100912020805", 1, 5, 9, false).SetName(
-                "MessageEntry.LaterScalarWins.Direct"
-            );
-            yield return new TestCaseData("120C080112040807100912020805", 1, 5, 9, true).SetName(
-                "MessageEntry.LaterScalarWins.Facade"
-            );
-            yield return new TestCaseData(
-                "12060801120208071206080112021009",
-                1,
-                0,
-                9,
-                false
-            ).SetName("MessageEntry.LaterEntryReplaces.Direct");
-            yield return new TestCaseData(
-                "12060801120208071206080112021009",
-                1,
-                0,
-                9,
-                true
-            ).SetName("MessageEntry.LaterEntryReplaces.Facade");
-            yield return new TestCaseData("12020801", 1, 0, 0, false).SetName(
-                "MessageEntry.AbsentValue.Direct"
-            );
-            yield return new TestCaseData("12020801", 1, 0, 0, true).SetName(
-                "MessageEntry.AbsentValue.Facade"
-            );
-            yield return new TestCaseData("1200", 0, 0, 0, false).SetName(
-                "MessageEntry.AbsentKeyAndValue.Direct"
-            );
-            yield return new TestCaseData("1200", 0, 0, 0, true).SetName(
-                "MessageEntry.AbsentKeyAndValue.Facade"
             );
         }
     }

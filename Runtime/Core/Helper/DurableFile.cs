@@ -578,7 +578,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             ownsTemporary = true;
                             break;
                         }
-                        catch (PathTooLongException) when (temporaryNameLength > filename.Length)
+                        catch (PathTooLongException) when (filename.Length < temporaryNameLength)
                         {
                             temporaryNameLength = filename.Length;
                         }
