@@ -87,6 +87,151 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             return restored;
         }
 
+        private static IEnumerable<TestCaseData> MessageMapEntryCases()
+        {
+            yield return new TestCaseData("120A08011202080712021009", 1, 7, 9, false).SetName(
+                "MessageEntry.SplitFields.Direct"
+            );
+            yield return new TestCaseData("120A08011202080712021009", 1, 7, 9, true).SetName(
+                "MessageEntry.SplitFields.Facade"
+            );
+            yield return new TestCaseData("120A08011202100912020807", 1, 7, 9, false).SetName(
+                "MessageEntry.ReversedFields.Direct"
+            );
+            yield return new TestCaseData("120A08011202100912020807", 1, 7, 9, true).SetName(
+                "MessageEntry.ReversedFields.Facade"
+            );
+            yield return new TestCaseData("12080801120208071200", 1, 7, 0, false).SetName(
+                "MessageEntry.EmptyLast.Direct"
+            );
+            yield return new TestCaseData("12080801120208071200", 1, 7, 0, true).SetName(
+                "MessageEntry.EmptyLast.Facade"
+            );
+            yield return new TestCaseData("12080801120012020807", 1, 7, 0, false).SetName(
+                "MessageEntry.EmptyFirst.Direct"
+            );
+            yield return new TestCaseData("12080801120012020807", 1, 7, 0, true).SetName(
+                "MessageEntry.EmptyFirst.Facade"
+            );
+            yield return new TestCaseData("120C080112020807180412021009", 1, 7, 9, false).SetName(
+                "MessageEntry.UnknownInterleaved.Direct"
+            );
+            yield return new TestCaseData("120C080112020807180412021009", 1, 7, 9, true).SetName(
+                "MessageEntry.UnknownInterleaved.Facade"
+            );
+            yield return new TestCaseData("120C080112040807100912020805", 1, 5, 9, false).SetName(
+                "MessageEntry.LaterScalarWins.Direct"
+            );
+            yield return new TestCaseData("120C080112040807100912020805", 1, 5, 9, true).SetName(
+                "MessageEntry.LaterScalarWins.Facade"
+            );
+            yield return new TestCaseData(
+                "12060801120208071206080112021009",
+                1,
+                0,
+                9,
+                false
+            ).SetName("MessageEntry.LaterEntryReplaces.Direct");
+            yield return new TestCaseData(
+                "12060801120208071206080112021009",
+                1,
+                0,
+                9,
+                true
+            ).SetName("MessageEntry.LaterEntryReplaces.Facade");
+            yield return new TestCaseData("12020801", 1, 0, 0, false).SetName(
+                "MessageEntry.AbsentValue.Direct"
+            );
+            yield return new TestCaseData("12020801", 1, 0, 0, true).SetName(
+                "MessageEntry.AbsentValue.Facade"
+            );
+            yield return new TestCaseData("1200", 0, 0, 0, false).SetName(
+                "MessageEntry.AbsentKeyAndValue.Direct"
+            );
+            yield return new TestCaseData("1200", 0, 0, 0, true).SetName(
+                "MessageEntry.AbsentKeyAndValue.Facade"
+            );
+        }
+
+        [TestCase("12080801120108120107")]
+        [TestCase("12090801120208071201")]
+        [TestCase("1209080112020807120108")]
+        [TestCase("120A08011202080712020000")]
+        [TestCase("120B08011202080712041080")]
+        public void MalformedMessageMapValuesAreRefused(string hex)
+        {
+            byte[] payload = Parse(hex);
+            WProtoReader reader = new WProtoReader(payload);
+            Assert.IsFalse(
+                WProtoFormatterProvider
+                    .Get<WProtoMapContract>()
+                    .TryRead(ref reader, out WProtoMapContract direct)
+            );
+            Assert.IsTrue(direct == null);
+            Assert.Throws<InvalidOperationException>(() =>
+                WProtoFacade.TryDeserialize(payload, out WProtoMapContract _)
+            );
+        }
+
+        [TestCase(0, false)]
+        [TestCase(1, false)]
+        [TestCase(2, true)]
+        public void MessageMapMergingChargesBothEntryAndValueDepth(int maximumDepth, bool expected)
+        {
+            byte[] payload = Parse("120A08011202080712021009");
+            WProtoReader reader = new WProtoReader(
+                payload,
+                new WProtoReadLimits(maximumNestingDepth: maximumDepth)
+            );
+            Assert.AreEqual(
+                expected,
+                WProtoFormatterProvider
+                    .Get<WProtoMapContract>()
+                    .TryRead(ref reader, out WProtoMapContract read)
+            );
+            if (expected)
+            {
+                Assert.IsTrue(read != null);
+                Assert.AreEqual(7, read.ById[1].X);
+                Assert.AreEqual(9, read.ById[1].Y);
+                Assert.IsFalse(reader.Malformed);
+                Assert.IsTrue(reader.End);
+            }
+            else
+            {
+                Assert.IsTrue(read == null);
+            }
+        }
+
+        [TestCaseSource(nameof(MessageMapEntryCases))]
+        public void MessageMapEntryFieldsMergeWithoutMergingSeparateEntries(
+            string hex,
+            int key,
+            int expectedX,
+            int expectedY,
+            bool facade
+        )
+        {
+            byte[] payload = Parse(hex);
+            WProtoMapContract read;
+            if (facade)
+            {
+                Assert.IsTrue(WProtoFacade.TryDeserialize(payload, out read));
+            }
+            else
+            {
+                WProtoReader reader = new WProtoReader(payload);
+                Assert.IsTrue(
+                    WProtoFormatterProvider.Get<WProtoMapContract>().TryRead(ref reader, out read)
+                );
+                Assert.IsFalse(reader.Malformed);
+                Assert.IsTrue(reader.End);
+            }
+            Assert.AreEqual(1, read.ById.Count);
+            Assert.AreEqual(expectedX, read.ById[key].X);
+            Assert.AreEqual(expectedY, read.ById[key].Y);
+        }
+
         [TestCase(WProtoButtonType.None, 0d, "0A020800")]
         [TestCase(WProtoButtonType.None, 1d, "0A0B080011000000000000F03F")]
         [TestCase(WProtoButtonType.Primary, 0d, "0A020801")]

@@ -58,6 +58,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         internal const string PreservedStagingPathDataKey = nameof(PreservedStagingPathDataKey);
         internal const string OwnershipSuffix = ".lock";
 
+        private const int MaximumInitializationStageNameLength = 32;
+        private const int MaximumInitializationStageAttempts = 64;
         private const int UnixNameAlreadyExists = 17;
         private const int DefaultBufferSize = 4096;
 
@@ -505,6 +507,117 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 finally
                 {
                     ReleaseStagingOwnership(ownership);
+                }
+            }
+        }
+
+        /// <summary>Initializes absent data without leaving a partial destination after failure.</summary>
+        internal static bool TryInitializeAllBytes(string path, byte[] contents)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            using (EnterGate(path))
+            {
+                string temporaryPath = null;
+                bool ownsTemporary = false;
+                try
+                {
+                    string destinationPath = Path.GetFullPath(path);
+                    string directory = Path.GetDirectoryName(destinationPath);
+                    string filename = Path.GetFileName(destinationPath);
+                    if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(filename))
+                    {
+                        return false;
+                    }
+                    Directory.CreateDirectory(directory);
+                    if (File.Exists(destinationPath) || Directory.Exists(destinationPath))
+                    {
+                        return false;
+                    }
+                    int temporaryNameLength = MaximumInitializationStageNameLength;
+                    FileStream staging = null;
+                    for (int attempt = 0; attempt < MaximumInitializationStageAttempts; ++attempt)
+                    {
+                        Guid temporaryIdentifier = Guid.NewGuid();
+                        string temporaryName =
+                            temporaryNameLength == MaximumInitializationStageNameLength
+                                ? temporaryIdentifier.ToString("N")
+                                : Convert
+                                    .ToBase64String(temporaryIdentifier.ToByteArray())
+                                    .TrimEnd('=')
+                                    .Replace('+', '-')
+                                    .Replace('/', '_');
+                        if (temporaryNameLength < temporaryName.Length)
+                        {
+                            temporaryName = temporaryName.Substring(0, temporaryNameLength);
+                        }
+                        if (
+                            string.Equals(
+                                temporaryName,
+                                filename,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        )
+                        {
+                            continue;
+                        }
+                        temporaryPath = Path.Combine(directory, temporaryName);
+                        try
+                        {
+                            staging = new FileStream(
+                                temporaryPath,
+                                FileMode.CreateNew,
+                                FileAccess.Write,
+                                FileShare.None,
+                                DefaultBufferSize,
+                                useAsync: false
+                            );
+                            ownsTemporary = true;
+                            break;
+                        }
+                        catch (PathTooLongException) when (filename.Length < temporaryNameLength)
+                        {
+                            temporaryNameLength = filename.Length;
+                        }
+                        catch (IOException)
+                            when (File.Exists(temporaryPath) || Directory.Exists(temporaryPath)) { }
+                    }
+                    if (staging == null)
+                    {
+                        return false;
+                    }
+                    using (staging)
+                    {
+                        contents ??= Array.Empty<byte>();
+                        staging.Write(contents, 0, contents.Length);
+                        staging.Flush(flushToDisk: true);
+                    }
+                    if (
+                        !TryPublishStagedFileWithoutOverwrite(
+                            temporaryPath,
+                            destinationPath,
+                            out bool leavesStaged
+                        )
+                    )
+                    {
+                        return false;
+                    }
+                    ownsTemporary = leavesStaged;
+                    return true;
+                }
+                catch (Exception)
+                {
+                    return false;
+                }
+                finally
+                {
+                    if (ownsTemporary)
+                    {
+                        DiscardStagedFile(temporaryPath);
+                    }
                 }
             }
         }

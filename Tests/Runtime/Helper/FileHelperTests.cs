@@ -244,6 +244,117 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(largeContents.Length, new FileInfo(testFile).Length);
         }
 
+        [TestCase(1, TestName = "InitializePath.NameLength.Single.PreservesBytes")]
+        [TestCase(220, TestName = "InitializePath.NameLength.Long.PreservesBytes")]
+        [TestCase(255, TestName = "InitializePath.NameLength.Maximum.PreservesBytes")]
+        public void InitializePathPreservesLegalFilenameLength(int filenameLength)
+        {
+            string testFile = Path.Combine(_testDirectory, new string('a', filenameLength));
+            byte[] contents = { 0, 1, 127, 255 };
+            try
+            {
+                File.WriteAllBytes(testFile, contents);
+                Assert.AreEqual(contents, File.ReadAllBytes(testFile));
+                File.Delete(testFile);
+            }
+            catch (IOException exception)
+            {
+                Assert.Ignore(
+                    $"The ordinary file API cannot round-trip a {filenameLength}-character filename at this path: {exception.GetType().Name}: {exception.Message}"
+                );
+            }
+
+            Assert.IsTrue(FileHelper.InitializePath(testFile, contents));
+            Assert.AreEqual(contents, File.ReadAllBytes(testFile));
+            Assert.AreEqual(new[] { testFile }, Directory.GetFiles(_testDirectory));
+        }
+
+        [Test]
+        public void InitializePathShortFilenamePreservesExistingShortNames()
+        {
+            const string existingNames = "0123456789abcdef";
+            foreach (char existingName in existingNames)
+            {
+                File.WriteAllText(
+                    Path.Combine(_testDirectory, existingName.ToString()),
+                    "existing data"
+                );
+            }
+            string testFile = Path.Combine(_testDirectory, "z");
+            byte[] contents = { 1, 2, 3 };
+
+            Assert.IsTrue(FileHelper.InitializePath(testFile, contents));
+            Assert.AreEqual(contents, File.ReadAllBytes(testFile));
+            Assert.AreEqual(existingNames.Length + 1, Directory.GetFiles(_testDirectory).Length);
+            foreach (char existingName in existingNames)
+            {
+                Assert.AreEqual(
+                    "existing data",
+                    File.ReadAllText(Path.Combine(_testDirectory, existingName.ToString()))
+                );
+            }
+        }
+
+        [TestCase(false, TestName = "InitializePath.Collision.File.PreservesEntries")]
+        [TestCase(true, TestName = "InitializePath.Collision.Directory.PreservesEntries")]
+        public void InitializePathCollisionLeavesNoTemporaryFiles(bool directoryCollision)
+        {
+            string testFile = Path.Combine(_testDirectory, "occupied");
+            string sentinel = Path.Combine(_testDirectory, "sentinel");
+            File.WriteAllText(sentinel, "unrelated data");
+            if (directoryCollision)
+            {
+                Directory.CreateDirectory(testFile);
+            }
+            else
+            {
+                File.WriteAllText(testFile, "existing data");
+            }
+            string[] entries = Directory.GetFileSystemEntries(_testDirectory);
+
+            Assert.IsFalse(FileHelper.InitializePath(testFile, new byte[] { 1, 2, 3 }));
+            CollectionAssert.AreEquivalent(entries, Directory.GetFileSystemEntries(_testDirectory));
+            Assert.AreEqual("unrelated data", File.ReadAllText(sentinel));
+            if (!directoryCollision)
+            {
+                Assert.AreEqual("existing data", File.ReadAllText(testFile));
+            }
+        }
+
+        [TestCase(2, TestName = "InitializePath.Creators.Two.PublishOneCompleteFile")]
+        [TestCase(8, TestName = "InitializePath.Creators.Eight.PublishOneCompleteFile")]
+        public void InitializePathConcurrentCreatorsPublishOneCompleteFile(int creatorCount)
+        {
+            string testFile = Path.Combine(_testDirectory, "shared.save");
+            Task<bool>[] creators = new Task<bool>[creatorCount];
+            byte[][] contents = new byte[creatorCount][];
+            for (int creator = 0; creator < creatorCount; ++creator)
+            {
+                byte[] bytes = new byte[8192];
+                for (int index = 0; index < bytes.Length; ++index)
+                {
+                    bytes[index] = (byte)(creator + 1);
+                }
+                contents[creator] = bytes;
+                creators[creator] = Task.Run(() => FileHelper.InitializePath(testFile, bytes));
+            }
+            Task.WaitAll(creators);
+
+            int winnerCount = 0;
+            byte[] winnerContents = null;
+            for (int creator = 0; creator < creatorCount; ++creator)
+            {
+                if (creators[creator].Result)
+                {
+                    ++winnerCount;
+                    winnerContents = contents[creator];
+                }
+            }
+            Assert.AreEqual(1, winnerCount);
+            Assert.AreEqual(winnerContents, File.ReadAllBytes(testFile));
+            Assert.AreEqual(new[] { testFile }, Directory.GetFiles(_testDirectory));
+        }
+
         [UnityTest]
         public IEnumerator CopyFileAsyncCopiesFileSuccessfully()
         {

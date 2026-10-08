@@ -1579,6 +1579,7 @@ Five behaviors are worth knowing, because two of them are the opposite of the ru
 
 - **A null sub-message is omitted; a present-but-empty one is written** as a key and a zero length,
   the same distinction an empty `string` draws.
+- **Repeated sub-message fragments must each contain complete wire fields.** Incomplete fragments cannot repair each other across their boundaries.
 - **A sub-message field merges into what the member already holds**, as protobuf requires and
   protobuf-net does. Two occurrences combine (`12 02 08 01` followed by `12 02 10 02` sets both
   members rather than only the second), and so does the **first** occurrence and whatever your
@@ -1805,6 +1806,12 @@ A zero `int` or `double` value is omitted, so `{"a": 0}` carries only its key.
 A missing key or value decodes to that type's protobuf default. A missing string is `""`,
 which can serve as a dictionary key. Historical keyless enum entries and explicit zero numeric
 keys remain readable. Repeated keys are last-wins, applied through the indexer rather than `Add`.
+Repeated message-valued field 2 occurrences inside one entry merge: an occurrence containing
+`X` followed by one containing `Y` restores both members, and an empty occurrence preserves
+members read earlier. Later scalar fields within that message win. A separate entry with the same
+key replaces the earlier message value instead of merging into it. Each value is decoded once per
+entry, so its deserialization hooks run once. Both the entry and its value count toward the
+reader's nesting limit; malformed values are refused.
 Rewriting an older payload can change its bytes and hash while preserving its map contents.
 
 Both protobuf-net majors retain zero enum keys. For enum-keyed maps with `double` values,

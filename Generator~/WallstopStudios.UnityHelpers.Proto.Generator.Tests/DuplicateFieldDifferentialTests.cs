@@ -94,6 +94,94 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
+        [TestCase("08")]
+        [TestCase("0880")]
+        [TestCase("0D010203")]
+        [TestCase("0901020304050607")]
+        [TestCase("0A")]
+        [TestCase("0A0201")]
+        [TestCase("13")]
+        [TestCase("130801")]
+        [TestCase("131C")]
+        [TestCase("14")]
+        [TestCase("00")]
+        [TestCase("0E")]
+        public void AccumulatorRefusesIncompleteFieldsWithoutChangingAcceptedPayload(string hex)
+        {
+            byte[] malformed = Parse(hex);
+            byte[] valid = Parse("0801");
+            WProtoMessageAccumulator firstMalformed = default;
+            Assert.IsTrue(firstMalformed.TryAdd(malformed));
+            Assert.IsFalse(firstMalformed.TryAdd(valid));
+            Assert.IsTrue(firstMalformed.HasValue);
+            CollectionAssert.AreEqual(malformed, firstMalformed.Payload.ToArray());
+
+            WProtoMessageAccumulator firstValid = default;
+            Assert.IsTrue(firstValid.TryAdd(valid));
+            Assert.IsFalse(firstValid.TryAdd(malformed));
+            CollectionAssert.AreEqual(valid, firstValid.Payload.ToArray());
+            Assert.IsTrue(firstValid.TryAdd(valid));
+            byte[] beforeRejection = firstValid.Payload.ToArray();
+            Assert.IsFalse(firstValid.TryAdd(malformed));
+            CollectionAssert.AreEqual(beforeRejection, firstValid.Payload.ToArray());
+            Assert.IsTrue(firstValid.TryAdd(valid));
+            CollectionAssert.AreEqual(Parse("080108010801"), firstValid.Payload.ToArray());
+        }
+
+        [TestCase("")]
+        [TestCase("08010802")]
+        [TestCase("0D01020304")]
+        [TestCase("090102030405060708")]
+        [TestCase("0A0108")]
+        [TestCase("13080114")]
+        [TestCase("132308012414")]
+        public void AccumulatorAcceptsCompleteFieldsIncludingUnknownGroups(string hex)
+        {
+            byte[] occurrence = Parse(hex);
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsFalse(accumulator.HasValue);
+            Assert.IsTrue(accumulator.TryAdd(occurrence));
+            Assert.IsTrue(accumulator.HasValue);
+            Assert.IsTrue(accumulator.TryAdd(occurrence));
+            Assert.IsTrue(accumulator.TryAdd(occurrence));
+            CollectionAssert.AreEqual(Parse(hex + hex + hex), accumulator.Payload.ToArray());
+        }
+
+        [Test]
+        public void SingleAccumulatorOccurrenceRetainsItsOriginalSpan()
+        {
+            byte[] occurrence = Parse("0801");
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(occurrence));
+            occurrence[1] = 7;
+            Assert.AreEqual(7, accumulator.Payload[1]);
+        }
+
+        [Test]
+        public void SingleAccumulatorOccurrencesAllocateNoMemory()
+        {
+            byte[] occurrence = Parse("0801");
+            WProtoMessageAccumulator warmup = default;
+            Assert.IsTrue(warmup.TryAdd(occurrence));
+            long controlStart = GC.GetAllocatedBytesForCurrentThread();
+            GC.KeepAlive(new byte[32]);
+            Assert.Less(controlStart, GC.GetAllocatedBytesForCurrentThread());
+
+            int checksum = 0;
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (int index = 0; index < 128; ++index)
+            {
+                WProtoMessageAccumulator accumulator = default;
+                if (accumulator.TryAdd(occurrence))
+                {
+                    checksum += accumulator.Payload[1];
+                }
+            }
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.AreEqual(128, checksum);
+            Assert.AreEqual(0, allocated);
+        }
+
         [Test]
         public void ADuplicatedSubMessageMergesRatherThanReplacing()
         {

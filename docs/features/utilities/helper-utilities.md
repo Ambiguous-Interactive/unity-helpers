@@ -956,9 +956,17 @@ FileHelper.InitializePath(
 );
 ```
 
-`InitializePath` creates the file only when its path is free. It returns `false` for an existing
-file, a null, empty, or whitespace-only path, or an I/O failure; it does not replace existing contents.
-Paths that contain spaces alongside other characters are kept as supplied.
+`InitializePath` stages and flushes initial contents before publishing them at a free path.
+A failed write leaves the destination absent, so you can retry without deleting a partial save.
+It returns `false` for an existing file or directory, a blank path, an I/O failure, or a platform
+or filesystem that cannot publish a complete file atomically while preserving a competing creator.
+Null contents create an empty file. Missing parent directories are created. Paths containing spaces
+and legal long filenames remain supported.
+
+Operations through `DurableFile` and `FileHelper` serialize on the same path within this process.
+Publication preserves a file created by another process before publication; it does not prevent
+another process from replacing the file afterward. Temporary files use short random names in the
+same directory and are removed on a best-effort basis. An interrupted process can leave one behind.
 
 **Async file copy:**
 

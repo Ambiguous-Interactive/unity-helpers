@@ -96,12 +96,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         /// <summary>
         /// The maximum total weight of all cache entries.
-        /// Only used when <see cref="Weigher"/> is specified.
+        /// Only used when <see cref="Weigher"/> is specified; remains a strict bound during adaptive growth.
         /// </summary>
         public long MaximumWeight;
 
         /// <summary>
-        /// Function to compute the weight of a cache entry.
+        /// Function to compute a nonnegative entry weight; values exceeding the budget are rejected.
         /// When specified, <see cref="MaximumWeight"/> is used instead of <see cref="MaximumSize"/>.
         /// </summary>
         public Func<TKey, TValue, long> Weigher;

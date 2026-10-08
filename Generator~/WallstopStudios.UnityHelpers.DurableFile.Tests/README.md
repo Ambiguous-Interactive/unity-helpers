@@ -1,7 +1,8 @@
-# DurableFile replacement regression tests
+# DurableFile regression tests
 
 This pure .NET NUnit project compiles the repository's actual
 [DurableFile](../../Runtime/Core/Helper/DurableFile.cs),
+[FileHelper](../../Runtime/Core/Helper/FileHelper.cs),
 [SemaphoreLease](../../Runtime/Core/Threading/SemaphoreLease.cs), and
 [DisposalLease](../../Runtime/Utils/DisposalLease.cs) sources through project links. It does not copy,
 rewrite, or inject test hooks into those production files.
@@ -23,6 +24,15 @@ async text, async bytes, and async copy. It checks both unsupported exception fo
 move would succeed or fail, supported existing-file replacement, first creation, and supported retry
 following a rejected replacement. It asserts exact previous bytes, returned errors, absence of
 fallback deletion, staged-file cleanup, and release of staging ownership.
+
+`FileHelperInitializationTests` starts the same assembly as an isolated executable on 64-bit Linux.
+Its child lowers its own `RLIMIT_FSIZE` and ignores `SIGXFSZ` before calling the actual source-linked
+initializer. Both buffered 128-byte writes and direct 65,536-byte writes exceed limits of zero, one,
+and 63 bytes. The parent verifies failure leaves the destination absent and no staging files, then
+retries without a limit and checks exact contents. These are real kernel write/flush refusals rather
+than injected failure branches; the parent process and other tests retain their original limits.
+Null initialization, an existing file, and a directory collision are also covered. These host results
+remain distinct from Unity player qualification.
 
 Run from the repository root:
 
