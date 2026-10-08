@@ -999,6 +999,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>An array too, since the two take different epilogue paths.</summary>
         [WProtoMember(2)]
         public int[] Extras;
+
+        /// <summary>A list with no constructor seed.</summary>
+        [WProtoMember(3)]
+        public List<int> UnseededItems;
+
+        /// <summary>A constructor list replaced by a present field.</summary>
+        [WProtoMember(4, OverwriteList = true)]
+        public List<int> ReplacedItems = new List<int> { 9 };
+
+        /// <summary>The constructor list identity retained by append reads.</summary>
+        public List<int> ConstructorItems;
     }
 
     /// <summary>
@@ -1020,6 +1031,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public PolyListSub()
         {
             Items = new List<int> { 5 };
+            ConstructorItems = Items;
         }
     }
 

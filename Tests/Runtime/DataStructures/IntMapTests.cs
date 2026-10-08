@@ -234,6 +234,160 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(12_000, map.Count);
         }
 
+        [TestCase(0, 1, false)]
+        [TestCase(0, 1024, true)]
+        [TestCase(16, -1024, false)]
+        [TestCase(16, 1024, true)]
+        [TestCase(4096, 1, false)]
+        [TestCase(4096, -1024, true)]
+        public void ReplacingAtHalfCapacityPreservesCapacityAndAllValues(
+            int capacityHint,
+            int stride,
+            bool useIndexer
+        )
+        {
+            IntMap<int> map = new(capacityHint);
+            int capacity = map.Capacity;
+            int count = capacity / 2;
+            for (int index = 0; index < count; ++index)
+            {
+                Assert.IsTrue(map.TrySet(index * stride, index));
+            }
+
+            for (int index = 0; index < count; ++index)
+            {
+                int key = index * stride;
+                if (useIndexer)
+                {
+                    map[key] = -index;
+                }
+                else
+                {
+                    Assert.IsTrue(map.TrySet(key, -index));
+                }
+                Assert.AreEqual(capacity, map.Capacity);
+                Assert.AreEqual(count, map.Count);
+            }
+
+            foreach (KeyValuePair<int, int> entry in map)
+            {
+                Assert.AreEqual(-(entry.Key / stride), entry.Value);
+            }
+            Assert.AreEqual(count, CountByEnumeration(map));
+            Assert.IsTrue(map.TrySet(count * stride, count));
+            Assert.AreEqual(capacity * 2, map.Capacity);
+            Assert.AreEqual(count + 1, map.Count);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ReplacingAfterRemovalsPreservesNullsAndInvalidatesEnumerators(bool useIndexer)
+        {
+            IntMap<string> map = new();
+            int capacity = map.Capacity;
+            int halfCapacity = capacity / 2;
+            for (int key = 0; key < halfCapacity; ++key)
+            {
+                map.TrySet(key * 1024, "original");
+            }
+            for (int key = 1; key < halfCapacity; key += 2)
+            {
+                Assert.IsTrue(map.Remove(key * 1024, out string removed));
+                Assert.AreEqual("original", removed);
+            }
+
+            IntMap<string>.Enumerator enumerator = map.GetEnumerator();
+            Assert.IsTrue(enumerator.MoveNext());
+            for (int key = 0; key < halfCapacity; key += 2)
+            {
+                if (useIndexer)
+                {
+                    map[key * 1024] = null;
+                }
+                else
+                {
+                    Assert.IsTrue(map.TrySet(key * 1024, null));
+                }
+                Assert.AreEqual(capacity, map.Capacity);
+            }
+            Assert.Throws<InvalidOperationException>(() => enumerator.MoveNext());
+            Assert.Throws<InvalidOperationException>(() => enumerator.Reset());
+            Assert.AreEqual(halfCapacity / 2, map.Count);
+            for (int key = 0; key < halfCapacity; ++key)
+            {
+                Assert.AreEqual(key % 2 == 0, map.TryGet(key * 1024, out string value));
+                Assert.IsTrue(value == null);
+            }
+        }
+
+        [TestCase(0, 0, false)]
+        [TestCase(16, 0, true)]
+        [TestCase(16, 8, false)]
+        [TestCase(16, 24, true)]
+        [TestCase(4096, 0, false)]
+        [TestCase(4096, 4096, true)]
+        public void FirstReplacementAtTheOccupancyLimitDoesNotAllocate(
+            int capacityHint,
+            int removedCount,
+            bool useIndexer
+        )
+        {
+            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
+            const int controlSize = 4096;
+            try
+            {
+                long beforeControl = GC.GetAllocatedBytesForCurrentThread();
+                byte[] control = new byte[controlSize];
+                long controlBytes = GC.GetAllocatedBytesForCurrentThread() - beforeControl;
+                GC.KeepAlive(control);
+                if (controlBytes < controlSize)
+                {
+                    Assert.Ignore("The allocation counter cannot observe a retained allocation.");
+                    return;
+                }
+            }
+            catch (PlatformNotSupportedException)
+            {
+                Assert.Ignore("The allocation counter is unavailable on this platform.");
+                return;
+            }
+
+            IntMap<string> map = new(capacityHint);
+            int count = map.Capacity / 2;
+            for (int key = 0; key < count; ++key)
+            {
+                if (useIndexer)
+                {
+                    map[key] = "original";
+                }
+                else
+                {
+                    map.TrySet(key, "original");
+                }
+            }
+            for (int key = 1; key <= removedCount; ++key)
+            {
+                Assert.IsTrue(map.Remove(key, out _));
+            }
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            bool written = true;
+            if (useIndexer)
+            {
+                map[0] = null;
+            }
+            else
+            {
+                written = map.TrySet(0, null);
+            }
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.IsTrue(written);
+            Assert.AreEqual(0L, allocated);
+            Assert.IsTrue(map.TryGet(0, out string value));
+            Assert.IsTrue(value == null);
+            Assert.AreEqual(count - removedCount, map.Count);
+        }
+
         [Test]
         public void TombstoneHeavyChurnEndsEmptyAndStaysCorrect()
         {

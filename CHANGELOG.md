@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix invalid background-worker idle timeouts stranding queued save jobs; supported fractional and infinite waits retain their behavior ([#965](https://github.com/Ambiguous-Interactive/unity-helpers/issues/965)).
+- Fix extra allocations during WProto polymorphic list reads by reusing unseeded and replacement lists; preserve constructor list identity and append order ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Fix scene retrieval in packed players and already loaded nonactive scenes; borrowed scenes stay loaded, while owned scene disposal waits for loading and releases callbacks ([#963](https://github.com/Ambiguous-Interactive/unity-helpers/issues/963)).
 - Fix queued dispatcher tasks hanging after destruction. Cancel abandoned work, reject uninitialized or destroyed dispatchers, and preserve running task completion ([#961](https://github.com/Ambiguous-Interactive/unity-helpers/issues/961)).
 - Fix dispatcher scope cleanup attempting to destroy loaded prefab assets; scene instances still receive cleanup ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
@@ -62,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix blank custom validation messages hiding the default warning in standard and Odin inspectors; nonblank messages and serialized string values retain their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank prefixes in inline editor headers when a field label contains only whitespace ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix dropdowns showing invisible labels for Unity objects with whitespace-only names; object names, references, and literal string options stay unchanged ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
-- Fix IntMap lookups for keys sharing low bits and keep small live windows at their starting capacity during add/remove churn ([#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926)).
+- Fix IntMap lookups for keys sharing low bits, keep small live windows at their starting capacity during churn, and replace existing values without rebuilding the table ([#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926)).
 - Fix main-thread guard diagnostics to omit blank context labels and use the source filename for blank member names; nonblank labels retain their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix blank serialized member names creating synthetic backing fields, and reject backing-field names with blank property names ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix newly constructed serialization failure diagnostics with blank reasons so they show `operation failed`; nonblank reasons and literal input descriptors keep their exact text ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).

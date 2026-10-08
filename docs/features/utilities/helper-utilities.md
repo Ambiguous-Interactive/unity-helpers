@@ -691,6 +691,12 @@ async Task<string> GetTextFromMainThread()
 
 **Run background work one item at a time, in enqueue order:**
 
+The optional `noWorkWaitTime` controls how long an idle worker waits for a signal. Invalid delays
+use the default one-second interval, so a mistaken negative or oversized timeout cannot stop the
+worker and strand later save jobs. Valid delays retain `SemaphoreSlim`'s integer-millisecond
+truncation, including fractional values, zero, and `Timeout.InfiniteTimeSpan`. Enqueueing still
+signals the worker immediately, even with an infinite idle delay.
+
 **Disposal discards queued work.** `Dispose()` and `DisposeAsync()` cancel the worker rather than
 draining it, so anything enqueued but not yet started is dropped; the `await` inside
 `DisposeAsync()` waits only for the item already in flight. Disposal immediately removes pending

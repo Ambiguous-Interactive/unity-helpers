@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Text;
     using NUnit.Framework;
@@ -79,6 +80,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             WProtoReader reader = new WProtoReader(buffer);
             Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
             return restored;
+        }
+
+        private static long ReadListAllocations(
+            IWProtoFormatter<PolyListBase> formatter,
+            ReadOnlySpan<byte> payload,
+            int iterations
+        )
+        {
+            PolyListBase restored = null;
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (int iteration = 0; iteration < iterations; ++iteration)
+            {
+                WProtoReader reader = new WProtoReader(payload);
+                if (!formatter.TryRead(ref reader, out restored))
+                {
+                    Assert.Fail("The polymorphic list payload must decode.");
+                }
+            }
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            GC.KeepAlive(restored);
+            return allocated;
         }
 
         [Test]
@@ -331,6 +353,92 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsInstanceOf<ConcreteShape>(decoded);
             Assert.AreEqual(3, decoded.Sides);
             Assert.AreEqual(5, ((ConcreteShape)decoded).Edge);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(128)]
+        [TestCase(257)]
+        public void DeferredNullListAllocatesOnlyItsReturnedCollection(int count)
+        {
+            byte[] storage = new byte[count + 16];
+            WProtoWriter writer = new WProtoWriter(storage);
+            Assert.IsTrue(writer.TryWriteTag(100, WProtoWireType.LengthDelimited));
+            Assert.IsTrue(writer.TryWriteLengthPrefix(0));
+            Assert.IsTrue(writer.TryWriteTag(3, WProtoWireType.LengthDelimited));
+            Assert.IsTrue(writer.TryWriteLengthPrefix(count));
+            for (int index = 0; index < count; ++index)
+            {
+                Assert.IsTrue(writer.TryWriteInt32(0));
+            }
+            ReadOnlySpan<byte> payload = storage.AsSpan(0, writer.Position);
+            ReadOnlySpan<byte> absent = storage.AsSpan(0, 3);
+            IWProtoFormatter<PolyListBase> formatter = WProtoFormatterProvider.Get<PolyListBase>();
+            for (int iteration = 0; iteration < 256; ++iteration)
+            {
+                WProtoReader warm = new WProtoReader(payload);
+                Assert.IsTrue(formatter.TryRead(ref warm, out PolyListBase _));
+            }
+
+            const int iterations = 1024;
+            long presentBytes = ReadListAllocations(formatter, payload, iterations);
+            long absentBytes = ReadListAllocations(formatter, absent, iterations);
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            List<int> materialized = null;
+            for (int iteration = 0; iteration < iterations; ++iteration)
+            {
+                materialized = new List<int>(count);
+            }
+            long collectionBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            GC.KeepAlive(materialized);
+            Assert.Greater(collectionBytes, 0, "The allocation counter must observe fresh lists.");
+            TestContext.WriteLine(
+                $"count={count}: read delta={(presentBytes - absentBytes) / iterations}, returned list={collectionBytes / iterations} bytes/op"
+            );
+            Assert.AreEqual(collectionBytes, presentBytes - absentBytes);
+        }
+
+        [TestCase("A20600080118022003")]
+        [TestCase("080118022003A20600")]
+        [TestCase("1802A2060008012003")]
+        [TestCase("A206001A01022201030801")]
+        public void DeferredListsPreserveSeedIdentityAndWireOrder(string hex)
+        {
+            PolyListBase decoded = Decode<PolyListBase>(hex);
+            Assert.AreSame(decoded.ConstructorItems, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 5, 1 }, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 2 }, decoded.UnseededItems);
+            CollectionAssert.AreEqual(new[] { 3 }, decoded.ReplacedItems);
+        }
+
+        [TestCase("080118022003A20600080418062007")]
+        [TestCase("A206000A02010418021A01062003A206002007")]
+        public void DeferredListsKeepInterleavedElementsAcrossSubtypeIncludes(string hex)
+        {
+            PolyListBase decoded = Decode<PolyListBase>(hex);
+            Assert.AreSame(decoded.ConstructorItems, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 5, 1, 4 }, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 2, 6 }, decoded.UnseededItems);
+            CollectionAssert.AreEqual(new[] { 3, 7 }, decoded.ReplacedItems);
+        }
+
+        [TestCase("A20600")]
+        [TestCase("A206001A002200")]
+        public void DeferredListsDistinguishAbsentAndPresentEmptyRuns(string hex)
+        {
+            PolyListBase decoded = Decode<PolyListBase>(hex);
+            Assert.AreSame(decoded.ConstructorItems, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 5 }, decoded.Items);
+            if (string.Equals(hex, "A20600", StringComparison.Ordinal))
+            {
+                Assert.IsNull(decoded.UnseededItems);
+                CollectionAssert.AreEqual(new[] { 9 }, decoded.ReplacedItems);
+            }
+            else
+            {
+                Assert.IsEmpty(decoded.UnseededItems);
+                Assert.IsEmpty(decoded.ReplacedItems);
+            }
         }
 
         [Test]

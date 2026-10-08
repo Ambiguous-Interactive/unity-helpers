@@ -234,6 +234,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(5, ((WProtoConcreteShape)decoded).Edge);
         }
 
+        [TestCase("A20600080118022003")]
+        [TestCase("080118022003A20600")]
+        [TestCase("1802A2060008012003")]
+        [TestCase("A206001A01022201030801")]
+        public void DeferredListsPreserveSeedIdentityAndWireOrder(string hex)
+        {
+            WProtoPolyListBase decoded = Decode<WProtoPolyListBase>(hex);
+            Assert.AreSame(decoded.ConstructorItems, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 5, 1 }, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 2 }, decoded.UnseededItems);
+            CollectionAssert.AreEqual(new[] { 3 }, decoded.ReplacedItems);
+        }
+
+        [TestCase("080118022003A20600080418062007")]
+        [TestCase("A206000A02010418021A01062003A206002007")]
+        public void DeferredListsKeepInterleavedElementsAcrossSubtypeIncludes(string hex)
+        {
+            WProtoPolyListBase decoded = Decode<WProtoPolyListBase>(hex);
+            Assert.AreSame(decoded.ConstructorItems, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 5, 1, 4 }, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 2, 6 }, decoded.UnseededItems);
+            CollectionAssert.AreEqual(new[] { 3, 7 }, decoded.ReplacedItems);
+        }
+
+        [TestCase("A20600")]
+        [TestCase("A206001A002200")]
+        public void DeferredListsDistinguishAbsentAndPresentEmptyRuns(string hex)
+        {
+            WProtoPolyListBase decoded = Decode<WProtoPolyListBase>(hex);
+            Assert.AreSame(decoded.ConstructorItems, decoded.Items);
+            CollectionAssert.AreEqual(new[] { 5 }, decoded.Items);
+            if (string.Equals(hex, "A20600", StringComparison.Ordinal))
+            {
+                Assert.IsTrue(decoded.UnseededItems == null);
+                CollectionAssert.AreEqual(new[] { 9 }, decoded.ReplacedItems);
+            }
+            else
+            {
+                Assert.IsEmpty(decoded.UnseededItems);
+                Assert.IsEmpty(decoded.ReplacedItems);
+            }
+        }
+
         [Test]
         public void ACollectionOnAnAbstractBaseSurvivesAnElementBeforeTheIncludeTag()
         {
