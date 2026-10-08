@@ -7,16 +7,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using System.Threading.Tasks;
     using System.Threading.Tasks.Sources;
 
-    internal sealed class CountingValueTaskSource<T> : IValueTaskSource<T>
+    internal sealed class CountingValueTaskSource<T> : IValueTaskSource<T>, IValueTaskSource
     {
         internal int GetResultCount { get; private set; }
 
         internal int OnCompletedCount { get; private set; }
 
+        internal bool OwnsSlot { get; private set; } = true;
+
         internal ValueTask<T> Task => new(this, 0);
+
+        internal ValueTask VoidTask => new(this, 0);
 
         private bool _completed;
         private T _result;
+        private Exception _failure;
         private Action<object> _continuation;
         private object _continuationState;
 
@@ -25,10 +30,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// </summary>
         public T GetResult(short token)
         {
-            ++GetResultCount;
-            if (!_completed)
+            if (!_completed || !OwnsSlot || token != 0)
             {
-                throw new InvalidOperationException("The source has not completed.");
+                throw new InvalidOperationException(
+                    "The source is pending, already consumed, or has an invalid token."
+                );
+            }
+            ++GetResultCount;
+            OwnsSlot = false;
+            if (_failure != null)
+            {
+                throw _failure;
             }
             return _result;
         }
@@ -38,7 +50,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// </summary>
         public ValueTaskSourceStatus GetStatus(short token)
         {
-            return _completed ? ValueTaskSourceStatus.Succeeded : ValueTaskSourceStatus.Pending;
+            if (!_completed)
+            {
+                return ValueTaskSourceStatus.Pending;
+            }
+            if (_failure is OperationCanceledException)
+            {
+                return ValueTaskSourceStatus.Canceled;
+            }
+            return _failure != null
+                ? ValueTaskSourceStatus.Faulted
+                : ValueTaskSourceStatus.Succeeded;
         }
 
         /// <summary>
@@ -63,13 +85,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         internal void Complete(T result)
         {
+            CompleteCore(result, null);
+        }
+
+        internal void CompleteException(Exception failure)
+        {
+            CompleteCore(default, failure);
+        }
+
+        private void CompleteCore(T result, Exception failure)
+        {
             _result = result;
+            _failure = failure;
             _completed = true;
             Action<object> continuation = _continuation;
             object state = _continuationState;
             _continuation = null;
             _continuationState = null;
             continuation?.Invoke(state);
+        }
+
+        void IValueTaskSource.GetResult(short token)
+        {
+            GetResult(token);
         }
     }
 }

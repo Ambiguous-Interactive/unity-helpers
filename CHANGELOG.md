@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix completed `ValueTask` coroutine adapters retaining pooled source resources when no result callback is supplied; completed cancellation is now propagated in those paths ([#967](https://github.com/Ambiguous-Interactive/unity-helpers/issues/967)).
 - Fix invalid background-worker idle timeouts stranding queued save jobs; supported fractional and infinite waits retain their behavior ([#965](https://github.com/Ambiguous-Interactive/unity-helpers/issues/965)).
 - Fix extra allocations during WProto polymorphic list reads by reusing unseeded and replacement lists; preserve constructor list identity and append order ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Fix scene retrieval in packed players and already loaded nonactive scenes; borrowed scenes stay loaded, while owned scene disposal waits for loading and releases callbacks ([#963](https://github.com/Ambiguous-Interactive/unity-helpers/issues/963)).

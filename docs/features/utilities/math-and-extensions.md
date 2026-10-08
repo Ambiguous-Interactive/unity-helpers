@@ -1537,8 +1537,15 @@ IEnumerator Start()
 
 Tuple overloads accept callbacks with two or three arguments. They allocate an iterator without
 an extra callback wrapper. Callbacks run when the coroutine observes completion, not when you
-create it. Tuple results are still consumed when the callback is omitted. Pending `ValueTask`
-operations may also allocate a backing task.
+create it. Every completed `ValueTask` source is consumed once, including scalar results when
+no callback is supplied, so pooled sources can release their operation slots or buffers. Pending
+`ValueTask` operations may also allocate a backing task.
+
+Already-completed cancellation is propagated by the `ValueTask` adapters, including the
+nongeneric and scalar overloads without callbacks. Pending cancellation in those two paths
+retains the existing behavior: the source is consumed, but the coroutine finishes without
+throwing. Faulted tasks continue to propagate their existing aggregate exceptions, and a
+throwing result callback runs after its source has been consumed.
 
 ### Chain Continuations
 
