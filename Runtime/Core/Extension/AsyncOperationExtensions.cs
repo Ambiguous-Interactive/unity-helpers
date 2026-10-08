@@ -301,10 +301,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: ValueTask is a value type and cannot be null.</para>
         /// <para>Thread safety: Must be iterated on Unity main thread. No Unity main thread requirement for task execution.</para>
         /// <para>Performance: No yielding if already complete. Otherwise yields every frame. O(1) per iteration.</para>
-        /// <para>Allocations: No allocations if already complete. Otherwise allocates iterator and converts to Task internally.</para>
+        /// <para>Allocations: Allocates an iterator; a pending operation may also allocate a backing Task.</para>
         /// <para>Edge cases: Returns immediately if task is already completed. Throws task exception if faulted.</para>
+        /// <para>Consumes a completed task once so pooled sources can retire their resources. Already-completed cancellation is propagated; pending cancellation retains the existing completion behavior.</para>
         /// </remarks>
         /// <exception cref="Exception">Throws the task's exception if the task is faulted.</exception>
+        /// <exception cref="OperationCanceledException">Thrown when the task is already canceled when iteration begins.</exception>
         public static IEnumerator AsCoroutine(this ValueTask task)
         {
             if (task.IsCompleted)
@@ -313,6 +315,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     throw task.AsTask().Exception;
                 }
+                task.GetAwaiter().GetResult();
                 yield break;
             }
 
@@ -339,10 +342,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: ValueTask is a value type and cannot be null. onResult can be null.</para>
         /// <para>Thread safety: Must be iterated on Unity main thread. No Unity main thread requirement for task execution.</para>
         /// <para>Performance: No yielding if already complete. Otherwise yields every frame. O(1) per iteration.</para>
-        /// <para>Allocations: No allocations if already complete. Otherwise allocates iterator and converts to Task internally.</para>
+        /// <para>Allocations: Allocates an iterator; a pending operation may also allocate a backing Task.</para>
         /// <para>Edge cases: Returns immediately if task is already completed. onResult invoked with result after successful completion.</para>
+        /// <para>Consumes a completed result once, even without a callback, so pooled sources can retire their resources. Already-completed cancellation is propagated; pending cancellation without a callback retains the existing completion behavior.</para>
         /// </remarks>
         /// <exception cref="Exception">Throws the task's exception if the task is faulted.</exception>
+        /// <exception cref="OperationCanceledException">Thrown when the task is already canceled when iteration begins.</exception>
         public static IEnumerator AsCoroutine<T>(this ValueTask<T> task, Action<T> onResult = null)
         {
             if (task.IsCompleted)
@@ -351,7 +356,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     throw task.AsTask().Exception;
                 }
-                onResult?.Invoke(task.Result);
+                T completedResult = task.Result;
+                onResult?.Invoke(completedResult);
                 yield break;
             }
 

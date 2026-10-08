@@ -17,6 +17,172 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class AsyncOperationExtensionsTests : CommonTestBase
     {
+        [TestCase(false, false, false)]
+        [TestCase(false, false, true)]
+        [TestCase(true, false, false)]
+        [TestCase(true, false, true)]
+        [TestCase(true, true, false)]
+        [TestCase(true, true, true)]
+        public void CoroutineConsumesValueTaskSourceAndRetiresSlotExactlyOnce(
+            bool useGeneric,
+            bool provideCallback,
+            bool initiallyComplete
+        )
+        {
+            CountingValueTaskSource<int> source = new();
+            int callbackCount = 0;
+            Action<int> callback = provideCallback
+                ? result =>
+                {
+                    Assert.AreEqual(7, result);
+                    Assert.IsFalse(source.OwnsSlot);
+                    Assert.AreEqual(1, source.GetResultCount);
+                    ++callbackCount;
+                }
+                : null;
+            if (initiallyComplete)
+            {
+                source.Complete(7);
+            }
+            IEnumerator coroutine = useGeneric
+                ? source.Task.AsCoroutine(callback)
+                : source.VoidTask.AsCoroutine();
+            Assert.AreEqual(0, source.GetResultCount);
+            Assert.IsTrue(source.OwnsSlot);
+            Assert.AreEqual(0, callbackCount);
+            if (!initiallyComplete)
+            {
+                Assert.IsTrue(coroutine.MoveNext());
+                Assert.IsTrue(coroutine.Current == null);
+                Assert.AreEqual(0, source.GetResultCount);
+                Assert.IsTrue(source.OwnsSlot);
+                source.Complete(7);
+                Assert.AreEqual(0, callbackCount);
+            }
+            Assert.IsFalse(coroutine.MoveNext());
+            Assert.IsFalse(coroutine.MoveNext());
+            Assert.AreEqual(1, source.GetResultCount);
+            Assert.IsFalse(source.OwnsSlot);
+            Assert.AreEqual(initiallyComplete ? 0 : 1, source.OnCompletedCount);
+            Assert.AreEqual(provideCallback ? 1 : 0, callbackCount);
+        }
+
+        [TestCase(false, false, false, false)]
+        [TestCase(false, false, false, true)]
+        [TestCase(false, false, true, false)]
+        [TestCase(false, false, true, true)]
+        [TestCase(true, false, false, false)]
+        [TestCase(true, false, false, true)]
+        [TestCase(true, false, true, false)]
+        [TestCase(true, false, true, true)]
+        [TestCase(true, true, false, false)]
+        [TestCase(true, true, false, true)]
+        [TestCase(true, true, true, false)]
+        [TestCase(true, true, true, true)]
+        public void CoroutineRetiresValueTaskSourceAfterFaultOrCancellation(
+            bool useGeneric,
+            bool provideCallback,
+            bool initiallyComplete,
+            bool canceled
+        )
+        {
+            CountingValueTaskSource<int> source = new();
+            Exception failure = canceled
+                ? new OperationCanceledException(
+                    nameof(CoroutineRetiresValueTaskSourceAfterFaultOrCancellation)
+                )
+                : new InvalidOperationException(
+                    nameof(CoroutineRetiresValueTaskSourceAfterFaultOrCancellation)
+                );
+            int callbackCount = 0;
+            Action<int> callback = provideCallback ? _ => ++callbackCount : null;
+            if (initiallyComplete)
+            {
+                source.CompleteException(failure);
+            }
+            IEnumerator coroutine = useGeneric
+                ? source.Task.AsCoroutine(callback)
+                : source.VoidTask.AsCoroutine();
+            Assert.AreEqual(0, source.GetResultCount);
+            Assert.IsTrue(source.OwnsSlot);
+            if (!initiallyComplete)
+            {
+                Assert.IsTrue(coroutine.MoveNext());
+                Assert.AreEqual(0, source.GetResultCount);
+                Assert.IsTrue(source.OwnsSlot);
+                source.CompleteException(failure);
+            }
+            if (canceled && initiallyComplete)
+            {
+                OperationCanceledException thrown = Assert.Throws<OperationCanceledException>(() =>
+                    coroutine.MoveNext()
+                );
+                Assert.AreSame(failure, thrown);
+            }
+            else if (canceled && (!useGeneric || !provideCallback))
+            {
+                Assert.IsFalse(coroutine.MoveNext());
+            }
+            else
+            {
+                AggregateException thrown = Assert.Throws<AggregateException>(() =>
+                    coroutine.MoveNext()
+                );
+                Assert.AreEqual(1, thrown.InnerExceptions.Count);
+                if (canceled)
+                {
+                    Assert.IsInstanceOf<OperationCanceledException>(thrown.InnerExceptions[0]);
+                }
+                else
+                {
+                    Assert.AreSame(failure, thrown.InnerExceptions[0]);
+                }
+            }
+            Assert.IsFalse(coroutine.MoveNext());
+            Assert.AreEqual(1, source.GetResultCount);
+            Assert.IsFalse(source.OwnsSlot);
+            Assert.AreEqual(initiallyComplete ? 0 : 1, source.OnCompletedCount);
+            Assert.AreEqual(0, callbackCount);
+        }
+
+        [Test]
+        public void CoroutineRetiresValueTaskSourceBeforeThrowingCallback(
+            [Values(false, true)] bool initiallyComplete
+        )
+        {
+            CountingValueTaskSource<int> source = new();
+            int callbackCount = 0;
+            InvalidOperationException failure = new(
+                nameof(CoroutineRetiresValueTaskSourceBeforeThrowingCallback)
+            );
+            if (initiallyComplete)
+            {
+                source.Complete(7);
+            }
+            IEnumerator coroutine = source.Task.AsCoroutine(result =>
+            {
+                Assert.AreEqual(7, result);
+                Assert.IsFalse(source.OwnsSlot);
+                Assert.AreEqual(1, source.GetResultCount);
+                ++callbackCount;
+                throw failure;
+            });
+            if (!initiallyComplete)
+            {
+                Assert.IsTrue(coroutine.MoveNext());
+                source.Complete(7);
+            }
+            Assert.AreSame(
+                failure,
+                Assert.Throws<InvalidOperationException>(() => coroutine.MoveNext())
+            );
+            Assert.IsFalse(coroutine.MoveNext());
+            Assert.AreEqual(1, source.GetResultCount);
+            Assert.IsFalse(source.OwnsSlot);
+            Assert.AreEqual(initiallyComplete ? 0 : 1, source.OnCompletedCount);
+            Assert.AreEqual(1, callbackCount);
+        }
+
         [Test]
         public void TupleCoroutineConsumesValueTaskSourceExactlyOnce(
             [Values(false, true)] bool useTriple,
