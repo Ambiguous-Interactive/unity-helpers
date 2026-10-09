@@ -449,40 +449,43 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(2, producerCalls);
         }
 
-        [UnityTest]
-        public IEnumerator MultipleTtlExpirationsWork()
+        [Test]
+        public void MultipleTtlExpirationsWork()
         {
+            float now = 0f;
             int producerCalls = 0;
-            TimedCache<int> cache = new(() => ++producerCalls, 0.05f);
+            TimedCache<int> cache = new(() => ++producerCalls, 0.05f, timeProvider: () => now);
 
             int value1 = cache.Value;
             Assert.AreEqual(1, value1);
 
-            yield return new WaitForSeconds(0.06f);
+            now = 0.06f;
             int value2 = cache.Value;
             Assert.AreEqual(2, value2);
 
-            yield return new WaitForSeconds(0.06f);
+            now = 0.12f;
             int value3 = cache.Value;
             Assert.AreEqual(3, value3);
 
             Assert.AreEqual(3, producerCalls);
         }
 
-        [UnityTest]
-        public IEnumerator AccessWithinTtlDoesNotResetTimer()
+        [Test]
+        public void AccessWithinTtlDoesNotResetTimer()
         {
+            float now = 0f;
             int producerCalls = 0;
-            TimedCache<int> cache = new(() => ++producerCalls, 0.1f);
+            TimedCache<int> cache = new(() => ++producerCalls, 0.125f, timeProvider: () => now);
 
-            _ = cache.Value;
-            yield return new WaitForSeconds(0.05f);
-            _ = cache.Value;
-            yield return new WaitForSeconds(0.05f);
-
-            _ = cache.Value;
-
-            Assert.GreaterOrEqual(producerCalls, 1);
+            Assert.AreEqual(1, cache.Value);
+            now = 0.0625f;
+            Assert.AreEqual(1, cache.Value);
+            now = 0.125f;
+            Assert.AreEqual(1, cache.Value);
+            Assert.AreEqual(1, producerCalls);
+            now = 0.1875f;
+            Assert.AreEqual(2, cache.Value);
+            Assert.AreEqual(2, producerCalls);
         }
 
         [Test]
@@ -628,24 +631,37 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(3, producerCalls);
         }
 
-        [UnityTest]
-        public IEnumerator SubsequentExpirationsAfterJitterUseStandardTtl()
+        [Test]
+        public void SubsequentExpirationsAfterJitterUseStandardTtl()
         {
+            float now = 0f;
             int producerCalls = 0;
-            TimedCache<int> cache = new(() => ++producerCalls, 0.05f, useJitter: true);
+            TimedCache<int> cache = new(
+                () => ++producerCalls,
+                0.125f,
+                useJitter: true,
+                timeProvider: () => now,
+                jitterOverride: 0.0625f
+            );
 
             _ = cache.Value;
             Assert.AreEqual(1, producerCalls);
 
-            yield return new WaitForSeconds(0.11f);
+            now = 0.1875f;
+            Assert.AreEqual(1, cache.Value);
+            now = 0.25f;
             _ = cache.Value;
             Assert.AreEqual(2, producerCalls);
 
-            yield return new WaitForSeconds(0.06f);
+            now = 0.375f;
+            Assert.AreEqual(2, cache.Value);
+            now = 0.4375f;
             _ = cache.Value;
             Assert.AreEqual(3, producerCalls);
 
-            yield return new WaitForSeconds(0.06f);
+            now = 0.5625f;
+            Assert.AreEqual(3, cache.Value);
+            now = 0.625f;
             _ = cache.Value;
             Assert.AreEqual(4, producerCalls);
         }
@@ -1136,24 +1152,25 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(2, externalCounter);
         }
 
-        [UnityTest]
-        public IEnumerator VeryShortTtlMultipleExpirationsWork()
+        [Test]
+        public void VeryShortTtlMultipleExpirationsWork()
         {
+            float now = 0f;
             int producerCalls = 0;
-            TimedCache<int> cache = new(() => ++producerCalls, 0.001f);
+            TimedCache<int> cache = new(() => ++producerCalls, 0.001f, timeProvider: () => now);
 
             _ = cache.Value;
             Assert.AreEqual(1, producerCalls);
 
-            yield return new WaitForSecondsRealtime(0.1f);
+            now = 0.002f;
             _ = cache.Value;
             Assert.AreEqual(2, producerCalls);
 
-            yield return new WaitForSecondsRealtime(0.1f);
+            now = 0.004f;
             _ = cache.Value;
             Assert.AreEqual(3, producerCalls);
 
-            yield return new WaitForSecondsRealtime(0.1f);
+            now = 0.006f;
             _ = cache.Value;
             Assert.AreEqual(4, producerCalls);
         }

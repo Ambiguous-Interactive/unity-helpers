@@ -329,6 +329,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <remarks>
         /// The factory runs outside the cache lock. Concurrent callers may both compute a value;
         /// the result that loses insertion is reported to the eviction callback as replaced.
+        /// If admission throws, a factory result that no entry retains is reported as replaced after unlocking;
+        /// the original exception propagates. References retained by another entry are not released.
         /// </remarks>
         public TValue GetOrAdd(TKey key, Func<TKey, TValue> factory)
         {
@@ -386,6 +388,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     SetUnlocked(key, created);
                 }
+            }
+            catch
+            {
+                QueueFailedAdmission(key, created);
+                throw;
             }
             finally
             {
@@ -1721,6 +1728,34 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 Interlocked.Increment(ref _expiredCount);
             }
+        }
+
+        private void QueueFailedAdmission(TKey key, TValue value)
+        {
+            if (_options.OnEviction == null)
+            {
+                return;
+            }
+
+            if (!typeof(TValue).IsValueType)
+            {
+                foreach (CacheEntry entry in _entries)
+                {
+                    if (entry.IsAlive && ReferenceEquals(entry.Value, value))
+                    {
+                        return;
+                    }
+                }
+                foreach (EvictionNotification notification in _pendingEvictions)
+                {
+                    if (ReferenceEquals(notification.Value, value))
+                    {
+                        return;
+                    }
+                }
+            }
+
+            QueueEviction(key, value, EvictionReason.Replaced);
         }
 
         private void QueueEviction(TKey key, TValue value, EvictionReason reason)
