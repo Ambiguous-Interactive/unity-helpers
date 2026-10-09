@@ -1010,8 +1010,10 @@ What that buys you:
 - **Removing twice is a no-op**, and so is removing a handle that was never applied. A callback that
   calls `RemoveEffect` on its own handle -- directly, or through `RemoveAllEffects` -- returns
   immediately instead of recursing.
+- **Component removal finishes before attribute notifications.** Each component detaches the old handle and removes all its modifiers before the first notification. Removing that handle again does nothing. A notification that reapplies the same component handle keeps the new modifiers.
 - **Re-applying during teardown gives you a new, independent handle.** The old one stays removed,
   and `RemoveAllEffects` leaves the new effect active rather than silently forgetting it.
+- **Attribute cancellation stops the periodic payload.** If an attribute notification removes the owning effect, remaining modifications, other components and later periodic definitions do not run. Changes already applied before cancellation remain.
 - **Self-removal stops the rest of the pass.** A behaviour that removes its own handle from `OnTick`
   or `OnPeriodicTick` gets no further tick callbacks for that handle this frame, and neither do the
   other behaviours cloned alongside it.

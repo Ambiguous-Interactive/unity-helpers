@@ -332,6 +332,103 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             AssertHandlerIsIdle(handler);
         }
 
+        [TestCase(1, false)]
+        [TestCase(1, true)]
+        [TestCase(2, false)]
+        [TestCase(2, true)]
+        public void PeriodicAttributeCancellationStopsRemainingModifications(
+            int componentCount,
+            bool cancelOnArmor
+        )
+        {
+            (
+                GameObject entity,
+                EffectHandler handler,
+                TestAttributesComponent attributes,
+                TagHandler tags
+            ) = CreateEntity();
+            List<TestAttributesComponent> components = new() { attributes };
+            if (componentCount == 2)
+            {
+                components.Add(entity.AddComponent<TestAttributesComponent>());
+            }
+            RecordingEffectBehavior recording = Track(
+                ScriptableObject.CreateInstance<RecordingEffectBehavior>()
+            );
+            AttributeEffect effect = CreateEffect(
+                nameof(PeriodicAttributeCancellationStopsRemainingModifications),
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    for (int i = 0; i < 2; ++i)
+                    {
+                        e.periodicEffects.Add(
+                            new PeriodicEffectDefinition
+                            {
+                                interval = 1f,
+                                modifications = new List<AttributeModification>
+                                {
+                                    new()
+                                    {
+                                        attribute = nameof(TestAttributesComponent.health),
+                                        action = ModificationAction.Addition,
+                                        value = -5f,
+                                    },
+                                    new()
+                                    {
+                                        attribute = nameof(TestAttributesComponent.armor),
+                                        action = ModificationAction.Addition,
+                                        value = -7f,
+                                    },
+                                    new()
+                                    {
+                                        attribute = nameof(TestAttributesComponent.health),
+                                        action = ModificationAction.Addition,
+                                        value = -11f,
+                                    },
+                                },
+                            }
+                        );
+                    }
+                    e.behaviors.Add(recording);
+                }
+            );
+            EffectHandle handle = handler.ApplyEffect(effect, currentTime: 100f).Value;
+            string cancellationAttribute = cancelOnArmor
+                ? nameof(TestAttributesComponent.armor)
+                : nameof(TestAttributesComponent.health);
+            int notifications = 0;
+            foreach (TestAttributesComponent component in components)
+            {
+                component.OnAttributeModified += (attribute, _, _) =>
+                {
+                    ++notifications;
+                    if (string.Equals(attribute, cancellationAttribute, StringComparison.Ordinal))
+                    {
+                        handler.RemoveEffect(handle);
+                    }
+                };
+            }
+
+            int ticks = handler.ProcessPeriodicEffects(currentTime: 100f, deltaTime: 0f);
+
+            float healthTotal = 0f;
+            float armorTotal = 0f;
+            foreach (TestAttributesComponent component in components)
+            {
+                healthTotal += component.health.CurrentValue;
+                armorTotal += component.armor.CurrentValue;
+            }
+            Assert.AreEqual(1, ticks);
+            Assert.AreEqual(cancelOnArmor ? 2 : 1, notifications);
+            Assert.AreEqual(componentCount * 100f - 5f, healthTotal);
+            Assert.AreEqual(componentCount * 50f - (cancelOnArmor ? 7f : 0f), armorTotal);
+            Assert.AreEqual(0, RecordingEffectBehavior.PeriodicTickCount);
+            Assert.IsFalse(handler.IsEffectActive(effect));
+            Assert.AreEqual(0, handler.ProcessPeriodicEffects(currentTime: 101f, deltaTime: 1f));
+            AssertHandlerIsIdle(handler);
+        }
+
         [UnityTest]
         public IEnumerator SelfRemovalFromPeriodicTickStopsLaterCallbacks()
         {

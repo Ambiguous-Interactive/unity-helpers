@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     using System.Runtime.ExceptionServices;
     using Core.Attributes;
     using UnityEngine;
+    using Utils;
 
     /// <summary>
     /// Abstract base class for components that contain Attribute fields to be modified by effects.
@@ -94,9 +95,9 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         /// <param name="handle">The effect handle whose modifications should be removed.</param>
         /// <remarks>
-        /// Every modification comes off even when an <see cref="OnAttributeModified"/> subscriber
-        /// throws. The first exception is rethrown once the last modification is removed, and any
-        /// later one is logged.
+        /// The handle is detached and every modification is removed before notifications run.
+        /// Repeated or recursive removal is a no-op; reapplication from a notification remains intact.
+        /// Subscriber failures are reported after all notifications have run.
         /// </remarks>
         public void ForceRemoveAttributeModifications(EffectHandle handle)
         {
@@ -226,25 +227,27 @@ namespace WallstopStudios.UnityHelpers.Tags
             _attributeFieldGetters = AttributeUtilities.GetOptimizedAttributeFields(GetType());
         }
 
+        internal void ApplyPeriodicAttributeModifications(
+            IEnumerable<AttributeModification> attributeModifications,
+            EffectHandle sourceHandle
+        )
+        {
+            InternalApplyAttributeModifications(attributeModifications, sourceHandle);
+        }
+
         private void InternalApplyAttributeModifications(
-            IEnumerable<AttributeModification> attributeModifications
+            IEnumerable<AttributeModification> attributeModifications,
+            EffectHandle? sourceHandle = null
         )
         {
             if (attributeModifications is IReadOnlyList<AttributeModification> readonlyList)
             {
                 for (int i = 0; i < readonlyList.Count; ++i)
                 {
-                    AttributeModification modification = readonlyList[i];
-                    if (!TryGetAttribute(modification.attribute, out Attribute attribute))
+                    if (!TryApplyPermanentModification(readonlyList[i], sourceHandle))
                     {
-                        continue;
+                        return;
                     }
-
-                    float oldValue = attribute;
-                    attribute.ApplyAttributeModification(modification);
-                    float currentValue = attribute;
-
-                    OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
                 }
 
                 return;
@@ -252,17 +255,40 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             foreach (AttributeModification modification in attributeModifications)
             {
-                if (!TryGetAttribute(modification.attribute, out Attribute attribute))
+                if (!TryApplyPermanentModification(modification, sourceHandle))
                 {
-                    continue;
+                    return;
                 }
-
-                float oldValue = attribute;
-                attribute.ApplyAttributeModification(modification);
-                float currentValue = attribute;
-
-                OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
             }
+        }
+
+        private bool TryApplyPermanentModification(
+            AttributeModification modification,
+            EffectHandle? sourceHandle
+        )
+        {
+            if (
+                sourceHandle.HasValue
+                && (
+                    this == null
+                    || _effectHandler == null
+                    || !_effectHandler.IsHandleActive(sourceHandle.Value)
+                )
+            )
+            {
+                return false;
+            }
+
+            if (!TryGetAttribute(modification.attribute, out Attribute attribute))
+            {
+                return true;
+            }
+
+            float oldValue = attribute;
+            attribute.ApplyAttributeModification(modification);
+            float currentValue = attribute;
+            OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
+            return true;
         }
 
         private void InternalRemoveAttributeModifications(EffectHandle handle)
@@ -273,8 +299,15 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return;
             }
 
-            // Remove every modifier before rethrowing a subscriber failure; this handle is already detached.
-            Exception firstFailure = null;
+            if (!_effectHandles.Remove(handle))
+            {
+                return;
+            }
+
+            using PooledResource<List<(string attribute, float previous, float current)>> lease =
+                Buffers<(string attribute, float previous, float current)>.List.Get(
+                    out List<(string attribute, float previous, float current)> notifications
+                );
             foreach (AttributeModification modification in effect.modifications)
             {
                 if (!TryGetAttribute(modification.attribute, out Attribute attribute))
@@ -285,10 +318,21 @@ namespace WallstopStudios.UnityHelpers.Tags
                 float oldValue = attribute;
                 _ = attribute.RemoveAttributeModification(handle);
                 float currentValue = attribute;
-                _ = _effectHandles.Remove(handle);
+                notifications.Add((modification.attribute, oldValue, currentValue));
+            }
+
+            Exception firstFailure = null;
+            foreach (
+                (string attribute, float previous, float current) notification in notifications
+            )
+            {
                 try
                 {
-                    OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
+                    OnAttributeModified?.Invoke(
+                        notification.attribute,
+                        notification.previous,
+                        notification.current
+                    );
                 }
                 catch (Exception notificationFailure)
                 {

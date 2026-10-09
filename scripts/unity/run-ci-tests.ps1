@@ -3531,9 +3531,8 @@ function Invoke-UnityEditor {
 # it crashes or aborts. Keyed by the canonical 8-char uppercase hex of the
 # UNSIGNED exit code. This is the single source of truth for both the human
 # description (Get-NativeExitCodeDescription) and the "is this a native crash
-# code" classifier (Test-NativeCrashExitCode). Crash codes (the 0xC000xxxx
-# family) are EXACTLY the benign post-work shutdown-race exits the
-# artifact-is-source-of-truth gate tolerates when the durable artifact is valid.
+# code" classifier (Test-NativeCrashExitCode). These statuses identify native errors;
+# they do not establish crash timing or prove a shutdown race.
 $script:NativeExitCodeDescriptions = [ordered]@{
     'C0000005' = 'STATUS_ACCESS_VIOLATION'
     'C000001D' = 'STATUS_ILLEGAL_INSTRUCTION'
@@ -3563,21 +3562,12 @@ function ConvertTo-UnsignedExitHex {
 }
 
 function Test-NativeCrashExitCode {
-    # True when the exit code is a native Windows CRASH/abort NTSTATUS (the
-    # 0xC000xxxx severity-error family), i.e. a process the OS terminated rather
-    # than a value the app returned (0..255). Used ONLY to phrase the benign-exit
-    # ::warning:: accurately; the pass/fail decision is gated on the durable
-    # artifact, never on this classifier.
+    # Preserve the standalone build status policy; a matching status does not prove shutdown timing.
     param([Parameter(Mandatory = $true)][int]$ExitCode)
     $hexBare = ConvertTo-UnsignedExitHex -ExitCode $ExitCode
     if ($script:NativeExitCodeDescriptions.Contains($hexBare)) {
         return $true
     }
-    # The 0xC000xxxx NTSTATUS family (STATUS_SEVERITY_ERROR + facility 0) covers
-    # the native crash/abort statuses a Unity batch process exits with. This is a
-    # best-effort classifier for the warning text ONLY; pass/fail is gated on the
-    # durable artifact, so a status outside this prefix is at worst a missing
-    # "(a native crash code)" note, never a wrong verdict.
     return ($hexBare -like 'C0*')
 }
 
@@ -3633,11 +3623,6 @@ function Test-BenignStandaloneBuildExit {
 }
 
 function Get-UnityCrashSignature {
-    # Best-effort: scan a captured Unity log for the signature of a BACKGROUND-thread
-    # crash that fired DURING shutdown, AFTER the batch work completed. Returns a
-    # short human description (for the benign-exit ::warning::) or '' when no crash
-    # signature is present. NEVER throws -- a diagnostic must not mask the real
-    # decision (which is gated on the durable artifact, not on this scan).
     param([string]$LogPath)
 
     if (-not $LogPath -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) {
@@ -3652,54 +3637,51 @@ function Get-UnityCrashSignature {
         return ''
     }
 
-    # The editor reached the end of batch execution before the crash -> the crash
-    # is in teardown, not in the work. (-quit prints this; -runTests prints the
-    # "Exiting batchmode successfully" variant.)
-    $cleanShutdown = ($logText -match 'Batchmode quit successfully invoked' -or
-        $logText -match 'Exiting batchmode successfully')
-
-    # A known benign Windows shutdown-race: the DirectoryMonitor file-watcher
-    # thread faulting while the editor tears down. This is the crash observed on
-    # the 6000.3 standalone configure pass.
-    if ($logText -match 'DirectoryMonitor') {
-        $suffix = if ($cleanShutdown) { ' after a clean batch shutdown' } else { '' }
-        return "Unity DirectoryMonitor file-watcher thread crash during shutdown$suffix"
-    }
+    $observations = @()
     if ($logText -match 'Crash!!!') {
-        $suffix = if ($cleanShutdown) { ' after a clean batch shutdown' } else { '' }
-        return "Unity native crash during shutdown$suffix"
+        if ($logText -match 'DirectoryMonitor') {
+            $observations += 'The log contains a native crash marker and a DirectoryMonitor reference; crash timing is unresolved'
+        } else {
+            $observations += 'The log contains a native crash marker; crash timing is unresolved'
+        }
     }
-    if ($cleanShutdown) {
-        return 'Unity completed its batch work (clean shutdown logged) before exiting non-zero'
+    $completion = [regex]::Match($logText, '(?m)^Test run completed\. Exiting with code [^\r\n]*')
+    if ($completion.Success) {
+        $observations += "Editor completion: $(ConvertTo-UnitySafeLogText -Text $completion.Value)"
     }
-    return ''
+    if ($logText -match 'Batchmode quit successfully invoked' -or
+        $logText -match 'Exiting batchmode successfully') {
+        $observations += 'The log records successful batch completion; the nonzero exit cause is unresolved'
+    }
+    return $observations -join '; '
+
 }
 
 function Write-UnityBenignExitWarning {
-    # Emit a single ::warning:: when a Unity batch invocation produced a VALID
-    # durable artifact but still exited non-zero or was tree-killed by the
-    # watchdog. Decodes the exit code (for example 0xC0000005 /
-    # STATUS_ACCESS_VIOLATION) and names any crash signature found in the log, so
-    # the benign post-work shutdown crash stays VISIBLE and trackable in CI without
-    # failing the job. The artifact -- already validated by the caller -- is the
-    # source of truth; this only narrates why a non-zero exit was tolerated.
     param(
         [Parameter(Mandatory = $true)][string]$Label,
         [int]$ExitCode = 0,
         [switch]$TimedOut,
-        [string]$LogPath
+        [string]$LogPath,
+        [string]$ArtifactSummary
     )
 
     $cause = if ($TimedOut) {
-        'was tree-killed by the watchdog (likely a deferred Application.Quit)'
+        'was tree-killed by the watchdog; the shutdown cause is unresolved'
     } else {
         $description = Get-NativeExitCodeDescription -ExitCode $ExitCode
-        $crashNote = if (Test-NativeCrashExitCode -ExitCode $ExitCode) { ' (a native crash code)' } else { '' }
+        $hexBare = ConvertTo-UnsignedExitHex -ExitCode $ExitCode
+        $crashNote = if ($script:NativeExitCodeDescriptions.Contains($hexBare)) {
+            ' (a known native error/crash status; timing and cause are unresolved)'
+        } else {
+            ' (exit/artifact discrepancy; cause is unresolved)'
+        }
         "exited with code $ExitCode / $description$crashNote"
     }
     $signature = Get-UnityCrashSignature -LogPath $LogPath
-    $signatureNote = if ($signature) { " Crash signature: $signature." } else { '' }
-    Write-Host "::warning::${Label}: Unity $cause AFTER producing a valid result artifact; honoring the artifact as the source of truth and treating this as a benign post-work shutdown crash.$signatureNote"
+    $signatureNote = if ($signature) { " Log evidence: $signature." } else { '' }
+    $artifactNote = if ($ArtifactSummary) { " Accepted XML: $ArtifactSummary." } else { '' }
+    Write-Host "::warning::${Label}: Unity $cause. The validated result artifact is accepted under the existing artifact policy.$artifactNote$signatureNote"
 }
 
 function Test-UnityConfigureMarker {
@@ -4144,12 +4126,9 @@ function Test-StandalonePlayerBuildOutput {
 
 function Test-NUnitResults {
     # The NUnit results.xml is the SOLE source of truth for editmode/playmode and
-    # the standalone player run. $UnityExitCode is the process exit code of the
-    # editor/player that produced the file; it is ADVISORY only -- a valid passing
-    # results.xml means the run succeeded EVEN IF the process then exited non-zero
-    # (a benign background-thread shutdown-race crash after RunFinished already
-    # wrote the file). A missing/invalid/failing file still fails loudly, and the
-    # exit code is folded into the diagnostics so a crash-before-results is named.
+    # the standalone player run. The producing process exit code is advisory;
+    # accepted XML can coexist with an ordinary nonzero exit or a native error.
+    # Missing, invalid, empty or failing XML still fails independently of the exit.
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$Label,
@@ -4227,10 +4206,11 @@ function Test-NUnitResults {
         throw "No selected tests passed for $Label; an all-skipped or inconclusive filtered run is not acceptance."
     }
 
-    # PASS. If the producing process exited non-zero despite the valid passing
-    # file, narrate the benign post-work shutdown crash (and KEEP it green).
+    # The exit diagnostic must preserve the accepted XML outcomes without attributing an unproven cause.
     if ($UnityExitCode -ne 0) {
-        Write-UnityBenignExitWarning -Label $Label -ExitCode $UnityExitCode -LogPath $LogPath
+        $inconclusive = $xml.SelectNodes("//test-case[@result='Inconclusive']").Count
+        $artifactSummary = "total=$total passed=$passed failed=$failed skipped=$skipped inconclusive=$inconclusive root-result='$($run.GetAttribute('result'))'"
+        Write-UnityBenignExitWarning -Label $Label -ExitCode $UnityExitCode -LogPath $LogPath -ArtifactSummary $artifactSummary
     }
     Write-CiNotice "${Label}: total=$total passed=$passed failed=$failed skipped=$skipped"
 }

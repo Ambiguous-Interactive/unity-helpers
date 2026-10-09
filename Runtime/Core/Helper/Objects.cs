@@ -1020,7 +1020,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             private const uint NullSentinel = 0x9E3779B9u;
 
-            private static readonly bool IsReferenceType = !typeof(T).IsValueType;
             private static readonly bool IsObjectType = typeof(T) == typeof(object);
             private static readonly bool IsUnityObject =
                 typeof(UnityEngine.Object).IsAssignableFrom(typeof(T));
@@ -1030,7 +1029,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static uint GetValueHash(T value, out bool hasNonNullValue)
             {
-                if (!IsReferenceType)
+                if (ObjectsTypeTraits<T>.IsValueType)
                 {
                     hasNonNullValue = true;
                     return unchecked((uint)EqualityComparer.GetHashCode(value));

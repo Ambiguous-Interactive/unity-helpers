@@ -222,6 +222,8 @@ before the job starts, including the `Library` the previous leg had just built o
 that same disk. Keeping the project one directory up puts it out of `git clean`'s
 reach, so a leg reuses its own local copy instead of downloading one.
 
+A nonzero editor exit and an accepted result artifact are separate observations. The runner reports the actual exit code, accepted NUnit counts and root result, and captured editor completion text. Known native status codes retain their descriptions; ordinary exits remain unresolved exit/artifact discrepancies. A crash marker does not establish shutdown timing. Inconclusive cases remain inconclusive, and missing, malformed, empty or failed results still fail their existing gates.
+
 Operator notes:
 
 - **Confirm reuse.** Every run logs `Library: warm (reused)` or

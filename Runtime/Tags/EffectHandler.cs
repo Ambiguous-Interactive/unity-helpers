@@ -657,6 +657,11 @@ namespace WallstopStudios.UnityHelpers.Tags
             return true;
         }
 
+        internal bool IsHandleActive(EffectHandle handle)
+        {
+            return _effectHandlesById.ContainsKey(handle.id);
+        }
+
         internal int ProcessBehaviorTicks(float deltaTime)
         {
             if (_behaviorsByHandleId.Count <= 0)
@@ -1487,10 +1492,14 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     if (attributesComponent != null)
                     {
-                        attributesComponent.ApplyAttributeModifications(
+                        attributesComponent.ApplyPeriodicAttributeModifications(
                             definition.modifications,
-                            null
+                            handle
                         );
+                        if (!IsHandleActive(handle))
+                        {
+                            return;
+                        }
                     }
                 }
             }
