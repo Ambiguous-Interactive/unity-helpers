@@ -88,15 +88,16 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
+            int edgesCount = edges.Count;
             using PooledArray<bool> visitedLease = SystemArrayPool<bool>.Get(
-                edges.Count,
+                edgesCount,
                 out bool[] visited
             );
-            Array.Clear(visited, 0, edges.Count);
+            Array.Clear(visited, 0, edgesCount);
             using PooledResource<List<Vector2Int>> cornerLease = Buffers<Vector2Int>.List.Get(
                 out List<Vector2Int> corners
             );
-            for (int start = 0; start < edges.Count; ++start)
+            for (int start = 0; start < edgesCount; ++start)
             {
                 if (visited[start])
                 {
@@ -142,8 +143,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     continue;
                 }
-                Vector2[] path = new Vector2[corners.Count];
-                for (int index = 0; index < corners.Count; ++index)
+                int cornersCount = corners.Count;
+                Vector2[] path = new Vector2[cornersCount];
+                for (int index = 0; index < cornersCount; ++index)
                 {
                     Vector2Int corner = corners[index];
                     Vector2 point = new(

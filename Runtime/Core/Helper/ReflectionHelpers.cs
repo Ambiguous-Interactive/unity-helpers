@@ -2977,7 +2977,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 true
             );
             ILGenerator il = dm.GetILGenerator();
-            if (typeof(TInstance).IsValueType)
+            if (ObjectsTypeTraits<TInstance>.IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 EmitValueReceiverCall<TInstance>(il, method);
@@ -3001,7 +3001,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 true
             );
             ILGenerator il = dm.GetILGenerator();
-            if (typeof(TInstance).IsValueType)
+            if (ObjectsTypeTraits<TInstance>.IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
@@ -3027,7 +3027,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 true
             );
             ILGenerator il = dm.GetILGenerator();
-            if (typeof(TInstance).IsValueType)
+            if (ObjectsTypeTraits<TInstance>.IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
@@ -3057,7 +3057,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 true
             );
             ILGenerator il = dm.GetILGenerator();
-            if (typeof(TInstance).IsValueType)
+            if (ObjectsTypeTraits<TInstance>.IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
@@ -3089,7 +3089,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 true
             );
             ILGenerator il = dm.GetILGenerator();
-            if (typeof(TInstance).IsValueType)
+            if (ObjectsTypeTraits<TInstance>.IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
@@ -3121,7 +3121,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 true
             );
             ILGenerator il = dm.GetILGenerator();
-            if (typeof(TInstance).IsValueType)
+            if (ObjectsTypeTraits<TInstance>.IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 EmitValueReceiverCall<TInstance>(il, method);
@@ -3145,7 +3145,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 true
             );
             ILGenerator il = dm.GetILGenerator();
-            if (typeof(TInstance).IsValueType)
+            if (ObjectsTypeTraits<TInstance>.IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
@@ -3171,7 +3171,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 true
             );
             ILGenerator il = dm.GetILGenerator();
-            if (typeof(TInstance).IsValueType)
+            if (ObjectsTypeTraits<TInstance>.IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
@@ -3201,7 +3201,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 true
             );
             ILGenerator il = dm.GetILGenerator();
-            if (typeof(TInstance).IsValueType)
+            if (ObjectsTypeTraits<TInstance>.IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
@@ -3233,7 +3233,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 true
             );
             ILGenerator il = dm.GetILGenerator();
-            if (typeof(TInstance).IsValueType)
+            if (ObjectsTypeTraits<TInstance>.IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
@@ -5186,7 +5186,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 if (declaringType.IsValueType)
                 {
                     il.Emit(OpCodes.Box, declaringType);
-                    if (typeof(T) != typeof(object))
+                    if (!ObjectsTypeTraits<T>.IsObjectType)
                     {
                         il.Emit(OpCodes.Castclass, typeof(T));
                     }
@@ -5313,7 +5313,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             else
             {
-                if (typeof(TInstance).IsValueType)
+                if (ObjectsTypeTraits<TInstance>.IsValueType)
                 {
                     il.Emit(OpCodes.Ldarga_S, 0);
                 }
@@ -5360,7 +5360,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             else
             {
-                if (typeof(TInstance).IsValueType)
+                if (ObjectsTypeTraits<TInstance>.IsValueType)
                 {
                     il.Emit(OpCodes.Ldarg_0);
                 }
@@ -5442,7 +5442,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             else
             {
-                if (typeof(TInstance).IsValueType)
+                if (ObjectsTypeTraits<TInstance>.IsValueType)
                 {
                     il.Emit(OpCodes.Ldarga_S, 0);
                 }
@@ -5494,7 +5494,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             else
             {
-                if (typeof(TInstance).IsValueType)
+                if (ObjectsTypeTraits<TInstance>.IsValueType)
                 {
                     il.Emit(OpCodes.Ldarga_S, 0);
                 }

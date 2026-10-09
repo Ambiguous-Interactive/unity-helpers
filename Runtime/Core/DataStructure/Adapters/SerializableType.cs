@@ -1110,7 +1110,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
                     if (hasDuplicates)
                     {
-                        for (int i = 0; i < descriptors.Count; ++i)
+                        int descriptorsCount = descriptors.Count;
+                        for (int i = 0; i < descriptorsCount; ++i)
                         {
                             SerializableTypeDescriptor descriptor = descriptors[i];
                             if (

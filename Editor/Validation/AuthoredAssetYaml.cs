@@ -295,13 +295,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
 
                 string text = lines[line];
+                int textLength = text.Length;
                 int indent = 0;
-                while (indent < text.Length && text[indent] == ' ')
+                while (indent < textLength && text[indent] == ' ')
                 {
                     ++indent;
                 }
 
-                if (indent != entry.Indent || text.Length <= indent || text[indent] != '-')
+                if (indent != entry.Indent || textLength <= indent || text[indent] != '-')
                 {
                     continue;
                 }
@@ -325,18 +326,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             char quote = content[0];
             if (quote == '\'' || quote == '"')
             {
+                int quotedContentLength = content.Length;
                 int closingQuote = 1;
-                while (closingQuote < content.Length && IsKeyCharacter(content[closingQuote]))
+                while (closingQuote < quotedContentLength && IsKeyCharacter(content[closingQuote]))
                 {
                     ++closingQuote;
                 }
 
                 if (
                     closingQuote <= 1
-                    || content.Length <= closingQuote + 1
+                    || quotedContentLength <= closingQuote + 1
                     || content[closingQuote] != quote
                     || content[closingQuote + 1] != ':'
-                    || (closingQuote + 2 < content.Length && content[closingQuote + 2] != ' ')
+                    || (closingQuote + 2 < quotedContentLength && content[closingQuote + 2] != ' ')
                 )
                 {
                     key = null;
@@ -356,7 +358,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 char character = content[index];
                 if (character == ':')
                 {
-                    bool terminated = content.Length <= index + 1 || content[index + 1] == ' ';
+                    bool terminated = contentLength <= index + 1 || content[index + 1] == ' ';
                     if (terminated)
                     {
                         separator = index;
@@ -418,8 +420,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         internal static int LeadingSpaces(string line)
         {
+            int lineLength = line.Length;
             int index = 0;
-            while (index < line.Length && line[index] == ' ')
+            while (index < lineLength && line[index] == ' ')
             {
                 ++index;
             }
@@ -684,8 +687,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static string ReadToken(string line, int start)
         {
+            int lineLength = line.Length;
             int end = start;
-            while (end < line.Length && !char.IsWhiteSpace(line[end]))
+            while (end < lineLength && !char.IsWhiteSpace(line[end]))
             {
                 ++end;
             }

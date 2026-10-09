@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add public `ObjectsTypeTraits<T>` with cached value-type, exact-object, and Unity-object classifications for generic code ([guide](./docs/features/utilities/helper-utilities.md#cached-generic-type-classification), [#976](https://github.com/Ambiguous-Interactive/unity-helpers/issues/976)).
 - Add opt-in `WALLSTOP_PROTO_ONLY` builds that omit protobuf-net contracts and fallback, plus caller-owned WProto buffer writers for pooled equality and hashing ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Add value-returning `WProtoFacade` serialize and read methods that reject unsupported types and report typed serialization failures ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Add `WPROTO050` to report generated deserialization constructors whose base has no accessible zero-argument constructor ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix effect removal callbacks losing reapplied modifiers or repeating cleanup. Stop periodic damage after an attribute callback cancels its effect ([#977](https://github.com/Ambiguous-Interactive/unity-helpers/issues/977)).
 - Fix loading caches leaking disposable factory results when weight or lifetime callbacks throw, while preserving references retained by other entries ([#972](https://github.com/Ambiguous-Interactive/unity-helpers/issues/972)).
 - Fix first-save initialization so failed writes leave the save path free for retry and competing creators keep their complete files ([#964](https://github.com/Ambiguous-Interactive/unity-helpers/issues/964)).
 - Fix WallstopProto map entries losing earlier members when one entry repeats its message value; separate entries for the same key still replace the value. Reject malformed fragments across message boundaries ([#970](https://github.com/Ambiguous-Interactive/unity-helpers/issues/970)).

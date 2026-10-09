@@ -1294,6 +1294,31 @@ Handles:
 
 ---
 
+### Cached Generic Type Classification
+
+`ObjectsTypeTraits<T>` in `WallstopStudios.UnityHelpers.Core.Helper` exposes three read-only
+classifications cached once for each closed generic type. They describe the declared `T`:
+
+| Field           | Meaning                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------- |
+| `IsValueType`   | `T` is a value type, including enums and nullable value types.                                          |
+| `IsObjectType`  | `T` is exactly `System.Object`. Other reference types return `false`.                                   |
+| `IsUnityObject` | `T` is `UnityEngine.Object` or derives from it. Arrays and collections of Unity objects return `false`. |
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+bool nullableIsValueType = ObjectsTypeTraits<int?>.IsValueType; // true
+bool exactlyObject = ObjectsTypeTraits<object>.IsObjectType; // true
+bool componentIsUnityObject = ObjectsTypeTraits<UnityEngine.Component>.IsUnityObject; // true
+bool declaredObjectIsUnityObject = ObjectsTypeTraits<object>.IsUnityObject; // false
+```
+
+An `object` variable holding a boxed struct or a `GameObject` retains the `object` classifications.
+The flags do not inspect an instance or change when a Unity object is destroyed. Use
+`Objects.Null(value)` for Unity-aware instance null checks. A nullable value type still has
+`IsValueType == true` when its value is null, so this flag does not establish non-nullness.
+
 ### Hash Code Composition
 
 **Combine hash codes correctly:**

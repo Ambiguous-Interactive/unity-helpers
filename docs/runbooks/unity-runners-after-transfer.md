@@ -222,6 +222,12 @@ before the job starts, including the `Library` the previous leg had just built o
 that same disk. Keeping the project one directory up puts it out of `git clean`'s
 reach, so a leg reuses its own local copy instead of downloading one.
 
+A nonzero editor exit and an accepted result artifact are separate observations. The runner reports the actual exit code, accepted NUnit counts and root result, and captured editor completion text. Known native status codes retain their descriptions; ordinary exits remain unresolved exit/artifact discrepancies. A crash marker does not establish shutdown timing. Inconclusive cases remain inconclusive, and missing, malformed, empty or failed results still fail their existing gates.
+
+A missing configure marker also attempts to save `configure.process-diagnostics.json` beside the configure log. It records the child process identity, UTC launch and observation boundaries, raw and returned exits, and watchdog termination provenance. On Windows, it queries Application Error and Windows Error Reporting events once, from two seconds before launch through the earlier of capture time or fifteen seconds after the process observation ended. It examines at most 64 candidates and retains at most eight matches, with explicit truncation flags. Events require the child's executable path and process ID, or a report ID joined to an event with that identity. Unrelated events and full event messages are excluded. The report distinguishes unavailable evidence and no observed matches; a missing or delayed event does not rule out a crash. The existing Package Manager cancellation retry also attempts to preserve its first attempt in `configure.first-attempt.process-diagnostics.json`.
+
+Use those observations to investigate the original process on the named runner before selecting a repair. A successful later launch does not explain an earlier failure, and the diagnostic report does not replace the fresh configure marker or required player results.
+
 Operator notes:
 
 - **Confirm reuse.** Every run logs `Library: warm (reused)` or

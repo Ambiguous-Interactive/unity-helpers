@@ -1610,7 +1610,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 gaps.Add(firstBoundary);
             }
 
-            for (int i = 1; i < boundaries.Count; ++i)
+            int boundariesCount = boundaries.Count;
+            for (int i = 1; i < boundariesCount; ++i)
             {
                 int gap = boundaries[i] - boundaries[i - 1];
                 if (minimumCellSize <= gap)
@@ -1619,7 +1620,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            int lastBoundary = boundaries[boundaries.Count - 1];
+            int lastBoundary = boundaries[boundariesCount - 1];
             int trailingGap = totalDimension - lastBoundary - 1;
             if (minimumCellSize <= trailingGap)
             {

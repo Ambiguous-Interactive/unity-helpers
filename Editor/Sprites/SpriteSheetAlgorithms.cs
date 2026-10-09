@@ -1637,7 +1637,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             using PooledResource<List<float>> gapsLease = Buffers<float>.List.Get(
                 out List<float> gaps
             );
-            for (int i = 1; i < sortedPositions.Count; ++i)
+            int sortedPositionsCount = sortedPositions.Count;
+            for (int i = 1; i < sortedPositionsCount; ++i)
             {
                 float gap = sortedPositions[i] - sortedPositions[i - 1];
                 // Filters out small variations in sprite positions within the same column.
@@ -2047,19 +2048,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             using PooledResource<List<int>> sortedIndicesLease = Buffers<int>.List.Get(
                 out List<int> sortedIndices
             );
-            for (int i = 0; i < rawMaxima.Count; ++i)
+            int rawMaximaCount = rawMaxima.Count;
+            for (int i = 0; i < rawMaximaCount; ++i)
             {
                 sortedIndices.Add(i);
             }
             sortedIndices.Sort((a, b) => rawMaximaValues[b].CompareTo(rawMaximaValues[a]));
 
             using PooledArray<bool> suppressedLease = SystemArrayPool<bool>.Get(
-                rawMaxima.Count,
+                rawMaximaCount,
                 out bool[] suppressed
             );
             Array.Clear(suppressed, 0, suppressed.Length);
 
-            for (int i = 0; i < sortedIndices.Count; ++i)
+            int sortedIndicesCount = sortedIndices.Count;
+            for (int i = 0; i < sortedIndicesCount; ++i)
             {
                 int idx = sortedIndices[i];
                 if (suppressed[idx])
@@ -2070,7 +2073,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Vector2Int peak = rawMaxima[idx];
                 localMaxima.Add(peak);
 
-                int sortedIndicesCount = sortedIndices.Count;
                 for (int j = i + 1; j < sortedIndicesCount; ++j)
                 {
                     int otherIdx = sortedIndices[j];
@@ -2313,7 +2315,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int currentRegion = 0;
             using PooledResource<List<int>> stackLease = Buffers<int>.List.Get(out List<int> stack);
 
-            for (int seedIdx = 0; seedIdx < seeds.Count && currentRegion < 256; ++seedIdx)
+            int seedsCount = seeds.Count;
+            for (int seedIdx = 0; seedIdx < seedsCount && currentRegion < 256; ++seedIdx)
             {
                 Vector2Int seed = seeds[seedIdx];
                 int startIdx = seed.y * textureWidth + seed.x;

@@ -90,8 +90,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             AddCollectionFindingsWhenOdinOwnsState(masked, blockers, lineMap);
             AddOdinDependencyFindings(masked, manualReviews, lineMap);
 
+            int maskedLength = masked.Length;
             int searchStart = 0;
-            while (searchStart < masked.Length)
+            while (searchStart < maskedLength)
             {
                 int bracketStart = masked.IndexOf('[', searchStart);
                 if (bracketStart < 0)
@@ -219,17 +220,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return;
             }
 
+            int maskedLength = masked.Length;
             foreach (string token in CollectionTokens)
             {
                 int searchStart = 0;
                 while (TryFindIdentifier(masked, token, searchStart, out int position, true))
                 {
                     int after = position + token.Length;
-                    while (after < masked.Length && char.IsWhiteSpace(masked[after]))
+                    while (after < maskedLength && char.IsWhiteSpace(masked[after]))
                     {
                         ++after;
                     }
-                    if (after < masked.Length && masked[after] == '<')
+                    if (after < maskedLength && masked[after] == '<')
                     {
                         AddFinding(
                             blockers,
@@ -600,15 +602,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         private static string MaskNonCode(string source)
         {
             char[] masked = source.ToCharArray();
+            int maskedLength = masked.Length;
             int index = 0;
-            while (index < masked.Length)
+            while (index < maskedLength)
             {
                 char character = masked[index];
-                if (character == '/' && index + 1 < masked.Length && masked[index + 1] == '/')
+                if (character == '/' && index + 1 < maskedLength && masked[index + 1] == '/')
                 {
                     MaskLineComment(masked, ref index);
                 }
-                else if (character == '/' && index + 1 < masked.Length && masked[index + 1] == '*')
+                else if (character == '/' && index + 1 < maskedLength && masked[index + 1] == '*')
                 {
                     MaskBlockComment(masked, ref index);
                 }
@@ -645,8 +648,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         private static int CountConsecutive(char[] characters, int start, char character)
         {
+            int charactersLength = characters.Length;
             int count = 0;
-            while (start + count < characters.Length && characters[start + count] == character)
+            while (start + count < charactersLength && characters[start + count] == character)
             {
                 ++count;
             }
@@ -665,7 +669,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             MaskCharacters(characters, ref index, delimiterLength);
 
-            while (index < characters.Length)
+            int charactersLength = characters.Length;
+            while (index < charactersLength)
             {
                 if (delimiterLength <= CountConsecutive(characters, index, '"'))
                 {
@@ -701,11 +706,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             characters[index++] = ' ';
             characters[index++] = ' ';
-            while (index < characters.Length)
+            int charactersLength = characters.Length;
+            while (index < charactersLength)
             {
                 if (
                     characters[index] == '*'
-                    && index + 1 < characters.Length
+                    && index + 1 < charactersLength
                     && characters[index + 1] == '/'
                 )
                 {
@@ -723,8 +729,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         private static void MaskLineComment(char[] characters, ref int index)
         {
+            int charactersLength = characters.Length;
             while (
-                index < characters.Length && characters[index] != '\r' && characters[index] != '\n'
+                index < charactersLength && characters[index] != '\r' && characters[index] != '\n'
             )
             {
                 characters[index++] = ' ';
@@ -734,7 +741,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         private static void MaskQuoted(char[] characters, ref int index, char quote, bool verbatim)
         {
             characters[index++] = ' ';
-            while (index < characters.Length)
+            int charactersLength = characters.Length;
+            while (index < charactersLength)
             {
                 char character = characters[index];
                 if (character == '\r' || character == '\n')
@@ -750,14 +758,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 ++index;
                 if (character == quote)
                 {
-                    if (verbatim && index < characters.Length && characters[index] == quote)
+                    if (verbatim && index < charactersLength && characters[index] == quote)
                     {
                         characters[index++] = ' ';
                         continue;
                     }
                     return;
                 }
-                if (!verbatim && character == '\\' && index < characters.Length)
+                if (!verbatim && character == '\\' && index < charactersLength)
                 {
                     if (characters[index] != '\r' && characters[index] != '\n')
                     {
@@ -971,9 +979,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return false;
             }
 
+            int sourceLength = source.Length;
             int position = bracketEnd + 1;
-            SkipWhitespace(source, ref position, source.Length);
-            while (position < source.Length && source[position] == '[')
+            SkipWhitespace(source, ref position, sourceLength);
+            while (position < sourceLength && source[position] == '[')
             {
                 int nextBracketEnd = FindAttributeListEnd(source, position);
                 if (nextBracketEnd < 0)
@@ -981,12 +990,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     return false;
                 }
                 position = nextBracketEnd + 1;
-                SkipWhitespace(source, ref position, source.Length);
+                SkipWhitespace(source, ref position, sourceLength);
             }
 
             int declarationStart = position;
             int angleDepth = 0;
-            int sourceLength = source.Length;
             for (; position < sourceLength; ++position)
             {
                 char character = source[position];
@@ -1012,7 +1020,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     return false;
                 }
-                if (character == '=' && position + 1 < source.Length && source[position + 1] == '>')
+                if (character == '=' && position + 1 < sourceLength && source[position + 1] == '>')
                 {
                     return false;
                 }
@@ -1202,11 +1210,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 }
             }
 
+            int headerLength = header.Length;
             int identifierCount = 0;
             int position = 0;
-            while (position < header.Length)
+            while (position < headerLength)
             {
-                if (TryReadIdentifier(header, ref position, header.Length, out _))
+                if (TryReadIdentifier(header, ref position, headerLength, out _))
                 {
                     ++identifierCount;
                 }
@@ -1298,7 +1307,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     if (source[index] == '\r')
                     {
-                        if (index + 1 < source.Length && source[index + 1] == '\n')
+                        if (index + 1 < sourceLength && source[index + 1] == '\n')
                         {
                             ++index;
                         }
@@ -1326,15 +1335,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
             internal SourceContext(string source)
             {
-                _compilationUnit = new bool[source.Length + 1];
-                _directTypeBody = new bool[source.Length + 1];
+                int sourceLength = source.Length;
+                _compilationUnit = new bool[sourceLength + 1];
+                _directTypeBody = new bool[sourceLength + 1];
                 List<bool> braceKinds = new List<bool>();
                 bool headerDeclaresType = false;
                 bool headerHasParentheses = false;
                 int bracketDepth = 0;
                 int parenthesisDepth = 0;
                 int index = 0;
-                while (index < source.Length)
+                while (index < sourceLength)
                 {
                     int braceCount = braceKinds.Count;
                     bool atCompilationUnit = braceCount == 0;
@@ -1349,7 +1359,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     )
                     {
                         int end = index + 1;
-                        while (end < source.Length && IsIdentifierCharacter(source[end]))
+                        while (end < sourceLength && IsIdentifierCharacter(source[end]))
                         {
                             ++end;
                         }
@@ -1420,8 +1430,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     ++index;
                 }
                 int finalBraceCount = braceKinds.Count;
-                _compilationUnit[source.Length] = finalBraceCount == 0;
-                _directTypeBody[source.Length] =
+                _compilationUnit[sourceLength] = finalBraceCount == 0;
+                _directTypeBody[sourceLength] =
                     0 < finalBraceCount && braceKinds[finalBraceCount - 1] && parenthesisDepth == 0;
             }
 

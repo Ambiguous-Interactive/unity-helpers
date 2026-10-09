@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
 #if !WALLSTOP_PROTO_ONLY
     using System.IO;
@@ -239,12 +240,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 ? collectionType.GetGenericArguments()
                 : Array.Empty<Type>();
             return arguments.Length == 1 ? arguments[0] : null;
-        }
-
-        private static bool TypeSupportsNullReferences(Type type)
-        {
-            return type != null
-                && (!type.IsValueType || typeof(UnityEngine.Object).IsAssignableFrom(type));
         }
 
         private static void LogNullReferenceSkip(string component, int index)
@@ -788,7 +783,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _dictionary.Clear();
             bool hasDuplicateKeys = false;
             bool encounteredNullReference = false;
-            bool keySupportsNullCheck = TypeSupportsNullReferences(typeof(TKey));
+            bool keySupportsNullCheck =
+                !ObjectsTypeTraits<TKey>.IsValueType || ObjectsTypeTraits<TKey>.IsUnityObject;
             int length = _keys.Length;
             for (int index = 0; index < length; ++index)
             {

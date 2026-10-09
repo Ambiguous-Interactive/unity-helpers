@@ -1401,7 +1401,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return _ => (TValue)field.GetValue(null);
                 }
 
-                if (typeof(TInstance).IsValueType)
+                if (ObjectsTypeTraits<TInstance>.IsValueType)
                 {
                     return instance =>
                     {
@@ -1446,7 +1446,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     };
                 }
 
-                if (typeof(TInstance).IsValueType)
+                if (ObjectsTypeTraits<TInstance>.IsValueType)
                 {
                     return (ref TInstance instance, TValue value) =>
                     {
@@ -1998,7 +1998,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return _ => (TValue)field.GetValue(null);
                 }
 
-                if (typeof(TInstance).IsValueType)
+                if (ObjectsTypeTraits<TInstance>.IsValueType)
                 {
                     return instance =>
                     {
@@ -2132,7 +2132,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     };
                 }
 
-                if (typeof(TInstance).IsValueType)
+                if (ObjectsTypeTraits<TInstance>.IsValueType)
                 {
                     return (ref TInstance instance, TValue value) =>
                     {

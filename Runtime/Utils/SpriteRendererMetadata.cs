@@ -297,7 +297,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                     out List<(Component component, Color color)> colorBuffer
                 );
             colorBuffer.AddRange(_colorStackCache);
-            for (int i = 1; i < colorBuffer.Count; ++i)
+            int colorBufferCount = colorBuffer.Count;
+            for (int i = 1; i < colorBufferCount; ++i)
             {
                 (Component component, Color color) entry = colorBuffer[i];
                 PushColor(entry.component, entry.color, force: true);
@@ -316,7 +317,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 out List<(Component component, Material material)> materialBuffer
             );
             materialBuffer.AddRange(_materialStackCache);
-            for (int i = 1; i < materialBuffer.Count; ++i)
+            int materialBufferCount = materialBuffer.Count;
+            for (int i = 1; i < materialBufferCount; ++i)
             {
                 (Component component, Material material) entry = materialBuffer[i];
                 PushMaterial(entry.component, entry.material, force: true);

@@ -233,6 +233,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void ParallelRoundtripSmoke()
         {
+            System.Threading.Tasks.ParallelOptions parallelOptions = new();
+#if SINGLE_THREADED
+            parallelOptions.MaxDegreeOfParallelism = 1;
+#endif
+
             byte[] a = new byte[1024];
             byte[] b = new byte[1536];
             FillDeterministicBytes(a, 1);
@@ -242,6 +247,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             byte[] bCompressed = null;
 
             System.Threading.Tasks.Parallel.Invoke(
+                parallelOptions,
                 () => aCompressed = LZMA.Compress(a),
                 () => bCompressed = LZMA.Compress(b)
             );
@@ -250,6 +256,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             byte[] bRound = null;
 
             System.Threading.Tasks.Parallel.Invoke(
+                parallelOptions,
                 () => aRound = LZMA.Decompress(aCompressed),
                 () => bRound = LZMA.Decompress(bCompressed)
             );

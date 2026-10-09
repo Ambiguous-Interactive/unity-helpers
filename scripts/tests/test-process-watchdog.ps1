@@ -108,7 +108,8 @@ function Invoke-Watchdog {
         [int]$TimeoutSeconds,
         [int]$GraceSeconds,
         [string]$Label,
-        [int]$StallSeconds = 0
+        [int]$StallSeconds = 0,
+        [hashtable]$ProcessObservation
     )
     $log = Join-Path $tmp ("uh-watchdog-{0}.log" -f $Label)
     return Invoke-ProcessWithTreeKillTimeout `
@@ -119,58 +120,74 @@ function Invoke-Watchdog {
         -Label $Label `
         -CompletionPattern $sentinel `
         -CompletionGraceSeconds $GraceSeconds `
-        -StallSeconds $StallSeconds
+        -StallSeconds $StallSeconds `
+        -ProcessObservation $ProcessObservation
 }
 
 # 1. sentinel (code 0) then hang -> grace-killed fast, exit 0, not timed out.
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
-$r = Invoke-Watchdog -ChildCommand 'Write-Host "Test run completed. Exiting with code 0"; Start-Sleep -Seconds 90' -TimeoutSeconds 600 -GraceSeconds 2 -Label 'pass-then-hang'
+$observation = @{}
+$r = Invoke-Watchdog -ProcessObservation $observation -ChildCommand 'Write-Host "Test run completed. Exiting with code 0"; Start-Sleep -Seconds 90' -TimeoutSeconds 600 -GraceSeconds 2 -Label 'pass-then-hang'
 $sw.Stop()
 Assert-That "completion+hang is killed within the grace window (elapsed=$([int]$sw.Elapsed.TotalSeconds)s, far below the 600s timeout)" ($sw.Elapsed.TotalSeconds -lt 30)
 Assert-That "completion+hang reports the parsed exit code 0" ($r.ExitCode -eq 0)
 Assert-That "completion+hang is NOT treated as a timeout" (-not $r.TimedOut)
 
+Assert-That 'completion-grace records raw child status separately from returned sentinel status' ($observation.ExitOrigin -eq 'completion-grace' -and $null -ne $observation.RawExitCode -and $observation.ReturnedExitCode -eq 0 -and $observation.KillSucceeded)
+
 # 2. sentinel (code 2) then hang -> exit 2, not timed out (a failing run still fails).
-$r = Invoke-Watchdog -ChildCommand 'Write-Host "Test run completed. Exiting with code 2 (Failed)."; Start-Sleep -Seconds 90' -TimeoutSeconds 600 -GraceSeconds 2 -Label 'fail-then-hang'
+$observation = @{}
+$r = Invoke-Watchdog -ProcessObservation $observation -ChildCommand 'Write-Host "Test run completed. Exiting with code 2 (Failed)."; Start-Sleep -Seconds 90' -TimeoutSeconds 600 -GraceSeconds 2 -Label 'fail-then-hang'
 Assert-That "failing completion+hang reports the parsed exit code 2" ($r.ExitCode -eq 2)
 Assert-That "failing completion+hang is NOT treated as a timeout" (-not $r.TimedOut)
 
 # 3. normal exit, no sentinel -> real exit code, guard inert.
-$r = Invoke-Watchdog -ChildCommand 'Write-Host "hello"; exit 0' -TimeoutSeconds 600 -GraceSeconds 2 -Label 'normal-exit'
+$observation = @{}
+$r = Invoke-Watchdog -ProcessObservation $observation -ChildCommand 'Write-Host "hello"; exit 0' -TimeoutSeconds 600 -GraceSeconds 2 -Label 'normal-exit'
 Assert-That "normal exit reports the real exit code 0" ($r.ExitCode -eq 0)
 Assert-That "normal exit is NOT treated as a timeout" (-not $r.TimedOut)
+
+Assert-That 'normal process provenance has child identity and raw exit' ($observation.MachineName -eq [Environment]::MachineName -and $observation.ProcessId -gt 0 -and $observation.ExitOrigin -eq 'process-exit' -and $observation.RawExitCode -eq 0 -and $null -eq $observation.KillReason -and [DateTime]$observation.EndObservedUtc -ge [DateTime]$observation.LaunchUtc)
 
 # 3b. sentinel logged but editor then EXITS CLEANLY within grace (the common non-hang
 #     path on healthy Unity): the REAL editor exit code must win over the parsed
 #     sentinel code, and it must not be treated as a kill/timeout. Child logs
 #     "Exiting with code 0" then actually exits 5 -> expect 5.
-$r = Invoke-Watchdog -ChildCommand 'Write-Host "Test run completed. Exiting with code 0"; Start-Sleep -Seconds 1; exit 5' -TimeoutSeconds 600 -GraceSeconds 30 -Label 'sentinel-then-clean-exit'
+$observation = @{}
+$r = Invoke-Watchdog -ProcessObservation $observation -ChildCommand 'Write-Host "Test run completed. Exiting with code 0"; Start-Sleep -Seconds 1; exit 5' -TimeoutSeconds 600 -GraceSeconds 30 -Label 'sentinel-then-clean-exit'
 Assert-That "sentinel + clean exit returns the REAL editor exit code (5), not the parsed sentinel code (0)" ($r.ExitCode -eq 5)
 Assert-That "sentinel + clean exit is NOT treated as a timeout" (-not $r.TimedOut)
 
 # 4. hang with no sentinel -> wall-clock backstop fires (timeout, exit 124).
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
-$r = Invoke-Watchdog -ChildCommand 'Write-Host "working"; Start-Sleep -Seconds 90' -TimeoutSeconds 2 -GraceSeconds 600 -Label 'no-sentinel-timeout'
+$observation = @{}
+$r = Invoke-Watchdog -ProcessObservation $observation -ChildCommand 'Write-Host "working"; Start-Sleep -Seconds 90' -TimeoutSeconds 2 -GraceSeconds 600 -Label 'no-sentinel-timeout'
 $sw.Stop()
 Assert-That "sentinel-less hang hits the wall-clock backstop fast (elapsed=$([int]$sw.Elapsed.TotalSeconds)s)" ($sw.Elapsed.TotalSeconds -lt 30)
 Assert-That "sentinel-less hang is reported as a timeout" ($r.TimedOut)
 Assert-That "sentinel-less hang reports the timeout exit code 124" ($r.ExitCode -eq 124)
 
+Assert-That 'wall timeout preserves raw status and kill origin' ($observation.ExitOrigin -eq 'wall-timeout' -and $observation.KillReason -eq 'wall-timeout' -and $observation.ReturnedExitCode -eq 124 -and $null -ne $observation.RawExitCode)
+
 # 5. output then SILENCE with no sentinel -> the no-output stall guard fires FAST (exit
 #    125, Stalled, TimedOut), far below the 600s wall clock. This is the CircleLineRenderer
 #    SINGLE_THREADED hang class: a run that prints, then goes quiet mid-flight forever.
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
-$r = Invoke-Watchdog -ChildCommand 'Write-Host "starting tests"; Start-Sleep -Seconds 90' -TimeoutSeconds 600 -GraceSeconds 600 -StallSeconds 2 -Label 'midrun-stall'
+$observation = @{}
+$r = Invoke-Watchdog -ProcessObservation $observation -ChildCommand 'Write-Host "starting tests"; Start-Sleep -Seconds 90' -TimeoutSeconds 600 -GraceSeconds 600 -StallSeconds 2 -Label 'midrun-stall'
 $sw.Stop()
 Assert-That "no-output stall is killed within the stall window (elapsed=$([int]$sw.Elapsed.TotalSeconds)s, far below the 600s wall clock)" ($sw.Elapsed.TotalSeconds -lt 30)
 Assert-That "no-output stall reports the distinct stall exit code 125 (not 124)" ($r.ExitCode -eq 125)
 Assert-That "no-output stall sets Stalled" ($r.Stalled)
 Assert-That "no-output stall is surfaced as a timeout-class failure" ($r.TimedOut)
 
+Assert-That 'stall timeout preserves distinct origin' ($observation.ExitOrigin -eq 'stall-timeout' -and $observation.KillReason -eq 'stall-timeout' -and $observation.ReturnedExitCode -eq 125)
+
 # 6. CONTINUOUS output (a line every 0.5s) must NOT trip a 2s stall guard: the stall clock
 #    resets on every line, so a slow-but-ALIVE run is never falsely killed (the guard must
 #    not be fragile). The child prints 8 lines over ~4s (each gap < the 2s window), exits 0.
-$r = Invoke-Watchdog -ChildCommand '1..8 | ForEach-Object { Write-Host "tick $_"; Start-Sleep -Milliseconds 500 }; exit 0' -TimeoutSeconds 600 -GraceSeconds 600 -StallSeconds 2 -Label 'chatty-no-stall'
+$observation = @{}
+$r = Invoke-Watchdog -ProcessObservation $observation -ChildCommand '1..8 | ForEach-Object { Write-Host "tick $_"; Start-Sleep -Milliseconds 500 }; exit 0' -TimeoutSeconds 600 -GraceSeconds 600 -StallSeconds 2 -Label 'chatty-no-stall'
 Assert-That "continuous output is NOT stall-killed (a slow-but-alive run survives)" (-not $r.Stalled)
 Assert-That "continuous output returns the real exit code 0" ($r.ExitCode -eq 0)
 Assert-That "continuous output is NOT treated as a timeout" (-not $r.TimedOut)
@@ -180,10 +197,15 @@ Assert-That "continuous output is NOT treated as a timeout" (-not $r.TimedOut)
 #    pre-empt the completion-grace handling. Child logs the sentinel then hangs; with
 #    StallSeconds(2) < GraceSeconds(3) the grace path must still own the kill (exit 0,
 #    completion -> NOT stalled, NOT timed out).
-$r = Invoke-Watchdog -ChildCommand 'Write-Host "Test run completed. Exiting with code 0"; Start-Sleep -Seconds 90' -TimeoutSeconds 600 -GraceSeconds 3 -StallSeconds 2 -Label 'sentinel-suspends-stall'
+$observation = @{}
+$r = Invoke-Watchdog -ProcessObservation $observation -ChildCommand 'Write-Host "Test run completed. Exiting with code 0"; Start-Sleep -Seconds 90' -TimeoutSeconds 600 -GraceSeconds 3 -StallSeconds 2 -Label 'sentinel-suspends-stall'
 Assert-That "stall guard is suspended after the completion sentinel (grace owns the kill, not stall)" (-not $r.Stalled)
 Assert-That "sentinel+hang with stall enabled still reports the parsed exit code 0" ($r.ExitCode -eq 0)
 Assert-That "sentinel+hang with stall enabled is NOT treated as a timeout" (-not $r.TimedOut)
+
+$observation = @{}
+$r = Invoke-ProcessWithTreeKillTimeout -FilePath (Join-Path $tmp 'missing-unity-executable') -Arguments @() -TimeoutSeconds 1 -LogPath (Join-Path $tmp 'uh-watchdog-launch-failure.log') -Label 'launch-failure' -ProcessObservation $observation
+Assert-That 'launch failure keeps synthetic minus one separate from absent raw exit' ($r.ExitCode -eq -1 -and $observation.ExitOrigin -eq 'watchdog-exception' -and $null -eq $observation.RawExitCode -and $null -eq $observation.ProcessId -and $observation.ExceptionType)
 
 # A complete player build can exit 255 during Unity's post-build shutdown. Its
 # fresh output and both durable success markers permit the player run; a partial

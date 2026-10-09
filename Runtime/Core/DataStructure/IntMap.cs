@@ -499,7 +499,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     throw new InvalidOperationException("The map changed during enumeration.");
                 }
 
-                while (_slot < _map._keys.Length)
+                int keysLength = _map._keys.Length;
+                while (_slot < keysLength)
                 {
                     int stored = _map._keys[_slot];
                     ++_slot;
@@ -620,7 +621,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     throw new InvalidOperationException("The map changed during enumeration.");
                 }
 
-                while (_slot < _map._keys.Length)
+                int keysLength = _map._keys.Length;
+                while (_slot < keysLength)
                 {
                     int stored = _map._keys[_slot];
                     ++_slot;
@@ -679,7 +681,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     throw new InvalidOperationException("The map changed during enumeration.");
                 }
 
-                while (_slot < _map._keys.Length)
+                int keysLength = _map._keys.Length;
+                while (_slot < keysLength)
                 {
                     int stored = _map._keys[_slot];
                     ++_slot;

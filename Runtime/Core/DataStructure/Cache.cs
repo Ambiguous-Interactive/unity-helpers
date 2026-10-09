@@ -253,7 +253,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private static bool AreSameCachedValue(TValue first, TValue second)
         {
-            if (typeof(TValue).IsValueType)
+            if (ObjectsTypeTraits<TValue>.IsValueType)
             {
                 return EqualityComparer<TValue>.Default.Equals(first, second);
             }
@@ -1737,7 +1737,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            if (!typeof(TValue).IsValueType)
+            if (!ObjectsTypeTraits<TValue>.IsValueType)
             {
                 foreach (CacheEntry entry in _entries)
                 {

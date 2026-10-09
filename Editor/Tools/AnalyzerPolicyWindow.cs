@@ -754,11 +754,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             _status.style.color = _canEdit
                 ? StyleKeyword.Null
                 : new StyleColor(new Color(0.9f, 0.35f, 0.3f));
+            int severityActionsLength = SeverityActions.Length;
             foreach (KeyValuePair<string, DropdownField> entry in _severityFields)
             {
                 string action = GetAction(entry.Key);
                 int selected = 0;
-                for (int index = 0; index < SeverityActions.Length; ++index)
+                for (int index = 0; index < severityActionsLength; ++index)
                 {
                     if (
                         string.Equals(

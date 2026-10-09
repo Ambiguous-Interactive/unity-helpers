@@ -9,7 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using ProtoBuf;
     using ProtoBuf.Meta;
     using ProtoBuf.Serializers;
-    using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using PbSerializer = ProtoBuf.Serializer;
 
     internal static class LegacyProtoComparerSerializer
@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         internal static void Serialize<T>(Stream destination, T value, bool useRuntimeType)
         {
             if (
-                ProtoEqualityComparer<T>.IsReferenceType
+                !ObjectsTypeTraits<T>.IsValueType
                 && value is ILegacyProtobufMap map
                 && map.TrySerialize(destination)
             )

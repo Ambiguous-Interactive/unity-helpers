@@ -41,6 +41,10 @@ foreach ($name in @(
         'Write-UnityPackageManagerTransientFailureWarnings',
         'Clear-UnityPackageManagerRetryState',
         'Test-UnityConfigureMarker',
+        'Select-UnityProcessFailureEvents',
+        'Get-UnityProcessFailureEvents',
+        'Read-UnityProcessFailureEvents',
+        'Write-UnityConfigureFailureObservation',
         'Invoke-UnityConfigurePass'
     )) {
     $functionAst = $ast.FindAll(
@@ -168,6 +172,8 @@ function Invoke-ConfigureCase {
         Log = $log
         Project = $project
         FirstAttemptLog = Join-Path $artifacts 'configure.first-attempt.log'
+        FirstAttemptObservation = Join-Path $artifacts 'configure.first-attempt.process-diagnostics.json'
+        FailureObservation = Join-Path $artifacts 'configure.process-diagnostics.json'
         EnvironmentCleared = -not (Test-Path -LiteralPath Env:\UH_CONFIGURE_MARKER_PATH)
     }
 }
@@ -179,6 +185,8 @@ try {
     Assert-That 'success clears the marker-path environment variable' (
         $ordinarySuccess.EnvironmentCleared
     )
+
+    Assert-That 'successful configuration does not query or persist failure diagnostics' (-not (Test-Path $ordinarySuccess.FailureObservation))
 
     $markerWins = Invoke-ConfigureCase `
         -Name 'marker-wins' `
@@ -199,6 +207,9 @@ try {
         (Test-Path -LiteralPath $retried.FirstAttemptLog -PathType Leaf) -and
         (Get-Content -LiteralPath $retried.FirstAttemptLog -Raw) -match 'IPC stream failed to read'
     )
+    Assert-That 'existing retry preserves first-attempt observation even when second succeeds' (Test-Path $retried.FirstAttemptObservation)
+    $firstObservation = Get-Content $retried.FirstAttemptObservation -Raw | ConvertFrom-Json
+    Assert-That 'custom invoker records explicit unavailable process identity' ($firstObservation.Process.State -eq 'unavailable' -and $firstObservation.WindowsEvents.State -eq 'no-query')
     Assert-That 'retry clears and recreates PackageCache' (
         (Test-Path -LiteralPath (Join-Path $retried.Project 'Library/PackageCache') -PathType Container) -and
         -not (Test-Path -LiteralPath (Join-Path $retried.Project 'Library/PackageCache/stale.txt'))
@@ -220,6 +231,7 @@ try {
     Assert-That 'an ordinary compile failure clears the marker-path environment variable' (
         $compileFailure.EnvironmentCleared
     )
+    Assert-That 'ordinary failure persists diagnostics without changing rejection' (Test-Path $compileFailure.FailureObservation)
     Assert-That 'an ordinary compile failure does not create a retry log' (
         -not (Test-Path -LiteralPath $compileFailure.FirstAttemptLog)
     )
@@ -243,6 +255,115 @@ try {
     Assert-That 'a mixed case-varied failure clears the marker-path environment variable' (
         $mixedCaseFatal.EnvironmentCleared
     )
+    $observation = @{
+        State = 'observed'; ProcessId = 42; ExecutablePath = 'D:\Unity\Unity.exe'
+        LaunchUtc = '2026-10-09T20:05:20Z'; EndObservedUtc = '2026-10-09T20:05:22Z'
+    }
+    function New-EventRecord {
+        param([int]$Id, [hashtable]$Fields, [DateTime]$Time = [DateTime]'2026-10-09T20:05:22Z', [string]$XmlOverride = '')
+        $data = foreach ($key in $Fields.Keys) {
+            '<Data Name="' + [Security.SecurityElement]::Escape($key) + '">' + [Security.SecurityElement]::Escape([string]$Fields[$key]) + '</Data>'
+        }
+        $record = [pscustomobject]@{
+            Id = $Id; ProviderName = if ($Id -eq 1000) { 'Application Error' } else { 'Windows Error Reporting' }
+            TimeCreated = $Time; RecordId = 1
+            EventXml = if ($XmlOverride) { $XmlOverride } else { '<Event><EventData>' + ($data -join '') + '</EventData></Event>' }
+        }
+        $record | Add-Member -MemberType ScriptMethod -Name ToXml -Value { return $this.EventXml }
+        return $record
+    }
+    $reportId = '35d131f6-0a49-4207-83da-f9d809c86aa0'
+    $fault = New-EventRecord -Id 1000 -Fields @{
+        ProcessId = '0x2a'; AppPath = 'd:/Unity/Unity.exe'; IntegratorReportId = $reportId
+        ExceptionCode = 'ffffffff'; ModuleName = "access token=secret@example.com`n::error::untrusted"
+        CommandLine = 'never export'; Message = 'never export'
+    }
+    $reportingEvent = New-EventRecord -Id 1001 -Fields @{ ReportId = $reportId; AppName = 'Unity.exe'; Message = 'never export' }
+    $events = Select-UnityProcessFailureEvents -ProcessObservation $observation -Candidates @($reportingEvent, $fault)
+    Assert-That 'exact hex PID/path and report-only Windows report join match independent of input order' ($events.Events.Count -eq 2 -and $events.Events[0].Match -eq 'joined-report-id' -and $events.MalformedEvents -eq 0)
+    $json = ConvertTo-Json $events -Depth 8
+    Assert-That 'event export excludes arbitrary fields and credential data' ($json -notmatch 'never export|secret@example.com' -and $events.Events[1].Fields.ModuleName -notmatch '[\r\n]')
+    foreach ($conflict in @(@{ ProcessId = '43'; ReportId = $reportId }, @{ ProcessId = 'not-a-pid'; ReportId = $reportId }, @{ AppPath = 'D:\Other\Unity.exe'; ReportId = $reportId })) {
+        $contradictory = New-EventRecord -Id 1001 -Fields $conflict
+        $events = Select-UnityProcessFailureEvents -ProcessObservation $observation -Candidates @($fault, $contradictory)
+        Assert-That 'report-ID join rejects explicitly contradictory target identity' ($events.Events.Count -eq 1 -and $events.Events[0].EventId -eq 1000)
+    }
+    $decimal = New-EventRecord -Id 1000 -Fields @{ ProcessId = '42'; AppPath = 'D:\Unity\Unity.exe' }
+    $events = Select-UnityProcessFailureEvents -ProcessObservation $observation -Candidates @($decimal)
+    Assert-That 'decimal target PID matches without optional report fields' ($events.Events.Count -eq 1 -and $events.MalformedEvents -eq 0)
+    foreach ($case in @(
+        @{ Name = 'wrong-pid'; Fields = @{ ProcessId = '43'; AppPath = 'D:\Unity\Unity.exe' } },
+        @{ Name = 'wrong-path'; Fields = @{ ProcessId = '42'; AppPath = 'D:\Other\Unity.exe' } },
+        @{ Name = 'basename-only'; Fields = @{ ProcessId = '42'; AppName = 'Unity.exe' } },
+        @{ Name = 'path-without-pid'; Fields = @{ AppPath = 'D:\Unity\Unity.exe' } }
+    )) {
+        $record = New-EventRecord -Id 1000 -Fields $case.Fields
+        $events = Select-UnityProcessFailureEvents -ProcessObservation $observation -Candidates @($record)
+        Assert-That "unrelated event rejected: $($case.Name)" ($events.State -eq 'no-matching-events' -and $events.MalformedEvents -eq 0)
+    }
+    $outside = New-EventRecord -Id 1000 -Fields @{ ProcessId = '42'; AppPath = 'D:\Unity\Unity.exe' } -Time ([DateTime]'2026-10-09T20:04:00Z')
+    $events = Select-UnityProcessFailureEvents -ProcessObservation $observation -Candidates @($outside, $reportingEvent)
+    Assert-That 'outside-window anchor cannot qualify Windows report' ($events.Events.Count -eq 0)
+    $wrongProvider = New-EventRecord -Id 1000 -Fields @{ ProcessId = '42'; AppPath = 'D:\Unity\Unity.exe' }
+    $wrongProvider.ProviderName = 'Unrelated provider'
+    $events = Select-UnityProcessFailureEvents -ProcessObservation $observation -Candidates @($wrongProvider)
+    Assert-That 'unrelated provider cannot qualify an event' ($events.Events.Count -eq 0)
+    foreach ($payload in @('<broken', '<!DOCTYPE Event [<!ENTITY x "expanded">]><Event><EventData><Data Name="AppName">&x;</Data></EventData></Event>', ('x' * 65537))) {
+        $record = New-EventRecord -Id 1000 -Fields @{} -XmlOverride $payload
+        $events = Select-UnityProcessFailureEvents -ProcessObservation $observation -Candidates @($record)
+        Assert-That 'malformed, DTD and oversized XML are bounded and rejected' ($events.Events.Count -eq 0 -and $events.MalformedEvents -eq 1)
+    }
+    $events = Select-UnityProcessFailureEvents -ProcessObservation $observation -Candidates (@($decimal) * 65)
+    Assert-That 'candidate and match bounds report truncation explicitly' ($events.Events.Count -eq 8 -and $events.CandidateLimitReached -and $events.MatchLimitReached)
+    $noIdentity = Get-UnityProcessFailureEvents -ProcessObservation @{ State = 'unavailable' }
+    Assert-That 'missing process identity has explicit no-query state' ($noIdentity.State -eq 'no-query' -and $noIdentity.Reason -eq 'process-identity-unavailable')
+    if (-not $IsWindows) {
+        $unsupported = Get-UnityProcessFailureEvents -ProcessObservation $observation
+        Assert-That 'non-Windows host cannot supply runner events' ($unsupported.State -eq 'no-query' -and $unsupported.Reason -eq 'unsupported-platform')
+    }
+    $script:eventQueryMode = 'empty'
+    $script:eventQueryFilter = $null
+    $script:eventQueryLimit = 0
+    function Get-WinEvent {
+        [CmdletBinding()]
+        param([hashtable]$FilterHashtable, [int]$MaxEvents)
+        $script:eventQueryFilter = $FilterHashtable
+        $script:eventQueryLimit = $MaxEvents
+        if ($script:eventQueryMode -eq 'empty' -or $script:eventQueryMode -eq 'unavailable') {
+            $errorId = if ($script:eventQueryMode -eq 'empty') { 'NoMatchingEventsFound' } else { 'AccessDenied' }
+            $record = [Management.Automation.ErrorRecord]::new([InvalidOperationException]::new('not exported'), $errorId, [Management.Automation.ErrorCategory]::NotSpecified, $null)
+            Write-Error -ErrorRecord $record
+        } elseif ($script:eventQueryMode -eq 'throw') { throw 'not exported' }
+        else { return @($decimal) * 65 }
+    }
+    $query = Read-UnityProcessFailureEvents -ProcessObservation $observation
+    Assert-That 'native no-events error maps to no-matching rather than unavailable' ($query.State -eq 'no-matching-events')
+    Assert-That 'query bounds request sixty-five and only intended event providers and IDs' ($script:eventQueryLimit -eq 65 -and $script:eventQueryFilter.LogName -eq 'Application' -and $script:eventQueryFilter.ProviderName.Count -eq 2 -and $script:eventQueryFilter.Id.Count -eq 2)
+    foreach ($queryMode in @('unavailable', 'throw')) {
+        $script:eventQueryMode = $queryMode
+        $query = Read-UnityProcessFailureEvents -ProcessObservation $observation
+        Assert-That "query failures explicitly unavailable: $queryMode" ($query.State -eq 'query-unavailable' -and ($query | ConvertTo-Json -Depth 8) -notmatch 'not exported')
+    }
+    $script:eventQueryMode = 'matched'
+    $query = Read-UnityProcessFailureEvents -ProcessObservation $observation
+    Assert-That 'query passes bounded records to strict matcher with truncation' ($query.State -eq 'matched-events' -and $query.Events.Count -eq 8 -and $query.CandidateLimitReached)
+    $future = $observation.Clone()
+    $future.EndObservedUtc = [DateTime]::UtcNow.AddHours(1).ToString('o')
+    $query = Read-UnityProcessFailureEvents -ProcessObservation $future
+    Assert-That 'query upper time is clamped to capture time without waiting' ([DateTime]$query.WindowEndUtc -eq [DateTime]$query.CapturedUtc)
+    Remove-Item Function:\Get-WinEvent
+
+    $persistPath = Join-Path $temporaryRoot 'event-failure.log'
+    Write-UnityConfigureFailureObservation -LogPath $persistPath -ProcessObservation $observation
+    $persisted = Get-Content (Join-Path $temporaryRoot 'event-failure.process-diagnostics.json') -Raw | ConvertFrom-Json
+    Assert-That 'persisted failure report preserves process identity' ($persisted.Process.ProcessId -eq 42)
+    $savedPreferences = $ErrorActionPreference
+    $ErrorActionPreference = 'Stop'
+    try {
+        Write-UnityConfigureFailureObservation -LogPath (Join-Path $temporaryRoot 'missing/diagnostics.log') -ProcessObservation $observation
+        Assert-That 'diagnostic persistence failure never hides original failure' $true
+    } finally { $ErrorActionPreference = $savedPreferences }
+
 } finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
