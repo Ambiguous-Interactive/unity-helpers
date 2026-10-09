@@ -79,6 +79,11 @@ const CHECKS = [
 
   // Linter self-tests.
   {
+    id: "lint-markdown",
+    name: "Markdown inventory and lint failure controls",
+    run: "npm run test:lint-markdown"
+  },
+  {
     id: "agent-skill-migration",
     name: "Agent skill migration and discovery",
     run: "npm run test:agent-skill-migration"

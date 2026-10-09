@@ -160,6 +160,13 @@ namespace 'Unity.CompilationPipeline'` -- the name bound to a NAMESPACE, not to 
 
 ### Native asynchronous runner limits (session 348)
 
+Use a namespace-qualified feature prefix during the edit loop. The substring filter `Cache` also
+ran unrelated type-catalog scans, another package's benchmark and Zenject tests on the host.
+`WallstopStudios.UnityHelpers.Tests.DataStructures.Cache` retained all 335 matching case identities
+and passed in 2.07 seconds, versus 43.99 seconds for the broader 736-case run (session 453).
+This is a smaller feature-scoped workload, not a faster full suite. Run separately named ownership
+and timed-cache fixtures when relevant, and retain broader final validation and every CI gate.
+
 The pipeline backend rejects `mode: "all"` with `async_tests: true` before clearing its
 previous result. A response can therefore contain an old completed run. Run `editor` and
 `playmode` separately and verify a fresh job identity and status, its filter and discovered case count.

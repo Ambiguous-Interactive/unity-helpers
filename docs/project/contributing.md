@@ -59,6 +59,11 @@ These tools are required and installed via npm/dotnet:
 - YAML linting: yamllint
 - Workflow linting: actionlint
 
+`npm run lint:markdown` checks tracked Markdown and new files that Git does not ignore,
+then applies `.markdownlintignore`. Tracked files remain eligible even when a Git ignore rule
+matches them. Hidden paths stay excluded, and generated, ignored local artifacts do not slow
+file discovery. The command fails if discovery fails or finds no eligible documents.
+
 ## Python Tooling
 
 Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.12.10` and

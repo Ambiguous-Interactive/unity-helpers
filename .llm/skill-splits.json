@@ -428,7 +428,7 @@
     },
     {
       "name": "unity-mcp-fixture-runner",
-      "sha256": "a4e69aad560a6e06836d3640c8f0b20f712badfdfe0b69a271e961cbd449c10e",
+      "sha256": "dd0eec377ac9416484bf33f04b298a8e08612ac912dd80d4e8b130bc410bacbb",
       "parts": [
         "unity-mcp-fixture-runner-part-1.md",
         "unity-mcp-fixture-runner-part-2.md",
