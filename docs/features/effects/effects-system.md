@@ -156,6 +156,23 @@ Instant effects modify base values permanently and return `null` instead of a ha
    }
    ```
 
+### Refresh and Tag Ownership During Callbacks
+
+An effect removal callback can refresh another active duration effect through `RefreshEffect`,
+`EnsureHandle`, or reapplication. The refreshed effect keeps its handle and remains active until
+its new deadline, even when it was already selected for expiry in that update. A throwing callback
+still allows other genuinely expired effects to finish removal before its exception is reported.
+
+Each handle records the tags it actually applies. Changing or destroying the effect asset does
+not change those active tags: handle queries and removal use the recorded identities. Duplicate
+tags retain their individual counts, and literal whitespace tags remain valid. Application takes
+a snapshot before callbacks; tags not yet applied do not appear in handle queries. Removal or a
+failed application releases its recorded tags without decrementing tags owned by another handle.
+Reapplying the same handle during a callback starts a new application; the interrupted application
+cannot continue changing its tags or unwind the replacement.
+Destroying the tag component during application stops further tag notifications and releases its
+recorded ownership.
+
 ## Understanding Attributes: What to Model and What to Avoid
 
 **Important: Attributes are NOT required!** The Effects System works well when used solely for tag-based state management and cosmetic effects.

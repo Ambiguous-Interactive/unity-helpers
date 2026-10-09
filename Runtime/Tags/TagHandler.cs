@@ -92,9 +92,10 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private readonly Dictionary<string, uint> _tagCount = new(StringComparer.Ordinal);
         private readonly Dictionary<long, EffectHandle> _effectHandles = new();
+        private bool _retired;
 
-        // Track the applied prefix so partial teardown cannot decrement tags owned by another effect.
-        private readonly Dictionary<long, int> _appliedTagCountByHandle = new();
+        private readonly Dictionary<long, PooledResource<List<string>>> _appliedTagsByHandle =
+            new();
 
         /// <summary>
         /// Checks whether the specified tag is currently active (has a count > 0).
@@ -557,11 +558,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             int estimatedCapacity = Math.Min(_effectHandles.Count, 8);
             foreach (EffectHandle handle in _effectHandles.Values)
             {
-                if (
-                    handle.effect != null
-                    && handle.effect.effectTags != null
-                    && handle.effect.effectTags.Contains(effectTag)
-                )
+                if (HasAppliedTag(handle.id, effectTag))
                 {
                     target ??= new List<EffectHandle>(estimatedCapacity);
                     target.Add(handle);
@@ -627,11 +624,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 int estimatedCapacity = Math.Min(handleCount, 8);
                 foreach (EffectHandle handle in _effectHandles.Values)
                 {
-                    if (
-                        handle.effect != null
-                        && handle.effect.effectTags != null
-                        && handle.effect.effectTags.Contains(effectTag)
-                    )
+                    if (HasAppliedTag(handle.id, effectTag))
                     {
                         target ??= new List<EffectHandle>(estimatedCapacity);
                         target.Add(handle);
@@ -702,7 +695,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return HandleEnumerable.Empty;
             }
 
-            return new HandleEnumerable(_effectHandles.GetEnumerator(), effectTag);
+            return new HandleEnumerable(_effectHandles.GetEnumerator(), effectTag, this);
         }
 
         /// <summary>
@@ -713,25 +706,25 @@ namespace WallstopStudios.UnityHelpers.Tags
         public void ForceApplyTags(EffectHandle handle)
         {
             long id = handle.id;
-            if (!_effectHandles.TryAdd(id, handle))
+            if (_retired || !_effectHandles.TryAdd(id, handle))
             {
                 return;
             }
 
-            _appliedTagCountByHandle[id] = 0;
+            PooledResource<List<string>> appliedLease = Buffers<string>.List.Get(out _);
+            _appliedTagsByHandle[id] = appliedLease;
             try
             {
-                ApplyTrackedEffectTags(id, handle.effect);
+                ApplyTrackedEffectTags(handle.effect, appliedLease);
             }
             catch (Exception applyFailure)
             {
                 // Undo only tags this call raised; reentrant teardown may already have unwound them.
-                if (_effectHandles.Remove(id))
+                if (appliedLease.IsHeld && _effectHandles.Remove(id))
                 {
-                    _ = _appliedTagCountByHandle.Remove(id, out int applied);
                     try
                     {
-                        RemoveTrackedTags(handle.effect, applied);
+                        RemoveTrackedTags(id);
                     }
                     catch (Exception unwindFailure)
                     {
@@ -755,7 +748,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Removes all tags that were applied by the specified effect handle.
+        /// Removes the tags recorded when the handle was applied, even if its effect asset changes or is destroyed.
         /// </summary>
         /// <param name="handle">The effect handle whose tags should be removed.</param>
         /// <returns><c>true</c> if the handle was found and tags were removed; otherwise, <c>false</c>.</returns>
@@ -767,14 +760,12 @@ namespace WallstopStudios.UnityHelpers.Tags
         public bool ForceRemoveTags(EffectHandle handle)
         {
             long id = handle.id;
-            if (!_effectHandles.Remove(id, out EffectHandle appliedHandle))
+            if (!_effectHandles.Remove(id))
             {
                 return false;
             }
 
-            // Missing ledger entries remove nothing; guessing all effect tags could decrement another handle's counts.
-            _ = _appliedTagCountByHandle.Remove(id, out int applied);
-            RemoveTrackedTags(appliedHandle.effect, applied);
+            RemoveTrackedTags(id);
             return true;
         }
 
@@ -870,7 +861,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private void ApplyEffectTags(AttributeEffect effect)
         {
-            if (effect == null)
+            if (_retired || effect == null)
             {
                 return;
             }
@@ -880,75 +871,103 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return;
             }
 
-            foreach (string effectTag in effect.effectTags)
+            using PooledResource<List<string>> sourceLease = Buffers<string>.List.Get(
+                out List<string> source
+            );
+            source.AddRange(effect.effectTags);
+            foreach (string effectTag in source)
             {
-                InternalApplyTag(effectTag);
-            }
-        }
-
-        // Notification subscribers can remove the effect; stop before raising tags without a removal owner.
-        private void ApplyTrackedEffectTags(long id, AttributeEffect effect)
-        {
-            if (effect == null)
-            {
-                return;
-            }
-
-            List<string> effectTags = effect.effectTags;
-            if (effectTags == null)
-            {
-                return;
-            }
-
-            int applied = 0;
-            foreach (string effectTag in effectTags)
-            {
-                if (!_effectHandles.ContainsKey(id))
+                if (_retired)
                 {
                     return;
                 }
 
-                // Record ownership before notifying so reentrant teardown sees the tag just raised.
+                InternalApplyTag(effectTag);
+            }
+        }
+
+        private bool HasAppliedTag(long id, string effectTag)
+        {
+            return _appliedTagsByHandle.TryGetValue(id, out PooledResource<List<string>> lease)
+                && lease.resource.Contains(effectTag);
+        }
+
+        private void ApplyTrackedEffectTags(
+            AttributeEffect effect,
+            PooledResource<List<string>> appliedLease
+        )
+        {
+            if (effect == null || effect.effectTags == null)
+            {
+                return;
+            }
+
+            using PooledResource<List<string>> sourceLease = Buffers<string>.List.Get(
+                out List<string> source
+            );
+            source.AddRange(effect.effectTags);
+            List<string> applied = appliedLease.resource;
+            foreach (string effectTag in source)
+            {
+                if (!appliedLease.IsHeld)
+                {
+                    return;
+                }
+
                 uint currentCount = RaiseTagCount(effectTag);
-                ++applied;
-                _appliedTagCountByHandle[id] = applied;
+                applied.Add(effectTag);
                 NotifyTagApplied(effectTag, currentCount);
             }
         }
 
-        // Detach every tag before propagating subscriber failures; skipped tags have no remaining owner.
-        private void RemoveTrackedTags(AttributeEffect effect, int applied)
+        private void RemoveTrackedTags(long id)
         {
-            // Unity null checks also detect effect assets unloaded while their handles remain live.
-            if (effect == null)
+            if (!_appliedTagsByHandle.Remove(id, out PooledResource<List<string>> lease))
             {
                 return;
             }
 
-            List<string> effectTags = effect.effectTags;
-            if (effectTags == null)
+            using (lease)
             {
+                Exception firstFailure = null;
+                foreach (string effectTag in lease.resource)
+                {
+                    try
+                    {
+                        InternalRemoveTag(effectTag, allInstances: false);
+                    }
+                    catch (Exception tagFailure)
+                    {
+                        firstFailure = TeardownFailures.KeepFirst(this, firstFailure, tagFailure);
+                    }
+                }
+
+                if (firstFailure != null)
+                {
+                    ExceptionDispatchInfo.Capture(firstFailure).Throw();
+                }
+            }
+        }
+
+        private void OnDestroy()
+        {
+            _retired = true;
+            if (_appliedTagsByHandle.Count == 0)
+            {
+                _effectHandles.Clear();
+                _tagCount.Clear();
                 return;
             }
-
-            Exception firstFailure = null;
-            int effectTagCount = effectTags.Count;
-            int removable = applied < effectTagCount ? applied : effectTagCount;
-            for (int index = 0; index < removable; ++index)
+            using PooledResource<List<PooledResource<List<string>>>> lease = Buffers<
+                PooledResource<List<string>>
+            >.List.Get(out List<PooledResource<List<string>>> snapshots);
+            snapshots.AddRange(_appliedTagsByHandle.Values);
+            _appliedTagsByHandle.Clear();
+            _effectHandles.Clear();
+            _tagCount.Clear();
+            foreach (PooledResource<List<string>> snapshot in snapshots)
             {
-                try
-                {
-                    InternalRemoveTag(effectTags[index], allInstances: false);
-                }
-                catch (Exception tagFailure)
-                {
-                    firstFailure = TeardownFailures.KeepFirst(this, firstFailure, tagFailure);
-                }
-            }
-
-            if (firstFailure != null)
-            {
-                ExceptionDispatchInfo.Capture(firstFailure).Throw();
+                snapshot.Dispose();
             }
         }
 
@@ -982,19 +1001,23 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         public readonly struct HandleEnumerable
         {
-            public static HandleEnumerable Empty => new HandleEnumerable(default, string.Empty);
+            public static HandleEnumerable Empty =>
+                new HandleEnumerable(default, string.Empty, null);
 
             private readonly Dictionary<long, EffectHandle>.Enumerator _enumerator;
             private readonly string _effectTag;
+            private readonly TagHandler _owner;
             private readonly bool _hasData;
 
             internal HandleEnumerable(
                 Dictionary<long, EffectHandle>.Enumerator enumerator,
-                string effectTag
+                string effectTag,
+                TagHandler owner
             )
             {
                 _enumerator = enumerator;
                 _effectTag = effectTag;
+                _owner = owner;
                 _hasData = true;
             }
 
@@ -1005,7 +1028,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     return default;
                 }
 
-                return new HandleEnumerator(_enumerator, _effectTag);
+                return new HandleEnumerator(_enumerator, _effectTag, _owner);
             }
         }
 
@@ -1018,16 +1041,19 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             private Dictionary<long, EffectHandle>.Enumerator _enumerator;
             private readonly string _effectTag;
+            private readonly TagHandler _owner;
             private bool _hasEnumerator;
             private EffectHandle _current;
 
             internal HandleEnumerator(
                 Dictionary<long, EffectHandle>.Enumerator enumerator,
-                string effectTag
+                string effectTag,
+                TagHandler owner
             )
             {
                 _enumerator = enumerator;
                 _effectTag = effectTag;
+                _owner = owner;
                 _hasEnumerator = true;
                 _current = default;
             }
@@ -1042,12 +1068,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 while (_enumerator.MoveNext())
                 {
                     EffectHandle handle = _enumerator.Current.Value;
-                    AttributeEffect effect = handle.effect;
-                    if (
-                        effect != null
-                        && effect.effectTags != null
-                        && effect.effectTags.Contains(_effectTag)
-                    )
+                    if (_owner.HasAppliedTag(handle.id, _effectTag))
                     {
                         _current = handle;
                         return true;

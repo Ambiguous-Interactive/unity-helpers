@@ -107,32 +107,59 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         }
 
         /// <summary>
-        /// Queues an action to run on the worker. Ignored once the pool stops accepting work.
+        /// Queues an action to run on the worker. Ignored when null or once the pool stops accepting work.
         /// </summary>
         /// <param name="work">The action to run.</param>
         public void Enqueue(Action work)
         {
-            EnqueueWork(WorkItem.FromAction(work));
+            _ = TryEnqueue(work);
         }
 
         /// <summary>
         /// Queues an asynchronous action to run on the worker, which awaits it before starting the
-        /// next item. Ignored once the pool stops accepting work.
+        /// next item. Ignored when null or once the pool stops accepting work.
         /// </summary>
         /// <param name="work">The asynchronous action to run.</param>
         public void Enqueue(Func<Task> work)
         {
-            EnqueueWork(WorkItem.FromTask(work));
+            _ = TryEnqueue(work);
         }
 
         /// <summary>
         /// Queues an asynchronous action to run on the worker, which awaits it before starting the
-        /// next item. Ignored once the pool stops accepting work.
+        /// next item. Ignored when null or once the pool stops accepting work.
         /// </summary>
         /// <param name="work">The asynchronous action to run.</param>
         public void Enqueue(Func<ValueTask> work)
         {
-            EnqueueWork(WorkItem.FromValueTask(work));
+            _ = TryEnqueue(work);
+        }
+
+        /// <summary>
+        /// Attempts to queue an action, reporting rejection when it is null or the pool has stopped accepting work.
+        /// </summary>
+        /// <remarks>Acceptance does not prevent later disposal from discarding queued work; drain before disposal when execution is required.</remarks>
+        public bool TryEnqueue(Action work)
+        {
+            return work != null && EnqueueWork(WorkItem.FromAction(work));
+        }
+
+        /// <summary>
+        /// Attempts to queue an asynchronous action, reporting rejection when it is null or the pool has stopped accepting work.
+        /// </summary>
+        /// <remarks>Acceptance does not prevent later disposal from discarding queued work; drain before disposal when execution is required.</remarks>
+        public bool TryEnqueue(Func<Task> work)
+        {
+            return work != null && EnqueueWork(WorkItem.FromTask(work));
+        }
+
+        /// <summary>
+        /// Attempts to queue a value-task action, reporting rejection when it is null or the pool has stopped accepting work.
+        /// </summary>
+        /// <remarks>Acceptance does not prevent later disposal from discarding queued work; drain before disposal when execution is required.</remarks>
+        public bool TryEnqueue(Func<ValueTask> work)
+        {
+            return work != null && EnqueueWork(WorkItem.FromValueTask(work));
         }
 
         /// <summary>
@@ -277,18 +304,19 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             }
         }
 
-        private void EnqueueWork(WorkItem work)
+        private bool EnqueueWork(WorkItem work)
         {
             lock (_workGate)
             {
                 if (_disposed || !_acceptingWork)
                 {
-                    return;
+                    return false;
                 }
 
                 _work.Enqueue(work);
             }
             Signal();
+            return true;
         }
 
         private bool TryStartWork(out WorkItem work)

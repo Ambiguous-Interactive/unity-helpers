@@ -697,6 +697,22 @@ worker and strand later save jobs. Valid delays retain `SemaphoreSlim`'s integer
 truncation, including fractional values, zero, and `Timeout.InfiniteTimeSpan`. Enqueueing still
 signals the worker immediately, even with an infinite idle delay.
 
+Use `TryEnqueue` when the caller must know whether submission succeeded. Its `Action`,
+`Func<Task>`, and `Func<ValueTask>` overloads return `false` for a null delegate or a pool already
+closed by draining or disposal. Admission is checked atomically with queue insertion; checking
+`IsAcceptingWork` before `Enqueue` cannot provide that guarantee. Existing `Enqueue` overloads ignore
+null or rejected work.
+
+```csharp
+if (!pool.TryEnqueue(() => SaveSnapshot(snapshot)))
+{
+    SaveSnapshot(snapshot);
+}
+```
+
+A `true` result means the work entered the queue. It does not promise successful execution or
+protect it from later disposal. Stop producers and drain the pool when accepted save work must run.
+
 **Disposal discards queued work.** `Dispose()` and `DisposeAsync()` cancel the worker rather than
 draining it, so anything enqueued but not yet started is dropped; the `await` inside
 `DisposeAsync()` waits only for the item already in flight. Disposal immediately removes pending
