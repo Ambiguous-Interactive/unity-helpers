@@ -2622,7 +2622,8 @@ function Invoke-ProcessWithTreeKillTimeout {
         # alone would let burn the full TimeoutSeconds. Deliberately SUSPENDED once the
         # completion sentinel is seen, because the editor legitimately goes quiet while
         # flushing results during the grace window (that case is the completion guard's).
-        [int]$StallSeconds = 0
+        [int]$StallSeconds = 0,
+        [hashtable]$ProcessObservation
     )
 
     $logDir = Split-Path -Parent $LogPath
@@ -2668,6 +2669,13 @@ function Invoke-ProcessWithTreeKillTimeout {
     $completionArmed = $false
     $completionExitCode = $null
     $killedAfterCompletion = $false
+    $observedProcessId = $null
+    $launchUtc = [DateTime]::UtcNow
+    $rawExitCode = $null
+    $exitOrigin = 'unobserved'
+    $killReason = $null
+    $killSucceeded = $false
+    $exceptionType = $null
     try {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $FilePath
@@ -2681,6 +2689,7 @@ function Invoke-ProcessWithTreeKillTimeout {
         $proc.StartInfo = $psi
 
         [void]$proc.Start()
+        try { $observedProcessId = $proc.Id } catch { }
 
         $outReader = $proc.StandardOutput
         $errReader = $proc.StandardError
@@ -2748,10 +2757,12 @@ function Invoke-ProcessWithTreeKillTimeout {
                 } else {
                     $timedOut = $true
                 }
+                $killReason = if ($completionArmed) { 'completion-grace' } else { 'wall-timeout' }
                 try {
                     $proc.Kill($true)
+                    $killSucceeded = $true
                 } catch {
-                    try { $proc.Kill() } catch { }
+                    try { $proc.Kill(); $killSucceeded = $true } catch { }
                 }
                 break
             }
@@ -2769,10 +2780,12 @@ function Invoke-ProcessWithTreeKillTimeout {
                 # wall-clock breach so the caller reports exit 125 (not 124).
                 Write-Host "::error::$Label produced no output for ${StallSeconds}s (no-output stall) and was tree-killed. The wall-clock and completion-sentinel guards remain in force; raise the stall window if a run is legitimately silent for longer."
                 $stalled = $true
+                $killReason = 'stall-timeout'
                 try {
                     $proc.Kill($true)
+                    $killSucceeded = $true
                 } catch {
-                    try { $proc.Kill() } catch { }
+                    try { $proc.Kill(); $killSucceeded = $true } catch { }
                 }
                 break
             }
@@ -2816,7 +2829,11 @@ function Invoke-ProcessWithTreeKillTimeout {
             }
         }
 
+        try {
+            if ($reaped -and $proc.HasExited) { $rawExitCode = $proc.ExitCode }
+        } catch { }
         if ($killedAfterCompletion) {
+            $exitOrigin = 'completion-grace'
             # The test run finished and wrote results.xml; the editor then hung on
             # shutdown and we tree-killed it after the grace window. This is NOT a
             # timeout -- report the exit code the runner logged in the sentinel (the
@@ -2830,16 +2847,20 @@ function Invoke-ProcessWithTreeKillTimeout {
             }
             $timedOut = $false
         } elseif ($stalled) {
+            $exitOrigin = 'stall-timeout'
             # A no-output stall kill. Distinct exit code (125) from the wall-clock 124;
             # surfaced as a timeout-class failure ($timedOut) so a stalled run is never
             # mistaken for a clean exit by a caller that gates on TimedOut.
             $exit = $stallExitCode
             $timedOut = $true
         } elseif ($timedOut) {
+            $exitOrigin = 'wall-timeout'
             $exit = $timeoutExitCode
         } elseif ($reaped -and $proc.HasExited) {
+            $exitOrigin = 'process-exit'
             $exit = $proc.ExitCode
         } else {
+            $exitOrigin = 'exit-not-observed'
             $exit = $timeoutExitCode
             $timedOut = $true
         }
@@ -2848,11 +2869,33 @@ function Invoke-ProcessWithTreeKillTimeout {
         Write-Host "::warning::$message"
         $buffer.Add($message)
         $exit = -1
+        $exitOrigin = 'watchdog-exception'
+        $exceptionType = $_.Exception.GetType().FullName
     } finally {
         # If we are unwinding on a throw/cancellation and the process is still alive,
         # tree-kill it so a cancelled step never orphans the editor/player.
         if ($proc -and -not $proc.HasExited) {
-            try { $proc.Kill($true) } catch { }
+            $killReason = 'finally-cleanup'
+            try { $proc.Kill($true); $killSucceeded = $true } catch { }
+        }
+        if ($null -ne $ProcessObservation) {
+            try {
+                $ProcessObservation.Clear()
+                $ProcessObservation.State = 'observed'
+                $ProcessObservation.MachineName = [Environment]::MachineName
+                $ProcessObservation['ExecutablePath'] = [IO.Path]::GetFullPath($FilePath)
+                $ProcessObservation['ProcessId'] = $observedProcessId
+                $ProcessObservation['LaunchUtc'] = $launchUtc.ToString('o')
+                $ProcessObservation['EndObservedUtc'] = [DateTime]::UtcNow.ToString('o')
+                $ProcessObservation.RawExitCode = $rawExitCode
+                $ProcessObservation.ReturnedExitCode = $exit
+                $ProcessObservation.ExitOrigin = $exitOrigin
+                $ProcessObservation.KillReason = $killReason
+                $ProcessObservation.KillSucceeded = $killSucceeded
+                $ProcessObservation.ExceptionType = $exceptionType
+            } catch {
+                Write-Host '::warning::Could not record process observation; execution outcome is unchanged.'
+            }
         }
         if ($proc) { $proc.Dispose() }
     }
@@ -3454,7 +3497,8 @@ function Invoke-UnityEditor {
         [string]$CompletionPattern = '',
         [int]$CompletionGraceSeconds = 120,
         [int]$TimeoutSeconds = 0,
-        [int]$StallSeconds = 0
+        [int]$StallSeconds = 0,
+        [hashtable]$ProcessObservation
     )
 
     # Unity.exe is a Windows GUI-subsystem binary. PowerShell's `&` launches such
@@ -3483,7 +3527,8 @@ function Invoke-UnityEditor {
             -Label $Label `
             -CompletionPattern $CompletionPattern `
             -CompletionGraceSeconds $CompletionGraceSeconds `
-            -StallSeconds $StallSeconds
+            -StallSeconds $StallSeconds `
+            -ProcessObservation $ProcessObservation
         $exitCode = $watch.ExitCode
     } else {
         Write-Host "::group::$Label"
@@ -4215,6 +4260,147 @@ function Test-NUnitResults {
     Write-CiNotice "${Label}: total=$total passed=$passed failed=$failed skipped=$skipped"
 }
 
+function Select-UnityProcessFailureEvents {
+    param([hashtable]$ProcessObservation, [object[]]$Candidates)
+
+    $matched = New-Object System.Collections.Generic.List[object]
+    $parsed = New-Object System.Collections.Generic.List[object]
+    $reportIds = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $malformed = 0
+    $startUtc = [DateTime]::Parse($ProcessObservation['LaunchUtc']).ToUniversalTime().AddSeconds(-2)
+    $endUtc = [DateTime]::Parse($ProcessObservation['EndObservedUtc']).ToUniversalTime().AddSeconds(15)
+    foreach ($candidate in @($Candidates | Select-Object -First 64)) {
+        try {
+            if ($candidate.TimeCreated.ToUniversalTime() -lt $startUtc -or $candidate.TimeCreated.ToUniversalTime() -gt $endUtc) { continue }
+            if (($candidate.Id -ne 1000 -or $candidate.ProviderName -ne 'Application Error') -and
+                ($candidate.Id -ne 1001 -or $candidate.ProviderName -ne 'Windows Error Reporting')) { continue }
+            $xml = New-Object System.Xml.XmlDocument
+            $xml.XmlResolver = $null
+            $eventXml = $candidate.ToXml()
+            if ($eventXml.Length -gt 65536) { ++$malformed; continue }
+            $settings = New-Object System.Xml.XmlReaderSettings
+            $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+            $settings.MaxCharactersInDocument = 65536
+            $reader = [System.Xml.XmlReader]::Create([IO.StringReader]::new($eventXml), $settings)
+            try { $xml.Load($reader) } finally { $reader.Dispose() }
+            $fields = @{}
+            foreach ($node in $xml.SelectNodes("//*[local-name()='EventData']/*[local-name()='Data']")) {
+                $name = $node.GetAttribute('Name')
+                if (-not [string]::IsNullOrWhiteSpace($name)) { $fields[$name] = $node.InnerText }
+            }
+            $pidValue = if ($fields.ContainsKey('ProcessId')) { $fields.ProcessId } else { $fields['FaultingProcessId'] }
+            $targetPid = 0L
+            $pidMatches = $false
+            if ($pidValue -match '^0x[0-9a-fA-F]+$') {
+                $pidMatches = [long]::TryParse($pidValue.Substring(2), [Globalization.NumberStyles]::HexNumber,
+                    [Globalization.CultureInfo]::InvariantCulture, [ref]$targetPid)
+            } elseif ($pidValue -match '^\d+$') {
+                $pidMatches = [long]::TryParse($pidValue, [ref]$targetPid)
+            }
+            $pidMatches = $pidMatches -and $targetPid -eq $ProcessObservation['ProcessId']
+            $pathMatches = $fields.ContainsKey('AppPath') -and [string]::Equals(
+                $fields.AppPath.Replace('\', '/'), $ProcessObservation['ExecutablePath'].Replace('\', '/'),
+                [StringComparison]::OrdinalIgnoreCase)
+            $reportId = if ($fields.ContainsKey('IntegratorReportId')) { $fields.IntegratorReportId } else { $fields['ReportId'] }
+            $validReportId = [Guid]::Empty
+            if (-not [Guid]::TryParse($reportId, [ref]$validReportId) -or $validReportId -eq [Guid]::Empty) { $reportId = $null }
+            $directMatch = $pidMatches -and $pathMatches
+            $identityConflict = ($null -ne $pidValue -and -not $pidMatches) -or ($fields.ContainsKey('AppPath') -and -not $pathMatches)
+            if ($candidate.Id -eq 1000 -and $directMatch -and $reportId) { [void]$reportIds.Add($reportId) }
+            $parsed.Add(@{ Candidate = $candidate; Fields = $fields; DirectMatch = $directMatch; IdentityConflict = $identityConflict; ReportId = $reportId })
+        } catch { ++$malformed }
+    }
+    foreach ($item in $parsed) {
+        $joined = $item.Candidate.Id -eq 1001 -and -not $item.IdentityConflict -and $item.ReportId -and $reportIds.Contains($item.ReportId)
+        if (-not $item.DirectMatch -and -not $joined) { continue }
+        $safeFields = [ordered]@{}
+        foreach ($name in @('AppName', 'ModuleName', 'ModulePath', 'ExceptionCode', 'FaultingOffset')) {
+            if ($item.Fields.ContainsKey($name)) {
+                $value = ConvertTo-SingleLineDiagnostic -Text $item.Fields[$name]
+                $safeFields[$name] = $value.Substring(0, [Math]::Min(256, $value.Length))
+            }
+        }
+        $matched.Add([ordered]@{
+            EventUtc = $item.Candidate.TimeCreated.ToUniversalTime().ToString('o')
+            Provider = $item.Candidate.ProviderName
+            EventId = $item.Candidate.Id
+            RecordId = $item.Candidate.RecordId
+            Match = if ($item.DirectMatch) { 'path-and-pid' } else { 'joined-report-id' }
+            ReportId = $item.ReportId
+            Fields = $safeFields
+        })
+    }
+    return @{
+        State = if ($matched.Count -gt 0) { 'matched-events' } else { 'no-matching-events' }
+        Events = @($matched | Select-Object -First 8)
+        CandidateLimitReached = @($Candidates).Count -gt 64
+        MatchLimitReached = $matched.Count -gt 8
+        MalformedEvents = $malformed
+    }
+}
+
+function Get-UnityProcessFailureEvents {
+    param([hashtable]$ProcessObservation)
+
+    $report = @{ State = 'no-query'; Reason = 'process-identity-unavailable'; Events = @() }
+    if (-not $ProcessObservation -or -not $ProcessObservation['ProcessId'] -or
+        -not $ProcessObservation['ExecutablePath'] -or -not $ProcessObservation['LaunchUtc'] -or
+        -not $ProcessObservation['EndObservedUtc']) { return $report }
+    if (-not $IsWindows) { $report.Reason = 'unsupported-platform'; return $report }
+    return Read-UnityProcessFailureEvents -ProcessObservation $ProcessObservation
+}
+
+function Read-UnityProcessFailureEvents {
+    param([hashtable]$ProcessObservation)
+
+    $report = @{ State = 'query-unavailable'; Reason = 'event-query-failed'; Events = @() }
+    try {
+        $startUtc = [DateTime]::Parse($ProcessObservation['LaunchUtc']).ToUniversalTime().AddSeconds(-2)
+        $captureUtc = [DateTime]::UtcNow
+        $endUtc = [DateTime]::Parse($ProcessObservation['EndObservedUtc']).ToUniversalTime().AddSeconds(15)
+        if ($endUtc -gt $captureUtc) { $endUtc = $captureUtc }
+        $queryErrors = @()
+        $candidates = @(Get-WinEvent -FilterHashtable @{
+            LogName = 'Application'; ProviderName = @('Application Error', 'Windows Error Reporting')
+            Id = @(1000, 1001); StartTime = $startUtc; EndTime = $endUtc
+        } -MaxEvents 65 -ErrorAction SilentlyContinue -ErrorVariable queryErrors)
+        $unavailable = @($queryErrors | Where-Object { $_.FullyQualifiedErrorId -notlike 'NoMatchingEventsFound*' })
+        if ($unavailable.Count -gt 0) {
+            $report.State = 'query-unavailable'
+            $report.Reason = 'event-query-failed'
+        } else {
+            $report = Select-UnityProcessFailureEvents -ProcessObservation $ProcessObservation -Candidates $candidates
+        }
+        $report.WindowStartUtc = $startUtc.ToString('o')
+        $report.WindowEndUtc = $endUtc.ToString('o')
+        $report.CapturedUtc = $captureUtc.ToString('o')
+        $report.Qualification = 'Only events observed by capture time; missing or delayed events do not rule out a crash.'
+    } catch {
+        $report.State = 'query-unavailable'
+        $report.Reason = 'event-query-failed'
+    }
+    return $report
+}
+
+function Write-UnityConfigureFailureObservation {
+    param([string]$LogPath, [hashtable]$ProcessObservation, [string]$Suffix = '')
+
+    try {
+        $stem = [IO.Path]::GetFileNameWithoutExtension($LogPath)
+        if ($Suffix) { $stem += ".$Suffix" }
+        $path = Join-Path (Split-Path -Parent $LogPath) "$stem.process-diagnostics.json"
+        $report = [ordered]@{
+            Process = $ProcessObservation
+            WindowsEvents = Get-UnityProcessFailureEvents -ProcessObservation $ProcessObservation
+        }
+        $json = ConvertTo-UnitySafeLogText -Text (ConvertTo-Json -InputObject $report -Depth 8)
+        Set-Content -LiteralPath $path -Value $json -Encoding UTF8 -ErrorAction Stop
+        Write-Host "::notice::Saved configure failure process diagnostics: $path"
+    } catch {
+        Write-Host '::warning::Could not persist configure failure process diagnostics; original failure is unchanged.'
+    }
+}
+
 # Run the UhCiTestConfigurator.Apply configure pass (a SEPARATE -executeMethod
 # editor invocation) and validate the success marker it writes as its final action.
 # The CONFIGURED PROJECT -- proven by a FRESH marker -- is the source of truth, NOT
@@ -4271,10 +4457,12 @@ function Invoke-UnityConfigurePass {
             -Label $AttemptLabel `
             -LogPath $LogPath `
             -TimeoutSeconds (Get-EditorTestRunTimeoutSeconds) `
-            -StallSeconds (Get-EditorTestStallSeconds)
+            -StallSeconds (Get-EditorTestStallSeconds) `
+            -ProcessObservation $processObservation
     }
 
     $firstAttemptLogPath = $null
+    $processObservation = @{ State = 'unavailable' }
     $configureStartedUtc = [DateTime]::UtcNow
     try {
         $configureExit = & $invokeConfigure $Label
@@ -4292,6 +4480,7 @@ function Invoke-UnityConfigurePass {
         -not [string]::IsNullOrWhiteSpace($configureProblem) -and
         (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath)
     ) {
+        Write-UnityConfigureFailureObservation -LogPath $LogPath -ProcessObservation $processObservation -Suffix 'first-attempt'
         Write-CiWarning "Unity Package Manager canceled package resolution before the configure marker existed; clearing UPM state and retrying once."
         Write-UnityPackageManagerTransientFailureWarnings -LogPath $LogPath
         $preservedLogPath = Join-Path (Split-Path -Parent $LogPath) ("{0}.first-attempt.log" -f [System.IO.Path]::GetFileNameWithoutExtension($LogPath))
@@ -4307,6 +4496,7 @@ function Invoke-UnityConfigurePass {
             Remove-Item -LiteralPath $MarkerPath -Force
         }
 
+        $processObservation = @{ State = 'unavailable' }
         $configureStartedUtc = [DateTime]::UtcNow
         try {
             $configureExit = & $invokeConfigure "$Label (retry 1 after UPM cancellation)"
@@ -4317,6 +4507,7 @@ function Invoke-UnityConfigurePass {
     }
 
     if (-not [string]::IsNullOrWhiteSpace($configureProblem)) {
+        Write-UnityConfigureFailureObservation -LogPath $LogPath -ProcessObservation $processObservation
         Write-UnityRunFailureDiagnostics `
             -Project $ProjectPath `
             -LogPath $LogPath `
