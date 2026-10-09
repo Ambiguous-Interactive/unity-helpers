@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Text.Json.Serialization;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Utils;
 #if !WALLSTOP_PROTO_ONLY
@@ -198,12 +199,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 #if !WALLSTOP_PROTO_ONLY
             ProtobufUnityModel.EnsureInitialized();
 #endif
-        }
-
-        private static bool TypeSupportsNullReferences(Type type)
-        {
-            return type != null
-                && (!type.IsValueType || typeof(UnityEngine.Object).IsAssignableFrom(type));
         }
 
         private static void LogNullEntrySkip(int index)
@@ -907,7 +902,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _set.Clear();
             bool hasDuplicates = false;
             bool encounteredNullReference = false;
-            bool supportsNullCheck = TypeSupportsNullReferences(typeof(T));
+            bool supportsNullCheck =
+                !ObjectsTypeTraits<T>.IsValueType || ObjectsTypeTraits<T>.IsUnityObject;
             // Hashing and logging callbacks can rebuild the serialized items.
             for (int index = 0; index < _items.Length; ++index)
             {
@@ -1242,7 +1238,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
             bool hasDuplicates = false;
             bool hasNulls = false;
-            bool supportsNullCheck = TypeSupportsNullReferences(typeof(T));
+            bool supportsNullCheck =
+                !ObjectsTypeTraits<T>.IsValueType || ObjectsTypeTraits<T>.IsUnityObject;
             _set.Clear();
             foreach (T convertedItem in convertedItems)
             {

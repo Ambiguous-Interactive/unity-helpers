@@ -372,15 +372,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 Buffers<MemberPathSegment>.GetList(4, out List<MemberPathSegment> segments);
 
             ParseMemberPath(memberPath, segments);
-            if (segments.Count == 0)
+            int segmentsCount = segments.Count;
+            if (segmentsCount == 0)
             {
                 return static _ => null;
             }
 
-            List<Func<object, object>> steps = new(segments.Count);
+            List<Func<object, object>> steps = new(segmentsCount);
             Type currentType = ownerType;
 
-            for (int segmentIndex = 0; segmentIndex < segments.Count; segmentIndex += 1)
+            for (int segmentIndex = 0; segmentIndex < segmentsCount; segmentIndex += 1)
             {
                 MemberPathSegment segment = segments[segmentIndex];
                 MemberAccessor memberAccessor = ResolveMemberAccessor(
@@ -429,8 +430,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             return instance =>
             {
+                int stepsCount = steps.Count;
                 object current = instance;
-                for (int stepIndex = 0; stepIndex < steps.Count; stepIndex += 1)
+                for (int stepIndex = 0; stepIndex < stepsCount; stepIndex += 1)
                 {
                     if (current == null)
                     {
@@ -700,8 +702,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 if (0 <= bracket)
                 {
                     name = raw.Substring(0, bracket);
+                    int rawLength = raw.Length;
                     int cursor = bracket;
-                    while (cursor < raw.Length && 0 <= (cursor = raw.IndexOf('[', cursor)))
+                    while (cursor < rawLength && 0 <= (cursor = raw.IndexOf('[', cursor)))
                     {
                         int endBracket = raw.IndexOf(']', cursor + 1);
                         if (endBracket < 0)

@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
     using System.Threading;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Encodes one field whose type is only known when a generic contract is closed.
@@ -126,9 +127,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
         }
 
-        // Nullability is fixed per closed generic, avoiding repeated checks for every element.
-        private static readonly bool IsReferenceType = !typeof(T).IsValueType;
-
         private static IWProtoScalarFormatter<T> _scalar;
         private static IWProtoFormatter<T> _message;
         private static bool _resolved;
@@ -183,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return 0;
             }
 
-            if (IsReferenceType && value == null)
+            if (!ObjectsTypeTraits<T>.IsValueType && value == null)
             {
                 return 0;
             }
@@ -227,7 +225,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return true;
             }
 
-            if (IsReferenceType && value == null)
+            if (!ObjectsTypeTraits<T>.IsValueType && value == null)
             {
                 return true;
             }
@@ -251,7 +249,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             if (_scalar != null)
             {
-                if (IsReferenceType && value == null)
+                if (!ObjectsTypeTraits<T>.IsValueType && value == null)
                 {
                     throw WProtoRepeated.NullElement(typeof(T).Name, "element", typeof(T).FullName);
                 }
@@ -259,7 +257,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return WProtoSizes.TagSize(tag) + _scalar.MeasureValue(value);
             }
 
-            if (IsReferenceType && value == null)
+            if (!ObjectsTypeTraits<T>.IsValueType && value == null)
             {
                 throw WProtoRepeated.NullElement(typeof(T).Name, "element", typeof(T).FullName);
             }
@@ -276,7 +274,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             Resolve();
 
-            if (IsReferenceType && value == null)
+            if (!ObjectsTypeTraits<T>.IsValueType && value == null)
             {
                 throw WProtoRepeated.NullElement(typeof(T).Name, "element", typeof(T).FullName);
             }
@@ -409,7 +407,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return _scalar.IsDefault(value);
             }
 
-            return IsReferenceType && value == null;
+            return !ObjectsTypeTraits<T>.IsValueType && value == null;
         }
 
         private static IWProtoFormatter<T> Message()

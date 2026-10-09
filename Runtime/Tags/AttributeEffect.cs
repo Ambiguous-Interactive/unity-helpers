@@ -256,7 +256,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            for (int i = 0; i < left.Count; ++i)
+            int leftCount = left.Count;
+            for (int i = 0; i < leftCount; ++i)
             {
                 if (!PeriodicEffectEqual(left[i], right[i]))
                 {

@@ -678,8 +678,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             component.GetComponents(elementType, buffer);
             if (!allowInterfaces && !elementType.IsSealed)
             {
+                int bufferCount = buffer.Count;
                 int writeIndex = 0;
-                for (int index = 0; index < buffer.Count; ++index)
+                for (int index = 0; index < bufferCount; ++index)
                 {
                     Component candidate = buffer[index];
                     if (candidate != null && candidate.GetType() == elementType)
@@ -687,7 +688,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         buffer[writeIndex++] = candidate;
                     }
                 }
-                int bufferCount = buffer.Count;
                 if (writeIndex < bufferCount)
                 {
                     buffer.RemoveRange(writeIndex, bufferCount - writeIndex);

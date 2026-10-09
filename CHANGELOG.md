@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add public `ObjectsTypeTraits<T>` with cached value-type, exact-object, and Unity-object classifications for generic code ([guide](./docs/features/utilities/helper-utilities.md#cached-generic-type-classification), [#976](https://github.com/Ambiguous-Interactive/unity-helpers/issues/976)).
 - Add opt-in `WALLSTOP_PROTO_ONLY` builds that omit protobuf-net contracts and fallback, plus caller-owned WProto buffer writers for pooled equality and hashing ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Add value-returning `WProtoFacade` serialize and read methods that reject unsupported types and report typed serialization failures ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Add `WPROTO050` to report generated deserialization constructors whose base has no accessible zero-argument constructor ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).

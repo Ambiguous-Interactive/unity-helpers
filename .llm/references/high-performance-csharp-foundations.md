@@ -82,6 +82,19 @@ public class ConstantStringProvider : IStringProvider { ... }  // Just use the s
 
 ---
 
+## Cached Generic Type Classification
+
+Use `ObjectsTypeTraits<T>` for cached classification of a declared generic type: `IsValueType`,
+`IsObjectType`, and `IsUnityObject`. Sweep equivalent generic checks and duplicated flag caches when
+adding a trait; keep runtime `Type` observations dynamic when the caller supplies a different type.
+`IsObjectType` means exactly `object`, and `IsUnityObject` describes assignability of `T`, not the
+runtime value or Unity's destroyed-object null state. A boxed value declared as `object` retains
+reference-type classification. Keep equality comparers and hash implementations in their own caches
+so reading classification does not initialize unrelated behavior. Verify nullable values, interfaces,
+ordinary classes, Unity base/derived types, and boxed values before migrating callers.
+When migrating shared serializer code, check projects that list source files explicitly. Include
+the real helper in those harnesses; keep Unity marker shims narrow and verify Unity behavior natively.
+
 ## Aggressive Inlining for Hot Paths
 
 Mark frequently-called small methods -- `GetHashCode`, `Equals`, the comparison operators:

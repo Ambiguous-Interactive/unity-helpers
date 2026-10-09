@@ -627,19 +627,20 @@ namespace WallstopStudios.UnityHelpers.Utils
                 out List<string> typeArgStrings
             );
             ParseGenericArguments(argsSection, typeArgStrings);
-            if (typeArgStrings.Count == 0)
+            int typeArgStringsCount = typeArgStrings.Count;
+            if (typeArgStringsCount == 0)
             {
                 return null;
             }
 
-            Type genericDef = ResolveOpenGenericType(genericTypeName, typeArgStrings.Count);
+            Type genericDef = ResolveOpenGenericType(genericTypeName, typeArgStringsCount);
             if (genericDef == null)
             {
                 return null;
             }
 
-            Type[] typeArgs = new Type[typeArgStrings.Count];
-            for (int i = 0; i < typeArgStrings.Count; ++i)
+            Type[] typeArgs = new Type[typeArgStringsCount];
+            for (int i = 0; i < typeArgStringsCount; ++i)
             {
                 Type argType = ResolveType(typeArgStrings[i]);
                 if (argType == null)

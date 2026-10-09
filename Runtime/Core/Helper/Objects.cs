@@ -1020,9 +1020,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             private const uint NullSentinel = 0x9E3779B9u;
 
-            private static readonly bool IsObjectType = typeof(T) == typeof(object);
-            private static readonly bool IsUnityObject =
-                typeof(UnityEngine.Object).IsAssignableFrom(typeof(T));
             private static readonly EqualityComparer<T> EqualityComparer =
                 EqualityComparer<T>.Default;
 
@@ -1035,12 +1032,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return unchecked((uint)EqualityComparer.GetHashCode(value));
                 }
 
-                if (IsObjectType)
+                if (ObjectsTypeTraits<T>.IsObjectType)
                 {
                     return GetBoxedObjectHash(value, out hasNonNullValue);
                 }
 
-                if (IsUnityObject)
+                if (ObjectsTypeTraits<T>.IsUnityObject)
                 {
                     return GetUnityObjectHash(value, out hasNonNullValue);
                 }

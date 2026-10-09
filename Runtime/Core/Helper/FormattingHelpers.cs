@@ -27,7 +27,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             const int bitShift = 10;
 
-            while (1024 <= workingValue && order < ByteSizes.Length - 1)
+            int byteSizesLength = ByteSizes.Length;
+            while (1024 <= workingValue && order < byteSizesLength - 1)
             {
                 workingValue >>= bitShift;
                 ++order;

@@ -350,6 +350,129 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(!cancel, handler.IsEffectActive(effect));
         }
 
+        [Test]
+        public void ArrayModificationsPreserveCancellation([Values] bool cancel)
+        {
+            GameObject entity = CreateTrackedGameObject(
+                nameof(ArrayModificationsPreserveCancellation),
+                typeof(TestAttributesComponent)
+            );
+            TestAttributesComponent component = entity.GetComponent<TestAttributesComponent>();
+            EffectHandler handler = entity.GetComponent<EffectHandler>();
+            AttributeEffect effect = CreateEffect(
+                nameof(ArrayModificationsPreserveCancellation),
+                e => e.durationType = ModifierDurationType.Infinite
+            );
+            EffectHandle handle = handler.ApplyEffect(effect).Value;
+            AttributeModification[] modifications =
+            {
+                new()
+                {
+                    attribute = nameof(TestAttributesComponent.health),
+                    action = ModificationAction.Addition,
+                    value = 5f,
+                },
+                new()
+                {
+                    attribute = nameof(TestAttributesComponent.armor),
+                    action = ModificationAction.Addition,
+                    value = 7f,
+                },
+            };
+            component.OnAttributeModified += (_, _, _) =>
+            {
+                if (cancel)
+                {
+                    handler.RemoveEffect(handle);
+                }
+            };
+
+            component.ApplyPeriodicAttributeModifications(modifications, handle);
+
+            Assert.AreEqual(105f, component.health.CurrentValue);
+            Assert.AreEqual(cancel ? 50f : 57f, component.armor.CurrentValue);
+            Assert.AreEqual(cancel ? 1 : 2, component.notifications.Count);
+            Assert.AreEqual(!cancel, handler.IsEffectActive(effect));
+        }
+
+        [Test]
+        public void ListModificationsObserveCallbackSizeChanges(
+            [Values] bool shrink,
+            [Values] bool useReadOnlyView,
+            [Values] bool periodic
+        )
+        {
+            GameObject entity = CreateTrackedGameObject(
+                nameof(ListModificationsObserveCallbackSizeChanges),
+                typeof(TestAttributesComponent)
+            );
+            TestAttributesComponent component = entity.GetComponent<TestAttributesComponent>();
+            EffectHandler handler = entity.GetComponent<EffectHandler>();
+            AttributeEffect effect = CreateEffect(
+                nameof(ListModificationsObserveCallbackSizeChanges),
+                e => e.durationType = ModifierDurationType.Infinite
+            );
+            EffectHandle handle = handler.ApplyEffect(effect).Value;
+            List<AttributeModification> modifications = new()
+            {
+                new()
+                {
+                    attribute = nameof(TestAttributesComponent.health),
+                    action = ModificationAction.Addition,
+                    value = 5f,
+                },
+                new()
+                {
+                    attribute = nameof(TestAttributesComponent.armor),
+                    action = ModificationAction.Addition,
+                    value = 7f,
+                },
+            };
+            bool modified = false;
+            component.OnAttributeModified += (_, _, _) =>
+            {
+                if (modified)
+                {
+                    return;
+                }
+
+                modified = true;
+                if (shrink)
+                {
+                    modifications.Clear();
+                }
+                else
+                {
+                    modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.health),
+                            action = ModificationAction.Addition,
+                            value = 11f,
+                        }
+                    );
+                }
+            };
+            IEnumerable<AttributeModification> source = useReadOnlyView
+                ? modifications.AsReadOnly()
+                : modifications;
+
+            if (periodic)
+            {
+                component.ApplyPeriodicAttributeModifications(source, handle);
+            }
+            else
+            {
+                component.ApplyAttributeModifications(source, null);
+            }
+
+            Assert.IsTrue(modified);
+            Assert.AreEqual(shrink ? 105f : 116f, component.health.CurrentValue);
+            Assert.AreEqual(shrink ? 50f : 57f, component.armor.CurrentValue);
+            Assert.AreEqual(shrink ? 1 : 3, component.notifications.Count);
+            Assert.IsTrue(handler.IsEffectActive(effect));
+        }
+
         [UnityTest]
         public IEnumerator ForceApplyAttributeModificationsSkipsUnknownAttributes()
         {

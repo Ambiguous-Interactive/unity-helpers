@@ -26,9 +26,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The real serializer, not a copy. The bootstrap is excluded because it is the one file that
-         references UnityEngine, and the Unity-free compilation is exactly what makes this harness
-         possible. -->
+    <!-- The real serializer excludes Unity bootstrap and built-in Unity formatters. Signature-only
+         shims keep this harness independent of Unity; native tests cover Unity behavior. -->
+    <!-- Shared traits classify declared types against the local Object marker. This harness tests
+         wire semantics; ObjectsTypeTraitsTests verifies the actual Unity hierarchy natively. -->
+    <Compile Include="$(RepoRoot)/Runtime/Core/Helper/ObjectsTypeTraits.cs" />
     <!-- The capacity limits live one directory up and are Unity-free; WProtoRectangular refuses a
          dimension through them, so the harness needs the real file rather than a stand-in. -->
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationCapacityLimits.cs" />

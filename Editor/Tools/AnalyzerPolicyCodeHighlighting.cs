@@ -67,9 +67,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 return formatted;
             }
-            StringBuilder output = new(code.Length * 2);
+            int codeLength = code.Length;
+            StringBuilder output = new(codeLength * 2);
             int index = 0;
-            while (index < code.Length)
+            while (index < codeLength)
             {
                 int start = index;
                 char current = code[index];
@@ -79,20 +80,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     index = EndQuotedLiteral(code, index, current);
                     color = darkTheme ? "#CE9178" : "#A31515";
                 }
-                else if (current == '/' && index + 1 < code.Length && code[index + 1] == '/')
+                else if (current == '/' && index + 1 < codeLength && code[index + 1] == '/')
                 {
-                    while (index < code.Length && code[index] != '\n')
+                    while (index < codeLength && code[index] != '\n')
                     {
                         ++index;
                     }
                     color = darkTheme ? "#8CBF73" : "#477A32";
                 }
-                else if (current == '/' && index + 1 < code.Length && code[index + 1] == '*')
+                else if (current == '/' && index + 1 < codeLength && code[index + 1] == '*')
                 {
                     index += 2;
-                    while (index < code.Length)
+                    while (index < codeLength)
                     {
-                        if (code[index] == '*' && index + 1 < code.Length && code[index + 1] == '/')
+                        if (code[index] == '*' && index + 1 < codeLength && code[index + 1] == '/')
                         {
                             index += 2;
                             break;
@@ -107,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     {
                         ++index;
                     } while (
-                        index < code.Length
+                        index < codeLength
                         && (char.IsLetterOrDigit(code[index]) || code[index] == '.')
                     );
                     color = darkTheme ? "#B5CEA8" : "#68501E";
@@ -118,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     {
                         ++index;
                     } while (
-                        index < code.Length
+                        index < codeLength
                         && (char.IsLetterOrDigit(code[index]) || code[index] == '_')
                     );
                     string token = code.Substring(start, index - start);
@@ -137,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     {
                         ++index;
                     } while (
-                        index < code.Length
+                        index < codeLength
                         && !char.IsLetterOrDigit(code[index])
                         && code[index] != '_'
                         && code[index] != '"'
@@ -167,17 +168,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private static int EndQuotedLiteral(string code, int start, char quote)
         {
             bool verbatim = quote == '"' && 0 < start && code[start - 1] == '@';
+            int codeLength = code.Length;
             int index = start + 1;
-            while (index < code.Length)
+            while (index < codeLength)
             {
                 if (!verbatim && code[index] == '\\')
                 {
-                    index += Math.Min(2, code.Length - index);
+                    index += Math.Min(2, codeLength - index);
                     continue;
                 }
                 if (code[index] == quote)
                 {
-                    if (verbatim && index + 1 < code.Length && code[index + 1] == quote)
+                    if (verbatim && index + 1 < codeLength && code[index + 1] == quote)
                     {
                         index += 2;
                         continue;

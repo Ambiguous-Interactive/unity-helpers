@@ -77,6 +77,13 @@ caller changes between `MoveNext` calls. Hoisting a bound past its null guard al
 Do not infer a stable size from a property name alone. A borrowed interface getter can execute
 user code; cache it only when concrete caller ownership proves the source remains stable.
 
+For callback-driven walks, verify both clearing and appending to the supplied list, including
+a `List<T>.AsReadOnly()` view. That view prevents writes through the interface; another alias can
+still change its size. Keep those bounds live. An array has a fixed size: specialize a borrowed
+sequence's array case before its interface case and use concrete `foreach` when no index is needed.
+This avoids interface size dispatch and enumerator boxing without freezing a mutable list's size.
+Preserve cancellation and element-observation order in every specialized path.
+
 `WUH019` is opt-in for consumers and enabled in production TypeCheck, EditorCheck, and
 IntegrationCheck through `Generator~/ProductionCheckProjects.ruleset`. The excluded-production
 loop audit holds WUH013, WUH019, and WUH021 with reporting controls. Shared test and tooling projects

@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using System;
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
@@ -44,7 +45,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool ProtoEquals<T>(this T self, T other)
         {
-            if (ProtoEqualityComparer<T>.IsReferenceType)
+            if (!ObjectsTypeTraits<T>.IsValueType)
             {
                 if (ReferenceEquals(self, other))
                 {
@@ -124,9 +125,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </summary>
         public static readonly ProtoEqualityComparer<T> Instance = new();
 
-        // Cache the type handle because reference-type generic closures resolve typeof(T) on each call.
-        internal static readonly bool IsReferenceType = !typeof(T).IsValueType;
-
         private ProtoEqualityComparer() { }
 
         /// <summary>
@@ -144,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         public bool Equals(T x, T y)
         {
-            if (IsReferenceType)
+            if (!ObjectsTypeTraits<T>.IsValueType)
             {
                 if (ReferenceEquals(x, y))
                 {

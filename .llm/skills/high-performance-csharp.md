@@ -8,7 +8,7 @@
 
 ## Read by Task
 
-- For every code change, read [core philosophy, abstraction, inlining, string building, and editor requirements](../references/high-performance-csharp-foundations.md).
+- For every code change, read [core philosophy, abstraction, cached type classification, inlining, string building, and editor requirements](../references/high-performance-csharp-foundations.md).
 - For LINQ, iteration, sorting, and copying, read [collection paths](../references/high-performance-csharp-collections.md).
 - For caches, concurrency, and pooled scratch, read [concurrency and pooling](../references/high-performance-csharp-concurrency.md).
 

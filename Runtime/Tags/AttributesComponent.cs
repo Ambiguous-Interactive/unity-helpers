@@ -240,6 +240,19 @@ namespace WallstopStudios.UnityHelpers.Tags
             EffectHandle? sourceHandle = null
         )
         {
+            if (attributeModifications is AttributeModification[] modifications)
+            {
+                foreach (AttributeModification modification in modifications)
+                {
+                    if (!TryApplyPermanentModification(modification, sourceHandle))
+                    {
+                        return;
+                    }
+                }
+
+                return;
+            }
+
             if (attributeModifications is IReadOnlyList<AttributeModification> readonlyList)
             {
                 for (int i = 0; i < readonlyList.Count; ++i)

@@ -45,12 +45,12 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             byte[] chunk = ChunkCache.Value;
             char[] encoded = EncodedCache.Value;
-            while (index < data.Length)
+            int dataLength = data.Length;
+            while (index < dataLength)
             {
                 Array.Clear(chunk, 0, chunk.Length);
                 int chunkLength = 0;
 
-                int dataLength = data.Length;
                 for (int i = 0; i < 4 && index < dataLength; ++i)
                 {
                     chunk[i] = data[index++];
@@ -104,12 +104,12 @@ namespace WallstopStudios.UnityHelpers.Utils
             int index = 0;
             char[] chunk = EncodedCache.Value;
             byte[] decodedBytes = ChunkCache.Value;
-            while (index < encoded.Length)
+            int encodedLength = encoded.Length;
+            while (index < encodedLength)
             {
                 Array.Fill(chunk, (char)117);
                 int chunkLen = 0;
 
-                int encodedLength = encoded.Length;
                 for (int i = 0; i < 5 && index < encodedLength; ++i)
                 {
                     chunk[i] = encoded[index++];

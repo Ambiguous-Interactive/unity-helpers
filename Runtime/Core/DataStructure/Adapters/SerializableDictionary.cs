@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Text.Json.Serialization;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 #if !WALLSTOP_PROTO_ONLY
@@ -407,12 +408,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return arguments.Length == 1 ? arguments[0] : null;
         }
 
-        private static bool TypeSupportsNullReferences(Type type)
-        {
-            return type != null
-                && (!type.IsValueType || typeof(UnityEngine.Object).IsAssignableFrom(type));
-        }
-
         private static void LogNullReferenceSkip(string component, int index)
         {
 #if UNITY_EDITOR
@@ -487,7 +482,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             HashSet<TKey> observedKeys = new(_dictionary.Comparer);
             bool hasDuplicateKeys = false;
             bool encounteredNullReference = false;
-            bool keySupportsNullCheck = TypeSupportsNullReferences(typeof(TKey));
+            bool keySupportsNullCheck =
+                !ObjectsTypeTraits<TKey>.IsValueType || ObjectsTypeTraits<TKey>.IsUnityObject;
             int length = _keys.Length;
 
             for (int index = 0; index < length; ++index)

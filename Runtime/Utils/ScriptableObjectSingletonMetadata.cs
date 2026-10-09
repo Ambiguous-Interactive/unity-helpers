@@ -114,7 +114,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             _entries ??= new List<Entry>();
 
             string key = entry.assemblyQualifiedTypeName;
-            for (int i = 0; i < _entries.Count; ++i)
+            int entriesCount = _entries.Count;
+            for (int i = 0; i < entriesCount; ++i)
             {
                 if (
                     string.Equals(
@@ -150,7 +151,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return false;
             }
 
-            for (int i = 0; i < _entries.Count; ++i)
+            int entriesCount = _entries.Count;
+            for (int i = 0; i < entriesCount; ++i)
             {
                 if (
                     string.Equals(

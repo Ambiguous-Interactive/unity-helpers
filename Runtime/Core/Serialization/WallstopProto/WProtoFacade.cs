@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
     using System.Buffers;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// The seam <see cref="Serializer"/> uses to serve a type through WallstopProto instead of
@@ -105,7 +106,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         "No WallstopProto formatter serves the declared type and runtime value."
                     );
                 }
-                if (TypeShape<T>.IsReferenceType && value == null)
+                if (!ObjectsTypeTraits<T>.IsValueType && value == null)
                 {
                     return 0;
                 }
@@ -290,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return new WProtoWriteResult(null, false);
             }
 
-            if (TypeShape<T>.IsReferenceType && value == null)
+            if (!ObjectsTypeTraits<T>.IsValueType && value == null)
             {
                 return new WProtoWriteResult(0, false);
             }
@@ -591,7 +592,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when the request is WallstopProto's to answer.</returns>
         private static bool CanServe<T>(T value, IWProtoFormatter<T> formatter)
         {
-            if (!TypeShape<T>.IsReferenceType || value == null)
+            if (ObjectsTypeTraits<T>.IsValueType || value == null)
             {
                 return true;
             }
@@ -624,19 +625,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             // Read and write must accept the same runtime types through the same dispatch chain.
             return formatter is IWProtoPolymorphicFormatter polymorphic
                 && polymorphic.CanWrite(concrete);
-        }
-
-        /// <summary>
-        /// Whether a value of <typeparamref name="T"/> can be null, resolved once per closure.
-        /// </summary>
-        /// <typeparam name="T">The declared type.</typeparam>
-        /// <remarks>
-        /// Reference-type closures share one canonical instantiation, so <c>typeof(T)</c> inside a
-        /// generic method is a per-call handle lookup rather than a constant.
-        /// </remarks>
-        private static class TypeShape<T>
-        {
-            internal static readonly bool IsReferenceType = !typeof(T).IsValueType;
         }
     }
 }
