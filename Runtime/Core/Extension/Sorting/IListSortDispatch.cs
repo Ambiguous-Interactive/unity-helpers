@@ -54,6 +54,15 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
+            if (!sortAlgorithm.IsValid())
+            {
+                throw new InvalidEnumArgumentException(
+                    nameof(sortAlgorithm),
+                    (int)sortAlgorithm,
+                    typeof(SortAlgorithm)
+                );
+            }
+
             switch (sortAlgorithm)
             {
                 case SortAlgorithm.Ghost:
@@ -146,14 +155,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     array.YamSort(comparer);
                     return;
                 }
-                default:
-                {
-                    throw new InvalidEnumArgumentException(
-                        nameof(sortAlgorithm),
-                        (int)sortAlgorithm,
-                        typeof(SortAlgorithm)
-                    );
-                }
             }
         }
 
@@ -235,6 +236,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return true;
+        }
+
+        private static bool IsValid(this SortAlgorithm sortAlgorithm)
+        {
+            return SortAlgorithm.Ghost <= sortAlgorithm && sortAlgorithm <= SortAlgorithm.Yam;
         }
     }
 }

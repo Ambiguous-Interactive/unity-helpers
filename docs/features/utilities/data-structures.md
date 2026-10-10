@@ -325,9 +325,9 @@ Tips
 
 - What it is: `IntMap<TValue>`, a hash table with linear probing, Fibonacci hashing from the high product bits, a power-of-two table and keys compared as raw integers, with no `IEqualityComparer` indirection anywhere on the lookup path.
 - Use for: read-mostly lookups keyed by entity ids, network ids, slot indices or any dense/sparse int id.
-- Operations: `TryGet`, `TrySet`, indexer, `Remove`, `Clear`, enumeration; growth at a 0.5 occupancy factor; rebuild at the same capacity when tombstones dominate.
+- Operations: `TryGet`, `TrySet`, indexer, `Remove`, `Clear`, enumeration; growth at a 0.5 live-entry load factor; removal closes probe-chain gaps in place without allocating or rebuilding the table.
 - Pros: direct integer comparison and value enumerators avoid comparer dispatch and typed enumeration boxing. Measure lookup speed for your own key distribution and miss rate.
-- Cons: misses probe until an empty slot, so measure the intended miss rate; the two lowest key values (`int.MinValue` and one above) are internal slot markers, refused by `TrySet` without throwing.
+- Cons: misses probe until an empty slot, so measure the intended miss rate; the two lowest key values (`int.MinValue` and one above) are reserved, refused by `TrySet` without throwing.
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
@@ -336,17 +336,17 @@ var map = new IntMap<HealthState>();
 map.TrySet(entityId, HealthState.Poisoned);
 if (map.TryGet(entityId, out HealthState state)) { /* ... */ }
 map.TrySet(entityId, HealthState.Healthy);   // overwrite in place
-map.Remove(entityId, out _);                 // leaves a tombstone, compacted at the next rebuild
+map.Remove(entityId, out _);                 // closes the probe-chain gap without allocating
 ```
 
 Tips and pitfalls
 
 - Earlier editor Mono measurements reported 1.97x–2.19x hit-heavy and 1.26x–1.65x at a 50% miss rate using the previous low-bit slot selection. Those margins do not describe the corrected implementation. `IntMapPerformanceTests` retains calibrated counterbalanced comparisons; measurements whose spread exceeds 3% cannot establish acceptance.
 - **Those historical numbers are editor Mono only.** IL2CPP has not been measured, and part of the margin is Mono not devirtualizing `EqualityComparer<int>.Default` — which an AOT compiler may do. See [#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578).
-- Removed entries become tombstones until a rebuild compacts them away. When tombstones are at least as numerous as live entries, the rebuild keeps the current capacity; an eight-entry sliding window stays at the default 64 slots even after one million insertions. Live entries still trigger doubling when more space is needed.
-- Replacing an existing value through `TrySet` or the indexer keeps the current storage, including at the occupancy limit and after removals. Only adding an absent key can trigger growth or tombstone cleanup.
+- Removal closes gaps by shifting displaced entries whose probe paths cross the deleted slot, including chains that wrap around the table. It leaves no tombstones and allocates no replacement arrays. Remove-before-add sliding windows can therefore retain half the table as live entries without growth or cleanup allocations; an eight-entry sliding window stays at the default 64 slots even after one million insertions. The table doubles only when adding another live entry would exceed its 0.5 load factor.
+- Replacing an existing value through `TrySet` or the indexer keeps the current storage, including at the occupancy limit and after removals. Only adding an absent key beyond the live-entry load limit triggers growth.
 - Keys sharing low bits, such as `i * 1024`, use the high bits of the hash product for their starting slots. The performance fixture compares hits and misses against dense keys at 64 and 1,024 entries; stable sparse-key measurements must stay within twice the dense lookup time.
-- Keys below `IntMap<TValue>.MinimumAllowedKey` name slot states and are refused by `TrySet`; the indexer throws for them.
+- Keys below `IntMap<TValue>.MinimumAllowedKey` remain reserved and are refused by `TrySet`; the indexer throws for them.
 
 ## String Wrapper (Interned Flyweight)
 

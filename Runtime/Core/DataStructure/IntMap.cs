@@ -23,11 +23,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// Keys are
     /// compared as raw integers rather than routed through <see cref="IEqualityComparer{T}"/>.
     /// Table length stays a power of two, so slot position is one multiply and one
-    /// shift instead of a division. Growth doubles the table; tombstone cleanup retains its size.
+    /// shift instead of a division. Growth doubles the table only when live entries reach the load limit.
+    /// Removal closes probe-chain gaps in place without allocating replacement storage.
     /// </para>
     /// <para>
-    /// The table stores keys verbatim beside their values, and the two lowest key values name the
-    /// slot states instead of callers' data; see <see cref="MinimumAllowedKey"/>. Include miss-heavy
+    /// The table stores keys verbatim beside their values, and the two lowest key values remain
+    /// reserved; see <see cref="MinimumAllowedKey"/>. Include miss-heavy
     /// workloads when benchmarking against <see cref="Dictionary{TKey, TValue}"/>.
     /// </para>
     /// </remarks>
@@ -35,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         : IReadOnlyDictionary<int, TValue>,
             IEnumerable<KeyValuePair<int, TValue>>
     {
-        /// <summary>The smallest key a caller may store; everything lower names a slot state.</summary>
+        /// <summary>The smallest key a caller may store; everything lower is reserved.</summary>
         public const int MinimumAllowedKey = int.MinValue + 2;
 
         private const int DefaultInitialCapacity = 16;
@@ -45,9 +46,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         // Fibonacci hashing uses the high product bits so shared low key bits do not form a cluster.
         private const uint KeyMultiplier = 0x9E37_79B9u;
 
-        // Slot states rather than caller data. Stored keys are live iff MinimumAllowedKey <= them.
         private const int EmptySlot = int.MinValue;
-        private const int TombstoneSlot = int.MinValue + 1;
 
         /// <summary>Gets how many live entries the map holds.</summary>
         public int Count => _count;
@@ -107,7 +106,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private int _mask;
         private int _shift;
         private int _count;
-        private int _tombstones;
         private ulong _version;
 
         /// <summary>
@@ -185,7 +183,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         /// <returns>
-        /// <c>true</c> when written; <c>false</c> when the key is a reserved marker, in which case
+        /// <c>true</c> when written; <c>false</c> when the key is reserved, in which case
         /// nothing was stored.
         /// </returns>
         /// <remarks>Replacing an existing value preserves the table storage, even at the occupancy limit.</remarks>
@@ -232,10 +230,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="value">Receives the removed value, or the type's default on absence.</param>
         /// <returns><c>true</c> when the key was present and is now gone.</returns>
         /// <remarks>
-        /// A probe chain reads slots until an empty one proves the key absent, so removal marks the
-        /// slot as a tombstone rather than releasing it: closing the gap would sever the tail of its
-        /// own chain. Tombstones join live entries against the load factor, so a workload dominated
-        /// by removals periodically rebuilds at the same size to reclaim deleted slots.
+        /// Removal shifts displaced entries whose probe paths cross the deleted slot, closing
+        /// the gap without allocating or rebuilding the table. Other keys remain reachable,
+        /// including probe chains that wrap around the end of the table.
         /// </remarks>
         public bool Remove(int key, out TValue value)
         {
@@ -253,10 +250,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             TValue removed = _values[slot];
-            _values[slot] = default(TValue);
-            _keys[slot] = TombstoneSlot;
+            CloseGap(slot);
             --_count;
-            ++_tombstones;
             ++_version;
             value = removed;
             return true;
@@ -280,7 +275,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </remarks>
         public void Clear()
         {
-            if (_count != 0 || _tombstones != 0)
+            if (_count != 0)
             {
                 int keysLength = _keys.Length;
                 for (int index = 0; index < keysLength; ++index)
@@ -292,7 +287,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             _count = 0;
-            _tombstones = 0;
             ++_version;
         }
 
@@ -304,10 +298,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void SetInternal(int key, TValue value)
         {
-            uint hash = Mix(key);
-
-            int slot = SlotFor(hash);
-            int reuseSlot = -1;
+            int slot = SlotFor(Mix(key));
             while (true)
             {
                 int stored = _keys[slot];
@@ -318,23 +309,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     return;
                 }
 
-                if (stored == TombstoneSlot)
+                if (stored == EmptySlot)
                 {
-                    if (reuseSlot < 0)
-                    {
-                        reuseSlot = slot;
-                    }
-                }
-                else if (stored == EmptySlot)
-                {
-                    if (_keys.Length <= (_count + _tombstones) * 2)
+                    if (_keys.Length <= _count * 2)
                     {
                         Resize();
                         SetInternal(key, value);
                         return;
                     }
 
-                    Fill(slot, key, value, reuseSlot);
+                    _keys[slot] = key;
+                    _values[slot] = value;
+                    ++_count;
+                    ++_version;
                     return;
                 }
 
@@ -342,22 +329,23 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private void Fill(int emptySlot, int key, TValue value, int reuseSlot)
+        private void CloseGap(int gap)
         {
-            int target = reuseSlot < 0 ? emptySlot : reuseSlot;
-            if (reuseSlot < 0)
+            int slot = NextSlot(gap);
+            while (_keys[slot] != EmptySlot)
             {
-                ++_count;
-            }
-            else
-            {
-                --_tombstones;
-                ++_count;
+                int home = SlotFor(Mix(_keys[slot]));
+                if (((gap - home) & _mask) < ((slot - home) & _mask))
+                {
+                    _keys[gap] = _keys[slot];
+                    _values[gap] = _values[slot];
+                    gap = slot;
+                }
+                slot = NextSlot(slot);
             }
 
-            _keys[target] = key;
-            _values[target] = value;
-            ++_version;
+            _keys[gap] = EmptySlot;
+            _values[gap] = default(TValue);
         }
 
         private int FindSlot(int key)
@@ -378,7 +366,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private void Resize()
         {
             int currentPower = PowerOf(_keys.Length);
-            int nextPower = _count <= _tombstones ? currentPower : currentPower + 1;
+            int nextPower = currentPower + 1;
 
             if (MaximumTablePower < nextPower)
             {
@@ -399,7 +387,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _mask = capacity - 1;
             _shift = 32 - power;
             _count = 0;
-            _tombstones = 0;
             ++_version;
             for (int index = 0; index < capacity; ++index)
             {

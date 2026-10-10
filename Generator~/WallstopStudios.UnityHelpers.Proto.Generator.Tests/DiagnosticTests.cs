@@ -3539,6 +3539,158 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        [TestCase("Take(Create(7));", TestName = "InferredClosure.DirectArgument")]
+        [TestCase("Take(Identity(Create(7)));", TestName = "InferredClosure.NestedArgument")]
+        [TestCase("Take(Create(7).Value);", TestName = "InferredClosure.MemberReceiver")]
+        [TestCase("Take(Many(7));", TestName = "InferredClosure.CollectionResult")]
+        [TestCase("Take(Array(7));", TestName = "InferredClosure.ArrayResult")]
+        [TestCase("Take(Matrix(7));", TestName = "InferredClosure.RectangularArrayResult")]
+        [TestCase("Take(Wrapped(7));", TestName = "InferredClosure.NestedContractResult")]
+        [TestCase("Take(Token(7));", TestName = "InferredClosure.NestedGenericOwner")]
+        public void InferredFactoryResultsRegisterTheirClosedContracts(string expression)
+        {
+            string source =
+                @"[WProtoContract] public partial struct InferredBox<T>
+                  {
+                      [WProtoMember(1)] public T Value;
+                  }
+                  public sealed class Wrapper<T> { public sealed class Token { } }
+                  public static class Factories
+                  {
+                      public static InferredBox<T> Create<T>(T value) { return new InferredBox<T> { Value = value }; }
+                      public static T Identity<T>(T value) { return value; }
+                      public static System.Collections.Generic.List<InferredBox<T>> Many<T>(T value) { return null; }
+                      public static InferredBox<T>[] Array<T>(T value) { return null; }
+                      public static InferredBox<T>[,] Matrix<T>(T value) { return null; }
+                      public static InferredBox<InferredBox<T>> Wrapped<T>(T value) { return default; }
+                      public static Wrapper<InferredBox<T>>.Token Token<T>(T value) { return null; }
+                      public static void Take<T>(T value) { }
+                      public static void Run() { "
+                + expression
+                + @" }
+                  }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.IsEmpty(diagnostics.Select(d => d.Id + " " + d.GetMessage()));
+            Assert.IsEmpty(
+                generated.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)
+            );
+            string registrar = generated
+                .SyntaxTrees.Single(tree =>
+                    tree.FilePath.EndsWith(
+                        "WProtoGeneratedRegistrar.g.cs",
+                        StringComparison.Ordinal
+                    )
+                )
+                .ToString();
+            StringAssert.Contains("InferredBox<int>.WProtoFormatter.Instance", registrar);
+            if (expression.Contains("Wrapped"))
+            {
+                StringAssert.Contains(
+                    "InferredBox<global::Consumer.InferredBox<int>>.WProtoFormatter.Instance",
+                    registrar
+                );
+            }
+        }
+
+        [Test]
+        public void AnInferredForeignFactoryResultRegistersItsClosedContract()
+        {
+            MetadataReference upstream = CompileGeneratedReference(
+                "InferredUpstream",
+                @"namespace Upstream
+                  {
+                      [WProtoContract] public partial struct Box<T> { [WProtoMember(1)] public T Value; }
+                      public static class Factory
+                      {
+                          public static Box<T> Create<T>(T value) { return new Box<T> { Value = value }; }
+                      }
+                  }"
+            );
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"public static class Calls
+                  {
+                      public static void Take<T>(T value) { }
+                      public static void Save() { Take(global::Upstream.Factory.Create(7)); }
+                  }",
+                new[] { upstream },
+                out Compilation generated
+            );
+            Assert.IsEmpty(diagnostics.Select(d => d.Id + " " + d.GetMessage()));
+            Assert.IsEmpty(
+                generated.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)
+            );
+            StringAssert.Contains(
+                "Upstream.Box<int>.WProtoFormatter.Instance",
+                generated
+                    .SyntaxTrees.Single(tree =>
+                        tree.FilePath.EndsWith(
+                            "WProtoGeneratedRegistrar.g.cs",
+                            StringComparison.Ordinal
+                        )
+                    )
+                    .ToString()
+            );
+        }
+
+        [TestCase("Take(Create(7));", TestName = "InferredRegistration.MarshalAndJson.Direct")]
+        [TestCase("Take(Many(7));", TestName = "InferredRegistration.MarshalAndJson.Collection")]
+        [TestCase("Take(Array(7));", TestName = "InferredRegistration.MarshalAndJson.Array")]
+        public void InferredFactoryResultsRegisterRootMarshalsAndJsonConverters(string expression)
+        {
+            string source =
+                @"[assembly: WProtoRootMarshal(typeof(Consumer.Ring<>), typeof(Consumer.RingFormatter<>))]
+                  [assembly: global::WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters.WJsonConverter(typeof(Consumer.Ring<>), typeof(Consumer.RingConverter<>))]
+                  public sealed class Ring<T> { }
+                  public sealed class RingFormatter<T> : IWProtoFormatter<Ring<T>>
+                  {
+                      public int Measure(in Ring<T> value) { return 0; }
+                      public bool Write(ref WProtoWriter writer, in Ring<T> value) { return true; }
+                      public bool TryRead(ref WProtoReader reader, out Ring<T> value) { value = null; return true; }
+                  }
+                  public sealed class RingConverter<T> : global::System.Text.Json.Serialization.JsonConverter<Ring<T>>
+                  {
+                      public override Ring<T> Read(ref global::System.Text.Json.Utf8JsonReader reader, System.Type type, global::System.Text.Json.JsonSerializerOptions options) { return null; }
+                      public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Ring<T> value, global::System.Text.Json.JsonSerializerOptions options) { }
+                  }
+                  public static class Factory
+                  {
+                      public static Ring<T> Create<T>(T value) { return null; }
+                      public static System.Collections.Generic.List<Ring<T>> Many<T>(T value) { return null; }
+                      public static Ring<T>[] Array<T>(T value) { return null; }
+                      public static void Take<T>(T value) { }
+                      public static void Save() { "
+                + expression
+                + @" }
+                  }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.IsEmpty(diagnostics.Select(d => d.Id + " " + d.GetMessage()));
+            Assert.IsEmpty(
+                generated.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)
+            );
+            StringAssert.Contains(
+                "new global::Consumer.RingFormatter<int>()",
+                generated
+                    .SyntaxTrees.Single(tree =>
+                        tree.FilePath.EndsWith(
+                            "WProtoGeneratedRegistrar.g.cs",
+                            StringComparison.Ordinal
+                        )
+                    )
+                    .ToString()
+            );
+            StringAssert.Contains(
+                "new global::Consumer.RingConverter<int>()",
+                generated
+                    .SyntaxTrees.Single(tree =>
+                        tree.FilePath.EndsWith(
+                            "WJsonGeneratedRegistrar.g.cs",
+                            StringComparison.Ordinal
+                        )
+                    )
+                    .ToString()
+            );
+        }
+
         [Test]
         public void AClosedGenericContractPropagatesItsSurrogateAndEnumDependencies()
         {

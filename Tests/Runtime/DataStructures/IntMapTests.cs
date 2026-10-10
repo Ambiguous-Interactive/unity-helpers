@@ -279,6 +279,339 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(count + 1, map.Count);
         }
 
+        [TestCase(0, false)]
+        [TestCase(0, true)]
+        [TestCase(16, false)]
+        [TestCase(16, true)]
+        [TestCase(4096, false)]
+        [TestCase(4096, true)]
+        public void ReinsertingRemovedEntryAtHalfOccupancyDoesNotAllocate(
+            int capacityHint,
+            bool useIndexer
+        )
+        {
+            const int controlSize = 4096;
+            long controlBytes = MeasureAllocated(() => GC.KeepAlive(new byte[controlSize]));
+            if (controlBytes < controlSize)
+            {
+                Assert.Ignore("The allocation counter cannot observe a retained allocation.");
+                return;
+            }
+
+            IntMap<string> map = new(capacityHint);
+            int capacity = map.Capacity;
+            int count = capacity / 2;
+            for (int key = 0; key < count; ++key)
+            {
+                Assert.IsTrue(map.TrySet(key, "original"));
+            }
+            Assert.IsTrue(map.Remove(0, out string removed));
+            Assert.AreEqual("original", removed);
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            bool written = true;
+            if (useIndexer)
+            {
+                map[0] = null;
+            }
+            else
+            {
+                written = map.TrySet(0, null);
+            }
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.IsTrue(written);
+            Assert.AreEqual(0L, allocated);
+            Assert.AreEqual(capacity, map.Capacity);
+            Assert.AreEqual(count, map.Count);
+            Assert.IsTrue(map.TryGet(0, out string value));
+            Assert.IsTrue(value == null);
+            for (int key = 1; key < count; ++key)
+            {
+                Assert.AreEqual("original", map[key]);
+            }
+        }
+
+        [Test]
+        public void AddingAwayFromRemovedSlotPreservesCapacityWhenLiveEntriesFit()
+        {
+            IntMap<int> map = new(0);
+            int capacity = map.Capacity;
+            for (int key = 0; key < 4; ++key)
+            {
+                Assert.IsTrue(map.TrySet(key, key));
+            }
+            Assert.IsTrue(map.Remove(0, out int removed));
+            Assert.AreEqual(0, removed);
+            Assert.IsTrue(map.TrySet(4, 4));
+            Assert.AreEqual(capacity, map.Capacity);
+            Assert.AreEqual(4, map.Count);
+            Assert.IsFalse(map.TryGet(0, out _));
+            for (int key = 1; key <= 4; ++key)
+            {
+                Assert.IsTrue(map.TryGet(key, out int value));
+                Assert.AreEqual(key, value);
+            }
+            Assert.IsTrue(map.TrySet(5, 5));
+            Assert.AreEqual(capacity * 2, map.Capacity);
+        }
+
+        [TestCase(0, 1)]
+        [TestCase(0, -1024)]
+        [TestCase(16, 1)]
+        [TestCase(16, 1024)]
+        [TestCase(256, 1)]
+        [TestCase(256, -1024)]
+        public void SlidingHalfCapacityWindowReclaimsDeletedSlotsBeforeGrowing(
+            int capacityHint,
+            int stride
+        )
+        {
+            IntMap<int> map = new(capacityHint);
+            int capacity = map.Capacity;
+            int count = capacity / 2;
+            for (int index = 0; index < count; ++index)
+            {
+                Assert.IsTrue(map.TrySet(index * stride, index));
+            }
+
+            const int replacements = 4096;
+            for (int index = count; index < count + replacements; ++index)
+            {
+                Assert.IsTrue(map.Remove((index - count) * stride, out int removed));
+                Assert.AreEqual(index - count, removed);
+                Assert.IsTrue(map.TrySet(index * stride, index));
+                Assert.AreEqual(capacity, map.Capacity);
+                Assert.AreEqual(count, map.Count);
+                Assert.IsFalse(map.TryGet((index - count) * stride, out _));
+            }
+
+            for (int index = replacements; index < replacements + count; ++index)
+            {
+                Assert.IsTrue(map.TryGet(index * stride, out int value));
+                Assert.AreEqual(index, value);
+            }
+            Assert.AreEqual(count, CountByEnumeration(map));
+            Assert.IsTrue(map.TrySet((replacements + count) * stride, replacements + count));
+            Assert.AreEqual(capacity * 2, map.Capacity);
+            Assert.AreEqual(count + 1, map.Count);
+        }
+
+        [TestCase(0, 1)]
+        [TestCase(16, 1024)]
+        [TestCase(256, -1024)]
+        public void SlidingHalfCapacityWindowDoesNotAllocate(int capacityHint, int stride)
+        {
+            const int controlSize = 4096;
+            long controlBytes = MeasureAllocated(() => GC.KeepAlive(new byte[controlSize]));
+            if (controlBytes < controlSize)
+            {
+                Assert.Ignore("The allocation counter cannot observe a retained allocation.");
+                return;
+            }
+
+            IntMap<int> map = new(capacityHint);
+            int capacity = map.Capacity;
+            int count = capacity / 2;
+            for (int index = 0; index < count; ++index)
+            {
+                Assert.IsTrue(map.TrySet(index * stride, index));
+            }
+            int next = count;
+            long allocated = MeasureAllocated(() =>
+            {
+                for (int replacement = 0; replacement < 128; ++replacement)
+                {
+                    map.Remove((next - count) * stride, out _);
+                    map.TrySet(next * stride, next);
+                    ++next;
+                }
+            });
+            Assert.AreEqual(0L, allocated);
+            Assert.AreEqual(capacity, map.Capacity);
+            Assert.AreEqual(count, map.Count);
+            for (int index = next - count; index < next; ++index)
+            {
+                Assert.IsTrue(map.TryGet(index * stride, out int value));
+                Assert.AreEqual(index, value);
+            }
+        }
+
+        [TestCase(new[] { -191, -183, -178, -170 })]
+        [TestCase(new[] { -196, -188, -180, -175 })]
+        [TestCase(new[] { -199, -194, -186, -173 })]
+        [TestCase(new[] { -191, -199, -183, -194 })]
+        [TestCase(new[] { -191, -196, -199, -183 })]
+        [TestCase(new[] { int.MinValue + 2, int.MinValue + 3, int.MaxValue, 0 })]
+        public void EveryDeletionOrderPreservesSmallProbeChains(int[] keys)
+        {
+            for (int first = 0; first < keys.Length; ++first)
+            {
+                for (int second = 0; second < keys.Length; ++second)
+                {
+                    if (first == second)
+                    {
+                        continue;
+                    }
+                    for (int third = 0; third < keys.Length; ++third)
+                    {
+                        if (first == third || second == third)
+                        {
+                            continue;
+                        }
+                        int[] order = { first, second, third, 6 - first - second - third };
+                        bool[] removed = new bool[keys.Length];
+                        IntMap<string> map = new(0);
+                        int capacity = map.Capacity;
+                        for (int index = 0; index < keys.Length; ++index)
+                        {
+                            Assert.IsTrue(
+                                map.TrySet(keys[index], index % 2 == 0 ? "stored" : null)
+                            );
+                        }
+                        foreach (int removedIndex in order)
+                        {
+                            Assert.IsTrue(map.Remove(keys[removedIndex], out string value));
+                            Assert.AreEqual(removedIndex % 2 == 0 ? "stored" : null, value);
+                            removed[removedIndex] = true;
+                            int survivors = 0;
+                            for (int index = 0; index < keys.Length; ++index)
+                            {
+                                Assert.AreEqual(
+                                    !removed[index],
+                                    map.TryGet(keys[index], out string stored)
+                                );
+                                Assert.AreEqual(
+                                    !removed[index] && index % 2 == 0 ? "stored" : null,
+                                    stored
+                                );
+                                if (!removed[index])
+                                {
+                                    ++survivors;
+                                }
+                            }
+                            Assert.AreEqual(survivors, map.Count);
+                            Assert.AreEqual(survivors, CountByEnumeration(map));
+                            Assert.AreEqual(capacity, map.Capacity);
+                        }
+                        foreach (int key in keys)
+                        {
+                            Assert.IsTrue(map.TrySet(key, "again"));
+                            Assert.AreEqual("again", map[key]);
+                        }
+                        map.Clear();
+                        Assert.AreEqual(0, map.Count);
+                        Assert.AreEqual(0, CountByEnumeration(map));
+                    }
+                }
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void RandomSmallTableChurnMatchesDictionary(int seed)
+        {
+            int[] keys =
+            {
+                IntMap<string>.MinimumAllowedKey,
+                int.MinValue + 3,
+                -199,
+                -194,
+                -191,
+                -188,
+                -183,
+                -180,
+                -178,
+                -175,
+                -170,
+                -1,
+                0,
+                1,
+                int.MaxValue - 1,
+                int.MaxValue,
+            };
+            Random random = new(seed);
+            IntMap<string> map = new(0);
+            Dictionary<int, string> oracle = new();
+            int capacity = map.Capacity;
+            for (int index = 0; index < capacity / 2; ++index)
+            {
+                string value = index % 2 == 0 ? "stored" : null;
+                map.TrySet(keys[index], value);
+                oracle[keys[index]] = value;
+            }
+            for (int operation = 0; operation < 2048; ++operation)
+            {
+                int selected = random.Next(oracle.Count);
+                int removedKey = 0;
+                foreach (int storedKey in oracle.Keys)
+                {
+                    removedKey = storedKey;
+                    if (selected == 0)
+                    {
+                        break;
+                    }
+                    --selected;
+                }
+                Assert.IsTrue(oracle.Remove(removedKey, out string expectedRemoved));
+                Assert.IsTrue(map.Remove(removedKey, out string actualRemoved));
+                Assert.AreEqual(expectedRemoved, actualRemoved);
+                int nextIndex = random.Next(keys.Length);
+                while (oracle.ContainsKey(keys[nextIndex]))
+                {
+                    ++nextIndex;
+                    if (keys.Length <= nextIndex)
+                    {
+                        nextIndex = 0;
+                    }
+                }
+                int nextKey = keys[nextIndex];
+                string nextValue = operation % 3 == 0 ? null : "next";
+                oracle[nextKey] = nextValue;
+                Assert.IsTrue(map.TrySet(nextKey, nextValue));
+                Assert.AreEqual(oracle.Count, map.Count);
+                Assert.AreEqual(capacity, map.Capacity);
+                Assert.AreEqual(oracle.Count, CountByEnumeration(map));
+                foreach (int key in keys)
+                {
+                    Assert.AreEqual(
+                        oracle.TryGetValue(key, out string expected),
+                        map.TryGet(key, out string actual)
+                    );
+                    Assert.AreEqual(expected, actual);
+                }
+                foreach (KeyValuePair<int, string> entry in map)
+                {
+                    Assert.IsTrue(oracle.TryGetValue(entry.Key, out string expected));
+                    Assert.AreEqual(expected, entry.Value);
+                }
+            }
+        }
+
+        [Test]
+        public void RemovingWithinWrappingProbeChainInvalidatesAllEnumerators()
+        {
+            IntMap<int> map = new(0);
+            foreach (int key in new[] { -191, -183, -178, -170 })
+            {
+                Assert.IsTrue(map.TrySet(key, key));
+            }
+            IntMap<int>.Enumerator entries = map.GetEnumerator();
+            IntMap<int>.KeyEnumerator keys = map.Keys.GetEnumerator();
+            IntMap<int>.ValueEnumerator values = map.Values.GetEnumerator();
+            Assert.IsTrue(entries.MoveNext());
+            Assert.IsTrue(keys.MoveNext());
+            Assert.IsTrue(values.MoveNext());
+            Assert.IsTrue(map.Remove(-191, out _));
+            Assert.Throws<InvalidOperationException>(() => entries.MoveNext());
+            Assert.Throws<InvalidOperationException>(() => entries.Reset());
+            Assert.Throws<InvalidOperationException>(() => keys.MoveNext());
+            Assert.Throws<InvalidOperationException>(() => keys.Reset());
+            Assert.Throws<InvalidOperationException>(() => values.MoveNext());
+            Assert.Throws<InvalidOperationException>(() => values.Reset());
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void ReplacingAfterRemovalsPreservesNullsAndInvalidatesEnumerators(bool useIndexer)
