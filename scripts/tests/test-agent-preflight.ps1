@@ -1,7 +1,8 @@
 Param(
     [switch]$VerboseOutput,
     [switch]$LicensePipeOnly,
-    [switch]$PipePressureOnly
+    [switch]$PipePressureOnly,
+    [switch]$JavaScriptLibraryOnly
 )
 
 Set-StrictMode -Version Latest
@@ -595,6 +596,86 @@ function Test-LicensePipeDrain {
     }
 }
 
+function Test-JavaScriptLibraryPreflight {
+    # Use the actual installed formatter and repository configuration: a dummy binary
+    # cannot prove that .jslib selection reaches Babel or that syntax errors fail closed.
+    $repoRoot = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
+    $prettierPackage = Join-Path $repoRoot 'node_modules/prettier'
+    $repoPath = New-TestRepo -ConfigurePushDefaults -GitIgnorePatterns @('node_modules/')
+    try {
+        if (-not (Test-Path -LiteralPath (Join-Path $prettierPackage 'bin/prettier.cjs'))) {
+            Write-TestResult 'Jslib_RealPrettierAvailable' $false 'Run npm ci before the hook regression suite; real Prettier is required.'
+            return
+        }
+        Copy-Item -LiteralPath $prettierPackage -Destination (Join-Path $repoPath 'node_modules/prettier') -Recurse -Force
+        Copy-Item -LiteralPath (Join-Path $repoRoot '.prettierrc.json') -Destination $repoPath
+        New-Item -ItemType Directory -Path (Join-Path $repoPath 'Runtime') -Force | Out-Null
+        $bridgePath = Join-Path $repoPath 'Runtime/Bridge.jslib'
+        $original = "mergeInto(LibraryManager.library,{Bridge:function(){return 1;}});`r`n"
+        [System.IO.File]::WriteAllText($bridgePath, $original)
+        $unrelatedPath = Join-Path $repoPath 'unrelated.txt'
+        [System.IO.File]::WriteAllText($unrelatedPath, 'preserve this unstaged file')
+        Push-Location $repoPath
+        try { git add -- Runtime/Bridge.jslib }
+        finally { Pop-Location }
+
+        $check = Invoke-Preflight -RepoPath $repoPath -Arguments @('-Paths', 'Runtime/Bridge.jslib')
+        Write-TestResult 'Jslib_CheckRejectsRealFormattingDrift' ($check.ExitCode -eq 1 -and $check.Output -match 'Prettier found formatting issues') "Expected actual formatting failure. Output: $($check.Output)"
+        Write-TestResult 'Jslib_CheckDoesNotRewrite' ([System.IO.File]::ReadAllText($bridgePath) -ceq $original) 'Check mode rewrote the input.'
+
+        $fix = Invoke-Preflight -RepoPath $repoPath -Arguments @('-Fix', '-Paths', 'Runtime/Bridge.jslib')
+        Write-TestResult 'Jslib_FixSucceeds' ($fix.ExitCode -eq 0) "Expected formatter and meta repair success. Output: $($fix.Output)"
+        $formatted = [System.IO.File]::ReadAllText($bridgePath)
+        Write-TestResult 'Jslib_FixActuallyFormats' ($formatted -cne $original -and $formatted.Contains('Bridge: function ()')) 'The actual Babel formatter did not rewrite the bridge.'
+        $metaPath = "$bridgePath.meta"
+        $meta = if (Test-Path -LiteralPath $metaPath) { [System.IO.File]::ReadAllText($metaPath) } else { '' }
+        Write-TestResult 'Jslib_RepairUsesWebGLOnlyPluginImporter' ($meta -match '(?m)^PluginImporter:' -and $meta -match 'Any:\r?\n    second:\r?\n      enabled: 0' -and $meta -match 'WebGL: WebGL\r?\n    second:\r?\n      enabled: 1' -and $meta -notmatch 'DefaultImporter:') 'Repair must disable Any and enable only WebGL.'
+        Write-TestResult 'Jslib_RepairProducesGuidAndCRLF' ($meta -match '(?m)^guid: [a-f0-9]{32}\r?$' -and $meta.Contains("`r`n") -and $meta -notmatch '(?<!\r)\n') 'Expected a Unity GUID and CRLF meta bytes.'
+        $controlPath = Join-Path $repoPath 'Runtime/GeneratorControl.jslib'
+        [System.IO.File]::WriteAllText($controlPath, $formatted)
+        $generatorOutput = & bash (Join-Path $repoPath 'scripts/generate-meta.sh') $controlPath 2>&1
+        $generatorExit = $LASTEXITCODE
+        $controlMetaPath = "$controlPath.meta"
+        $controlMeta = if (Test-Path -LiteralPath $controlMetaPath) { [System.IO.File]::ReadAllText($controlMetaPath) } else { '' }
+        $normalizedRepair = (($meta -replace "`r`n", "`n") -replace '(?m)^guid: [a-f0-9]{32}$', 'guid: CONTROL').TrimEnd()
+        $normalizedGenerator = (($controlMeta -replace "`r`n", "`n") -replace '(?m)^guid: [a-f0-9]{32}$', 'guid: CONTROL').TrimEnd()
+        Write-TestResult 'Jslib_RepairMatchesActualShellGenerator' ($generatorExit -eq 0 -and $normalizedRepair -ceq $normalizedGenerator) "Preflight and shell generator differ. Output: $($generatorOutput -join ' ')"
+        Remove-Item -LiteralPath $controlPath, $controlMetaPath -Force -ErrorAction SilentlyContinue
+        $staged = @(Get-StagedPaths -RepoPath $repoPath)
+        Write-TestResult 'Jslib_RepairStagesMeta' ($staged -contains 'Runtime/Bridge.jslib.meta') 'Generated plugin meta was not staged.'
+        Write-TestResult 'Jslib_UnrelatedInputPreserved' ([System.IO.File]::ReadAllText($unrelatedPath) -ceq 'preserve this unstaged file' -and $staged -notcontains 'unrelated.txt') 'Unrelated unstaged input changed or entered the index.'
+        Push-Location $repoPath
+        try { $stagedBridge = git show ':Runtime/Bridge.jslib' }
+        finally { Pop-Location }
+        Write-TestResult 'Jslib_FormattedStagedBytesMatch' (($stagedBridge -join "`n") -ceq (($formatted -replace "`r`n", "`n").TrimEnd("`n"))) 'Formatted worktree and staged content differ.'
+        $recheck = Invoke-Preflight -RepoPath $repoPath -Arguments @('-Paths', 'Runtime/Bridge.jslib')
+        Write-TestResult 'Jslib_RecheckPasses' ($recheck.ExitCode -eq 0) "Formatted bridge did not pass. Output: $($recheck.Output)"
+
+        $invalid = "mergeInto(LibraryManager.library, { Bridge: function( });`r`n"
+        [System.IO.File]::WriteAllText($bridgePath, $invalid)
+        $invalidCheck = Invoke-Preflight -RepoPath $repoPath -Arguments @('-Paths', 'Runtime/Bridge.jslib')
+        Write-TestResult 'Jslib_InvalidSyntaxFailsClosed' ($invalidCheck.ExitCode -eq 1 -and $invalidCheck.Output -match 'SyntaxError' -and $invalidCheck.Output -match 'Prettier found formatting issues') "Malformed JavaScript was not rejected by Babel. Output: $($invalidCheck.Output)"
+        Write-TestResult 'Jslib_InvalidSyntaxBytesPreserved' ([System.IO.File]::ReadAllText($bridgePath) -ceq $invalid) 'Syntax-error check rewrote the invalid input.'
+        Push-Location $repoPath
+        try { git add -- Runtime/Bridge.jslib }
+        finally { Pop-Location }
+        $invalidFix = Invoke-Preflight -RepoPath $repoPath -Arguments @('-Fix', '-Paths', 'Runtime/Bridge.jslib')
+        Write-TestResult 'Jslib_InvalidSyntaxFixFailsClosed' ($invalidFix.ExitCode -eq 1 -and $invalidFix.Output -match 'SyntaxError' -and $invalidFix.Output -match 'Prettier formatting failed') "Malformed staged JavaScript was not rejected in fix mode. Output: $($invalidFix.Output)"
+        Push-Location $repoPath
+        try { $stagedInvalid = git show ':Runtime/Bridge.jslib' }
+        finally { Pop-Location }
+        Write-TestResult 'Jslib_InvalidSyntaxFixPreservesIndexAndWorktree' ([System.IO.File]::ReadAllText($bridgePath) -ceq $invalid -and ($stagedInvalid -join "`n") -ceq (($invalid -replace "`r`n", "`n").TrimEnd("`n")) -and [System.IO.File]::ReadAllText($metaPath) -ceq $meta) 'Failed formatter changed the invalid input, index, or existing plugin meta.'
+    }
+    finally {
+        Remove-Item -LiteralPath $repoPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+if ($JavaScriptLibraryOnly) {
+    Test-JavaScriptLibraryPreflight
+    exit $script:TestsFailed
+}
+
 if ($PipePressureOnly) {
     Test-GitStderrPipeDrain
     if ($script:TestsFailed -gt 0) {
@@ -614,6 +695,8 @@ if ($LicensePipeOnly) {
 Test-GitStderrPipeDrain
 
 Write-Host 'Testing agent-preflight.ps1...' -ForegroundColor White
+
+Test-JavaScriptLibraryPreflight
 
 Write-Host "`nTest group: isolated runspace harness" -ForegroundColor Magenta
 $harnessRepo = New-TestRepo -ConfigurePushDefaults

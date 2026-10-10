@@ -4294,6 +4294,654 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(match.GetMessage().Contains("SecondRoots"));
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ARequiredPrivateTupleMemberStillReportsItsMissingFormatter(bool alias)
+        {
+            string attribute = alias
+                ? "Member"
+                : "global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoMember";
+            string source =
+                "using Member = global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoMemberAttribute; "
+                + @"[WProtoContract] public sealed partial class Geometry
+                {
+                    public object Inspect() { return (new Hidden(), 42); }
+                    ["
+                + attribute
+                + @"(1)] private System.ValueTuple<Hidden,int> _saved;
+                    private sealed class Hidden { }
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+        }
+
+        [TestCase("global::ProtoBuf.ProtoMember(1)")]
+        [TestCase("global::System.Runtime.Serialization.DataMember(Order = 1)")]
+        public void AProtobufOrDataMemberPrivateTupleStillReportsItsMissingFormatter(
+            string attribute
+        )
+        {
+            string source =
+                @"[WProtoContract] public sealed partial class Geometry
+                {
+                    public object Inspect() { return (new Hidden(), 42); }
+                    ["
+                + attribute
+                + @"] private System.ValueTuple<Hidden,int> _saved;
+                    private sealed class Hidden { }
+                }";
+            Assert.IsNotEmpty(
+                Run(source, DataContractReference)
+                    .Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+        }
+
+        [Test]
+        public void APrivateTupleGenericFieldApiStillReportsItsMissingFormatter()
+        {
+            const string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public int Measure()
+                    {
+                        var value = (new Hidden(), 42);
+                        return global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoGeneric<System.ValueTuple<Hidden,int>>.MeasureField(1, in value);
+                    }
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void AnInferredPrivateTupleSerializerRootStillReportsItsMissingFormatter(bool alias)
+        {
+            // Signature-only facade reference: the real Serializer depends on Unity and is not loaded by this harness.
+            MetadataReference facade = CompileReference(
+                "SerializerFacade",
+                @"namespace WallstopStudios.UnityHelpers.Core.Serialization
+                  {
+                      public static class Serializer
+                      {
+                          public static byte[] ProtoSerialize<T>(T input, bool forceRuntimeType = false) => null;
+                      }
+                  }"
+            );
+            string api = alias
+                ? "Api"
+                : "global::WallstopStudios.UnityHelpers.Core.Serialization.Serializer";
+            string source =
+                "using Api = global::WallstopStudios.UnityHelpers.Core.Serialization.Serializer; "
+                + @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public byte[] Save()
+                    {
+                        var value = (new Hidden(), 42);
+                        return "
+                + api
+                + @".ProtoSerialize(value);
+                    }
+                }";
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                source,
+                new[] { facade },
+                out Compilation generated
+            );
+            Assert.IsNotEmpty(
+                diagnostics.Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.GetMessage())
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void APrivateTuplePassedThroughTwoSourceWrappersStillReportsItsMissingFormatter(
+            bool alias
+        )
+        {
+            string api = alias
+                ? "Api"
+                : "global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoFacade";
+            string source =
+                "using Api = global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoFacade; "
+                + @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public bool Save() => Outer((new Hidden(), 42));
+                    private static bool Outer<T>(T value) => Persist(value);
+                    private static bool Persist<T>(T value) => "
+                + api
+                + @".TrySerialize(value, out byte[] bytes);
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [Test]
+        public void APrivateTuplePassedToAGenericContainingTypeWrapperStillReportsItsMissingFormatter()
+        {
+            const string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public bool Save()
+                    {
+                        var pair = (new Hidden(), 42);
+                        return new Recorder<System.ValueTuple<Hidden,int>>().Persist(pair);
+                    }
+                }
+                public sealed class Recorder<T>
+                {
+                    public bool Persist(T value) => WProtoFacade.TrySerialize(value, out byte[] bytes);
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void APrivateTuplePassedToAnObjectSerializationWrapperStillReportsItsMissingFormatter(
+            bool boxed
+        )
+        {
+            MetadataReference facade = CompileReference(
+                "SerializerFacade",
+                @"namespace WallstopStudios.UnityHelpers.Core.Serialization
+                  {
+                      public static class Serializer
+                      {
+                          public static byte[] ProtoSerialize<T>(T input, bool forceRuntimeType = false) => null;
+                      }
+                  }"
+            );
+            string value = boxed ? "(object)(new Hidden(), 42)" : "(new Hidden(), 42)";
+            string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public byte[] Save() => Persist("
+                + value
+                + @");
+                    private static byte[] Persist(object value) => global::WallstopStudios.UnityHelpers.Core.Serialization.Serializer.ProtoSerialize(value, forceRuntimeType: true);
+                }";
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                source,
+                new[] { facade },
+                out Compilation generated
+            );
+            Assert.IsNotEmpty(
+                diagnostics.Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.GetMessage())
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void APrivateTupleInOnlyAnUnusedWrapperArgumentDoesNotRequestASerializationFormatter(
+            bool reversed
+        )
+        {
+            string args = reversed
+                ? "value: 7, unused: (new Hidden(), 42)"
+                : "unused: (new Hidden(), 42), value: 7";
+            string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public bool Save() => Persist("
+                + args
+                + @");
+                    private static bool Persist<TUnused,TValue>(TUnused unused, TValue value) => WProtoFacade.TrySerialize(value, out byte[] bytes);
+                }";
+            Assert.IsEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void APrivateTupleInARequiredNamedWrapperArgumentStillReportsItsMissingFormatter(
+            bool reversed
+        )
+        {
+            string args = reversed
+                ? "value: (new Hidden(), 42), unused: 7"
+                : "unused: 7, value: (new Hidden(), 42)";
+            string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public bool Save() => Persist("
+                + args
+                + @");
+                    private static bool Persist<TUnused,TValue>(TUnused unused, TValue value) => WProtoFacade.TrySerialize(value, out byte[] bytes);
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void AnUnrelatedGenericUtilityDoesNotRequestAPrivateTupleSerializationFormatter(
+            bool recursive
+        )
+        {
+            string methods = recursive
+                ? "private static bool Utility<T>(T value) => Other(value); private static bool Other<T>(T value) => Utility(value);"
+                : "private static bool Utility<T>(T value) => WProtoFacade.TrySerialize(7, out byte[] bytes);";
+            string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public bool Inspect() => Utility((new Hidden(), 42));
+                    "
+                + methods
+                + @"
+                }";
+            Assert.IsEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [Test]
+        public void ARecursiveWrapperTypeSubstitutionStillReportsItsPrivateSerializationDependency()
+        {
+            const string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public bool Save() => Persist((new Hidden(), 42), 7, true);
+                    private static bool Persist<TLeft,TRight>(TLeft left, TRight right, bool recurse)
+                    {
+                        if (recurse) return Persist(right, left, false);
+                        return WProtoFacade.TrySerialize(right, out byte[] bytes);
+                    }
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [Test]
+        public void APrivateTuplePassedToJsonSerializeDoesNotCreateAProtobufSerializationObligation()
+        {
+            MetadataReference facade = CompileReference(
+                "SerializerJsonFacade",
+                @"namespace WallstopStudios.UnityHelpers.Core.Serialization
+                  {
+                      public static class Serializer
+                      {
+                          public static byte[] JsonSerialize<T>(T input) => null;
+                      }
+                  }"
+            );
+            const string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public byte[] Save() => global::WallstopStudios.UnityHelpers.Core.Serialization.Serializer.JsonSerialize((new Hidden(), 42));
+                }";
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                source,
+                new[] { facade },
+                out Compilation generated
+            );
+            Assert.IsEmpty(
+                diagnostics.Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.GetMessage())
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void APrivateTupleCapturedByASourceSerializationWrapperReportsItsMissingFormatter(
+            bool lambda
+        )
+        {
+            string nested = lambda
+                ? "System.Func<bool> save = () => WProtoFacade.TrySerialize(value, out byte[] bytes); return save();"
+                : "bool Save() => WProtoFacade.TrySerialize(value, out byte[] bytes); return Save();";
+            string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    private static bool Persist<T>(T value) { "
+                + nested
+                + @" }
+                    public bool Save() => Persist((new Hidden(), 42));
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ASourceExtensionSerializationWrapperBindsItsReceiverAndNamedValue(bool receiver)
+        {
+            string method = receiver
+                ? "public static bool Persist<T>(this T value, int other) => WProtoFacade.TrySerialize(value, out byte[] bytes);"
+                : "public static bool Persist<T>(this int other, T value) => WProtoFacade.TrySerialize(value, out byte[] bytes);";
+            string call = receiver
+                ? "(new Hidden(), 42).Persist(other: 7)"
+                : "7.Persist(value: (new Hidden(), 42))";
+            string source =
+                "public static class Extensions { "
+                + method
+                + @" }
+                public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public bool Save() => "
+                + call
+                + @";
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ASourceExtensionWrapperDoesNotSerializeItsUnusedPrivateTuple(bool receiver)
+        {
+            string method = receiver
+                ? "public static bool Persist<T>(this T unused, int value) => WProtoFacade.TrySerialize(value, out byte[] bytes);"
+                : "public static bool Persist<T>(this int value, T unused) => WProtoFacade.TrySerialize(value, out byte[] bytes);";
+            string call = receiver
+                ? "(new Hidden(), 42).Persist(value: 7)"
+                : "7.Persist(unused: (new Hidden(), 42))";
+            string source =
+                "public static class Extensions { "
+                + method
+                + @" }
+                public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public bool Save() => "
+                + call
+                + @";
+                }";
+            Assert.IsEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ASourceWrapperNestedFixedValueSerializationDoesNotRequireItsUnusedTuple(
+            bool lambda
+        )
+        {
+            string nested = lambda
+                ? "System.Func<bool> save = () => WProtoFacade.TrySerialize(7, out byte[] bytes); return save();"
+                : "bool Save() => WProtoFacade.TrySerialize(7, out byte[] bytes); return Save();";
+            string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    private static bool Persist<T>(T unused) { "
+                + nested
+                + @" }
+                    public bool Save() => Persist((new Hidden(), 42));
+                }";
+            Assert.IsEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [TestCase(false, 0)]
+        [TestCase(false, 1)]
+        [TestCase(false, 2)]
+        [TestCase(true, 0)]
+        [TestCase(true, 1)]
+        [TestCase(true, 2)]
+        public void AConcretePrivateTupleDeserializationTypeRemainsRequiredThroughSourceWrappers(
+            bool serializer,
+            int wrapper
+        )
+        {
+            MetadataReference facade = CompileReference(
+                "SerializerFacade",
+                @"namespace WallstopStudios.UnityHelpers.Core.Serialization
+                { public static class Serializer
+                  { public static T ProtoDeserialize<T>(byte[] data, System.Type type) => default; }
+                }"
+            );
+            string api = serializer
+                ? "global::WallstopStudios.UnityHelpers.Core.Serialization.Serializer.ProtoDeserialize<object>"
+                : "WProtoFacade.DeserializeAs<object>";
+            string call =
+                wrapper == 0 ? api + "(new byte[0], typeof(System.ValueTuple<Hidden,int>))"
+                : wrapper == 1 ? "Restore<System.ValueTuple<Hidden,int>>()"
+                : "Restore(typeof(System.ValueTuple<Hidden,int>))";
+            string method =
+                wrapper == 1
+                    ? "private static object Restore<T>() => " + api + "(new byte[0], typeof(T));"
+                : wrapper == 2
+                    ? "private static object Restore(System.Type type) => "
+                        + api
+                        + "(new byte[0], type);"
+                : "";
+            string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public object Save() => "
+                + call
+                + "; "
+                + method
+                + @"
+                }";
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                source,
+                new[] { facade },
+                out Compilation generated
+            );
+            Assert.IsNotEmpty(
+                diagnostics.Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.GetMessage())
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void APrivateTupleTypeObjectIsNotAConcreteDeserializationRoot(bool unused)
+        {
+            string call = unused
+                ? "Persist(typeof(System.ValueTuple<Hidden,int>), 7)"
+                : "WProtoFacade.TrySerialize(typeof(System.ValueTuple<Hidden,int>), out byte[] bytes)";
+            string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public bool Save() => "
+                + call
+                + "; "
+                + (
+                    unused
+                        ? "private static bool Persist(System.Type unused, int value) => WProtoFacade.TrySerialize(value, out byte[] bytes);"
+                        : ""
+                )
+                + @" }";
+            Assert.IsEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [Test]
+        public void APrivateTuplePassedToASourceGenericSerializationWrapperStillReportsItsMissingFormatter()
+        {
+            const string source =
+                @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    private static bool Persist<T>(T value)
+                    {
+                        return WProtoFacade.TrySerialize(value, out byte[] bytes);
+                    }
+                    public bool Save()
+                    {
+                        return Persist((new Hidden(), 42));
+                    }
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void AnInferredPrivateTupleFacadeRootStillReportsItsMissingFormatter(bool alias)
+        {
+            string api = alias
+                ? "Api"
+                : "global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoFacade";
+            string source =
+                "using Api = global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoFacade; "
+                + @"public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    public bool Save()
+                    {
+                        var value = (new Hidden(), 42);
+                        return "
+                + api
+                + @".TrySerialize(value, out byte[] bytes);
+                    }
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [Test]
+        public void AnExplicitPrivateTupleMarshalObligationIsStillReported()
+        {
+            const string source =
+                @"[assembly: WProtoRootMarshal(typeof(System.ValueTuple<,>), typeof(Consumer.TupleRoot<,>))]
+                public sealed class TupleRoot<TFirst,TSecond> : IWProtoFormatter<System.ValueTuple<TFirst,TSecond>>
+                {
+                    public int Measure(in System.ValueTuple<TFirst,TSecond> value) => 0;
+                    public bool Write(ref WProtoWriter writer, in System.ValueTuple<TFirst,TSecond> value) => true;
+                    public bool TryRead(ref WProtoReader reader, out System.ValueTuple<TFirst,TSecond> value) { value = default; return true; }
+                }
+                public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    private System.ValueTuple<Hidden,int> _temporary;
+                }";
+            Assert.IsNotEmpty(
+                Run(source).Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            Assert.IsEmpty(CompileGenerated(source).Select(d => d.GetMessage()));
+        }
+
+        [Test]
+        public void AnAccessibleInferredTupleFactoryStillRegistersItsFormatter()
+        {
+            const string source =
+                @"public sealed class Geometry
+                {
+                    public object Inspect() { return System.Tuple.Create(3, 7); }
+                    public object InspectValueTuple() { return System.ValueTuple.Create(3, 7); }
+                }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.IsEmpty(
+                diagnostics.Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+            );
+            string registrar = generated
+                .SyntaxTrees.Single(t =>
+                    t.FilePath.EndsWith("WProtoGeneratedRegistrar.g.cs", StringComparison.Ordinal)
+                )
+                .ToString();
+            StringAssert.Contains("ValueTupleMarshalFormatter<int, int>", registrar);
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.GetMessage())
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void AnUnrelatedPrivateTupleDoesNotRequestASerializationFormatter(bool inferred)
+        {
+            string utility = inferred
+                ? "public object Inspect() { return (new Hidden(), 42); }"
+                : "private System.ValueTuple<Hidden, int> _temporary;";
+            string source =
+                @"[assembly: WProtoSurrogate(typeof(System.ValueTuple<,>), typeof(Consumer.TupleShape<,>))]
+                [WProtoContract] public partial struct TupleShape<TFirst, TSecond>
+                {
+                    [WProtoMember(1)] public TFirst Item1;
+                    [WProtoMember(2)] public TSecond Item2;
+                    public static implicit operator TupleShape<TFirst,TSecond>(System.ValueTuple<TFirst,TSecond> value) => new TupleShape<TFirst,TSecond> { Item1 = value.Item1, Item2 = value.Item2 };
+                    public static implicit operator System.ValueTuple<TFirst,TSecond>(TupleShape<TFirst,TSecond> value) => (value.Item1, value.Item2);
+                }
+                public sealed class Geometry
+                {
+                    private sealed class Hidden { }
+                    "
+                + utility
+                + @"
+                }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.IsEmpty(
+                diagnostics
+                    .Where(d => string.Equals(d.Id, "WPROTO028", StringComparison.Ordinal))
+                    .Select(d => d.GetMessage())
+            );
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.GetMessage())
+            );
+        }
+
         /// <summary>
         /// A closure the registrar cannot name is skipped, and now says so.
         /// </summary>

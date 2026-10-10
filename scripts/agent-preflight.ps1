@@ -781,6 +781,36 @@ MonoImporter:
   assetBundleVariant:
 "@
         }
+        'jslib' {
+            return @"
+fileFormatVersion: 2
+guid: $Guid
+PluginImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  iconMap: {}
+  executionOrder: {}
+  defineConstraints: []
+  isPreloaded: 0
+  isOverridable: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 1
+  platformData:
+  - first:
+      Any:
+    second:
+      enabled: 0
+      settings: {}
+  - first:
+      WebGL: WebGL
+    second:
+      enabled: 1
+      settings: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"@
+        }
         'asmdef' {
             return @"
 fileFormatVersion: 2
@@ -1801,7 +1831,8 @@ $prettierTargets = @(
         $_ -like '*.asmref' -or
         $_ -like '*.yml' -or
         $_ -like '*.yaml' -or
-        $_ -like '*.js'
+        $_ -like '*.js' -or
+        $_ -like '*.jslib'
     }
 )
 $markdownTargets = @(

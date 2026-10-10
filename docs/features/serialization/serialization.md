@@ -1317,6 +1317,17 @@ registrar would be `CS0122` in your own build, so it is skipped instead; the war
 the skip is otherwise invisible until that type is serialized in a shipped player. Widen the offending
 type to `internal`, or register the formatter yourself from code that can name it.
 
+Automatic built-in tuple discovery skips inaccessible two- and three-element `ValueTuple` closures
+used only as local implementation details. Such tuples still report `WPROTO028` when they are
+serialized members or roots passed to the protobuf serialization APIs. The scan also follows exact
+source method calls, generic substitutions, explicit `typeof(...)` concrete deserialization operands,
+and parameters captured by nested local functions or
+lambdas, including transitive source wrappers. It tracks the serialized type and value parameters;
+unused parameters do not make an unrelated private tuple a serialization root. This is bounded source
+provenance: it does not inspect opaque external method bodies, follow object-typed local aliases, or
+resolve virtual dispatch and arbitrary delegate invocation. Explicit root-marshal registrations,
+custom formatters, and JSON converter registrations keep their existing diagnostics.
+
 `WPROTO033` warns when a contract declaring `SkipConstructor` has a field that is initialized where
 it is declared and is not a `[WProtoMember]` (**including one inherited from a base type**), because
 an uninitialized allocation zeroes the whole object rather than just the contract's own half. `SkipConstructor` asks protobuf-net to allocate the

@@ -44,6 +44,11 @@ on:
           - serialization
           - nullableconsumer
           - all
+      fresh-conversion:
+        description: "Clear Standalone compilation outputs before IL2CPP acceptance builds."
+        required: false
+        default: false
+        type: boolean
       intmap-diagnostics:
         description: "Capture IntMap slot diagnostics; diagnostic records cannot pass acceptance."
         required: false
@@ -538,6 +543,7 @@ jobs:
         timeout-minutes: 60
         shell: pwsh
         env:
+          UH_FORCE_FRESH_COMPILATION_CACHE: ${{ github.event_name == 'workflow_dispatch' && inputs.fresh-conversion && 'true' || 'false' }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -553,6 +559,7 @@ jobs:
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode 'standalone' `
+            -ForceFreshCompilationCache:($env:UH_FORCE_FRESH_COMPILATION_CACHE -eq 'true') `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-standalone' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
@@ -615,6 +622,7 @@ jobs:
         timeout-minutes: 60
         shell: pwsh
         env:
+          UH_FORCE_FRESH_COMPILATION_CACHE: ${{ github.event_name == 'workflow_dispatch' && inputs.fresh-conversion && 'true' || 'false' }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -628,6 +636,7 @@ jobs:
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode 'standalone' `
+            -ForceFreshCompilationCache:($env:UH_FORCE_FRESH_COMPILATION_CACHE -eq 'true') `
             -AssemblyNames 'WallstopStudios.UnityHelpers.Tests.ProtoOnly' `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-standalone-proto-only' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
@@ -1224,6 +1233,7 @@ jobs:
         timeout-minutes: 60
         shell: pwsh
         env:
+          UH_FORCE_FRESH_COMPILATION_CACHE: ${{ github.event_name == 'workflow_dispatch' && inputs.fresh-conversion && 'true' || 'false' }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -1239,6 +1249,7 @@ jobs:
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode 'standalone' `
+            -ForceFreshCompilationCache:($env:UH_FORCE_FRESH_COMPILATION_CACHE -eq 'true') `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add scoped `BrowserStorage` string reads, writes and deletes through WebGL local storage, with PlayerPrefs on other platforms and explicit failure results ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add Span overloads for all 18 sorting algorithms, including slices and stack-allocated data, while preserving caller data when comparisons fail ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `SingleThreadedThreadPool.TryEnqueue` overloads so callers can detect rejected background work and choose a fallback ([#986](https://github.com/Ambiguous-Interactive/unity-helpers/issues/986)).
 - Add public `ObjectsTypeTraits<T>` with cached value-type, exact-object, and Unity-object classifications for generic code ([guide](./docs/features/utilities/helper-utilities.md#cached-generic-type-classification), [#976](https://github.com/Ambiguous-Interactive/unity-helpers/issues/976)).
@@ -34,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix spurious formatter diagnostics for private two- and three-element tuples used only in implementation code, while preserving diagnostics for serialization roots, members and explicit marshal registrations ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
+- Fix editor folder creation and singleton cleanup accepting paths that escape Assets through parent segments. Normalize paths remaining inside Assets before creating or deleting files ([#988](https://github.com/Ambiguous-Interactive/unity-helpers/issues/988)).
 - Fix generic serializer and JSON converter registration when constructed types appear only in inferred factory results ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Fix IntMap tables growing during remove-and-add churn when their live entries still fit. Reclaim removed slots without replacement tables ([#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926)).
 - Fix effects refreshed by removal callbacks expiring before their new deadline ([#984](https://github.com/Ambiguous-Interactive/unity-helpers/issues/984)).

@@ -253,6 +253,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void APrivateGeometryTupleDoesNotChangeTheSerializableMapBytes()
+        {
+            TupleMapShape value = new TupleMapShape
+            {
+                Values = new Dictionary<(TupleButtonType, TupleButtonDirection), double>
+                {
+                    { (TupleButtonType.Primary, TupleButtonDirection.Left), 0.25d },
+                    { (TupleButtonType.None, TupleButtonDirection.Right), 1d },
+                },
+            };
+            Assert.IsNotNull(value.InspectGeometry());
+#if PROTOBUF_NET_ORACLE_V2
+            AssertInterops(value, "private geometry beside actual tuple adapter");
+#else
+            AssertIdentical(value, "private geometry beside actual tuple adapter");
+#endif
+        }
+
+        [Test]
         public void AStringMemberEncodesAsTheOracleEncodesIt()
         {
             AssertIdentical(new TypeNameShape { name = null, cached = 9 }, "null");

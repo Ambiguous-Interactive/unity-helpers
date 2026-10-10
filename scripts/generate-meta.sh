@@ -31,6 +31,7 @@
 #   .html/.htm    -> TextScriptImporter
 #   .css          -> TextScriptImporter
 #   .js           -> TextScriptImporter
+#   .jslib        -> PluginImporter (WebGL only)
 #   .rsp          -> DefaultImporter (simple format)
 #   directories   -> DefaultImporter with folderAsset: yes
 #   other         -> DefaultImporter
@@ -91,6 +92,36 @@ MonoImporter:
   defaultReferences: []
   executionOrder: 0
   icon: {instanceID: 0}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+EOF
+            ;;
+        jslib)
+            cat <<EOF
+fileFormatVersion: 2
+guid: $guid
+PluginImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  iconMap: {}
+  executionOrder: {}
+  defineConstraints: []
+  isPreloaded: 0
+  isOverridable: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 1
+  platformData:
+  - first:
+      Any:
+    second:
+      enabled: 0
+      settings: {}
+  - first:
+      WebGL: WebGL
+    second:
+      enabled: 1
+      settings: {}
   userData:
   assetBundleName:
   assetBundleVariant:

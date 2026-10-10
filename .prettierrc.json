@@ -11,6 +11,12 @@
   "endOfLine": "crlf",
   "overrides": [
     {
+      "files": ["*.jslib"],
+      "options": {
+        "parser": "babel"
+      }
+    },
+    {
       "files": ["*.asmdef", "*.asmref"],
       "options": {
         "parser": "json"

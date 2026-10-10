@@ -148,7 +148,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 INamedTypeSymbol named = use.Type;
                 Location where = use.Location;
-                if (named.IsUnboundGenericType || IsOpen(named))
+                if (
+                    named.IsUnboundGenericType
+                    || IsOpen(named)
+                    || ClosureScan.IsIncidentalUnnameableTuple(use, compilation)
+                )
                 {
                     continue;
                 }
@@ -164,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     announced,
                     visited,
                     visitedWithDependencies,
-                    false,
+                    use.IsSerializationDependency,
                     found
                 );
             }

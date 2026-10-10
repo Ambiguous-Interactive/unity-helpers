@@ -247,7 +247,8 @@
         "sqr",
         "MonoBehaviours",
         "ARGB32",
-        "BGRA32"
+        "BGRA32",
+        "jslib"
       ]
     },
     {
@@ -525,7 +526,8 @@
         "sfc64",
         "stcf",
         "wvalue",
-        "rebitcast"
+        "rebitcast",
+        "PREFS"
       ]
     },
     {

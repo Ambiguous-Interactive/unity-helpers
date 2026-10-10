@@ -911,6 +911,19 @@ DirectoryHelper.EnsureDirectoryExists("Assets/Generated/Data");
 #endif
 ```
 
+In the Editor, directory creation canonicalizes paths before touching disk or the AssetDatabase.
+`Assets/Generated/Discarded/../Data` creates `Assets/Generated/Data`; discarded folders are
+not created. Mixed separators and any casing of the initial `Assets` segment are supported.
+Invalid paths and paths resolving outside Assets, such as `Assets/../Temp/Data`, raise
+`ArgumentException` without writing outside Assets. Blank inputs remain a no-op. Existing
+disk-only directories are imported without creating numbered duplicates.
+
+`AssetDatabaseBatchHelper.EnsureAssetFolder` and `EnsureAssetParentFolder` apply the same
+normalization and return `false` for invalid or escaping paths. Singleton failure cleanup
+also refuses escaping paths before deleting assets or disk files. These checks provide
+lexical containment; symbolic links within Assets are not resolved, so physical containment
+is not guaranteed. Player builds retain the ordinary `Directory.CreateDirectory` behavior.
+
 **Find package root:**
 
 ```csharp
@@ -1802,6 +1815,45 @@ list.Sort(reversed);
 ```
 
 ---
+
+## Browser String Storage
+
+`BrowserStorage` provides scoped string storage. WebGL players use the browser's `localStorage`.
+Editor and other players use `PlayerPrefs`. Backend selection happens at compile time. A blocked
+or full browser store returns failure rather than switching to another store and hiding existing
+data.
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+BrowserStorage storage = new BrowserStorage("my-game");
+if (storage.TrySetString("settings", "volume=0.5")
+    && storage.TryGetString("settings", out string settings))
+{
+    UnityEngine.Debug.Log(settings);
+}
+storage.TryDeleteKey("settings");
+```
+
+Call these methods on Unity's main thread. A scope must be nonblank; invalid scopes produce a store
+with `IsConfigured == false` whose operations return false. Keys are literal, case-sensitive strings;
+whitespace keys are valid, null and empty keys are rejected. Different scopes cannot alias each other's
+keys, even when scopes or keys contain colons. The store never clears all browser or PlayerPrefs data.
+Null values, null characters and unpaired UTF-16 surrogates in keys, scopes or values are rejected; invalid writes leave existing
+values unchanged. Reads return false with a null result when a key is missing or the backend fails.
+Present empty strings return true. Browser values containing invalid text written by another
+application are rejected rather than silently truncated by the native string bridge.
+
+Writes and deletes are synchronous browser operations. The PlayerPrefs backend calls `Save` after
+each mutation. Success means the backend accepted the operation; it does not guarantee disk flush,
+future availability, cross-tab transactions or protection from browser eviction. If PlayerPrefs saving
+fails, its in-memory mutation may already have happened. Use an application-specific scope on shared
+origins. Stored strings are not encrypted. Private browsing, denied storage access and quotas can cause
+failure. Each operation constructs a scoped key, and reads allocate their returned string.
+
+See Unity's [browser scripting guide](https://docs.unity3d.com/2021.3/Documentation/Manual/webgl-interactingwithbrowserscripting.html)
+and [PlayerPrefs documentation](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/PlayerPrefs.html)
+for native string marshalling and platform storage limits.
 
 <a id="environment-detection"></a>
 

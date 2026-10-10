@@ -32,6 +32,123 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 #endif
 
+#if UNITY_EDITOR
+        [TestCase("Assets/../Temp/{0}", "Temp/{0}")]
+        [TestCase(@"Assets\..\Temp\{0}", "Temp/{0}")]
+        [TestCase("Assets/Nested/../../Temp/{0}", "Temp/{0}")]
+        [TestCase("Assets/../AssetsSibling/{0}", "AssetsSibling/{0}")]
+        [TestCase("assets/../Temp/{0}", "Temp/{0}")]
+        public void EnsureDirectoryExistsRejectsTraversalBeforeAnyDiskWrite(
+            string pathPattern,
+            string externalPattern
+        )
+        {
+            string name = "DirectoryTraversal" + Guid.NewGuid().ToString("N");
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string outside = Path.Combine(projectRoot, string.Format(externalPattern, name));
+            Assert.IsFalse(Directory.Exists(outside));
+            try
+            {
+                ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+                    DirectoryHelper.EnsureDirectoryExists(string.Format(pathPattern, name))
+                );
+                Assert.That(exception.ParamName, Is.EqualTo("relativeDirectoryPath"));
+                Assert.IsFalse(Directory.Exists(outside));
+                Assert.IsFalse(File.Exists(outside + ".meta"));
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally
+            {
+                if (Directory.Exists(outside))
+                {
+                    Directory.Delete(outside, true);
+                }
+            }
+        }
+
+        [TestCase("Assets/DirectoryCanonical/Unused/../Nested")]
+        [TestCase(@"assets\DirectoryCanonical\Unused/../Nested")]
+        [TestCase("ASSETS//DirectoryCanonical/./Nested/")]
+        public void EnsureDirectoryExistsCreatesCanonicalInsidePathOnce(string path)
+        {
+            const string root = "Assets/DirectoryCanonical";
+            const string canonical = root + "/Nested";
+            UnityEditor.AssetDatabase.DeleteAsset(root);
+            try
+            {
+                DirectoryHelper.EnsureDirectoryExists(path);
+                Assert.IsTrue(UnityEditor.AssetDatabase.IsValidFolder(canonical));
+                string guid = UnityEditor.AssetDatabase.AssetPathToGUID(canonical);
+                DirectoryHelper.EnsureDirectoryExists(path);
+                Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID(canonical), Is.EqualTo(guid));
+                Assert.IsFalse(
+                    Directory.Exists(
+                        Path.Combine(Application.dataPath, "DirectoryCanonical/Unused")
+                    )
+                );
+                Assert.IsFalse(
+                    Directory.Exists(
+                        Path.Combine(Application.dataPath, "DirectoryCanonical/Nested 1")
+                    )
+                );
+            }
+            finally
+            {
+                UnityEditor.AssetDatabase.DeleteAsset(root);
+            }
+        }
+
+        [TestCase("AssetsSibling/Child")]
+        [TestCase("Assets/../../Outside")]
+        [TestCase("Assets/Invalid\0Path")]
+        [TestCase("/Assets/Folder")]
+        public void EnsureDirectoryExistsRejectsInvalidAssetPaths(string path)
+        {
+            ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+                DirectoryHelper.EnsureDirectoryExists(path)
+            );
+            Assert.That(exception.ParamName, Is.EqualTo("relativeDirectoryPath"));
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [TestCase("Assets")]
+        [TestCase("assets/")]
+        [TestCase("ASSETS/./")]
+        [TestCase("Assets/Unused/..")]
+        public void EnsureDirectoryExistsAcceptsCanonicalAssetsRoot(string path)
+        {
+            Assert.DoesNotThrow(() => DirectoryHelper.EnsureDirectoryExists(path));
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
+        public void EnsureDirectoryExistsImportsExistingDiskFolderWithoutDuplicate()
+        {
+            const string root = "Assets/DirectoryDiskOnly";
+            const string child = root + "/Nested";
+            string absoluteChild = Path.Combine(Application.dataPath, "DirectoryDiskOnly/Nested");
+            UnityEditor.AssetDatabase.DeleteAsset(root);
+            try
+            {
+                Directory.CreateDirectory(absoluteChild);
+                Assert.IsFalse(UnityEditor.AssetDatabase.IsValidFolder(child));
+                DirectoryHelper.EnsureDirectoryExists(root + "/Discarded/../Nested");
+                Assert.IsTrue(UnityEditor.AssetDatabase.IsValidFolder(child));
+                Assert.IsTrue(Directory.Exists(absoluteChild));
+                Assert.IsFalse(Directory.Exists(absoluteChild + " 1"));
+            }
+            finally
+            {
+                UnityEditor.AssetDatabase.DeleteAsset(root);
+                string absoluteRoot = Path.GetDirectoryName(absoluteChild);
+                if (Directory.Exists(absoluteRoot))
+                {
+                    Directory.Delete(absoluteRoot, true);
+                }
+            }
+        }
+#endif
+
         [Test]
         public void EnsureDirectoryExistsWithNullDoesNothing()
         {
