@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            if (sortAlgorithm < SortAlgorithm.Ghost || SortAlgorithm.Yam < sortAlgorithm)
+            if (!sortAlgorithm.IsValid())
             {
                 throw new InvalidEnumArgumentException(
                     nameof(sortAlgorithm),
