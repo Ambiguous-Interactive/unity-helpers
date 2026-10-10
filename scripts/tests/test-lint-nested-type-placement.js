@@ -109,6 +109,38 @@ const SILENT = [
     "a tuple-typed field and a tuple-typed property",
     "class A { (int X, int Y) Point { get; set; } (int X, int Y) _point; }"
   ],
+  [
+    "named tuple method after a static method",
+    "class A { private static void First() { } private static (bool IsValueType, bool IsObjectType, bool IsUnityObject) ReadTraits() { return (true, false, false); } }"
+  ],
+  [
+    "generic named tuple method after a static method",
+    "class A { private static void First() { } private static (bool Left, bool Right) ReadTraits<T>() where T : class { return (true, false); } }"
+  ],
+  [
+    "unnamed tuple method after an instance method",
+    "class A { private void First() { } private (int, int) Pair() { return (1, 2); } }"
+  ],
+  [
+    "nested tuple method return type",
+    "class A { private static void First() { } private static ((int X, int Y) Point, bool Valid) Pair() { return ((1, 2), true); } }"
+  ],
+  [
+    "generic tuple return type after a static method",
+    "class A { private static void First() { } private static List<(int X, int Y)> Pair<T>() { return null; } }"
+  ],
+  [
+    "attributed tuple method return type",
+    "class A { private static void First() { } [Attribute(1)] private static (int X, int Y) Pair() { return (1, 2); } }"
+  ],
+  [
+    "tuple field initializer invocation stays a field",
+    "class A { private static (int X, int Y) _pair = Pair(); private static (int X, int Y) Pair() { return (1, 2); } }"
+  ],
+  [
+    "tuple property invocation stays a property",
+    "class A { private static (int X, int Y) Point => Pair(); private static (int X, int Y) Pair() { return (1, 2); } }"
+  ],
   ["an indexer is a property", "class A { int this[int i] => i; int _y; }"],
   [
     "an operator overload is a static method",
@@ -204,6 +236,36 @@ for (const [name, source, expected] of REPORTED) {
 
 /** Shapes the #672 member ordering MUST report. */
 const ORDER_REPORTED = [
+  [
+    "tuple property after a static method",
+    "class A { private static void First() { } private static (int X, int Y) Point { get; set; } }",
+    "static property",
+    "Point"
+  ],
+  [
+    "tuple field after a static method",
+    "class A { private static void First() { } private static (int X, int Y) _point = Pair(); private static (int X, int Y) Pair() { return (1, 2); } }",
+    "static field",
+    "_point"
+  ],
+  [
+    "public generic tuple method after a private static method",
+    "class A { private static void First() { } public static (int X, int Y) Pair<T>() { return (1, 2); } }",
+    "static method",
+    "Pair"
+  ],
+  [
+    "static tuple method after an instance method",
+    "class A { private void First() { } private static (int X, int Y) Pair() { return (1, 2); } }",
+    "static method",
+    "Pair"
+  ],
+  [
+    "tuple property after a field",
+    "class A { private int _value; private (int X, int Y) Point => (1, 2); }",
+    "property",
+    "Point"
+  ],
   [
     "a static property after a static field",
     "class A { private static int _f; private static int P { get; set; } }",
@@ -610,6 +672,25 @@ runTest("ordering: --fix never moves a static field whose initializer names a si
     fixedText(source),
     source,
     "an initializer that names a sibling must not sort past it"
+  );
+});
+
+runTest("ordering: --fix preserves tuple initializer dependencies", () => {
+  const source = [
+    "class Registry",
+    "{",
+    "    private static readonly int Seed = 1;",
+    "    private static (int X, int Y) Point { get; } = Pair(Seed);",
+    "    private static (int X, int Y) Pair(int value) { return (value, value); }",
+    "}"
+  ].join("\n");
+  const violations = analyzeFile(source).violations;
+  assert.strictEqual(violations.length, 1);
+  assert.strictEqual(violations[0].kind, "static property");
+  assert.strictEqual(
+    fixedText(source),
+    source,
+    "tuple initializer dependencies must keep their order"
   );
 });
 

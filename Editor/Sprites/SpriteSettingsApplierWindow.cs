@@ -41,114 +41,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </remarks>
     public sealed class SpriteSettingsApplierWindow : EditorWindow
     {
-        private List<(string fullFilePath, string relativePath)> GetTargetSpritePaths()
-        {
-            List<(string fullFilePath, string relativePath)> filePaths = _targetSpriteBuffer;
-            filePaths.Clear();
-            HashSet<string> uniqueRelativePaths = new(StringComparer.OrdinalIgnoreCase);
-            using PooledResource<List<string>> folderAssetPathsLease = Buffers<string>.List.Get(
-                out List<string> folderAssetPaths
-            );
-
-            for (int i = 0; i < _directoriesProp.arraySize; ++i)
-            {
-                Object dir = _directoriesProp.GetArrayElementAtIndex(i).objectReferenceValue;
-                if (dir == null)
-                {
-                    continue;
-                }
-
-                string assetPath = AssetDatabase.GetAssetPath(dir);
-                if (string.IsNullOrWhiteSpace(assetPath))
-                {
-                    continue;
-                }
-
-                if (AssetDatabase.IsValidFolder(assetPath))
-                {
-                    folderAssetPaths.Add(assetPath);
-                }
-                else
-                {
-                    this.LogWarn($"Item '{assetPath}' is not a valid directory. Skipping.");
-                }
-            }
-
-            HashSet<string> allowedExtensions = new(StringComparer.OrdinalIgnoreCase);
-            int spriteFileExtensionsPropArraySize = _spriteFileExtensionsProp.arraySize;
-            for (int i = 0; i < spriteFileExtensionsPropArraySize; ++i)
-            {
-                string ext = _spriteFileExtensionsProp.GetArrayElementAtIndex(i).stringValue;
-                if (string.IsNullOrWhiteSpace(ext))
-                {
-                    continue;
-                }
-
-                if (!ext.StartsWith("."))
-                {
-                    ext = "." + ext;
-                }
-
-                allowedExtensions.Add(ext);
-            }
-
-            if (0 < folderAssetPaths.Count)
-            {
-                string[] guids = AssetDatabase.FindAssets(
-                    "t:Texture2D",
-                    folderAssetPaths.ToArray()
-                );
-                foreach (string guid in guids)
-                {
-                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                    if (string.IsNullOrWhiteSpace(assetPath))
-                    {
-                        continue;
-                    }
-
-                    string ext = Path.GetExtension(assetPath);
-                    if (0 < allowedExtensions.Count && !allowedExtensions.Contains(ext))
-                    {
-                        continue;
-                    }
-
-                    if (uniqueRelativePaths.Add(assetPath))
-                    {
-                        filePaths.Add((string.Empty, assetPath));
-                    }
-                }
-            }
-
-            int spritesPropArraySize = _spritesProp.arraySize;
-            for (int i = 0; i < spritesPropArraySize; ++i)
-            {
-                Sprite sprite =
-                    _spritesProp.GetArrayElementAtIndex(i).objectReferenceValue as Sprite;
-                if (sprite == null)
-                {
-                    continue;
-                }
-
-                string assetPath = AssetDatabase.GetAssetPath(sprite);
-                if (string.IsNullOrWhiteSpace(assetPath))
-                {
-                    continue;
-                }
-
-                string ext = Path.GetExtension(assetPath);
-                if (0 < allowedExtensions.Count && !allowedExtensions.Contains(ext))
-                {
-                    continue;
-                }
-
-                if (uniqueRelativePaths.Add(assetPath))
-                {
-                    filePaths.Add((string.Empty, assetPath));
-                }
-            }
-            return filePaths;
-        }
-
         public List<Sprite> sprites = new();
         public List<string> spriteFileExtensions = new() { ".png" };
         public List<SpriteSettings> spriteSettings = new() { new SpriteSettings() };
@@ -583,6 +475,114 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
             this.Log($"Loaded {spriteSettings.Count} profiles from {projectRelative}");
+        }
+
+        private List<(string fullFilePath, string relativePath)> GetTargetSpritePaths()
+        {
+            List<(string fullFilePath, string relativePath)> filePaths = _targetSpriteBuffer;
+            filePaths.Clear();
+            HashSet<string> uniqueRelativePaths = new(StringComparer.OrdinalIgnoreCase);
+            using PooledResource<List<string>> folderAssetPathsLease = Buffers<string>.List.Get(
+                out List<string> folderAssetPaths
+            );
+
+            for (int i = 0; i < _directoriesProp.arraySize; ++i)
+            {
+                Object dir = _directoriesProp.GetArrayElementAtIndex(i).objectReferenceValue;
+                if (dir == null)
+                {
+                    continue;
+                }
+
+                string assetPath = AssetDatabase.GetAssetPath(dir);
+                if (string.IsNullOrWhiteSpace(assetPath))
+                {
+                    continue;
+                }
+
+                if (AssetDatabase.IsValidFolder(assetPath))
+                {
+                    folderAssetPaths.Add(assetPath);
+                }
+                else
+                {
+                    this.LogWarn($"Item '{assetPath}' is not a valid directory. Skipping.");
+                }
+            }
+
+            HashSet<string> allowedExtensions = new(StringComparer.OrdinalIgnoreCase);
+            int spriteFileExtensionsPropArraySize = _spriteFileExtensionsProp.arraySize;
+            for (int i = 0; i < spriteFileExtensionsPropArraySize; ++i)
+            {
+                string ext = _spriteFileExtensionsProp.GetArrayElementAtIndex(i).stringValue;
+                if (string.IsNullOrWhiteSpace(ext))
+                {
+                    continue;
+                }
+
+                if (!ext.StartsWith("."))
+                {
+                    ext = "." + ext;
+                }
+
+                allowedExtensions.Add(ext);
+            }
+
+            if (0 < folderAssetPaths.Count)
+            {
+                string[] guids = AssetDatabase.FindAssets(
+                    "t:Texture2D",
+                    folderAssetPaths.ToArray()
+                );
+                foreach (string guid in guids)
+                {
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    if (string.IsNullOrWhiteSpace(assetPath))
+                    {
+                        continue;
+                    }
+
+                    string ext = Path.GetExtension(assetPath);
+                    if (0 < allowedExtensions.Count && !allowedExtensions.Contains(ext))
+                    {
+                        continue;
+                    }
+
+                    if (uniqueRelativePaths.Add(assetPath))
+                    {
+                        filePaths.Add((string.Empty, assetPath));
+                    }
+                }
+            }
+
+            int spritesPropArraySize = _spritesProp.arraySize;
+            for (int i = 0; i < spritesPropArraySize; ++i)
+            {
+                Sprite sprite =
+                    _spritesProp.GetArrayElementAtIndex(i).objectReferenceValue as Sprite;
+                if (sprite == null)
+                {
+                    continue;
+                }
+
+                string assetPath = AssetDatabase.GetAssetPath(sprite);
+                if (string.IsNullOrWhiteSpace(assetPath))
+                {
+                    continue;
+                }
+
+                string ext = Path.GetExtension(assetPath);
+                if (0 < allowedExtensions.Count && !allowedExtensions.Contains(ext))
+                {
+                    continue;
+                }
+
+                if (uniqueRelativePaths.Add(assetPath))
+                {
+                    filePaths.Add((string.Empty, assetPath));
+                }
+            }
+            return filePaths;
         }
     }
 #endif

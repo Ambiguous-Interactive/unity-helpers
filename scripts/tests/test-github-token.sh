@@ -452,18 +452,27 @@ fi
 # subset and the uncovered url is the one that hangs.
 check_sandbox="$(mktemp -d)"
 : > "$check_sandbox/global"
+# The checker derives the main checkout helper; both scripts must therefore belong to the
+# same independent fixture checkout rather than the caller's possibly linked worktree.
 : > "$check_sandbox/system"
+mkdir -p "$check_sandbox/scripts"
+cp "$REPO_ROOT/scripts/check-container-git-credentials.sh" \
+    "$REPO_ROOT/scripts/normalize-container-git-config.sh" \
+    "$REPO_ROOT/scripts/github-token.sh" "$check_sandbox/scripts/"
+chmod +x "$check_sandbox/scripts"/*.sh
+GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
+    git -C "$check_sandbox" -c init.templateDir= init -q || exit 1
 GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
     git config --system --add credential.helper \
     '!f() { /usr/bin/node /tmp/vscode-remote-containers-test.js git-credential-helper $*; }; f' 2>/dev/null
 
 run_credential_check() {
     GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
-        bash "$CREDENTIAL_CHECK" --quiet 2>&1
+        bash "$check_sandbox/scripts/check-container-git-credentials.sh" --quiet 2>&1
 }
 
 GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
-    bash "$REPO_ROOT/scripts/normalize-container-git-config.sh" > /dev/null 2>&1
+    bash "$check_sandbox/scripts/normalize-container-git-config.sh" > /dev/null 2>&1
 
 run_credential_check > /dev/null 2>&1
 if [ "$?" = "0" ]; then

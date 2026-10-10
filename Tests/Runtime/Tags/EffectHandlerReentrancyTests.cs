@@ -28,25 +28,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             "made no progress because a removal callback re-applied it"
         );
 
-        private (
-            GameObject entity,
-            EffectHandler handler,
-            TestAttributesComponent attributes,
-            TagHandler tags
-        ) CreateEntity()
-        {
-            GameObject entity = CreateTrackedGameObject(
-                "ReentrancyEntity",
-                typeof(TestAttributesComponent)
-            );
-            return (
-                entity,
-                entity.GetComponent<EffectHandler>(),
-                entity.GetComponent<TestAttributesComponent>(),
-                entity.GetComponent<TagHandler>()
-            );
-        }
-
         private static IEnumerable<TestCaseData> DestroyedCosmeticSiblingCases()
         {
             yield return new TestCaseData(ModifierDurationType.Instant, false, false)
@@ -1550,6 +1531,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 template.AddComponent<ReentrantCosmeticComponent>();
             component.requireInstance = requiresInstance;
             return template.GetComponent<CosmeticEffectData>();
+        }
+
+        private (
+            GameObject entity,
+            EffectHandler handler,
+            TestAttributesComponent attributes,
+            TagHandler tags
+        ) CreateEntity()
+        {
+            GameObject entity = CreateTrackedGameObject(
+                "ReentrancyEntity",
+                typeof(TestAttributesComponent)
+            );
+            return (
+                entity,
+                entity.GetComponent<EffectHandler>(),
+                entity.GetComponent<TestAttributesComponent>(),
+                entity.GetComponent<TagHandler>()
+            );
         }
     }
 }

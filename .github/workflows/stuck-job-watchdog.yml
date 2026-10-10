@@ -132,7 +132,8 @@ jobs:
         continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
         with:
-          app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
+          # The retained App ID is an accepted JWT issuer for this pinned action.
+          client-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 

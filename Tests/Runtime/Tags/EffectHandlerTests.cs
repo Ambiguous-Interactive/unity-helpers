@@ -18,22 +18,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
     {
         private const float RemainingDurationEpsilon = 1e-3f;
 
-        private (
-            GameObject entity,
-            EffectHandler handler,
-            TestAttributesComponent attributes,
-            TagHandler tags
-        ) CreateEntity()
-        {
-            GameObject entity = CreateTrackedGameObject("Entity", typeof(TestAttributesComponent));
-            return (
-                entity,
-                entity.GetComponent<EffectHandler>(),
-                entity.GetComponent<TestAttributesComponent>(),
-                entity.GetComponent<TagHandler>()
-            );
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -1725,6 +1709,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             component.requireInstance = requiresInstance;
             component.cleansSelf = false;
             return template.GetComponent<CosmeticEffectData>();
+        }
+
+        private (
+            GameObject entity,
+            EffectHandler handler,
+            TestAttributesComponent attributes,
+            TagHandler tags
+        ) CreateEntity()
+        {
+            GameObject entity = CreateTrackedGameObject("Entity", typeof(TestAttributesComponent));
+            return (
+                entity,
+                entity.GetComponent<EffectHandler>(),
+                entity.GetComponent<TestAttributesComponent>(),
+                entity.GetComponent<TagHandler>()
+            );
         }
     }
 }

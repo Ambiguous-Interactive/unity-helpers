@@ -86,6 +86,8 @@ The `Unity CI Success` aggregate job runs with `always()` and is the required br
 
 The reader App must be installed for the organization and expose the organization secrets `BUILD_LOCK_READER_APP_ID` and `BUILD_LOCK_READER_APP_PRIVATE_KEY` to this repository. Its organization permission is Self-hosted runners: read. No PAT or repository-level environment is required.
 
+The watchdog uses the `client-id` input of `actions/create-github-app-token` pinned at `bcd2ba49218906704ab6c1aa796996da409d3eb1`, while retaining `BUILD_LOCK_READER_APP_ID` and its existing private key. That revision forwards the identity unchanged into the JWT issuer; [GitHub accepts either the application ID or client ID](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app). The retained secret is an application ID, not a newly provisioned client ID. The release workflow uses the same supported input with `AUTO_COMMIT_APP_ID`. No secret replacement or additional permission is required for this input migration. Missing or expired reader credentials still follow the inventory fallback and unreadable-inventory failure path.
+
 If the preflight passes but the matrix job still stays queued, the cause is more likely the dispatcher bug (see [GitHub Community Discussion #186811](https://github.com/orgs/community/discussions/186811)) than the access list. Use the recovery workflows in this repository: `.github/workflows/unstick-run.yml` for manual recovery of a single run, and `.github/workflows/stuck-job-watchdog.yml` for the automated 5-minute scan.
 
 ### The watchdog's second recovery mode

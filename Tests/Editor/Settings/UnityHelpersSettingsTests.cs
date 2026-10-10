@@ -29,39 +29,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
     [NUnit.Framework.Category("Integration")]
     public sealed class UnityHelpersSettingsTests
     {
-        private static (Color Button, Color Text) GetPaletteEntryColors(
-            SerializedProperty dictionaryProperty,
-            string key,
-            string buttonField,
-            string textField
-        )
-        {
-            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
-                dictionaryProperty
-            );
-            int index = FindDictionaryIndex(keys, key);
-            Assert.GreaterOrEqual(index, 0, $"Palette entry '{key}' was not found.");
-
-            SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
-            return (
-                valueProperty.FindPropertyRelative(buttonField).colorValue,
-                valueProperty.FindPropertyRelative(textField).colorValue
-            );
-        }
-
-        private static (SerializedProperty Keys, SerializedProperty Values) GetDictionaryArrays(
-            SerializedProperty dictionaryProperty
-        )
-        {
-            SerializedProperty keys = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            SerializedProperty values = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-            return (keys, values);
-        }
-
         private readonly List<string> _ownedBufferSettingsFolders = new();
         private UnityHelpersBufferSettingsAsset _bufferSettingsAsset;
         private byte[] _originalBufferSettingsBytes;
@@ -391,6 +358,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             return 0 < propertyNames.Count
                 ? string.Join(", ", propertyNames)
                 : "(no visible properties found)";
+        }
+
+        private static (Color Button, Color Text) GetPaletteEntryColors(
+            SerializedProperty dictionaryProperty,
+            string key,
+            string buttonField,
+            string textField
+        )
+        {
+            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
+                dictionaryProperty
+            );
+            int index = FindDictionaryIndex(keys, key);
+            Assert.GreaterOrEqual(index, 0, $"Palette entry '{key}' was not found.");
+
+            SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
+            return (
+                valueProperty.FindPropertyRelative(buttonField).colorValue,
+                valueProperty.FindPropertyRelative(textField).colorValue
+            );
+        }
+
+        private static (SerializedProperty Keys, SerializedProperty Values) GetDictionaryArrays(
+            SerializedProperty dictionaryProperty
+        )
+        {
+            SerializedProperty keys = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty values = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+            return (keys, values);
         }
 
         [OneTimeSetUp]

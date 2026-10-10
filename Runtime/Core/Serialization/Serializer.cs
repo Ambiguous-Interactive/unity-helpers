@@ -3640,6 +3640,52 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             private const BindingFlags InstanceMethodFlags =
                 BindingFlags.Public | BindingFlags.Instance;
 
+            private static readonly ConcurrentDictionary<
+                Type,
+                (
+                    Func<object, object> GetItems,
+                    Action<object, object> SetItems,
+                    Func<object, object> GetKeys,
+                    Action<object, object> SetKeys,
+                    Func<object, object> GetValues,
+                    Action<object, object> SetValues,
+                    Action<object, object> SetPreserve,
+                    Action<object> OnBeforeSerialize,
+                    Action<object> OnAfterDeserialize
+                )
+            > TypeAccessors = new();
+
+            // Cache method-group delegates because C# 9 allocates the conversion on every call.
+            private static readonly Func<
+                Type,
+                (
+                    Func<object, object> GetItems,
+                    Action<object, object> SetItems,
+                    Func<object, object> GetKeys,
+                    Action<object, object> SetKeys,
+                    Func<object, object> GetValues,
+                    Action<object, object> SetValues,
+                    Action<object, object> SetPreserve,
+                    Action<object> OnBeforeSerialize,
+                    Action<object> OnAfterDeserialize
+                )
+            > CreateAccessorsFactory = CreateAccessors;
+
+            /// <summary>
+            /// Gets cached accessors for protobuf wrapper types.
+            /// </summary>
+            private static readonly ConcurrentDictionary<
+                Type,
+                (
+                    Func<object, object> GetItems,
+                    Action<object, object> SetItems,
+                    Func<object, object> GetKeys,
+                    Action<object, object> SetKeys,
+                    Func<object, object> GetValues,
+                    Action<object, object> SetValues
+                )
+            > WrapperAccessors = new();
+
             /// <summary>
             /// Gets or creates cached accessors for the specified collection type.
             /// </summary>
@@ -3810,52 +3856,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
                 return (getItems, setItems, getKeys, setKeys, getValues, setValues);
             }
-
-            private static readonly ConcurrentDictionary<
-                Type,
-                (
-                    Func<object, object> GetItems,
-                    Action<object, object> SetItems,
-                    Func<object, object> GetKeys,
-                    Action<object, object> SetKeys,
-                    Func<object, object> GetValues,
-                    Action<object, object> SetValues,
-                    Action<object, object> SetPreserve,
-                    Action<object> OnBeforeSerialize,
-                    Action<object> OnAfterDeserialize
-                )
-            > TypeAccessors = new();
-
-            // Cache method-group delegates because C# 9 allocates the conversion on every call.
-            private static readonly Func<
-                Type,
-                (
-                    Func<object, object> GetItems,
-                    Action<object, object> SetItems,
-                    Func<object, object> GetKeys,
-                    Action<object, object> SetKeys,
-                    Func<object, object> GetValues,
-                    Action<object, object> SetValues,
-                    Action<object, object> SetPreserve,
-                    Action<object> OnBeforeSerialize,
-                    Action<object> OnAfterDeserialize
-                )
-            > CreateAccessorsFactory = CreateAccessors;
-
-            /// <summary>
-            /// Gets cached accessors for protobuf wrapper types.
-            /// </summary>
-            private static readonly ConcurrentDictionary<
-                Type,
-                (
-                    Func<object, object> GetItems,
-                    Action<object, object> SetItems,
-                    Func<object, object> GetKeys,
-                    Action<object, object> SetKeys,
-                    Func<object, object> GetValues,
-                    Action<object, object> SetValues
-                )
-            > WrapperAccessors = new();
         }
         // Cycle detection uses reference identity so distinct value-equal nodes are still written.
 

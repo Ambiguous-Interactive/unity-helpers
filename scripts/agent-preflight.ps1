@@ -13,6 +13,17 @@ Param(
     [string[]]$AdditionalPaths
 )
 
+foreach ($argument in @($Paths) + @($AdditionalPaths) + @($PathList)) {
+    if ($null -ne $argument -and $argument -match '^[-\u2013\u2014\u2015]') {
+        [Console]::Error.WriteLine("[agent-preflight] Unsupported argument or ambiguous path '$argument'. Use -Paths or -PathList; prefix filenames starting with a hyphen with './' (or use an absolute path).")
+        exit 2
+    }
+}
+if ($null -ne $AdditionalPaths -and $AdditionalPaths.Count -gt 0 -and ($null -eq $Paths -or $Paths.Count -eq 0)) {
+    [Console]::Error.WriteLine('[agent-preflight] Trailing paths require -Paths. Use -Paths <path> [additional paths] or -PathList <list file>.')
+    exit 2
+}
+
 # cspell:ignore aniso dxf fnt hlsl iff
 
 Set-StrictMode -Version Latest

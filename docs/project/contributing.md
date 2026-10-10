@@ -151,6 +151,9 @@ What does not auto‑fix:
   - `npm run hooks:install`: installs git hooks. The install script also configures `push.autoSetupRemote=true` and `push.default=simple` locally, so `git push` on a new branch sets tracking automatically.
 - Verify all tools: `npm run verify:tools`
 - Format C#: `dotnet tool run csharpier format`
+- Check member ordering: `npm run lint:nested-type-placement`. Tuple return types, including
+  tuples inside generic return types, keep methods in their method tier. Tuple fields and
+  properties keep their field or property tier; initializer calls do not turn them into methods.
 - Check docs/JSON/YAML: `npm run validate:content`
 - Run the complete contract suite: `npm run validate:tests`. Hook regressions share the bounded
   worker pool with the fast checks; any check that mutates the repository runs exclusively first.
@@ -158,6 +161,11 @@ What does not auto‑fix:
   `npm run validate:tests:hook-regressions` remains available for hook changes.
   To select a hook check in the full runner, use
   `node scripts/run-contract-tests.js --include-hook-regressions --only agent-preflight`.
+- Run changed-file checks with `npm run agent:preflight` (or `agent:preflight:fix`).
+  Select paths with `-Paths first/path second/path`, or use `-PathList list.txt` for a file
+  containing one path per line. Unsupported options such as `--files` fail before any mutation.
+  Trailing paths require `-Paths`; prefix filenames starting with a hyphen with `./`, or use
+  an absolute path. With no path arguments, preflight checks the changed-file set.
 - Enforce EOL/encoding: `npm run eol:check`
 - Lint GitHub Actions: `actionlint`
 - Verify Markdown/code links: `npm run lint:doc-links` (cross-platform wrapper that locates PowerShell automatically)

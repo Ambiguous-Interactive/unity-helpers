@@ -36,8 +36,8 @@
  *   * `[Attr(new[] { 1, 2 })]` puts a brace before the member's own body brace.
  *   * a field initializer -- `private int[] _a = { 1, 2 };` -- does the same.
  *   * `private (int X, int Y) _point;` opens a tuple type, not a parameter list, so a member whose
- *     declaration prefix breaks at `(` is only a method when the token before the paren is an
- *     identifier (or `>` of a generic, or `operator`).
+ *     declaration prefix skips the balanced tuple type before finding the callable parameter list.
+ *     Named, unnamed and generic tuple return types follow the same member-ordering rules.
  * Parameter lists, attribute sections and bracketed types are skipped as balanced spans, and
  * comments and string literals are masked to spaces first so a brace inside either cannot count.
  *
@@ -525,6 +525,18 @@ function declarationPrefix(masked, start, end) {
   let scan = start;
   while (scan < end) {
     const char = masked[scan];
+    if (
+      char === "(" &&
+      callableNameBefore(masked, scan) === null &&
+      !/\boperator\b/.test(masked.slice(start, scan))
+    ) {
+      const close = skipBalanced(masked, scan);
+      if (close < 0) {
+        return null;
+      }
+      scan = close;
+      continue;
+    }
     if (char === "{" || char === "(" || char === "=" || char === ";") {
       return { prefix: masked.slice(start, scan).trim(), breakChar: char };
     }
@@ -646,40 +658,6 @@ function classifyMember(masked, member, typeName) {
     if (/(\boperator\b|\bimplicit\b|\bexplicit\b)/.test(prefix.prefix)) {
       return { tier: isStatic ? "static method" : "method", access };
     }
-    // Find the paren that terminated the prefix: the first top-level `(` after the header.
-    let paren = -1;
-    for (let scan = member.headerStart; scan < member.end; scan += 1) {
-      if (masked[scan] === "(") {
-        paren = scan;
-        break;
-      }
-      if (masked[scan] === "[") {
-        const close = skipBalanced(masked, scan);
-        if (close < 0) {
-          break;
-        }
-        scan = close - 1;
-        continue;
-      }
-    }
-    const callable = 0 <= paren ? callableNameBefore(masked, paren) : null;
-    if (callable === null) {
-      // A type-position paren: a tuple-typed member. Property or field, per its accessor.
-      const kind = accessorKind(masked, member.headerStart, member.end);
-      return kind === null
-        ? { unclassifiable: true }
-        : {
-            tier:
-              kind === "property"
-                ? isStatic
-                  ? "static property"
-                  : "property"
-                : isStatic
-                  ? "static field"
-                  : "field",
-            access
-          };
-    }
     const lastIdent = /~?[A-Za-z_]\w*\s*$/.exec(prefix.prefix)?.[0]?.trim();
     if (lastIdent !== null && (lastIdent === typeName || lastIdent === `~${typeName}`)) {
       return { tier: "constructor", access };
@@ -774,35 +752,7 @@ function memberName(masked, member) {
     return null;
   }
   if (prefix.breakChar === "(") {
-    // The name sits before the paren -- unless a tuple type opened it
-    // (`private (int X, int Y) _point;`), in which case it sits after the span.
-    let paren = -1;
-    for (let scan = member.headerStart; scan < member.end; scan += 1) {
-      if (masked[scan] === "(") {
-        paren = scan;
-        break;
-      }
-      if (masked[scan] === "[") {
-        const inner = skipBalanced(masked, scan);
-        if (inner < 0) {
-          return null;
-        }
-        scan = inner - 1;
-        continue;
-      }
-    }
-    if (0 <= paren && callableNameBefore(masked, paren) !== null) {
-      return /~?[A-Za-z_]\w*\s*$/.exec(prefix.prefix)?.[0]?.trim() ?? null;
-    }
-    let scan = 0 <= paren ? skipBalanced(masked, paren) : member.headerStart;
-    if (scan < 0) {
-      return null;
-    }
-    while (scan < member.end && /\s/.test(masked[scan])) {
-      scan += 1;
-    }
-    const after = /^[A-Za-z_]\w*/.exec(masked.slice(scan, member.end));
-    return after === null ? null : after[0];
+    return /(~?[A-Za-z_]\w*)\s*(?:<[^<>]*>)?\s*$/.exec(prefix.prefix)?.[1] ?? null;
   }
   const last = /~?[A-Za-z_]\w*\s*$/.exec(prefix.prefix);
   return last === null ? null : last[0].trim();
