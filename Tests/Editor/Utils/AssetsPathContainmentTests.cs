@@ -63,8 +63,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [TestCase("File.asset")]
         public void FolderHelpersRejectInvalidPaths(string path)
         {
+            const string bareAssetName = "File.asset";
+            bool isBareAssetName = string.Equals(path, bareAssetName, StringComparison.Ordinal);
+            string bareAssetPath = Path.Combine(
+                Path.GetDirectoryName(Application.dataPath),
+                bareAssetName
+            );
+            bool fileExisted = File.Exists(bareAssetPath);
+            bool directoryExisted = Directory.Exists(bareAssetPath);
+            bool metaExisted = File.Exists(bareAssetPath + ".meta");
+
             Assert.IsFalse(AssetDatabaseBatchHelper.EnsureAssetFolder(path));
-            Assert.IsFalse(AssetDatabaseBatchHelper.EnsureAssetParentFolder(path));
+            Assert.That(
+                AssetDatabaseBatchHelper.EnsureAssetParentFolder(path),
+                Is.EqualTo(isBareAssetName)
+            );
+            Assert.That(File.Exists(bareAssetPath), Is.EqualTo(fileExisted));
+            Assert.That(Directory.Exists(bareAssetPath), Is.EqualTo(directoryExisted));
+            Assert.That(File.Exists(bareAssetPath + ".meta"), Is.EqualTo(metaExisted));
             LogAssert.NoUnexpectedReceived();
         }
 

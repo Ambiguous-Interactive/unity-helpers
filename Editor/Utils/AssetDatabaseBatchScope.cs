@@ -418,18 +418,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         ///     so a subsequent <see cref="AssetDatabase.CreateAsset(UnityEngine.Object, string)"/> at that path cannot
         ///     fail with "Parent directory must exist".
         /// </summary>
-        /// <param name="assetPath">A Unity-relative asset path rooted at <c>Assets</c> (e.g. <c>Assets/Foo/Bar.asset</c>).</param>
+        /// <param name="assetPath">A Unity-relative asset path rooted at <c>Assets</c> (e.g. <c>Assets/Foo/Bar.asset</c>), or a bare file name with no parent to create.</param>
         /// <returns>
         ///     <see langword="true"/> if the parent folder exists in the AssetDatabase after the call,
-        ///     or if <paramref name="assetPath"/> sits directly under <c>Assets</c> (no folder to create);
+        ///     or if <paramref name="assetPath"/> has no parent segment or sits directly under <c>Assets</c> (no folder to create);
         ///     otherwise <see langword="false"/>.
         /// </returns>
         /// <remarks>
-        /// Invalid paths and paths escaping Assets return false before creating folders.
+        /// Invalid parent paths and paths escaping Assets return false before creating folders.
         /// See <see cref="EnsureAssetFolder"/> for the batch-pause and AssetDatabase-only rationale.
         /// </remarks>
         public static bool EnsureAssetParentFolder(string assetPath)
         {
+            if (
+                !string.IsNullOrWhiteSpace(assetPath)
+                && assetPath.IndexOf('/') < 0
+                && assetPath.IndexOf('\\') < 0
+            )
+            {
+                return true;
+            }
+
             if (!DirectoryHelper.TryResolveAssetsPath(assetPath, out string normalized, out _))
             {
                 return false;
