@@ -90,6 +90,8 @@ param(
 
     [switch]$ReleasePlayerBuild,
 
+    [switch]$ForceFreshCompilationCache,
+
     # IL2CPP C++ compiler configuration for the standalone player build. 'Release' is
     # what CI passes on every leg: it is what a shipped player runs, so it is what the
     # IL2CPP-compat leg should validate, and 'Debug' costs real time -- the standalone
@@ -230,6 +232,10 @@ if ($UnboundArguments -and 0 -lt $UnboundArguments.Count) {
         "(-AdditionalScriptingDefines a,b,c) rather than space-separated values."
     )
     exit 64
+}
+
+if ($ForceFreshCompilationCache -and ($TestMode -ne 'standalone' -or $StandaloneScriptingBackend -ne 'IL2CPP')) {
+    throw 'ForceFreshCompilationCache requires Standalone IL2CPP mode.'
 }
 
 # PowerShell 7.4 introduced $PSNativeCommandUseErrorActionPreference (stabilizing
@@ -773,7 +779,8 @@ function Write-UnityCompilationSourceInventoryMarker {
 function Clear-StaleUnityCompilationCache {
     param(
         [Parameter(Mandatory = $true)][string]$Project,
-        [Parameter(Mandatory = $true)][string]$RepoRoot
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [switch]$Force
     )
 
     $libraryPath = Join-Path $Project 'Library'
@@ -813,11 +820,14 @@ function Clear-StaleUnityCompilationCache {
         $null -ne $previousSourceInventory -and
         $previousSourceInventory -ceq $currentSourceInventory
     )
-    if ($repoRootMatches -and $sourceInventoryMatches) {
+    if (-not $Force -and $repoRootMatches -and $sourceInventoryMatches) {
         return
     }
 
     $reasons = @()
+    if ($Force) {
+        $reasons += 'fresh compilation explicitly requested'
+    }
     if (-not $repoRootMatches) {
         $reasons += if ([string]::IsNullOrWhiteSpace($previousRepoRoot)) {
             'repo-root marker is missing or unreadable'
@@ -4715,7 +4725,7 @@ if ($TestMode -ne 'export') {
     $ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
     $LibraryPath = Join-Path $ProjectPath 'Library'
     New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
-    Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot
+    Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot -Force:$ForceFreshCompilationCache
 } else {
     $LibraryPath = Join-Path $ProjectPath 'Library'
 }

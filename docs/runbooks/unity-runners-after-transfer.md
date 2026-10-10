@@ -298,6 +298,16 @@ Artifacts named `unity-<version>-acceptance` contain separate result directories
 Each requested test, verification, credential redaction and upload must succeed. These optional
 runs do not restore the separate disabled benchmark or release workflows.
 
+For fresh IL2CPP conversion evidence, set `fresh-conversion=true` on a manual **Unity Tests**
+dispatch. The default is `false`, preserving normal warm CI. This clears only `Bee`,
+`ScriptAssemblies`, `PlayerScriptAssemblies`, and `Il2cppBuildCache` in each selected Standalone
+project before configuration, inside the existing organization license lease. Regular,
+`SINGLE_THREADED`, and WProto-only Standalone builds receive the request; EditMode and PlayMode
+keep their caches. Package and import caches remain available. The script records the explicit
+fresh-compilation reason in the runner job log; acceptance still requires the actual converter
+invocation, source bindings, and passing native results. Direct script callers can pass
+`-ForceFreshCompilationCache` only with Standalone IL2CPP mode.
+
 The runner creates fresh projects and removes them after results are copied outside the project.
 If an editor remains active, cleanup retains the project and fails with its path for diagnosis.
 There are no automatic measurement retries. An inconclusive result is evidence to inspect, not a

@@ -1445,6 +1445,34 @@ function Test-UnityCompilationCacheBehavior {
             return 'matching marker must preserve compilation-cache sentinels, PackageCache, and marker contents'
         }
 
+        Clear-StaleUnityCompilationCache -Project $matchingMarkerFixture.Project -RepoRoot $matchingMarkerRoot -Force:$false
+        if (-not (Test-CompilationCacheSentinelsPresent -Fixture $matchingMarkerFixture)) {
+            return 'an explicitly false fresh-compilation switch must preserve matching warm caches'
+        }
+
+        $forcedFixture = New-UnityCompilationCacheFixture `
+            -MarkerValue $matchingMarkerValue `
+            -SourceMarkerValue $matchingSourceInventory
+        $fixtures += $forcedFixture
+        $importSentinel = Join-Path $forcedFixture.Library 'ArtifactDB'
+        Set-Content -LiteralPath $importSentinel -Value 'import-database' -Encoding utf8
+        $siblingSentinel = Join-Path $forcedFixture.Root 'sibling.txt'
+        Set-Content -LiteralPath $siblingSentinel -Value 'unrelated' -Encoding utf8
+        $forceLog = Clear-StaleUnityCompilationCache -Project $forcedFixture.Project -RepoRoot $matchingMarkerRoot -Force 6>&1 | Out-String
+        if (-not (Test-CompilationCacheDirsAbsent -Fixture $forcedFixture) -or
+            -not (Test-Path -LiteralPath $forcedFixture.PackageCacheSentinel -PathType Leaf) -or
+            (Get-Content -LiteralPath $importSentinel -Raw).Trim() -cne 'import-database' -or
+            (Get-Content -LiteralPath $siblingSentinel -Raw).Trim() -cne 'unrelated' -or
+            (Get-Content -LiteralPath $forcedFixture.MarkerPath -Raw).Trim() -cne $matchingMarkerValue -or
+            (Get-Content -LiteralPath $forcedFixture.SourceMarkerPath -Raw).Trim() -cne $matchingSourceInventory -or
+            $forceLog -notmatch 'fresh compilation explicitly requested') {
+            return 'explicit fresh compilation must clear all four matching-cache outputs, explain the request, and preserve import/package/sibling files and successful markers'
+        }
+        Clear-StaleUnityCompilationCache -Project $forcedFixture.Project -RepoRoot $matchingMarkerRoot -Force
+        if (-not (Test-CompilationCacheDirsAbsent -Fixture $forcedFixture)) {
+            return 'fresh compilation must also tolerate already absent compilation outputs'
+        }
+
         # Content-only changes are normal on every commit and Unity tracks them itself. Preserve
         # the warm compilation cache when the source path set is unchanged.
         Set-Content -LiteralPath (Join-Path $matchingRuntimeRoot 'Existing.cs') -Value 'class Existing { int Value; }' -Encoding utf8
@@ -1509,6 +1537,53 @@ if ($compilationCacheBehaviorFailure) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked stale Unity compilation cache cleanup behavior with no-Unity temp fixtures."
+}
+
+$freshCompilationSteps = @([regex]::Split($workflowContent, '(?m)^      - name: ') | Where-Object { $_.Contains('-ForceFreshCompilationCache:') })
+$freshCompilationWorkflowValid = (
+    $workflowContent -match '(?ms)^      fresh-conversion:\r?\n        description: [^\r\n]+\r?\n        required: false\r?\n        default: false\r?\n        type: boolean' -and
+    $freshCompilationSteps.Count -eq 3 -and
+    [regex]::Matches($workflowContent, 'UH_FORCE_FRESH_COMPILATION_CACHE:').Count -eq 3
+)
+foreach ($step in $freshCompilationSteps) {
+    $freshCompilationWorkflowValid = $freshCompilationWorkflowValid -and
+        $step.Contains("-TestMode 'standalone'") -and
+        $step.Contains("github.event_name == 'workflow_dispatch' && inputs.fresh-conversion && 'true' || 'false'") -and
+        $step.Contains('-ForceFreshCompilationCache:($env:UH_FORCE_FRESH_COMPILATION_CACHE -eq ''true'')') -and
+        -not $step.Contains("-TestMode 'editmode'") -and
+        -not $step.Contains("-TestMode 'playmode'")
+}
+if (-not $freshCompilationWorkflowValid) {
+    Write-Host '::error file=.github/workflows/unity-tests.yml::Fresh compilation must default false and flow only from the typed manual-dispatch input into all three Standalone steps.'
+    $failed = $true
+}
+
+foreach ($invalidFreshRequest in @(
+        @{ Mode = 'editmode'; Backend = 'IL2CPP' },
+        @{ Mode = 'playmode'; Backend = 'IL2CPP' },
+        @{ Mode = 'export'; Backend = 'IL2CPP' },
+        @{ Mode = 'standalone'; Backend = 'Mono2x' }
+    )) {
+    $requestRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-fresh-invalid-$PID-$(Get-Random)"
+    try {
+        $requestOutput = & pwsh -NoProfile -File $runCiTestsPath `
+            -UnityVersion '6000.6.0f1' `
+            -TestMode $invalidFreshRequest.Mode `
+            -StandaloneScriptingBackend $invalidFreshRequest.Backend `
+            -ArtifactsPath (Join-Path $requestRoot 'artifacts') `
+            -ProjectPath (Join-Path $requestRoot 'project') `
+            -ForceFreshCompilationCache 2>&1 | Out-String
+        $requestExit = $LASTEXITCODE
+        if ($requestExit -eq 0 -or $requestOutput -notmatch 'ForceFreshCompilationCache requires Standalone IL2CPP mode' -or
+            (Test-Path -LiteralPath $requestRoot)) {
+            Write-Host "::error file=scripts/unity/run-ci-tests.ps1::Fresh compilation must reject $($invalidFreshRequest.Mode)/$($invalidFreshRequest.Backend) before project/artifact initialization."
+            $failed = $true
+        }
+    } finally {
+        if (Test-Path -LiteralPath $requestRoot) {
+            Remove-Item -LiteralPath $requestRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 $maintenanceForceDetectorFixtures = @(
