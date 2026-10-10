@@ -185,6 +185,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [ProtoMember(1)]
         [WProtoMember(1)]
         public Dictionary<(TupleButtonType, TupleButtonDirection), double> Values;
+
+        /// <summary>Exercises private geometry tuples unrelated to the serialized map.</summary>
+        public object InspectGeometry()
+        {
+            (GeometryPoint, GeometryPoint) edge = (new GeometryPoint(), new GeometryPoint());
+            return edge;
+        }
+
+        private readonly struct GeometryPoint { }
     }
 
     /// <summary>

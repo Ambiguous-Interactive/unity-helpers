@@ -372,13 +372,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </remarks>
         public static bool EnsureAssetFolder(string assetFolderPath)
         {
-            if (string.IsNullOrWhiteSpace(assetFolderPath))
-            {
-                return false;
-            }
-
-            string normalized = assetFolderPath.SanitizePath().TrimEnd('/');
-            if (string.IsNullOrWhiteSpace(normalized))
+            if (
+                !DirectoryHelper.TryResolveAssetsPath(assetFolderPath, out string normalized, out _)
+            )
             {
                 return false;
             }
@@ -389,16 +385,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
 
             string[] segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (segments.Length == 0)
-            {
-                return false;
-            }
-
-            // Only Assets paths can be created through this helper; refuse other roots.
-            if (!string.Equals(segments[0], "Assets", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
 
             // Pause batching so folder creation and imports become visible synchronously.
             using (PauseBatch())
@@ -438,15 +424,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         ///     or if <paramref name="assetPath"/> sits directly under <c>Assets</c> (no folder to create);
         ///     otherwise <see langword="false"/>.
         /// </returns>
-        /// <remarks>See <see cref="EnsureAssetFolder"/> for the batch-pause and AssetDatabase-only rationale.</remarks>
+        /// <remarks>
+        /// Invalid paths and paths escaping Assets return false before creating folders.
+        /// See <see cref="EnsureAssetFolder"/> for the batch-pause and AssetDatabase-only rationale.
+        /// </remarks>
         public static bool EnsureAssetParentFolder(string assetPath)
         {
-            if (string.IsNullOrWhiteSpace(assetPath))
+            if (!DirectoryHelper.TryResolveAssetsPath(assetPath, out string normalized, out _))
             {
                 return false;
             }
 
-            string normalized = assetPath.SanitizePath();
             int lastSlash = normalized.LastIndexOf('/');
             if (lastSlash <= 0)
             {

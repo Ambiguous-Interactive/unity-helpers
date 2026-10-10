@@ -487,6 +487,74 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             return InvokeDetector(_defaultAssetImportWorkerDetector, assumeWorkerOnFailure: false);
         }
 
+        /// <summary>
+        /// Attempts to clean up any partially created asset files on disk.
+        /// This handles the case where CreateAsset wrote the file but Unity failed to import it.
+        /// </summary>
+        internal static void TryCleanupPartiallyCreatedAsset(string assetsRelativePath)
+        {
+            if (
+                !DirectoryHelper.TryResolveAssetsPath(
+                    assetsRelativePath,
+                    out string canonicalAssetPath,
+                    out _
+                ) || string.Equals(canonicalAssetPath, "Assets", StringComparison.Ordinal)
+            )
+            {
+                return;
+            }
+
+            assetsRelativePath = canonicalAssetPath;
+
+            try
+            {
+                if (AssetDatabase.DeleteAsset(assetsRelativePath))
+                {
+                    LogVerbose(
+                        $"ScriptableObjectSingletonCreator: Cleaned up partially created asset at {assetsRelativePath}."
+                    );
+                    return;
+                }
+            }
+            catch (Exception) { }
+
+            string absolutePath = TryGetAbsoluteAssetsPath(assetsRelativePath);
+            if (string.IsNullOrWhiteSpace(absolutePath))
+            {
+                return;
+            }
+
+            bool cleaned = false;
+            try
+            {
+                if (File.Exists(absolutePath))
+                {
+                    File.Delete(absolutePath);
+                    cleaned = true;
+                }
+
+                string metaPath = absolutePath + ".meta";
+                if (File.Exists(metaPath))
+                {
+                    File.Delete(metaPath);
+                    cleaned = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogVerbose(
+                    $"ScriptableObjectSingletonCreator: Failed to clean up partially created asset files at {absolutePath}: {ex}"
+                );
+            }
+
+            if (cleaned)
+            {
+                LogVerbose(
+                    $"ScriptableObjectSingletonCreator: Cleaned up partially created asset files at {absolutePath}."
+                );
+            }
+        }
+
         private static void MarkInitialEnsureCompleted()
         {
             UnityHelpers.Utils.ScriptableObjectSingletonInitState.InitialEnsureCompleted = true;
@@ -1123,25 +1191,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private static string TryGetAbsoluteAssetsPath(string assetsRelativePath)
         {
-            if (string.IsNullOrWhiteSpace(assetsRelativePath))
-            {
-                return string.Empty;
-            }
-
-            string normalized = NormalizePath(assetsRelativePath);
-            if (!normalized.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
-            {
-                return string.Empty;
-            }
-
-            string projectRoot = Validation.AuthoredAssetPaths.ProjectRoot();
-            if (string.IsNullOrEmpty(projectRoot))
-            {
-                return string.Empty;
-            }
-
-            string combined = Path.Combine(projectRoot, normalized);
-            return Path.GetFullPath(combined);
+            return DirectoryHelper.TryResolveAssetsPath(
+                assetsRelativePath,
+                out _,
+                out string absolutePath
+            )
+                ? absolutePath
+                : string.Empty;
         }
 
         private static bool DoesAssetFileExistOnDisk(string assetsRelativePath)
@@ -1209,63 +1265,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
         }
 
-        /// <summary>
-        /// Attempts to clean up any partially created asset files on disk.
-        /// This handles the case where CreateAsset wrote the file but Unity failed to import it.
-        /// </summary>
-        private static void TryCleanupPartiallyCreatedAsset(string assetsRelativePath)
-        {
-            try
-            {
-                if (AssetDatabase.DeleteAsset(assetsRelativePath))
-                {
-                    LogVerbose(
-                        $"ScriptableObjectSingletonCreator: Cleaned up partially created asset at {assetsRelativePath}."
-                    );
-                    return;
-                }
-            }
-            catch (Exception) { }
-
-            string absolutePath = TryGetAbsoluteAssetsPath(assetsRelativePath);
-            if (string.IsNullOrWhiteSpace(absolutePath))
-            {
-                return;
-            }
-
-            bool cleaned = false;
-            try
-            {
-                if (File.Exists(absolutePath))
-                {
-                    File.Delete(absolutePath);
-                    cleaned = true;
-                }
-
-                string metaPath = absolutePath + ".meta";
-                if (File.Exists(metaPath))
-                {
-                    File.Delete(metaPath);
-                    cleaned = true;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogVerbose(
-                    $"ScriptableObjectSingletonCreator: Failed to clean up partially created asset files at {absolutePath}: {ex}"
-                );
-            }
-
-            if (cleaned)
-            {
-                LogVerbose(
-                    $"ScriptableObjectSingletonCreator: Cleaned up partially created asset files at {absolutePath}."
-                );
-            }
-        }
-
         private static bool TryRemoveStaleAssetArtifacts(string assetsRelativePath)
         {
+            if (
+                !DirectoryHelper.TryResolveAssetsPath(
+                    assetsRelativePath,
+                    out string canonicalAssetPath,
+                    out _
+                ) || string.Equals(canonicalAssetPath, "Assets", StringComparison.Ordinal)
+            )
+            {
+                return false;
+            }
+
+            assetsRelativePath = canonicalAssetPath;
+
             bool removed = false;
 
             // Pause batching to remove stale GUID mappings before creating a replacement at the same path.

@@ -986,10 +986,11 @@ deliberate container. On this package alone that is 41 registrations, 11 of them
 that can never serialize (`Type`, `ConstructorInfo`, …). Those decline at run time, but under IL2CPP
 each closure is still compiled code.
 
-It also silences a second cost. Because the registration is automatic, a tuple that closes over a
-type the generated registrar cannot name (a `private` nested type, say) produces a `WPROTO028`
-warning asking you to widen it, for a formatter you never asked for. Two such warnings exist in this
-package's own tests.
+An inaccessible two- or three-element tuple used only as a local aggregate is skipped by the
+built-in formatter scan without a warning. A tuple used as a serialized member or passed to the
+serialization facade still produces `WPROTO028` if its private argument types prevent the generated
+registrar from naming it. Explicit root-marshal and custom formatter registrations retain their
+warnings, as do JSON converter registrations.
 
 Turning it off does **not** affect `SerializableValueTuple`; the stand-in keeps its own converter
 and its generated formatter either way. Only the automatic support for the raw framework tuple goes.

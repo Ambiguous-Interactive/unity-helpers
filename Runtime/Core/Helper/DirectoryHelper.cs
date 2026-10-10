@@ -23,7 +23,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// Ensures a directory exists in the project. In the editor, the directory must be inside <c>Assets/</c> and is created via <c>AssetDatabase</c>.
         /// </summary>
         /// <param name="relativeDirectoryPath">Unity relative path (e.g., <c>Assets/MyFolder/Sub</c>).</param>
-        /// <exception cref="ArgumentException">Thrown if attempting to create a directory outside of <c>Assets/</c> in the editor.</exception>
+        /// <remarks>
+        /// Editor paths are canonicalized before writing; parent segments remaining within Assets are supported.
+        /// Containment is lexical and does not resolve filesystem symbolic links.
+        /// </remarks>
+        /// <exception cref="ArgumentException">Thrown for invalid paths or paths resolving outside <c>Assets/</c> in the editor.</exception>
         public static void EnsureDirectoryExists(string relativeDirectoryPath)
         {
             if (string.IsNullOrWhiteSpace(relativeDirectoryPath))
@@ -35,14 +39,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
 #if UNITY_EDITOR
 
-            if (!relativeDirectoryPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+            if (
+                !TryResolveAssetsPath(
+                    relativeDirectoryPath,
+                    out string canonicalAssetPath,
+                    out string absoluteDirectory
+                )
+            )
             {
-                if (relativeDirectoryPath.Equals("Assets", StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-
-                // The typed exception already carries the path; a second log would duplicate the failure.
                 throw new ArgumentException(
                     $"Cannot create directory '{relativeDirectoryPath}' outside the Assets folder: "
                         + "AssetDatabase only manages paths under 'Assets/'.",
@@ -50,25 +54,25 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
 
-            // Create the disk folder first to prevent Unity from showing a modal move-failure dialog.
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            string absoluteDirectory = null;
-            if (!string.IsNullOrWhiteSpace(projectRoot))
+            relativeDirectoryPath = canonicalAssetPath;
+            if (string.Equals(relativeDirectoryPath, "Assets", StringComparison.Ordinal))
             {
-                absoluteDirectory = Path.Combine(projectRoot, relativeDirectoryPath);
-                try
+                return;
+            }
+
+            // Create the disk folder first to prevent Unity from showing a modal move-failure dialog.
+            try
+            {
+                if (!Directory.Exists(absoluteDirectory))
                 {
-                    if (!Directory.Exists(absoluteDirectory))
-                    {
-                        Directory.CreateDirectory(absoluteDirectory);
-                    }
+                    Directory.CreateDirectory(absoluteDirectory);
                 }
-                catch (Exception e)
-                {
-                    Debug.LogWarning(
-                        $"DirectoryHelper: Failed to create directory on disk '{absoluteDirectory}': {e}"
-                    );
-                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning(
+                    $"DirectoryHelper: Failed to create directory on disk '{absoluteDirectory}': {e}"
+                );
             }
 
             // Disk folders may be absent from AssetDatabase; creating again would produce a suffixed duplicate.
@@ -413,5 +417,75 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return string.Empty;
             }
         }
+
+#if UNITY_EDITOR
+        internal static bool TryResolveAssetsPath(
+            string assetPath,
+            out string canonicalAssetPath,
+            out string absolutePath
+        )
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                canonicalAssetPath = string.Empty;
+                absolutePath = string.Empty;
+                return false;
+            }
+
+            string normalized = assetPath.SanitizePath();
+            if (
+                !string.Equals(normalized, "Assets", StringComparison.OrdinalIgnoreCase)
+                && !normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                canonicalAssetPath = string.Empty;
+                absolutePath = string.Empty;
+                return false;
+            }
+
+            try
+            {
+                string assetsRoot = Path.GetFullPath(Application.dataPath)
+                    .SanitizePath()
+                    .TrimEnd('/');
+                string suffix =
+                    normalized.Length == "Assets".Length
+                        ? string.Empty
+                        : normalized.Substring("Assets/".Length).TrimStart('/');
+                string candidate = Path.GetFullPath(Path.Combine(assetsRoot, suffix))
+                    .SanitizePath()
+                    .TrimEnd('/');
+                StringComparison comparison =
+                    Path.DirectorySeparatorChar == '\\'
+                        ? StringComparison.OrdinalIgnoreCase
+                        : StringComparison.Ordinal;
+                string resolvedAssetPath;
+                if (string.Equals(candidate, assetsRoot, comparison))
+                {
+                    resolvedAssetPath = "Assets";
+                }
+                else if (candidate.StartsWith(assetsRoot + "/", comparison))
+                {
+                    resolvedAssetPath = "Assets/" + candidate.Substring(assetsRoot.Length + 1);
+                }
+                else
+                {
+                    canonicalAssetPath = string.Empty;
+                    absolutePath = string.Empty;
+                    return false;
+                }
+
+                canonicalAssetPath = resolvedAssetPath;
+                absolutePath = candidate;
+                return true;
+            }
+            catch (Exception)
+            {
+                canonicalAssetPath = string.Empty;
+                absolutePath = string.Empty;
+                return false;
+            }
+        }
+#endif
     }
 }

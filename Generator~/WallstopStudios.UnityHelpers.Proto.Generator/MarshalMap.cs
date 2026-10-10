@@ -322,6 +322,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
+                if (
+                    !_declaredHere.Contains(closure.OriginalDefinition)
+                    && ClosureScan.IsIncidentalUnnameableTuple(use, compilation)
+                    && SymbolEqualityComparer.Default.Equals(
+                        definition.OriginalDefinition,
+                        compilation.GetTypeByMetadataName(
+                            closure.Arity == 2
+                                ? "WallstopStudios.UnityHelpers.Core.Serialization.ValueTupleMarshalFormatter`2"
+                                : "WallstopStudios.UnityHelpers.Core.Serialization.ValueTupleMarshalFormatter`3"
+                        )
+                    )
+                )
+                {
+                    continue;
+                }
+
                 INamedTypeSymbol formatter = ClosureScan.Close(definition, closure.TypeArguments);
                 if (
                     formatter == null
