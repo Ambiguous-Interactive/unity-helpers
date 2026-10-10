@@ -74,6 +74,160 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(1, count);
         }
 
+        [TestCase(0, false, false)]
+        [TestCase(0, true, false)]
+        [TestCase(1, false, false)]
+        [TestCase(1, true, false)]
+        [TestCase(2, false, false)]
+        [TestCase(2, true, false)]
+        [TestCase(0, false, true)]
+        [TestCase(0, true, true)]
+        [TestCase(1, false, true)]
+        [TestCase(1, true, true)]
+        [TestCase(2, false, true)]
+        [TestCase(2, true, true)]
+        public void TagRemovalPreservesApplicationsCreatedDuringCallbacks(
+            int replacementMode,
+            bool matchesRemovedTag,
+            bool throws
+        )
+        {
+            GameObject entity = CreateTrackedGameObject(
+                nameof(TagOwnershipSnapshotTests),
+                typeof(TagHandler)
+            );
+            TagHandler tags = entity.GetComponent<TagHandler>();
+            for (int i = 0; i < 2; ++i)
+            {
+                AttributeEffect effect = CreateEffect(
+                    OwnedTag + i,
+                    authored => authored.effectTags.Add(OwnedTag)
+                );
+                tags.ForceApplyTags(EffectHandle.CreateInstance(effect));
+            }
+            string survivingTag = matchesRemovedTag ? OwnedTag : OtherTag;
+            AttributeEffect replacement = CreateEffect(
+                nameof(replacement),
+                authored => authored.effectTags.Add(survivingTag)
+            );
+            EffectHandle survivor = default;
+            bool replaced = false;
+            tags.OnTagCountChanged += (changed, count) =>
+            {
+                if (
+                    replaced
+                    || !string.Equals(changed, OwnedTag, System.StringComparison.Ordinal)
+                    || count != 1u
+                )
+                {
+                    return;
+                }
+                replaced = true;
+                EffectHandle remaining = tags.GetHandlesWithTag(OwnedTag)[0];
+                if (replacementMode != 2)
+                {
+                    Assert.IsTrue(tags.ForceRemoveTags(remaining));
+                }
+                if (replacementMode == 0)
+                {
+                    remaining.effect.effectTags.Clear();
+                    remaining.effect.effectTags.Add(survivingTag);
+                    survivor = remaining;
+                }
+                else
+                {
+                    survivor = EffectHandle.CreateInstance(replacement);
+                }
+                tags.ForceApplyTags(survivor);
+                if (throws)
+                {
+                    throw new System.InvalidOperationException("Removal callback failed");
+                }
+            };
+
+            if (throws)
+            {
+                Assert.Throws<System.InvalidOperationException>(() => tags.RemoveTag(OwnedTag));
+            }
+            else
+            {
+                Assert.AreEqual(2, tags.RemoveTag(OwnedTag).Count);
+            }
+            Assert.IsTrue(replaced);
+            Assert.IsTrue(tags.TryGetTagCount(survivingTag, out int count));
+            Assert.AreEqual(1, count);
+            List<EffectHandle> owners = tags.GetHandlesWithTag(survivingTag);
+            Assert.AreEqual(1, owners.Count);
+            Assert.AreEqual(survivor.id, owners[0].id);
+            Assert.AreEqual(matchesRemovedTag, tags.HasTag(OwnedTag));
+            Assert.IsTrue(tags.ForceRemoveTags(survivor));
+            Assert.IsEmpty(tags.GetActiveTags());
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void UntrackedCleanupPreservesCallbackOwnedCounts(bool throws)
+        {
+            GameObject entity = CreateTrackedGameObject(
+                nameof(TagOwnershipSnapshotTests),
+                typeof(TagHandler)
+            );
+            TagHandler tags = entity.GetComponent<TagHandler>();
+            tags.ApplyTag(OwnedTag);
+            tags.ApplyTag(OwnedTag);
+            AttributeEffect original = CreateEffect(
+                nameof(original),
+                authored => authored.effectTags.Add(OwnedTag)
+            );
+            tags.ForceApplyTags(EffectHandle.CreateInstance(original));
+            AttributeEffect replacement = CreateEffect(
+                nameof(replacement),
+                authored =>
+                {
+                    authored.effectTags.Add(OwnedTag);
+                    authored.effectTags.Add(OwnedTag);
+                }
+            );
+            EffectHandle survivor = EffectHandle.CreateInstance(replacement);
+            bool replaced = false;
+            tags.OnTagCountChanged += (changed, count) =>
+            {
+                if (
+                    !string.Equals(changed, OwnedTag, System.StringComparison.Ordinal)
+                    || count != 2u
+                )
+                {
+                    return;
+                }
+                if (!replaced)
+                {
+                    replaced = true;
+                    tags.ForceApplyTags(survivor);
+                }
+                else if (throws)
+                {
+                    throw new System.InvalidOperationException(
+                        "Untracked cleanup notification failed"
+                    );
+                }
+            };
+            if (throws)
+            {
+                Assert.Throws<System.InvalidOperationException>(() => tags.RemoveTag(OwnedTag));
+            }
+            else
+            {
+                Assert.AreEqual(1, tags.RemoveTag(OwnedTag).Count);
+            }
+            Assert.IsTrue(replaced);
+            Assert.IsTrue(tags.TryGetTagCount(OwnedTag, out int count));
+            Assert.AreEqual(2, count);
+            Assert.AreEqual(1, tags.GetHandlesWithTag(OwnedTag).Count);
+            Assert.AreEqual(survivor.id, tags.GetHandlesWithTag(OwnedTag)[0].id);
+            Assert.IsTrue(tags.ForceRemoveTags(survivor));
+            Assert.IsEmpty(tags.GetActiveTags());
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void ReapplyingSameHandleDuringApplicationRetainsOnlyNewOwnership(bool throws)

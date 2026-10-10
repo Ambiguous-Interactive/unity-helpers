@@ -579,8 +579,9 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Removes all instances of the specified tag and returns the contributing effect handles.
+        /// Removes current contributing effect applications and untracked instances of the specified tag.
         /// </summary>
+        /// <remarks>Tracked applications created during removal callbacks remain active, including reapplications of the same handle.</remarks>
         /// <param name="effectTag">The tag to remove.</param>
         /// <param name="buffer">
         /// Optional list that receives the handles whose effects applied <paramref name="effectTag"/>.
@@ -634,14 +635,37 @@ namespace WallstopStudios.UnityHelpers.Tags
                 if (target != null && 0 < target.Count)
                 {
                     // Snapshot the buffer before callbacks can reenter and replace its contents.
-                    using PooledResource<List<EffectHandle>> scratchLease =
-                        Buffers<EffectHandle>.List.Get(out List<EffectHandle> scratch);
-                    scratch.AddRange(target);
-                    foreach (EffectHandle handle in scratch)
+                    using PooledResource<
+                        List<(EffectHandle handle, PooledResource<List<string>> owner)>
+                    > scratchLease = Buffers<(
+                        EffectHandle handle,
+                        PooledResource<List<string>> owner
+                    )>.List.Get(
+                        out List<(EffectHandle handle, PooledResource<List<string>> owner)> scratch
+                    );
+                    foreach (EffectHandle handle in target)
                     {
+                        if (
+                            _appliedTagsByHandle.TryGetValue(
+                                handle.id,
+                                out PooledResource<List<string>> owner
+                            )
+                        )
+                        {
+                            scratch.Add((handle, owner));
+                        }
+                    }
+                    foreach (
+                        (EffectHandle handle, PooledResource<List<string>> owner) entry in scratch
+                    )
+                    {
+                        if (!entry.owner.IsHeld)
+                        {
+                            continue;
+                        }
                         try
                         {
-                            _ = ForceRemoveTags(handle);
+                            _ = ForceRemoveTags(entry.handle);
                         }
                         catch (Exception handleFailure)
                         {
@@ -655,13 +679,18 @@ namespace WallstopStudios.UnityHelpers.Tags
 
                     // Restore this call's results after reentrant calls reuse the caller buffer.
                     target.Clear();
-                    target.AddRange(scratch);
+                    foreach (
+                        (EffectHandle handle, PooledResource<List<string>> owner) entry in scratch
+                    )
+                    {
+                        target.Add(entry.handle);
+                    }
                 }
             }
 
             try
             {
-                InternalRemoveTag(effectTag, allInstances: true);
+                RemoveUntrackedTagInstances(effectTag);
             }
             catch (Exception tagFailure)
             {
@@ -946,6 +975,34 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     ExceptionDispatchInfo.Capture(firstFailure).Throw();
                 }
+            }
+        }
+
+        private void RemoveUntrackedTagInstances(string effectTag)
+        {
+            if (!_tagCount.TryGetValue(effectTag, out uint currentCount))
+            {
+                return;
+            }
+            uint trackedCount = 0;
+            foreach (PooledResource<List<string>> owner in _appliedTagsByHandle.Values)
+            {
+                foreach (string appliedTag in owner.resource)
+                {
+                    if (string.Equals(appliedTag, effectTag, StringComparison.Ordinal))
+                    {
+                        ++trackedCount;
+                    }
+                }
+            }
+            if (trackedCount == 0)
+            {
+                InternalRemoveTag(effectTag, allInstances: true);
+            }
+            else if (trackedCount < currentCount)
+            {
+                _tagCount[effectTag] = trackedCount;
+                OnTagCountChanged?.Invoke(effectTag, trackedCount);
             }
         }
 

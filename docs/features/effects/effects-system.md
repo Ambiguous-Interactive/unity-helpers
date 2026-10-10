@@ -170,6 +170,8 @@ a snapshot before callbacks; tags not yet applied do not appear in handle querie
 failed application releases its recorded tags without decrementing tags owned by another handle.
 Reapplying the same handle during a callback starts a new application; the interrupted application
 cannot continue changing its tags or unwind the replacement.
+Removal by tag also preserves newly tracked applications created by its callbacks, including
+applications of the requested tag.
 Destroying the tag component during application stops further tag notifications and releases its
 recorded ownership.
 

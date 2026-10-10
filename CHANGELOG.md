@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix effects refreshed by removal callbacks expiring before their new deadline ([#984](https://github.com/Ambiguous-Interactive/unity-helpers/issues/984)).
-- Fix active tags losing ownership when their effect asset changes or is destroyed; queries and removal retain the tags actually applied ([#985](https://github.com/Ambiguous-Interactive/unity-helpers/issues/985)).
+- Fix active tags losing ownership after effect asset edits or destruction. Preserve replacement effects during tag-removal callbacks ([#985](https://github.com/Ambiguous-Interactive/unity-helpers/issues/985)).
 - Fix effect removal callbacks losing reapplied modifiers or repeating cleanup. Stop periodic damage after an attribute callback cancels its effect ([#977](https://github.com/Ambiguous-Interactive/unity-helpers/issues/977)).
 - Fix loading caches leaking disposable factory results when weight or lifetime callbacks throw, while preserving references retained by other entries ([#972](https://github.com/Ambiguous-Interactive/unity-helpers/issues/972)).
 - Fix first-save initialization so failed writes leave the save path free for retry and competing creators keep their complete files ([#964](https://github.com/Ambiguous-Interactive/unity-helpers/issues/964)).
