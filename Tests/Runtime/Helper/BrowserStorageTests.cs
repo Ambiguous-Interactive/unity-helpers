@@ -7,6 +7,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
+#if !UNITY_WEBGL || UNITY_EDITOR
+    using System.Globalization;
+    using UnityEngine;
+#endif
 
     [TestFixture]
     [Category("Fast")]
@@ -131,6 +135,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(second.TryGetString("key", out string remaining), Is.True);
             Assert.That(remaining, Is.EqualTo("second"));
         }
+
+#if !UNITY_WEBGL || UNITY_EDITOR
+        [TestCase(9)]
+        [TestCase(10)]
+        [TestCase(99)]
+        [TestCase(100)]
+        [TestCase(999)]
+        [TestCase(1000)]
+        public void ReadsLegacyPlayerPrefsScopeLengthFormat(int scopeLength)
+        {
+            string scope = Guid.NewGuid()
+                .ToString("N")
+                .PadRight(scopeLength, 's')
+                .Substring(0, scopeLength);
+            Assert.That(scope.Length, Is.EqualTo(scopeLength));
+            string key = nameof(scopeLength);
+            BrowserStorage store = OwnStore(scope, key);
+            string legacyKey =
+                "WallstopBrowserStorage:"
+                + scopeLength.ToString(CultureInfo.InvariantCulture)
+                + ":"
+                + scope
+                + ":"
+                + key;
+            PlayerPrefs.SetString(legacyKey, "legacy-value");
+            try
+            {
+                Assert.That(store.TryGetString(key, out string value), Is.True);
+                Assert.That(value, Is.EqualTo("legacy-value"));
+                Assert.That(store.TrySetString(key, "replacement"), Is.True);
+                Assert.That(PlayerPrefs.GetString(legacyKey), Is.EqualTo("replacement"));
+            }
+            finally
+            {
+                PlayerPrefs.DeleteKey(legacyKey);
+            }
+        }
+#endif
 
         private BrowserStorage OwnStore(string scope, string key)
         {

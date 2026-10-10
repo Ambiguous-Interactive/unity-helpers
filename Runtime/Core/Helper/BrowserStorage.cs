@@ -6,7 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System;
     using System.Globalization;
     using UnityEngine;
-#if UNITY_WEBGL && !UNITY_EDITOR && !WALLSTOP_BROWSER_STORAGE_PLAYER_PREFS
+#if UNITY_WEBGL && !UNITY_EDITOR
     using System.Runtime.InteropServices;
 #endif
 
@@ -14,6 +14,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// <remarks>Call from Unity's main thread. Storage is not encrypted.</remarks>
     public sealed class BrowserStorage
     {
+        private const string StoragePrefix = "WallstopBrowserStorage:";
+
         /// <summary>Whether the scope is nonblank and can cross the UTF-8 bridge unchanged.</summary>
         public bool IsConfigured => _keyPrefix != null;
 
@@ -24,12 +26,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             if (!string.IsNullOrWhiteSpace(scope) && IsSupportedText(scope))
             {
-                _keyPrefix =
-                    "WallstopBrowserStorage:"
-                    + scope.Length.ToString(CultureInfo.InvariantCulture)
-                    + ":"
-                    + scope
-                    + ":";
+                _keyPrefix = string.Concat(
+                    StoragePrefix,
+                    scope.Length.ToString(CultureInfo.InvariantCulture),
+                    ":",
+                    scope
+                );
             }
         }
 
@@ -44,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
-#if UNITY_WEBGL && !UNITY_EDITOR && !WALLSTOP_BROWSER_STORAGE_PLAYER_PREFS
+#if UNITY_WEBGL && !UNITY_EDITOR
                 string storedValue = WUHBrowserStorageGetString(storageKey);
                 if (storedValue == null)
                 {
@@ -84,7 +86,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
-#if UNITY_WEBGL && !UNITY_EDITOR && !WALLSTOP_BROWSER_STORAGE_PLAYER_PREFS
+#if UNITY_WEBGL && !UNITY_EDITOR
                 return WUHBrowserStorageSetString(storageKey, value) == 1;
 #else
                 PlayerPrefs.SetString(storageKey, value);
@@ -108,7 +110,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
-#if UNITY_WEBGL && !UNITY_EDITOR && !WALLSTOP_BROWSER_STORAGE_PLAYER_PREFS
+#if UNITY_WEBGL && !UNITY_EDITOR
                 return WUHBrowserStorageDeleteKey(storageKey) == 1;
 #else
                 PlayerPrefs.DeleteKey(storageKey);
@@ -122,7 +124,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-#if UNITY_WEBGL && !UNITY_EDITOR && !WALLSTOP_BROWSER_STORAGE_PLAYER_PREFS
+#if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal", ExactSpelling = true)]
         private static extern string WUHBrowserStorageGetString(string key);
 
@@ -167,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
-            storageKey = _keyPrefix + key;
+            storageKey = string.Concat(_keyPrefix, ":", key);
             return true;
         }
     }

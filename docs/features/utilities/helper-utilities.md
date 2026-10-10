@@ -1819,9 +1819,9 @@ list.Sort(reversed);
 ## Browser String Storage
 
 `BrowserStorage` provides scoped string storage. WebGL players use the browser's `localStorage`.
-Editor and other players use `PlayerPrefs`; define `WALLSTOP_BROWSER_STORAGE_PLAYER_PREFS` to use
-that backend in WebGL too. Backend selection happens at compile time. A blocked or full browser
-store returns failure rather than switching to another store and hiding existing data.
+Editor and other players use `PlayerPrefs`. Backend selection happens at compile time. A blocked
+or full browser store returns failure rather than switching to another store and hiding existing
+data.
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;

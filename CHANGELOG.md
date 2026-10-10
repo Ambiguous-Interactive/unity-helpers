@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add scoped `BrowserStorage` string reads, writes and deletes through WebGL local storage, with a PlayerPrefs fallback and explicit failure results ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
+- Add scoped `BrowserStorage` string reads, writes and deletes through WebGL local storage, with PlayerPrefs on other platforms and explicit failure results ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add Span overloads for all 18 sorting algorithms, including slices and stack-allocated data, while preserving caller data when comparisons fail ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `SingleThreadedThreadPool.TryEnqueue` overloads so callers can detect rejected background work and choose a fallback ([#986](https://github.com/Ambiguous-Interactive/unity-helpers/issues/986)).
 - Add public `ObjectsTypeTraits<T>` with cached value-type, exact-object, and Unity-object classifications for generic code ([guide](./docs/features/utilities/helper-utilities.md#cached-generic-type-classification), [#976](https://github.com/Ambiguous-Interactive/unity-helpers/issues/976)).
