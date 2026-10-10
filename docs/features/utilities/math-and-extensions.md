@@ -1048,6 +1048,35 @@ Span<int> even = stackalloc int[values.Length];
 type deliberately does not shadow them. A `ReadOnlySpan<T>` receiver needs an explicit cast at this
 language version, because an extension receiver takes no user-defined conversion.
 
+#### Sorting a Span
+
+All 18 list sorting algorithms also accept `Span<T>`, including stack buffers and array slices.
+Pass an explicit `SortAlgorithm` to `Sort`, or use the named methods such as `GrailSort`,
+`InsertionSort`, `PatternDefeatingQuickSort`, and `YamSort`.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using System.Collections.Generic;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+Span<int> values = stackalloc int[] { 7, 2, 5, 2 };
+values.Sort(Comparer<int>.Default, SortAlgorithm.Grail);
+values.InsertionSort(Comparer<int>.Default);
+```
+
+These overloads use the same algorithm kernels and comparer as the list methods, preserving
+ordering and stability guarantees. They copy through one pooled buffer of the span's length;
+the selected algorithm may also rent its usual scratch buffers. Cold pools can allocate. Only
+the supplied slice is written back, so elements outside it remain untouched. Empty and
+single-element spans do not rent a buffer or call the comparer.
+
+An invalid algorithm throws `InvalidEnumArgumentException`, including for an empty span.
+Comparer exceptions propagate; the caller's span stays unchanged, and pooled buffers are
+returned and cleared when they contain managed references. The explicit algorithm argument
+keeps `Sort(comparer)` available to the framework without an ambiguous extension call.
+
 ### Dictionary Helpers
 
 **Thread-safe get-or-create:**

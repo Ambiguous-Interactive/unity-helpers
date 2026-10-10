@@ -26,7 +26,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </summary>
         /// <remarks>
         /// Keep occurrences in syntax order, including duplicates: each consumer owns its filtering
-        /// and diagnostic precedence. Tuple literals count even when no type is written explicitly.
+        /// and diagnostic precedence. Tuple literals and factory results count even when no type
+        /// is written explicitly.
         /// Reusing discovery's semantic models avoids rebinding already inspected declarations.
         /// Release them per tree because later registration needs only symbols and locations.
         /// </remarks>
@@ -64,15 +65,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             resolved = tupleType.TupleUnderlyingType ?? tupleType;
                         }
                     }
+                    else if (
+                        node
+                        is Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax invocation
+                    )
+                    {
+                        resolved = model.GetTypeInfo(invocation).Type;
+                    }
                     else
                     {
                         continue;
                     }
 
-                    if (resolved is INamedTypeSymbol named)
-                    {
-                        uses.Add(new TypeUse(named, node.GetLocation()));
-                    }
+                    CollectTypes(resolved, node.GetLocation(), uses);
                 }
             }
 
@@ -215,6 +220,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return false;
+        }
+
+        private static void CollectTypes(ITypeSymbol type, Location location, List<TypeUse> uses)
+        {
+            if (type is IArrayTypeSymbol array)
+            {
+                CollectTypes(array.ElementType, location, uses);
+                return;
+            }
+
+            if (!(type is INamedTypeSymbol named))
+            {
+                return;
+            }
+
+            uses.Add(new TypeUse(named, location));
+            CollectTypes(named.ContainingType, location, uses);
+            foreach (ITypeSymbol argument in named.TypeArguments)
+            {
+                CollectTypes(argument, location, uses);
+            }
         }
 
         private static ITypeSymbol Substitute(

@@ -2349,11 +2349,15 @@ that is a closed generic IL2CPP compiles ahead of time like any other.
 **The closures you use must appear in source.** A registrar cannot register an open generic, and
 constructing one at runtime would need `MakeGenericType`, the exact call IL2CPP cannot compile. The
 generator registers every closed construction it can see in the compilation, which is what makes a
-consumer's own `Box<TheirStruct>` work without any manual registration. A construction that appears
-in no source could not have been reached at runtime either.
+consumer's own `Box<TheirStruct>` work without any manual registration. This includes inferred
+factory results: `Save(CreateBox(7))` registers `Box<int>` when `CreateBox<T>(T value)` returns
+`Box<T>`, even if no declaration spells `Box<int>`. Discovery also follows array elements,
+nested generic arguments in returned collections, and arguments on a returned nested type's owner.
+Contracts declared in another assembly, root
+marshals and JSON converters use the same discovered types.
 
-If you need a closure that no code names directly, name it; a `static` field of that type is
-enough.
+A closure hidden entirely inside a generic method body or selected through runtime reflection still
+needs a source reference to its concrete type; a `static` field of that type is enough.
 
 The generator resolves source type uses once per compilation and shares those results across generic
 contracts, surrogates, referenced contracts, root marshals and JSON converters. Each registration path
