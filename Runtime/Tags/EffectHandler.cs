@@ -124,6 +124,19 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private bool _initialized;
 
+        private static bool HasExpired((float startTime, float duration) timing, float currentTime)
+        {
+            return float.IsFinite(timing.startTime) && float.IsFinite(currentTime)
+                ? CompensatedTime.HasElapsed(
+                    timing.startTime,
+                    currentTime,
+                    timing.duration,
+                    0d,
+                    inclusive: true
+                )
+                : (float)((double)timing.startTime + timing.duration) <= currentTime;
+        }
+
         private static void DestroyCosmeticInstance(CosmeticEffectData data)
         {
             bool shouldDestroyGameObject = true;
@@ -413,7 +426,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Attempts to refresh the duration of the specified effect handle.
+        /// Attempts to refresh the duration of the specified effect handle, including during another effect's removal callback.
         /// </summary>
         /// <param name="handle">The handle to refresh.</param>
         /// <returns><c>true</c> if the duration was refreshed; otherwise, <c>false</c>.</returns>
@@ -423,7 +436,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Attempts to refresh the duration of the specified effect handle.
+        /// Attempts to refresh the duration of the specified effect handle, including during another effect's removal callback.
         /// </summary>
         /// <param name="handle">The handle to refresh.</param>
         /// <param name="ignoreReapplicationPolicy">
@@ -834,18 +847,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 KeyValuePair<long, (float startTime, float duration)> entry in _effectExpirations
             )
             {
-                (float startTime, float duration) timing = entry.Value;
-                bool expired =
-                    float.IsFinite(timing.startTime) && float.IsFinite(currentTime)
-                        ? CompensatedTime.HasElapsed(
-                            timing.startTime,
-                            currentTime,
-                            timing.duration,
-                            0d,
-                            inclusive: true
-                        )
-                        : (float)((double)timing.startTime + timing.duration) <= currentTime;
-                if (expired)
+                if (HasExpired(entry.Value, currentTime))
                 {
                     _expiredEffectIds.Add(entry.Key);
                 }
@@ -863,6 +865,11 @@ namespace WallstopStudios.UnityHelpers.Tags
                             _expiredEffectIds[i],
                             out EffectHandle expiredHandle
                         )
+                        && _effectExpirations.TryGetValue(
+                            expiredHandle.id,
+                            out (float startTime, float duration) timing
+                        )
+                        && HasExpired(timing, currentTime)
                     )
                     {
                         teardownFailure = RecordFailure(
