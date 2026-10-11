@@ -306,7 +306,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Dictionary<K, V> result = creator?.Invoke() ?? new Dictionary<K, V>();
             if (0 < lhs.Count)
             {
-                foreach (KeyValuePair<K, V> kvp in lhs)
+                foreach (KeyValuePair<K, V> kvp in lhs.AsValueDictionaryEnumerableRequired())
                 {
                     result[kvp.Key] = kvp.Value;
                 }
@@ -314,7 +314,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (0 < rhs.Count)
             {
-                foreach (KeyValuePair<K, V> kvp in rhs)
+                foreach (KeyValuePair<K, V> kvp in rhs.AsValueDictionaryEnumerableRequired())
                 {
                     result[kvp.Key] = kvp.Value;
                 }
@@ -372,7 +372,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
         {
             Dictionary<K, V> result = creator?.Invoke() ?? new Dictionary<K, V>(rhs.Count);
-            foreach (KeyValuePair<K, V> kvp in rhs)
+            foreach (KeyValuePair<K, V> kvp in rhs.AsValueDictionaryEnumerableRequired())
             {
                 K key = kvp.Key;
                 if (lhs.TryGetValue(key, out V existing) && Equals(existing, kvp.Value))
@@ -408,7 +408,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
         {
             Dictionary<V, K> output = creator?.Invoke() ?? new Dictionary<V, K>(dictionary.Count);
-            foreach (KeyValuePair<K, V> entry in dictionary)
+            foreach (KeyValuePair<K, V> entry in dictionary.AsValueDictionaryEnumerableRequired())
             {
                 output[entry.Value] = entry.Key;
             }
@@ -610,7 +610,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return true;
             }
 
-            foreach (KeyValuePair<K, V> entry in dictionary)
+            foreach (KeyValuePair<K, V> entry in dictionary.AsValueDictionaryEnumerableRequired())
             {
                 if (!other.TryGetValue(entry.Key, out V value) || !entry.Value.Equals(value))
                 {

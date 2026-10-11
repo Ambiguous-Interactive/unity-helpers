@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using System.Runtime.Serialization;
+    using DataStructure;
     using DataStructure.Adapters;
     using Extension;
     using Helper;
@@ -1814,7 +1815,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private T NextFromEnumerable<T>(IEnumerable<T> enumerable)
         {
-            using IEnumerator<T> enumerator = enumerable.GetEnumerator();
+            using ValueEnumerator<T> enumerator = enumerable
+                .AsValueEnumerableRequired()
+                .GetEnumerator();
             if (!enumerator.MoveNext())
             {
                 throw new ArgumentException("Collection cannot be empty", nameof(enumerable));

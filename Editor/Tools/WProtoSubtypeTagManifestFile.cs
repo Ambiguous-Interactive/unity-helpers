@@ -107,7 +107,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return matching;
             }
 
-            foreach (KeyValuePair<string, List<string>> pair in unnumbered)
+            foreach (
+                KeyValuePair<
+                    string,
+                    List<string>
+                > pair in unnumbered.AsValueDictionaryEnumerableRequired()
+            )
             {
                 if (pair.Key != null && shipped.Contains(pair.Key))
                 {
@@ -133,7 +138,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 return conflicts;
             }
-            foreach (KeyValuePair<string, List<string>> pair in owners)
+            foreach (
+                KeyValuePair<
+                    string,
+                    List<string>
+                > pair in owners.AsValueDictionaryEnumerableRequired()
+            )
             {
                 List<string> included = new List<string>();
                 if (pair.Value == null)

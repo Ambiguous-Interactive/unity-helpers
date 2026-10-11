@@ -188,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             LineMap lineMap
         )
         {
-            foreach (Match match in OdinUsing.Matches(masked))
+            for (Match match = OdinUsing.Match(masked); match.Success; match = match.NextMatch())
             {
                 AddFinding(
                     manualReviews,
@@ -1232,7 +1232,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             SourceContext sourceContext
         )
         {
-            foreach (Match match in DirectOdinUsing.Matches(source))
+            for (
+                Match match = DirectOdinUsing.Match(source);
+                match.Success;
+                match = match.NextMatch()
+            )
             {
                 if (sourceContext.IsCompilationUnit(match.Index))
                 {

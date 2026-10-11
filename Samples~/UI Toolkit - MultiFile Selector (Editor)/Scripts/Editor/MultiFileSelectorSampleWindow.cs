@@ -7,6 +7,7 @@ namespace Samples.UnityHelpers.UIToolkit.Editor
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.UIElements;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Visuals.UIToolkit;
 
     /// <summary>
@@ -38,8 +39,12 @@ namespace Samples.UnityHelpers.UIToolkit.Editor
 
         private void OnFilesSelected(IReadOnlyCollection<string> files)
         {
+            if (files == null)
+            {
+                throw new System.NullReferenceException();
+            }
             string first = "<none>";
-            foreach (string file in files)
+            foreach (string file in files.AsValueEnumerable())
             {
                 first = file ?? "<none>";
                 break;

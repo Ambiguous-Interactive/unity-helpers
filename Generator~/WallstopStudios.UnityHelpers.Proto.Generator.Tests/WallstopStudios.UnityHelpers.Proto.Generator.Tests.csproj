@@ -26,6 +26,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile
+      Include="../../Runtime/Core/DataStructure/ValueDictionaryEnumerable.cs"
+      Link="ValueDictionaryEnumerable.cs"
+    />
+    <Compile
+      Include="../../Runtime/Core/DataStructure/ValueDictionaryEnumerator.cs"
+      Link="ValueDictionaryEnumerator.cs"
+    />
     <!-- The real serializer excludes Unity bootstrap and built-in Unity formatters. Signature-only
          shims keep this harness independent of Unity; native tests cover Unity behavior. -->
     <!-- Shared traits classify declared types against the local Object marker. This harness tests

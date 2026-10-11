@@ -49,7 +49,12 @@ namespace WallstopStudios.UnityHelpers.Editor
                 BuildSearchTerms(item.search, methodSearchTerms);
                 BuildSearchTerms(item.typeSearch, typeSearchTerms);
 
-                foreach (KeyValuePair<Type, IReadOnlyList<MethodInfo>> entry in lookup)
+                foreach (
+                    KeyValuePair<
+                        Type,
+                        IReadOnlyList<MethodInfo>
+                    > entry in lookup.AsValueDictionaryEnumerableRequired()
+                )
                 {
                     Type type = entry.Key;
 
@@ -170,7 +175,12 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return;
             }
 
-            foreach (KeyValuePair<Type, IReadOnlyList<MethodInfo>> entry in lookup)
+            foreach (
+                KeyValuePair<
+                    Type,
+                    IReadOnlyList<MethodInfo>
+                > entry in lookup.AsValueDictionaryEnumerableRequired()
+            )
             {
                 foreach (MethodInfo method in entry.Value.AsValueEnumerableRequired())
                 {

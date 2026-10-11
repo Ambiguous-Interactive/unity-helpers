@@ -2986,9 +2986,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (elementType.IsEnum)
             {
-                foreach (object value in Enum.GetValues(elementType))
+                Array values = Enum.GetValues(elementType);
+                int valueCount = values.Length;
+                for (int index = 0; index < valueCount; ++index)
                 {
-                    yield return value;
+                    yield return values.GetValue(index);
                 }
                 yield break;
             }

@@ -929,9 +929,35 @@ public static class CollectionSum
 }
 ```
 
+`AsValueDictionaryEnumerable` provides the same lazy behavior for
+`IEnumerable<KeyValuePair<TKey, TValue>>`, including dictionary interfaces. Exact
+`Dictionary<TKey, TValue>` instances use their concrete value enumerator. Derived dictionaries keep their interface protocol. Other sources, including sorted
+dictionaries, keep their original enumerator and its allocations. Use `AsValueEnumerable`
+for pair arrays, lists and hash sets.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System.Collections.Generic;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+public static class DictionaryTotal
+{
+    public static int Sum(IReadOnlyDictionary<string, int> source)
+    {
+        int result = 0;
+        foreach (KeyValuePair<string, int> entry in source.AsValueDictionaryEnumerable())
+        {
+            result += entry.Value;
+        }
+        return result;
+    }
+}
+```
+
 Custom sequences, derived collections and other collection types retain their original
 `GetEnumerator`, `MoveNext`, `Current` and `Dispose` behavior, including exceptions and
-allocations. Lists and hash sets retain their mutation checks. Array enumeration observes
+allocations. Lists, hash sets and exact dictionaries retain their mutation checks. Array enumeration observes
 changes to array elements. Early exit still disposes the enumerator. Copies of a fallback
 enumerator share the source's lifetime; use each enumerator within one `foreach` or
 `using` scope. Read `Current` only after a successful `MoveNext`.

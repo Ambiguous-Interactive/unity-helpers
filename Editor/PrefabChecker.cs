@@ -757,7 +757,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             using PooledResource<HashSet<string>> includeSetLease = Buffers<string>.HashSet.Get(
                 out HashSet<string> includeSet
             );
-            foreach (string label in options.IncludeLabels ?? Array.Empty<string>())
+            foreach (string label in options.IncludeLabels.AsValueEnumerable())
             {
                 if (!string.IsNullOrWhiteSpace(label))
                 {
@@ -768,7 +768,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             using PooledResource<HashSet<string>> excludeSetLease = Buffers<string>.HashSet.Get(
                 out HashSet<string> excludeSet
             );
-            foreach (string label in options.ExcludeLabels ?? Array.Empty<string>())
+            foreach (string label in options.ExcludeLabels.AsValueEnumerable())
             {
                 if (!string.IsNullOrWhiteSpace(label))
                 {

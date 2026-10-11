@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `AsValueEnumerable` to avoid enumerator boxing for arrays, exact lists and exact hash sets held through collection interfaces, while preserving custom enumeration ([guide](./docs/features/utilities/math-and-extensions.md#value-enumeration), [#882](https://github.com/Ambiguous-Interactive/unity-helpers/issues/882)).
+- Add `AsValueEnumerable` and `AsValueDictionaryEnumerable` to avoid enumerator boxing for common collections held through interfaces, while preserving custom enumeration ([guide](./docs/features/utilities/math-and-extensions.md#value-enumeration), [#882](https://github.com/Ambiguous-Interactive/unity-helpers/issues/882)).
 - Add scoped `BrowserStorage` string reads, writes and deletes through WebGL local storage, with PlayerPrefs on other platforms and explicit failure results ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add Span overloads for all 18 sorting algorithms, including slices and stack-allocated data, while preserving caller data when comparisons fail ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `SingleThreadedThreadPool.TryEnqueue` overloads so callers can detect rejected background work and choose a fallback ([#986](https://github.com/Ambiguous-Interactive/unity-helpers/issues/986)).

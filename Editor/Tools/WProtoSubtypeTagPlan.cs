@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.Collections.Generic;
     using System.Globalization;
     using System.Text;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
@@ -338,9 +339,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return new WProtoSubtypeTagPlan(assignments, retiredOut, fresh);
         }
 
-        private static IEnumerable<T> Safe<T>(IReadOnlyList<T> values)
+        private static ValueEnumerable<T> Safe<T>(IReadOnlyList<T> values)
         {
-            return values ?? (IReadOnlyList<T>)Array.Empty<T>();
+            return values.AsValueEnumerable();
         }
 
         private static void Claim(Dictionary<string, HashSet<int>> taken, string baseName, int tag)

@@ -309,7 +309,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return;
             }
 
-            foreach (KeyValuePair<Type, Type> surrogate in surrogates)
+            foreach (
+                KeyValuePair<
+                    Type,
+                    Type
+                > surrogate in surrogates.AsValueDictionaryEnumerableRequired()
+            )
             {
                 _surrogates[surrogate.Key] = surrogate.Value;
             }

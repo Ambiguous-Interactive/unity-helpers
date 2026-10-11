@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using System.Collections.Generic;
     using System.Linq;
     using Random;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -294,7 +295,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 throw new ArgumentOutOfRangeException(nameof(size), size, "Size must be positive.");
             }
-            using IEnumerator<T> enumerator = items.GetEnumerator();
+            using ValueEnumerator<T> enumerator = items.AsValueEnumerableRequired().GetEnumerator();
 
             while (enumerator.MoveNext())
             {
@@ -365,7 +366,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             public IEnumerator<PooledResource<List<T>>> GetEnumerator()
             {
-                return new PartitionPooledEnumerator<T>(_items.GetEnumerator(), _size);
+                return new PartitionPooledEnumerator<T>(
+                    _items.AsValueEnumerableRequired().GetEnumerator(),
+                    _size
+                );
             }
 
             IEnumerator IEnumerable.GetEnumerator()
@@ -383,14 +387,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             object IEnumerator.Current => Current;
 #pragma warning restore WUH022
 
-            private readonly IEnumerator<T> _source;
+            private ValueEnumerator<T> _source;
             private readonly int _size;
 
             // Track the consumer lease itself; a second lease would leak its disposal slot.
             private readonly List<PooledResource<List<T>>> _outstanding = new();
             private bool _disposed;
 
-            public PartitionPooledEnumerator(IEnumerator<T> source, int size)
+            public PartitionPooledEnumerator(ValueEnumerator<T> source, int size)
             {
                 _source = source;
                 _size = size;

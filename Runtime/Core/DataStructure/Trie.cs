@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections.Generic;
     using System.Text;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -428,7 +429,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 KeyValuePair<string, T>
             >.List.Get(out List<KeyValuePair<string, T>> itemList);
             int capacity = 1;
-            foreach (KeyValuePair<string, T> entry in items)
+            foreach (KeyValuePair<string, T> entry in items.AsValueDictionaryEnumerableRequired())
             {
                 capacity += entry.Key.Length;
                 itemList.Add(entry);

@@ -282,7 +282,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal IEnumerable<string> Registrations(
             Compilation compilation,
-            IReadOnlyList<ClosureScan.TypeUse> typeUses,
+            List<ClosureScan.TypeUse> typeUses,
             Action<Diagnostic> report,
             HashSet<string> announced
         )
