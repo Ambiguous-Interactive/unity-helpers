@@ -1813,6 +1813,24 @@ function Get-UnityWorkflowStepText {
     return $JobText.Substring($stepIndex, $stepEndIndex - $stepIndex)
 }
 
+function Test-GitHubAppTokenIdentityStepText {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$StepText,
+        [Parameter(Mandatory = $true)][string]$IdentitySecret
+    )
+
+    $action = 'uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1'
+    $identity = 'client-id: ${{ secrets.' + $IdentitySecret + ' }}'
+    $privateKey = 'private-key: ${{ secrets.' + $IdentitySecret.Replace('_APP_ID', '_APP_PRIVATE_KEY') + ' }}'
+    return (
+        [regex]::Matches($StepText, ('(?m)^\s+' + [regex]::Escape($action) + '\s*$')).Count -eq 1 -and
+        [regex]::Matches($StepText, ('(?m)^\s+' + [regex]::Escape($identity) + '\s*$')).Count -eq 1 -and
+        [regex]::Matches($StepText, '(?m)^\s+client-id:').Count -eq 1 -and
+        $StepText -notmatch '(?m)^\s+app-id:' -and
+        [regex]::Matches($StepText, ('(?m)^\s+' + [regex]::Escape($privateKey) + '\s*$')).Count -eq 1
+    )
+}
+
 function Test-UnityWorkflowStepHasEmptyAssemblyGate {
     param(
         [Parameter(Mandatory = $true)][string]$JobText,
@@ -4129,15 +4147,54 @@ if (-not (Test-Path -LiteralPath $watchdogPath)) {
     $failed = $true
 } else {
     $watchdogContent = Get-Content -LiteralPath $watchdogPath -Raw
+    $readerTokenStep = Get-UnityWorkflowStepText -JobText $watchdogContent -StepName 'Mint an org-scoped runner-inventory token'
+    $releaseContent = Get-Content -LiteralPath (Join-Path $repoRoot '.github/workflows/release-prepare.yml') -Raw
+    $releaseTokenStep = Get-UnityWorkflowStepText -JobText $releaseContent -StepName 'Generate auto-commit GitHub App token'
+    $deprecatedReaderStep = $readerTokenStep.Replace('client-id:', 'app-id:')
+    $deprecatedReleaseStep = $releaseTokenStep.Replace('client-id:', 'app-id:')
+    $appTokenActionCount = 0
+    foreach ($candidateWorkflow in Get-ChildItem -LiteralPath (Join-Path $repoRoot '.github/workflows') -File) {
+        $candidateContent = Get-Content -LiteralPath $candidateWorkflow.FullName -Raw
+        $appTokenActionCount += [regex]::Matches($candidateContent, '(?m)^\s+uses: actions/create-github-app-token@').Count
+    }
     $supersededGateContracts += @(
         @{
             Name = 'watchdog reads the runner inventory with the build-lock reader App'
             Ok = (
                 $watchdogContent.Contains('RUNNER_INVENTORY_TOKEN: ${{ steps.reader-token.outputs.token }}') -and
-                $watchdogContent.Contains('app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}') -and
+                (Test-GitHubAppTokenIdentityStepText -StepText $readerTokenStep -IdentitySecret 'BUILD_LOCK_READER_APP_ID') -and
                 $watchdogContent -match 'RUNNER_INVENTORY_TOKEN[^\n]*\n[^\n]*orgs/\$\{OWNER\}/actions/runners'
             )
             Message = 'The watchdog must query orgs/{owner}/actions/runners with the build-lock reader App token. GITHUB_TOKEN lacks admin:org and 403s, and the repo-scoped fallback does not list org-level runners, so without it the audit can never see a runner.'
+            File = '.github/workflows/stuck-job-watchdog.yml'
+        },
+        @{
+            Name = 'all pinned App token actions avoid the deprecated identity input'
+            Ok = (
+                $appTokenActionCount -eq 2 -and
+                (Test-GitHubAppTokenIdentityStepText -StepText $readerTokenStep -IdentitySecret 'BUILD_LOCK_READER_APP_ID') -and
+                (Test-GitHubAppTokenIdentityStepText -StepText $releaseTokenStep -IdentitySecret 'AUTO_COMMIT_APP_ID') -and
+                -not (Test-GitHubAppTokenIdentityStepText -StepText $deprecatedReaderStep -IdentitySecret 'BUILD_LOCK_READER_APP_ID') -and
+                -not (Test-GitHubAppTokenIdentityStepText -StepText $deprecatedReleaseStep -IdentitySecret 'AUTO_COMMIT_APP_ID')
+            )
+            Message = 'Both pinned token actions must use client-id with the existing App ID and private-key secrets. The pinned implementation accepts the numeric App ID as a JWT issuer; prior app-id input shapes must fail this contract because they emit the deprecation warning.'
+            File = '.github/workflows/stuck-job-watchdog.yml'
+        },
+        @{
+            Name = 'App input migration retains inventory fallback and release permission boundaries'
+            Ok = (
+                $readerTokenStep -match '(?m)^\s+continue-on-error: true\s*$' -and
+                $readerTokenStep.Contains('owner: ${{ github.repository_owner }}') -and
+                $readerTokenStep -notmatch '(?m)^\s+permission-' -and
+                $watchdogContent.Contains('elif gh api --paginate "orgs/${OWNER}/actions/runners?per_page=100"') -and
+                $watchdogContent.Contains('elif gh api --paginate "repos/${REPO}/actions/runners?per_page=100"') -and
+                $releaseTokenStep.Contains('if: ${{ !inputs.dry_run }}') -and
+                $releaseTokenStep -match '(?m)^\s+permission-contents: write\s*$' -and
+                $releaseTokenStep -match '(?m)^\s+permission-pull-requests: write\s*$' -and
+                [regex]::Matches($releaseTokenStep, '(?m)^\s+permission-').Count -eq 2 -and
+                $releaseContent.Contains('if [ -n "${AUTO_COMMIT_APP_ID:-}" ] && [ -n "${AUTO_COMMIT_APP_PRIVATE_KEY:-}" ]; then')
+            )
+            Message = 'Missing or expired reader credentials must remain a tolerated mint failure followed by the existing inventory lookup and fail-closed guard. The release token must retain the dry-run credential gate and only contents/pull-request write grants.'
             File = '.github/workflows/stuck-job-watchdog.yml'
         },
         @{

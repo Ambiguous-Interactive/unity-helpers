@@ -179,101 +179,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             RegexOptions.Compiled | RegexOptions.CultureInvariant
         );
 
-        private Dictionary<
-            string,
-            Dictionary<string, List<(int index, Sprite sprite)>>
-        > GroupFilteredSprites(bool withProgress)
-        {
-            Dictionary<
-                string,
-                Dictionary<string, List<(int index, Sprite sprite)>>
-            > spritesByBaseAndAssetPath = new(StringComparer.Ordinal);
-
-            int total = _filteredSprites.Count;
-            int processed = 0;
-
-            foreach (Sprite sprite in _filteredSprites)
-            {
-                ++processed;
-                if (sprite == null)
-                {
-                    // Serialized preview rows can survive reimports that destroy their sprite slices; reject dead entries.
-                    continue;
-                }
-
-                if (withProgress && (processed % 10 == 0 || processed == total))
-                {
-                    Utils.EditorUi.ShowProgress(
-                        "Auto-Parsing Sprites",
-                        $"Processing: {sprite.name} ({processed}/{total})",
-                        (float)processed / total
-                    );
-                }
-
-                string assetPath = AssetDatabase.GetAssetPath(sprite);
-                string directoryPath =
-                    Path.GetDirectoryName(assetPath).SanitizePath() ?? string.Empty;
-                string frameName = StripDensitySuffix(sprite.name);
-
-                string baseName;
-                int frameIndex;
-
-                if (useCustomGroupRegex && _compiledGroupRegex != null)
-                {
-                    Match m = _compiledGroupRegex.Match(frameName);
-                    if (m.Success)
-                    {
-                        baseName = _compiledGroupRegex.TryGetGroup(m, "base", out Group baseGroup)
-                            ? baseGroup.Value
-                            : frameName;
-                        frameIndex =
-                            _compiledGroupRegex.TryGetGroup(m, "index", out Group indexGroup)
-                            && int.TryParse(indexGroup.Value, out int idx)
-                                ? idx
-                                : -1;
-                    }
-                    else if (!TryExtractBaseAndIndex(frameName, out baseName, out frameIndex))
-                    {
-                        baseName = frameName;
-                        frameIndex = -1;
-                    }
-                }
-                else if (!TryExtractBaseAndIndex(frameName, out baseName, out frameIndex))
-                {
-                    baseName = frameName;
-                    frameIndex = -1;
-                }
-
-                if (string.IsNullOrWhiteSpace(baseName))
-                {
-                    this.LogWarn(
-                        $"Could not extract valid base name for '{frameName}' at '{assetPath}'. Skipping."
-                    );
-                    continue;
-                }
-
-                if (
-                    !spritesByBaseAndAssetPath.TryGetValue(
-                        directoryPath,
-                        out Dictionary<string, List<(int index, Sprite sprite)>> byBase
-                    )
-                )
-                {
-                    byBase = new Dictionary<string, List<(int index, Sprite sprite)>>(
-                        groupingCaseInsensitive
-                            ? StringComparer.OrdinalIgnoreCase
-                            : StringComparer.Ordinal
-                    );
-                    spritesByBaseAndAssetPath.Add(directoryPath, byBase);
-                }
-
-                List<(int index, Sprite sprite)> list = byBase.GetOrAdd(baseName);
-                list.Add((frameIndex, sprite));
-            }
-
-            return spritesByBaseAndAssetPath;
-        }
-
         public List<AnimationData> animationData = new();
         public List<Object> animationSources = new();
         public string spriteNameRegex = ".*";
@@ -2831,6 +2736,101 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _autoParsePreview.Sort(
                 (a, b) => string.Compare(a.folder, b.folder, StringComparison.Ordinal)
             );
+        }
+
+        private Dictionary<
+            string,
+            Dictionary<string, List<(int index, Sprite sprite)>>
+        > GroupFilteredSprites(bool withProgress)
+        {
+            Dictionary<
+                string,
+                Dictionary<string, List<(int index, Sprite sprite)>>
+            > spritesByBaseAndAssetPath = new(StringComparer.Ordinal);
+
+            int total = _filteredSprites.Count;
+            int processed = 0;
+
+            foreach (Sprite sprite in _filteredSprites)
+            {
+                ++processed;
+                if (sprite == null)
+                {
+                    // Serialized preview rows can survive reimports that destroy their sprite slices; reject dead entries.
+                    continue;
+                }
+
+                if (withProgress && (processed % 10 == 0 || processed == total))
+                {
+                    Utils.EditorUi.ShowProgress(
+                        "Auto-Parsing Sprites",
+                        $"Processing: {sprite.name} ({processed}/{total})",
+                        (float)processed / total
+                    );
+                }
+
+                string assetPath = AssetDatabase.GetAssetPath(sprite);
+                string directoryPath =
+                    Path.GetDirectoryName(assetPath).SanitizePath() ?? string.Empty;
+                string frameName = StripDensitySuffix(sprite.name);
+
+                string baseName;
+                int frameIndex;
+
+                if (useCustomGroupRegex && _compiledGroupRegex != null)
+                {
+                    Match m = _compiledGroupRegex.Match(frameName);
+                    if (m.Success)
+                    {
+                        baseName = _compiledGroupRegex.TryGetGroup(m, "base", out Group baseGroup)
+                            ? baseGroup.Value
+                            : frameName;
+                        frameIndex =
+                            _compiledGroupRegex.TryGetGroup(m, "index", out Group indexGroup)
+                            && int.TryParse(indexGroup.Value, out int idx)
+                                ? idx
+                                : -1;
+                    }
+                    else if (!TryExtractBaseAndIndex(frameName, out baseName, out frameIndex))
+                    {
+                        baseName = frameName;
+                        frameIndex = -1;
+                    }
+                }
+                else if (!TryExtractBaseAndIndex(frameName, out baseName, out frameIndex))
+                {
+                    baseName = frameName;
+                    frameIndex = -1;
+                }
+
+                if (string.IsNullOrWhiteSpace(baseName))
+                {
+                    this.LogWarn(
+                        $"Could not extract valid base name for '{frameName}' at '{assetPath}'. Skipping."
+                    );
+                    continue;
+                }
+
+                if (
+                    !spritesByBaseAndAssetPath.TryGetValue(
+                        directoryPath,
+                        out Dictionary<string, List<(int index, Sprite sprite)>> byBase
+                    )
+                )
+                {
+                    byBase = new Dictionary<string, List<(int index, Sprite sprite)>>(
+                        groupingCaseInsensitive
+                            ? StringComparer.OrdinalIgnoreCase
+                            : StringComparer.Ordinal
+                    );
+                    spritesByBaseAndAssetPath.Add(directoryPath, byBase);
+                }
+
+                List<(int index, Sprite sprite)> list = byBase.GetOrAdd(baseName);
+                list.Add((frameIndex, sprite));
+            }
+
+            return spritesByBaseAndAssetPath;
         }
 
         private readonly struct CachedElementProperties

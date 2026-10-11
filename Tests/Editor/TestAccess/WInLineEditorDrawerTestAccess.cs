@@ -24,62 +24,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     internal static class WInLineEditorDrawerTestAccess
     {
         /// <summary>
-        /// Test hook to get detailed height calculation info for diagnostics.
-        /// </summary>
-        internal static (
-            float baseHeight,
-            float inlineHeight,
-            bool showHeader,
-            bool showBody,
-            float displayHeight
-        ) GetHeightCalculationDetails(
-            SerializedProperty property,
-            WInLineEditorAttribute inlineAttribute,
-            Object value,
-            float availableWidth
-        )
-        {
-            if (value == null || property == null)
-            {
-                return (0f, 0f, false, false, 0f);
-            }
-
-            float baseHeight = inlineAttribute.DrawObjectField
-                ? EditorGUI.GetPropertyHeight(property, GUIContent.none, false)
-                : EditorGUIUtility.singleLineHeight;
-
-            WInLineEditorMode mode = InLineEditorShared.ResolveMode(inlineAttribute);
-            bool useStandaloneHeader = InLineEditorShared.ShouldDrawStandaloneHeader(
-                inlineAttribute
-            );
-            bool showHeader =
-                useStandaloneHeader
-                && (inlineAttribute.DrawHeader || mode != WInLineEditorMode.AlwaysExpanded);
-            bool foldoutState = GetFoldoutState(property, inlineAttribute, mode);
-            bool showBody = mode == WInLineEditorMode.AlwaysExpanded || foldoutState;
-
-            float inlineHeight = 0f;
-            float displayHeight = 0f;
-            if (showHeader)
-            {
-                inlineHeight += InLineEditorShared.HeaderHeight + InLineEditorShared.Spacing;
-            }
-
-            if (showBody)
-            {
-                InspectorHeightInfo inspectorHeightInfo = ResolveInspectorHeightInfo(
-                    value,
-                    inlineAttribute,
-                    availableWidth
-                );
-                displayHeight = inspectorHeightInfo.DisplayHeight;
-                inlineHeight += displayHeight;
-            }
-
-            return (baseHeight, inlineHeight, showHeader, showBody, displayHeight);
-        }
-
-        /// <summary>
         /// Test hook to check if the force serialized inspector flag is enabled.
         /// </summary>
         internal static bool ForceSerializedInspector => _forceSerializedInspector;
@@ -315,6 +259,62 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static float CalculateLabelWidth(float availableWidth)
         {
             return availableWidth * InLineEditorShared.DefaultLabelWidthRatio;
+        }
+
+        /// <summary>
+        /// Test hook to get detailed height calculation info for diagnostics.
+        /// </summary>
+        internal static (
+            float baseHeight,
+            float inlineHeight,
+            bool showHeader,
+            bool showBody,
+            float displayHeight
+        ) GetHeightCalculationDetails(
+            SerializedProperty property,
+            WInLineEditorAttribute inlineAttribute,
+            Object value,
+            float availableWidth
+        )
+        {
+            if (value == null || property == null)
+            {
+                return (0f, 0f, false, false, 0f);
+            }
+
+            float baseHeight = inlineAttribute.DrawObjectField
+                ? EditorGUI.GetPropertyHeight(property, GUIContent.none, false)
+                : EditorGUIUtility.singleLineHeight;
+
+            WInLineEditorMode mode = InLineEditorShared.ResolveMode(inlineAttribute);
+            bool useStandaloneHeader = InLineEditorShared.ShouldDrawStandaloneHeader(
+                inlineAttribute
+            );
+            bool showHeader =
+                useStandaloneHeader
+                && (inlineAttribute.DrawHeader || mode != WInLineEditorMode.AlwaysExpanded);
+            bool foldoutState = GetFoldoutState(property, inlineAttribute, mode);
+            bool showBody = mode == WInLineEditorMode.AlwaysExpanded || foldoutState;
+
+            float inlineHeight = 0f;
+            float displayHeight = 0f;
+            if (showHeader)
+            {
+                inlineHeight += InLineEditorShared.HeaderHeight + InLineEditorShared.Spacing;
+            }
+
+            if (showBody)
+            {
+                InspectorHeightInfo inspectorHeightInfo = ResolveInspectorHeightInfo(
+                    value,
+                    inlineAttribute,
+                    availableWidth
+                );
+                displayHeight = inspectorHeightInfo.DisplayHeight;
+                inlineHeight += displayHeight;
+            }
+
+            return (baseHeight, inlineHeight, showHeader, showBody, displayHeight);
         }
     }
 #endif

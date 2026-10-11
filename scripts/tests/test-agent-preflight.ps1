@@ -2,6 +2,8 @@ Param(
     [switch]$VerboseOutput,
     [switch]$LicensePipeOnly,
     [switch]$PipePressureOnly,
+    [switch]$ArgumentAdmissionOnly,
+    [string]$ArgumentAdmissionEvidencePath,
     [switch]$JavaScriptLibraryOnly
 )
 
@@ -530,6 +532,128 @@ exit 0
     }
 }
 
+function Get-AdmissionSnapshot {
+    param([string]$RepoPath)
+    $rows = @()
+    foreach ($file in Get-ChildItem -LiteralPath $RepoPath -File -Recurse -Force) {
+        $relative = $file.FullName.Substring($RepoPath.TrimEnd([IO.Path]::DirectorySeparatorChar).Length + 1).Replace('\', '/')
+        if ($relative.StartsWith('.git/') -and $relative -notin @('.git/config', '.git/index')) { continue }
+        $rows += [ordered]@{ path = $relative; sha = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash; bytes = $file.Length; modified = $file.LastWriteTimeUtc.Ticks; attributes = [int]$file.Attributes }
+    }
+    return ($rows | Sort-Object { $_.path } | ConvertTo-Json -Depth 5 -Compress)
+}
+
+function New-AdmissionRepo {
+    param([switch]$UnsafeConfig)
+    $repo = New-TestRepo -ConfigurePushDefaults:(!$UnsafeConfig) -GitIgnorePatterns @('node_modules/', 'pre-commit.log')
+    [void][IO.Directory]::CreateDirectory((Join-Path $repo 'Runtime'))
+    foreach ($name in @('Selected', 'Additional', 'User')) {
+        [IO.File]::WriteAllText((Join-Path $repo "Runtime/$name.png.meta"), ("fileFormatVersion: 2`r`n" + "guid: 0123456789abcdef0123456789abcdef`r`n"))
+    }
+    [IO.File]::WriteAllText((Join-Path $repo '-selected.png.meta'), ("fileFormatVersion: 2`r`n" + "guid: 0123456789abcdef0123456789abcdef`r`n"))
+    [void][IO.Directory]::CreateDirectory((Join-Path $repo '.githooks'))
+    [IO.File]::WriteAllText((Join-Path $repo '.githooks/pre-commit'), 'exit 0')
+    & git -C $repo add .
+    & git -C $repo -c user.email=test@example.com -c user.name=test commit -q -m 'admission fixture'
+    foreach ($name in @('Selected', 'Additional', 'User')) {
+        [IO.File]::WriteAllText((Join-Path $repo "Runtime/$name.png.meta"), ("fileFormatVersion: 2`n" + "guid: fedcba9876543210fedcba9876543210`n"))
+    }
+    [IO.File]::WriteAllText((Join-Path $repo '-selected.png.meta'), ("fileFormatVersion: 2`n" + "guid: fedcba9876543210fedcba9876543210`n"))
+    [IO.File]::WriteAllText((Join-Path $repo 'user-untracked.txt'), 'untracked user bytes')
+    [IO.File]::WriteAllText((Join-Path $repo '.githooks/pre-commit.log'), 'owned ignored user artifact')
+    & git -C $repo add -- Runtime/Selected.png.meta
+    return $repo
+}
+
+function Test-ArgumentAdmissionPreflight {
+    $repo = New-AdmissionRepo -UnsafeConfig
+    try {
+        foreach ($arguments in @(
+            @('-Fix', '--files', 'Runtime/Selected.png.meta'),
+            @('-Fix', '-Paths', 'Runtime/Selected.png.meta', '--unknown'),
+            @('-Fix', '-Paths', '-selected.png.meta'),
+            @('-Fix', '-PathList', '--unknown'),
+            @('-Fix', 'Runtime/Selected.png.meta')
+        )) {
+            $before = Get-AdmissionSnapshot $repo
+            $result = Invoke-Preflight -RepoPath $repo -Arguments $arguments -UseCli
+            Write-TestResult 'ArgumentAdmission_UnsupportedNonzero' ($result.ExitCode -ne 0) "Unsupported invocation accepted: $arguments"
+            Write-TestResult 'ArgumentAdmission_UsageMessage' ($result.Output -match 'Use -Paths') $result.Output
+            Write-TestResult 'ArgumentAdmission_AllBytesMetadataConfigIndexPreserved' ((Get-AdmissionSnapshot $repo) -ceq $before) "Unsupported invocation mutated fixture: $arguments"
+        }
+        $scriptPath = Join-Path $repo 'scripts/agent-preflight.ps1'
+        $source = [IO.File]::ReadAllText($scriptPath)
+        $start = $source.IndexOf('foreach ($argument in @($Paths)')
+        $end = $source.IndexOf('# cspell:ignore aniso', $start)
+        if ($start -lt 0 -or $end -le $start) { throw 'Admission counterfactual extraction failed' }
+        [IO.File]::WriteAllText($scriptPath, $source.Remove($start, $end - $start))
+        $before = Get-AdmissionSnapshot $repo
+        $red = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '--files', 'Runtime/Selected.png.meta') -UseCli
+        Write-TestResult 'ArgumentAdmission_LegacyMutationNegativeControl' ((Get-AdmissionSnapshot $repo) -cne $before) 'Removing admission must reproduce broader mutation'
+        Write-TestResult 'ArgumentAdmission_LegacyUnselectedMetadataChanged' ([IO.File]::ReadAllText((Join-Path $repo 'Runtime/User.png.meta')).Contains("`r`n")) $red.Output
+        Write-TestResult 'ArgumentAdmission_LegacyConfigChanged' ([IO.File]::ReadAllText((Join-Path $repo '.git/config')) -match 'autoSetupRemote') $red.Output
+        Write-TestResult 'ArgumentAdmission_LegacyArtifactDeleted' (-not(Test-Path -LiteralPath (Join-Path $repo '.githooks/pre-commit.log'))) $red.Output
+        if ($ArgumentAdmissionEvidencePath) {
+            $evidence = [ordered]@{ scope = 'Owned fixture source-derived legacy mutation negative control; production source unchanged'; arguments = @('-Fix', '--files', 'Runtime/Selected.png.meta'); sourceSha256 = (Get-FileHash -LiteralPath $scriptPath -Algorithm SHA256).Hash; result = $red; before = ($before | ConvertFrom-Json); after = (Get-AdmissionSnapshot $repo | ConvertFrom-Json); mutatedConfig = [IO.File]::ReadAllText((Join-Path $repo '.git/config')); mutatedUnselectedMetadata = [IO.File]::ReadAllText((Join-Path $repo 'Runtime/User.png.meta')) }
+            $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($evidence | ConvertTo-Json -Depth 8))
+            $stream = [IO.File]::Open($ArgumentAdmissionEvidencePath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+            try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
+        }
+    }
+    finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+    foreach ($mode in @('Paths', 'PathList', 'Array', 'Hyphen', 'AbsoluteHyphen')) {
+        $repo = New-AdmissionRepo
+        try {
+            Remove-Item -LiteralPath (Join-Path $repo '.githooks/pre-commit.log') -Force
+            $hyphenMode = $mode -in @('Hyphen', 'AbsoluteHyphen')
+            $allBefore = @(Get-AdmissionSnapshot $repo | ConvertFrom-Json)
+            $stagedBefore = @(Get-StagedPaths -RepoPath $repo)
+            $userPath = Join-Path $repo 'Runtime/User.png.meta'
+            $userBefore = [IO.File]::ReadAllBytes($userPath)
+            $userTime = (Get-Item -LiteralPath $userPath).LastWriteTimeUtc
+            $untrackedBefore = [IO.File]::ReadAllBytes((Join-Path $repo 'user-untracked.txt'))
+            if ($mode -eq 'PathList') {
+                $list = [IO.Path]::GetTempFileName()
+                try {
+                    [IO.File]::WriteAllText($list, "Runtime/Selected.png.meta`nRuntime/Additional.png.meta`n")
+                    $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '-PathList', $list) -UseCli
+                } finally { Remove-Item -LiteralPath $list -Force }
+            }
+            elseif ($mode -eq 'Array') {
+                $runner = [Management.Automation.PowerShell]::Create()
+                try {
+                    [void]$runner.AddCommand((Join-Path $repo 'scripts/agent-preflight.ps1')).AddParameter('Fix').AddParameter('Paths', @('Runtime/Selected.png.meta')).AddParameter('AdditionalPaths', @('Runtime/Additional.png.meta'))
+                    $null = $runner.Invoke()
+                    $result = @{ ExitCode = [int]$runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE'); Output = ($runner.Streams.Error -join "`n") }
+                } finally { $runner.Dispose() }
+            }
+            else {
+                $arguments = if ($mode -eq 'AbsoluteHyphen') { @('-Fix', '-Paths', (Join-Path $repo '-selected.png.meta')) } elseif ($mode -eq 'Hyphen') { @('-Fix', '-Paths', './-selected.png.meta') } else { @('-Fix', '-Paths', 'Runtime/Selected.png.meta', 'Runtime/Additional.png.meta') }
+                $result = Invoke-Preflight -RepoPath $repo -Arguments $arguments -UseCli
+            }
+            Write-TestResult "ArgumentAdmission_${mode}ExitZero" ($result.ExitCode -eq 0) $result.Output
+            $selected = if ($hyphenMode) { '-selected.png.meta' } else { 'Runtime/Selected.png.meta' }
+            Write-TestResult "ArgumentAdmission_${mode}SelectedFixed" ([IO.File]::ReadAllText((Join-Path $repo $selected)).Contains("`r`n")) 'Selected metadata was not fixed'
+            if (-not $hyphenMode) { Write-TestResult "ArgumentAdmission_${mode}AdditionalFixed" ([IO.File]::ReadAllText((Join-Path $repo 'Runtime/Additional.png.meta')).Contains("`r`n")) 'Additional selected metadata was not fixed' }
+            Write-TestResult "ArgumentAdmission_${mode}UnselectedPreserved" ((Test-ByteArrayEqual $userBefore ([IO.File]::ReadAllBytes($userPath))) -and (Get-Item -LiteralPath $userPath).LastWriteTimeUtc -eq $userTime -and (Test-ByteArrayEqual $untrackedBefore ([IO.File]::ReadAllBytes((Join-Path $repo 'user-untracked.txt'))))) 'Unselected user bytes or metadata changed'
+            $closure = if ($hyphenMode) { @('-selected.png.meta', '.git/index') } else { @('Runtime/Selected.png.meta', 'Runtime/Additional.png.meta', '.git/index') }
+            $protectedBefore = @($allBefore | Where-Object { $_.path -notin $closure }) | ConvertTo-Json -Depth 5 -Compress
+            $protectedAfter = @(Get-AdmissionSnapshot $repo | ConvertFrom-Json | Where-Object { $_.path -notin $closure }) | ConvertTo-Json -Depth 5 -Compress
+            Write-TestResult "ArgumentAdmission_${mode}ExactClosure" ($protectedBefore -ceq $protectedAfter) 'Files outside selected closure changed'
+            $expectedStaged = @($stagedBefore | Sort-Object -Unique) -join "`n"
+            $actualStaged = @(Get-StagedPaths -RepoPath $repo | Sort-Object -Unique) -join "`n"
+            Write-TestResult "ArgumentAdmission_${mode}IndexClosure" ($actualStaged -ceq $expectedStaged) 'Fix must preserve the prior staged path set and keep unstaged inputs unstaged'
+        }
+        finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+    }
+    $repo = New-AdmissionRepo
+    try {
+        Remove-Item -LiteralPath (Join-Path $repo '.githooks/pre-commit.log') -Force
+        $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix') -UseCli
+        Write-TestResult 'ArgumentAdmission_DefaultChangedDiscovery' ($result.ExitCode -eq 0 -and [IO.File]::ReadAllText((Join-Path $repo 'Runtime/User.png.meta')).Contains("`r`n")) $result.Output
+    } finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+}
+
 function Test-LicensePipeDrain {
     $repoPath = New-TestRepo -ConfigurePushDefaults
     $process = $null
@@ -681,6 +805,14 @@ if ($PipePressureOnly) {
     if ($script:TestsFailed -gt 0) {
         exit 1
     }
+    exit 0
+}
+
+if ($ArgumentAdmissionOnly -or -not ($LicensePipeOnly -or $PipePressureOnly -or $JavaScriptLibraryOnly)) {
+    Test-ArgumentAdmissionPreflight
+}
+if ($ArgumentAdmissionOnly) {
+    if ($script:TestsFailed -gt 0) { exit 1 }
     exit 0
 }
 

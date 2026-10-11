@@ -14,25 +14,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
     [NUnit.Framework.Category("Fast")]
     public sealed class EffectBehaviorTests : TagsTestBase
     {
-        private (
-            GameObject entity,
-            EffectHandler handler,
-            TestAttributesComponent attributes,
-            TagHandler tags
-        ) CreateEntity()
-        {
-            GameObject entity = CreateTrackedGameObject(
-                "EffectBehaviorEntity",
-                typeof(TestAttributesComponent)
-            );
-            return (
-                entity,
-                entity.GetComponent<EffectHandler>(),
-                entity.GetComponent<TestAttributesComponent>(),
-                entity.GetComponent<TagHandler>()
-            );
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -230,6 +211,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
 
             handler.RemoveEffect(handle);
+        }
+
+        private (
+            GameObject entity,
+            EffectHandler handler,
+            TestAttributesComponent attributes,
+            TagHandler tags
+        ) CreateEntity()
+        {
+            GameObject entity = CreateTrackedGameObject(
+                "EffectBehaviorEntity",
+                typeof(TestAttributesComponent)
+            );
+            return (
+                entity,
+                entity.GetComponent<EffectHandler>(),
+                entity.GetComponent<TestAttributesComponent>(),
+                entity.GetComponent<TagHandler>()
+            );
         }
     }
 }

@@ -102,192 +102,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         internal static bool SuppressUserPrompts { get; set; }
 
         /// <summary>
-        /// Detects cell size by analyzing opaque regions using flood-fill.
-        /// Identifies individual sprite regions, computes their median dimensions,
-        /// and finds the nearest divisor that produces multiple cells.
-        /// </summary>
-        /// <param name="pixels">The texture pixel data in Color32 format.</param>
-        /// <param name="textureWidth">Width of the texture in pixels.</param>
-        /// <param name="textureHeight">Height of the texture in pixels.</param>
-        /// <param name="alphaThreshold">Finite alpha value (0-1) below which a pixel is considered transparent.</param>
-        /// <returns>A tuple of (cellWidth, cellHeight), or (0, 0) if detection failed.</returns>
-        internal static (int cellWidth, int cellHeight) DetectCellSizeFromOpaqueRegions(
-            Color32[] pixels,
-            int textureWidth,
-            int textureHeight,
-            float alphaThreshold
-        )
-        {
-            if (!float.IsFinite(alphaThreshold))
-            {
-                return (0, 0);
-            }
-
-            if (pixels == null || pixels.Length == 0)
-            {
-                return (0, 0);
-            }
-
-            if (
-                textureWidth < SpriteSheetAlgorithms.MinimumCellSize
-                || textureHeight < SpriteSheetAlgorithms.MinimumCellSize
-            )
-            {
-                return (0, 0);
-            }
-
-            if (pixels.Length != textureWidth * textureHeight)
-            {
-                return (0, 0);
-            }
-
-            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
-
-            using PooledArray<bool> visitedLease = SystemArrayPool<bool>.Get(
-                pixels.Length,
-                out bool[] visited
-            );
-            Array.Clear(visited, 0, visited.Length);
-
-            using PooledResource<List<int>> widthsLease = Buffers<int>.List.Get(
-                out List<int> regionWidths
-            );
-            using PooledResource<List<int>> heightsLease = Buffers<int>.List.Get(
-                out List<int> regionHeights
-            );
-            using PooledResource<List<int>> stackLease = Buffers<int>.List.Get(out List<int> stack);
-
-            const int minimumRegionSize = SpriteSheetAlgorithms.MinimumCellSize;
-            const int maxRegionCount = 256;
-
-            for (int startY = 0; startY < textureHeight; ++startY)
-            {
-                if (maxRegionCount <= regionWidths.Count)
-                {
-                    break;
-                }
-
-                for (int startX = 0; startX < textureWidth; ++startX)
-                {
-                    int startIdx = startY * textureWidth + startX;
-                    if (visited[startIdx])
-                    {
-                        continue;
-                    }
-
-                    if (pixels[startIdx].a <= alphaThresholdByte)
-                    {
-                        visited[startIdx] = true;
-                        continue;
-                    }
-
-                    int minX = startX;
-                    int maxX = startX;
-                    int minY = startY;
-                    int maxY = startY;
-
-                    stack.Clear();
-                    stack.Add(startIdx);
-                    visited[startIdx] = true;
-
-                    while (0 < stack.Count)
-                    {
-                        int lastIndex = stack.Count - 1;
-                        int idx = stack[lastIndex];
-                        stack.RemoveAt(lastIndex);
-
-                        int px = idx % textureWidth;
-                        int py = idx / textureWidth;
-
-                        if (px < minX)
-                        {
-                            minX = px;
-                        }
-                        if (maxX < px)
-                        {
-                            maxX = px;
-                        }
-                        if (py < minY)
-                        {
-                            minY = py;
-                        }
-                        if (maxY < py)
-                        {
-                            maxY = py;
-                        }
-
-                        if (0 < px)
-                        {
-                            int left = idx - 1;
-                            if (!visited[left] && alphaThresholdByte < pixels[left].a)
-                            {
-                                visited[left] = true;
-                                stack.Add(left);
-                            }
-                        }
-                        if (px < textureWidth - 1)
-                        {
-                            int right = idx + 1;
-                            if (!visited[right] && alphaThresholdByte < pixels[right].a)
-                            {
-                                visited[right] = true;
-                                stack.Add(right);
-                            }
-                        }
-                        if (0 < py)
-                        {
-                            int down = idx - textureWidth;
-                            if (!visited[down] && alphaThresholdByte < pixels[down].a)
-                            {
-                                visited[down] = true;
-                                stack.Add(down);
-                            }
-                        }
-                        if (py < textureHeight - 1)
-                        {
-                            int up = idx + textureWidth;
-                            if (!visited[up] && alphaThresholdByte < pixels[up].a)
-                            {
-                                visited[up] = true;
-                                stack.Add(up);
-                            }
-                        }
-                    }
-
-                    int regionWidth = maxX - minX + 1;
-                    int regionHeight = maxY - minY + 1;
-
-                    if (minimumRegionSize <= regionWidth && minimumRegionSize <= regionHeight)
-                    {
-                        regionWidths.Add(regionWidth);
-                        regionHeights.Add(regionHeight);
-                    }
-                }
-            }
-
-            if (regionWidths.Count < 2)
-            {
-                return (0, 0);
-            }
-
-            regionWidths.Sort();
-            regionHeights.Sort();
-
-            int medianWidth = regionWidths[regionWidths.Count / 2];
-            int medianHeight = regionHeights[regionHeights.Count / 2];
-
-            int cellWidth = FindNearestDivisorWithMinCells(textureWidth, medianWidth, 2);
-            int cellHeight = FindNearestDivisorWithMinCells(textureHeight, medianHeight, 2);
-
-            if (cellWidth < minimumRegionSize || cellHeight < minimumRegionSize)
-            {
-                return (0, 0);
-            }
-
-            return (cellWidth, cellHeight);
-        }
-
-        /// <summary>
         /// Controls whether diagnostic logging is enabled.
         /// Set to true for debugging sprite regeneration and cache issues.
         /// </summary>
@@ -1314,6 +1128,192 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             texture.SetPixels32(0, 0, width, height, pixels, 0);
             texture.Apply();
+        }
+
+        /// <summary>
+        /// Detects cell size by analyzing opaque regions using flood-fill.
+        /// Identifies individual sprite regions, computes their median dimensions,
+        /// and finds the nearest divisor that produces multiple cells.
+        /// </summary>
+        /// <param name="pixels">The texture pixel data in Color32 format.</param>
+        /// <param name="textureWidth">Width of the texture in pixels.</param>
+        /// <param name="textureHeight">Height of the texture in pixels.</param>
+        /// <param name="alphaThreshold">Finite alpha value (0-1) below which a pixel is considered transparent.</param>
+        /// <returns>A tuple of (cellWidth, cellHeight), or (0, 0) if detection failed.</returns>
+        internal static (int cellWidth, int cellHeight) DetectCellSizeFromOpaqueRegions(
+            Color32[] pixels,
+            int textureWidth,
+            int textureHeight,
+            float alphaThreshold
+        )
+        {
+            if (!float.IsFinite(alphaThreshold))
+            {
+                return (0, 0);
+            }
+
+            if (pixels == null || pixels.Length == 0)
+            {
+                return (0, 0);
+            }
+
+            if (
+                textureWidth < SpriteSheetAlgorithms.MinimumCellSize
+                || textureHeight < SpriteSheetAlgorithms.MinimumCellSize
+            )
+            {
+                return (0, 0);
+            }
+
+            if (pixels.Length != textureWidth * textureHeight)
+            {
+                return (0, 0);
+            }
+
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
+
+            using PooledArray<bool> visitedLease = SystemArrayPool<bool>.Get(
+                pixels.Length,
+                out bool[] visited
+            );
+            Array.Clear(visited, 0, visited.Length);
+
+            using PooledResource<List<int>> widthsLease = Buffers<int>.List.Get(
+                out List<int> regionWidths
+            );
+            using PooledResource<List<int>> heightsLease = Buffers<int>.List.Get(
+                out List<int> regionHeights
+            );
+            using PooledResource<List<int>> stackLease = Buffers<int>.List.Get(out List<int> stack);
+
+            const int minimumRegionSize = SpriteSheetAlgorithms.MinimumCellSize;
+            const int maxRegionCount = 256;
+
+            for (int startY = 0; startY < textureHeight; ++startY)
+            {
+                if (maxRegionCount <= regionWidths.Count)
+                {
+                    break;
+                }
+
+                for (int startX = 0; startX < textureWidth; ++startX)
+                {
+                    int startIdx = startY * textureWidth + startX;
+                    if (visited[startIdx])
+                    {
+                        continue;
+                    }
+
+                    if (pixels[startIdx].a <= alphaThresholdByte)
+                    {
+                        visited[startIdx] = true;
+                        continue;
+                    }
+
+                    int minX = startX;
+                    int maxX = startX;
+                    int minY = startY;
+                    int maxY = startY;
+
+                    stack.Clear();
+                    stack.Add(startIdx);
+                    visited[startIdx] = true;
+
+                    while (0 < stack.Count)
+                    {
+                        int lastIndex = stack.Count - 1;
+                        int idx = stack[lastIndex];
+                        stack.RemoveAt(lastIndex);
+
+                        int px = idx % textureWidth;
+                        int py = idx / textureWidth;
+
+                        if (px < minX)
+                        {
+                            minX = px;
+                        }
+                        if (maxX < px)
+                        {
+                            maxX = px;
+                        }
+                        if (py < minY)
+                        {
+                            minY = py;
+                        }
+                        if (maxY < py)
+                        {
+                            maxY = py;
+                        }
+
+                        if (0 < px)
+                        {
+                            int left = idx - 1;
+                            if (!visited[left] && alphaThresholdByte < pixels[left].a)
+                            {
+                                visited[left] = true;
+                                stack.Add(left);
+                            }
+                        }
+                        if (px < textureWidth - 1)
+                        {
+                            int right = idx + 1;
+                            if (!visited[right] && alphaThresholdByte < pixels[right].a)
+                            {
+                                visited[right] = true;
+                                stack.Add(right);
+                            }
+                        }
+                        if (0 < py)
+                        {
+                            int down = idx - textureWidth;
+                            if (!visited[down] && alphaThresholdByte < pixels[down].a)
+                            {
+                                visited[down] = true;
+                                stack.Add(down);
+                            }
+                        }
+                        if (py < textureHeight - 1)
+                        {
+                            int up = idx + textureWidth;
+                            if (!visited[up] && alphaThresholdByte < pixels[up].a)
+                            {
+                                visited[up] = true;
+                                stack.Add(up);
+                            }
+                        }
+                    }
+
+                    int regionWidth = maxX - minX + 1;
+                    int regionHeight = maxY - minY + 1;
+
+                    if (minimumRegionSize <= regionWidth && minimumRegionSize <= regionHeight)
+                    {
+                        regionWidths.Add(regionWidth);
+                        regionHeights.Add(regionHeight);
+                    }
+                }
+            }
+
+            if (regionWidths.Count < 2)
+            {
+                return (0, 0);
+            }
+
+            regionWidths.Sort();
+            regionHeights.Sort();
+
+            int medianWidth = regionWidths[regionWidths.Count / 2];
+            int medianHeight = regionHeights[regionHeights.Count / 2];
+
+            int cellWidth = FindNearestDivisorWithMinCells(textureWidth, medianWidth, 2);
+            int cellHeight = FindNearestDivisorWithMinCells(textureHeight, medianHeight, 2);
+
+            if (cellWidth < minimumRegionSize || cellHeight < minimumRegionSize)
+            {
+                return (0, 0);
+            }
+
+            return (cellWidth, cellHeight);
         }
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]

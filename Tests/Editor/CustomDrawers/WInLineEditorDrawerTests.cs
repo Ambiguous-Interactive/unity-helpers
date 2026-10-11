@@ -23,166 +23,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
     {
         private const float InlinePaddingContribution = 4f;
 
-        /// <summary>
-        /// Prepares a test context for inline editor testing, creating all necessary objects.
-        /// </summary>
-        /// <typeparam name="THost">The host ScriptableObject type with a WInLineEditor attribute.</typeparam>
-        /// <param name="propertyExpanded">Whether the property should be expanded.</param>
-        /// <param name="setInlineExpanded">Optional inline foldout state.</param>
-        /// <returns>Tuple containing the drawer, property, attribute, target, and serialized object.</returns>
-        private (
-            WInLineEditorDrawer drawer,
-            SerializedProperty property,
-            WInLineEditorAttribute attribute,
-            ScriptableObject target,
-            SerializedObject serializedHost
-        ) PrepareInlineEditorTestContext<THost>(bool propertyExpanded, bool? setInlineExpanded)
-            where THost : ScriptableObject
-        {
-            WInLineEditorDrawerTestAccess.ClearCachedState();
-            THost host = Track(ScriptableObject.CreateInstance<THost>());
-            host.hideFlags = HideFlags.HideAndDontSave;
-
-            (FieldInfo targetField, WInLineEditorAttribute inlineAttribute) =
-                PropertyDrawerTestHelper.FindFirstFieldWithAttributeOrFail<WInLineEditorAttribute>(
-                    typeof(THost)
-                );
-
-            string propertyName = targetField.Name;
-            Type fieldType = targetField.FieldType;
-
-            ScriptableObject target = Track(
-                ScriptableObject.CreateInstance(fieldType) as ScriptableObject
-            );
-            Assert.That(target, Is.Not.Null, $"Failed to create instance of {fieldType.Name}.");
-            target.hideFlags = HideFlags.HideAndDontSave;
-
-            SerializedObject serializedHost = new(host);
-            serializedHost.Update();
-            SerializedProperty property = serializedHost.FindProperty(propertyName);
-            Assert.That(
-                property,
-                Is.Not.Null,
-                $"Failed to find property '{propertyName}' on {typeof(THost).Name}."
-            );
-            property.objectReferenceValue = target;
-            serializedHost.ApplyModifiedPropertiesWithoutUndo();
-            serializedHost.Update();
-            property = serializedHost.FindProperty(propertyName);
-            Assert.That(
-                property,
-                Is.Not.Null,
-                $"Failed to re-find property '{propertyName}' after assignment."
-            );
-            property.isExpanded = propertyExpanded;
-            if (setInlineExpanded.HasValue)
-            {
-                WInLineEditorDrawerTestAccess.SetInlineFoldoutState(
-                    property,
-                    setInlineExpanded.Value
-                );
-            }
-
-            WInLineEditorDrawer drawer = new();
-            PropertyDrawerTestHelper.AssignAttribute(drawer, inlineAttribute);
-
-            return (drawer, property, inlineAttribute, target, serializedHost);
-        }
-
         private bool _originalTweenEnabled;
         private float _originalTweenSpeed;
-
-        /// <summary>
-        /// Measures property height and returns detailed calculation info for diagnostics.
-        /// </summary>
-        private (
-            float height,
-            (
-                float baseHeight,
-                float inlineHeight,
-                bool showHeader,
-                bool showBody,
-                float displayHeight
-            ) details
-        ) MeasurePropertyHeightWithDetails<THost>(
-            bool propertyExpanded,
-            bool? setInlineExpanded = null
-        )
-            where THost : ScriptableObject
-        {
-            (
-                float height,
-                (
-                    float baseHeight,
-                    float inlineHeight,
-                    bool showHeader,
-                    bool showBody,
-                    float displayHeight
-                ) details,
-                _
-            ) = MeasurePropertyHeightWithDetailedDiagnostics<THost>(
-                propertyExpanded,
-                setInlineExpanded
-            );
-            return (height, details);
-        }
-
-        /// <summary>
-        /// Measures property height and returns detailed calculation info plus extensive diagnostics.
-        /// </summary>
-        private (
-            float height,
-            (
-                float baseHeight,
-                float inlineHeight,
-                bool showHeader,
-                bool showBody,
-                float displayHeight
-            ) details,
-            string diagnostics
-        ) MeasurePropertyHeightWithDetailedDiagnostics<THost>(
-            bool propertyExpanded,
-            bool? setInlineExpanded = null
-        )
-            where THost : ScriptableObject
-        {
-            (
-                WInLineEditorDrawer drawer,
-                SerializedProperty property,
-                WInLineEditorAttribute inlineAttribute,
-                ScriptableObject target,
-                SerializedObject serializedHost
-            ) = PrepareInlineEditorTestContext<THost>(propertyExpanded, setInlineExpanded);
-
-            using (serializedHost)
-            {
-                GUIContent label = new("Target");
-
-                float height = drawer.GetPropertyHeight(property, label);
-
-                (
-                    float baseHeight,
-                    float inlineHeight,
-                    bool showHeader,
-                    bool showBody,
-                    float displayHeight
-                ) details = WInLineEditorDrawerTestAccess.GetHeightCalculationDetails(
-                    property,
-                    inlineAttribute,
-                    target,
-                    500f
-                );
-
-                string diagnostics = WInLineEditorDrawerTestAccess.GetExtensiveDiagnostics(
-                    property,
-                    inlineAttribute,
-                    target,
-                    500f
-                );
-
-                return (height, details, diagnostics);
-            }
-        }
 
         [SetUp]
         public override void BaseSetUp()
@@ -2377,6 +2219,164 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             T instance = Track(ScriptableObject.CreateInstance<T>());
             instance.hideFlags = HideFlags.HideAndDontSave;
             return instance;
+        }
+
+        /// <summary>
+        /// Prepares a test context for inline editor testing, creating all necessary objects.
+        /// </summary>
+        /// <typeparam name="THost">The host ScriptableObject type with a WInLineEditor attribute.</typeparam>
+        /// <param name="propertyExpanded">Whether the property should be expanded.</param>
+        /// <param name="setInlineExpanded">Optional inline foldout state.</param>
+        /// <returns>Tuple containing the drawer, property, attribute, target, and serialized object.</returns>
+        private (
+            WInLineEditorDrawer drawer,
+            SerializedProperty property,
+            WInLineEditorAttribute attribute,
+            ScriptableObject target,
+            SerializedObject serializedHost
+        ) PrepareInlineEditorTestContext<THost>(bool propertyExpanded, bool? setInlineExpanded)
+            where THost : ScriptableObject
+        {
+            WInLineEditorDrawerTestAccess.ClearCachedState();
+            THost host = Track(ScriptableObject.CreateInstance<THost>());
+            host.hideFlags = HideFlags.HideAndDontSave;
+
+            (FieldInfo targetField, WInLineEditorAttribute inlineAttribute) =
+                PropertyDrawerTestHelper.FindFirstFieldWithAttributeOrFail<WInLineEditorAttribute>(
+                    typeof(THost)
+                );
+
+            string propertyName = targetField.Name;
+            Type fieldType = targetField.FieldType;
+
+            ScriptableObject target = Track(
+                ScriptableObject.CreateInstance(fieldType) as ScriptableObject
+            );
+            Assert.That(target, Is.Not.Null, $"Failed to create instance of {fieldType.Name}.");
+            target.hideFlags = HideFlags.HideAndDontSave;
+
+            SerializedObject serializedHost = new(host);
+            serializedHost.Update();
+            SerializedProperty property = serializedHost.FindProperty(propertyName);
+            Assert.That(
+                property,
+                Is.Not.Null,
+                $"Failed to find property '{propertyName}' on {typeof(THost).Name}."
+            );
+            property.objectReferenceValue = target;
+            serializedHost.ApplyModifiedPropertiesWithoutUndo();
+            serializedHost.Update();
+            property = serializedHost.FindProperty(propertyName);
+            Assert.That(
+                property,
+                Is.Not.Null,
+                $"Failed to re-find property '{propertyName}' after assignment."
+            );
+            property.isExpanded = propertyExpanded;
+            if (setInlineExpanded.HasValue)
+            {
+                WInLineEditorDrawerTestAccess.SetInlineFoldoutState(
+                    property,
+                    setInlineExpanded.Value
+                );
+            }
+
+            WInLineEditorDrawer drawer = new();
+            PropertyDrawerTestHelper.AssignAttribute(drawer, inlineAttribute);
+
+            return (drawer, property, inlineAttribute, target, serializedHost);
+        }
+
+        /// <summary>
+        /// Measures property height and returns detailed calculation info for diagnostics.
+        /// </summary>
+        private (
+            float height,
+            (
+                float baseHeight,
+                float inlineHeight,
+                bool showHeader,
+                bool showBody,
+                float displayHeight
+            ) details
+        ) MeasurePropertyHeightWithDetails<THost>(
+            bool propertyExpanded,
+            bool? setInlineExpanded = null
+        )
+            where THost : ScriptableObject
+        {
+            (
+                float height,
+                (
+                    float baseHeight,
+                    float inlineHeight,
+                    bool showHeader,
+                    bool showBody,
+                    float displayHeight
+                ) details,
+                _
+            ) = MeasurePropertyHeightWithDetailedDiagnostics<THost>(
+                propertyExpanded,
+                setInlineExpanded
+            );
+            return (height, details);
+        }
+
+        /// <summary>
+        /// Measures property height and returns detailed calculation info plus extensive diagnostics.
+        /// </summary>
+        private (
+            float height,
+            (
+                float baseHeight,
+                float inlineHeight,
+                bool showHeader,
+                bool showBody,
+                float displayHeight
+            ) details,
+            string diagnostics
+        ) MeasurePropertyHeightWithDetailedDiagnostics<THost>(
+            bool propertyExpanded,
+            bool? setInlineExpanded = null
+        )
+            where THost : ScriptableObject
+        {
+            (
+                WInLineEditorDrawer drawer,
+                SerializedProperty property,
+                WInLineEditorAttribute inlineAttribute,
+                ScriptableObject target,
+                SerializedObject serializedHost
+            ) = PrepareInlineEditorTestContext<THost>(propertyExpanded, setInlineExpanded);
+
+            using (serializedHost)
+            {
+                GUIContent label = new("Target");
+
+                float height = drawer.GetPropertyHeight(property, label);
+
+                (
+                    float baseHeight,
+                    float inlineHeight,
+                    bool showHeader,
+                    bool showBody,
+                    float displayHeight
+                ) details = WInLineEditorDrawerTestAccess.GetHeightCalculationDetails(
+                    property,
+                    inlineAttribute,
+                    target,
+                    500f
+                );
+
+                string diagnostics = WInLineEditorDrawerTestAccess.GetExtensiveDiagnostics(
+                    property,
+                    inlineAttribute,
+                    target,
+                    500f
+                );
+
+                return (height, details, diagnostics);
+            }
         }
 
         private sealed class InlineEditorFoldoutBehaviorScope : IDisposable

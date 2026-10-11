@@ -51,29 +51,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         // A sigma-based floor prevents reduced-sample variance from exceeding a fixed relative tolerance.
         private const double DeviationSigmaFloor = 5.5;
 
-        private static IEnumerable<(int Width, int Height)> EnumerateNoiseMapDimensions(
-            IRandom random
-        )
-        {
-            if (NoiseMapIterationCount <= FastNoiseMapDimensions.Length)
-            {
-                for (int i = 0; i < NoiseMapIterationCount; ++i)
-                {
-                    yield return FastNoiseMapDimensions[i];
-                }
-
-                yield break;
-            }
-
-            for (int i = 0; i < NoiseMapIterationCount; ++i)
-            {
-                yield return (
-                    random.Next(1, NoiseMapExclusiveMaxDimension),
-                    random.Next(1, NoiseMapExclusiveMaxDimension)
-                );
-            }
-        }
-
         protected static readonly Guid DeterministicGuid = new(
             "11223344-5566-7788-99AA-BBCCDDEEFF00"
         );
@@ -131,6 +108,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
 
             return defaultValue;
+        }
+
+        private static IEnumerable<(int Width, int Height)> EnumerateNoiseMapDimensions(
+            IRandom random
+        )
+        {
+            if (NoiseMapIterationCount <= FastNoiseMapDimensions.Length)
+            {
+                for (int i = 0; i < NoiseMapIterationCount; ++i)
+                {
+                    yield return FastNoiseMapDimensions[i];
+                }
+
+                yield break;
+            }
+
+            for (int i = 0; i < NoiseMapIterationCount; ++i)
+            {
+                yield return (
+                    random.Next(1, NoiseMapExclusiveMaxDimension),
+                    random.Next(1, NoiseMapExclusiveMaxDimension)
+                );
+            }
         }
 
         [SetUp]

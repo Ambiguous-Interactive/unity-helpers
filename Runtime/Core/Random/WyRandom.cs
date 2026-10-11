@@ -78,6 +78,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public static WyRandom Instance => ThreadLocalRandom<WyRandom>.Instance;
 
+        public override RandomState InternalState => BuildState(_state);
+
         /// <summary>
         /// Multiplies 2 unsigned 64-bit integers, returning the result in 2 ulongs representing the hi and lo bits
         /// of the resulting 128-bit integer
@@ -126,8 +128,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             return (hi, lo);
         }
-
-        public override RandomState InternalState => BuildState(_state);
 
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(6)]

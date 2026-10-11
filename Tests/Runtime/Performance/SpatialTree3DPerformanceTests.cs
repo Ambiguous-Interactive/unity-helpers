@@ -29,44 +29,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private const int BenchmarkTimeoutMilliseconds = 600_000;
         private const int WarmupIterations = 3;
 
-        private static (string Label, float Radius)[] BuildRangeBenchmarks(DatasetSpec dataset)
-        {
-            (string Label, float Radius)[] benchmarks = new (string, float)[
-                RangeBenchmarkDefinitions.Length
-            ];
-
-            for (int i = 0; i < RangeBenchmarkDefinitions.Length; ++i)
-            {
-                (string name, float ratio) = RangeBenchmarkDefinitions[i];
-                float radius = Mathf.Max(1f, dataset.MaxSpan * ratio);
-                benchmarks[i] = ($"{name} (r={FormatValue(radius)})", radius);
-            }
-
-            return benchmarks;
-        }
-
-        private static (string Label, int Count)[] BuildNeighborBenchmarks(DatasetSpec dataset)
-        {
-            List<(string Label, int Count)> benchmarks = new();
-            HashSet<int> seenCounts = new();
-            foreach ((string label, int count) in NeighborBenchmarkDefinitions)
-            {
-                int effectiveCount = Mathf.Min(count, dataset.TotalPoints);
-
-                if (effectiveCount <= 0 || !seenCounts.Add(effectiveCount))
-                {
-                    continue;
-                }
-
-                string effectiveLabel =
-                    count == effectiveCount ? label : $"{effectiveCount} neighbors (max)";
-
-                benchmarks.Add((effectiveLabel, effectiveCount));
-            }
-
-            return benchmarks.ToArray();
-        }
-
         private static readonly TimeSpan BenchmarkDuration = TimeSpan.FromSeconds(1);
 
         private static readonly DatasetSpec[] DatasetSpecs =
@@ -475,6 +437,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 point,
                 new Vector3(PointBoundsSize, PointBoundsSize, PointBoundsSize)
             );
+        }
+
+        private static (string Label, float Radius)[] BuildRangeBenchmarks(DatasetSpec dataset)
+        {
+            (string Label, float Radius)[] benchmarks = new (string, float)[
+                RangeBenchmarkDefinitions.Length
+            ];
+
+            for (int i = 0; i < RangeBenchmarkDefinitions.Length; ++i)
+            {
+                (string name, float ratio) = RangeBenchmarkDefinitions[i];
+                float radius = Mathf.Max(1f, dataset.MaxSpan * ratio);
+                benchmarks[i] = ($"{name} (r={FormatValue(radius)})", radius);
+            }
+
+            return benchmarks;
+        }
+
+        private static (string Label, int Count)[] BuildNeighborBenchmarks(DatasetSpec dataset)
+        {
+            List<(string Label, int Count)> benchmarks = new();
+            HashSet<int> seenCounts = new();
+            foreach ((string label, int count) in NeighborBenchmarkDefinitions)
+            {
+                int effectiveCount = Mathf.Min(count, dataset.TotalPoints);
+
+                if (effectiveCount <= 0 || !seenCounts.Add(effectiveCount))
+                {
+                    continue;
+                }
+
+                string effectiveLabel =
+                    count == effectiveCount ? label : $"{effectiveCount} neighbors (max)";
+
+                benchmarks.Add((effectiveLabel, effectiveCount));
+            }
+
+            return benchmarks.ToArray();
         }
 
         [UnityTest]

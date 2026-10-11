@@ -78,6 +78,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public static BlastCircuitRandom Instance => ThreadLocalRandom<BlastCircuitRandom>.Instance;
 
+        public override RandomState InternalState
+        {
+            get
+            {
+                byte[] payload = new byte[PayloadByteCount];
+                BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(0, sizeof(ulong)), _c);
+                BinaryPrimitives.WriteUInt64LittleEndian(
+                    payload.AsSpan(sizeof(ulong), sizeof(ulong)),
+                    _d
+                );
+                return BuildState(_a, _b, payload);
+            }
+        }
+
         private static (ulong, ulong) ReadPayload(IReadOnlyList<byte> payload)
         {
             if (payload == null || payload.Count < PayloadByteCount)
@@ -107,20 +121,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 buffer.Slice(sizeof(ulong), sizeof(ulong))
             );
             return (c, d);
-        }
-
-        public override RandomState InternalState
-        {
-            get
-            {
-                byte[] payload = new byte[PayloadByteCount];
-                BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(0, sizeof(ulong)), _c);
-                BinaryPrimitives.WriteUInt64LittleEndian(
-                    payload.AsSpan(sizeof(ulong), sizeof(ulong)),
-                    _d
-                );
-                return BuildState(_a, _b, payload);
-            }
         }
 
 #if !WALLSTOP_PROTO_ONLY

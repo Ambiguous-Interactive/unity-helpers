@@ -13,61 +13,6 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
     public sealed class OctTreeBoundsQueryDiagnosticsCollector
         : OctTree3D<Vector3>.IOctTreeBoundsQueryLogger
     {
-        private static (List<Vector3> missing, List<Vector3> extra) ComputeDifferences(
-            ICollection<Vector3> expected,
-            ICollection<Vector3> actual,
-            int maxItems
-        )
-        {
-            Dictionary<Vector3, int> left = new();
-            foreach (Vector3 v in expected)
-            {
-                left[v] = left.TryGetValue(v, out int seen) ? seen + 1 : 1;
-            }
-
-            Dictionary<Vector3, int> right = new();
-            foreach (Vector3 v in actual)
-            {
-                right[v] = right.TryGetValue(v, out int seen) ? seen + 1 : 1;
-            }
-
-            HashSet<Vector3> keys = new(left.Keys);
-            keys.UnionWith(right.Keys);
-
-            List<Vector3> missing = new();
-            List<Vector3> extra = new();
-
-            foreach (Vector3 key in keys)
-            {
-                int lc = left.TryGetValue(key, out int leftCount) ? leftCount : 0;
-                int rc = right.TryGetValue(key, out int rightCount) ? rightCount : 0;
-                if (rc < lc)
-                {
-                    int diff = Math.Min(maxItems - missing.Count, lc - rc);
-                    for (int i = 0; i < diff; ++i)
-                    {
-                        missing.Add(key);
-                    }
-                }
-                else if (lc < rc)
-                {
-                    int diff = Math.Min(maxItems - extra.Count, rc - lc);
-                    for (int i = 0; i < diff; ++i)
-                    {
-                        extra.Add(key);
-                    }
-                }
-                if (maxItems <= missing.Count && maxItems <= extra.Count)
-                {
-                    break;
-                }
-            }
-
-            missing.Sort(CompareVector);
-            extra.Sort(CompareVector);
-            return (missing, extra);
-        }
-
         public Bounds ClosedQuery { get; private set; }
 
         public BoundingBox3D HalfOpenQuery { get; private set; }
@@ -167,6 +112,61 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             }
 
             return string.Join(", ", counts.Select(pair => $"{pair.Key}: {pair.Value}"));
+        }
+
+        private static (List<Vector3> missing, List<Vector3> extra) ComputeDifferences(
+            ICollection<Vector3> expected,
+            ICollection<Vector3> actual,
+            int maxItems
+        )
+        {
+            Dictionary<Vector3, int> left = new();
+            foreach (Vector3 v in expected)
+            {
+                left[v] = left.TryGetValue(v, out int seen) ? seen + 1 : 1;
+            }
+
+            Dictionary<Vector3, int> right = new();
+            foreach (Vector3 v in actual)
+            {
+                right[v] = right.TryGetValue(v, out int seen) ? seen + 1 : 1;
+            }
+
+            HashSet<Vector3> keys = new(left.Keys);
+            keys.UnionWith(right.Keys);
+
+            List<Vector3> missing = new();
+            List<Vector3> extra = new();
+
+            foreach (Vector3 key in keys)
+            {
+                int lc = left.TryGetValue(key, out int leftCount) ? leftCount : 0;
+                int rc = right.TryGetValue(key, out int rightCount) ? rightCount : 0;
+                if (rc < lc)
+                {
+                    int diff = Math.Min(maxItems - missing.Count, lc - rc);
+                    for (int i = 0; i < diff; ++i)
+                    {
+                        missing.Add(key);
+                    }
+                }
+                else if (lc < rc)
+                {
+                    int diff = Math.Min(maxItems - extra.Count, rc - lc);
+                    for (int i = 0; i < diff; ++i)
+                    {
+                        extra.Add(key);
+                    }
+                }
+                if (maxItems <= missing.Count && maxItems <= extra.Count)
+                {
+                    break;
+                }
+            }
+
+            missing.Sort(CompareVector);
+            extra.Sort(CompareVector);
+            return (missing, extra);
         }
 
         public void OnQueryInitialized(

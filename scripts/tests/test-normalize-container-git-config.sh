@@ -6,7 +6,6 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/normalize-container-git-config.sh"
 
 passed=0
 failed=0
@@ -17,23 +16,31 @@ fail() { printf '  [FAIL] %s\n         %s\n' "$1" "$2"; failed=$((failed + 1)); 
 
 HELPER='!f() { /usr/bin/node /tmp/vscode-remote-containers-test.js git-credential-helper $*; }; f'
 
-# Builds a fresh sandbox and echoes its directory.
+# Copies the actual scripts into an independent checkout so helper paths and local git config
+# belong to the fixture even when this suite runs from a linked worktree. Echoes its directory.
 new_sandbox() {
     local dir
     dir="$(mktemp -d)"
     : > "$dir/global"
     : > "$dir/system"
+    mkdir -p "$dir/scripts"
+    cp "$REPO_ROOT/scripts/check-container-git-credentials.sh" \
+        "$REPO_ROOT/scripts/normalize-container-git-config.sh" \
+        "$REPO_ROOT/scripts/github-token.sh" "$dir/scripts/"
+    chmod +x "$dir/scripts"/*.sh
+    GIT_CONFIG_GLOBAL="$dir/global" GIT_CONFIG_SYSTEM="$dir/system" \
+        git -C "$dir" -c init.templateDir= init -q || return 1
     printf '%s' "$dir"
 }
 
 run_normalizer() {
     local dir="$1"
-    GIT_CONFIG_GLOBAL="$dir/global" GIT_CONFIG_SYSTEM="$dir/system" bash "$SCRIPT" >/dev/null 2>&1
+    GIT_CONFIG_GLOBAL="$dir/global" GIT_CONFIG_SYSTEM="$dir/system" bash "$dir/scripts/normalize-container-git-config.sh" >/dev/null 2>&1
 }
 
 cfg() {
     local dir="$1"; shift
-    GIT_CONFIG_GLOBAL="$dir/global" GIT_CONFIG_SYSTEM="$dir/system" git config "$@" 2>/dev/null
+    GIT_CONFIG_GLOBAL="$dir/global" GIT_CONFIG_SYSTEM="$dir/system" git -C "$dir" config "$@" 2>/dev/null
 }
 
 printf 'Testing scripts/normalize-container-git-config.sh...\n\n'
@@ -139,7 +146,7 @@ ask_credential() {
     printf 'protocol=https\nhost=%s\n\n' "$1" \
         | GIT_CONFIG_GLOBAL="$sandbox/global" GIT_CONFIG_SYSTEM="$sandbox/system" \
             UNITY_HELPERS_GITHUB_TOKEN_CACHE="$sandbox/token" GITHUB_TOKEN='' GH_TOKEN='' \
-            GIT_TERMINAL_PROMPT=0 timeout 30 git credential fill 2>/dev/null
+            GIT_TERMINAL_PROMPT=0 timeout 30 git -C "$sandbox" credential fill 2>/dev/null
 }
 
 printf 'ghp_FROMCACHE\n' | UNITY_HELPERS_GITHUB_TOKEN_CACHE="$sandbox/token" \
@@ -182,7 +189,7 @@ CHECK="$REPO_ROOT/scripts/check-container-git-credentials.sh"
 run_check() {
     local dir="$1"
     shift
-    GIT_CONFIG_GLOBAL="$dir/global" GIT_CONFIG_SYSTEM="$dir/system" bash "$CHECK" "$@" 2>&1
+    GIT_CONFIG_GLOBAL="$dir/global" GIT_CONFIG_SYSTEM="$dir/system" bash "$dir/scripts/check-container-git-credentials.sh" "$@" 2>&1
 }
 
 # A sandbox whose --system helper is the Dev Containers one, recorded by a marker file so that
@@ -229,7 +236,7 @@ fi
 # RED: the subtle half. Our helper IS registered, but without the empty reset the inherited
 # Dev Containers helper still runs first and still raises the dialog.
 cfg "$sandbox" --global --add 'credential.https://github.com.helper' \
-    "!$REPO_ROOT/scripts/github-token.sh"
+    "!$sandbox/scripts/github-token.sh"
 output="$(run_check "$sandbox")"
 status=$?
 if [ "$status" = "1" ]; then
