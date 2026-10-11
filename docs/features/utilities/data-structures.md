@@ -341,6 +341,7 @@ map.Remove(entityId, out _);                 // closes the probe-chain gap witho
 
 Tips and pitfalls
 
+- `TryGet` checks each stored key directly and returns its value on a match. It uses the same high-bit hash and wrapping probe sequence as insertion and removal.
 - Earlier editor Mono measurements reported 1.97x–2.19x hit-heavy and 1.26x–1.65x at a 50% miss rate using the previous low-bit slot selection. Those margins do not describe the corrected implementation. `IntMapPerformanceTests` retains calibrated counterbalanced comparisons; measurements whose spread exceeds 3% cannot establish acceptance.
 - **Those historical numbers are editor Mono only.** IL2CPP has not been measured, and part of the margin is Mono not devirtualizing `EqualityComparer<int>.Default` — which an AOT compiler may do. See [#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578).
 - Removal closes gaps by shifting displaced entries whose probe paths cross the deleted slot, including chains that wrap around the table. It leaves no tombstones and allocates no replacement arrays. Remove-before-add sliding windows can therefore retain half the table as live entries without growth or cleanup allocations; an eight-entry sliding window stays at the default 64 slots even after one million insertions. The table doubles only when adding another live entry would exceed its 0.5 load factor.

@@ -187,7 +187,10 @@ option is rejected.
 
 - Correctness runs before warmup and again after the retained timing samples.
 - Each arm warms separately for at least 100 ms and three executions. Calibration doubles the
-  common iteration count until both arms take at least 20 ms; inability to calibrate is inconclusive.
+  common iteration count until both arms reach the selected duration, 20 ms by default.
+  A caller can preregister a finite target from 20 through 2,000 ms; inability to calibrate is
+  inconclusive. The optional observer receives every completed calibration pair after both timed
+  windows close. A longer target leaves the 10 ms sample floor and 3% spread limit unchanged.
 - Eight predeclared `ABBABAAB` batches retain 32 observations per arm. Each slot begins with heap
   settling, consumes a checksum, and must take at least 10 ms. There are no acceptance retries.
 - Immutable raw milliseconds, paired log ratios, geometric throughput ratio, median, p95, MAD,
