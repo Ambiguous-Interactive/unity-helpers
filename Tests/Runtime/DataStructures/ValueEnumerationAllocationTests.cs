@@ -14,33 +14,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     {
         private static int _observedSum;
 
-        [TestCase(0)]
-        [TestCase(1)]
-        [TestCase(2)]
-        public void InterfaceEnumerationAvoidsBoxingForCommonSources(int shape)
-        {
-#if ENABLE_IL2CPP && !UNITY_6000_2_OR_NEWER
-            Assert.Ignore("The allocation counter is unsafe on older IL2CPP players.");
-#else
-            int[] values = { 1, 2, 3, 4, 5 };
-            IEnumerable<int> source =
-                shape == 0 ? values
-                : shape == 1 ? new List<int>(values)
-                : new HashSet<int>(values);
-            Action original = () => Consume(source, false);
-            Action wrapped = () => Consume(source, true);
-            long control = Measure(original);
-            if (control <= 0)
-            {
-                Assert.Ignore("The control did not observe interface enumerator allocation.");
-            }
-            Assert.That(control, Is.GreaterThan(0));
-            long actual = Measure(wrapped);
-            Assert.That(actual, Is.EqualTo(0));
-            Assert.That(_observedSum, Is.EqualTo(15));
-#endif
-        }
-
         private static void Consume(IEnumerable<int> source, bool wrapped)
         {
             int sum = 0;
@@ -77,6 +50,33 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 action();
             }
             return GC.GetAllocatedBytesForCurrentThread() - before;
+#endif
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void InterfaceEnumerationAvoidsBoxingForCommonSources(int shape)
+        {
+#if ENABLE_IL2CPP && !UNITY_6000_2_OR_NEWER
+            Assert.Ignore("The allocation counter is unsafe on older IL2CPP players.");
+#else
+            int[] values = { 1, 2, 3, 4, 5 };
+            IEnumerable<int> source =
+                shape == 0 ? values
+                : shape == 1 ? new List<int>(values)
+                : new HashSet<int>(values);
+            Action original = () => Consume(source, false);
+            Action wrapped = () => Consume(source, true);
+            long control = Measure(original);
+            if (control <= 0)
+            {
+                Assert.Ignore("The control did not observe interface enumerator allocation.");
+            }
+            Assert.That(control, Is.GreaterThan(0));
+            long actual = Measure(wrapped);
+            Assert.That(actual, Is.EqualTo(0));
+            Assert.That(_observedSum, Is.EqualTo(15));
 #endif
         }
     }

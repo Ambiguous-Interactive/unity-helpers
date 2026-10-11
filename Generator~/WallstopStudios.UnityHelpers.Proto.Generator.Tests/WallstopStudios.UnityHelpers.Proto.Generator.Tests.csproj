@@ -31,6 +31,9 @@
     <!-- Shared traits classify declared types against the local Object marker. This harness tests
          wire semantics; ObjectsTypeTraitsTests verifies the actual Unity hierarchy natively. -->
     <Compile Include="$(RepoRoot)/Runtime/Core/Helper/ObjectsTypeTraits.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/DataStructure/ValueEnumerable.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/DataStructure/ValueEnumerator.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Extension/IEnumerableExtensions.ValueEnumerable.cs" />
     <!-- The capacity limits live one directory up and are Unity-free; WProtoRectangular refuses a
          dimension through them, so the harness needs the real file rather than a stand-in. -->
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationCapacityLimits.cs" />

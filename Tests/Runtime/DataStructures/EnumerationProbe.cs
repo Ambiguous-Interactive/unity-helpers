@@ -22,9 +22,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 return Values[_index];
             }
         }
-        object IEnumerator.Current => Current;
         public int this[int index] =>
             throw new InvalidOperationException("Indexer must not be read.");
+        object IEnumerator.Current => Current;
         public readonly List<string> Events = new List<string>();
         public readonly int[] Values = { 1, 2, 3 };
         public int Failure;
