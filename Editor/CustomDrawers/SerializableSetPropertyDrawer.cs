@@ -4774,7 +4774,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             else if (snapshot is { Length: > 0 })
             {
-                foreach (object value in snapshot)
+                foreach (object value in new ValueArrayEnumerable(snapshot))
                 {
                     existingValues.Add(value);
                 }

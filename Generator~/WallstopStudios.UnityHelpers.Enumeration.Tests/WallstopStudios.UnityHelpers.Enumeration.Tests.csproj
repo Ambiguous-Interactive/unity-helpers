@@ -10,6 +10,18 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile
+      Include="../../Runtime/Core/DataStructure/ValueArrayEnumerable.cs"
+      Link="ValueArrayEnumerable.cs"
+    />
+    <Compile
+      Include="../../Runtime/Core/DataStructure/ValueArrayEnumerator.cs"
+      Link="ValueArrayEnumerator.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/DataStructures/ValueArrayEnumerableTests.cs"
+      Link="ValueArrayEnumerableTests.cs"
+    />
+    <Compile
       Include="../../Runtime/Core/DataStructure/ValueDictionaryEnumerable.cs"
       Link="ValueDictionaryEnumerable.cs"
     />

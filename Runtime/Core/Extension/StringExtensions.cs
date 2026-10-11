@@ -654,6 +654,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return Convert.ToBase64String(bytes);
         }
 
+        /// <summary>Decodes Base64 as strict UTF-8, returning empty text for invalid input.</summary>
+        /// <remarks>The temporary byte array is privately owned and returned in finally.</remarks>
         public static string FromBase64(this string input)
         {
             if (string.IsNullOrEmpty(input))
@@ -1698,48 +1700,57 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            using PooledArray<byte> lease = SystemArrayPool<byte>.Get(outputLen, out byte[] buffer);
-
-            int k = 0;
-            for (int i = 0; i < len; i += 4)
+            byte[] buffer = SystemArrayPool<byte>.RentForPrivateOwner(outputLen);
+            try
             {
-                int v0 = Base64Map(s[i]);
-                int v1 = Base64Map(s[i + 1]);
-                char c2 = s[i + 2];
-                char c3 = s[i + 3];
-                int v2 = c2 == '=' ? 0 : Base64Map(c2);
-                int v3 = c3 == '=' ? 0 : Base64Map(c3);
-
-                if (v0 < 0 || v1 < 0 || (c2 != '=' && v2 < 0) || (c3 != '=' && v3 < 0))
+                int k = 0;
+                for (int i = 0; i < len; i += 4)
                 {
+                    int v0 = Base64Map(s[i]);
+                    int v1 = Base64Map(s[i + 1]);
+                    char c2 = s[i + 2];
+                    char c3 = s[i + 3];
+                    int v2 = c2 == '=' ? 0 : Base64Map(c2);
+                    int v3 = c3 == '=' ? 0 : Base64Map(c3);
+
+                    if (v0 < 0 || v1 < 0 || (c2 != '=' && v2 < 0) || (c3 != '=' && v3 < 0))
+                    {
+                        result = string.Empty;
+                        return false;
+                    }
+
+                    if (k < outputLen)
+                    {
+                        buffer[k++] = (byte)((v0 << 2) | (v1 >> 4));
+                    }
+                    if (k < outputLen)
+                    {
+                        buffer[k++] = (byte)((v1 << 4) | (v2 >> 2));
+                    }
+                    if (k < outputLen)
+                    {
+                        buffer[k++] = (byte)((v2 << 6) | v3);
+                    }
+                }
+
+                try
+                {
+                    result = StrictUtf8.GetString(buffer.AsSpan(0, outputLen));
+                    return true;
+                }
+                catch (ArgumentException)
+                {
+                    // Valid Base64 can decode to invalid UTF-8; refuse instead of substituting characters.
                     result = string.Empty;
                     return false;
                 }
-
-                if (k < outputLen)
-                {
-                    buffer[k++] = (byte)((v0 << 2) | (v1 >> 4));
-                }
-                if (k < outputLen)
-                {
-                    buffer[k++] = (byte)((v1 << 4) | (v2 >> 2));
-                }
-                if (k < outputLen)
-                {
-                    buffer[k++] = (byte)((v2 << 6) | v3);
-                }
             }
-
-            try
+            finally
             {
-                result = StrictUtf8.GetString(buffer.AsSpan(0, outputLen));
-                return true;
-            }
-            catch (ArgumentException)
-            {
-                // Valid Base64 can decode to invalid UTF-8; refuse instead of substituting characters.
-                result = string.Empty;
-                return false;
+                SystemArrayPool<byte>.ReturnForPrivateOwner(
+                    buffer,
+                    PooledArrayClearPolicy<byte>.ClearOnReturn
+                );
             }
         }
 

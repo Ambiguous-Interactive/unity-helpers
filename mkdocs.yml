@@ -234,6 +234,7 @@ nav:
           - Failed Tests Exporter: features/editor-tools/failed-tests-exporter.md
           - Test Run Reporter: features/editor-tools/test-run-reporter.md
   - Performance:
+      - Enumeration Audit: performance/enumeration-audit.md
       - Random Generators: performance/random-performance.md
       - Spatial Trees 2D: performance/spatial-tree-2d-performance.md
       - Spatial Trees 3D: performance/spatial-tree-3d-performance.md

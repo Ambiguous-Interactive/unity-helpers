@@ -904,6 +904,9 @@ image's RGB intact instead of flattening it to black.
 
 ### Value Enumeration
 
+See the [complete enumeration audit](../../performance/enumeration-audit.md) for source coverage,
+retained iterator protocols and allocation limits.
+
 `AsValueEnumerable` provides a lazy value view over `IEnumerable<T>`, including
 `IReadOnlyList<T>` and `IReadOnlyCollection<T>` sources. Arrays, exact `List<T>` and
 exact `HashSet<T>` instances avoid boxing their enumerators. Null and default views
@@ -1296,6 +1299,9 @@ string text = "Hello, World!";
 string encoded = text.ToBase64();       // "SGVsbG8sIFdvcmxkIQ=="
 string decoded = encoded.FromBase64();  // "Hello, World!"
 ```
+
+`FromBase64` returns empty text for malformed Base64 or invalid UTF-8. Its temporary byte array stays
+inside the call and returns to the pool in `finally`, without disposal-lease bookkeeping.
 
 **String analysis:**
 

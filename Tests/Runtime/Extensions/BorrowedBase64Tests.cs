@@ -405,6 +405,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsFalse(TryGetCampaignCase(AsciiShape, 4, out _));
         }
 
+        private static string DecodeLeased(string input)
+        {
+            if (string.IsNullOrEmpty(input) || !IsLikelyBase64(input))
+            {
+                return string.Empty;
+            }
+            int length = input.Length;
+            int padding = input[length - 1] == '=' ? (input[length - 2] == '=' ? 2 : 1) : 0;
+            int outputLength = (length >> 2) * 3 - padding;
+            if (outputLength < 0)
+            {
+                return string.Empty;
+            }
+            using PooledArray<byte> lease = SystemArrayPool<byte>.Get(
+                outputLength,
+                out byte[] buffer
+            );
+            return DecodeBuffer(buffer.AsSpan(0, outputLength), input);
+        }
+
         private static string DecodeBorrowed(string input)
         {
             if (string.IsNullOrEmpty(input) || !IsLikelyBase64(input))
@@ -572,6 +592,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 {
                     Assert.AreEqual(row.Expected, row.Input.FromBase64(), row.Id);
                     Assert.AreEqual(row.Expected, DecodeBorrowed(row.Input), row.Id);
+                    Assert.AreEqual(row.Expected, DecodeLeased(row.Input), row.Id);
                     ++verifiedRows;
                 }
                 else if (row.Section == CampaignSection)
@@ -592,14 +613,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     CorpusMarker,
                     GetCanonicalCorpusSha256(),
                     verifiedRows,
-                    verifiedRows * 2,
+                    verifiedRows * 3,
                     declaredCampaignRows
                 )
             );
         }
 
         [Test]
-        public void BorrowedWholeCallAvoidsLeaseWorkWithShippedPositiveControl()
+        public void ProductionAndBorrowedWholeCallsAvoidLeaseWorkWithShippedPositiveControl()
         {
             DisposalLease probe = DisposalLeases.Acquire();
             try
@@ -607,9 +628,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 int slot = probe._slot;
                 Assert.IsTrue(probe.TryClaim());
                 long before = DisposalLeases.CurrentGeneration(slot);
-                Assert.AreEqual("abc", "YWJj".FromBase64());
+                Assert.AreEqual("abc", DecodeLeased("YWJj"));
                 Assert.AreEqual(before + 2, DisposalLeases.CurrentGeneration(slot));
                 long afterControl = DisposalLeases.CurrentGeneration(slot);
+                Assert.AreEqual("abc", "YWJj".FromBase64());
+                Assert.AreEqual(afterControl, DisposalLeases.CurrentGeneration(slot));
                 Assert.AreEqual("abc", DecodeBorrowed("YWJj"));
                 Assert.AreEqual(afterControl, DisposalLeases.CurrentGeneration(slot));
             }

@@ -701,14 +701,22 @@ contract; disabling unsafe blocks alone does not exclude those tools.
 Reference clearing and callback invocation still perform runtime work. Removing disposal-lease work
 does not establish a timing or allocation improvement for a particular workload.
 
-The Base64 comparison in `BorrowedBufferPerformanceTests` measures complete calls against the shipped
-`FromBase64` lease path. The borrowed candidate retains the same Base64 and strict UTF-8 decoder,
-uses a cached callback and the same BCL pool, and checks results before and after measurement.
-Correctness controls cover pool boundaries, malformed input and invalid UTF-8, with a lease-generation
-positive control. Timing cases retain 32 observations per arm and require calibrated, stable timings
-before checking non-inferiority. Diagnostic runs cannot satisfy that acceptance gate. Unqualified
-timings reject adoption while leaving the shipped decoder intact. The candidate
-stays in test code until player timing, allocation and retained-memory evidence supports adoption.
+`FromBase64` privately owns its temporary byte array and returns it in `finally`, without issuing
+a disposable lease. The array never leaves the synchronous decoder; only the decoded string escapes.
+This preserves the BCL pool, byte clearing policy, bounded writes and strict UTF-8 failure handling.
+Copyable leases elsewhere still retain runtime generations.
+
+The Base64 comparison in `BorrowedBufferPerformanceTests` measures complete calls against the current
+`FromBase64` implementation. The experimental borrowed-callback candidate uses the same decoder,
+a cached callback and the same BCL pool. A test-side leased decoder preserves the former ownership
+shape as a correctness and lease-generation positive control. Controls cover pool boundaries,
+malformed input and invalid UTF-8; they verify that the shipped private decoder and borrowed candidate
+do not advance lease generations.
+
+Timing cases retain 32 observations per arm and require calibrated, stable timings before checking
+non-inferiority. Diagnostic runs cannot satisfy that acceptance gate. The borrowed-callback candidate
+stays in test code until player timing, allocation and retained-memory evidence supports its adoption.
+Host evidence does not establish Release-player performance or native allocation behavior.
 
 `BorrowedBufferPreflightTests` records runtime identity, all empty clock brackets, and retained-boxing
 allocation controls before reporting an unqualified channel. The IL2CPP thread allocation counter
