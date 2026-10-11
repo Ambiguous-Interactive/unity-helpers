@@ -173,6 +173,11 @@ jobs:
         if: matrix.phase == 'sources'
         run: npm run typecheck:unity
 
+      - name: Verify value enumeration and allocation controls
+        if: matrix.phase == 'sources'
+        shell: bash
+        run: npm run test:enumeration
+
       - name: Run IntMap correctness without Unity
         if: matrix.phase == 'sources'
         run: npm run test:intmap

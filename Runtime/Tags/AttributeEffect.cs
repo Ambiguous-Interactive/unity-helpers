@@ -461,7 +461,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 }
             }
 
-            foreach (string candidate in effectTagsToCheck)
+            foreach (string candidate in effectTagsToCheck.AsValueEnumerableRequired())
             {
                 if (string.IsNullOrEmpty(candidate))
                 {

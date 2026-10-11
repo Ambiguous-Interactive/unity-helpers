@@ -902,6 +902,44 @@ image's RGB intact instead of flattening it to black.
 
 ## Collections
 
+### Value Enumeration
+
+`AsValueEnumerable` provides a lazy value view over `IEnumerable<T>`, including
+`IReadOnlyList<T>` and `IReadOnlyCollection<T>` sources. Arrays, exact `List<T>` and
+exact `HashSet<T>` instances avoid boxing their enumerators. Null and default views
+are empty. The view does not copy the collection or read its count or indexer.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System.Collections.Generic;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+public static class CollectionSum
+{
+    public static int Sum(IEnumerable<int> source)
+    {
+        int result = 0;
+        foreach (int item in source.AsValueEnumerable())
+        {
+            result += item;
+        }
+        return result;
+    }
+}
+```
+
+Custom sequences, derived collections and other collection types retain their original
+`GetEnumerator`, `MoveNext`, `Current` and `Dispose` behavior, including exceptions and
+allocations. Lists and hash sets retain their mutation checks. Array enumeration observes
+changes to array elements. Early exit still disposes the enumerator. Copies of a fallback
+enumerator share the source's lifetime; use each enumerator within one `foreach` or
+`using` scope. Read `Current` only after a successful `MoveNext`.
+
+Keep direct enumeration of concrete collections and strings when it already uses a value
+enumerator or indexed traversal. This view removes boxing for the supported collection
+shapes; it does not remove allocations performed by custom enumerators or loop bodies.
+
 ### IEnumerable Helpers
 
 **Infinite cycling:**

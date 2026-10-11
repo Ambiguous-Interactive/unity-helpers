@@ -299,11 +299,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 ClearProgress();
             }
 
-            foreach (string warning in result.Warnings)
+            foreach (string warning in result.Warnings.AsValueEnumerableRequired())
             {
                 this.LogWarn($"{warning}");
             }
-            foreach (string error in result.Errors)
+            foreach (string error in result.Errors.AsValueEnumerableRequired())
             {
                 this.LogError($"{error}");
             }

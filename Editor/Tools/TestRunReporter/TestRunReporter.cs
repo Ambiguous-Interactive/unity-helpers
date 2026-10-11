@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor.Tools
 {
 #if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -266,7 +267,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return node;
             }
 
-            foreach (ITestResultAdaptor child in children)
+            foreach (ITestResultAdaptor child in children.AsValueEnumerableRequired())
             {
                 TestRunResultNode childNode = BuildNode(child, depth + 1);
                 if (childNode == null)

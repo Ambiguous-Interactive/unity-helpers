@@ -128,7 +128,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             using PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> materializedList);
-            foreach (T item in items)
+            foreach (T item in items.AsValueEnumerableRequired())
             {
                 materializedList.Add(item);
             }

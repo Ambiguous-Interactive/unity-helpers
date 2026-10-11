@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor.Sprites
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -193,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return result;
             }
 
-            foreach (SpriteSettings s in profiles)
+            foreach (SpriteSettings s in profiles.AsValueEnumerableRequired())
             {
                 if (s == null)
                 {
@@ -751,7 +752,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             List<SpriteSettings> copies = new(profiles.Count);
-            foreach (SpriteSettings profile in profiles)
+            foreach (SpriteSettings profile in profiles.AsValueEnumerableRequired())
             {
                 if (profile == null)
                 {

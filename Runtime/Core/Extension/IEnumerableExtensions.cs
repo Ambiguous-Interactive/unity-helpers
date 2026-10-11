@@ -19,7 +19,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// Performance: Methods are optimized for common collection types (IList, IReadOnlyList, HashSet) with pattern matching.
     /// Allocations: Documented per method. Many methods use pooled buffers to minimize allocations.
     /// </remarks>
-    public static class IEnumerableExtensions
+    public static partial class IEnumerableExtensions
     {
         /// <summary>
         /// Converts an enumerable collection to a LinkedList.
@@ -254,7 +254,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             using PooledResource<List<T>> buffer = Buffers<T>.List.Get(out List<T> bufferList);
-            foreach (T element in enumerable)
+            foreach (T element in enumerable.AsValueEnumerableRequired())
             {
                 bufferList.Add(element);
                 yield return element;

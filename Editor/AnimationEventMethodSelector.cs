@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using System.Reflection;
@@ -70,7 +71,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
 
                     List<MethodInfo> methodBuffer = new();
-                    foreach (MethodInfo method in entry.Value)
+                    foreach (MethodInfo method in entry.Value.AsValueEnumerableRequired())
                     {
                         string methodLower = method.Name.ToLowerInvariant();
                         if (ContainsAllTokens(methodLower, methodSearchTerms))
@@ -105,7 +106,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 out List<Type> sortedTypes
             );
             {
-                foreach (Type type in lookup.Keys)
+                foreach (Type type in lookup.Keys.AsValueEnumerableRequired())
                 {
                     sortedTypes.Add(type);
                 }
@@ -171,7 +172,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             foreach (KeyValuePair<Type, IReadOnlyList<MethodInfo>> entry in lookup)
             {
-                foreach (MethodInfo method in entry.Value)
+                foreach (MethodInfo method in entry.Value.AsValueEnumerableRequired())
                 {
                     if (
                         string.Equals(
@@ -210,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 out List<Type> allTypes
             );
             {
-                foreach (Type type in lookup.Keys)
+                foreach (Type type in lookup.Keys.AsValueEnumerableRequired())
                 {
                     allTypes.Add(type);
                 }

@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     using Core.Attributes;
     using UnityEngine;
     using Utils;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// Abstract base class for components that contain Attribute fields to be modified by effects.
@@ -266,7 +267,9 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return;
             }
 
-            foreach (AttributeModification modification in attributeModifications)
+            foreach (
+                AttributeModification modification in attributeModifications.AsValueEnumerableRequired()
+            )
             {
                 if (!TryApplyPermanentModification(modification, sourceHandle))
                 {

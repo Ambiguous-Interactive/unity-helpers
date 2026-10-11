@@ -184,7 +184,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             IEnumerable<Type> discoveredTypes = ReflectionHelpers.GetAllLoadedTypes();
             if (discoveredTypes != null)
             {
-                foreach (Type discoveredType in discoveredTypes)
+                foreach (Type discoveredType in discoveredTypes.AsValueEnumerableRequired())
                 {
                     if (discoveredType != null)
                     {

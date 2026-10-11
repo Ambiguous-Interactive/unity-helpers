@@ -130,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
             if (selectedTextures != null)
             {
-                foreach (Texture2D texture in selectedTextures)
+                foreach (Texture2D texture in selectedTextures.AsValueEnumerableRequired())
                 {
                     textures.Add(texture);
                 }
@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
             if (sourceFolderAssetPaths != null)
             {
-                foreach (string path in sourceFolderAssetPaths)
+                foreach (string path in sourceFolderAssetPaths.AsValueEnumerableRequired())
                 {
                     if (string.IsNullOrWhiteSpace(path))
                     {

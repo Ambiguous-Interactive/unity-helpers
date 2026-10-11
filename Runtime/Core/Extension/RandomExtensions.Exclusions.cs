@@ -348,7 +348,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             else
             {
-                foreach (T exception in exceptions)
+                foreach (T exception in exceptions.AsValueEnumerableRequired())
                 {
                     exclude.Add(exception);
                 }

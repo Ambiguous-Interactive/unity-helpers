@@ -110,7 +110,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int yMax = int.MinValue;
             int zMin = int.MaxValue;
             int zMax = int.MinValue;
-            foreach (Vector3Int position in positions)
+            foreach (Vector3Int position in positions.AsValueEnumerableRequired())
             {
                 any = true;
                 xMin = Math.Min(xMin, position.x);
@@ -145,7 +145,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int yMax = int.MinValue;
             int zMin = int.MaxValue;
             int zMax = int.MinValue;
-            foreach (FastVector3Int position in positions)
+            foreach (FastVector3Int position in positions.AsValueEnumerableRequired())
             {
                 any = true;
                 xMin = Math.Min(xMin, position.X);
@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float xMax = float.MinValue;
             float yMin = float.MaxValue;
             float yMax = float.MinValue;
-            foreach (Vector2 position in positions)
+            foreach (Vector2 position in positions.AsValueEnumerableRequired())
             {
                 any = true;
                 xMin = Math.Min(xMin, position.x);
@@ -206,7 +206,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float yMax = float.MinValue;
             float zMin = float.MaxValue;
             float zMax = float.MinValue;
-            foreach (Bounds boundary in boundaries)
+            foreach (Bounds boundary in boundaries.AsValueEnumerableRequired())
             {
                 any = true;
                 xMin = Math.Min(xMin, boundary.min.x);

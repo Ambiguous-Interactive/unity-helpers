@@ -11,11 +11,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using Random;
     using UnityEngine;
     using Utils;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using Object = UnityEngine.Object;
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
-#else
-    using WallstopStudios.UnityHelpers.Core.Extension;
 #endif
 #if UNITY_EDITOR
     using UnityEditor;
@@ -1204,7 +1203,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             else
             {
                 int index = 0;
-                foreach (string label in labels)
+                foreach (string label in labels.AsValueEnumerableRequired())
                 {
                     cache[index++] = label;
                 }

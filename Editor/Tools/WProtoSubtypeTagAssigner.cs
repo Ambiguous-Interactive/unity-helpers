@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.Text;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
@@ -198,7 +199,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 if (0 < plan.FreshlyAssigned.Count)
                 {
                     List<string> unnumbered = new List<string>();
-                    foreach (WProtoSubtypeTagPlan.Entry entry in plan.FreshlyAssigned)
+                    foreach (
+                        WProtoSubtypeTagPlan.Entry entry in plan.FreshlyAssigned.AsValueEnumerableRequired()
+                    )
                     {
                         unnumbered.Add(entry.SubTypeName + " on " + entry.BaseTypeName);
                     }
@@ -476,7 +479,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 #else
             IReadOnlyList<Assembly> loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
 #endif
-            foreach (Assembly assembly in loadedAssemblies)
+            foreach (Assembly assembly in loadedAssemblies.AsValueEnumerableRequired())
             {
                 if (assembly.IsDynamic || byAssembly.ContainsKey(assembly))
                 {
@@ -570,7 +573,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     )
                 )
                 {
-                    foreach (int fieldNumber in held.FieldNumbers)
+                    foreach (int fieldNumber in held.FieldNumbers.AsValueEnumerableRequired())
                     {
                         inventory.Reserved.Add(
                             new WProtoSubtypeTagPlan.Entry(

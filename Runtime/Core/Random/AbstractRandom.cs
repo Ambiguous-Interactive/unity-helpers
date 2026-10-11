@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.CompilerServices;
     using System.Runtime.Serialization;
     using DataStructure.Adapters;
+    using Extension;
     using Helper;
     using Utils;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -21,8 +22,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
-#else
-    using Extension;
 #endif
 
     /// <summary>
@@ -1152,7 +1151,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 default:
                 {
                     int i = 0;
-                    foreach (T element in collection)
+                    foreach (T element in collection.AsValueEnumerableRequired())
                     {
                         if (index == i++)
                         {

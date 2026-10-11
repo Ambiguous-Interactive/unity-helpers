@@ -255,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 throw new ArgumentNullException(nameof(other));
             }
 
-            foreach (T item in other)
+            foreach (T item in other.AsValueEnumerableRequired())
             {
                 if (_set.Add(item))
                 {

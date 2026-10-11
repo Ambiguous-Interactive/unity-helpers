@@ -510,7 +510,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             int lowCount = 0;
             int infoCount = 0;
 
-            foreach (AnalyzerIssue issue in issues)
+            foreach (AnalyzerIssue issue in issues.AsValueEnumerableRequired())
             {
                 switch (issue.Severity)
                 {

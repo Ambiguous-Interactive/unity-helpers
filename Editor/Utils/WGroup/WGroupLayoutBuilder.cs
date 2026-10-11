@@ -391,7 +391,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 );
                 anchored.Add(definition);
 
-                foreach (string path in definition.PropertyPaths)
+                foreach (string path in definition.PropertyPaths.AsValueEnumerableRequired())
                 {
                     groupedPaths.Add(path);
                 }
@@ -456,7 +456,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     }
 
                     List<string> directPaths = new(definition.PropertyPaths.Count);
-                    foreach (string path in definition.PropertyPaths)
+                    foreach (string path in definition.PropertyPaths.AsValueEnumerableRequired())
                     {
                         if (!childAnchorPaths.Contains(path))
                         {

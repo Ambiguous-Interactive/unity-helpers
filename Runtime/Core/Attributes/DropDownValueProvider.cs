@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System.Collections.Generic;
     using System.Reflection;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     internal static class DropDownValueProvider<T>
@@ -117,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         private static T[] ConvertEnumerable(IEnumerable<T> enumerable)
         {
             List<T> values = new();
-            foreach (T entry in enumerable)
+            foreach (T entry in enumerable.AsValueEnumerableRequired())
             {
                 values.Add(entry);
             }

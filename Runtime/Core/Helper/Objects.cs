@@ -827,7 +827,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 default:
                 {
-                    foreach (T item in enumerable)
+                    foreach (T item in enumerable.AsValueEnumerableRequired())
                     {
                         hash.Add(item);
                     }

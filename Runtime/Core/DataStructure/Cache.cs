@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Runtime.InteropServices;
     using System.Threading;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Utils;
@@ -545,7 +546,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         /// <summary>
         /// Gets multiple values from the cache.
-        /// Note: This overload allocates an enumerator. For zero-allocation enumeration,
+        /// Arrays, exact lists, and exact hash sets avoid enumerator boxing. For indexed access,
         /// use <see cref="GetAll(IList{TKey}, IDictionary{TKey, TValue})"/> instead.
         /// </summary>
         /// <param name="keys">The keys to look up.</param>
@@ -557,7 +558,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            foreach (TKey key in keys)
+            foreach (TKey key in keys.AsValueEnumerableRequired())
             {
                 if (TryGet(key, out TValue value))
                 {
@@ -592,7 +593,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         /// <summary>
         /// Adds or updates multiple entries in the cache.
-        /// Note: This overload allocates an enumerator. For zero-allocation enumeration,
+        /// Arrays and exact lists avoid enumerator boxing. For indexed access,
         /// use <see cref="SetAll(IList{KeyValuePair{TKey, TValue}})"/> instead.
         /// </summary>
         /// <param name="entries">The entries to add or update.</param>
@@ -603,7 +604,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            foreach (KeyValuePair<TKey, TValue> entry in entries)
+            foreach (KeyValuePair<TKey, TValue> entry in entries.AsValueEnumerableRequired())
             {
                 Set(entry.Key, entry.Value);
             }

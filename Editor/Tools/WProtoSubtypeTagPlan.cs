@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.Collections.Generic;
     using System.Globalization;
     using System.Text;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// The field numbers an assembly's subtype tag manifest should contain, computed from the
@@ -471,7 +472,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 builder.Append("\r\n");
             }
 
-            foreach (Entry entry in Assigned)
+            foreach (Entry entry in Assigned.AsValueEnumerableRequired())
             {
                 // Store subtype names as strings so deleted types cannot break compilation and tempt removal of their reserved numbers.
                 builder.Append(
@@ -491,7 +492,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 builder.Append("\r\n");
             }
 
-            foreach (Entry entry in Retired)
+            foreach (Entry entry in Retired.AsValueEnumerableRequired())
             {
                 builder.Append(
                     "[assembly: WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoRetiredSubtypeTag(\r\n"

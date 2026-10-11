@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using Tags;
     using UnityEngine;
     using UnityEngine.Scripting;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Utils;
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
@@ -137,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
-            foreach (Component component in components)
+            foreach (Component component in components.AsValueEnumerableRequired())
             {
                 Assign(component);
             }

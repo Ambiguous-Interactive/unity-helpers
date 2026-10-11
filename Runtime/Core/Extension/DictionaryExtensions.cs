@@ -479,7 +479,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
         {
             Dictionary<K, V> result = new();
-            foreach (KeyValuePair<K, V> kvp in prettyMuchADictionary)
+            foreach (KeyValuePair<K, V> kvp in prettyMuchADictionary.AsValueEnumerableRequired())
             {
                 result[kvp.Key] = kvp.Value;
             }
@@ -507,7 +507,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
         {
             Dictionary<K, V> result = new(comparer);
-            foreach (KeyValuePair<K, V> kvp in prettyMuchADictionary)
+            foreach (KeyValuePair<K, V> kvp in prettyMuchADictionary.AsValueEnumerableRequired())
             {
                 result[kvp.Key] = kvp.Value;
             }
@@ -533,7 +533,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
         {
             Dictionary<K, V> result = new();
-            foreach ((K key, V value) in prettyMuchADictionary)
+            foreach ((K key, V value) in prettyMuchADictionary.AsValueEnumerableRequired())
             {
                 result[key] = value;
             }
@@ -561,7 +561,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
         {
             Dictionary<K, V> result = new(comparer);
-            foreach ((K key, V value) in prettyMuchADictionary)
+            foreach ((K key, V value) in prettyMuchADictionary.AsValueEnumerableRequired())
             {
                 result[key] = value;
             }

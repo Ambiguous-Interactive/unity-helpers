@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Runtime.CompilerServices;
     using Helper;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Utils;
 #if !WALLSTOP_PROTO_ONLY
@@ -122,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _buffer = new List<T>();
             if (initialContents != null)
             {
-                foreach (T item in initialContents)
+                foreach (T item in initialContents.AsValueEnumerableRequired())
                 {
                     Add(item);
                 }

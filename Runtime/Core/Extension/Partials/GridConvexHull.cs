@@ -144,7 +144,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     using PooledResource<List<FastVector3Int>> fastLease =
                         Buffers<FastVector3Int>.List.Get(out List<FastVector3Int> fast);
-                    foreach (Vector3Int point in pointsSet)
+                    foreach (Vector3Int point in pointsSet.AsValueEnumerableRequired())
                     {
                         fast.Add(new FastVector3Int(point.x, point.y, point.z));
                     }
@@ -880,7 +880,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return true;
             }
 
-            foreach (FastVector3Int point in points)
+            foreach (FastVector3Int point in points.AsValueEnumerableRequired())
             {
                 bool isCorner = convexHull.Contains(point);
                 if (isCorner)

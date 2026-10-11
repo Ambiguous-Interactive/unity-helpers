@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using UnityEditor.UIElements;
     using UnityEngine;
     using UnityEngine.UIElements;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
@@ -289,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             HashSet<string> assemblyNames = new HashSet<string>(StringComparer.Ordinal);
-            foreach (Type contract in contracts)
+            foreach (Type contract in contracts.AsValueEnumerableRequired())
             {
                 _contracts.Add(contract);
                 assemblyNames.Add(AssemblyNameOf(contract));
@@ -428,7 +429,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         internal void SetSelection(IEnumerable<Type> contracts, bool selected)
         {
-            foreach (Type contract in contracts)
+            foreach (Type contract in contracts.AsValueEnumerableRequired())
             {
                 Exclude(contract, selected);
             }

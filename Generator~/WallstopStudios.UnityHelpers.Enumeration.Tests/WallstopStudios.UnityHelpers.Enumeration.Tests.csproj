@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile
+      Include="../../Runtime/Core/DataStructure/ValueEnumerable.cs"
+      Link="ValueEnumerable.cs"
+    />
+    <Compile
+      Include="../../Runtime/Core/DataStructure/ValueEnumerator.cs"
+      Link="ValueEnumerator.cs"
+    />
+    <Compile
+      Include="../../Runtime/Core/Extension/IEnumerableExtensions.ValueEnumerable.cs"
+      Link="IEnumerableExtensions.ValueEnumerable.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/DataStructures/ValueEnumerableTests.cs"
+      Link="ValueEnumerableTests.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/DataStructures/ValueEnumerationAllocationTests.cs"
+      Link="ValueEnumerationAllocationTests.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/DataStructures/EnumerationProbe.cs"
+      Link="EnumerationProbe.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/DataStructures/EnumerationDerivedList.cs"
+      Link="EnumerationDerivedList.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/DataStructures/EnumerationDerivedHashSet.cs"
+      Link="EnumerationDerivedHashSet.cs"
+    />
+    <Compile Include="../../Tests/Runtime/TestUtils/GCAssert.cs" Link="GCAssert.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+</Project>

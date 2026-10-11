@@ -1141,7 +1141,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            foreach (FastVector3Int point in source)
+            foreach (FastVector3Int point in source.AsValueEnumerableRequired())
             {
                 Vector2 vectorPoint = new(point.x, point.y);
                 vectorPoints.Add(vectorPoint);
