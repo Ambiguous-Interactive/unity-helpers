@@ -319,12 +319,20 @@ const workflow = fs
 const phaseJob = workflow.match(/^  typecheck-phases:\n(?:(?: {4}[^\n]*|)\n)*/m)?.[0] ?? "";
 const resultJob = workflow.match(/^  typecheck:\n(?:(?: {4}[^\n]*|)\n)*/m)?.[0] ?? "";
 
-runTest("parallel host phases retain both complete commands without fail-fast cancellation", () => {
+runTest("parallel host phases retain complete commands without fail-fast cancellation", () => {
   assert.match(phaseJob, /fail-fast: false/);
   assert.match(phaseJob, /phase: \[sources, controls\]/);
   assert.doesNotMatch(phaseJob, /continue-on-error:|max-parallel: 1/);
   const commands = [...phaseJob.matchAll(/^        run: (.+)$/gm)].map((match) => match[1]);
-  assert.deepEqual(commands, ["npm run typecheck:unity", "npm run typecheck:controls"]);
+  assert.deepEqual(commands, [
+    "npm run typecheck:unity",
+    "npm run test:intmap",
+    "npm run typecheck:controls"
+  ]);
+  assert.ok(
+    phaseJob.includes("if: matrix.phase == 'sources'\n        run: npm run test:intmap"),
+    "IntMap correctness must run in the sources phase"
+  );
   for (const [phase, command] of [
     ["sources", "unity"],
     ["controls", "controls"]
