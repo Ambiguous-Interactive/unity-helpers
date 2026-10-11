@@ -141,6 +141,9 @@ Action Items:
 
 ## Storing Learnings
 
+Keep the retrospective and session metrics in ignored local `progress/` files. Never store them
+or progress tracking in the root goal or the root plan; follow [maintain-plan](./maintain-plan.md).
+
 After completing a retrospective:
 
 1. If a takeaway applies broadly across sessions, consider noting it in memory

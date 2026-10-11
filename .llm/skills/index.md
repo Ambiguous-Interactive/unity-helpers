@@ -49,7 +49,7 @@ Invoke these skills for specific tasks.
 | [investigate-test-failures](./investigate-test-failures.md) | ANY test failure - investigate before fixing |
 | [license-headers](./license-headers.md) | Maintaining MIT license headers in C# files |
 | [linter-reference](./linter-reference.md) | Detailed linter commands, configurations |
-| [maintain-plan](./maintain-plan.md) | Keeping the working plan limited to active and future work |
+| [maintain-plan](./maintain-plan.md) | Keeping goals and plans general and ordered by priority |
 | [manage-skills](./manage-skills.md) | Creating, updating, splitting, consolidating, or removing skills |
 | [markdown-reference](./markdown-reference.md) | Link formatting, escaping, linting rules |
 | [no-regions](./no-regions.md) | ALL C# code - never use #region/#endregion |

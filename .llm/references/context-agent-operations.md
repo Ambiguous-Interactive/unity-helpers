@@ -2,17 +2,19 @@
 
 ## Agent-Specific Rules
 
-- For issue-debt delivery, implement substantive player-facing fixes across multiple pain points;
-  inventory, documentation and green-main checks alone are not delivery. Aim to fully close at
-  least three issues against their original acceptance criteria. Respect the user's session limit
-  (two hours for the current campaign), reserve time for validation and PR closeout, and retain
-  unfinished acceptance actions without counting partial work as closed issues.
+- Advance the root plan by driving open issues toward zero in priority order, selecting work from the
+  complete current backlog. Implement substantive improvements and close issues only against their
+  full acceptance criteria; inventory and green-main checks alone are not delivery. Respect the
+  user's session limit, reserve time for validation and PR closeout, and retain remaining scope in
+  canonical issues without counting partial work as closed.
 
 - Keep changes minimal and focused; respect folder boundaries (Runtime vs Editor)
 - Treat every failed test or CI job as unresolved until its cause is classified and fixed. A
   passing rerun only adds evidence; follow [investigate-test-failures](../skills/investigate-test-failures.md)
   before calling a branch or PR green.
-- Keep the working plan under 150 lines and actionable; follow [maintain-plan](../skills/maintain-plan.md).
+- Keep the root goal and plan general and free of specific issue selections, PR state, session
+  records, and progress tracking; follow [maintain-plan](../skills/maintain-plan.md). Store temporary
+  work notes and raw validation output in ignored `progress/` files, never in the goal or plan.
 - Follow `.editorconfig` formatting rules strictly
 - NEVER pipe output to `/dev/null`; NEVER hard-code machine-specific absolute paths
 - Agents may stage, commit, and push completed work when the task calls for publication. Use the

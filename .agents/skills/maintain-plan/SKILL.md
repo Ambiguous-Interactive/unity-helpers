@@ -1,6 +1,6 @@
 ---
 name: maintain-plan
-description: "Keeping the working plan limited to active and future work"
+description: "Keeping goals and plans general and ordered by priority"
 ---
 
 # Maintain Plan

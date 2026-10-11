@@ -181,10 +181,13 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 
 ## Agent Workflow and CI
 
-Keep the working plan to open actions, dependencies, and acceptance signals; follow
-[maintain-plan](./skills/maintain-plan.md). Route completed work to ignored `progress/` session files
-and reusable guidance to context, skills, or references. Link context instead of copying it into
-the plan; preserve open work when shortening it.
+Keep the root goal limited to the general objective of advancing the root plan and broad completion criteria;
+keep the root plan a general strategy to drive open issues toward zero, ordered by priority. Never store
+specific issue selections, PR state, session logs, progress tracking, status updates, validation
+results, or retrospectives in either file; follow [maintain-plan](./skills/maintain-plan.md).
+Route session records and temporary next actions to ignored `progress/` files, scope and remaining
+acceptance to canonical issues, durable evidence to issues or commit bodies, and reusable guidance
+to context, skills, or references. A cleanup does not complete or cancel the underlying work.
 
 Read [build commands](./references/context-build-commands.md) before running local checks.
 Read [agent operations](./references/context-agent-operations.md) before GitHub, git, or review work.
