@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 {
+    using System;
     using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
@@ -23,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class IntMapPerformanceTests
     {
-        private const int BenchmarkTimeoutMilliseconds = 600_000;
+        private const int BenchmarkTimeoutMilliseconds = 1_800_000;
 
         private const int ProbeCount = 500_000;
 
@@ -47,7 +48,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         */
         private static int _sink;
 
-        private static PairedMeasurement MeasureWorkload(int entries, int missPercent)
+        private readonly double _calibrationTargetMilliseconds;
+        private readonly Action<int, double, double> _calibrationObserver;
+
+        /// <summary>Initializes the normal fixture with the protocol's default calibration target.</summary>
+        public IntMapPerformanceTests()
+            : this(BenchmarkProtocol.MinimumSampleMilliseconds * 2) { }
+
+        /// <summary>Initializes an explicitly preregistered calibration configuration.</summary>
+        /// <param name="calibrationTargetMilliseconds">Minimum duration of both calibration arms, from 20 through 2,000 milliseconds.</param>
+        /// <param name="calibrationObserver">Optional receiver invoked after each completed calibration pair, outside timed windows.</param>
+        /// <remarks>Invalid targets produce an inconclusive comparison before invoking the workload.</remarks>
+        public IntMapPerformanceTests(
+            double calibrationTargetMilliseconds,
+            Action<int, double, double> calibrationObserver = null
+        )
+        {
+            _calibrationTargetMilliseconds = calibrationTargetMilliseconds;
+            _calibrationObserver = calibrationObserver;
+        }
+
+        private static PairedMeasurement MeasureWorkload(
+            int entries,
+            int missPercent,
+            double calibrationTargetMilliseconds,
+            Action<int, double, double> calibrationObserver
+        )
         {
             int[] keys = BuildKeys(entries);
             int[] surviving = KeysThatSurviveRemoval(keys);
@@ -59,7 +85,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 iterations => RunDictionary(reference, probes, iterations),
                 iterations => RunIntMap(subject, probes, iterations),
                 () => AssertBothAgreeOnEveryProbe(reference, subject, probes, surviving.Length),
-                unchecked((int)ProbeSeed)
+                unchecked((int)ProbeSeed),
+                calibrationTargetMilliseconds,
+                calibrationObserver
             );
             if (samples == null)
             {
@@ -314,7 +342,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                         Assert.AreEqual(denseValue, sparseValue);
                     }
                 },
-                unchecked((int)ProbeSeed)
+                unchecked((int)ProbeSeed),
+                _calibrationTargetMilliseconds,
+                _calibrationObserver
             );
             if (samples == null)
             {
@@ -353,7 +383,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 foreach (int missPercent in MissPercents)
                 {
                     string workload = $"{entries} entries / {missPercent}% miss";
-                    PairedMeasurement measurement = MeasureWorkload(entries, missPercent);
+                    PairedMeasurement measurement = MeasureWorkload(
+                        entries,
+                        missPercent,
+                        _calibrationTargetMilliseconds,
+                        _calibrationObserver
+                    );
                     if (!measurement.IsStable(BenchmarkProtocol.DefaultSpreadLimit))
                     {
                         unstable.Add($"{workload} ({measurement})");

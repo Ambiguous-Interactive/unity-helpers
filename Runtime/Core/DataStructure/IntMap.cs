@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Runtime.CompilerServices;
 
     /// <summary>
     /// An int-keyed open-addressing hash map built for read-mostly lookups, where a
@@ -23,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// Keys are
     /// compared as raw integers rather than routed through <see cref="IEqualityComparer{T}"/>.
     /// Table length stays a power of two, so slot position is one multiply and one
-    /// shift instead of a division. Growth doubles the table only when live entries reach the load limit.
+    /// shift instead of a division. Growth doubles the table when live entries reach one quarter of its slots.
     /// Removal closes probe-chain gaps in place without allocating replacement storage.
     /// </para>
     /// <para>
@@ -39,9 +40,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>The smallest key a caller may store; everything lower is reserved.</summary>
         public const int MinimumAllowedKey = int.MinValue + 2;
 
-        private const int DefaultInitialCapacity = 16;
-        private const int MinimumTablePower = 3;
+        private const int DefaultInitialCapacity = 8;
+        private const int MinimumTablePower = 4;
         private const int MaximumTablePower = 30;
+        private const int LoadFactorDivisor = 4;
 
         // Fibonacci hashing uses the high product bits so shared low key bits do not form a cluster.
         private const uint KeyMultiplier = 0x9E37_79B9u;
@@ -120,8 +122,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         /// <param name="initialCapacity">How many live entries to make room for.</param>
         /// <remarks>
-        /// Powers of two are honored directly; anything else rounds up, because a non-power-of-two
-        /// table would require division instead of a shift to choose the starting slot.
+        /// The table reserves at least four slots per requested live entry and rounds up to a power of two.
+        /// This keeps probe chains short at the cost of more storage.
         /// </remarks>
         public IntMap(int initialCapacity)
         {
@@ -134,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int power = SmallestSufficientPower(initialCapacity);
-            if ((1L << power) / 2 < initialCapacity)
+            if ((1L << power) / LoadFactorDivisor < initialCapacity)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(initialCapacity),
@@ -157,7 +159,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             while (
                 power < MaximumTablePower
                 && 0 < (long)capacityHint
-                && (long)(1 << power) / 2 <= (long)capacityHint
+                && (long)(1 << power) / LoadFactorDivisor <= (long)capacityHint
             )
             {
                 ++power;
@@ -204,6 +206,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="key">The key.</param>
         /// <param name="value">Receives the stored value, or the type's default on absence.</param>
         /// <returns><c>true</c> when the key is present.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGet(int key, out TValue value)
         {
             if (key < MinimumAllowedKey || _count == 0)
@@ -212,15 +215,25 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            int slot = FindSlot(key);
-            if (_keys[slot] == key)
+            int[] keys = _keys;
+            int slot = (int)(unchecked((uint)key * KeyMultiplier) >> _shift);
+            while (true)
             {
-                value = _values[slot];
-                return true;
-            }
+                int stored = keys[slot];
+                if (stored == key)
+                {
+                    value = _values[slot];
+                    return true;
+                }
 
-            value = default(TValue);
-            return false;
+                if (stored == EmptySlot)
+                {
+                    value = default(TValue);
+                    return false;
+                }
+
+                slot = (slot + 1) & _mask;
+            }
         }
 
         /// <summary>
@@ -311,7 +324,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
                 if (stored == EmptySlot)
                 {
-                    if (_keys.Length <= _count * 2)
+                    if (_keys.Length <= _count * LoadFactorDivisor)
                     {
                         Resize();
                         SetInternal(key, value);
