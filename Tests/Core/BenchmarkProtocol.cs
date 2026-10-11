@@ -73,15 +73,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// Each work delegate executes the requested iteration count and returns an observable
         /// checksum. Correctness runs before warmup and after timing. Null means calibration
         /// failed; callers must report it as inconclusive and must not retry for acceptance.
+        /// The optional target is the minimum duration of both calibration arms, from 20 through
+        /// 2,000 milliseconds. It does not change the retained-sample floor or spread gate.
+        /// The observer receives every completed calibration pair after both timed windows close.
         /// </remarks>
         public static CalibratedBenchmarkMeasurement MeasureCalibrated(
             Func<int, long> reference,
             Func<int, long> subject,
             Action verifyCorrectness,
-            int seed
+            int seed,
+            double calibrationTargetMilliseconds = MinimumSampleMilliseconds * 2,
+            Action<int, double, double> calibrationObserver = null
         )
         {
-            if (reference == null || subject == null || verifyCorrectness == null)
+            if (
+                reference == null
+                || subject == null
+                || verifyCorrectness == null
+                || double.IsNaN(calibrationTargetMilliseconds)
+                || double.IsInfinity(calibrationTargetMilliseconds)
+                || calibrationTargetMilliseconds < MinimumSampleMilliseconds * 2
+                || 2_000 < calibrationTargetMilliseconds
+            )
             {
                 return null;
             }
@@ -104,8 +117,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 double referenceMilliseconds = TimeWork(reference, iterations, out _, out _);
                 double subjectMilliseconds = TimeWork(subject, iterations, out _, out _);
+                calibrationObserver?.Invoke(iterations, referenceMilliseconds, subjectMilliseconds);
                 if (
-                    MinimumSampleMilliseconds * 2
+                    calibrationTargetMilliseconds
                     <= Math.Min(referenceMilliseconds, subjectMilliseconds)
                 )
                 {

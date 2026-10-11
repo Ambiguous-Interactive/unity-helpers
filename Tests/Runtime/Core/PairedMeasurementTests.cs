@@ -907,6 +907,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             );
         }
 
+        [TestCase(double.NaN)]
+        [TestCase(double.PositiveInfinity)]
+        [TestCase(double.NegativeInfinity)]
+        [TestCase(19.999)]
+        [TestCase(2_000.001)]
+        public void InvalidCalibrationTargetsDoNotInvokeWorkOrControls(double targetMilliseconds)
+        {
+            int workloadCalls = 0;
+            int correctnessCalls = 0;
+            int observerCalls = 0;
+            CalibratedBenchmarkMeasurement measurement = BenchmarkProtocol.MeasureCalibrated(
+                iterations => ++workloadCalls,
+                iterations => ++workloadCalls,
+                () => ++correctnessCalls,
+                1,
+                targetMilliseconds,
+                (iterations, reference, subject) => ++observerCalls
+            );
+            Assert.IsTrue(measurement == null);
+            Assert.AreEqual(0, workloadCalls);
+            Assert.AreEqual(0, correctnessCalls);
+            Assert.AreEqual(0, observerCalls);
+        }
+
+        [TestCase(20)]
+        [TestCase(2_000)]
+        public void ValidCalibrationTargetBoundariesRequireCorrectnessBeforeWork(
+            double targetMilliseconds
+        )
+        {
+            int workloadCalls = 0;
+            int observerCalls = 0;
+            Assert.Throws<InvalidOperationException>(() =>
+                BenchmarkProtocol.MeasureCalibrated(
+                    iterations => ++workloadCalls,
+                    iterations => ++workloadCalls,
+                    () => throw new InvalidOperationException(),
+                    1,
+                    targetMilliseconds,
+                    (iterations, reference, subject) => ++observerCalls
+                )
+            );
+            Assert.AreEqual(0, workloadCalls);
+            Assert.AreEqual(0, observerCalls);
+        }
+
         [Test]
         public void ExtremeRatiosAndBatchCountsCannotBecomeUsableMeasurements()
         {

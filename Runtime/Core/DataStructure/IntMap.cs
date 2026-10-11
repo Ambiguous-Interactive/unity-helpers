@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Runtime.CompilerServices;
 
     /// <summary>
     /// An int-keyed open-addressing hash map built for read-mostly lookups, where a
@@ -204,6 +205,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="key">The key.</param>
         /// <param name="value">Receives the stored value, or the type's default on absence.</param>
         /// <returns><c>true</c> when the key is present.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGet(int key, out TValue value)
         {
             if (key < MinimumAllowedKey || _count == 0)
@@ -212,15 +214,25 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            int slot = FindSlot(key);
-            if (_keys[slot] == key)
+            int[] keys = _keys;
+            int slot = (int)(unchecked((uint)key * KeyMultiplier) >> _shift);
+            while (true)
             {
-                value = _values[slot];
-                return true;
-            }
+                int stored = keys[slot];
+                if (stored == key)
+                {
+                    value = _values[slot];
+                    return true;
+                }
 
-            value = default(TValue);
-            return false;
+                if (stored == EmptySlot)
+                {
+                    value = default(TValue);
+                    return false;
+                }
+
+                slot = (slot + 1) & _mask;
+            }
         }
 
         /// <summary>
