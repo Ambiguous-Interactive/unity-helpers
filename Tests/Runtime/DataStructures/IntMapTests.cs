@@ -96,6 +96,47 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.LessOrEqual(capacityHint, map.Capacity);
         }
 
+        [TestCase(0, 16)]
+        [TestCase(1, 16)]
+        [TestCase(2, 16)]
+        [TestCase(3, 16)]
+        [TestCase(16, 128)]
+        [TestCase(17, 128)]
+        [TestCase(1000, 4096)]
+        public void ConstructorReservesFourSlotsPerRequestedEntry(
+            int capacityHint,
+            int expectedCapacity
+        )
+        {
+            IntMap<int> map = new(capacityHint);
+            Assert.AreEqual(expectedCapacity, map.Capacity);
+            for (int key = 0; key < capacityHint; ++key)
+            {
+                Assert.IsTrue(map.TrySet(key, key));
+            }
+            Assert.AreEqual(expectedCapacity, map.Capacity);
+            Assert.AreEqual(capacityHint, map.Count);
+        }
+
+        [Test]
+        public void DefaultTableKeepsSixtyFourSlotsUntilTheSeventeenthEntry()
+        {
+            IntMap<int> map = new();
+            Assert.AreEqual(64, map.Capacity);
+            for (int key = 0; key < 16; ++key)
+            {
+                map.TrySet(key, key);
+            }
+            Assert.AreEqual(64, map.Capacity);
+            Assert.IsTrue(map.TrySet(16, 16));
+            Assert.AreEqual(128, map.Capacity);
+            for (int key = 0; key <= 16; ++key)
+            {
+                Assert.IsTrue(map.TryGet(key, out int value));
+                Assert.AreEqual(key, value);
+            }
+        }
+
         [Test]
         public void SetOverwriteAndRemoveAgreeWithADictionary()
         {
@@ -240,7 +281,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TestCase(16, 1024, true)]
         [TestCase(4096, 1, false)]
         [TestCase(4096, -1024, true)]
-        public void ReplacingAtHalfCapacityPreservesCapacityAndAllValues(
+        public void ReplacingAtLoadLimitPreservesCapacityAndAllValues(
             int capacityHint,
             int stride,
             bool useIndexer
@@ -248,7 +289,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             IntMap<int> map = new(capacityHint);
             int capacity = map.Capacity;
-            int count = capacity / 2;
+            int count = capacity / 4;
             for (int index = 0; index < count; ++index)
             {
                 Assert.IsTrue(map.TrySet(index * stride, index));
@@ -285,7 +326,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TestCase(16, true)]
         [TestCase(4096, false)]
         [TestCase(4096, true)]
-        public void ReinsertingRemovedEntryAtHalfOccupancyDoesNotAllocate(
+        public void ReinsertingRemovedEntryAtLoadLimitDoesNotAllocate(
             int capacityHint,
             bool useIndexer
         )
@@ -300,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             IntMap<string> map = new(capacityHint);
             int capacity = map.Capacity;
-            int count = capacity / 2;
+            int count = capacity / 4;
             for (int key = 0; key < count; ++key)
             {
                 Assert.IsTrue(map.TrySet(key, "original"));
@@ -361,14 +402,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TestCase(16, 1024)]
         [TestCase(256, 1)]
         [TestCase(256, -1024)]
-        public void SlidingHalfCapacityWindowReclaimsDeletedSlotsBeforeGrowing(
+        public void SlidingLoadLimitWindowReclaimsDeletedSlotsBeforeGrowing(
             int capacityHint,
             int stride
         )
         {
             IntMap<int> map = new(capacityHint);
             int capacity = map.Capacity;
-            int count = capacity / 2;
+            int count = capacity / 4;
             for (int index = 0; index < count; ++index)
             {
                 Assert.IsTrue(map.TrySet(index * stride, index));
@@ -399,7 +440,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TestCase(0, 1)]
         [TestCase(16, 1024)]
         [TestCase(256, -1024)]
-        public void SlidingHalfCapacityWindowDoesNotAllocate(int capacityHint, int stride)
+        public void SlidingLoadLimitWindowDoesNotAllocate(int capacityHint, int stride)
         {
             const int controlSize = 4096;
             long controlBytes = MeasureAllocated(() => GC.KeepAlive(new byte[controlSize]));
@@ -411,7 +452,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             IntMap<int> map = new(capacityHint);
             int capacity = map.Capacity;
-            int count = capacity / 2;
+            int count = capacity / 4;
             for (int index = 0; index < count; ++index)
             {
                 Assert.IsTrue(map.TrySet(index * stride, index));
@@ -535,7 +576,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             IntMap<string> map = new(0);
             Dictionary<int, string> oracle = new();
             int capacity = map.Capacity;
-            for (int index = 0; index < capacity / 2; ++index)
+            for (int index = 0; index < capacity / 4; ++index)
             {
                 string value = index % 2 == 0 ? "stored" : null;
                 map.TrySet(keys[index], value);
@@ -618,12 +659,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             IntMap<string> map = new();
             int capacity = map.Capacity;
-            int halfCapacity = capacity / 2;
-            for (int key = 0; key < halfCapacity; ++key)
+            int loadLimit = capacity / 4;
+            for (int key = 0; key < loadLimit; ++key)
             {
                 map.TrySet(key * 1024, "original");
             }
-            for (int key = 1; key < halfCapacity; key += 2)
+            for (int key = 1; key < loadLimit; key += 2)
             {
                 Assert.IsTrue(map.Remove(key * 1024, out string removed));
                 Assert.AreEqual("original", removed);
@@ -631,7 +672,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             IntMap<string>.Enumerator enumerator = map.GetEnumerator();
             Assert.IsTrue(enumerator.MoveNext());
-            for (int key = 0; key < halfCapacity; key += 2)
+            for (int key = 0; key < loadLimit; key += 2)
             {
                 if (useIndexer)
                 {
@@ -645,8 +686,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             Assert.Throws<InvalidOperationException>(() => enumerator.MoveNext());
             Assert.Throws<InvalidOperationException>(() => enumerator.Reset());
-            Assert.AreEqual(halfCapacity / 2, map.Count);
-            for (int key = 0; key < halfCapacity; ++key)
+            Assert.AreEqual(loadLimit / 2, map.Count);
+            for (int key = 0; key < loadLimit; ++key)
             {
                 Assert.AreEqual(key % 2 == 0, map.TryGet(key * 1024, out string value));
                 Assert.IsTrue(value == null);
@@ -686,7 +727,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             IntMap<string> map = new(capacityHint);
-            int count = map.Capacity / 2;
+            int count = map.Capacity / 4;
             for (int key = 0; key < count; ++key)
             {
                 if (useIndexer)
@@ -781,17 +822,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             IntMap<int> map = new();
             int startingCapacity = map.Capacity;
-            int halfCapacity = startingCapacity / 2;
-            for (int key = 0; key < halfCapacity; ++key)
+            int loadLimit = startingCapacity / 4;
+            for (int key = 0; key < loadLimit; ++key)
             {
                 map.TrySet(key, key);
             }
-            for (int key = 8; key < halfCapacity; ++key)
+            for (int key = 8; key < loadLimit; ++key)
             {
                 Assert.IsTrue(map.Remove(key, out _));
             }
 
-            Assert.IsTrue(map.TrySet(halfCapacity, halfCapacity));
+            Assert.IsTrue(map.TrySet(loadLimit, loadLimit));
             Assert.AreEqual(startingCapacity, map.Capacity);
             Assert.AreEqual(9, map.Count);
             for (int key = 0; key < 8; ++key)
@@ -799,15 +840,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.IsTrue(map.TryGet(key, out int value));
                 Assert.AreEqual(key, value);
             }
-            for (int key = 8; key < halfCapacity; ++key)
+            for (int key = 8; key < loadLimit; ++key)
             {
                 Assert.IsFalse(map.TryGet(key, out _));
                 Assert.IsTrue(map.TrySet(key, key));
             }
 
-            Assert.AreEqual(halfCapacity + 1, map.Count);
+            Assert.AreEqual(loadLimit + 1, map.Count);
             Assert.AreEqual(startingCapacity * 2, map.Capacity);
-            for (int key = 0; key <= halfCapacity; ++key)
+            for (int key = 0; key <= loadLimit; ++key)
             {
                 Assert.IsTrue(map.TryGet(key, out int value));
                 Assert.AreEqual(key, value);

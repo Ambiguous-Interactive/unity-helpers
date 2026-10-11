@@ -173,6 +173,10 @@ jobs:
         if: matrix.phase == 'sources'
         run: npm run typecheck:unity
 
+      - name: Run IntMap correctness without Unity
+        if: matrix.phase == 'sources'
+        run: npm run test:intmap
+
       # A type-check reports a defect by FAILING, so a gate that has lost an analyzer, a source
       # root or a severity prints exactly what a clean tree prints. This injects a known
       # WPROTO001, WUH003 and CS0246 into each of the five check projects and asserts each build

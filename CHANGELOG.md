@@ -111,7 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
-- Reduce helper calls in `IntMap` lookups by probing stored keys directly, and allow longer performance-test calibration windows while preserving the 20 ms default ([#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926)).
+- Reduce `IntMap` lookup collisions with a 0.25 load limit, using more table storage while keeping the default 64 slots. Allow longer performance-test calibration windows while preserving the 20 ms default ([#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926)).
 - Reduce repeated pool purge and disposal snapshot allocations with bounded buffer reuse that preserves nested callback ownership.
 - Improve directly constructed `PooledResource<T>` wrappers with no return callback by avoiding disposal tracking; callback-backed leases remain copy-safe ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Improve large `Deque<T>` array transfers with contiguous copies, preserving logical order, offsets, and covariant destination behavior ([#904](https://github.com/Ambiguous-Interactive/unity-helpers/issues/904)).

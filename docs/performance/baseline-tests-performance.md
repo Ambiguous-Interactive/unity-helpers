@@ -201,6 +201,10 @@ option is rejected.
   generation and optimization settings remain `unknown`. Seed, iteration count, and measured
   warmup durations/executions accompany the samples.
 
+`IntMapPerformanceTests` allows 30 minutes per test case so its grouped dictionary workloads can
+use the maximum calibration target. Its default target remains 20 ms; the timeout does not relax
+any timing or stability gate.
+
 `IntMapPerformanceTests` emits the full raw record as `INTMAP_PAIRED_SAMPLES` JSON in its NUnit
 output through an explicit JSON writer that needs no runtime serializer generation. Incomplete
 counterbalanced batches cannot claim timing acceptance and report an undefined interval as JSON

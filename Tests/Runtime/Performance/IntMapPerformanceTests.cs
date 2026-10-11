@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class IntMapPerformanceTests
     {
-        private const int BenchmarkTimeoutMilliseconds = 600_000;
+        private const int BenchmarkTimeoutMilliseconds = 1_800_000;
 
         private const int ProbeCount = 500_000;
 

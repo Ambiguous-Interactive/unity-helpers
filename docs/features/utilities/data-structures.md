@@ -325,7 +325,7 @@ Tips
 
 - What it is: `IntMap<TValue>`, a hash table with linear probing, Fibonacci hashing from the high product bits, a power-of-two table and keys compared as raw integers, with no `IEqualityComparer` indirection anywhere on the lookup path.
 - Use for: read-mostly lookups keyed by entity ids, network ids, slot indices or any dense/sparse int id.
-- Operations: `TryGet`, `TrySet`, indexer, `Remove`, `Clear`, enumeration; growth at a 0.5 live-entry load factor; removal closes probe-chain gaps in place without allocating or rebuilding the table.
+- Operations: `TryGet`, `TrySet`, indexer, `Remove`, `Clear`, enumeration; growth at a 0.25 live-entry load factor; removal closes probe-chain gaps in place without allocating or rebuilding the table.
 - Pros: direct integer comparison and value enumerators avoid comparer dispatch and typed enumeration boxing. Measure lookup speed for your own key distribution and miss rate.
 - Cons: misses probe until an empty slot, so measure the intended miss rate; the two lowest key values (`int.MinValue` and one above) are reserved, refused by `TrySet` without throwing.
 
@@ -342,12 +342,15 @@ map.Remove(entityId, out _);                 // closes the probe-chain gap witho
 Tips and pitfalls
 
 - `TryGet` checks each stored key directly and returns its value on a match. It uses the same high-bit hash and wrapping probe sequence as insertion and removal.
+- A fresh Unity 6000.4.6f1 Release Windows Mono player measured 2.34x and 2.90x Dictionary speed for hit-only lookups at 1,000 and 10,000 keys, and 1.53x and 1.83x with 50% misses. All eight comparisons retained 32 samples per arm and met the 3% spread limit with a 600 ms calibration target. These measurements used an Intel Core Ultra 9 285K, CPU 12 affinity, elevated process/thread priority, and explicit High QoS. All four shared-low-bit comparisons stayed within twice the dense lookup time. See [the complete acceptance evidence](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926) for the method and retained failed experiments; measure your own runtime and key distribution.
 - Earlier editor Mono measurements reported 1.97x–2.19x hit-heavy and 1.26x–1.65x at a 50% miss rate using the previous low-bit slot selection. Those margins do not describe the corrected implementation. `IntMapPerformanceTests` retains calibrated counterbalanced comparisons; measurements whose spread exceeds 3% cannot establish acceptance.
 - **Those historical numbers are editor Mono only.** IL2CPP has not been measured, and part of the margin is Mono not devirtualizing `EqualityComparer<int>.Default` — which an AOT compiler may do. See [#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578).
-- Removal closes gaps by shifting displaced entries whose probe paths cross the deleted slot, including chains that wrap around the table. It leaves no tombstones and allocates no replacement arrays. Remove-before-add sliding windows can therefore retain half the table as live entries without growth or cleanup allocations; an eight-entry sliding window stays at the default 64 slots even after one million insertions. The table doubles only when adding another live entry would exceed its 0.5 load factor.
+- Removal closes gaps by shifting displaced entries whose probe paths cross the deleted slot, including chains that wrap around the table. It leaves no tombstones and allocates no replacement arrays. Remove-before-add sliding windows can therefore retain one quarter of the table as live entries without growth or cleanup allocations; an eight-entry sliding window stays at the default 64 slots even after one million insertions. The table doubles only when adding another live entry would exceed its 0.25 load factor. The default table remains 64 slots; explicit capacity hints reserve at least four slots per requested live entry, with a minimum of 16 slots. Compared with the previous 0.5 limit, larger tables usually use twice the key and value storage to reduce collisions.
 - Replacing an existing value through `TrySet` or the indexer keeps the current storage, including at the occupancy limit and after removals. Only adding an absent key beyond the live-entry load limit triggers growth.
 - Keys sharing low bits, such as `i * 1024`, use the high bits of the hash product for their starting slots. The performance fixture compares hits and misses against dense keys at 64 and 1,024 entries; stable sparse-key measurements must stay within twice the dense lookup time.
 - Keys below `IntMap<TValue>.MinimumAllowedKey` remain reserved and are refused by `TrySet`; the indexer throws for them.
+
+Run `npm run test:intmap` for the same map correctness tests on the host .NET runtime without starting Unity. This gives a fast local edit loop; it does not establish Unity player compatibility or performance.
 
 ## String Wrapper (Interned Flyweight)
 
