@@ -19,6 +19,10 @@ on:
         description: "Validate and print the prepared diff without pushing a PR"
         type: boolean
         default: false
+      auto_publish:
+        description: "Publish the merged release after main validation passes."
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -178,6 +182,7 @@ jobs:
         if: ${{ !inputs.dry_run }}
         env:
           GH_PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
+          AUTO_PUBLISH: ${{ inputs.auto_publish }}
           VERSION: ${{ steps.version.outputs.version }}
           BRANCH: ${{ steps.version.outputs.branch }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -213,6 +218,10 @@ jobs:
           pr_body_file="${RUNNER_TEMP}/release-pr-body.md"
           {
             echo "Automated release preparation for ${VERSION}."
+            if [ "${AUTO_PUBLISH}" = "true" ]; then
+              echo
+              echo '<!-- unity-helpers:auto-publish -->'
+            fi
             echo
             echo "## Checklist"
             echo
@@ -224,8 +233,12 @@ jobs:
             echo
             echo "## After Merge"
             echo
-            echo "Run the Release Publish workflow on \`${DEFAULT_BRANCH}\` with version \`${VERSION}\`."
-            echo "Leave \`source_ref\` as \`${DEFAULT_BRANCH}\` for the normal path."
+            if [ "${AUTO_PUBLISH}" = "true" ]; then
+              echo "After main validation passes, Release Publish starts automatically for the exact merged commit."
+            else
+              echo "Run Release Publish on \`${DEFAULT_BRANCH}\`; version defaults to the selected source's package metadata."
+              echo "Leave \`source_ref\` as \`${DEFAULT_BRANCH}\` for the normal path."
+            fi
             echo "Release Publish validates, packs npm, creates the \`.unitypackage\`, creates the release tag if needed, publishes npm, and publishes the GitHub Release assets."
           } > "${pr_body_file}"
           pr_body_length="$(wc -m < "${pr_body_file}")"

@@ -29,6 +29,11 @@ const { runChecks, runRegistry } = require("./check-runner");
 /** A check whose `run` is executed with `bash -c` from the repository root. */
 const CHECKS = [
   {
+    id: "auto-publish-release",
+    name: "Automatic release publication",
+    run: "npm run test:auto-publish-release"
+  },
+  {
     id: "browser-storage",
     name: "Browser storage bridge and platform metadata",
     run: "npm run test:browser-storage"

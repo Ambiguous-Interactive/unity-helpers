@@ -1,4 +1,5 @@
 name: Release Publish
+run-name: ${{ inputs.export_only && 'Export' || 'Release' }} ${{ inputs.version || 'package version' }} from ${{ inputs.source_ref }}
 
 on:
   workflow_dispatch:
