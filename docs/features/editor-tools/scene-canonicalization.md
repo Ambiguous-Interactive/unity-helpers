@@ -97,3 +97,9 @@ replacement and managed comparer cases on .NET, without starting Unity. This
 small suite runs on CI too. Use the same test command after an edit; reserve the
 full typecheck for closeout. Scene/prefab reloads and destroyed Unity keys still
 need the native integration fixtures and Unity CI.
+
+When copying edits into a local validation checkout, compare file contents and
+give changed destination files fresh timestamps. Preserving an older source
+timestamp can make MSBuild reuse an assembly compiled from different contents.
+Use `dotnet build --no-incremental` once if that happens, then resume incremental
+checks.

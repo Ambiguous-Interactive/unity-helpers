@@ -205,6 +205,90 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             }
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void AddedSiblingsUnderPrefabParentsBakeAndReloadConsistently(bool prefabChildren)
+        {
+            string parentPath = _folder + "/Parent.prefab";
+            string childPath = _folder + "/Nested.prefab";
+            GameObject parentSource = Track(new GameObject("Parent"));
+            GameObject childSource = Track(new GameObject("Nested"));
+            Assert.That(PrefabUtility.SaveAsPrefabAsset(parentSource, parentPath), Is.Not.Null);
+            Assert.That(PrefabUtility.SaveAsPrefabAsset(childSource, childPath), Is.Not.Null);
+            foreach (string path in new[] { parentPath, childPath })
+            {
+                Assert.That(
+                    SceneCanonicalizer.TryCanonicalizeFile(path, out _, out Exception error),
+                    Is.True,
+                    error?.ToString()
+                );
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            }
+            GameObject parentPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(parentPath);
+            GameObject childPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(childPath);
+            string scenePath = _folder + "/NestedSiblings.unity";
+            string[] canonical = new string[2];
+            for (int generation = 0; generation < 2; ++generation)
+            {
+                Scene scene = CreateWorkingScene();
+                try
+                {
+                    GameObject parent = (GameObject)
+                        PrefabUtility.InstantiatePrefab(parentPrefab, scene);
+                    for (int i = 0; i < 2; ++i)
+                    {
+                        if (prefabChildren)
+                        {
+                            PrefabUtility.InstantiatePrefab(childPrefab, parent.transform);
+                        }
+                        else
+                        {
+                            GameObject child = Track(new GameObject("Nested"));
+                            SceneManager.MoveGameObjectToScene(child, scene);
+                            child.transform.SetParent(parent.transform);
+                        }
+                    }
+                    Assert.That(EditorSceneManager.SaveScene(scene, scenePath), Is.True);
+                }
+                finally
+                {
+                    CloseWorkingScene(scene);
+                }
+                Assert.That(
+                    SceneCanonicalizer.TryCanonicalizeFile(scenePath, out _, out Exception error),
+                    Is.True,
+                    error?.ToString()
+                );
+                canonical[generation] = File.ReadAllText(scenePath);
+                Scene loaded = OpenWorkingScene(scenePath);
+                try
+                {
+                    GameObject[] roots = loaded.GetRootGameObjects();
+                    Assert.That(roots.Length, Is.EqualTo(1));
+                    Assert.That(roots[0].transform.childCount, Is.EqualTo(2));
+                    for (int i = 0; i < 2; ++i)
+                    {
+                        GameObject child = roots[0].transform.GetChild(i).gameObject;
+                        Assert.That(child.name, Is.EqualTo("Nested"));
+                        if (prefabChildren)
+                        {
+                            Assert.That(
+                                AssetDatabase.GetAssetPath(
+                                    PrefabUtility.GetCorrespondingObjectFromSource(child)
+                                ),
+                                Is.EqualTo(childPath)
+                            );
+                        }
+                    }
+                }
+                finally
+                {
+                    CloseWorkingScene(loaded);
+                }
+            }
+            Assert.That(canonical[1], Is.EqualTo(canonical[0]));
+        }
+
         [Test]
         public void AutomaticFoldersRespectBoundariesAndCanBeDisabled()
         {

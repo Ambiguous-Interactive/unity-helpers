@@ -34,6 +34,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         private const string FieldTransformParent = "m_TransformParent";
         private const string FieldSourcePrefab = "m_SourcePrefab";
         private const string FieldPrefabInstance = "m_PrefabInstance";
+        private const string FieldAddedGameObjects = "m_AddedGameObjects";
+        private const string FieldAddedObject = "addedObject";
 
         private const string ChildItemPrefix = "- {fileID: ";
         private const string ComponentItemPrefix = "- component: {fileID: ";

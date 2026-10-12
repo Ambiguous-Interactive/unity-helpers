@@ -96,6 +96,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             Assert.That(canonical, Does.Not.Contain("m_GameObject: {fileID: 11}"));
         }
 
+        [TestCase("Toss 'em")]
+        [TestCase("say \"hello")]
+        [TestCase("hello | world")]
+        [TestCase("hello > world")]
+        public void PlainScalarPunctuationDoesNotHideLaterReferences(string value)
+        {
+            string yaml = Scene.Replace(
+                "  m_Name: Root\n",
+                "  m_Name: Root\n  rows:\n  - text: " + value + "\n    target: {fileID: 11}\n"
+            );
+            string canonical = SceneCanonicalizer.CanonicalizeYaml(yaml);
+            string target = Regex
+                .Match(canonical, @"m_GameObject: {fileID: ([0-9]+)}")
+                .Groups[1]
+                .Value;
+            Assert.That(target, Is.Not.Empty);
+            Assert.That(canonical, Does.Contain("text: " + value + "\n"));
+            Assert.That(canonical, Does.Contain("target: {fileID: " + target + "}"));
+            Assert.That(SceneCanonicalizer.CanonicalizeYaml(canonical), Is.EqualTo(canonical));
+        }
+
         [TestCase(false, false)]
         [TestCase(true, false)]
         [TestCase(false, true)]
@@ -135,6 +156,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             twin = Regex.Replace(
                 twin,
                 @"(?<=&)[1-8](?=\s)|(?<=fileID: )[1-8](?=})",
+                match =>
+                    (60 - int.Parse(match.Value)).ToString(
+                        System.Globalization.CultureInfo.InvariantCulture
+                    )
+            );
+            string canonical = SceneCanonicalizer.CanonicalizeYaml(yaml);
+            Assert.That(SceneCanonicalizer.CanonicalizeYaml(twin), Is.EqualTo(canonical));
+            Assert.That(SceneCanonicalizer.CanonicalizeYaml(canonical), Is.EqualTo(canonical));
+        }
+
+        [Test]
+        public void AddedNestedPrefabSiblingsKeepDistinctStableIdentities()
+        {
+            const string yaml =
+                "--- !u!1001 &1\nPrefabInstance:\n  m_Modification:\n    m_TransformParent: {fileID: 0}\n    m_AddedGameObjects:\n    - targetCorrespondingSourceObject: {fileID: 4000, guid: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, type: 3}\n      insertIndex: -1\n      addedObject: {fileID: 5}\n    - targetCorrespondingSourceObject: {fileID: 4000, guid: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, type: 3}\n      insertIndex: -1\n      addedObject: {fileID: 6}\n    m_AddedComponents: []\n  m_SourcePrefab: {fileID: 100100000, guid: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, type: 3}\n--- !u!4 &4 stripped\nTransform:\n  m_CorrespondingSourceObject: {fileID: 4000, guid: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, type: 3}\n  m_PrefabInstance: {fileID: 1}\n--- !u!1001 &2\nPrefabInstance:\n  m_Modification:\n    m_TransformParent: {fileID: 4}\n  m_SourcePrefab: {fileID: 100100000, guid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, type: 3}\n--- !u!1001 &3\nPrefabInstance:\n  m_Modification:\n    m_TransformParent: {fileID: 4}\n  m_SourcePrefab: {fileID: 100100000, guid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, type: 3}\n--- !u!4 &5 stripped\nTransform:\n  m_CorrespondingSourceObject: {fileID: 5000, guid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, type: 3}\n  m_PrefabInstance: {fileID: 2}\n--- !u!4 &6 stripped\nTransform:\n  m_CorrespondingSourceObject: {fileID: 5000, guid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, type: 3}\n  m_PrefabInstance: {fileID: 3}\n--- !u!1660057539 &9223372036854775807\nSceneRoots:\n  m_Roots:\n  - {fileID: 1}\n";
+            string[] documents = yaml.Split(
+                new[] { "--- !u!" },
+                StringSplitOptions.RemoveEmptyEntries
+            );
+            Array.Reverse(documents);
+            string twin = "--- !u!" + string.Join("--- !u!", documents);
+            twin = Regex.Replace(
+                twin,
+                @"(?<=&)[1-6](?=\s)|(?<=fileID: )[1-6](?=})",
                 match =>
                     (60 - int.Parse(match.Value)).ToString(
                         System.Globalization.CultureInfo.InvariantCulture

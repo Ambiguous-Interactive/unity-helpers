@@ -99,6 +99,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         RecordPrefabSiblingIndex(roots[i], i);
                     }
                 }
+                foreach (SceneDocument document in documents)
+                {
+                    if (document._classId == PrefabInstanceClassId)
+                    {
+                        RecordAddedGameObjects(document);
+                    }
+                }
                 ValidateHierarchy(documents);
             }
 
@@ -292,6 +299,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             );
                         }
                         depths[path[i]] = depth;
+                    }
+                }
+            }
+
+            private void RecordAddedGameObjects(SceneDocument document)
+            {
+                int listIndent = -1;
+                int ordinal = 0;
+                foreach (string line in document._lines)
+                {
+                    int length = line.Length;
+                    int start = 0;
+                    while (start < length && line[start] == ' ')
+                    {
+                        ++start;
+                    }
+                    if (start == length)
+                    {
+                        continue;
+                    }
+                    if (listIndent < 0)
+                    {
+                        if (MatchesFieldName(line, start, FieldAddedGameObjects))
+                        {
+                            string value = line.Substring(start + FieldAddedGameObjects.Length + 1)
+                                .Trim();
+                            if (string.Equals(value, EmptyList, StringComparison.Ordinal))
+                            {
+                                return;
+                            }
+                            listIndent = start;
+                        }
+                        continue;
+                    }
+                    if (start <= listIndent && line[start] != '-')
+                    {
+                        break;
+                    }
+                    if (MatchesFieldName(line, start, FieldAddedObject))
+                    {
+                        long referenceId = ParseFileIdFromRef(
+                            line.Substring(start + FieldAddedObject.Length + 1)
+                        );
+                        if (referenceId != 0)
+                        {
+                            long transformId = _transformByGameObject.TryGetValue(
+                                referenceId,
+                                out long transform
+                            )
+                                ? transform
+                                : referenceId;
+                            _childIndex[transformId] = ordinal;
+                            RecordPrefabSiblingIndex(referenceId, ordinal);
+                        }
+                        ++ordinal;
                     }
                 }
             }

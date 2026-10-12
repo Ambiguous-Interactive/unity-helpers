@@ -70,7 +70,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             || text[i - 1] == ':'
                             || text[i - 1] == '['
                             || text[i - 1] == ',';
-                        if (tokenStart && (character == '\'' || character == '"'))
+                        bool valueStart = false;
+                        if (
+                            character == '\''
+                            || character == '"'
+                            || character == '|'
+                            || character == '>'
+                        )
+                        {
+                            int previous = i - 1;
+                            while (contentStart <= previous && text[previous] == ' ')
+                            {
+                                --previous;
+                            }
+                            valueStart =
+                                previous < contentStart
+                                || text[previous] == ':'
+                                || text[previous] == '['
+                                || text[previous] == '{'
+                                || text[previous] == ','
+                                || (text[previous] == '-' && previous == contentStart);
+                        }
+                        if (valueStart && (character == '\'' || character == '"'))
                         {
                             quote = character;
                             protectedText[i] = true;
@@ -83,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             }
                             break;
                         }
-                        else if (tokenStart && (character == '|' || character == '>'))
+                        else if (valueStart && (character == '|' || character == '>'))
                         {
                             blockIndent = indent;
                         }
