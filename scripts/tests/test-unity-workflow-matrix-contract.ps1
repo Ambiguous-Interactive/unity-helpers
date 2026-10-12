@@ -3709,15 +3709,14 @@ if (-not $failed) {
     Write-Info "Checked Windows runner bootstrap sparse uninstall registry entries."
 }
 
-# One stable group per PR/ref lets GitHub cancel both running and queued legs from an older
-# revision. The licensed jobs' `always()` cleanup path is responsible for returning the license
-# and releasing the organization lock when cancellation arrives after acquisition.
+# Pull request revisions cancel older legs; pushed commits retain their own validation runs
+# so prepared releases can publish the exact validated merge even when main advances.
 $cancelsSupersededLicensedRuns = (
-    $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}') -and
-    $workflowContent.Contains('cancel-in-progress: true')
+    $workflowContent.Contains('group: unity-tests-${{ github.event_name == ''push'' && github.sha || github.event.pull_request.number || github.ref }}') -and
+    $workflowContent.Contains('cancel-in-progress: ${{ github.event_name == ''pull_request'' }}')
 )
 if (-not $cancelsSupersededLicensedRuns) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must group by pull request/ref and cancel in-progress runs so superseded licensed legs cannot starve the self-hosted runners."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must retain pushed-commit validation while canceling superseded pull request revisions."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Unity Tests cancels superseded runs within a stable pull request/ref group."

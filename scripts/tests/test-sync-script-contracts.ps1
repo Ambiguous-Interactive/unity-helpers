@@ -2542,7 +2542,8 @@ function Run-ReleasePrepareWorkflowContractTests {
     -not $workflowContent.Contains('@arguments')
   )
   $prBodyUsesManualPublishWorkflow = (
-    $workflowContent.Contains('Run the Release Publish workflow on \`${DEFAULT_BRANCH}\` with version \`${VERSION}\`.') -and
+    $workflowContent.Contains('Run the Release Publish workflow on \`${DEFAULT_BRANCH}\`; version defaults to the selected source''s package metadata.') -and
+    $workflowContent.Contains('After main validation passes, Release Publish starts automatically for the exact merged commit.') -and
     $workflowContent.Contains('creates the release tag if needed') -and
     -not $workflowContent.Contains('The Release Tag workflow pushes tag')
   )
@@ -2580,9 +2581,9 @@ function Run-ReleasePrepareWorkflowContractTests {
     -Message 'Expected release-prepare.yml to avoid positional array splatting that can bind "-Bump" as the Bump value.'
 
   Write-TestResult `
-    -TestName 'release prepare points operators at the manual Release Publish button' `
+    -TestName 'release prepare explains automatic publication and manual fallback' `
     -Passed $prBodyUsesManualPublishWorkflow `
-    -Message 'Expected release PR body to tell operators to run Release Publish after merge, without referencing the retired Release Tag workflow.'
+    -Message 'Expected automatic exact-source publication and a manual version-derived fallback without the retired Release Tag workflow.'
 
   Write-TestResult `
     -TestName 'release prepare keeps the PR body independent of release-note size' `

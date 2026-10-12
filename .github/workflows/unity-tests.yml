@@ -61,13 +61,13 @@ permissions:
   checks: write
   pull-requests: read
 
-# One group per pull request or pushed ref lets a newer revision supersede the entire older run,
-# including matrix legs that have not reached a self-hosted runner yet. Licensed legs use the
+# Pull request revisions supersede older matrix legs; each pushed commit retains its validation.
+# Licensed legs use the
 # central cancellation-safe cleanup path: `always()` returns the Unity license, classifies the
 # evidence, releases the organization lock, and requires confirmed cleanup before the job ends.
 concurrency:
-  group: unity-tests-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: unity-tests-${{ github.event_name == 'push' && github.sha || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   matrix-config:
@@ -270,8 +270,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     concurrency:
-      group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
-      cancel-in-progress: true
+      group: ${{ github.workflow }}-runner-preflight-${{ github.event_name == 'push' && github.sha || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       # Verifies only that every required label set has a registered runner
       # visible to the repository; the licensed jobs below depend on this job so
