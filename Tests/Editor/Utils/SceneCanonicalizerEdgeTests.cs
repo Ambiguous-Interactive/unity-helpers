@@ -100,6 +100,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
         [TestCase("say \"hello")]
         [TestCase("hello | world")]
         [TestCase("hello > world")]
+        [TestCase("foo:'bar")]
+        [TestCase("Hello, 'em")]
+        [TestCase("hello, | world")]
+        [TestCase("hello, > world")]
         public void PlainScalarPunctuationDoesNotHideLaterReferences(string value)
         {
             string yaml = Scene.Replace(

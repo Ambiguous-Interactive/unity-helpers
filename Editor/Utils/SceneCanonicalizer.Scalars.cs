@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             bool[] protectedText = new bool[text.Length];
             char quote = '\0';
             int blockIndent = -1;
+            int flowDepth = 0;
             int lineStart = 0;
             while (lineStart < text.Length)
             {
@@ -24,6 +25,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     ++contentStart;
                 }
                 int indent = contentStart - lineStart;
+                int fieldValueStart = FindFieldValueStart(text, contentStart, lineEnd);
                 if (
                     0 <= blockIndent
                     && (
@@ -84,12 +86,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                                 --previous;
                             }
                             valueStart =
-                                previous < contentStart
-                                || text[previous] == ':'
-                                || text[previous] == '['
-                                || text[previous] == '{'
-                                || text[previous] == ','
-                                || (text[previous] == '-' && previous == contentStart);
+                                i == fieldValueStart
+                                || (
+                                    0 < flowDepth
+                                    && contentStart <= previous
+                                    && (
+                                        text[previous] == ':'
+                                        || text[previous] == '['
+                                        || text[previous] == '{'
+                                        || text[previous] == ','
+                                    )
+                                );
                         }
                         if (valueStart && (character == '\'' || character == '"'))
                         {
@@ -104,15 +111,74 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             }
                             break;
                         }
-                        else if (valueStart && (character == '|' || character == '>'))
+                        else if (
+                            i == fieldValueStart
+                            && flowDepth == 0
+                            && (character == '|' || character == '>')
+                        )
                         {
                             blockIndent = indent;
+                        }
+                        else if (
+                            (i == fieldValueStart || 0 < flowDepth)
+                            && (character == '[' || character == '{')
+                        )
+                        {
+                            ++flowDepth;
+                        }
+                        else if (0 < flowDepth && (character == ']' || character == '}'))
+                        {
+                            --flowDepth;
                         }
                     }
                 }
                 lineStart = lineEnd + 1;
             }
             return protectedText;
+        }
+
+        private static int FindFieldValueStart(string text, int contentStart, int lineEnd)
+        {
+            int start = contentStart;
+            if (
+                start < lineEnd
+                && text[start] == '-'
+                && start + 1 < lineEnd
+                && text[start + 1] == ' '
+            )
+            {
+                ++start;
+                while (start < lineEnd && text[start] == ' ')
+                {
+                    ++start;
+                }
+            }
+            if (
+                start == lineEnd
+                || text[start] == '['
+                || text[start] == '{'
+                || text[start] == '\''
+                || text[start] == '"'
+                || text[start] == '|'
+                || text[start] == '>'
+            )
+            {
+                return start;
+            }
+            int colon = text.IndexOf(':', start, lineEnd - start);
+            if (
+                colon < 0
+                || (colon + 1 < lineEnd && text[colon + 1] != ' ' && text[colon + 1] != '\r')
+            )
+            {
+                return start;
+            }
+            start = colon + 1;
+            while (start < lineEnd && text[start] == ' ')
+            {
+                ++start;
+            }
+            return start;
         }
     }
 }
