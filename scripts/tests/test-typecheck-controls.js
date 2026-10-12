@@ -327,6 +327,7 @@ runTest("parallel host phases retain complete commands without fail-fast cancell
   assert.deepEqual(commands, [
     "npm run typecheck:unity",
     "npm run test:enumeration",
+    "npm run test:stable-assets",
     "npm run test:intmap",
     "npm run typecheck:controls"
   ]);

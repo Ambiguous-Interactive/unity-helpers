@@ -210,13 +210,13 @@
     },
     {
       "name": "integrate-odin-inspector",
-      "sha256": "23b023fdf877d11310982b710690d4fa05b941fd79ba40d2fce0ec84053e8fb1",
+      "sha256": "d96d969882b737683c7b8dee2bc0a41a4ac061b045665186fefdb11338232491",
       "parts": [
         "integrate-odin-inspector-part-1.md",
         "integrate-odin-inspector-part-2.md",
         "integrate-odin-inspector-part-3.md"
       ],
-      "routerSha256": "67972b27ce1e58cd92f41a40c549de13b958d80be757446ffd9488adddeb9b6c"
+      "routerSha256": "c4447d6a43b2f316e8d8182471d892769682665bd781b40856ea97500f05ef63"
     },
     {
       "name": "integrate-optional-dependency",

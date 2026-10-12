@@ -66,6 +66,8 @@
 
 [Read section](../references/integrate-odin-inspector-part-3.md#odin-inspector-type-support)
 
+### [Automatic Runtime Base Opt-Out](../references/integrate-odin-inspector-part-3.md#automatic-runtime-base-opt-out)
+
 ### [SerializedMonoBehaviour/SerializedScriptableObject](../references/integrate-odin-inspector-part-3.md#serializedmonobehaviourserializedscriptableobject)
 
 ## Odin Drawer to Unity Helpers Attribute Mapping

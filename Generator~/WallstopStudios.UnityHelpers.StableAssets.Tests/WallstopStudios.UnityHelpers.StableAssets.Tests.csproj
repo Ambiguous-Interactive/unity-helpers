@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile
+      Include="../WallstopStudios.UnityHelpers.DurableFile.Tests/MathDependency.cs"
+      Link="MathDependency.cs"
+    />
+    <Compile Include="../../Editor/Utils/SceneCanonicalizer.cs" Link="SceneCanonicalizer.cs" />
+    <Compile
+      Include="../../Editor/Utils/SceneCanonicalizer.Document.cs"
+      Link="SceneCanonicalizer.Document.cs"
+    />
+    <Compile
+      Include="../../Editor/Utils/SceneCanonicalizer.Model.cs"
+      Link="SceneCanonicalizer.Model.cs"
+    />
+    <Compile
+      Include="../../Editor/Utils/SceneCanonicalizer.Scalars.cs"
+      Link="SceneCanonicalizer.Scalars.cs"
+    />
+    <Compile Include="../../Runtime/Core/Helper/DurableFile.cs" Link="DurableFile.cs" />
+    <Compile Include="../../Runtime/Core/Helper/FileHelper.cs" Link="FileHelper.cs" />
+    <Compile Include="../../Runtime/Core/Threading/SemaphoreLease.cs" Link="SemaphoreLease.cs" />
+    <Compile Include="../../Runtime/Utils/DisposalLease.cs" Link="DisposalLease.cs" />
+    <Compile
+      Include="../../Runtime/Core/Helper/ReferenceIdentityComparer.cs"
+      Link="ReferenceIdentityComparer.cs"
+    />
+    <Compile
+      Include="../../Tests/Editor/Utils/SceneCanonicalizerTests.cs"
+      Link="SceneCanonicalizerTests.cs"
+    />
+    <Compile
+      Include="../../Tests/Editor/Utils/SceneCanonicalizerEdgeTests.cs"
+      Link="SceneCanonicalizerEdgeTests.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/Helper/ReferenceIdentityComparerTests.cs"
+      Link="ReferenceIdentityComparerTests.cs"
+    />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+</Project>

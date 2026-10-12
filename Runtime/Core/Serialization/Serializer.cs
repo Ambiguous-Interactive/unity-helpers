@@ -3138,7 +3138,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 options != null && options.ReferenceHandler == ReferenceHandler.IgnoreCycles;
             if (tracksCycles)
             {
-                visited ??= new HashSet<object>(ReferenceComparer.Instance);
+                visited ??= new HashSet<object>(ReferenceIdentityComparer<object>.Instance);
                 if (!visited.Add(value))
                 {
                     writer.WriteNullValue();
@@ -3857,26 +3857,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return (getItems, setItems, getKeys, setKeys, getValues, setValues);
             }
         }
-        // Cycle detection uses reference identity so distinct value-equal nodes are still written.
-
 #endif
-
-        private sealed class ReferenceComparer : IEqualityComparer<object>
-        {
-            internal static readonly ReferenceComparer Instance = new();
-
-            private ReferenceComparer() { }
-
-            bool IEqualityComparer<object>.Equals(object x, object y)
-            {
-                return ReferenceEquals(x, y);
-            }
-
-            int IEqualityComparer<object>.GetHashCode(object obj)
-            {
-                return RuntimeHelpers.GetHashCode(obj);
-            }
-        }
     }
 
     internal sealed class PooledBufferStream : Stream

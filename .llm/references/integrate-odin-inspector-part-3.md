@@ -4,6 +4,22 @@
 
 ## Odin Inspector Type Support
 
+### Automatic Runtime Base Opt-Out
+
+Use the single project-wide `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` define
+for every runtime type that automatically inherits an Odin serialized base.
+Sweep runtime base aliases when adding or changing this setting; both singleton
+families and `AttributeEffect` must honor it. Keep Odin drawers enabled.
+Do not add a separate per-family opt-out without a concrete requirement.
+Base-class selection requires recompilation, so expose it through scripting
+defines rather than a runtime boolean.
+
+Compile the dependency-present configuration with and without the opt-out, and
+the dependency-absent fallback. Update production guards, inheritance tests,
+MSBuild properties, npm matrix commands, and migration docs together. Intrinsic
+Odin drawer and fixture types remain Odin types. See
+[singleton configuration](../../docs/features/utilities/singletons.md#odin-compatibility).
+
 ### SerializedMonoBehaviour/SerializedScriptableObject
 
 Unity Helpers attributes work on Odin's enhanced base classes which support:

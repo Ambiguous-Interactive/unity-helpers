@@ -1,6 +1,6 @@
 # Skill: Honest Gates
 
-<!-- trigger: vacuous pass, zero findings, subject count, gate scope, duplicate helper, reports clean | Keeping a check from passing because it looked at nothing | Core -->
+<!-- trigger: vacuous pass, zero findings, subject count, gate scope, duplicate helper, reports clean, stale assembly, incremental build | Keeping a check from passing because it looked at nothing | Core -->
 
 **Trigger**: When writing or reviewing anything that scans a set and reports what is wrong with it —
 a validator, a contract test, a linter, an analyzer fixture.
@@ -80,8 +80,22 @@ The repair is the class, not the instance: **delete the second copy and delegate
 adding the missing guard to whichever one happened to be reported. Otherwise two helpers still
 answer one question two ways, and the one that drifts next is the one nobody tested.
 
+## Copied sources must reach the compiled assembly
+
+When validating through a local checkout, compare source contents and give
+changed destination files fresh timestamps. A byte-identical source snapshot
+can still produce a stale result if copying preserves timestamps older than
+the existing assembly. MSBuild may skip compilation despite changed contents.
+
+If a regression result contradicts the current source, verify which assembly
+ran and force one `dotnet build --no-incremental` before changing production
+code. Then resume incremental checks. Keep failing-before and passing-after
+evidence for the regression, including actual case counts. See
+[fast local checks](../../docs/features/editor-tools/scene-canonicalization.md#fast-local-checks).
+
 ## Related
 
 - [create-test](./create-test.md): test coverage categories and data-driven fixtures
 - [defensive-programming](./defensive-programming.md): `TryXxx` contracts and graceful inputs
 - [unity-api-costs](./unity-api-costs.md): why an asset path read through `System.IO` fails silently
+- [durable-generated-state](./durable-generated-state.md): stable identities and independent rewrite checks

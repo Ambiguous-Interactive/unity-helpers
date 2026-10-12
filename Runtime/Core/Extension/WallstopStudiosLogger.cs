@@ -57,7 +57,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         // Reads and writes share the lock so log filtering cannot race set mutation.
         private static readonly object DisabledLock = new();
-        private static readonly HashSet<Object> Disabled = new(ObjectIdentityComparer.Instance);
+        private static readonly HashSet<Object> Disabled = new(
+            ReferenceIdentityComparer<Object>.Instance
+        );
 
 #if !SINGLE_THREADED
         private static readonly ConcurrentDictionary<
@@ -549,27 +551,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 );
             }
             catch { }
-        }
-
-        /// <summary>
-        /// Reference identity, so membership never asks a Unity object whether its native half is
-        /// still alive -- which is what <c>Object.Equals</c> does, on whatever thread asked.
-        /// </summary>
-        private sealed class ObjectIdentityComparer : IEqualityComparer<Object>
-        {
-            internal static readonly ObjectIdentityComparer Instance = new();
-
-            private ObjectIdentityComparer() { }
-
-            public bool Equals(Object left, Object right)
-            {
-                return ReferenceEquals(left, right);
-            }
-
-            public int GetHashCode(Object value)
-            {
-                return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
-            }
         }
     }
 }

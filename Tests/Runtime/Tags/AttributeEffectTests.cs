@@ -110,7 +110,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             Assert.IsInstanceOf<ScriptableObject>(effect);
 #if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
+            Assert.That(effect, Is.Not.InstanceOf<SerializedScriptableObject>());
+#else
             Assert.IsInstanceOf<SerializedScriptableObject>(effect);
+#endif
 #endif
         }
 
