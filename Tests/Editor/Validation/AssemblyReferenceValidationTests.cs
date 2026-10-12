@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using UnityEditor;
     using UnityEditor.Compilation;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using Assembly = System.Reflection.Assembly;
 
     /// <summary>
@@ -157,7 +158,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             List<string> skippedAssemblies
         )
         {
-            foreach (TestAsmdefDescriptor asmdef in asmdefs)
+            foreach (TestAsmdefDescriptor asmdef in asmdefs.AsValueEnumerableRequired())
             {
                 string assemblyName = asmdef.AssemblyName;
                 try
@@ -209,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
         private static bool ShouldSkipWhenUnloaded(IReadOnlyList<string> defineConstraints)
         {
-            foreach (string defineConstraint in defineConstraints)
+            foreach (string defineConstraint in defineConstraints.AsValueEnumerableRequired())
             {
                 if (string.IsNullOrWhiteSpace(defineConstraint))
                 {

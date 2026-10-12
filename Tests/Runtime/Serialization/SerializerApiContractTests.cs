@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.Linq;
     using System.Reflection;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
@@ -133,7 +134,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryPublicTryDeserializerHandlesNullPayloadWithoutThrowing()
         {
-            foreach (MethodInfo method in PublicMethods)
+            foreach (MethodInfo method in PublicMethods.AsValueEnumerableRequired())
             {
                 if (!method.Name.StartsWith("Try", StringComparison.Ordinal))
                 {

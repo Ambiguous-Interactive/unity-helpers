@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Editor.Tools;
 
@@ -1441,7 +1442,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void NoTwoPredefinedAssembliesShareAManifestPath()
         {
             List<string> paths = new List<string>();
-            foreach (string name in WProtoSubtypeTagManifestFile.PredefinedAssemblyNames())
+            foreach (
+                string name in WProtoSubtypeTagManifestFile
+                    .PredefinedAssemblyNames()
+                    .AsValueEnumerableRequired()
+            )
             {
                 paths.Add(
                     WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly(name)

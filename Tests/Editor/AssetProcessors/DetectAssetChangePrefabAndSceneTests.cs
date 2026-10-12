@@ -64,7 +64,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
 
             int count = 0;
-            foreach (T recorded in recordedInstances)
+            foreach (T recorded in recordedInstances.AsValueEnumerableRequired())
             {
                 if (recorded != null && expectedIds.Contains(recorded.GetUnityObjectId()))
                 {

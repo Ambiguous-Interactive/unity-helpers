@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -94,7 +95,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void EveryRegisteredConverterIsCoveredDeclaredOrExplicitlyNotOurs()
         {
             List<Type> covered = new();
-            foreach (JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets)
+            foreach (
+                JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets.AsValueEnumerableRequired()
+            )
             {
                 covered.Add(target.Type);
             }
@@ -168,7 +171,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
 
                 bool covered = false;
-                foreach (JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets)
+                foreach (
+                    JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets.AsValueEnumerableRequired()
+                )
                 {
                     Type candidate = target.Type.IsGenericType
                         ? target.Type.GetGenericTypeDefinition()
@@ -254,7 +259,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void TheWriteOnlyDeclarationAgreesWithTheFuzzTargets()
         {
             List<string> failures = new();
-            foreach (JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets)
+            foreach (
+                JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets.AsValueEnumerableRequired()
+            )
             {
                 bool declaredWriteOnly = JsonConverterFuzzTests.WriteOnlyConverters.ContainsKey(
                     target.Type

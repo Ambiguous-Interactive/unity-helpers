@@ -66,19 +66,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _lower1 = 0;
             _lower2 = 0;
             _index = -1;
-            if (_rank > 3)
+            if (3 < _rank)
             {
                 _fallback = source.GetEnumerator();
             }
-            else if (_rank > 0)
+            else if (0 < _rank)
             {
                 _lower0 = source.GetLowerBound(0);
-                if (_rank > 1)
+                if (1 < _rank)
                 {
                     _lower1 = source.GetLowerBound(1);
                     _length1 = source.GetLength(1);
                 }
-                if (_rank > 2)
+                if (2 < _rank)
                 {
                     _lower2 = source.GetLowerBound(2);
                     _length2 = source.GetLength(2);

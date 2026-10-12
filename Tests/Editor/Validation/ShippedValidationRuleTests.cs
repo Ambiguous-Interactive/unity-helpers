@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Validation;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules;
@@ -575,7 +576,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 "no shipped rule may throw on a committed asset"
             );
             bool reported = false;
-            foreach (ValidationFinding finding in run.Findings)
+            foreach (ValidationFinding finding in run.Findings.AsValueEnumerableRequired())
             {
                 reported |= string.Equals(
                     finding.RuleId,

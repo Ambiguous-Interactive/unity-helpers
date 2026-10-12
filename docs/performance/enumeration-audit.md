@@ -30,10 +30,10 @@ included explicitly because Unity does not import those package folders automati
 
 | Binding                  | Sites | Interpretation                                                           |
 | ------------------------ | ----: | ------------------------------------------------------------------------ |
-| Compiler-indexed arrays  | 1,236 | No enumerator object; element conversions can still box                  |
+| Compiler-indexed arrays  | 1,243 | No enumerator object; element conversions can still box                  |
 | Compiler-indexed strings |    22 | UTF-16 character indexing; no enumerator object                          |
-| Value return             | 1,744 | Concrete value protocol, with source and traversal-storage caveats below |
-| Reference return         |   471 | 336 test-reference sites and 135 retained production sites               |
+| Value return             | 1,804 | Concrete value protocol, with source and traversal-storage caveats below |
+| Reference return         |   404 | 269 test-reference sites and 135 retained production sites               |
 
 The changes avoid boxing for interface-held arrays, exact lists, exact hash sets and exact
 dictionaries. Custom sequences and derived collections retain their original acquisition,
@@ -42,7 +42,9 @@ internal calls; the public views deliberately treat null as empty.
 
 Explicit generic enumerators use the same value view. Internally owned generator lists keep their
 concrete type through five loops. Bit-set JSON writers avoid their iterator factories, regex
-scanning follows `NextMatch`, and private reflection results retain their array type.
+scanning follows `NextMatch`, and private reflection results retain their array type. Sixty ordinary
+fixture traversals use the value view; seven enum-array loops keep their concrete element type.
+Independent traversal oracles and allocating controls retain their source protocol.
 
 Untyped array traversal uses value enumeration for ranks one through three, including nonzero
 lower bounds and live element reads. Higher ranks retain the original BCL enumerator: the public
@@ -81,7 +83,8 @@ Preserve independent oracles and allocating controls during that review.
 
 The Release host enumeration suite passes 59 tests without skips. Native Unity 6000.4.6 passes the
 array behavior controls, dictionary protocols and affected extension, geometry, JSON, editor and
-reflection fixtures. Allocation assertions require an allocating positive control.
+reflection fixtures. The affected protobuf host fixtures pass 209 tests for each oracle version. Allocation assertions
+require an allocating positive control; allocation-only inconclusive results remain unqualified.
 
 Host controls observe interface enumerator allocations and zero enumerator allocations for the
 documented optimized shapes. The connected editor's allocation controls report zero even when

@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using UnityEngine.Rendering;
     using UnityEngine.TestTools;
     using UnityEngine.UIElements;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Tools;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -668,7 +669,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 search.value = query;
                 yield return null;
                 PumpPolicyLayout(window);
-                foreach (AnalyzerPolicy policy in AnalyzerPolicyWindow.GetPolicies())
+                foreach (
+                    AnalyzerPolicy policy in AnalyzerPolicyWindow
+                        .GetPolicies()
+                        .AsValueEnumerableRequired()
+                )
                 {
                     DisplayStyle expected = string.Equals(
                         policy.Id,
@@ -688,7 +693,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             search.value = string.Empty;
             yield return null;
             PumpPolicyLayout(window);
-            foreach (AnalyzerPolicy policy in AnalyzerPolicyWindow.GetPolicies())
+            foreach (
+                AnalyzerPolicy policy in AnalyzerPolicyWindow
+                    .GetPolicies()
+                    .AsValueEnumerableRequired()
+            )
             {
                 Assert.That(
                     window.GetPolicyRow(policy.Id).style.display.value,
@@ -810,7 +819,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.That(File.Exists(GetRulesetPath()), Is.True);
             Assert.That(dropdown.value, Is.EqualTo("Warning"));
             Assert.That(ReferenceEquals(dropdown, window.GetSeverityField("WUH001")), Is.True);
-            foreach (AnalyzerPolicy policy in AnalyzerPolicyWindow.GetPolicies())
+            foreach (
+                AnalyzerPolicy policy in AnalyzerPolicyWindow
+                    .GetPolicies()
+                    .AsValueEnumerableRequired()
+            )
             {
                 Assert.That(window.GetSeverityField(policy.Id).value, Is.EqualTo("Warning"));
             }

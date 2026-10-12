@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             for (int index = 0; index < total; ++index)
             {
                 source.SetValue(index, indices);
-                for (int dimension = rank - 1; dimension >= 0; --dimension)
+                for (int dimension = rank - 1; 0 <= dimension; --dimension)
                 {
                     ++indices[dimension];
                     if (indices[dimension] < lowerBounds[dimension] + lengths[dimension])

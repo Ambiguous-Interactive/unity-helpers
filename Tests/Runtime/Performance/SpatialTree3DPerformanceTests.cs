@@ -148,7 +148,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             lines.Add(string.Empty);
             lines.Add("<!-- tabs:start -->");
             lines.Add(string.Empty);
-            foreach ((DatasetSpec dataset, List<string> datasetLines) in datasetOutputs)
+            foreach (
+                (
+                    DatasetSpec dataset,
+                    List<string> datasetLines
+                ) in datasetOutputs.AsValueEnumerableRequired()
+            )
             {
                 lines.Add($"#### **{dataset.Label}**");
                 lines.Add(string.Empty);
@@ -375,7 +380,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 readmeLines.Add("  <thead>");
                 readmeLines.Add("    <tr>");
                 readmeLines.Add($"      <th align=\"left\">{header}</th>");
-                foreach (string treeName in treeNames)
+                foreach (string treeName in treeNames.AsValueEnumerableRequired())
                 {
                     readmeLines.Add($"      <th align=\"right\">{treeName}</th>");
                 }
@@ -409,7 +414,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     htmlRow.Append("    <tr><td align=\"left\">");
                     htmlRow.Append(label);
                     htmlRow.Append("</td>");
-                    foreach (string name in treeNames)
+                    foreach (string name in treeNames.AsValueEnumerableRequired())
                     {
                         string cellValue = values.TryGetValue(name, out string v)
                             ? v

@@ -1178,7 +1178,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 for (int x = 0; x < gridWidth; ++x)
                 {
                     bool inCavity = false;
-                    foreach (CavityRect cavity in cavities)
+                    foreach (CavityRect cavity in cavities.AsValueEnumerableRequired())
                     {
                         if (cavity.Contains(x, y))
                         {

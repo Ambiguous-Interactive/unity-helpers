@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// Asserts that every protobuf-net contract this package ships has an exactly-corresponding
@@ -157,7 +158,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             >(StringComparer.Ordinal);
             foreach (ContractDeclaration contract in all)
             {
-                foreach (KeyValuePair<string, string> subtype in contract.Subtypes)
+                foreach (
+                    KeyValuePair<
+                        string,
+                        string
+                    > subtype in contract.Subtypes.AsValueEnumerableRequired()
+                )
                 {
                     if (!declaredBySubtypes.TryGetValue(subtype.Key, out HashSet<string> entries))
                     {
@@ -282,7 +288,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     );
                 }
 
-                foreach (MemberDeclaration member in contract.Members)
+                foreach (MemberDeclaration member in contract.Members.AsValueEnumerableRequired())
                 {
                     Compare(
                         failures,
@@ -1221,7 +1227,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 List<KeyValuePair<string, string>> declared =
                     new List<KeyValuePair<string, string>>();
-                foreach (AttributeSyntax attribute in attributes)
+                foreach (AttributeSyntax attribute in attributes.AsValueEnumerableRequired())
                 {
                     if (
                         !string.Equals(
