@@ -3,6 +3,12 @@
 const fs = require("node:fs");
 
 const requiredWorkflows = ["unity-tests.yml", "local-gates.yml", "repo-lint.yml"];
+const independentWorkflows = [
+  "build-publish-devcontainer.yml",
+  "deploy-pages.yml",
+  "deploy-wiki.yml",
+  "sync-issue-template.yml"
+];
 const marker = "<!-- unity-helpers:auto-publish -->";
 
 function releaseCandidate(event, pulls, version, repository) {
@@ -43,7 +49,8 @@ function validationState(runs, sha, branch, repository) {
       run.event !== "push" ||
       run.head_sha !== sha ||
       run.head_branch !== branch ||
-      run.repository?.full_name !== repository
+      run.repository?.full_name !== repository ||
+      independentWorkflows.some((file) => run.path === `.github/workflows/${file}`)
     ) {
       continue;
     }
@@ -195,6 +202,7 @@ if (require.main === module) {
 module.exports = {
   autoPublish,
   createApi,
+  independentWorkflows,
   marker,
   releaseCandidate,
   requiredWorkflows,

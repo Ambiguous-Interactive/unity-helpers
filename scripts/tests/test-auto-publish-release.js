@@ -6,6 +6,7 @@ const path = require("node:path");
 const {
   autoPublish,
   createApi,
+  independentWorkflows,
   marker,
   releaseCandidate,
   requiredWorkflows,
@@ -116,6 +117,32 @@ assert.equal(
 assert.equal(
   validationState([...runs, { ...extra, conclusion: "skipped" }], sha, "main", repository),
   "passed"
+);
+for (const file of independentWorkflows) {
+  for (const [status, conclusion] of [
+    ["completed", "cancelled"],
+    ["completed", "failure"],
+    ["in_progress", null]
+  ]) {
+    assert.equal(
+      validationState(
+        [...runs, { ...extra, path: `.github/workflows/${file}`, status, conclusion }],
+        sha,
+        "main",
+        repository
+      ),
+      "passed"
+    );
+  }
+}
+assert.equal(
+  validationState(
+    [...runs, { ...extra, path: ".github/workflows/new-validation.yml", conclusion: "failure" }],
+    sha,
+    "main",
+    repository
+  ),
+  "failed"
 );
 assert.equal(
   validationState(
@@ -346,10 +373,13 @@ async function main() {
     "Every push workflow completion must wake publication."
   );
   assert.equal(workflow.jobs.publish.permissions.contents, "write");
-  for (const file of requiredWorkflows) {
+  for (const file of fs
+    .readdirSync(path.join(root, ".github/workflows"))
+    .filter((file) => file.endsWith(".yml") && !independentWorkflows.includes(file))) {
     const validation = yaml.parse(
       fs.readFileSync(path.join(root, ".github/workflows", file), "utf8")
     );
+    if (!validation.on?.push) continue;
     assert.ok(validation.concurrency.group.includes("github.event_name == 'push' && github.sha"));
     assert.equal(
       validation.concurrency["cancel-in-progress"],
