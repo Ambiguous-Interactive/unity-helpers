@@ -11,8 +11,9 @@
 For reaching package types and running fixtures at all, see
 [unity-mcp-fixture-runner](./unity-mcp-fixture-runner.md).
 
-**Time is measurable here; allocation is not.** Run a control FIRST and let it decide whether the
-platform can be measured, rather than asserting the subject and hoping.
+**Qualify each instrument separately.** Time and profiler allocation counts can be observable;
+thread allocated-byte counters and heap deltas remain unsuitable here. Run a control FIRST and
+let it decide whether the platform can be measured, rather than asserting the subject and hoping.
 
 - **Gate every measurement on a member only the variant under test declares, and print the gate.**
   This session probed for `RelationalComponentAssigner.ComputeHasRelationalAssignments` and the
@@ -29,7 +30,7 @@ platform can be measured, rather than asserting the subject and hoping.
   has and refuse to print numbers otherwise. For a before/after, that means checking the old sources
   out (`git checkout main -- Runtime Tests`), confirming the _old_ symbol is the loaded one, and
   measuring it the same way rather than trusting a figure recorded earlier.
-- **Allocation is not measurable here, and the reason is not the one recorded first.** Session 215
+- **Heap and thread-byte probes do not establish allocation.** Session 215
   said the counters "are not implemented on this Mono"; session 216 refuted that. They are
   **quantized to heap blocks**: on `6000.4.6f1`, `Profiler.GetMonoUsedSizeLong()` and
   `GC.GetTotalMemory(false)` both read **0** for a 64 KB control and both read **134,361,088** for a
@@ -40,9 +41,19 @@ platform can be measured, rather than asserting the subject and hoping.
   over 3M calls put the _non-allocating_ control at a **174 MB** delta, larger than the allocating
   path's 59 MB, because editor background activity swamps the signal.
 
-  So: time is measurable here, allocation is not. **Always run a control that allocates a known
+  These heap and thread-byte probes do not measure allocation here. **Always run a control that allocates a known
   amount and refuse to believe any allocation number whose control did not move** -- that one habit
-  caught all three of these. Leave allocation gates to the Docker legs and CI.
+  caught all three of these. Leave Release-player allocation gates to the Docker legs and CI.
+
+- **Profiler counts are a separate instrument.** On `6000.4.6f1`, a `GC.Alloc` recorder in
+  `ProfilerCategory.Memory` with `CollectOnlyOnCurrentThread` records 128 fresh boxes and zero
+  preboxed assignments over 128 calls. Nine actual PlayMode traversal cases at 1/16/4096 elements
+  repeat both controls and before/after paths three times; interface traversal records 128
+  allocations and value traversal zero. Warm float/double list statistics also record zero;
+  Base64 records one returned-string allocation per call. Stop before reading samples, sum their
+  `Count`, reject `WrappedAround`, and dispose the recorder. Its timing `Value` is not bytes.
+  Unity's allocation counters are unavailable in Release players; these editor observations do
+  not qualify Release-player allocation. Preserve separate byte-counter controls and their skips.
 
 - **A probe that serializes is a probe that mutates the editor.** `RuntimeTypeModel.Default` is
   process-global and freezes a type the first time it serializes one, so a diagnostic

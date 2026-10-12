@@ -97,9 +97,13 @@ lists and near parity at 4,096 elements. They preserve zero warm managed allocat
 positive controls. These host observations do not qualify Unity Release-player performance.
 The current Base64 host measurements show reduced cost for short inputs and
 near parity for large or rejected inputs, with unchanged allocation. They do not qualify Unity
-Release-player performance. The connected editor's allocation counter fails retained-box controls;
-its zero readings are unqualified. Floor/latest Release-player timing, allocation, retention and
-callback acceptance remains open before stronger adoption claims.
+Release-player performance. The connected editor's thread byte counter fails retained-box controls;
+its zero readings are unqualified. A separate `GC.Alloc` profiler-count probe observes 128 fresh
+boxes and zero preboxed assignments over 128 calls in three trials. Warm float/double list
+statistics at 1, 16 and 4,096 elements record zero allocations; Base64 records one returned-string
+allocation per call. These are editor counts, not byte measurements or Release-player qualification.
+Floor/latest Release-player timing, allocation, retention and callback acceptance remains open
+before stronger adoption claims.
 
 ## Release-Player Channel Qualification
 

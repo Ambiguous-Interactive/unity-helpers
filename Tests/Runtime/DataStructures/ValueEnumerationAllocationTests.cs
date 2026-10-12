@@ -6,12 +6,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System;
     using System.Collections.Generic;
     using NUnit.Framework;
+    using Unity.Profiling;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
 
     [TestFixture]
     public sealed class ValueEnumerationAllocationTests
     {
+        private const int ProfilerCalls = 128;
+        private const int ProfilerCapacity = 512;
+
         private static int _observedSum;
 
         private static void Consume(IEnumerable<int> source, bool wrapped)
@@ -51,6 +55,85 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             return GC.GetAllocatedBytesForCurrentThread() - before;
 #endif
+        }
+
+        private static long MeasureProfilerAllocationCount(Action action)
+        {
+            for (int index = 0; index < 64; ++index)
+            {
+                action();
+            }
+            using ProfilerRecorder recorder = ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                ProfilerCapacity,
+                ProfilerRecorderOptions.CollectOnlyOnCurrentThread
+            );
+            if (!recorder.Valid)
+            {
+                Assert.Ignore("This runtime does not expose the GC.Alloc marker.");
+            }
+            for (int index = 0; index < ProfilerCalls; ++index)
+            {
+                action();
+            }
+            recorder.Stop();
+            Assert.IsFalse(
+                recorder.WrappedAround,
+                "Allocation samples exceeded recorder capacity."
+            );
+            long count = 0;
+            for (int index = 0; index < recorder.Count; ++index)
+            {
+                count += recorder.GetSample(index).Count;
+            }
+            return count;
+        }
+
+        [TestCase(0, 1)]
+        [TestCase(0, 16)]
+        [TestCase(0, 4096)]
+        [TestCase(1, 1)]
+        [TestCase(1, 16)]
+        [TestCase(1, 4096)]
+        [TestCase(2, 1)]
+        [TestCase(2, 16)]
+        [TestCase(2, 4096)]
+        public void InterfaceEnumerationAvoidsObservableProfilerAllocations(int shape, int length)
+        {
+            object[] retained = new object[1];
+            object preboxed = 42;
+            Action allocate = () => retained[0] = (object)42;
+            Action reuse = () => retained[0] = preboxed;
+            for (int trial = 0; trial < 3; ++trial)
+            {
+                long positive = MeasureProfilerAllocationCount(allocate);
+                if (positive == 0)
+                {
+                    Assert.Ignore("The GC.Alloc marker did not observe fresh retained boxes.");
+                }
+                Assert.AreEqual(ProfilerCalls, positive, "Fresh-box positive control.");
+                Assert.AreEqual(0, MeasureProfilerAllocationCount(reuse), "Preboxed control.");
+            }
+
+            int[] values = new int[length];
+            for (int index = 0; index < values.Length; ++index)
+            {
+                values[index] = index + 1;
+            }
+            IEnumerable<int> source =
+                shape == 0 ? values
+                : shape == 1 ? new List<int>(values)
+                : new HashSet<int>(values);
+            Action original = () => Consume(source, false);
+            Action wrapped = () => Consume(source, true);
+            for (int trial = 0; trial < 3; ++trial)
+            {
+                Assert.AreEqual(ProfilerCalls, MeasureProfilerAllocationCount(original));
+                Assert.AreEqual(0, MeasureProfilerAllocationCount(wrapped));
+                Assert.AreEqual(length * (length + 1) / 2, _observedSum);
+            }
+            GC.KeepAlive(retained);
         }
 
         [TestCase(0)]

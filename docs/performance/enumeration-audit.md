@@ -127,7 +127,15 @@ reflection fixtures. The affected protobuf host fixtures pass 209 tests for each
 require an allocating positive control; allocation-only inconclusive results remain unqualified.
 
 Host controls observe interface enumerator allocations and zero enumerator allocations for the
-documented optimized shapes. The connected editor's allocation controls report zero even when
-allocation is expected, so its allocation channel is unqualified. Editor skips are not proof of
-zero allocation. Host and editor timing observations do not establish Release-player or IL2CPP
-performance, and the CSV does not claim that every value-returning operation is allocation-free.
+documented optimized shapes. The connected editor's thread byte counter reports zero even when
+allocation is expected, so that channel remains unqualified. Its `GC.Alloc` profiler marker does
+observe allocation counts: nine PlayMode cases cover arrays, lists and hash sets at 1, 16 and 4,096
+elements. Each case repeats fresh-box, preboxed and traversal controls three times. The ordinary
+interface path records 128 allocations over 128 calls; the value path records zero. Recorder
+overflow fails the test, and an unavailable or inert marker skips it. The three older byte-counter
+cases still skip. Counts are not byte measurements, and skips are not proof of zero allocation.
+
+Unity documents its allocation counters as unavailable in
+[Release players](https://docs.unity3d.com/6000.0/Documentation/Manual/profiler-counters-reference.html).
+These editor results do not qualify Release-player or IL2CPP performance, and the CSV does not
+claim that every value-returning operation is allocation-free.
