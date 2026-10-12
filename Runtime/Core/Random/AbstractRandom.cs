@@ -1457,16 +1457,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
             }
 
-            return new RandomState(
-                state1,
-                state2,
-                _cachedGaussian,
-                payload: payloadCopy,
-                bitBuffer: _bitBuffer,
-                bitCount: _bitCount,
-                byteBuffer: _byteBuffer,
-                byteCount: _byteCount
-            );
+            return CreateSnapshot(state1, state2, payloadCopy);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1523,6 +1514,29 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 2 => NextBool() ? values[0] : values[1],
                 _ => values[Next(count)],
             };
+        }
+
+        internal RandomState BuildStateFromSpan(
+            ulong state1,
+            ulong state2,
+            ReadOnlySpan<byte> payload
+        )
+        {
+            return CreateSnapshot(state1, state2, payload.ToArray());
+        }
+
+        private RandomState CreateSnapshot(ulong state1, ulong state2, byte[] payload)
+        {
+            return new RandomState(
+                state1,
+                state2,
+                _cachedGaussian,
+                payload: payload,
+                bitBuffer: _bitBuffer,
+                bitCount: _bitCount,
+                byteBuffer: _byteBuffer,
+                byteCount: _byteCount
+            );
         }
 
         private T RandomOf<T>(ReadOnlySpan<T> values)

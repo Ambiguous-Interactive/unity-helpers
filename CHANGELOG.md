@@ -112,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Reduce random-state snapshot overhead for FlurryBurst, PhotonSpin and StormDrop while preserving independent saved payloads ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Avoid disposal tracking when `StandardDeviation` snapshots float and double lists, preserving numeric results and source contents ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Reduce Base64 decoding overhead with a privately owned array returned in `finally`, preserving strict UTF-8 handling ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Reduce `IntMap` lookup collisions with a 0.25 load limit, using more table storage while keeping the default 64 slots. Allow longer performance-test calibration windows while preserving the 20 ms default ([#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926)).

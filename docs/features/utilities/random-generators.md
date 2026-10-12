@@ -69,6 +69,10 @@ constructor that takes one back. Snapshot mid-stream, store the snapshot in your
 restored generator resumes the exact sequence, verified for all of them by
 `GeneratorSnapshotRestoreTests`.
 
+`FlurryBurstRandom`, `PhotonSpinRandom` and `StormDropRandom` copy their logical payload directly
+into an independent saved array. Snapshot creation uses no pooled scratch buffer. Existing payload
+layouts, cached Gaussian samples and partly consumed bool and byte reservoirs remain compatible.
+
 For the 20 managed generators, `Copy()`, snapshot construction, and protobuf restoration retain
 pending Gaussian samples and partly consumed bool and byte reservoirs. Mixed draws continue with
 the same values and state, whether those caches are empty or primed. `WyRandom.Copy()` now preserves

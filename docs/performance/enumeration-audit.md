@@ -7,7 +7,7 @@ its source hash, compiler binding, concrete enumerator type and retained-allocat
 
 ## Coverage
 
-The inventory covers 2,557 C# files and 3,473 distinct `foreach` or explicit `GetEnumerator` sites.
+The inventory covers 2,559 C# files and 3,475 distinct `foreach` or explicit `GetEnumerator` sites.
 Syntax discovery parses every combination of conditional symbols in each file, deduplicating sites
 by path, source offset and syntax kind. It includes tracked sources and the new enumeration files;
 generated build outputs are excluded.
@@ -22,7 +22,7 @@ unresolved enumerators or compilation errors in its input compilations:
 - The Odin editor-test configuration binds the remaining conditional array traversal.
 - The shipped protobuf generator runs before semantic analysis where source generation is needed.
 
-The authored CSV includes the current variance ownership and statistics-test changes. Source hashes
+The authored CSV includes the current variance and random-snapshot ownership changes. Source hashes
 detect when a row needs another audit; it is not a permanent allowlist or a check that silently
 accepts later code. The two samples and acceptance templates are
 included explicitly because Unity does not import those package folders automatically.
@@ -31,7 +31,7 @@ included explicitly because Unity does not import those package folders automati
 
 | Binding                  | Sites | Interpretation                                                           |
 | ------------------------ | ----: | ------------------------------------------------------------------------ |
-| Compiler-indexed arrays  | 1,244 | No enumerator object; element conversions can still box                  |
+| Compiler-indexed arrays  | 1,246 | No enumerator object; element conversions can still box                  |
 | Compiler-indexed strings |    22 | UTF-16 character indexing; no enumerator object                          |
 | Value return             | 1,830 | Concrete value protocol, with source and traversal-storage caveats below |
 | Reference return         |   377 | 242 reviewed test sites and 135 retained production sites                |
