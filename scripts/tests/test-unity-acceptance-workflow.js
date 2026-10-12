@@ -15,7 +15,7 @@ assert.match(option, /^        default: "none"$/m);
 assert.match(option, /^        type: choice$/m);
 assert.deepEqual(
   [...option.matchAll(/^          - (\w+)$/gm)].map((match) => match[1]),
-  ["none", "sentinel", "intmap", "serialization", "nullableconsumer", "all"]
+  ["none", "sentinel", "intmap", "serialization", "nullableconsumer", "borrowed", "all"]
 );
 const job = workflow.match(/^  unity-tests:\n([\s\S]*?)(?=^  [\w-]+:\n)/m)?.[1];
 assert.ok(job, "Default licensed job must exist");
@@ -95,6 +95,7 @@ for (const event of ["pull_request", "push", "workflow_dispatch"]) {
     "intmap",
     "serialization",
     "nullableconsumer",
+    "borrowed",
     "all"
   ]) {
     for (const requested of [undefined, false, true]) {
@@ -124,6 +125,7 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
     "intmap",
     "serialization",
     "nullableconsumer",
+    "borrowed",
     "all"
   ]) {
     for (const unityVersion of ["2021.3.45f1", "2022.3.45f1", "6000.6.0f1"]) {
@@ -146,9 +148,14 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
             };
             const requested =
               event === "workflow_dispatch" &&
-              ["sentinel", "intmap", "serialization", "nullableconsumer", "all"].includes(
-                acceptance
-              ) &&
+              [
+                "sentinel",
+                "intmap",
+                "serialization",
+                "nullableconsumer",
+                "borrowed",
+                "all"
+              ].includes(acceptance) &&
               (acceptance !== "nullableconsumer" ||
                 ["2021.3.45f1", "6000.6.0f1"].includes(unityVersion));
             const expected = [

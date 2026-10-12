@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'all')]
+    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'borrowed', 'all')]
     [string]$Acceptance,
     [Parameter(Mandatory = $true)]
     [string]$ArtifactsPath,
@@ -17,6 +17,36 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if ($Acceptance -eq 'nullableconsumer') {
     & (Join-Path $PSScriptRoot 'verify-nullable-consumer.ps1') -ArtifactsPath $ArtifactsPath -Commit $Commit -UnityVersion $UnityVersion -Repository $Repository
+    return
+}
+if ($Acceptance -eq 'borrowed') {
+    $directory = Join-Path $ArtifactsPath 'borrowed'
+    $declarationPath = Join-Path $directory 'declaration.json'
+    $declaration = Get-Content -LiteralPath $declarationPath -Raw | ConvertFrom-Json
+    $reports = @(Get-ChildItem -LiteralPath $directory -Filter 'provenance.json' -File -Recurse)
+    if ($reports.Count -ne 1) { throw 'Borrowed acceptance requires exactly one frozen-player provenance report.' }
+    $report = Get-Content -LiteralPath $reports[0].FullName -Raw | ConvertFrom-Json
+    $declarationHash = (Get-FileHash -LiteralPath $declarationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $expectedBackend = if ($UnityVersion -like '2021.3.*') { 'Mono2x' } else { 'IL2CPP' }
+    if ($declaration.SourceCommit -cne $Commit -or $declaration.UnityVersion -cne $UnityVersion -or
+        $declaration.Backend -cne $expectedBackend -or $report.DeclarationSha256 -cne $declarationHash -or
+        $report.RunId -cne $declaration.RunId -or $report.RequestedUnityVersion -cne $UnityVersion -or
+        $report.RequestedBackend -cne $expectedBackend -or $report.ProvenanceStableState -cne 'passed' -or
+        $report.JointCorrectness.State -cne 'passed' -or $report.RuntimeRecordJoinState -cne 'passed' -or
+        $report.CorrectnessCorpusConsumptionState -cne 'passed' -or
+        -not $report.LaunchAttempted -or -not $report.InvocationObserved -or -not $report.ResultsValidated -or
+        $null -ne $report.ExecutionError -or $report.CampaignEligible -or $report.AdoptionEligible) {
+        throw 'Borrowed channel qualification lacks matching source, current invocation, correctness or stable payload evidence.'
+    }
+    $preflight = @($report.RuntimeJoin.RawRecords | Where-Object { $_.Marker -ceq 'BORROWED_PREFLIGHT' })
+    if ($preflight.Count -ne 1 -or $preflight[0].Record.RuntimeIdentity.Commit -cne $Commit -or
+        $preflight[0].Record.RuntimeReleasePlayerState -cne 'passed' -or
+        $preflight[0].Record.ClockState -cne 'passed' -or $preflight[0].Record.AllocatedBytesState -cne 'passed') {
+        throw 'Borrowed acceptance requires qualified Release-player clock and allocating positive controls.'
+    }
+    [ordered]@{ borrowed = 'passed'; SourceCommit = $Commit; UnityVersion = $UnityVersion
+        Backend = $expectedBackend; ChannelQualification = 'passed'; CampaignEligible = $false; AdoptionEligible = $false } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ArtifactsPath 'acceptance-summary.json')
     return
 }
 $selected = if ($Acceptance -eq 'all') { @('sentinel', 'capture', 'intmap', 'serialization', 'owners') } elseif ($Acceptance -eq 'serialization') { @('serialization', 'owners') } elseif ($Acceptance -eq 'sentinel') { @('sentinel', 'capture') } else { @($Acceptance) }

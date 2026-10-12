@@ -90,3 +90,17 @@ near parity for large or rejected inputs, with unchanged allocation. They do not
 Release-player performance. The connected editor's allocation counter fails retained-box controls;
 its zero readings are unqualified. Floor/latest Release-player timing, allocation, retention and
 callback acceptance remains open before stronger adoption claims.
+
+## Release-Player Channel Qualification
+
+The manual Unity Tests workflow accepts `acceptance: borrowed`. It runs exactly the existing
+clock/allocation preflight, 35-row decoder comparison and private/borrowed lease control.
+The 2021.3 floor uses Mono; later versions use IL2CPP. Older IL2CPP allocation counters remain
+unsupported. Select one Unity version and `test-mode: standalone` to keep the run focused.
+
+The profile freezes tracked runtime, editor and test inputs plus the canonical 47-row corpus.
+The existing runner checks those inputs and the complete player payload around build and launch.
+Verification requires all three native cases, stable provenance, matching runtime/corpus records
+and working clock/allocation positive controls. Skipped, inert or unmatched results fail qualification.
+The summary keeps campaign and adoption eligibility false: these channel controls do not measure
+whole-call gains, retained memory, code size or startup/callback effects.

@@ -43,6 +43,7 @@ on:
           - intmap
           - serialization
           - nullableconsumer
+          - borrowed
           - all
       fresh-conversion:
         description: "Clear Standalone compilation outputs before IL2CPP acceptance builds."

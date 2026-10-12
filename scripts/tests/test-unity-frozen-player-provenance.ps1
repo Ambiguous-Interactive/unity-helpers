@@ -67,8 +67,11 @@ function Start-ControlContext {
 $requiredNames = @(
     'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.BorrowedBufferPreflightTests.ReleasePlayerChannelsAreReported',
     'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.BorrowedDecoderMatchesShippedDecoderAcrossPoolBoundariesAndUtf8Failures',
-    'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.BorrowedWholeCallAvoidsLeaseWorkWithShippedPositiveControl'
+    'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.ProductionAndBorrowedWholeCallsAvoidLeaseWorkWithShippedPositiveControl'
 )
+$base64Source = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../Tests/Runtime/Extensions/BorrowedBase64Tests.cs') -Raw
+Assert-Control ($base64Source.Contains('public void ProductionAndBorrowedWholeCallsAvoidLeaseWorkWithShippedPositiveControl()')) 'joint correctness selects the current native lease control'
+Assert-Control ($base64Source.Contains('verifiedRows * 3,')) 'correctness record includes all three decoders'
 function Write-ControlResults {
     param([string]$Path, [string[]]$Names = $requiredNames, [string]$LeafResult = 'Passed', [string]$RootResult = 'Passed', [int]$RootPassed = 3, [string]$Extra = '')
     $leaves = ($Names | ForEach-Object { "<test-case fullname=`"$_`" result=`"$LeafResult`"/>" }) -join ''
@@ -95,7 +98,7 @@ function New-RuntimeRecords {
         ActualCorpusSha256 = $Context.Declaration.CanonicalCorpus.Sha256
         RuntimeIdentity = [ordered]@{ UnityVersion = '6000.6.0f1'; Backend = 'Mono'; Platform = 'WindowsPlayer'; ProcessBits = 64; IsEditor = $false; DevelopmentBuild = $false }
     }
-    $correctness = [ordered]@{ SchemaVersion = 1; CorpusSha256 = $Context.Declaration.CanonicalCorpus.Sha256; VerifiedRows = 35; DecoderAssertions = 70; DeclaredCampaignRows = 12 }
+    $correctness = [ordered]@{ SchemaVersion = 1; CorpusSha256 = $Context.Declaration.CanonicalCorpus.Sha256; VerifiedRows = 35; DecoderAssertions = 105; DeclaredCampaignRows = 12 }
     return [pscustomobject]@{ Preflight = $preflight; Correctness = $correctness }
 }
 function Write-RuntimeRecords {
@@ -297,7 +300,7 @@ try {
             'wrong-actual-corpus', 'wrong-version', 'wrong-backend', 'wrong-platform', 'editor', 'development', 'process32',
             'string-editor', 'string-schema', 'float-schema', 'bool-schema', 'string-count', 'float-count', 'bool-count',
             'string-process-bits', 'float-process-bits', 'bool-process-bits', 'missing-identity', 'array-run-id', 'array-runtime-version',
-            'array-anchor-digest', 'array-correctness-digest', 'escaped-duplicate-key', 'embedded-prefix', 'deep-json', 'wrong-correctness-digest', 'wrong-row-count', 'wrong-assertion-count', 'wrong-campaign-count')) {
+            'array-anchor-digest', 'array-correctness-digest', 'escaped-duplicate-key', 'embedded-prefix', 'deep-json', 'wrong-correctness-digest', 'wrong-row-count', 'wrong-assertion-count', 'stale-two-decoder-count', 'wrong-campaign-count')) {
         $changed = New-RuntimeRecords $context
         switch ($kind) {
             'wrong-run' { $changed.Preflight.FrozenRunId = 'another-run' }
@@ -327,7 +330,8 @@ try {
             'array-correctness-digest' { $changed.Correctness.CorpusSha256 = @($context.Declaration.CanonicalCorpus.Sha256) }
             'wrong-correctness-digest' { $changed.Correctness.CorpusSha256 = '0' * 64 }
             'wrong-row-count' { $changed.Correctness.VerifiedRows = 34 }
-            'wrong-assertion-count' { $changed.Correctness.DecoderAssertions = 69 }
+            'wrong-assertion-count' { $changed.Correctness.DecoderAssertions = 104 }
+            'stale-two-decoder-count' { $changed.Correctness.DecoderAssertions = 70 }
             'wrong-campaign-count' { $changed.Correctness.DeclaredCampaignRows = 11 }
         }
         Write-RuntimeRecords $log $changed

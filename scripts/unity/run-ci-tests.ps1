@@ -3281,8 +3281,8 @@ function Get-FrozenPlayerRuntimeJoin {
                 throw 'Runtime compiled anchor, actual corpus, or Release Windows x64 identity does not match the frozen declaration.'
             }
             if ($corpus.SchemaVersion -ne 1 -or $corpus.CorpusSha256 -cne $expectedCorpus -or
-                $corpus.VerifiedRows -ne 35 -or $corpus.DecoderAssertions -ne 70 -or $corpus.DeclaredCampaignRows -ne 12) {
-                throw 'Correctness-corpus record must consume exactly 35 rows with 70 assertions and declare 12 campaign rows under the frozen digest.'
+                $corpus.VerifiedRows -ne 35 -or $corpus.DecoderAssertions -ne 105 -or $corpus.DeclaredCampaignRows -ne 12) {
+                throw 'Correctness-corpus record must consume exactly 35 rows with 105 assertions and declare 12 campaign rows under the frozen digest.'
             }
             $state = 'passed'
             $corpusState = 'passed'
@@ -3349,7 +3349,7 @@ function Get-FrozenPlayerJointCorrectness {
     $expected = @(
         'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.BorrowedBufferPreflightTests.ReleasePlayerChannelsAreReported',
         'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.BorrowedDecoderMatchesShippedDecoderAcrossPoolBoundariesAndUtf8Failures',
-        'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.BorrowedWholeCallAvoidsLeaseWorkWithShippedPositiveControl'
+        'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.ProductionAndBorrowedWholeCallsAvoidLeaseWorkWithShippedPositiveControl'
     )
     $leaves = @()
     $reason = $null

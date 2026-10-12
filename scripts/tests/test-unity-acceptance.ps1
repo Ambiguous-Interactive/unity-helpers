@@ -31,7 +31,9 @@ $fixturePaths = @(
     'Tests/Editor/Tools/WProtoSubtypeTagAssignerClassificationTests.cs',
     'Tests/Runtime/Serialization/WProtoCrossAssemblyTests.cs',
     'Tests/Runtime/Serialization/WProtoConsumerMigrationTests.cs',
-    'Tests/Runtime/Performance/IntMapPerformanceTests.cs'
+    'Tests/Runtime/Performance/IntMapPerformanceTests.cs',
+    'Tests/Runtime/Extensions/BorrowedBase64Tests.cs',
+    'Tests/Runtime/Performance/BorrowedBufferPreflightTests.cs'
 )
 try {
     Set-Content -LiteralPath (Join-Path $temporary 'assert-no-active-unity-editor.ps1') -Value @'
@@ -40,7 +42,7 @@ if ($env:ACCEPTANCE_CONTROL_ACTIVE -eq 'true') { throw 'Editor is already active
     Set-Content -LiteralPath (Join-Path $temporary 'run-ci-tests.ps1') -Value @'
 param($UnityVersion, $RepoRoot, $ArtifactsPath, $ReleaseCodeOptimization, $ReleasePlayerBuild,
     $Il2CppCompilerConfiguration, $ProjectPath, $TestMode, $AssemblyNames, $TestFilter,
-    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics)
+    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics, $TestCategory, $FrozenPlayerDeclarationPath)
 if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
     if ($env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne $ProjectPath -or
         [IO.File]::ReadAllText((Join-Path $ProjectPath '.sentinel-interaction-disposable')) -ne
@@ -87,6 +89,18 @@ if ($ManagedStrippingLevel -eq 'High') {
     if ($migrationCases -match 'NUnit|\[Test|\[Category|Tests\.Serialization|#if !ENABLE_IL2CPP') { throw 'Migration acceptance retained test-only declarations.' }
     $driver = Get-Content -LiteralPath (Join-Path $root 'Consumer/SerializationAcceptance.cs') -Raw
     if ($driver -notmatch 'UH_SERIALIZATION_ACCEPTANCE commit=[0-9a-f]{40}') { throw 'Native driver is not bound to source.' }
+}
+if ($TestFilter -match 'BorrowedBufferPreflightTests') {
+    $declaration = Get-Content -LiteralPath $FrozenPlayerDeclarationPath -Raw | ConvertFrom-Json
+    if ($TestCategory -ne '' -or $TestMode -ne 'standalone' -or
+        ($TestFilter -split ';').Count -ne 3 -or $declaration.SourceFiles.Count -lt 100 -or
+        $declaration.CorpusFiles.Count -ne 1 -or $declaration.Backend -ne $StandaloneScriptingBackend -or
+        $declaration.UnityVersion -ne $UnityVersion -or $declaration.SourceCommit -notmatch '^[0-9a-f]{40}$') {
+        throw 'Borrowed qualification lost its source/corpus declaration or exact control selection.'
+    }
+    if ($declaration.CorpusFiles[0].Sha256 -cne 'd3933603fc240334440040824a7d56316a4e5bafc0124c611cffa6daf2ef8052') {
+        throw 'Borrowed qualification uses a different corpus.'
+    }
 }
 $PSBoundParameters | ConvertTo-Json -Compress | Add-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
 if ($env:ACCEPTANCE_CONTROL_FAIL -eq $TestMode) { throw 'Injected native failure.' }
@@ -233,7 +247,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         throw 'Ephemeral project seeds must rewrite only a truncated zero-byte seed.'
     }
     $checks++
-    foreach ($selection in @('sentinel', 'intmap', 'serialization', 'all')) {
+    foreach ($selection in @('sentinel', 'intmap', 'serialization', 'borrowed', 'all')) {
         Remove-Item -LiteralPath $env:ACCEPTANCE_CONTROL_LOG -ErrorAction SilentlyContinue
         & $subject -Acceptance $selection -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..')
         $calls = @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG | ForEach-Object { $_ | ConvertFrom-Json })
@@ -243,7 +257,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             $fixtures = @($fixturePaths | Where-Object {
                 [IO.Path]::GetFileNameWithoutExtension($_) -in ($call.TestFilter -split '[.;]')
             })
-            $expectedFixtures = if ($call.TestFilter -match 'WProtoConsumerMigrationTests') { 2 } else { 1 }
+            $expectedFixtures = if ($call.TestFilter -match 'WProtoConsumerMigrationTests|BorrowedBufferPreflightTests') { 2 } else { 1 }
             if ($fixtures.Count -ne $expectedFixtures) { throw 'Acceptance must select every known source fixture.' }
             foreach ($fixturePath in $fixtures) {
                 $fixture = Get-Item -LiteralPath (Join-Path $PSScriptRoot "../../$fixturePath")
@@ -255,7 +269,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
                 }
                 if ($definitions.Count -ne 1) { throw 'Acceptance fixture needs one nearest owning asmdef.' }
                 $owner = Get-Content -LiteralPath $definitions[0].FullName -Raw | ConvertFrom-Json
-                if ($call.AssemblyNames -ne $owner.name) {
+                if ($owner.name -notin ($call.AssemblyNames -split ';')) {
                     throw "Acceptance fixture $($fixture.Name) belongs to $($owner.name), not $($call.AssemblyNames)."
                 }
                 $checks++
@@ -270,7 +284,8 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             if ($call.TestFilter -match 'ValidationWorkspaceInteractionTests' -and $call.AssemblyNames -ne 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
                 throw 'Sentinel filter must select its actual owning assembly.'
             }
-            if ($call.TestMode -eq 'standalone' -and $call.StandaloneScriptingBackend -ne 'IL2CPP') {
+            if ($call.TestMode -eq 'standalone' -and $call.StandaloneScriptingBackend -ne 'IL2CPP' -and
+                -not ($selection -eq 'borrowed' -and $call.StandaloneScriptingBackend -eq 'Mono2x')) {
                 throw 'IntMap must use IL2CPP.'
             }
         }
@@ -516,6 +531,57 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         if ($summary.decision -ne $expectedDecision -or
             ($control.Selection -eq 'all' -and $summary.sentinel -ne 'passed')) {
             throw 'Combined verification lost the raw timing decision or the successful Sentinel callback result.'
+        }
+        $checks++
+    }
+    $env:ACCEPTANCE_CONTROL_ACTIVE = 'false'
+    $env:ACCEPTANCE_CONTROL_START_ACTIVE = 'false'
+    $env:ACCEPTANCE_CONTROL_FAIL = ''
+    Remove-Item -LiteralPath (Join-Path $temporary 'borrowed') -Recurse -Force
+    & $subject -Acceptance borrowed -UnityVersion '6000.6.0f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..')
+    $latest = @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG | ForEach-Object { $_ | ConvertFrom-Json })[-1]
+    if ($latest.StandaloneScriptingBackend -ne 'IL2CPP' -or $latest.UnityVersion -ne '6000.6.0f1') {
+        throw 'Latest borrowed qualification must use Release IL2CPP.'
+    }
+    $checks++
+    $borrowedDirectory = Join-Path $temporary 'borrowed'
+    $declarationPath = Join-Path $borrowedDirectory 'declaration.json'
+    $declaration = Get-Content -LiteralPath $declarationPath -Raw | ConvertFrom-Json
+    $reportDirectory = Join-Path $borrowedDirectory ('frozen-player-' + $declaration.RunId)
+    $null = New-Item -ItemType Directory -Path $reportDirectory
+    $reportPath = Join-Path $reportDirectory 'provenance.json'
+    foreach ($shape in @('pass', 'wrong-commit', 'unstable-payload', 'no-invocation', 'failed-correctness', 'failed-join', 'inert-counter', 'rejected-clock', 'campaign-claim', 'duplicate-report')) {
+        $record = @{ RuntimeIdentity = @{ Commit = $declaration.SourceCommit }; RuntimeReleasePlayerState = 'passed'; ClockState = 'passed'; AllocatedBytesState = 'passed' }
+        $report = @{
+            DeclarationSha256 = (Get-FileHash -LiteralPath $declarationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            RunId = $declaration.RunId; RequestedUnityVersion = '6000.6.0f1'; RequestedBackend = 'IL2CPP'
+            ProvenanceStableState = 'passed'; JointCorrectness = @{ State = 'passed' }; RuntimeRecordJoinState = 'passed'
+            CorrectnessCorpusConsumptionState = 'passed'; LaunchAttempted = $true; InvocationObserved = $true
+            ResultsValidated = $true; ExecutionError = $null; CampaignEligible = $false; AdoptionEligible = $false
+            RuntimeJoin = @{ RawRecords = @(@{ Marker = 'BORROWED_PREFLIGHT'; Record = $record }) }
+        }
+        switch ($shape) {
+            'wrong-commit' { $record.RuntimeIdentity.Commit = '0' * 40 }
+            'unstable-payload' { $report.ProvenanceStableState = 'rejected' }
+            'no-invocation' { $report.InvocationObserved = $false }
+            'failed-correctness' { $report.JointCorrectness.State = 'rejected' }
+            'failed-join' { $report.RuntimeRecordJoinState = 'rejected' }
+            'inert-counter' { $record.AllocatedBytesState = 'rejected' }
+            'rejected-clock' { $record.ClockState = 'rejected' }
+            'campaign-claim' { $report.CampaignEligible = $true }
+        }
+        $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath
+        if ($shape -eq 'duplicate-report') { Copy-Item -LiteralPath $reportPath -Destination (Join-Path $borrowedDirectory 'provenance.json') }
+        $failed = $false
+        try {
+            & (Join-Path $PSScriptRoot '../unity/verify-acceptance.ps1') -Acceptance borrowed -ArtifactsPath $temporary -Commit $declaration.SourceCommit -UnityVersion '6000.6.0f1'
+        } catch { $failed = $true }
+        if ($failed -ne ($shape -ne 'pass')) { throw "Wrong borrowed channel qualification for $shape." }
+        if ($shape -eq 'pass') {
+            $summary = Get-Content -LiteralPath (Join-Path $temporary 'acceptance-summary.json') -Raw | ConvertFrom-Json
+            if ($summary.ChannelQualification -ne 'passed' -or $summary.CampaignEligible -or $summary.AdoptionEligible) {
+                throw 'Channel controls must not authorize candidate adoption.'
+            }
         }
         $checks++
     }

@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'all')]
+    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'borrowed', 'all')]
     [string]$Acceptance,
     [Parameter(Mandatory = $true)]
     [string]$UnityVersion,
@@ -248,6 +248,37 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Sibling
     }
 }
 
+function New-BorrowedPlayerDeclaration {
+    param([string]$Repository, [string]$ArtifactsPath, [string]$UnityVersion, [string]$Backend)
+
+    $commit = (& git -C $Repository rev-parse HEAD | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { throw 'Cannot bind borrowed acceptance to its source commit.' }
+    $paths = @(& git -C $Repository ls-files -- Runtime Editor Tests package.json scripts/unity/run-ci-tests.ps1 scripts/unity/run-acceptance.ps1)
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot inventory borrowed acceptance inputs.' }
+    $sourceFiles = @($paths | Where-Object { $_ -match '\.(cs|json|xml|rsp|ps1)$|\.(asmdef|asmref|dll)(\.meta)?$' } | Sort-Object -Unique | ForEach-Object {
+        @{ Path = $_; Sha256 = (Get-FileHash -LiteralPath (Join-Path $Repository $_) -Algorithm SHA256).Hash.ToLowerInvariant() }
+    })
+    if ($sourceFiles.Count -lt 100 -or $sourceFiles.Count -gt 4096) { throw 'Borrowed acceptance source inventory is empty or exceeds its bound.' }
+    $corpusPath = 'scripts/unity/borrowed-base64-corpus.bin'
+    $corpus = Get-Item -LiteralPath (Join-Path $Repository $corpusPath)
+    $corpusHash = (Get-FileHash -LiteralPath $corpus.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($corpus.Length -ne 148757 -or $corpusHash -cne 'd3933603fc240334440040824a7d56316a4e5bafc0124c611cffa6daf2ef8052') {
+        throw 'Borrowed acceptance requires the exact canonical 47-row corpus.'
+    }
+    $null = New-Item -ItemType Directory -Force -Path $ArtifactsPath
+    $path = Join-Path $ArtifactsPath 'declaration.json'
+    if (Test-Path -LiteralPath $path) { throw 'Borrowed acceptance declaration already exists.' }
+    $declaration = [ordered]@{
+        SchemaVersion = 1; RunId = 'borrowed-' + [Guid]::NewGuid().ToString('N')
+        UnityVersion = $UnityVersion; Backend = $Backend; SourceCommit = $commit
+        SourceFiles = $sourceFiles
+        CorpusFiles = @(@{ Path = $corpusPath; Sha256 = $corpusHash })
+        CanonicalCorpusPath = $corpusPath
+    }
+    [IO.File]::WriteAllText($path, (ConvertTo-Json -InputObject $declaration -Depth 5))
+    return $path
+}
+
 if ($Acceptance -eq 'nullableconsumer') {
     & (Join-Path $PSScriptRoot 'run-nullable-consumer.ps1') -UnityVersion $UnityVersion -UnityEditorPath $env:UNITY_EDITOR_PATH -Repository $Repository -TemporaryRoot $TemporaryRoot -ArtifactsPath $ArtifactsPath
     return
@@ -342,6 +373,12 @@ foreach ($kind in $selected) {
                 $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime'
                 $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests;WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests'
                 Initialize-SerializationAcceptanceProject -Project $ownedProject -Repository $Repository
+            } elseif ($kind -eq 'borrowed') {
+                $parameters.StandaloneScriptingBackend = if ($UnityVersion -like '2021.3.*') { 'Mono2x' } else { 'IL2CPP' }
+                $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime;WallstopStudios.UnityHelpers.Tests.Runtime.Performance'
+                $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.BorrowedBufferPreflightTests.ReleasePlayerChannelsAreReported;WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.BorrowedDecoderMatchesShippedDecoderAcrossPoolBoundariesAndUtf8Failures;WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.ProductionAndBorrowedWholeCallsAvoidLeaseWorkWithShippedPositiveControl'
+                $parameters.TestCategory = ''
+                $parameters.FrozenPlayerDeclarationPath = New-BorrowedPlayerDeclaration -Repository $Repository -ArtifactsPath $parameters.ArtifactsPath -UnityVersion $UnityVersion -Backend $parameters.StandaloneScriptingBackend
             } else {
                 $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance'
                 $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.IntMapPerformanceTests.IntMapLookupsComparedAgainstDictionary'
