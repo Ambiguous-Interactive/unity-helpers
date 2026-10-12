@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         internal static Dictionary<Type, AssetWatcher> CloneWatchers(
-            IReadOnlyDictionary<Type, AssetWatcher> source
+            Dictionary<Type, AssetWatcher> source
         )
         {
             Dictionary<Type, AssetWatcher> clones = new(source.Count);
@@ -170,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         internal static Queue<PendingAssetChangeSet> ClonePendingChanges(
-            IEnumerable<PendingAssetChangeSet> source
+            Queue<PendingAssetChangeSet> source
         )
         {
             Queue<PendingAssetChangeSet> clones = new();

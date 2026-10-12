@@ -41,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         }
 
         private static IEnumerable<string> BuildSummaryTable(
-            IEnumerable<RandomBenchmarkResult> orderedResults
+            List<RandomBenchmarkResult> orderedResults
         )
         {
             List<string> lines = new()
@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         }
 
         private static IEnumerable<string> BuildDetailTable(
-            IEnumerable<RandomBenchmarkResult> orderedResults
+            List<RandomBenchmarkResult> orderedResults
         )
         {
             List<string> lines = new()

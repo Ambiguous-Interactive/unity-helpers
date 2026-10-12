@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// A <see cref="LinkedList{T}"/>-backed <see cref="IList{T}"/> whose storage is not contiguous
@@ -45,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// <param name="items">The elements to append.</param>
         public void AddRange(IEnumerable<T> items)
         {
-            foreach (T item in items)
+            foreach (T item in items.AsValueEnumerableRequired())
             {
                 _chain.AddLast(item);
             }

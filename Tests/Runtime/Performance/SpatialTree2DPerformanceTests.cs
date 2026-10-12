@@ -373,7 +373,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static void LogTable(
             string header,
             IReadOnlyList<string> treeNames,
-            IEnumerable<string> rowKeys,
+            List<string> rowKeys,
             IReadOnlyDictionary<string, Dictionary<string, string>> rowValues,
             IReadOnlyDictionary<string, (string Group, string Label)> rowMetadata,
             ICollection<string> readmeLines

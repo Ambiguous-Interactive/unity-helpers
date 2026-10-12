@@ -224,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     source =>
                     {
                         CustomList<int> custom = new();
-                        foreach (int value in source)
+                        foreach (int value in source.AsValueEnumerableRequired())
                         {
                             custom.Add(value);
                         }

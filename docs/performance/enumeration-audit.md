@@ -7,7 +7,7 @@ its source hash, compiler binding, concrete enumerator type and retained-allocat
 
 ## Coverage
 
-The inventory covers 2,556 C# files and 3,473 distinct `foreach` or explicit `GetEnumerator` sites.
+The inventory covers 2,556 C# files and 3,466 distinct `foreach` or explicit `GetEnumerator` sites.
 Syntax discovery parses every combination of conditional symbols in each file, deduplicating sites
 by path, source offset and syntax kind. It includes tracked sources and the new enumeration files;
 generated build outputs are excluded.
@@ -30,10 +30,10 @@ included explicitly because Unity does not import those package folders automati
 
 | Binding                  | Sites | Interpretation                                                           |
 | ------------------------ | ----: | ------------------------------------------------------------------------ |
-| Compiler-indexed arrays  | 1,243 | No enumerator object; element conversions can still box                  |
+| Compiler-indexed arrays  | 1,244 | No enumerator object; element conversions can still box                  |
 | Compiler-indexed strings |    22 | UTF-16 character indexing; no enumerator object                          |
-| Value return             | 1,804 | Concrete value protocol, with source and traversal-storage caveats below |
-| Reference return         |   404 | 269 test-reference sites and 135 retained production sites               |
+| Value return             | 1,825 | Concrete value protocol, with source and traversal-storage caveats below |
+| Reference return         |   375 | 240 reviewed test sites and 135 retained production sites                |
 
 The changes avoid boxing for interface-held arrays, exact lists, exact hash sets and exact
 dictionaries. Custom sequences and derived collections retain their original acquisition,
@@ -43,8 +43,11 @@ internal calls; the public views deliberately treat null as empty.
 Explicit generic enumerators use the same value view. Internally owned generator lists keep their
 concrete type through five loops. Bit-set JSON writers avoid their iterator factories, regex
 scanning follows `NextMatch`, and private reflection results retain their array type. Sixty ordinary
-fixture traversals use the value view; seven enum-array loops keep their concrete element type.
-Independent traversal oracles and allocating controls retain their source protocol.
+fixture traversals use the value view; eight enum-array loops keep their concrete element type.
+A second fixture review removes 29 more reference traversals through concrete owned dictionaries,
+lists and queues, required value views, a typed enum array, regex matching and indexing fixed-size
+array-backed snapshots. Independent traversal oracles and allocating controls retain their source
+protocol.
 
 Untyped array traversal uses value enumeration for ranks one through three, including nonzero
 lower bounds and live element reads. Higher ranks retain the original BCL enumerator: the public
@@ -73,11 +76,23 @@ enumerator can allocate its internal stack. The 68 trie sites use pooled travers
 cold rents and growth can allocate, and string results can allocate. Other factories, conversions
 and loop bodies remain independent of the enumerator representation.
 
-Test reference sites include interface and custom-iterator contracts, compatibility returns,
-differential oracles, allocating positive controls and ordinary interface-held fixture inputs.
-The CSV identifies those references; it does not prove that every fixture input must retain a
-reference enumerator. Review the remaining test inputs separately before treating #882 as closed.
-Preserve independent oracles and allocating controls during that review.
+The 240 retained test reference sites have specific reviewed dispositions:
+
+| Disposition                | Sites | Reason                                                         |
+| -------------------------- | ----: | -------------------------------------------------------------- |
+| Protocol and compatibility |    72 | Directly exercises the original iterator or interface contract |
+| Lazy iterator or query     |   109 | The source factory already owns its reference iterator         |
+| Independent oracle         |    24 | Keeps behavior comparisons and allocation controls independent |
+| Framework collection       |    13 | Backing storage or traversal belongs to the framework          |
+| Reflection stream          |     8 | Reflection discovery or its deferred filter owns the iterator  |
+| Filesystem source          |     7 | Keeps deferred file discovery and cleanup                      |
+| Concurrent registry        |     5 | Retains the BCL concurrent traversal protocol                  |
+| Unity hierarchy            |     2 | Retains engine hierarchy observation order                     |
+
+Each site retains its source hash and semantic witness in the CSV. The review removes ordinary
+fixture inputs whose concrete storage can be retained or dispatched safely. It preserves sources
+that test the original protocol, independent expected results and allocating positive controls.
+A value wrapper alone cannot remove a reference iterator already created by a lazy factory.
 
 ## Validation Limits
 

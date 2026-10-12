@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <c>WProtoFacade</c> answer first with different bytes; and a type with a hand-written
         /// formatter already has one, hardened beyond what the generator emits.
         /// </remarks>
-        private static readonly IReadOnlyDictionary<string, string> NotMirrored = new Dictionary<
+        private static readonly Dictionary<string, string> NotMirrored = new Dictionary<
             string,
             string
         >(StringComparer.Ordinal)
@@ -105,17 +105,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 + "SerializableHashSetProtoWrapper and SerializableSortedSetProtoWrapper.",
         };
 
-        private static readonly IReadOnlyDictionary<string, string> LegacyMapContracts =
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["SerializableDictionary`2"] = "SerializableDictionaryBase<TKey,TValue,TValue>",
-                ["SerializableDictionary`3"] =
-                    "SerializableDictionaryBase<TKey,TValue,TValueCache>",
-                ["SerializableSortedDictionary`2"] =
-                    "SerializableSortedDictionaryBase<TKey,TValue,TValue>",
-                ["SerializableSortedDictionary`3"] =
-                    "SerializableSortedDictionaryBase<TKey,TValue,TValueCache>",
-            };
+        private static readonly Dictionary<string, string> LegacyMapContracts = new Dictionary<
+            string,
+            string
+        >(StringComparer.Ordinal)
+        {
+            ["SerializableDictionary`2"] = "SerializableDictionaryBase<TKey,TValue,TValue>",
+            ["SerializableDictionary`3"] = "SerializableDictionaryBase<TKey,TValue,TValueCache>",
+            ["SerializableSortedDictionary`2"] =
+                "SerializableSortedDictionaryBase<TKey,TValue,TValue>",
+            ["SerializableSortedDictionary`3"] =
+                "SerializableSortedDictionaryBase<TKey,TValue,TValueCache>",
+        };
 
         private static readonly string[] MemberHookNames =
         {
@@ -551,7 +552,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             return argument == null ? "<none>" : Normalize(argument.Expression.ToString());
         }
 
-        private static IReadOnlyDictionary<string, string> NamedArguments(AttributeSyntax attribute)
+        private static Dictionary<string, string> NamedArguments(AttributeSyntax attribute)
         {
             Dictionary<string, string> arguments = new Dictionary<string, string>(
                 StringComparer.Ordinal
@@ -1023,7 +1024,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
             List<string> failures = new List<string>();
-            foreach (KeyValuePair<string, Type> entry in PackageContractShapeTests.Mirrors)
+            foreach (
+                KeyValuePair<
+                    string,
+                    Type
+                > entry in PackageContractShapeTests.Mirrors.AsValueDictionaryEnumerableRequired()
+            )
             {
                 if (!byName.TryGetValue(entry.Key, out ContractDeclaration contract))
                 {

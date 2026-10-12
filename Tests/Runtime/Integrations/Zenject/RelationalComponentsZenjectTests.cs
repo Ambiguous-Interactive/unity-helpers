@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
     using UnityEngine.SceneManagement;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Integrations.Zenject;
     using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -610,7 +611,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
                     return;
                 }
 
-                foreach (Component component in components)
+                foreach (Component component in components.AsValueEnumerableRequired())
                 {
                     Assign(component);
                 }

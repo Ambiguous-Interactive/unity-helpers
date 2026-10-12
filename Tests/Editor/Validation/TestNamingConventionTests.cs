@@ -298,8 +298,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 packagePath,
                 (relativePath, lineNumber, line) =>
                 {
-                    MatchCollection matches = TestNameAttributePattern.Matches(line);
-                    foreach (Match match in matches)
+                    for (
+                        Match match = TestNameAttributePattern.Match(line);
+                        match.Success;
+                        match = match.NextMatch()
+                    )
                     {
                         string testName = match.Groups[1].Value;
                         if (testName.Contains('_'))
@@ -333,8 +336,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 packagePath,
                 (relativePath, lineNumber, line) =>
                 {
-                    MatchCollection matches = SetNameMethodPattern.Matches(line);
-                    foreach (Match match in matches)
+                    for (
+                        Match match = SetNameMethodPattern.Match(line);
+                        match.Success;
+                        match = match.NextMatch()
+                    )
                     {
                         string setNameValue = match.Groups[1].Value;
                         if (setNameValue.Contains('_'))
@@ -474,8 +480,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 packagePath,
                 (relativePath, lineNumber, line) =>
                 {
-                    MatchCollection testNameMatches = TestNameAttributePattern.Matches(line);
-                    foreach (Match match in testNameMatches)
+                    for (
+                        Match match = TestNameAttributePattern.Match(line);
+                        match.Success;
+                        match = match.NextMatch()
+                    )
                     {
                         string testName = match.Groups[1].Value;
                         if (testName.Contains('_'))
@@ -487,8 +496,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         }
                     }
 
-                    MatchCollection setNameMatches = SetNameMethodPattern.Matches(line);
-                    foreach (Match match in setNameMatches)
+                    for (
+                        Match match = SetNameMethodPattern.Match(line);
+                        match.Success;
+                        match = match.NextMatch()
+                    )
                     {
                         string setNameValue = match.Groups[1].Value;
                         if (setNameValue.Contains('_'))
