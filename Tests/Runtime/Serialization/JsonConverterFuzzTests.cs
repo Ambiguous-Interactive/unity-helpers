@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using UnityEngine.SceneManagement;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -352,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private static IEnumerable<string> Corpus(FuzzTarget target)
         {
-            foreach (string seed in target.Seeds)
+            foreach (string seed in target.Seeds.AsValueEnumerableRequired())
             {
                 foreach (string payload in CorpusFor(seed))
                 {
@@ -1290,7 +1291,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
             int acceptedSeedCount = 0;
 
-            foreach (string seed in target.Seeds)
+            foreach (string seed in target.Seeds.AsValueEnumerableRequired())
             {
                 object original = null;
                 bool originalAccepted = true;

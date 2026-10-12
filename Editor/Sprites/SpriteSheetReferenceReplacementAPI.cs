@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Sprites
 {
+    using WallstopStudios.UnityHelpers.Core.Extension;
 #if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
@@ -68,7 +69,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return result;
             }
 
-            foreach (KeyValuePair<Sprite, Sprite> pair in replacements)
+            foreach (
+                KeyValuePair<
+                    Sprite,
+                    Sprite
+                > pair in replacements.AsValueDictionaryEnumerableRequired()
+            )
             {
                 if (
                     pair.Key == null

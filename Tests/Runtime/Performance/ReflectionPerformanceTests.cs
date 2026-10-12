@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using System.Reflection;
     using System.Runtime.InteropServices;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -1033,7 +1034,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 outputLines.Add("  </thead>");
                 outputLines.Add("  <tbody>");
 
-                foreach (ScenarioResult result in run.BoxedResults)
+                foreach (ScenarioResult result in run.BoxedResults.AsValueEnumerableRequired())
                 {
                     string row = string.Format(
                         System.Globalization.CultureInfo.InvariantCulture,
@@ -1075,13 +1076,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 outputLines.Add("  <tbody>");
 
                 Dictionary<string, double> reflectionBaselineLookup = new(StringComparer.Ordinal);
-                foreach (ScenarioResult boxed in run.BoxedResults)
+                foreach (ScenarioResult boxed in run.BoxedResults.AsValueEnumerableRequired())
                 {
                     reflectionBaselineLookup[GetScenarioKey(boxed.Name)] =
                         boxed.BaselineOpsPerSecond;
                 }
 
-                foreach (ScenarioResult result in run.TypedResults)
+                foreach (ScenarioResult result in run.TypedResults.AsValueEnumerableRequired())
                 {
                     double reflectionOps = reflectionBaselineLookup.GetValueOrDefault(
                         GetScenarioKey(result.Name),

@@ -58,9 +58,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 UnityHelpersSettings.GetInlineEditorFoldoutBehavior();
 
             foreach (
-                UnityHelpersSettings.InlineEditorFoldoutBehavior behavior in System.Enum.GetValues(
-                    typeof(UnityHelpersSettings.InlineEditorFoldoutBehavior)
-                )
+                UnityHelpersSettings.InlineEditorFoldoutBehavior behavior in (UnityHelpersSettings.InlineEditorFoldoutBehavior[])
+                    System.Enum.GetValues(typeof(UnityHelpersSettings.InlineEditorFoldoutBehavior))
             )
             {
                 using (InlineEditorFoldoutBehaviorScope scope = new(behavior))

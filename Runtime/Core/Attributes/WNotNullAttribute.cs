@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System.Collections.Generic;
     using System.Reflection;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// Specifies the type of message displayed in the inspector when a field is null.
@@ -104,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             IEnumerable<FieldInfo> properties =
                 Helper.ReflectionHelpers.GetFieldsWithAttribute<WNotNullAttribute>(o.GetType());
 
-            foreach (FieldInfo field in properties)
+            foreach (FieldInfo field in properties.AsValueEnumerableRequired())
             {
                 object fieldValue = field.GetValue(o);
 

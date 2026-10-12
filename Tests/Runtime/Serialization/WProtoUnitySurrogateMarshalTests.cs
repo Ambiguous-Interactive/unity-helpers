@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -410,7 +411,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
 
             List<string> unserved = new List<string>();
-            foreach (Type surrogated in ProtobufUnityModel.Surrogated)
+            foreach (Type surrogated in ProtobufUnityModel.Surrogated.AsValueEnumerableRequired())
             {
                 if (!rootServed.Contains(surrogated))
                 {

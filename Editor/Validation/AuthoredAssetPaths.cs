@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -75,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             );
 
             List<string> assetPaths = new(found.Count);
-            foreach (string filePath in found)
+            foreach (string filePath in found.AsValueEnumerableRequired())
             {
                 assetPaths.Add(ToAssetPath(filePath));
             }

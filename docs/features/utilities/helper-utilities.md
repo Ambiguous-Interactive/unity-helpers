@@ -1621,6 +1621,11 @@ measurements without a large-sample approximation. `TryFisherExactTest` compares
 with fixed margins. Sorting for median and percentile happens on a pooled internal copy, so your
 list is never reordered.
 
+`Mean` and `StandardDeviation` snapshot numeric `List<T>` inputs into privately owned pooled
+arrays and return them before the call exits. No disposable handle escapes. Array inputs retain
+their direct path, and other `IReadOnlyList<T>` implementations retain their indexed reads.
+Population/sample behavior, accumulation order and caller contents remain unchanged.
+
 <!-- doc-sample: compiles -->
 
 ```csharp

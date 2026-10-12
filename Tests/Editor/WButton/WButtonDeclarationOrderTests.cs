@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     using System.Collections.Generic;
     using System.Linq;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Utils.WButton;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Editor.TestTypes;
@@ -309,7 +310,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             int lastDrawOrder = int.MinValue;
-            foreach (WButtonMethodMetadata m in metadata)
+            foreach (WButtonMethodMetadata m in metadata.AsValueEnumerableRequired())
             {
                 Assert.That(
                     m.DrawOrder,
@@ -618,7 +619,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 IReadOnlyList<WButtonMethodMetadata> metadata = WButtonMetadataCache.GetMetadata(
                     targetType
                 );
-                foreach (WButtonMethodMetadata m in metadata)
+                foreach (WButtonMethodMetadata m in metadata.AsValueEnumerableRequired())
                 {
                     Assert.That(
                         m.DeclarationOrder,
@@ -646,7 +647,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                     targetType
                 );
                 HashSet<int> seenOrders = new HashSet<int>();
-                foreach (WButtonMethodMetadata m in metadata)
+                foreach (WButtonMethodMetadata m in metadata.AsValueEnumerableRequired())
                 {
                     Assert.That(
                         seenOrders.Add(m.DeclarationOrder),

@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor.Sprites
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -76,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int validFolderCount = 0;
             try
             {
-                foreach (string folder in inputFolders)
+                foreach (string folder in inputFolders.AsValueEnumerableRequired())
                 {
                     string normalizedFolder = NormalizeAssetPath(folder);
                     if (

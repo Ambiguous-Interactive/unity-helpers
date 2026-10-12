@@ -156,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(metadata, Has.All.Property("DrawOrder").EqualTo(0));
 
             HashSet<string> groupNames = new();
-            foreach (WButtonMethodMetadata m in metadata)
+            foreach (WButtonMethodMetadata m in metadata.AsValueEnumerableRequired())
             {
                 groupNames.Add(m.GroupName ?? string.Empty);
             }
@@ -322,7 +322,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             Dictionary<string, List<WButtonMethodMetadata>> byGroup = new();
-            foreach (WButtonMethodMetadata m in metadata)
+            foreach (WButtonMethodMetadata m in metadata.AsValueEnumerableRequired())
             {
                 string key = m.GroupName ?? string.Empty;
                 byGroup.GetOrAdd(key).Add(m);
@@ -347,7 +347,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(metadata, Has.All.Property("DeclarationOrder").GreaterThanOrEqualTo(0));
 
             HashSet<int> orders = new();
-            foreach (WButtonMethodMetadata m in metadata)
+            foreach (WButtonMethodMetadata m in metadata.AsValueEnumerableRequired())
             {
                 Assert.That(
                     orders.Add(m.DeclarationOrder),
@@ -502,7 +502,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             Dictionary<int, List<WButtonMethodMetadata>> byDrawOrder = new();
-            foreach (WButtonMethodMetadata m in metadata)
+            foreach (WButtonMethodMetadata m in metadata.AsValueEnumerableRequired())
             {
                 byDrawOrder.GetOrAdd(m.DrawOrder).Add(m);
             }

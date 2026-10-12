@@ -6,6 +6,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System;
     using System.Collections.Generic;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// Lightweight geometric helpers for Rect accumulation and sidedness tests.
@@ -22,7 +24,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </remarks>
         public static Rect Accumulate(this IEnumerable<Rect> rects)
         {
-            using IEnumerator<Rect> enumerator = rects.GetEnumerator();
+            using ValueEnumerator<Rect> enumerator = rects
+                .AsValueEnumerableRequired()
+                .GetEnumerator();
             if (!enumerator.MoveNext())
             {
                 throw new InvalidOperationException("Sequence contains no elements");

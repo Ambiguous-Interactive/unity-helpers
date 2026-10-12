@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using UnityEditor;
@@ -278,7 +279,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
 
             Sprite lastSpriteAtOrBeforeEvent = null;
-            foreach (ObjectReferenceKeyframe keyFrame in referenceCurve)
+            foreach (ObjectReferenceKeyframe keyFrame in referenceCurve.AsValueEnumerableRequired())
             {
                 // Keyframes are ordered by time, so the first one past the event ends the search
                 if (item.animationEvent.time < keyFrame.time)

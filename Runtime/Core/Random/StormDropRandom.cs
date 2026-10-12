@@ -92,19 +92,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             get
             {
                 EnsureElements();
-                // Only the initialized segment is read, so oversized SystemArrayPool rents are safe.
-                using PooledArray<byte> payloadLease = SystemArrayPool<byte>.Get(
-                    ElementByteSize,
-                    clearArray: false,
-                    out byte[] buffer
+                ReadOnlySpan<byte> payload = System.Runtime.InteropServices.MemoryMarshal.AsBytes(
+                    _elements.AsSpan(0, ElementCount)
                 );
-                Buffer.BlockCopy(_elements, 0, buffer, 0, ElementByteSize);
 
                 ulong state1 = ((ulong)_a << 32) | _b;
-                return BuildState(
-                    state1,
-                    payload: new ArraySegment<byte>(buffer, 0, ElementByteSize)
-                );
+                return BuildStateFromSpan(state1, 0, payload);
             }
         }
 

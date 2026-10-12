@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.Text;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using Object = UnityEngine.Object;
 
@@ -355,7 +356,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 report.AppendLine(
                     $"{file.AssetPath}: {file.Analysis.ReplacementCount} safe replacement(s)"
                 );
-                foreach (OdinMigrationChange change in file.Analysis.Changes)
+                foreach (
+                    OdinMigrationChange change in file.Analysis.Changes.AsValueEnumerableRequired()
+                )
                 {
                     report.AppendLine(
                         $"  CHANGE: {file.AssetPath}:{change.Line}: {change.From} => {change.To}"
@@ -386,7 +389,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             IReadOnlyList<OdinMigrationFinding> findings
         )
         {
-            foreach (OdinMigrationFinding finding in findings)
+            foreach (OdinMigrationFinding finding in findings.AsValueEnumerableRequired())
             {
                 report.AppendLine($"  {category}: {assetPath}:{finding.Line}: {finding.Message}");
             }

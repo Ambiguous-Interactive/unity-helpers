@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.IO;
     using System.Collections.Generic;
@@ -230,7 +231,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
             List<ValidationProjectFix.Request> requests = new List<ValidationProjectFix.Request>();
-            foreach (ValidationFinding finding in findings)
+            foreach (ValidationFinding finding in findings.AsValueEnumerableRequired())
             {
                 ValidationWorkspaceSettings.RuleDefinition rule = FixRule(finding);
                 if (ValidationProjectFix.CanFix(rule) && !_suppressions.IsSuppressed(in finding))

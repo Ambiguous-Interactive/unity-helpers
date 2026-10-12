@@ -16,6 +16,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
@@ -801,7 +802,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 )
             )
             {
-                foreach (string pattern in patterns)
+                foreach (string pattern in patterns.AsValueEnumerableRequired())
                 {
                     if (string.IsNullOrWhiteSpace(pattern))
                     {
@@ -843,7 +844,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 )
             )
             {
-                foreach (string pattern in patterns)
+                foreach (string pattern in patterns.AsValueEnumerableRequired())
                 {
                     if (string.IsNullOrWhiteSpace(pattern))
                     {
@@ -1029,7 +1030,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     {
                         IEnumerable<Assembly> assemblies =
                             ReflectionHelpers.GetAllLoadedAssemblies();
-                        foreach (Assembly assembly in assemblies)
+                        foreach (Assembly assembly in assemblies.AsValueEnumerableRequired())
                         {
                             if (assembly == null || assembly.IsDynamic)
                             {
@@ -1307,7 +1308,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 )
                 {
                     IEnumerable<Assembly> assemblies = ReflectionHelpers.GetAllLoadedAssemblies();
-                    foreach (Assembly assembly in assemblies)
+                    foreach (Assembly assembly in assemblies.AsValueEnumerableRequired())
                     {
                         if (assembly == null || assembly.IsDynamic)
                         {

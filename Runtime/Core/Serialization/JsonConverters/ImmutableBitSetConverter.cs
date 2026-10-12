@@ -128,9 +128,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             writer.WriteNumber(CapacityProp, value.Capacity);
             writer.WritePropertyName(SetIndicesProp);
             writer.WriteStartArray();
-            foreach (int idx in value.EnumerateSetIndices())
+            for (int index = 0; index < value.Capacity; ++index)
             {
-                writer.WriteNumberValue(idx);
+                if (value.TryGet(index, out bool set) && set)
+                {
+                    writer.WriteNumberValue(index);
+                }
             }
             writer.WriteEndArray();
             writer.WriteEndObject();

@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.Text;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
@@ -170,7 +171,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     continue;
                 }
 
-                foreach (string message in messages)
+                foreach (string message in messages.AsValueEnumerableRequired())
                 {
                     diagnostics.Add(
                         layout == ExportLayout.SingleFile ? message : $"{file.Group}: {message}"
@@ -282,7 +283,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 #else
             IReadOnlyList<Assembly> assemblies = AppDomain.CurrentDomain.GetAssemblies();
 #endif
-            foreach (Assembly assembly in assemblies)
+            foreach (Assembly assembly in assemblies.AsValueEnumerableRequired())
             {
                 try
                 {
@@ -354,7 +355,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             List<Type> selected = new List<Type>();
             HashSet<Type> seen = new HashSet<Type>();
-            foreach (Type contract in contracts)
+            foreach (Type contract in contracts.AsValueEnumerableRequired())
             {
                 if (contract == null || !contract.IsDefined(typeof(WProtoContractAttribute), false))
                 {
@@ -429,7 +430,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 _ => selected.GroupBy(type => type.Assembly.GetName().Name, StringComparer.Ordinal),
             };
             HashSet<string> usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (IGrouping<string, Type> group in groups)
+            foreach (IGrouping<string, Type> group in groups.AsValueEnumerableRequired())
             {
                 plannedFiles.Add(
                     new ExportFile(

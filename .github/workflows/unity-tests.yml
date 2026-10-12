@@ -43,6 +43,7 @@ on:
           - intmap
           - serialization
           - nullableconsumer
+          - borrowed
           - all
       fresh-conversion:
         description: "Clear Standalone compilation outputs before IL2CPP acceptance builds."
@@ -543,6 +544,7 @@ jobs:
         timeout-minutes: 60
         shell: pwsh
         env:
+          UH_NATIVE_ALLOCATOR_DIAGNOSTICS: ${{ matrix.unity-version == '6000.6.0f1' && '1' || '' }}
           UH_FORCE_FRESH_COMPILATION_CACHE: ${{ github.event_name == 'workflow_dispatch' && inputs.fresh-conversion && 'true' || 'false' }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}

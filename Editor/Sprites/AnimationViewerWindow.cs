@@ -355,7 +355,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int clipsAddedCount = 0;
             string lastValidDirectory = null;
 
-            foreach (string fullPath in selectedFullPaths)
+            foreach (string fullPath in selectedFullPaths.AsValueEnumerableRequired())
             {
                 string assetPath = fullPath.SanitizePath();
                 if (!assetPath.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))

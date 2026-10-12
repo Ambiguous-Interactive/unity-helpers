@@ -89,6 +89,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly string _contractName;
         private readonly bool _overwrite;
         private readonly bool _mapIsValueType;
+        private readonly bool _mapIsInterface;
         private readonly bool _keyIsString;
         private readonly bool _keyIsEnum;
         private readonly bool _valueIsString;
@@ -106,6 +107,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string commitGeneric,
             bool overwrite,
             bool mapIsValueType,
+            bool mapIsInterface,
             bool keyIsString,
             bool keyIsEnum,
             bool valueIsString
@@ -122,6 +124,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _commitGeneric = commitGeneric;
             _overwrite = overwrite;
             _mapIsValueType = mapIsValueType;
+            _mapIsInterface = mapIsInterface;
             _keyIsString = keyIsString;
             _keyIsEnum = keyIsEnum;
             _valueIsString = valueIsString;
@@ -245,6 +248,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 commitGeneric,
                 overwriteList,
                 named.IsValueType,
+                named.TypeKind == TypeKind.Interface,
                 keyIsString,
                 keyType.TypeKind == TypeKind.Enum,
                 valueType.SpecialType == SpecialType.System_String
@@ -722,7 +726,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + "> "
                     + PairLocal
                     + " in "
-                    + Access
+                    + (_mapIsInterface ? RequireSource(Access) : Access)
                     + ")"
                     + Writer.Open
             );
@@ -878,8 +882,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + _valueQualified
                     + "> "
                     + PairLocal
-                    + " in read."
-                    + Name
+                    + " in "
+                    + (_mapIsInterface ? RequireSource("read." + Name) : "read." + Name)
                     + ")"
                     + Writer.Open
             );
@@ -924,6 +928,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + ">("
                     + accumulator
                     + ")";
+        }
+
+        private string RequireSource(string source)
+        {
+            return "global::WallstopStudios.UnityHelpers.Core.DataStructure.ValueDictionaryEnumerable<"
+                + _keyQualified
+                + ", "
+                + _valueQualified
+                + ">."
+                + nameof(RequireSource)
+                + "("
+                + source
+                + ")";
         }
     }
 }

@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.Text;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
+    using Microsoft.CodeAnalysis.CSharp.Syntax;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
@@ -5156,6 +5157,51 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         + "; }"
                 )
             );
+        }
+
+        [TestCase("global::System.Collections.Generic.IEnumerable<int>")]
+        [TestCase("global::System.Collections.Generic.ICollection<int>")]
+        [TestCase("global::System.Collections.Generic.IList<int>")]
+        [TestCase("global::System.Collections.Generic.IReadOnlyCollection<int>")]
+        [TestCase("global::System.Collections.Generic.IReadOnlyList<int>")]
+        [TestCase("global::System.Collections.Generic.ISet<int>")]
+        [TestCase("global::System.Collections.Generic.IDictionary<string, int>")]
+        [TestCase("global::System.Collections.Generic.IReadOnlyDictionary<string, int>")]
+        public void GeneratedInterfaceLoopsUseValueEnumerators(string collectionType)
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                "[WProtoContract] public partial class TraversalSubject { [WProtoMember(1)] public "
+                    + collectionType
+                    + " Values; }",
+                out Compilation generated
+            );
+            Assert.IsEmpty(diagnostics);
+            foreach (Diagnostic diagnostic in generated.GetDiagnostics())
+            {
+                Assert.IsFalse(
+                    diagnostic.Severity == DiagnosticSeverity.Error,
+                    diagnostic.ToString()
+                );
+            }
+            int loops = 0;
+            foreach (SyntaxTree tree in generated.SyntaxTrees)
+            {
+                SemanticModel model = generated.GetSemanticModel(tree);
+                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                {
+                    if (!(node is CommonForEachStatementSyntax loop))
+                    {
+                        continue;
+                    }
+                    IMethodSymbol enumerator = model
+                        .GetForEachStatementInfo(loop)
+                        .GetEnumeratorMethod;
+                    Assert.IsTrue(enumerator != null);
+                    Assert.IsTrue(enumerator.ReturnType.IsValueType, loop.ToString());
+                    ++loops;
+                }
+            }
+            Assert.IsTrue(0 < loops, "The generator must emit a loop for the binding control.");
         }
     }
 }

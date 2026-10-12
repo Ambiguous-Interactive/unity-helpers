@@ -150,7 +150,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     }
 
                     Dictionary<string, List<Type>> byName = new(StringComparer.OrdinalIgnoreCase);
-                    foreach (Type t in allCandidates)
+                    foreach (Type t in allCandidates.AsValueEnumerableRequired())
                     {
                         List<Type> list = byName.GetOrAdd(t.Name);
                         list.Add(t);
@@ -158,7 +158,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                     HashSet<string> collisionLogged = new(StringComparer.OrdinalIgnoreCase);
 
-                    foreach (Type derivedType in allCandidates)
+                    foreach (Type derivedType in allCandidates.AsValueEnumerableRequired())
                     {
                         ++singletonsProcessed;
 
@@ -616,7 +616,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             int totalRemoved = 0;
             List<string> candidateFolders = new();
 
-            foreach (Type derivedType in candidateTypes)
+            foreach (Type derivedType in candidateTypes.AsValueEnumerableRequired())
             {
                 if (
                     !ReflectionHelpers.TryGetAttributeSafe<AllowDuplicateCleanupAttribute>(

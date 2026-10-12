@@ -314,7 +314,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float maxX = float.MinValue;
             float minY = float.MaxValue;
             float maxY = float.MinValue;
-            foreach (FastVector3Int position in positions)
+            foreach (FastVector3Int position in positions.AsValueEnumerableRequired())
             {
                 Vector3 world = grid.CellToWorld(position);
                 float x = world.x;

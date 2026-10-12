@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.Collections.Generic;
     using System.IO;
     using System.Text;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     internal static class OdinMigrationEncodedSource
@@ -135,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             List<OdinMigrationFilePlan> writesStarted = new List<OdinMigrationFilePlan>();
             try
             {
-                foreach (OdinMigrationFilePlan plan in plans)
+                foreach (OdinMigrationFilePlan plan in plans.AsValueEnumerableRequired())
                 {
                     byte[] current = store.ReadAllBytes(plan.FullPath);
                     if (!BytesEqual(current, plan.OriginalBytes))

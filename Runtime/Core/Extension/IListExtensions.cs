@@ -523,7 +523,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            foreach (T item in items)
+            foreach (T item in items.AsValueEnumerableRequired())
             {
                 list.Add(item);
             }

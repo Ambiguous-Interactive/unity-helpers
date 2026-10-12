@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// An array-backed <see cref="IList{T}"/> that is neither a <c>T[]</c> nor a
@@ -65,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// <param name="items">The elements to append.</param>
         public void AddRange(IEnumerable<T> items)
         {
-            foreach (T item in items)
+            foreach (T item in items.AsValueEnumerableRequired())
             {
                 Add(item);
             }

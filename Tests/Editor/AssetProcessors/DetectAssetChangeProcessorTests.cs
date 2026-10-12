@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     using UnityEngine;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Settings;
     using WallstopStudios.UnityHelpers.Editor.Utils;
@@ -1005,7 +1006,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 $"Processing a '{extension}' scene file as an imported asset should not throw or crash"
             );
 
-            foreach (AssetChangeContext context in TestDetectAssetChangeHandler.RecordedContexts)
+            foreach (
+                AssetChangeContext context in TestDetectAssetChangeHandler.RecordedContexts.AsValueEnumerableRequired()
+            )
             {
                 CollectionAssert.DoesNotContain(
                     context.CreatedAssetPaths,
@@ -1037,7 +1040,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     + $"but got {TestDetectAssetChangeHandler.RecordedContexts.Count}"
             );
 
-            foreach (AssetChangeContext context in TestDetectAssetChangeHandler.RecordedContexts)
+            foreach (
+                AssetChangeContext context in TestDetectAssetChangeHandler.RecordedContexts.AsValueEnumerableRequired()
+            )
             {
                 CollectionAssert.DoesNotContain(
                     context.CreatedAssetPaths,

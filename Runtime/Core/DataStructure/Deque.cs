@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Utils;
@@ -200,7 +201,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     int capacity = Math.Max(DefaultCapacity, readOnlyCollection.Count);
                     _items = new T[capacity];
-                    foreach (T item in readOnlyCollection)
+                    foreach (T item in readOnlyCollection.AsValueEnumerableRequired())
                     {
                         PushBack(item);
                     }
@@ -221,7 +222,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 default:
                 {
                     _items = new T[DefaultCapacity];
-                    foreach (T item in collection)
+                    foreach (T item in collection.AsValueEnumerableRequired())
                     {
                         PushBack(item);
                     }

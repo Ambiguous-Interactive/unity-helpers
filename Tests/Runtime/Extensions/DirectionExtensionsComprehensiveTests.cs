@@ -122,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void OppositeRoundTripsAllDirections()
         {
-            foreach (Direction direction in Enum.GetValues(typeof(Direction)))
+            foreach (Direction direction in (Direction[])Enum.GetValues(typeof(Direction)))
             {
                 Assert.AreEqual(direction, direction.Opposite().Opposite());
             }
@@ -173,7 +173,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void AsVector2MatchesVector2Int()
         {
-            foreach (Direction direction in Enum.GetValues(typeof(Direction)))
+            foreach (Direction direction in (Direction[])Enum.GetValues(typeof(Direction)))
             {
                 Vector2Int vector2Int = direction.AsVector2Int();
                 Assert.AreEqual((Vector2)vector2Int, direction.AsVector2());

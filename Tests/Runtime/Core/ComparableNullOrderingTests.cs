@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using System.Reflection;
     using System.Runtime.Serialization;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Random;
 
     /// <summary>
@@ -23,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     {
         private static IEnumerable<Type> ComparableTypes()
         {
-            foreach (Type type in RuntimeTypes())
+            foreach (Type type in RuntimeTypes().AsValueEnumerableRequired())
             {
                 if (type.IsAbstract || type.IsInterface || type.IsGenericTypeDefinition)
                 {

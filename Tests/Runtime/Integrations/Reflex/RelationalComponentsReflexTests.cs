@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
     using UnityEngine.SceneManagement;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Integrations.Reflex;
     using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -445,7 +446,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
                     return;
                 }
 
-                foreach (Component component in components)
+                foreach (Component component in components.AsValueEnumerableRequired())
                 {
                     Assign(component);
                 }

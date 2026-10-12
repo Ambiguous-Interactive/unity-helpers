@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System;
     using System.Collections.Generic;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 #if !WALLSTOP_PROTO_ONLY
@@ -362,7 +363,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _elementToIndex = new Dictionary<T, int>(_comparer);
             _indexToElement = new List<T>();
 
-            foreach (T element in elements)
+            foreach (T element in elements.AsValueEnumerableRequired())
             {
                 if (_elementToIndex.TryAdd(element, _indexToElement.Count))
                 {

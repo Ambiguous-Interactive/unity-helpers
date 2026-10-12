@@ -151,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 WallstopStudios.UnityHelpers.Core.Helper.ReflectionHelpers.GetTypesDerivedFrom<MonoBehaviour>(
                     includeAbstract: false
                 );
-            foreach (Type type in types)
+            foreach (Type type in types.AsValueEnumerableRequired())
             {
                 if (type == null)
                 {

@@ -169,8 +169,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         )
         {
             writer.WriteStartArray(name);
-            foreach (double sample in samples)
+            int sampleCount = samples.Count;
+            for (int index = 0; index < sampleCount; ++index)
             {
+                double sample = samples[index];
                 if (double.IsNaN(sample) || double.IsInfinity(sample))
                 {
                     writer.WriteNullValue();

@@ -34,7 +34,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// Reusing discovery's semantic models avoids rebinding already inspected declarations.
         /// Release them per tree because later registration needs only symbols and locations.
         /// </remarks>
-        internal static IReadOnlyList<TypeUse> Types(
+        internal static List<TypeUse> Types(
             Compilation compilation,
             Dictionary<SyntaxTree, SemanticModel> models
         )

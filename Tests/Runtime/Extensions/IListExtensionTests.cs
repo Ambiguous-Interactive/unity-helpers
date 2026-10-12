@@ -156,7 +156,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             get
             {
-                foreach (SortAlgorithm algorithm in Enum.GetValues(typeof(SortAlgorithm)))
+                foreach (
+                    SortAlgorithm algorithm in (SortAlgorithm[])
+                        Enum.GetValues(typeof(SortAlgorithm))
+                )
                 {
 #pragma warning disable CS0618 // Type or member is obsolete
                     if (algorithm == SortAlgorithm.None)
@@ -221,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     source =>
                     {
                         CustomList<int> custom = new();
-                        foreach (int value in source)
+                        foreach (int value in source.AsValueEnumerableRequired())
                         {
                             custom.Add(value);
                         }

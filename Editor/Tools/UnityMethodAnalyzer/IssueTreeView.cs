@@ -359,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             List<AnalyzerIssue> filtered = new(_issues.Count);
 
-            foreach (AnalyzerIssue issue in _issues)
+            foreach (AnalyzerIssue issue in _issues.AsValueEnumerableRequired())
             {
                 if (hasSeverityFilter && issue.Severity != _severityFilter.Value)
                 {

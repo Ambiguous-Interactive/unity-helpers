@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'all')]
+    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'borrowed', 'all')]
     [string]$Acceptance,
     [Parameter(Mandatory = $true)]
     [string]$ArtifactsPath,
@@ -15,8 +15,121 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+function Assert-NativeAllocationQualification {
+    param($Record, $Declaration, $Report, [string]$Directory, [string]$UnityVersion)
+
+    $buildPath = Join-Path $Directory 'native-allocation-probe/build.json'
+    $build = Get-Content -LiteralPath $buildPath -Raw | ConvertFrom-Json
+    $source = @($Declaration.SourceFiles | Where-Object { $_.Path -ceq 'Tests/Acceptance~/NativeAllocation/native-allocation-probe.cpp' })
+    $expectedBackends = if ($UnityVersion -like '2021.3.*') { @(1, 2) } else { @(3) }
+    if ($Record.NativeAllocationSourceSha256 -isnot [string] -or
+        ($Record.NativeAllocationBackend -isnot [int] -and $Record.NativeAllocationBackend -isnot [long]) -or
+        $source.Count -ne 1 -or $Record.NativeAllocationSourceSha256 -cne $source[0].Sha256 -or
+        $build.SourceSha256 -cne $source[0].Sha256 -or $build.SourcePath -cne $source[0].Path -or
+        $build.BinarySha256 -cnotmatch '^[0-9a-f]{64}$' -or
+        $Record.NativeAllocationCountState -cne 'passed' -or $null -ne $Record.NativeAllocationError -or
+        $Record.NativeAllocationBackend -notin $expectedBackends) {
+        throw 'Native allocation probe identity or backend does not match the frozen source.'
+    }
+    $payloads = @($Report.Snapshots | Where-Object { $_.PayloadFiles.Count -ne 0 })
+    if ($payloads.Count -lt 3) { throw 'Native allocation probe needs stable build, launch and final payload snapshots.' }
+    foreach ($snapshot in $payloads) {
+        $binary = @($snapshot.PayloadFiles | Where-Object { $_.Path -cmatch '(^|/)unity-helpers-allocation-probe\.dll$' })
+        if ($snapshot.State -cne 'passed' -or $binary.Count -ne 1 -or $binary[0].Sha256 -cne $build.BinarySha256) {
+            throw 'Native allocation probe binary differs from the compiled and sealed player payload.'
+        }
+    }
+    $windows = @($Record.NativeAllocationObservations)
+    if ($windows.Count -ne 15) { throw 'Native allocation controls need three warmups and twelve measured windows.' }
+    for ($index = 0; $index -lt $windows.Count; $index++) {
+        $window = $windows[$index]
+        $kind = if ($index -lt 3) { $index } else { ($index - 3) % 4 }
+        $requested = if ($index -lt 3) { if ($kind -eq 2) { 0 } else { 8192 } } elseif ($kind -eq 0) { 0 } elseif ($kind -eq 2) { 4096 } else { 8192 }
+        $preboxed = $kind -eq 1
+        $count = if ($preboxed) { 0 } else { $requested }
+        foreach ($name in @('ChronologicalIndex', 'Requested', 'Count', 'LogicalObjectBytes')) {
+            if ($window.$name -isnot [int] -and $window.$name -isnot [long]) { throw "Native $name must be a JSON integer." }
+        }
+        foreach ($name in @('IsWarmup', 'Preboxed', 'Completed', 'ValuesVerified')) {
+            if ($window.$name -isnot [bool]) { throw "Native $name must be a JSON boolean." }
+        }
+        if ($window.ChronologicalIndex -ne $index -or $window.IsWarmup -ne ($index -lt 3) -or
+            $window.Requested -ne $requested -or $window.Preboxed -ne $preboxed -or $window.Count -ne $count -or
+            -not $window.Completed -or -not $window.ValuesVerified -or
+            ($count -eq 0 -and $window.LogicalObjectBytes -ne 0) -or
+            ($count -ne 0 -and $window.LogicalObjectBytes -lt $count * 4) -or
+            $window.LogicalObjectBytes -gt 1048576) {
+            throw 'Native allocation control count, shape or logical size is invalid.'
+        }
+    }
+    for ($repetition = 0; $repetition -lt 3; $repetition++) {
+        $offset = 3 + $repetition * 4
+        if ($windows[$offset + 3].LogicalObjectBytes -ne $windows[$offset + 2].LogicalObjectBytes * 2) {
+            throw 'Native logical object sizes do not scale with the retained allocating control.'
+        }
+    }
+    foreach ($channel in @('TraversalTimingObservations', 'TraversalAllocationObservations')) {
+        $subjects = @($Record.$channel)
+        if ($subjects.Count -ne 36) { throw 'Traversal qualification requires all four shapes, three sizes and three repetitions.' }
+        $keys = New-Object 'System.Collections.Generic.HashSet[string]'
+        foreach ($subject in $subjects) {
+            if ($subject.Shape -notin @('array', 'list', 'hash-set', 'dictionary') -or
+                $subject.Size -notin @(1, 16, 4096) -or $subject.Repetition -notin @(0, 1, 2) -or
+                -not $keys.Add("$($subject.Shape)|$($subject.Size)|$($subject.Repetition)")) {
+                throw 'Traversal qualification has a duplicate or unsupported subject.'
+            }
+            $names = if ($channel -ceq 'TraversalTimingObservations') { @('Size', 'Repetition', 'Calls', 'ReferenceTicks', 'ValueTicks') } else { @('Size', 'Repetition', 'Calls', 'ReferenceCount', 'ValueCount') }
+            foreach ($name in $names) {
+                if ($subject.$name -isnot [int] -and $subject.$name -isnot [long]) { throw "Traversal $name must be a JSON integer." }
+            }
+            if ($channel -ceq 'TraversalTimingObservations') {
+                if ($subject.Calls -ne [Math]::Max(128, [Math]::Floor(131072 / $subject.Size)) -or
+                    $subject.ReferenceTicks -le 0 -or $subject.ValueTicks -le 0) {
+                    throw 'Traversal timing contains an empty or unexpected batch.'
+                }
+            } elseif ($subject.Calls -ne 128 -or $subject.ReferenceCount -ne 128 -or $subject.ValueCount -ne 0) {
+                throw 'Traversal allocation control or value view did not meet its count contract.'
+            }
+        }
+    }
+}
 if ($Acceptance -eq 'nullableconsumer') {
     & (Join-Path $PSScriptRoot 'verify-nullable-consumer.ps1') -ArtifactsPath $ArtifactsPath -Commit $Commit -UnityVersion $UnityVersion -Repository $Repository
+    return
+}
+if ($Acceptance -eq 'borrowed') {
+    $directory = Join-Path $ArtifactsPath 'borrowed'
+    $declarationPath = Join-Path $directory 'declaration.json'
+    $declaration = Get-Content -LiteralPath $declarationPath -Raw | ConvertFrom-Json
+    $reports = @(Get-ChildItem -LiteralPath $directory -Filter 'provenance.json' -File -Recurse)
+    if ($reports.Count -ne 1) { throw 'Borrowed acceptance requires exactly one frozen-player provenance report.' }
+    $report = Get-Content -LiteralPath $reports[0].FullName -Raw | ConvertFrom-Json
+    $declarationHash = (Get-FileHash -LiteralPath $declarationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $expectedBackend = if ($UnityVersion -like '2021.3.*') { 'Mono2x' } else { 'IL2CPP' }
+    if ($declaration.SourceCommit -cne $Commit -or $declaration.UnityVersion -cne $UnityVersion -or
+        $declaration.Backend -cne $expectedBackend -or $report.DeclarationSha256 -cne $declarationHash -or
+        $report.RunId -cne $declaration.RunId -or $report.RequestedUnityVersion -cne $UnityVersion -or
+        $report.RequestedBackend -cne $expectedBackend -or $report.ProvenanceStableState -cne 'passed' -or
+        $report.JointCorrectness.State -cne 'passed' -or $report.RuntimeRecordJoinState -cne 'passed' -or
+        $report.CorrectnessCorpusConsumptionState -cne 'passed' -or
+        -not $report.LaunchAttempted -or -not $report.InvocationObserved -or -not $report.ResultsValidated -or
+        $null -ne $report.ExecutionError -or $report.CampaignEligible -or $report.AdoptionEligible) {
+        throw 'Borrowed channel qualification lacks matching source, current invocation, correctness or stable payload evidence.'
+    }
+    $preflight = @($report.RuntimeJoin.RawRecords | Where-Object { $_.Marker -ceq 'BORROWED_PREFLIGHT' })
+    if ($preflight.Count -ne 1 -or $preflight[0].Record.RuntimeIdentity.Commit -cne $Commit -or
+        $preflight[0].Record.RuntimeReleasePlayerState -cne 'passed' -or
+        $preflight[0].Record.ClockState -cne 'passed') {
+        throw 'Borrowed acceptance requires qualified Release-player clock and allocating positive controls.'
+    }
+    $allocationChannel = 'managed-allocated-bytes'
+    if ($preflight[0].Record.AllocatedBytesState -cne 'passed') {
+        Assert-NativeAllocationQualification -Record $preflight[0].Record -Declaration $declaration -Report $report -Directory $directory -UnityVersion $UnityVersion
+        $allocationChannel = 'native-managed-object-counts'
+    }
+    [ordered]@{ borrowed = 'passed'; SourceCommit = $Commit; UnityVersion = $UnityVersion
+        Backend = $expectedBackend; ChannelQualification = 'passed'; AllocationChannel = $allocationChannel; CampaignEligible = $false; AdoptionEligible = $false } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ArtifactsPath 'acceptance-summary.json')
     return
 }
 $selected = if ($Acceptance -eq 'all') { @('sentinel', 'capture', 'intmap', 'serialization', 'owners') } elseif ($Acceptance -eq 'serialization') { @('serialization', 'owners') } elseif ($Acceptance -eq 'sentinel') { @('sentinel', 'capture') } else { @($Acceptance) }

@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System.Text;
     using System.Threading;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
@@ -782,7 +783,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 #else
             IReadOnlyList<Assembly> loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
 #endif
-            foreach (Assembly assembly in loadedAssemblies)
+            foreach (Assembly assembly in loadedAssemblies.AsValueEnumerableRequired())
             {
                 try
                 {

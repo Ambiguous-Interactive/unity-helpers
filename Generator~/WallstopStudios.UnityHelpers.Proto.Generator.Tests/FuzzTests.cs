@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.Collections.Generic;
     using System.Text;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -1217,9 +1218,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void WarmEveryReaderBeforeAnythingIsMeasured()
         {
             // Warm initialization and caches before measuring payload amplification.
-            foreach (Target target in Targets())
+            foreach (Target target in Targets().AsValueEnumerableRequired())
             {
-                foreach (byte[] seed in target.Seeds)
+                foreach (byte[] seed in target.Seeds.AsValueEnumerableRequired())
                 {
                     target.Read(seed, out int _);
                     target.ReEncode(seed, out byte[] _, out byte[] _);
@@ -1247,7 +1248,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void RandomBytesAreRefusedRatherThanThrown()
         {
-            foreach (Target target in Targets())
+            foreach (Target target in Targets().AsValueEnumerableRequired())
             {
                 FuzzRandom random = new FuzzRandom(0xC0FFEE);
                 for (int iteration = 0; iteration < Iterations; ++iteration)
@@ -1274,7 +1275,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
              * Mutating valid encodings reaches member readers that random bytes rarely pass the first tag to
              * reach.
              */
-            foreach (Target target in Targets())
+            foreach (Target target in Targets().AsValueEnumerableRequired())
             {
                 Coverage coverage = new Coverage();
                 FuzzRandom random = new FuzzRandom(0x5EED);
@@ -1319,7 +1320,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                  * seeds.
                  */
                 int minimumHits = Math.Max(1, Iterations / 100);
-                foreach (int member in target.Members)
+                foreach (int member in target.Members.AsValueEnumerableRequired())
                 {
                     Assert.GreaterOrEqual(
                         coverage.HitsFor(member),
@@ -1337,7 +1338,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void AHostileFieldSequenceIsRefusedRatherThanThrown()
         {
             // Large length and depth claims are too structured for random mutation to exercise reliably.
-            foreach (Target target in Targets())
+            foreach (Target target in Targets().AsValueEnumerableRequired())
             {
                 Coverage coverage = new Coverage();
                 FuzzRandom random = new FuzzRandom(0xBADF00D);
@@ -1383,7 +1384,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 payload = wrapped.ToArray();
             }
 
-            foreach (Target target in Targets())
+            foreach (Target target in Targets().AsValueEnumerableRequired())
             {
                 AssertDecodeIsSafe(target, payload, "strategy=nesting-bomb depth=20000");
             }
@@ -1392,7 +1393,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void APackedRunCannotReserveMoreThanItDelivers()
         {
-            foreach (Target target in Targets())
+            foreach (Target target in Targets().AsValueEnumerableRequired())
             {
                 foreach (int announced in new[] { 0x7FFFFFFF, 0x40000000, 0x00FFFFFF, 0x0000FFFF })
                 {
@@ -1454,7 +1455,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 payload.AddRange(wrapper);
 
                 byte[] bytes = payload.ToArray();
-                foreach (Target target in targets)
+                foreach (Target target in targets.AsValueEnumerableRequired())
                 {
                     AssertDecodeIsSafe(
                         target,
@@ -1470,7 +1471,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void AGeneratedValueWritesExactlyWhatItMeasures()
         {
             // Decode-derived values miss writer-only edges such as lone surrogates, zero axes, and NaN.
-            foreach (Target target in Targets())
+            foreach (Target target in Targets().AsValueEnumerableRequired())
             {
                 FuzzRandom random = new FuzzRandom(0x217E5);
                 for (int iteration = 0; iteration < Iterations; ++iteration)
@@ -1561,7 +1562,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // Repeated one-element runs expose quadratic growth hidden by a single valid packed run.
             const int runs = 10_000;
             Target repeated = null;
-            foreach (Target candidate in Targets())
+            foreach (Target candidate in Targets().AsValueEnumerableRequired())
             {
                 if (candidate.Name.Contains("repeated", StringComparison.Ordinal))
                 {
@@ -1653,7 +1654,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void AKnownHostilePayloadIsStillRefusedCleanly(string hex)
         {
             byte[] payload = FromHex(hex);
-            foreach (Target target in Targets())
+            foreach (Target target in Targets().AsValueEnumerableRequired())
             {
                 AssertDecodeIsSafe(target, payload, $"strategy=regression hex={hex}");
             }
@@ -1801,7 +1802,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 StringBuilder text = new StringBuilder(Describe(target));
                 text.Append("; per member (field/wire=hits):");
-                foreach (int member in members)
+                foreach (int member in members.AsValueEnumerableRequired())
                 {
                     text.Append(' ')
                         .Append(member >> 3)

@@ -3124,12 +3124,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             _regexError = null;
-            foreach (string warning in discovery.Warnings)
+            foreach (string warning in discovery.Warnings.AsValueEnumerableRequired())
             {
                 this.LogWarn($"{warning}");
             }
 
-            foreach (string assetPath in discovery.AssetPaths)
+            foreach (string assetPath in discovery.AssetPaths.AsValueEnumerableRequired())
             {
                 if (
                     AssetImporter.GetAtPath(assetPath)
@@ -3752,7 +3752,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _lastExtractedCount = result.ExtractedCount;
                 _lastSkippedCount = result.SkippedCount;
                 _lastErrorCount = result.Errors.Count;
-                foreach (string error in result.Errors)
+                foreach (string error in result.Errors.AsValueEnumerableRequired())
                 {
                     this.LogError($"{error}");
                 }
@@ -3871,7 +3871,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             total == 0 ? 0f : (float)processed / total
                         )
                 );
-                foreach (string error in result.Errors)
+                foreach (string error in result.Errors.AsValueEnumerableRequired())
                 {
                     this.LogError($"{error}");
                 }

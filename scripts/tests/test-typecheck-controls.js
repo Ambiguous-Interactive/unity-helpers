@@ -326,9 +326,16 @@ runTest("parallel host phases retain complete commands without fail-fast cancell
   const commands = [...phaseJob.matchAll(/^        run: (.+)$/gm)].map((match) => match[1]);
   assert.deepEqual(commands, [
     "npm run typecheck:unity",
+    "npm run test:enumeration",
     "npm run test:intmap",
     "npm run typecheck:controls"
   ]);
+  assert.ok(
+    phaseJob.includes(
+      "if: matrix.phase == 'sources'\n        shell: bash\n        run: npm run test:enumeration"
+    ),
+    "Enumeration correctness must run in the sources phase"
+  );
   assert.ok(
     phaseJob.includes("if: matrix.phase == 'sources'\n        run: npm run test:intmap"),
     "IntMap correctness must run in the sources phase"

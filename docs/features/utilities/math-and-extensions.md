@@ -902,6 +902,79 @@ image's RGB intact instead of flattening it to black.
 
 ## Collections
 
+### Value Enumeration
+
+See the [complete enumeration audit](../../performance/enumeration-audit.md) for source coverage,
+retained iterator protocols and allocation limits.
+
+`AsValueEnumerable` provides a lazy value view over `IEnumerable<T>`, including
+`IReadOnlyList<T>` and `IReadOnlyCollection<T>` sources. Arrays, exact `List<T>` and
+exact `HashSet<T>` instances avoid boxing their enumerators. Null and default views
+are empty. The view does not copy the collection or read its count or indexer.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System.Collections.Generic;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+public static class CollectionSum
+{
+    public static int Sum(IEnumerable<int> source)
+    {
+        int result = 0;
+        foreach (int item in source.AsValueEnumerable())
+        {
+            result += item;
+        }
+        return result;
+    }
+}
+```
+
+`AsValueDictionaryEnumerable` provides the same lazy behavior for
+`IEnumerable<KeyValuePair<TKey, TValue>>`, including dictionary interfaces. Exact
+`Dictionary<TKey, TValue>` instances use their concrete value enumerator. Derived dictionaries keep their interface protocol. Other sources, including sorted
+dictionaries, keep their original enumerator and its allocations. Use `AsValueEnumerable`
+for pair arrays, lists and hash sets.
+
+Use `ValueEnumerable<T>.RequireSource` or
+`ValueDictionaryEnumerable<TKey, TValue>.RequireSource` when a null sequence must retain its
+enumeration failure. Creating the view stays lazy; acquiring its enumerator raises the original
+null-source failure. Generated protobuf formatters use these factories for interface-declared
+collections, keeping custom protocols and concrete struct receivers.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System.Collections.Generic;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+public static class DictionaryTotal
+{
+    public static int Sum(IReadOnlyDictionary<string, int> source)
+    {
+        int result = 0;
+        foreach (KeyValuePair<string, int> entry in source.AsValueDictionaryEnumerable())
+        {
+            result += entry.Value;
+        }
+        return result;
+    }
+}
+```
+
+Custom sequences, derived collections and other collection types retain their original
+`GetEnumerator`, `MoveNext`, `Current` and `Dispose` behavior, including exceptions and
+allocations. Lists, hash sets and exact dictionaries retain their mutation checks. Array enumeration observes
+changes to array elements. Early exit still disposes the enumerator. Copies of a fallback
+enumerator share the source's lifetime; use each enumerator within one `foreach` or
+`using` scope. Read `Current` only after a successful `MoveNext`.
+
+Keep direct enumeration of concrete collections and strings when it already uses a value
+enumerator or indexed traversal. This view removes boxing for the supported collection
+shapes; it does not remove allocations performed by custom enumerators or loop bodies.
+
 ### IEnumerable Helpers
 
 **Infinite cycling:**
@@ -1232,6 +1305,9 @@ string text = "Hello, World!";
 string encoded = text.ToBase64();       // "SGVsbG8sIFdvcmxkIQ=="
 string decoded = encoded.FromBase64();  // "Hello, World!"
 ```
+
+`FromBase64` returns empty text for malformed Base64 or invalid UTF-8. Its temporary byte array stays
+inside the call and returns to the pool in `finally`, without disposal-lease bookkeeping.
 
 **String analysis:**
 

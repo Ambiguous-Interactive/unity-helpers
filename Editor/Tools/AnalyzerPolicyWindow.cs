@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor.Tools
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -1121,7 +1122,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         {
             if (policies != null)
             {
-                foreach (AnalyzerPolicy policy in policies)
+                foreach (AnalyzerPolicy policy in policies.AsValueEnumerableRequired())
                 {
                     if (string.Equals(policy.Id, id, StringComparison.Ordinal))
                     {

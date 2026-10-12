@@ -8,6 +8,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System.Collections.Generic;
     using System.Reflection;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     internal static class DropDownValueProvider<T>
@@ -117,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         private static T[] ConvertEnumerable(IEnumerable<T> enumerable)
         {
             List<T> values = new();
-            foreach (T entry in enumerable)
+            foreach (T entry in enumerable.AsValueEnumerableRequired())
             {
                 values.Add(entry);
             }
@@ -426,7 +428,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         private static object[] NormalizeArray(Array array, Type valueType, string attributeName)
         {
             List<object> normalized = new();
-            IEnumerator enumerator = array.GetEnumerator();
+            ValueArrayEnumerator enumerator = new ValueArrayEnumerable(array).GetEnumerator();
             int index = 0;
             while (enumerator.MoveNext())
             {

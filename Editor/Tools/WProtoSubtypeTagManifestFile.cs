@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System;
     using System.Collections.Generic;
     using System.Reflection;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
@@ -106,7 +107,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return matching;
             }
 
-            foreach (KeyValuePair<string, List<string>> pair in unnumbered)
+            foreach (
+                KeyValuePair<
+                    string,
+                    List<string>
+                > pair in unnumbered.AsValueDictionaryEnumerableRequired()
+            )
             {
                 if (pair.Key != null && shipped.Contains(pair.Key))
                 {
@@ -132,7 +138,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 return conflicts;
             }
-            foreach (KeyValuePair<string, List<string>> pair in owners)
+            foreach (
+                KeyValuePair<
+                    string,
+                    List<string>
+                > pair in owners.AsValueDictionaryEnumerableRequired()
+            )
             {
                 List<string> included = new List<string>();
                 if (pair.Value == null)
@@ -325,7 +336,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             string claimant = null;
             int deepest = -1;
-            foreach (string path in assemblyDefinitionPaths)
+            foreach (string path in assemblyDefinitionPaths.AsValueEnumerableRequired())
             {
                 if (string.IsNullOrWhiteSpace(path))
                 {

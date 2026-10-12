@@ -366,7 +366,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             (float)current / total
                         )
                 );
-                foreach (string diagnostic in result.Diagnostics)
+                foreach (string diagnostic in result.Diagnostics.AsValueEnumerableRequired())
                 {
                     this.LogError($"{diagnostic}");
                 }
@@ -517,7 +517,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             (float)current / total
                         )
                 );
-                foreach (string diagnostic in result.Diagnostics)
+                foreach (string diagnostic in result.Diagnostics.AsValueEnumerableRequired())
                 {
                     this.LogError($"{diagnostic}");
                 }
@@ -969,7 +969,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             (float)current / total
                         )
                 );
-                foreach (string diagnostic in result.Diagnostics)
+                foreach (string diagnostic in result.Diagnostics.AsValueEnumerableRequired())
                 {
                     this.LogError($"{diagnostic}");
                 }

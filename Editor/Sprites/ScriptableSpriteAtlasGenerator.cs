@@ -145,7 +145,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     sprites.Add(sprite);
                 }
             }
-            foreach (Sprite sprite in spritesToAdd)
+            foreach (Sprite sprite in spritesToAdd.AsValueEnumerableRequired())
             {
                 if (sprite != null)
                 {
@@ -154,7 +154,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             if (removeUnmatchedSprites)
             {
-                foreach (Sprite sprite in spritesToRemove)
+                foreach (Sprite sprite in spritesToRemove.AsValueEnumerableRequired())
                 {
                     if (sprite != null)
                     {

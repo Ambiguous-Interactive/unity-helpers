@@ -249,7 +249,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 default:
                 {
-                    foreach (Direction direction in directions)
+                    foreach (Direction direction in directions.AsValueEnumerableRequired())
                     {
                         combined |= direction;
                     }

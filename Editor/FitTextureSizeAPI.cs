@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -56,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                 if (sourcePaths != null)
                 {
-                    foreach (string path in sourcePaths)
+                    foreach (string path in sourcePaths.AsValueEnumerableRequired())
                     {
                         if (string.IsNullOrWhiteSpace(path))
                         {

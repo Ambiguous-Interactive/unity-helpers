@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor.Utils
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -168,7 +169,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             using PooledResource<List<string>> staleEntryResource = Buffers<string>.List.Get(
                 out List<string> staleEntries
             );
-            foreach (ScriptableObjectSingletonMetadata.Entry entry in entries)
+            foreach (
+                ScriptableObjectSingletonMetadata.Entry entry in entries.AsValueEnumerableRequired()
+            )
             {
                 if (string.IsNullOrEmpty(entry.resourcesLoadPath))
                 {
@@ -239,7 +242,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             Dictionary<string, ScriptableObjectSingletonMetadata.Entry> existingByTypeName = new(
                 StringComparer.Ordinal
             );
-            foreach (ScriptableObjectSingletonMetadata.Entry entry in existingEntries)
+            foreach (
+                ScriptableObjectSingletonMetadata.Entry entry in existingEntries.AsValueEnumerableRequired()
+            )
             {
                 if (!string.IsNullOrEmpty(entry.assemblyQualifiedTypeName))
                 {

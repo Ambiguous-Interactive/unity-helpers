@@ -3229,6 +3229,12 @@ function Get-FrozenPlayerRuntimeJoin {
                             @('SchemaVersion', 'FrozenRunId', 'FrozenDeclarationSha256', 'FrozenCorpusSha256', 'ActualCorpusSha256',
                                 'RuntimeIdentity', 'UnityVersion', 'Backend', 'Platform', 'ProcessBits', 'IsEditor', 'DevelopmentBuild')
                         } else { @('SchemaVersion', 'CorpusSha256', 'VerifiedRows', 'DecoderAssertions', 'DeclaredCampaignRows') }
+                        if ($observation.Marker -ceq 'BORROWED_PREFLIGHT' -and
+                            $record.PSObject.Properties.Name -contains 'NativeAllocationCountState') {
+                            $requiredKeys += @('NativeAllocationCountState', 'NativeAllocationBackend',
+                                'NativeAllocationSourceSha256', 'NativeAllocationError', 'NativeAllocationObservations',
+                                'TraversalTimingObservations', 'TraversalAllocationObservations')
+                        }
                         foreach ($key in $requiredKeys) {
                             if ([regex]::Matches($json, '(?<!\\)"' + [regex]::Escape($key) + '"\s*:').Count -ne 1) {
                                 throw "Marker must contain exactly one literal $key field."
@@ -3281,8 +3287,8 @@ function Get-FrozenPlayerRuntimeJoin {
                 throw 'Runtime compiled anchor, actual corpus, or Release Windows x64 identity does not match the frozen declaration.'
             }
             if ($corpus.SchemaVersion -ne 1 -or $corpus.CorpusSha256 -cne $expectedCorpus -or
-                $corpus.VerifiedRows -ne 35 -or $corpus.DecoderAssertions -ne 70 -or $corpus.DeclaredCampaignRows -ne 12) {
-                throw 'Correctness-corpus record must consume exactly 35 rows with 70 assertions and declare 12 campaign rows under the frozen digest.'
+                $corpus.VerifiedRows -ne 35 -or $corpus.DecoderAssertions -ne 105 -or $corpus.DeclaredCampaignRows -ne 12) {
+                throw 'Correctness-corpus record must consume exactly 35 rows with 105 assertions and declare 12 campaign rows under the frozen digest.'
             }
             $state = 'passed'
             $corpusState = 'passed'
@@ -3349,7 +3355,7 @@ function Get-FrozenPlayerJointCorrectness {
     $expected = @(
         'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.BorrowedBufferPreflightTests.ReleasePlayerChannelsAreReported',
         'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.BorrowedDecoderMatchesShippedDecoderAcrossPoolBoundariesAndUtf8Failures',
-        'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.BorrowedWholeCallAvoidsLeaseWorkWithShippedPositiveControl'
+        'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.ProductionAndBorrowedWholeCallsAvoidLeaseWorkWithShippedPositiveControl'
     )
     $leaves = @()
     $reason = $null
@@ -3464,6 +3470,9 @@ function Invoke-StandaloneTestPlayer {
         '-logFile', '-',
         '-uhTestResults', $ResultsPath
     )
+    if ($env:UH_NATIVE_ALLOCATOR_DIAGNOSTICS -eq '1') {
+        $playerArgs += '-diag-job-temp-memory-leak-validation'
+    }
 
     # No -StallSeconds here (only the wall-clock backstop): the no-output stall guard is
     # deliberately scoped to the in-editor -runTests pass, whose silent-hang class -- a

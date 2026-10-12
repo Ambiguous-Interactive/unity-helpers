@@ -1,0 +1,154 @@
+# Disposal Ownership Audit
+
+This audit supports [#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924).
+The [site inventory](./ownership-audit.csv) records 990 distinct ownership-producing sites across
+203 runtime and editor files, with source hashes, compiler-bound producers and reviewed dispositions.
+It records the current contracts and private-operation candidates; a candidate is not an adopted
+optimization or a measured result.
+
+## Coverage
+
+The semantic inventory uses the shipped generator, Unity 6000.4.6 references and C# 9 over 45
+assemblies in default and `SINGLE_THREADED` configurations. Both compilations have no errors or
+missing inputs. Sites are deduplicated by source path and offset. It includes construction and
+factories of package-owned disposable types, shared disposal handles, asynchronous lease results,
+and internal private-array rentals. Compiler symbols determine the produced type.
+
+A separate syntax scan of all conditional-symbol combinations in 762 runtime and editor C# files
+finds 110 explicit `SystemArrayPool<T>.Get` calls: 91 runtime and 19 editor sites. Every one has a
+semantic witness in the inventory. The inventory also includes the forwarding call inside the
+pool, other array factories, collection pools and restoration scopes. It does not claim every
+possible consumer, generated contract, player-only branch or optional dependency configuration.
+Source hashes bind the snapshot to the reviewed file bytes; later edits require another audit.
+
+## Current Contracts
+
+| Pattern                                                              | Runtime property that source checks cannot establish                                                                   |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `PooledArray`, `PooledResource`, `DisposableScope`, `SemaphoreLease` | Copies share an exactly-once claim, including repeated disposal and stale copies after reuse                           |
+| `PurgeBufferLease` and retirement snapshots                          | Nested callbacks and copied handles must not return a live retirement buffer twice                                     |
+| `RestorableGlobal` and editor wrappers                               | Dynamic nesting, out-of-order release and restoration remain valid across copied scopes                                |
+| `PartitionPooled`                                                    | Iterator cleanup and consumers share the same partition lease; early consumer disposal must not release a later rental |
+| Serialization accumulators and scratch frames                        | Stored and transferred ownership survives growth, nested serialization and failure cleanup                             |
+| Generic pools and caches                                             | Live rentals, retention limits, callback failures, concurrent operations and disposal depend on runtime state          |
+| Scene and dispatcher owners                                          | Cancellation, callbacks and repeated or reentrant disposal share runtime completion state                              |
+
+A copy diagnostic is advisory. It cannot exclude repeated disposal of one value, generated
+`using` cleanup, warning suppression or separately compiled callers. A C# 9 ref struct also permits
+local copies and repeated disposal. Existing shared claim and restoration checks remain necessary
+under the shipped guarantees. [The analyzer guide](./analyzers.md#wuh022-boxing-a-disposable-value-type)
+records the executable compiler counterexamples and the additive borrowed-span API.
+
+The operation-owned `TryWithBuffer` contract removes the returned disposal handle. Its callback
+receives a synchronous logical span and explicit state. Reference-bearing input requires
+initialization before exposure, and the physical reference-bearing array is cleared on return.
+Callback effects persist on failure, and cleanup attempts a return once. This contract gives up
+retained backing buffers, asynchronous use and caller-controlled release; element objects and
+independent copies can still outlive the call.
+
+## Site Dispositions
+
+| Disposition             | Sites | Decision                                                                             |
+| ----------------------- | ----: | ------------------------------------------------------------------------------------ |
+| Shared handle           |   665 | Preserve the producer's copy-safe ownership contract                                 |
+| Restoration or callback |    78 | Preserve dynamic restoration and exactly-once callback behavior                      |
+| Runtime owner           |   116 | Preserve resource validity, reentrancy and disposal state                            |
+| Private candidate       |   104 | Review the complete operation and measure before adopting a different lifetime shape |
+| Source protocol         |     8 | Preserve disposal of custom traversal sources                                        |
+| Existing private owner  |    13 | Keep the current operation-owned rental, cleanup and clearing                        |
+| Extended lifetime       |     6 | Preserve ownership that crosses the producing method's synchronous lifetime          |
+
+The six explicit array sites with extended lifetimes are the sparse-set enumerator, two JSON
+accumulator sites, the deferred subset iterator, the asynchronous JSON stream reader and the
+returned texture-premultiplication lease. Stored or returned ownership must not become an
+untracked local rental.
+
+The 104 synchronous array candidates include sorting, geometry, spatial construction, random
+selection, UTF-8 decoding and editor image operations. Local `using` alone does not prove
+an operation-owned replacement safe or worthwhile. Nested helpers, callbacks, source mutation,
+engine calls, cancellation and clearing belong to each complete operation. The inventory retains
+a reason for each family and site. Collection-pool producers retain their shared contracts; they
+are not automatically treated as private array candidates.
+
+## Adoption Requirements
+
+`BitSet.LeftShift` now shifts words backward in place, masks the last logical word and clears
+serialized words beyond capacity. It uses no temporary rental. Native editor tests pass all 551
+new behavior and lease cases and 151 existing bit-set cases, with no skips. Three repeated
+comparisons cover 18 capacity/shift combinations and eight trials each. For shifts below capacity,
+median candidate/current whole-call ratios range from 0.012 to 0.142. Both warm paths record zero
+profiler allocation events with fresh-box and preboxed controls. The measured operation includes
+`SetAll` before every shift; these editor observations do not qualify Release-player performance.
+
+`FlurryBurstRandom`, `PhotonSpinRandom` and `StormDropRandom` snapshots now copy their logical
+8-, 80- and 4,096-byte payloads directly into independent saved arrays. They use no pooled scratch
+buffer. The legacy protected snapshot factory still clones caller payloads. Native editor tests
+cover replay, payload independence, constructor input lengths and common cached state: all 85 cases
+pass, including a balanced-lease observation control. Three repeated editor comparisons record
+two allocations per snapshot before the change and one afterward, with retained-box and preboxed
+controls. These profiler counts and whole-call timings do not qualify Release-player performance.
+
+Before changing a candidate, establish the buffer's full lifetime, all aliases and exactly one
+cleanup attempt after acquisition. Preserve `Get(0)` returning an empty array without a lease;
+a direct BCL `Rent(0)` can return a nonempty bucket. Preserve initialization of the logical prefix,
+reference clearing of the physical return buffer, element order and exception timing. Confirm
+that returned values, fields, spans, iterators, tasks and callback state do not retain the rental.
+Exercise failure and reentrancy paths as well as ordinary completion.
+
+Measure the complete operation against the current implementation, including acquisition,
+initialization, callback work and cleanup. Retain allocating positive controls and before/after
+identity. A smaller lease counter proves avoided lease work; it does not prove better timing,
+zero allocation or lower retained memory.
+
+The four numeric mean paths, two float/double list-variance paths and the Base64 decoder own their
+private rentals without a returned handle. The variance paths validate count/sample size before
+renting, copy the list once and return the numeric array in `finally` without clearing. The snapshot
+and scalar result cannot expose the rental; existing array and custom-list paths remain unchanged.
+Native statistics controls cover ordinary/derived lists, special values, invalid inputs and pool
+boundaries. Eight lease-generation controls detect acquisition/claim work before the change and
+none afterward, while a balanced-lease positive control still detects both transitions.
+
+Three alternating pairs of host Release processes show smaller whole-call cost for short variance
+lists and near parity at 4,096 elements. They preserve zero warm managed allocation with allocating
+positive controls. These host observations do not qualify Unity Release-player performance.
+The current Base64 host measurements show reduced cost for short inputs and
+near parity for large or rejected inputs, with unchanged allocation. They do not qualify Unity
+Release-player performance. The connected editor's thread byte counter fails retained-box controls;
+its zero readings are unqualified. A separate `GC.Alloc` profiler-count probe observes 128 fresh
+boxes and zero preboxed assignments over 128 calls in three trials. Warm float/double list
+statistics at 1, 16 and 4,096 elements record zero allocations; Base64 records one returned-string
+allocation per call. These are editor counts, not byte measurements or Release-player qualification.
+Floor/latest Release-player timing, allocation, retention and callback acceptance remains open
+before stronger adoption claims.
+
+## Release-Player Channel Qualification
+
+The manual Unity Tests workflow accepts `acceptance: borrowed`. It runs exactly the existing
+clock/allocation preflight, 35-row decoder comparison and private/borrowed lease control.
+The 2021.3 floor uses Mono; later versions use IL2CPP. The managed byte counter can remain inert;
+the isolated Windows profile also compiles a native profiler allocation-event probe with the
+x64 Visual C++ compiler. Use `test-mode: standalone` to limit the ordinary test modes. The licensed workflow
+retains its fixed four-version matrix even when a Unity version input is supplied.
+
+The profile freezes tracked runtime, editor and test inputs plus the canonical 47-row corpus.
+The existing runner checks those inputs and the complete player payload around build and launch.
+Verification requires all three native cases, stable provenance, matching runtime/corpus records
+and working clock/allocation positive controls. Skipped, inert or unmatched results fail qualification.
+Native qualification requires matching source and compiled binary hashes, fifteen chronological
+fresh-box, preboxed and empty windows, and three repetitions of the four supported collection
+shapes at 1, 16 and 4,096 elements. Each comparison must observe 128 interface allocations and
+zero value-view allocations. Whole-call timing runs before native profiler registration and
+retains positive tick batches. A failed byte channel stays failed even when the count channel passes.
+
+The native callback remains installed in the isolated process; its DLL is pinned until exit.
+Classic profiler setters are configured once because they target the latest descriptor. Count
+windows observe only the calling thread. Logical object sizes exclude allocator rounding,
+native allocations and retained heap size. The profile records the compiler command, source,
+binary and generated identity header alongside the sealed player payload.
+
+The summary keeps campaign and adoption eligibility false: these controls do not establish
+whole-call ownership gains, retained memory, code size or startup/callback effects. The local
+IL2CPP diagnostic traversal results in the [enumeration audit](./enumeration-audit.md#validation-limits)
+do not replace the canonical four-version acceptance run. Unity 6000.6 ordinary Standalone tests
+enable temporary-allocation stack diagnostics after repeated engine lifetime warnings; those
+warnings remain failures until their source is classified.

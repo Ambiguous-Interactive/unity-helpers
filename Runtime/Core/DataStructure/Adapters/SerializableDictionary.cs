@@ -654,7 +654,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             _dictionary ??= new Dictionary<TKey, TValue>();
             _dictionary.Clear();
-            foreach (KeyValuePair<TKey, TValue> pair in dictionary)
+            foreach (
+                KeyValuePair<TKey, TValue> pair in dictionary.AsValueDictionaryEnumerableRequired()
+            )
             {
                 _dictionary[pair.Key] = pair.Value;
             }

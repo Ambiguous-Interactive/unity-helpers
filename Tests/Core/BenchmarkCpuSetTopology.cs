@@ -408,9 +408,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
             writer.WriteString(nameof(MappingLimits), MappingLimits);
             writer.WriteStartArray(nameof(CpuSets));
-            foreach (BenchmarkCpuSetRecord record in CpuSets)
+            int cpuSetCount = CpuSets.Count;
+            for (int index = 0; index < cpuSetCount; ++index)
             {
-                record.WriteTo(writer);
+                CpuSets[index].WriteTo(writer);
             }
             writer.WriteEndArray();
             writer.WriteEndObject();

@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System.Collections.Generic;
     using System.Reflection;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Utils;
@@ -39,7 +40,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             IEnumerable<Type> targetTypes = types ?? EnumerateAllComponentTypes();
 
-            foreach (Type type in targetTypes)
+            foreach (Type type in targetTypes.AsValueEnumerableRequired())
             {
                 if (type == null)
                 {

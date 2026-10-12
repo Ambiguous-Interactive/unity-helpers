@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     using System.Linq;
     using System.Reflection;
     using System.Text;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// Renders the wire contract of <see cref="WProtoContractAttribute"/> types as a proto3 schema a
@@ -183,7 +184,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             List<Type> requested = new List<Type>();
-            foreach (Type contractType in contractTypes)
+            foreach (Type contractType in contractTypes.AsValueEnumerableRequired())
             {
                 if (contractType == null || contractType.IsGenericTypeDefinition)
                 {
@@ -693,7 +694,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         continue;
                     }
 
-                    foreach (int number in reserved.FieldNumbers)
+                    foreach (int number in reserved.FieldNumbers.AsValueEnumerableRequired())
                     {
                         // Proto3 forbids reserved runtime field numbers and values outside its field-number range.
                         if (
@@ -715,7 +716,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         }
                     }
 
-                    foreach (string name in reserved.MemberNames)
+                    foreach (string name in reserved.MemberNames.AsValueEnumerableRequired())
                     {
                         if (!string.IsNullOrEmpty(name) && IsValidProtoIdentifier(name))
                         {

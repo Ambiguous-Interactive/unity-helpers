@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using UnityEditor;
@@ -485,7 +486,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                                 + " assets checked · "
                                 + complete.Failures.Count
                                 + " failures";
-                        foreach (ValidationFinding finding in complete.Findings)
+                        foreach (
+                            ValidationFinding finding in complete.Findings.AsValueEnumerableRequired()
+                        )
                         {
                             Button row = new Button(() => Reveal(finding))
                             {
@@ -494,7 +497,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                             };
                             _dryFindings.Add(row);
                         }
-                        foreach (ValidationRuleFailure failure in complete.Failures)
+                        foreach (
+                            ValidationRuleFailure failure in complete.Failures.AsValueEnumerableRequired()
+                        )
                             AddLabel(_dryFindings, failure.ToString(), "dx-error");
                     }
                 )

@@ -51,9 +51,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 CpuSetTopology.WriteTo(writer);
             }
             writer.WriteStartArray(nameof(Slots));
-            foreach (BenchmarkSlotObservation slot in Slots)
+            int slotCount = Slots.Count;
+            for (int index = 0; index < slotCount; ++index)
             {
-                slot.WriteTo(writer);
+                Slots[index].WriteTo(writer);
             }
             writer.WriteEndArray();
             writer.WriteEndObject();

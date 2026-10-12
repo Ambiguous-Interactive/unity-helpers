@@ -782,7 +782,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static IEnumerable<FieldInfo> SafeGetFields(Type t, BindingFlags flags)
+        private static FieldInfo[] SafeGetFields(Type t, BindingFlags flags)
         {
             try
             {

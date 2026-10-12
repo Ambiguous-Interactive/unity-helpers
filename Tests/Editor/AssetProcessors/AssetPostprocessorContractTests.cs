@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
     /// Source-scan contract that every <see cref="AssetPostprocessor"/> subclass in this
@@ -1162,7 +1163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     continue;
                 }
 
-                foreach (MethodInfo method in inspected)
+                foreach (MethodInfo method in inspected.AsValueEnumerableRequired())
                 {
                     MethodBodySearchResult result = TryExtractBodyAcrossFiles(
                         sourcePaths,

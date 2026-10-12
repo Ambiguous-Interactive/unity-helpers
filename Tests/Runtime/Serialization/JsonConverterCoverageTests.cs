@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -52,10 +53,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// <summary>
         /// Registered converters this package does not own and does not fuzz, each with the reason.
         /// </summary>
-        private static readonly IReadOnlyDictionary<Type, string> NotCovered = new Dictionary<
-            Type,
-            string
-        >
+        private static readonly Dictionary<Type, string> NotCovered = new Dictionary<Type, string>
         {
             [typeof(JsonStringEnumConverter)] =
                 "System.Text.Json's own enum converter; it writes a name for any enum, so no fixed type covers it and its behaviour is not this package's contract",
@@ -94,14 +92,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void EveryRegisteredConverterIsCoveredDeclaredOrExplicitlyNotOurs()
         {
             List<Type> covered = new();
-            foreach (JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets)
+            foreach (
+                JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets.AsValueEnumerableRequired()
+            )
             {
                 covered.Add(target.Type);
             }
 
-            foreach (Type writeOnly in JsonConverterFuzzTests.WriteOnlyConverters.Keys)
+            foreach (
+                KeyValuePair<
+                    Type,
+                    string
+                > writeOnly in JsonConverterFuzzTests.WriteOnlyConverters.AsValueDictionaryEnumerableRequired()
+            )
             {
-                covered.Add(writeOnly);
+                covered.Add(writeOnly.Key);
             }
 
             List<string> failures = new();
@@ -168,7 +173,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
 
                 bool covered = false;
-                foreach (JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets)
+                foreach (
+                    JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets.AsValueEnumerableRequired()
+                )
                 {
                     Type candidate = target.Type.IsGenericType
                         ? target.Type.GetGenericTypeDefinition()
@@ -210,7 +217,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             List<string> failures = new();
             foreach (
-                KeyValuePair<Type, string> writeOnly in JsonConverterFuzzTests.WriteOnlyConverters
+                KeyValuePair<
+                    Type,
+                    string
+                > writeOnly in JsonConverterFuzzTests.WriteOnlyConverters.AsValueDictionaryEnumerableRequired()
             )
             {
                 bool claimed = false;
@@ -254,7 +264,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void TheWriteOnlyDeclarationAgreesWithTheFuzzTargets()
         {
             List<string> failures = new();
-            foreach (JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets)
+            foreach (
+                JsonConverterFuzzTests.FuzzTarget target in JsonConverterFuzzTests.Targets.AsValueEnumerableRequired()
+            )
             {
                 bool declaredWriteOnly = JsonConverterFuzzTests.WriteOnlyConverters.ContainsKey(
                     target.Type

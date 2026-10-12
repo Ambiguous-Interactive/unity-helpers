@@ -186,7 +186,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             string normalized = NormalizeReferences(json, references, hasEditorRoot: true);
             List<KeyValuePair<string, string>> ordered = new List<KeyValuePair<string, string>>();
             if (references != null)
-                foreach (KeyValuePair<string, string> reference in references)
+                foreach (
+                    KeyValuePair<
+                        string,
+                        string
+                    > reference in references.AsValueDictionaryEnumerableRequired()
+                )
                     ordered.Add(reference);
             ordered.Sort((left, right) => StringComparer.Ordinal.Compare(left.Key, right.Key));
             using PooledResource<PooledArrayBufferWriter> lease = PooledArrayBufferWriter.Rent(

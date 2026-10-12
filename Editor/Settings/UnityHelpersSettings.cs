@@ -4050,8 +4050,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             // Migrate explicit-color flags before deriving colors can overwrite authored choices.
-            foreach (WButtonCustomColor stored in _wbuttonCustomColors.Values)
+            foreach (KeyValuePair<string, WButtonCustomColor> entry in _wbuttonCustomColors)
             {
+                WButtonCustomColor stored = entry.Value;
                 if (stored != null)
                 {
                     if (stored.MigrateChosenTextColor())
@@ -4383,8 +4384,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             bool changed = false;
 
             // Migrate before deriving colors to preserve authored choices.
-            foreach (WEnumToggleButtonsCustomColor stored in _wenumToggleButtonsCustomColors.Values)
+            foreach (
+                KeyValuePair<
+                    string,
+                    WEnumToggleButtonsCustomColor
+                > entry in _wenumToggleButtonsCustomColors
+            )
             {
+                WEnumToggleButtonsCustomColor stored = entry.Value;
                 if (stored != null)
                 {
                     if (stored.MigrateChosenTextColors())

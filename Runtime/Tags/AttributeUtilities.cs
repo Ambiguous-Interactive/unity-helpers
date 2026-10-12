@@ -84,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             uniqueNames.Clear();
 
             IEnumerable<Type> loadedTypes = ReflectionHelpers.GetAllLoadedTypes();
-            foreach (Type type in loadedTypes)
+            foreach (Type type in loadedTypes.AsValueEnumerableRequired())
             {
                 if (
                     type == null
@@ -517,7 +517,9 @@ namespace WallstopStudios.UnityHelpers.Tags
             EffectHandler effectHandler = go.GetOrAddComponent<EffectHandler>();
             // This overload intentionally discards handles; callers needing removal use the list-taking overload.
 #pragma warning disable WUH006
-            foreach (AttributeEffect attributeEffect in attributeEffects)
+            foreach (
+                AttributeEffect attributeEffect in attributeEffects.AsValueEnumerableRequired()
+            )
             {
                 _ = effectHandler.ApplyEffect(attributeEffect);
             }

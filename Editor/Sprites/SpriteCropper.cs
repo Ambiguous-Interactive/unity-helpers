@@ -830,7 +830,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Utils.EditorUi.ClearProgress();
             }
 
-            foreach (string error in result.Errors)
+            foreach (string error in result.Errors.AsValueEnumerableRequired())
             {
                 this.LogError($"{error}");
             }

@@ -299,6 +299,77 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        private static IEnumerable<TestCaseData> StandardDeviationListCases()
+        {
+            IList[] sources =
+            {
+                new float[] { 42f },
+                new float[] { 2f, 4f },
+                new float[] { 2f, 4f, 4f, 4f, 5f, 5f, 7f, 9f },
+                new float[] { float.MaxValue, -float.MaxValue },
+                new float[] { float.MaxValue, float.MaxValue },
+                new float[] { 16777216f, 1f, -16777216f },
+                new float[] { float.NaN, 1f },
+                new float[] { float.PositiveInfinity, 1f },
+                new float[] { float.NegativeInfinity, 1f },
+                new float[] { float.PositiveInfinity, float.NegativeInfinity },
+                new double[] { 42.0 },
+                new double[] { 2.0, 4.0 },
+                new double[] { 2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0 },
+                new double[] { double.MaxValue, -double.MaxValue },
+                new double[] { double.MaxValue, double.MaxValue },
+                new double[] { 1e16, 1.0, -1e16 },
+                new double[] { double.NaN, 1.0 },
+                new double[] { double.PositiveInfinity, 1.0 },
+                new double[] { double.NegativeInfinity, 1.0 },
+                new double[] { double.PositiveInfinity, double.NegativeInfinity },
+            };
+            for (int index = 0; index < sources.Length; ++index)
+            {
+                IList source = sources[index];
+                for (int shape = 0; shape < 4; ++shape)
+                {
+                    bool derived = (shape & 1) != 0;
+                    bool sample = (shape & 2) != 0;
+                    if (sample && source.Count == 1)
+                    {
+                        continue;
+                    }
+                    yield return new TestCaseData(source, derived, sample).SetName(
+                        $"StandardDeviation.List.Numeric.{index}.Derived.{derived}.Sample.{sample}"
+                    );
+                }
+            }
+        }
+
+        private static IList CreateStatisticsList(IList source, bool derived)
+        {
+            if (source is float[] floats)
+            {
+                return derived ? new StatisticsDerivedList<float>(floats) : new List<float>(floats);
+            }
+            double[] doubles = (double[])source;
+            return derived ? new StatisticsDerivedList<double>(doubles) : new List<double>(doubles);
+        }
+
+        private static double StandardDeviationOfList(IList values, bool sample)
+        {
+            if (values is List<float> floats)
+            {
+                return ((IReadOnlyList<float>)floats).StandardDeviation(sample);
+            }
+            return ((IReadOnlyList<double>)values).StandardDeviation(sample);
+        }
+
+        private static double StandardDeviationOfArray(IList values, bool sample)
+        {
+            if (values is float[] floats)
+            {
+                return floats.StandardDeviation(sample);
+            }
+            return ((double[])values).StandardDeviation(sample);
+        }
+
         private static IEnumerable<TestCaseData> StandardDeviationCases()
         {
             yield return new TestCaseData(
@@ -1313,6 +1384,157 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 Assert.Throws<ArgumentNullException>(() => ((List<long>)null).Mean());
                 Assert.Throws<ArgumentException>(() => new List<long>().Mean());
+            }
+        }
+
+        [TestCase(true, false, false)]
+        [TestCase(true, false, true)]
+        [TestCase(true, true, false)]
+        [TestCase(true, true, true)]
+        [TestCase(false, false, false)]
+        [TestCase(false, false, true)]
+        [TestCase(false, true, false)]
+        [TestCase(false, true, true)]
+        public void StandardDeviationListScratchDoesNotAcquireADisposalLease(
+            bool useFloat,
+            bool derived,
+            bool sample
+        )
+        {
+            IList source = useFloat ? (IList)new float[] { 2f, 4f } : new double[] { 2.0, 4.0 };
+            IList values = CreateStatisticsList(source, derived);
+            double expected = StandardDeviationOfArray(source, sample);
+            DisposalLease probe = DisposalLeases.Acquire();
+            try
+            {
+                int slot = probe._slot;
+                bool released = probe.TryClaim();
+                long before = DisposalLeases.CurrentGeneration(slot);
+                double actual = StandardDeviationOfList(values, sample);
+                long after = DisposalLeases.CurrentGeneration(slot);
+                Assert.That(released, Is.True);
+                Assert.That(actual, Is.EqualTo(expected));
+                Assert.That(
+                    after,
+                    Is.EqualTo(before),
+                    "A private variance snapshot must not acquire a disposal lease."
+                );
+            }
+            finally
+            {
+                probe.TryClaim();
+            }
+        }
+
+        [TestCaseSource(nameof(StandardDeviationListCases))]
+        public void StandardDeviationListPreservesArrayResultsAndSource(
+            IList source,
+            bool derived,
+            bool sample
+        )
+        {
+            IList values = CreateStatisticsList(source, derived);
+            double expected = StandardDeviationOfArray(source, sample);
+            for (int repeat = 0; repeat < 3; ++repeat)
+            {
+                double actual = StandardDeviationOfList(values, sample);
+                if (double.IsNaN(expected))
+                {
+                    Assert.That(double.IsNaN(actual), Is.True);
+                }
+                else
+                {
+                    Assert.That(actual, Is.EqualTo(expected));
+                }
+                CollectionAssert.AreEqual(source, values);
+            }
+        }
+
+        [TestCase(true, false, false)]
+        [TestCase(true, false, true)]
+        [TestCase(true, true, false)]
+        [TestCase(true, true, true)]
+        [TestCase(false, false, false)]
+        [TestCase(false, false, true)]
+        [TestCase(false, true, false)]
+        [TestCase(false, true, true)]
+        public void StandardDeviationListScratchPreservesLogicalLengthAcrossPoolBuckets(
+            bool useFloat,
+            bool derived,
+            bool sample
+        )
+        {
+            int[] counts = { 17, 19, 3, 32, 2, 17, 4096, 2 };
+            for (int repeat = 0; repeat < 3; ++repeat)
+            {
+                for (int index = 0; index < counts.Length; ++index)
+                {
+                    int count = counts[index];
+                    float[] floats = new float[count];
+                    double[] doubles = new double[count];
+                    for (int item = 0; item < count; ++item)
+                    {
+                        floats[item] = (item % 7 - 3) * (index + 1f);
+                        doubles[item] = (item % 7 - 3) * (index + 1.0);
+                    }
+                    IList source = useFloat ? (IList)floats : doubles;
+                    IList values = CreateStatisticsList(source, derived);
+                    double expected = StandardDeviationOfArray(source, sample);
+                    double actual = StandardDeviationOfList(values, sample);
+                    Assert.That(actual, Is.EqualTo(expected));
+                    CollectionAssert.AreEqual(source, values);
+                }
+            }
+        }
+
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        public void StandardDeviationListRejectsInvalidInputsBeforeRenting(
+            bool useFloat,
+            bool derived
+        )
+        {
+            IList empty = CreateStatisticsList(
+                useFloat ? (IList)Array.Empty<float>() : Array.Empty<double>(),
+                derived
+            );
+            IList single = CreateStatisticsList(
+                useFloat ? (IList)new float[] { 42f } : new double[] { 42.0 },
+                derived
+            );
+            DisposalLease probe = DisposalLeases.Acquire();
+            try
+            {
+                int slot = probe._slot;
+                bool released = probe.TryClaim();
+                long before = DisposalLeases.CurrentGeneration(slot);
+                if (useFloat)
+                {
+                    Assert.Throws<ArgumentNullException>(() =>
+                        ((IReadOnlyList<float>)null).StandardDeviation()
+                    );
+                }
+                else
+                {
+                    Assert.Throws<ArgumentNullException>(() =>
+                        ((IReadOnlyList<double>)null).StandardDeviation()
+                    );
+                }
+                Assert.Throws<ArgumentException>(() => StandardDeviationOfList(empty, false));
+                Assert.Throws<ArgumentException>(() => StandardDeviationOfList(empty, true));
+                Assert.Throws<ArgumentOutOfRangeException>(() =>
+                    StandardDeviationOfList(single, true)
+                );
+                long after = DisposalLeases.CurrentGeneration(slot);
+                Assert.That(released, Is.True);
+                Assert.That(after, Is.EqualTo(before));
+                Assert.That(StandardDeviationOfList(single, false), Is.EqualTo(0.0));
+            }
+            finally
+            {
+                probe.TryClaim();
             }
         }
 

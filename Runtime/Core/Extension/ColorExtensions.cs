@@ -146,7 +146,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 double a = 0;
                 double b = 0;
                 int count = 0;
-                foreach (Sprite sprite in sprites)
+                foreach (Sprite sprite in sprites.AsValueEnumerableRequired())
                 {
                     if (sprite == null)
                     {
@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 float sumS = 0f;
                 float sumV = 0f;
                 int count = 0;
-                foreach (Sprite sprite in sprites)
+                foreach (Sprite sprite in sprites.AsValueEnumerableRequired())
                 {
                     if (sprite == null)
                     {
@@ -293,7 +293,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 float g = 0f;
                 float b = 0f;
                 float a = 0f;
-                foreach (Sprite sprite in sprites)
+                foreach (Sprite sprite in sprites.AsValueEnumerableRequired())
                 {
                     if (sprite == null)
                     {
@@ -372,7 +372,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 const int bucketSize = 32;
                 bool hasSamples = false;
 
-                foreach (Sprite sprite in sprites)
+                foreach (Sprite sprite in sprites.AsValueEnumerableRequired())
                 {
                     if (sprite == null)
                     {
@@ -641,7 +641,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 default:
                 {
-                    foreach (Color pixel in pixels)
+                    foreach (Color pixel in pixels.AsValueEnumerableRequired())
                     {
                         if (pixel.a <= alphaCutoff)
                         {
@@ -737,7 +737,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     }
                     default:
                     {
-                        foreach (Color pixel in source)
+                        foreach (Color pixel in source.AsValueEnumerableRequired())
                         {
                             if (pixel.a <= alphaCutoff)
                             {
@@ -830,7 +830,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 default:
                 {
-                    foreach (Color pixel in pixels)
+                    foreach (Color pixel in pixels.AsValueEnumerableRequired())
                     {
                         if (pixel.a <= alphaCutoff)
                         {
@@ -927,7 +927,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 default:
                 {
-                    foreach (Color pixel in pixels)
+                    foreach (Color pixel in pixels.AsValueEnumerableRequired())
                     {
                         if (pixel.a <= alphaCutoff)
                         {

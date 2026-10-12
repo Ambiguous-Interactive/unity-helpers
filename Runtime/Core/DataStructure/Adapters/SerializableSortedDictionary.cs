@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Runtime.Serialization;
     using System.Text.Json.Serialization;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
 #if !WALLSTOP_PROTO_ONLY
@@ -200,7 +201,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _dictionary = dictionary is SortedDictionary<TKey, TValue> sorted
                 ? new SortedDictionary<TKey, TValue>(sorted.Comparer)
                 : new SortedDictionary<TKey, TValue>();
-            foreach (KeyValuePair<TKey, TValue> pair in dictionary)
+            foreach (
+                KeyValuePair<TKey, TValue> pair in dictionary.AsValueDictionaryEnumerableRequired()
+            )
             {
                 _dictionary[pair.Key] = pair.Value;
             }
@@ -412,7 +415,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             _dictionary.Clear();
-            foreach (KeyValuePair<TKey, TValue> pair in dictionary)
+            foreach (
+                KeyValuePair<TKey, TValue> pair in dictionary.AsValueDictionaryEnumerableRequired()
+            )
             {
                 _dictionary[pair.Key] = pair.Value;
             }

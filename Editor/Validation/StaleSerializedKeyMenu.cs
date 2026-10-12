@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using WallstopStudios.UnityHelpers.Core.Extension;
 #if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
@@ -149,7 +150,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             UnreadableAssetPaths.Append(message, unreadable);
 
-            foreach (KeyValuePair<string, int> cause in causes)
+            foreach (
+                KeyValuePair<string, int> cause in causes.AsValueDictionaryEnumerableRequired()
+            )
             {
                 message
                     .AppendLine()

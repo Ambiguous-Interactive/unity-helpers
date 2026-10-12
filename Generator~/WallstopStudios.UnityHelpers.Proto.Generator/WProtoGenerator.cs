@@ -130,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private static IEnumerable<string> SurrogateClosures(
             Compilation compilation,
-            IReadOnlyList<ClosureScan.TypeUse> typeUses,
+            List<ClosureScan.TypeUse> typeUses,
             SurrogateMap surrogates,
             HashSet<INamedTypeSymbol> emittedContracts,
             HashSet<INamedTypeSymbol> enumClosures,
@@ -416,7 +416,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private static IEnumerable<string> ForeignClosures(
             Compilation compilation,
-            IReadOnlyList<ClosureScan.TypeUse> typeUses,
+            List<ClosureScan.TypeUse> typeUses,
             Action<Diagnostic> report,
             HashSet<string> announced
         )
@@ -2928,7 +2928,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private static IEnumerable<string> ClosedConstructions(
             Compilation compilation,
-            IReadOnlyList<ClosureScan.TypeUse> typeUses,
+            List<ClosureScan.TypeUse> typeUses,
             INamedTypeSymbol contract,
             Action<Diagnostic> report,
             HashSet<string> announced
@@ -4447,10 +4447,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 emissions.Add(new Emission(contract, source, registration));
             }
 
-            IReadOnlyList<ClosureScan.TypeUse> typeUses = ClosureScan.Types(
-                context.Compilation,
-                models
-            );
+            List<ClosureScan.TypeUse> typeUses = ClosureScan.Types(context.Compilation, models);
 
             foreach (Emission emission in emissions)
             {

@@ -208,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 }
             }
 
-            foreach (string effectTag in effectTags)
+            foreach (string effectTag in effectTags.AsValueEnumerableRequired())
             {
                 if (string.IsNullOrEmpty(effectTag))
                 {
@@ -349,7 +349,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 }
             }
 
-            foreach (string effectTag in effectTags)
+            foreach (string effectTag in effectTags.AsValueEnumerableRequired())
             {
                 if (string.IsNullOrEmpty(effectTag))
                 {

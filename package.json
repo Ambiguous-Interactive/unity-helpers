@@ -377,7 +377,8 @@
     "unity:retry-license": "bash scripts/unity/retry-license.sh",
     "test:intmap": "dotnet test \"Generator~/WallstopStudios.UnityHelpers.IntMap.Tests/WallstopStudios.UnityHelpers.IntMap.Tests.csproj\" -c Release --nologo",
     "test:durable-file": "dotnet test \"Generator~/WallstopStudios.UnityHelpers.DurableFile.Tests/WallstopStudios.UnityHelpers.DurableFile.Tests.csproj\" -c Release --nologo",
-    "typecheck:unity:proto-only": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopProtoOnly=true && dotnet build \"Generator~/WallstopStudios.UnityHelpers.EditorCheck/WallstopStudios.UnityHelpers.EditorCheck.csproj\" --nologo -v minimal -p:WallstopProtoOnly=true"
+    "typecheck:unity:proto-only": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopProtoOnly=true && dotnet build \"Generator~/WallstopStudios.UnityHelpers.EditorCheck/WallstopStudios.UnityHelpers.EditorCheck.csproj\" --nologo -v minimal -p:WallstopProtoOnly=true",
+    "test:enumeration": "dotnet test \"Generator~/WallstopStudios.UnityHelpers.Enumeration.Tests/WallstopStudios.UnityHelpers.Enumeration.Tests.csproj\" -c Release --nologo"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.0",

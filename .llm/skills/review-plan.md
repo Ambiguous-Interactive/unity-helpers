@@ -4,6 +4,9 @@
 
 **Trigger**: When reviewing an implementation plan, technical design, or task breakdown before coding begins.
 
+Keep issue-specific designs in canonical issues or ignored local notes. The root goal and plan
+remain general objectives and priority rules; follow [maintain-plan](./maintain-plan.md).
+
 ---
 
 ## When to Use
@@ -130,7 +133,7 @@ Plan Review Summary:
 
 ## Related Skills
 
-- [maintain-plan](./maintain-plan.md) - Keep the working plan limited to actionable work.
+- [maintain-plan](./maintain-plan.md) - Keep goals and plans general and ordered by priority.
 - [review-code-changes](./review-code-changes.md) - Post-implementation code review
 - [validate-before-commit](./validate-before-commit.md) - Pre-commit validation
 - [performance-audit](./performance-audit.md) - Performance-specific review

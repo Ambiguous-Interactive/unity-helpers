@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Validation;
 
     /// <summary>
@@ -107,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             AuthoredAssetDocument document = AuthoredAssetYaml.ReadDocuments(MonoBehaviourAsset)[0];
 
             List<AuthoredAssetEntry> names = new();
-            foreach (AuthoredAssetEntry entry in document.Entries)
+            foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
             {
                 if (string.Equals(entry.Key, "_name", System.StringComparison.Ordinal))
                 {

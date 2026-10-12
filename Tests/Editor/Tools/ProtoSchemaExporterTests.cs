@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using System.IO;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Editor.Tools;
@@ -137,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
                 Assert.IsTrue(result.Success, result.Message);
                 Assert.AreEqual(2, result.WrittenPaths.Count);
-                foreach (string path in result.WrittenPaths)
+                foreach (string path in result.WrittenPaths.AsValueEnumerableRequired())
                 {
                     StringAssert.Contains("syntax = \"proto3\";", File.ReadAllText(path));
                 }

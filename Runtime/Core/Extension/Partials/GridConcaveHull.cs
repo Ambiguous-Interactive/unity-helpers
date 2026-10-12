@@ -122,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
         {
             destination.Clear();
-            foreach (Vector2 point in source)
+            foreach (Vector2 point in source.AsValueEnumerableRequired())
             {
                 destination.Add(
                     new FastVector3Int(Mathf.RoundToInt(point.x), Mathf.RoundToInt(point.y), 0)
@@ -132,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static bool AreVector2PointsAxisAligned(IEnumerable<Vector2> source)
         {
-            foreach (Vector2 point in source)
+            foreach (Vector2 point in source.AsValueEnumerableRequired())
             {
                 if (
                     !IsApproximatelyInteger(point.x, Vector2AxisSnapTolerance)

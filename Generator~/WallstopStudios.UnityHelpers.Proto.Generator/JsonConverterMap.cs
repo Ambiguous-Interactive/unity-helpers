@@ -272,7 +272,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <returns>Registration argument lists, ready to be emitted.</returns>
         internal IEnumerable<string> Registrations(
             Compilation compilation,
-            IReadOnlyList<ClosureScan.TypeUse> typeUses,
+            List<ClosureScan.TypeUse> typeUses,
             Action<Diagnostic> report,
             HashSet<string> announced
         )

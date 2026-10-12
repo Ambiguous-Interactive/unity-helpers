@@ -63,7 +63,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private static IEnumerable<TestCaseData> TextureFormatCases()
         {
-            foreach (ColorAveragingMethod method in Enum.GetValues(typeof(ColorAveragingMethod)))
+            foreach (
+                ColorAveragingMethod method in (ColorAveragingMethod[])
+                    Enum.GetValues(typeof(ColorAveragingMethod))
+            )
             {
                 yield return new TestCaseData(TextureFormat.RGBA32, method).SetName(
                     $"GetAverageColor.Texture.{method}.RGBA32"
@@ -142,7 +145,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Color input = new(0.25f, 0.5f, 0.75f, 1f);
             Color[] pixels = { input, input, input };
 
-            foreach (ColorAveragingMethod method in Enum.GetValues(typeof(ColorAveragingMethod)))
+            foreach (
+                ColorAveragingMethod method in (ColorAveragingMethod[])
+                    Enum.GetValues(typeof(ColorAveragingMethod))
+            )
             {
                 Color result = pixels.GetAverageColor(method);
                 AssertColorsApproximatelyEqual(input, result, 1e-2f, method.ToString());
@@ -257,7 +263,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
             Sprite[] sprites = { null, sprite, null };
 
-            foreach (ColorAveragingMethod method in Enum.GetValues(typeof(ColorAveragingMethod)))
+            foreach (
+                ColorAveragingMethod method in (ColorAveragingMethod[])
+                    Enum.GetValues(typeof(ColorAveragingMethod))
+            )
             {
                 Color expected = sprite.GetAverageColor(method);
                 Color actual = sprites.GetAverageColor(method);

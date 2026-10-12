@@ -145,7 +145,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 out List<Vector2> offsets
             );
             int index = 0;
-            foreach (Vector2 offset in worldSpaceOffsets)
+            foreach (Vector2 offset in worldSpaceOffsets.AsValueEnumerableRequired())
             {
                 if (frames.Length <= index)
                 {

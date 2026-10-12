@@ -2986,9 +2986,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (elementType.IsEnum)
             {
-                foreach (object value in Enum.GetValues(elementType))
+                Array values = Enum.GetValues(elementType);
+                int valueCount = values.Length;
+                for (int index = 0; index < valueCount; ++index)
                 {
-                    yield return value;
+                    yield return values.GetValue(index);
                 }
                 yield break;
             }
@@ -4772,7 +4774,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             else if (snapshot is { Length: > 0 })
             {
-                foreach (object value in snapshot)
+                foreach (object value in new ValueArrayEnumerable(snapshot))
                 {
                     existingValues.Add(value);
                 }

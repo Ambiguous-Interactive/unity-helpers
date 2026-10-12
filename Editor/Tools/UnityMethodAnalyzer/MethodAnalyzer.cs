@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 {
 #if UNITY_EDITOR
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -155,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
             string root = Path.GetFullPath(rootPath);
             List<string> selectedPaths = new();
-            foreach (string directory in directories)
+            foreach (string directory in directories.AsValueEnumerableRequired())
             {
                 if (!string.IsNullOrWhiteSpace(directory))
                 {
@@ -175,7 +176,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 Status = "No source directories selected; report coverage is unverified.";
                 return;
             }
-            foreach (CompilerMessage message in messages)
+            foreach (CompilerMessage message in messages.AsValueEnumerableRequired())
             {
                 if (
                     string.IsNullOrWhiteSpace(message.file)

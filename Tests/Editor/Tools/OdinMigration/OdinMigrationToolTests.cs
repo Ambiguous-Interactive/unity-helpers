@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using System.IO;
     using System.Text;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
 
     [TestFixture]
@@ -65,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             StringAssert.Contains("\r\n", analysis.UpgradedSource);
             Assert.AreEqual(2, analysis.Changes.Count);
             OdinMigrationChange lockedChange = default;
-            foreach (OdinMigrationChange change in analysis.Changes)
+            foreach (OdinMigrationChange change in analysis.Changes.AsValueEnumerableRequired())
             {
                 if (
                     string.Equals(
@@ -106,7 +107,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.AreEqual(0, analysis.ReplacementCount);
             Assert.AreSame(Source, analysis.UpgradedSource);
             Assert.AreEqual(3, analysis.ManualReviews.Count);
-            foreach (OdinMigrationFinding finding in analysis.ManualReviews)
+            foreach (
+                OdinMigrationFinding finding in analysis.ManualReviews.AsValueEnumerableRequired()
+            )
             {
                 StringAssert.Contains("value type", finding.Message);
                 StringAssert.Contains("Odin animation", finding.Message);
@@ -179,7 +182,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.GreaterOrEqual(analysis.Blockers.Count, 3);
             Assert.GreaterOrEqual(analysis.ManualReviews.Count, 4);
             bool foundButtonGuidance = false;
-            foreach (OdinMigrationFinding finding in analysis.ManualReviews)
+            foreach (
+                OdinMigrationFinding finding in analysis.ManualReviews.AsValueEnumerableRequired()
+            )
             {
                 if (finding.Message.Contains("WButton supports methods on Unity objects"))
                 {
@@ -273,7 +278,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.AreSame(Source, analysis.UpgradedSource);
             Assert.AreEqual(1, analysis.Blockers.Count);
             Assert.AreEqual(2, analysis.ManualReviews.Count);
-            foreach (OdinMigrationFinding finding in analysis.ManualReviews)
+            foreach (
+                OdinMigrationFinding finding in analysis.ManualReviews.AsValueEnumerableRequired()
+            )
             {
                 StringAssert.Contains("Odin-owned serialized state", finding.Message);
             }
@@ -377,7 +384,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 analysis.UpgradedSource
             );
             Assert.AreEqual(5, analysis.ManualReviews.Count);
-            foreach (OdinMigrationFinding finding in analysis.ManualReviews)
+            foreach (
+                OdinMigrationFinding finding in analysis.ManualReviews.AsValueEnumerableRequired()
+            )
             {
                 StringAssert.Contains("public field", finding.Message);
             }
@@ -533,7 +542,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.AreEqual(0, analysis.ReplacementCount);
             Assert.AreSame(Source, analysis.UpgradedSource);
             Assert.AreEqual(2, analysis.ManualReviews.Count);
-            foreach (OdinMigrationFinding finding in analysis.ManualReviews)
+            foreach (
+                OdinMigrationFinding finding in analysis.ManualReviews.AsValueEnumerableRequired()
+            )
             {
                 StringAssert.DoesNotContain("could not be proven", finding.Message);
             }
@@ -660,7 +671,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
 
             Assert.AreEqual(1, analysis.ReplacementCount);
-            foreach (OdinMigrationChange change in analysis.Changes)
+            foreach (OdinMigrationChange change in analysis.Changes.AsValueEnumerableRequired())
             {
                 Assert.AreEqual(3, change.Line);
             }

@@ -103,7 +103,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 using PooledResource<List<string>> folderLease = Buffers<string>.List.Get(
                     out List<string> validFolders
                 );
-                foreach (string folder in folders)
+                foreach (string folder in folders.AsValueEnumerableRequired())
                 {
                     string normalizedFolder = folder.SanitizePath();
                     if (
@@ -466,7 +466,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
                     List<FieldInfo> res = new();
-                    foreach (FieldInfo f in baseFields)
+                    foreach (FieldInfo f in baseFields.AsValueEnumerableRequired())
                     {
                         if (f == null)
                         {
@@ -610,7 +610,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
                     List<FieldInfo> res = new();
-                    foreach (FieldInfo f in baseFields)
+                    foreach (FieldInfo f in baseFields.AsValueEnumerableRequired())
                     {
                         if (f != null && f.FieldType == typeof(string))
                         {
@@ -702,7 +702,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             using PooledResource<List<string>> requestedPathBuffer = Buffers<string>.List.Get(
                 out List<string> requestedPaths
             );
-            foreach (string assetPath in folders)
+            foreach (string assetPath in folders.AsValueEnumerableRequired())
             {
                 requestedPaths.Add(assetPath);
                 string normalizedPath = assetPath.SanitizePath();
@@ -757,7 +757,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             using PooledResource<HashSet<string>> includeSetLease = Buffers<string>.HashSet.Get(
                 out HashSet<string> includeSet
             );
-            foreach (string label in options.IncludeLabels ?? Array.Empty<string>())
+            foreach (string label in options.IncludeLabels.AsValueEnumerable())
             {
                 if (!string.IsNullOrWhiteSpace(label))
                 {
@@ -768,7 +768,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             using PooledResource<HashSet<string>> excludeSetLease = Buffers<string>.HashSet.Get(
                 out HashSet<string> excludeSet
             );
-            foreach (string label in options.ExcludeLabels ?? Array.Empty<string>())
+            foreach (string label in options.ExcludeLabels.AsValueEnumerable())
             {
                 if (!string.IsNullOrWhiteSpace(label))
                 {
@@ -1083,7 +1083,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
                     List<FieldInfo> res = new();
-                    foreach (FieldInfo f in baseFields)
+                    foreach (FieldInfo f in baseFields.AsValueEnumerableRequired())
                     {
                         if (f != null && typeof(Object).IsAssignableFrom(f.FieldType))
                         {
@@ -1813,7 +1813,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     out List<string> list
                 );
 
-                foreach (string s in folders)
+                foreach (string s in folders.AsValueEnumerableRequired())
                 {
                     list.Add(s);
                 }

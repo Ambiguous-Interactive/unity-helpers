@@ -91,24 +91,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 ulong state1 = ((ulong)_a << 32) | _b;
                 ulong state2 = ((ulong)_c << 32) | _d;
-                // Only the written span slice is read, so oversized SystemArrayPool rents are safe.
-                using PooledArray<byte> payloadLease = SystemArrayPool<byte>.Get(
-                    PayloadByteCount,
-                    clearArray: false,
-                    out byte[] buffer
-                );
-                Span<byte> payload = buffer.AsSpan(0, PayloadByteCount);
+                Span<byte> payload = stackalloc byte[PayloadByteCount];
                 BinaryPrimitives.WriteUInt32LittleEndian(payload.Slice(0, sizeof(uint)), _e);
                 BinaryPrimitives.WriteUInt32LittleEndian(
                     payload.Slice(sizeof(uint), sizeof(uint)),
                     _f
                 );
 
-                return BuildState(
-                    state1,
-                    state2,
-                    new ArraySegment<byte>(buffer, 0, PayloadByteCount)
-                );
+                return BuildStateFromSpan(state1, state2, payload);
             }
         }
 

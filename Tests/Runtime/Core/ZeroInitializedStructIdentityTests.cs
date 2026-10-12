@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Core.Serialization;
@@ -34,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     {
         private static IEnumerable<Type> CandidateStructs()
         {
-            foreach (Type type in RuntimeTypes())
+            foreach (Type type in RuntimeTypes().AsValueEnumerableRequired())
             {
                 if (
                     !type.IsValueType

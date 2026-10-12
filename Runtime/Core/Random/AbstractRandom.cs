@@ -7,7 +7,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using System.Runtime.Serialization;
+    using DataStructure;
     using DataStructure.Adapters;
+    using Extension;
     using Helper;
     using Utils;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -21,8 +23,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
-#else
-    using Extension;
 #endif
 
     /// <summary>
@@ -1152,7 +1152,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 default:
                 {
                     int i = 0;
-                    foreach (T element in collection)
+                    foreach (T element in collection.AsValueEnumerableRequired())
                     {
                         if (index == i++)
                         {
@@ -1457,16 +1457,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
             }
 
-            return new RandomState(
-                state1,
-                state2,
-                _cachedGaussian,
-                payload: payloadCopy,
-                bitBuffer: _bitBuffer,
-                bitCount: _bitCount,
-                byteBuffer: _byteBuffer,
-                byteCount: _byteCount
-            );
+            return CreateSnapshot(state1, state2, payloadCopy);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1523,6 +1514,29 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 2 => NextBool() ? values[0] : values[1],
                 _ => values[Next(count)],
             };
+        }
+
+        internal RandomState BuildStateFromSpan(
+            ulong state1,
+            ulong state2,
+            ReadOnlySpan<byte> payload
+        )
+        {
+            return CreateSnapshot(state1, state2, payload.ToArray());
+        }
+
+        private RandomState CreateSnapshot(ulong state1, ulong state2, byte[] payload)
+        {
+            return new RandomState(
+                state1,
+                state2,
+                _cachedGaussian,
+                payload: payload,
+                bitBuffer: _bitBuffer,
+                bitCount: _bitCount,
+                byteBuffer: _byteBuffer,
+                byteCount: _byteCount
+            );
         }
 
         private T RandomOf<T>(ReadOnlySpan<T> values)
@@ -1815,7 +1829,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private T NextFromEnumerable<T>(IEnumerable<T> enumerable)
         {
-            using IEnumerator<T> enumerator = enumerable.GetEnumerator();
+            using ValueEnumerator<T> enumerator = enumerable
+                .AsValueEnumerableRequired()
+                .GetEnumerator();
             if (!enumerator.MoveNext())
             {
                 throw new ArgumentException("Collection cannot be empty", nameof(enumerable));
