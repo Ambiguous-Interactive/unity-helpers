@@ -6,7 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections.Generic;
 
     /// <summary>Provides value enumeration of common collections through an enumerable interface.</summary>
-    /// <remarks>Arrays, exact lists, and exact hash sets avoid enumerator boxing. Other sources retain their original enumerator. Null sources are empty. Enumeration remains lazy and does not snapshot the collection.</remarks>
+    /// <remarks>Arrays, exact lists, and exact hash sets avoid enumerator boxing. Other sources retain their original enumerator. The constructor treats null as empty; RequireSource retains null-source failures. Enumeration remains lazy and does not snapshot the collection.</remarks>
     public readonly struct ValueEnumerable<T>
     {
         private readonly IEnumerable<T> _source;
@@ -23,6 +23,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             _source = source;
             _required = required;
+        }
+
+        /// <summary>Creates a lazy view that retains null-source enumeration failures.</summary>
+        public static ValueEnumerable<T> RequireSource(IEnumerable<T> source)
+        {
+            return new ValueEnumerable<T>(source, true);
         }
 
         /// <summary>Acquires the source enumerator for this view.</summary>

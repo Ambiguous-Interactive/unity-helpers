@@ -7,7 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Runtime.CompilerServices;
 
     /// <summary>Provides lazy dictionary enumeration without boxing an exact dictionary's enumerator.</summary>
-    /// <remarks>Other sources preserve their enumeration protocol. Null sources are empty. The view does not snapshot its source.</remarks>
+    /// <remarks>Other sources preserve their enumeration protocol. The constructor treats null as empty; RequireSource retains null-source failures. The view does not snapshot its source.</remarks>
     public readonly struct ValueDictionaryEnumerable<TKey, TValue>
     {
         private readonly IEnumerable<KeyValuePair<TKey, TValue>> _source;
@@ -27,6 +27,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             _source = source;
             _required = required;
+        }
+
+        /// <summary>Creates a lazy view that retains null-source enumeration failures.</summary>
+        public static ValueDictionaryEnumerable<TKey, TValue> RequireSource(
+            IEnumerable<KeyValuePair<TKey, TValue>> source
+        )
+        {
+            return new ValueDictionaryEnumerable<TKey, TValue>(source, true);
         }
 
         /// <summary>Acquires the source enumerator for this view.</summary>

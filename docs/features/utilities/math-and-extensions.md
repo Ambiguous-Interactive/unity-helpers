@@ -938,6 +938,12 @@ public static class CollectionSum
 dictionaries, keep their original enumerator and its allocations. Use `AsValueEnumerable`
 for pair arrays, lists and hash sets.
 
+Use `ValueEnumerable<T>.RequireSource` or
+`ValueDictionaryEnumerable<TKey, TValue>.RequireSource` when a null sequence must retain its
+enumeration failure. Creating the view stays lazy; acquiring its enumerator raises the original
+null-source failure. Generated protobuf formatters use these factories for interface-declared
+collections, keeping custom protocols and concrete struct receivers.
+
 <!-- doc-sample: compiles -->
 
 ```csharp

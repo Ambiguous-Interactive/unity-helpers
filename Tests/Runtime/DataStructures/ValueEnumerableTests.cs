@@ -12,11 +12,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [TestFixture]
     public sealed class ValueEnumerableTests
     {
-        [TestCase(0)]
-        [TestCase(1)]
-        [TestCase(17)]
-        [TestCase(10001)]
-        public void ConcreteSourcesPreserveOrderAndReenumeration(int count)
+        [TestCase(0, false)]
+        [TestCase(0, true)]
+        [TestCase(1, false)]
+        [TestCase(1, true)]
+        [TestCase(17, false)]
+        [TestCase(17, true)]
+        [TestCase(10001, false)]
+        [TestCase(10001, true)]
+        public void ConcreteSourcesPreserveOrderAndReenumeration(int count, bool required)
         {
             int[] values = new int[count];
             for (int index = 0; index < count; ++index)
@@ -36,7 +40,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 {
                     expected.Add(value);
                 }
-                ValueEnumerable<int> view = source.AsValueEnumerable();
+                ValueEnumerable<int> view = required
+                    ? ValueEnumerable<int>.RequireSource(source)
+                    : source.AsValueEnumerable();
                 for (int repetition = 0; repetition < 2; ++repetition)
                 {
                     List<int> actual = new List<int>();
@@ -63,6 +69,27 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             ValueEnumerator<int> empty = default;
             Assert.That(empty.MoveNext(), Is.False);
             empty.Dispose();
+        }
+
+        [Test]
+        public void RequiredFactoryRetainsNullFailureAtAcquisition()
+        {
+            ValueEnumerable<int> view = ValueEnumerable<int>.RequireSource(null);
+            Assert.Throws<NullReferenceException>(() => view.GetEnumerator());
+        }
+
+        [Test]
+        public void RequiredFactoryKeepsCustomAcquisitionLazy()
+        {
+            EnumerationProbe source = new EnumerationProbe();
+            ValueEnumerable<int> view = ValueEnumerable<int>.RequireSource(source);
+            Assert.IsEmpty(source.Events);
+            source.Failure = 1;
+            Assert.Throws<InvalidOperationException>(() => view.GetEnumerator());
+            CollectionAssert.AreEqual(
+                new[] { nameof(EnumerationProbe.GetEnumerator) },
+                source.Events
+            );
         }
 
         [Test]

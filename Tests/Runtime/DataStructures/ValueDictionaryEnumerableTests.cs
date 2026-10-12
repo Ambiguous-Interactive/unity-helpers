@@ -119,6 +119,37 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void RequiredFactoryRetainsNullFailureAtAcquisition()
+        {
+            ValueDictionaryEnumerable<int, int> view = ValueDictionaryEnumerable<
+                int,
+                int
+            >.RequireSource(null);
+            Assert.Throws<NullReferenceException>(() => view.GetEnumerator());
+        }
+
+        [Test]
+        public void RequiredFactoryAcquiresAfterLaterDictionaryChanges()
+        {
+            Dictionary<int, int> source = new Dictionary<int, int>();
+            ValueDictionaryEnumerable<int, int> view = ValueDictionaryEnumerable<
+                int,
+                int
+            >.RequireSource(source);
+            source.Add(1, 2);
+            for (int repetition = 0; repetition < 2; ++repetition)
+            {
+                int count = 0;
+                foreach (KeyValuePair<int, int> entry in view)
+                {
+                    Assert.AreEqual(new KeyValuePair<int, int>(1, 2), entry);
+                    ++count;
+                }
+                Assert.AreEqual(1, count);
+            }
+        }
+
+        [Test]
         public void DictionaryMutationMatchesConcreteEnumerator()
         {
             Dictionary<int, int> source = new Dictionary<int, int> { { 1, 2 } };

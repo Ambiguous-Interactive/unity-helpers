@@ -145,6 +145,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly string _collectionQualified;
         private readonly string _collectionDisplay;
         private readonly bool _collectionIsValueType;
+        private readonly bool _collectionIsInterface;
         private readonly bool _overwrite;
         private readonly bool _isPacked;
         private readonly bool _elementIsReference;
@@ -161,6 +162,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string collectionQualified,
             string collectionDisplay,
             bool collectionIsValueType,
+            bool collectionIsInterface,
             bool overwrite,
             bool elementIsGeneric,
             bool isPacked
@@ -175,6 +177,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _collectionQualified = collectionQualified;
             _collectionDisplay = collectionDisplay;
             _collectionIsValueType = collectionIsValueType;
+            _collectionIsInterface = collectionIsInterface;
             _overwrite = overwrite;
             _isPacked = isPacked;
             _elementIsGeneric = elementIsGeneric;
@@ -238,6 +241,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 TypeNaming.Display(type),
                 type.IsValueType,
+                type.TypeKind == TypeKind.Interface,
                 overwriteList,
                 elementIsGeneric,
                 isPacked
@@ -297,6 +301,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 TypeNaming.Display(element),
                 array.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 TypeNaming.Display(array),
+                false,
                 false,
                 // Wrapper arrays have no constructor seed, so reads replace rather than append.
                 true,
@@ -955,8 +960,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </summary>
         /// <remarks>
         /// An array is walked by index because that is what the compiler would do anyway and it
-        /// keeps the bounds check visible; every other collection is walked with <c>foreach</c> over
-        /// its declared type, which binds to the concrete enumerator. That matters for a struct
+        /// keeps the bounds check visible. Interface collections use a required value view; other
+        /// collections retain their declared enumerator. That matters for a struct
         /// collection: enumerating it through <c>IEnumerable&lt;T&gt;</c> would box it on every
         /// serialization, which is exactly the cost a struct collection exists to avoid.
         /// </remarks>
@@ -1012,7 +1017,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + " "
                         + ElementLocal
                         + " in "
-                        + Access
+                        + (_collectionIsInterface ? RequireSource(Access) : Access)
                         + ")"
                         + Writer.Open
                 );
@@ -1398,6 +1403,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return (Guard == null ? "read." + Name : "(" + Guard + " ? read." + Name + " : null)")
                 + " ?? "
                 + fresh;
+        }
+
+        private string RequireSource(string source)
+        {
+            return "global::WallstopStudios.UnityHelpers.Core.DataStructure.ValueEnumerable<"
+                + _elementQualified
+                + ">."
+                + nameof(RequireSource)
+                + "("
+                + source
+                + ")";
         }
     }
 }

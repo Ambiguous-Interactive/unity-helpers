@@ -22,7 +22,8 @@ unresolved enumerators or compilation errors in its input compilations:
 - The Odin editor-test configuration binds the remaining conditional array traversal.
 - The shipped protobuf generator runs before semantic analysis where source generation is needed.
 
-The CSV is a snapshot. Source hashes detect when a row needs another audit; it is not a permanent
+The authored CSV is a snapshot at commit `ec3f5588`. Later test additions require another
+authored-site audit. Source hashes detect when a row needs another audit; it is not a permanent
 allowlist or a check that silently accepts later code. The two samples and acceptance templates are
 included explicitly because Unity does not import those package folders automatically.
 
@@ -38,7 +39,8 @@ included explicitly because Unity does not import those package folders automati
 The changes avoid boxing for interface-held arrays, exact lists, exact hash sets and exact
 dictionaries. Custom sequences and derived collections retain their original acquisition,
 mutation, exception and cleanup protocols. Existing null failures remain failures in migrated
-internal calls; the public views deliberately treat null as empty.
+internal calls. Public view constructors treat null as empty; the public `RequireSource`
+factories retain acquisition failures.
 
 Explicit generic enumerators use the same value view. Internally owned generator lists keep their
 concrete type through five loops. Bit-set JSON writers avoid their iterator factories, regex
@@ -94,9 +96,28 @@ fixture inputs whose concrete storage can be retained or dispatched safely. It p
 that test the original protocol, independent expected results and allocating positive controls.
 A value wrapper alone cannot remove a reference iterator already created by a lazy factory.
 
+## Generated Code
+
+The [generated inventory](./generated-enumeration-audit.csv) separately records emitted protobuf
+loops. Unity 6000.4.6 references and C# 9 bind 45 assemblies in both default and
+`SINGLE_THREADED` configurations, with no compilation errors or missing sources.
+Each configuration contains 150 emitted sites: 127 value returns, 16 indexed arrays and seven
+reference returns. The previous generator had 106 value returns and 28 reference returns.
+
+Interface-declared repeated and map collections now use required value views, avoiding boxing at
+21 emitted sites. Concrete classes and structs retain their declared enumeration protocol.
+The seven retained reference returns belong to `ReadOnlyCollection`, `ReadOnlyDictionary` and
+`Collection`; their framework traversal is preserved. The inventory records emitted source hashes
+and the shipped generator hash. Its coverage is the compiled fixture and sample contracts, rather
+than every contract a future consumer could declare.
+
+Eight semantic compiler controls cover the supported repeated and dictionary interfaces. All eight
+fail against the previous generator and pass against the changed generator. The complete Release
+protobuf compatibility suites pass 1,250 v3 cases and 1,218 v2 cases without skips.
+
 ## Validation Limits
 
-The Release host enumeration suite passes 59 tests without skips. Native Unity 6000.4.6 passes the
+The Release host enumeration suite passes 67 tests without skips. Native Unity 6000.4.6 passes the
 array behavior controls, dictionary protocols and affected extension, geometry, JSON, editor and
 reflection fixtures. The affected protobuf host fixtures pass 209 tests for each oracle version. Allocation assertions
 require an allocating positive control; allocation-only inconclusive results remain unqualified.

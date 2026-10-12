@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `AsValueEnumerable` and `AsValueDictionaryEnumerable` to avoid enumerator boxing for common collections held through interfaces, while preserving custom enumeration ([guide](./docs/features/utilities/math-and-extensions.md#value-enumeration), [#882](https://github.com/Ambiguous-Interactive/unity-helpers/issues/882)).
+- Add `AsValueEnumerable` and `AsValueDictionaryEnumerable` to avoid boxing common interface-held collections and generated protobuf loops, with required-source factories for null failures ([guide](./docs/features/utilities/math-and-extensions.md#value-enumeration), [#882](https://github.com/Ambiguous-Interactive/unity-helpers/issues/882)).
 - Add scoped `BrowserStorage` string reads, writes and deletes through WebGL local storage, with PlayerPrefs on other platforms and explicit failure results ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add Span overloads for all 18 sorting algorithms, including slices and stack-allocated data, while preserving caller data when comparisons fail ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `SingleThreadedThreadPool.TryEnqueue` overloads so callers can detect rejected background work and choose a fallback ([#986](https://github.com/Ambiguous-Interactive/unity-helpers/issues/986)).
@@ -112,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Reduce Base64 decoding overhead with a privately owned array returned in `finally`, preserving strict UTF-8 handling ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - Reduce `IntMap` lookup collisions with a 0.25 load limit, using more table storage while keeping the default 64 slots. Allow longer performance-test calibration windows while preserving the 20 ms default ([#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926)).
 - Reduce repeated pool purge and disposal snapshot allocations with bounded buffer reuse that preserves nested callback ownership.
 - Improve directly constructed `PooledResource<T>` wrappers with no return callback by avoiding disposal tracking; callback-backed leases remain copy-safe ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
@@ -469,8 +470,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clamp or refuse a capacity a payload claims in `Deque`, `SparseSet`, `BitSet` and `ImmutableBitSet`. Six bytes claiming `int.MaxValue` previously allocated 8-16 GB and crashed the player. Raise `SerializationCapacityLimits.MaximumRestoredCapacity` if your saves exceed 1,048,576 elements ([#429](https://github.com/Ambiguous-Interactive/unity-helpers/pull/429)).
 
 ### Changed
-
-- Reduce Base64 decoding overhead with a privately owned array returned in `finally`, preserving strict UTF-8 handling ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 
 - Change Editor `MatchColliderToSprite.OnValidate` to preserve collider geometry; programmatic callers now use `RebuildCollider()`. Inspector edits and the match button still rebuild immediately with Undo support. See [Sprite Colliders](./docs/features/inspector/utility-components.md#matchcollidertosprite).
 - Reduce script compilation work for generic protobuf and JSON contracts ([#706](https://github.com/Ambiguous-Interactive/unity-helpers/issues/706)).
