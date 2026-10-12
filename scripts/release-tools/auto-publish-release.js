@@ -14,7 +14,7 @@ function releaseCandidate(event, pulls, version, repository) {
     run?.event !== "push" ||
     run?.head_branch !== branch ||
     run?.head_repository?.full_name !== repository ||
-    run?.conclusion !== "success" ||
+    !["success", "skipped"].includes(run?.conclusion) ||
     !/^[a-f0-9]{40}$/.test(run?.head_sha ?? "") ||
     !/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version)
   ) {
@@ -80,7 +80,7 @@ async function autoPublish({
   if (
     !/^[a-f0-9]{40}$/.test(sha ?? "") ||
     event.workflow_run?.event !== "push" ||
-    event.workflow_run?.conclusion !== "success" ||
+    !["success", "skipped"].includes(event.workflow_run?.conclusion) ||
     event.repository?.fork ||
     event.repository?.full_name !== repository ||
     event.workflow_run?.head_branch !== event.repository?.default_branch ||
@@ -108,6 +108,18 @@ async function autoPublish({
       );
       const existing = publishRuns.find((run) => run.display_title === runTitle(candidate));
       if (existing) return { status: "already-dispatched", runId: existing.id, ...candidate };
+      const claimRef = `refs/tags/release-publish-claims/${version}`;
+      try {
+        const claim = await api.post("git/refs", { ref: claimRef, sha });
+        if (claim?.ref !== claimRef || claim?.object?.sha !== sha)
+          throw new Error("Publication claim does not match the validated source.");
+      } catch (error) {
+        if (error.status !== 409 && error.status !== 422) throw error;
+        const claim = await api.get(`git/ref/tags/release-publish-claims/${version}`);
+        if (claim?.ref !== claimRef || !/^[a-f0-9]{40}$/.test(claim?.object?.sha ?? ""))
+          throw new Error("Invalid existing publication claim.");
+        return { status: "already-claimed", claimedSha: claim.object.sha, ...candidate };
+      }
       await api.post("actions/workflows/release.yml/dispatches", {
         ref: candidate.branch,
         inputs: { version, source_ref: sha, export_only: "false", allow_tag_recovery: "false" }
@@ -137,7 +149,10 @@ function createApi(repository, token, fetcher = fetch) {
       redirect: "error"
     });
     if (!response.ok)
-      throw new Error(`GitHub ${method} ${endpoint} failed with HTTP ${response.status}.`);
+      throw Object.assign(
+        new Error(`GitHub ${method} ${endpoint} failed with HTTP ${response.status}.`),
+        { status: response.status }
+      );
     return response.status === 204 ? null : response.json();
   }
   return {

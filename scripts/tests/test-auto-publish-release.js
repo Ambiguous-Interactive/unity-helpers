@@ -47,6 +47,9 @@ const runs = requiredWorkflows.map((file, index) => ({
 }));
 const candidate = releaseCandidate(event, [pull], version, repository);
 assert.deepEqual(candidate, { sha, version, branch: "main", pull: 42 });
+const skippedEvent = structuredClone(event);
+skippedEvent.workflow_run.conclusion = "skipped";
+assert.deepEqual(releaseCandidate(skippedEvent, [pull], version, repository), candidate);
 for (const mutate of [
   (e) => (e.repository.fork = true),
   (e) => (e.repository.full_name = "outside/package"),
@@ -134,7 +137,15 @@ assert.equal(
 );
 
 async function main() {
-  function fixture({ states = [runs], releases = [], existing = [], error } = {}) {
+  function fixture({
+    states = [runs],
+    releases = [],
+    existing = [],
+    error,
+    claimError,
+    claimedSha = sha,
+    invalidClaim = false
+  } = {}) {
     const posts = [];
     let reads = 0;
     let sleeps = 0;
@@ -145,6 +156,10 @@ async function main() {
       },
       api: {
         async get(endpoint) {
+          if (endpoint.startsWith("git/ref/"))
+            return invalidClaim
+              ? {}
+              : { ref: `refs/tags/release-publish-claims/${version}`, object: { sha: claimedSha } };
           assert.equal(endpoint, `contents/package.json?ref=${sha}`);
           return {
             encoding: "base64",
@@ -161,6 +176,10 @@ async function main() {
         },
         async post(endpoint, body) {
           posts.push({ endpoint, body });
+          if (endpoint === "git/refs") {
+            if (claimError) throw claimError;
+            return { ref: body.ref, object: { sha: body.sha } };
+          }
           if (error) throw error;
         }
       },
@@ -173,7 +192,16 @@ async function main() {
   const accepted = fixture({ states: [[], runs] });
   assert.equal((await autoPublish({ event, repository, ...accepted })).status, "dispatched");
   assert.equal(accepted.sleeps, 1);
+  const skippedCompletion = fixture();
+  assert.equal(
+    (await autoPublish({ event: skippedEvent, repository, ...skippedCompletion })).status,
+    "dispatched"
+  );
   assert.deepEqual(accepted.posts, [
+    {
+      endpoint: "git/refs",
+      body: { ref: `refs/tags/release-publish-claims/${version}`, sha }
+    },
     {
       endpoint: "actions/workflows/release.yml/dispatches",
       body: {
@@ -202,7 +230,58 @@ async function main() {
   assert.equal(exhausted.posts.length, 0);
   const ambiguous = fixture({ error: new Error("dispatch response lost") });
   await assert.rejects(autoPublish({ event, repository, ...ambiguous }), /response lost/);
-  assert.equal(ambiguous.posts.length, 1, "An uncertain mutation must never be retried.");
+  assert.equal(ambiguous.posts.length, 2, "An uncertain mutation must never be retried.");
+  for (const status of [409, 422]) {
+    const claimed = fixture({ claimError: Object.assign(new Error("claim exists"), { status }) });
+    assert.equal((await autoPublish({ event, repository, ...claimed })).status, "already-claimed");
+    assert.equal(claimed.posts.length, 1);
+  }
+  const otherSource = fixture({
+    claimError: Object.assign(new Error("claim exists"), { status: 422 }),
+    claimedSha: "b".repeat(40)
+  });
+  assert.equal(
+    (await autoPublish({ event, repository, ...otherSource })).claimedSha,
+    "b".repeat(40)
+  );
+  assert.equal(otherSource.posts.length, 1);
+  const invalidClaim = fixture({
+    claimError: Object.assign(new Error("claim exists"), { status: 422 }),
+    invalidClaim: true
+  });
+  await assert.rejects(autoPublish({ event, repository, ...invalidClaim }), /Invalid existing/);
+  assert.equal(invalidClaim.posts.length, 1);
+  for (const claimError of [
+    new Error("claim response lost"),
+    Object.assign(new Error("claim forbidden"), { status: 403 })
+  ]) {
+    const uncertain = fixture({ claimError });
+    await assert.rejects(autoPublish({ event, repository, ...uncertain }), /claim/);
+    assert.equal(uncertain.posts.length, 1);
+  }
+  const racing = fixture();
+  let reserved = false;
+  const originalPost = racing.api.post;
+  racing.api.post = async (endpoint, body) => {
+    if (endpoint === "git/refs") {
+      if (reserved) throw Object.assign(new Error("claim exists"), { status: 422 });
+      reserved = true;
+    }
+    return originalPost(endpoint, body);
+  };
+  const raceResults = await Promise.all([
+    autoPublish({ event, repository, ...racing }),
+    autoPublish({ event, repository, ...racing })
+  ]);
+  assert.deepEqual(raceResults.map((result) => result.status).sort(), [
+    "already-claimed",
+    "dispatched"
+  ]);
+  assert.equal(
+    racing.posts.filter((post) => post.endpoint.endsWith("dispatches")).length,
+    1,
+    "Run listing lag must not permit duplicate dispatches."
+  );
   const forbidden = structuredClone(event);
   forbidden.workflow_run.event = "pull_request";
   assert.equal(
@@ -255,6 +334,33 @@ async function main() {
     fs.readFileSync(path.join(root, ".github/workflows/release-auto-publish.yml"), "utf8")
   );
   assert.deepEqual(workflow.on.workflow_run.types, ["completed"]);
+  const pushNames = fs
+    .readdirSync(path.join(root, ".github/workflows"))
+    .filter((file) => file.endsWith(".yml"))
+    .map((file) => yaml.parse(fs.readFileSync(path.join(root, ".github/workflows", file), "utf8")))
+    .filter((entry) => entry.on?.push)
+    .map((entry) => entry.name);
+  assert.deepEqual(
+    [...workflow.on.workflow_run.workflows].sort(),
+    pushNames.sort(),
+    "Every push workflow completion must wake publication."
+  );
+  assert.equal(workflow.jobs.publish.permissions.contents, "write");
+  for (const file of requiredWorkflows) {
+    const validation = yaml.parse(
+      fs.readFileSync(path.join(root, ".github/workflows", file), "utf8")
+    );
+    assert.ok(validation.concurrency.group.includes("github.event_name == 'push' && github.sha"));
+    assert.equal(
+      validation.concurrency["cancel-in-progress"],
+      "${{ github.event_name == 'pull_request' }}"
+    );
+    if (file === "unity-tests.yml") {
+      const access = validation.jobs["runner-preflight"].concurrency;
+      assert.ok(access.group.includes("github.event_name == 'push' && github.sha"));
+      assert.equal(access["cancel-in-progress"], "${{ github.event_name == 'pull_request' }}");
+    }
+  }
   assert.equal(workflow.concurrency["cancel-in-progress"], false);
   assert.equal(
     workflow.concurrency.group,

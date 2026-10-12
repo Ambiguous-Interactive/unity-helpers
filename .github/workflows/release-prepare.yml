@@ -236,7 +236,7 @@ jobs:
             if [ "${AUTO_PUBLISH}" = "true" ]; then
               echo "After main validation passes, Release Publish starts automatically for the exact merged commit."
             else
-              echo "Run Release Publish on \`${DEFAULT_BRANCH}\`; version defaults to the selected source's package metadata."
+              echo "Run the Release Publish workflow on \`${DEFAULT_BRANCH}\`; version defaults to the selected source's package metadata."
               echo "Leave \`source_ref\` as \`${DEFAULT_BRANCH}\` for the normal path."
             fi
             echo "Release Publish validates, packs npm, creates the \`.unitypackage\`, creates the release tag if needed, publishes npm, and publishes the GitHub Release assets."

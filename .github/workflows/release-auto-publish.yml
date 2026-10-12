@@ -7,6 +7,14 @@ on:
       - Local Gates
       - Repo Lint
       - WallstopProto Generator
+      - Build and Publish Devcontainer
+      - Deploy Documentation to GitHub Pages
+      - LLM Instructions Lint
+      - Deploy Documentation to GitHub Wiki
+      - Sync Issue Template Versions
+      - Sync Banner Version
+      - Validate Documentation
+      - Validate Wiki Links
     types: [completed]
     branches: [main]
 
@@ -19,11 +27,11 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event.repository.fork == false && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    if: github.event.repository.fork == false && github.event.workflow_run.event == 'push' && contains(fromJSON('["success", "skipped"]'), github.event.workflow_run.conclusion)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
       pull-requests: read
       actions: write
     steps:
