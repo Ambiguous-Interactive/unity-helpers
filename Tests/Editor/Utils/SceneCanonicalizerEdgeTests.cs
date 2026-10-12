@@ -381,6 +381,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             }
         }
 
+        [TestCase("ExactIdProbel6Aifv", 2)]
+        [TestCase("ExactIdProbeINJf15", 2)]
+        [TestCase("ExactIdProbeZ4Hffo", 4)]
+        public void AllocationSkipsEngineReservedPrefabIdentifiers(string name, long expected)
+        {
+            string yaml = Scene.Replace("m_Name: Root", "m_Name: " + name);
+            string canonical = SceneCanonicalizer.CanonicalizeYaml(yaml);
+            Match anchor = Regex.Match(canonical, @"(?m)^--- !u!1 &([0-9]+)");
+            Assert.That(anchor.Success, Is.True);
+            Assert.That(long.Parse(anchor.Groups[1].Value), Is.EqualTo(expected));
+            Assert.That(SceneCanonicalizer.CanonicalizeYaml(canonical), Is.EqualTo(canonical));
+        }
+
+        [Test]
+        public void CollisionWrapSkipsReservedAndUnresolvedIdentifiers()
+        {
+            string yaml = Scene.Replace(
+                "  m_Name: Root\n",
+                "  m_Name: ExactIdProbesRdcmz\n  missing: {fileID: 2147483647}\n  other: {fileID: 2}\n"
+            );
+            string canonical = SceneCanonicalizer.CanonicalizeYaml(yaml);
+            Match anchor = Regex.Match(canonical, @"(?m)^--- !u!1 &([0-9]+)");
+            Assert.That(anchor.Success, Is.True);
+            Assert.That(long.Parse(anchor.Groups[1].Value), Is.EqualTo(4));
+            Assert.That(canonical, Does.Contain("missing: {fileID: 2147483647}"));
+            Assert.That(canonical, Does.Contain("other: {fileID: 2}"));
+            Assert.That(SceneCanonicalizer.CanonicalizeYaml(canonical), Is.EqualTo(canonical));
+        }
+
         [Test]
         public void HashCollisionsReceiveDistinctStableIdentifiers()
         {

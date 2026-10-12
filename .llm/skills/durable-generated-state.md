@@ -99,6 +99,10 @@ volatile generated IDs.
 
 Verify renumbered and shuffled documents as well as fresh bakes and native
 reloads with references intact. Check content independently of the remapping.
+Reserve engine-owned IDs before allocation, including collision wraparound;
+a positive integer is not proof that the importer accepts it. Force hashes and
+collisions to reserved IDs, then reimport and reload in Unity. Derive the test
+from saved names: Unity can rename a prefab root to its asset filename.
 For text rewrites, recognize quoted and block values at syntax boundaries;
 punctuation inside a plain scalar does not begin a new value. Probe the native
 serializer's output and retain those cases as regressions. See

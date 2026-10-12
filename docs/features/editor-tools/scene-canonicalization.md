@@ -35,8 +35,9 @@ input instead of treating them as a successful rewrite.
 - Components use their class and ordinal among components of that class.
 - Prefab instances use their source GUID, parent and normalized modifications.
   Repeated instances use sibling order to keep their stripped references distinct.
-- IDs use a positive FNV-1a hash. Hash collisions resolve in structural key and
-  normalized body order.
+- IDs use a positive FNV-1a hash and skip Unity-reserved IDs `0`, `1` and `3`.
+  Hash collisions resolve in structural key and normalized body order, including
+  when allocation wraps around the ID range.
 - Local references follow the remap. External GUID references, quoted text,
   block scalars and comments stay unchanged.
 - The `SceneRoots` anchor stays at `long.MaxValue`. Its local root references follow

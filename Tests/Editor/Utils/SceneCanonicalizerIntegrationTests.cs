@@ -205,6 +205,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             }
         }
 
+        [TestCase("ExactIdProbel6Aifv")]
+        [TestCase("ExactIdProbeINJf15")]
+        [TestCase("ExactIdProbeZ4Hffo")]
+        public void ReservedIdentifierHashesBakePrefabsThatImportWithReferencesIntact(string name)
+        {
+            string path = _folder + "/" + name + ".prefab";
+            GameObject source = Track(new GameObject(name));
+            GameObject child = Track(new GameObject("Child"));
+            child.transform.SetParent(source.transform);
+            child.transform.localPosition = new Vector3(1, 2, 3);
+            Rigidbody body = source.AddComponent<Rigidbody>();
+            FixedJoint joint = child.AddComponent<FixedJoint>();
+            joint.connectedBody = body;
+            TextMesh text = source.AddComponent<TextMesh>();
+            text.text = "hello{fileID:1}";
+            Assert.That(PrefabUtility.SaveAsPrefabAsset(source, path) != null, Is.True);
+            Assert.That(
+                SceneCanonicalizer.TryCanonicalizeFile(path, out bool changed, out Exception error),
+                Is.True,
+                error?.ToString()
+            );
+            Assert.That(changed, Is.True);
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            Assert.That(prefab != null, Is.True);
+            Assert.That(prefab.name, Is.EqualTo(name));
+            Assert.That(prefab.GetComponent<TextMesh>().text, Is.EqualTo(text.text));
+            Assert.That(
+                prefab.GetComponentInChildren<FixedJoint>().connectedBody,
+                Is.SameAs(prefab.GetComponent<Rigidbody>())
+            );
+            Assert.That(
+                prefab.transform.GetChild(0).localPosition,
+                Is.EqualTo(new Vector3(1, 2, 3))
+            );
+            string canonical = File.ReadAllText(path);
+            Assert.That(SceneCanonicalizer.CanonicalizeYaml(canonical), Is.EqualTo(canonical));
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void AddedSiblingsUnderPrefabParentsBakeAndReloadConsistently(bool prefabChildren)

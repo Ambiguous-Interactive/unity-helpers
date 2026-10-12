@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `SceneCanonicalizer` for stable generated scenes and prefabs, with local reference remapping and opt-in folder imports ([guide](./docs/features/editor-tools/scene-canonicalization.md), [#999](https://github.com/Ambiguous-Interactive/unity-helpers/issues/999)).
+- Add `SceneCanonicalizer` for stable generated scenes and prefabs, with local reference remapping, Unity-reserved ID avoidance and opt-in folder imports ([guide](./docs/features/editor-tools/scene-canonicalization.md), [#999](https://github.com/Ambiguous-Interactive/unity-helpers/issues/999)).
 - Add `ReferenceIdentityComparer<T>` and `UnityObjectMap<TKey, TValue>` for managed identity, destroyed-key cleanup and optional scene-unload pruning ([guide](./docs/features/utilities/reference-identity.md), [#998](https://github.com/Ambiguous-Interactive/unity-helpers/issues/998)).
 - Add the `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` opt-out to use Unity bases for both singleton families and `AttributeEffect` while retaining Odin drawers.
 - Add `AsValueEnumerable` and `AsValueDictionaryEnumerable` to avoid boxing common interface-held collections and generated protobuf loops, with required-source factories for null failures ([guide](./docs/features/utilities/math-and-extensions.md#value-enumeration), [#882](https://github.com/Ambiguous-Interactive/unity-helpers/issues/882)).

@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Canonicalizes Unity text scenes and prefabs using structural object identities.</summary>
+    /// <remarks>Generated IDs skip Unity-reserved values while external references remain unchanged.</remarks>
     public static partial class SceneCanonicalizer
     {
         private const string DocumentMarker = "--- !u!";
@@ -61,6 +62,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private const ulong FnvOffsetBasis = 0xcbf29ce484222325UL;
         private const ulong FnvPrime = 0x100000001b3UL;
+
+        private static readonly long[] ReservedFileIds = { 0, 1, 3 };
 
         /// <summary>Canonicalizes a saved scene or prefab, returning true only when the file changes.</summary>
         /// <remarks>File replacement is outside Unity Undo. Reopen loaded assets after rewriting their identifiers.</remarks>
@@ -463,6 +466,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             ordered.Sort(static (left, right) => CompareByKeyThenNormalized(left, right));
 
             HashSet<long> used = reserved;
+            foreach (long identifier in ReservedFileIds)
+            {
+                used.Add(identifier);
+            }
             foreach (SceneDocument document in ordered)
             {
                 if (document._fileId == SceneRootsSentinelFileId)
