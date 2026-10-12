@@ -7,7 +7,7 @@ its source hash, compiler binding, concrete enumerator type and retained-allocat
 
 ## Coverage
 
-The inventory covers 2,556 C# files and 3,466 distinct `foreach` or explicit `GetEnumerator` sites.
+The inventory covers 2,556 C# files and 3,473 distinct `foreach` or explicit `GetEnumerator` sites.
 Syntax discovery parses every combination of conditional symbols in each file, deduplicating sites
 by path, source offset and syntax kind. It includes tracked sources and the new enumeration files;
 generated build outputs are excluded.
@@ -22,8 +22,7 @@ unresolved enumerators or compilation errors in its input compilations:
 - The Odin editor-test configuration binds the remaining conditional array traversal.
 - The shipped protobuf generator runs before semantic analysis where source generation is needed.
 
-The authored CSV is a snapshot at commit `ec3f5588`. Later test additions require another
-authored-site audit. Source hashes detect when a row needs another audit; it is not a permanent
+The authored CSV is a snapshot at source commit `35ceec70`. Source hashes detect when a row needs another audit; it is not a permanent
 allowlist or a check that silently accepts later code. The two samples and acceptance templates are
 included explicitly because Unity does not import those package folders automatically.
 
@@ -33,8 +32,8 @@ included explicitly because Unity does not import those package folders automati
 | ------------------------ | ----: | ------------------------------------------------------------------------ |
 | Compiler-indexed arrays  | 1,244 | No enumerator object; element conversions can still box                  |
 | Compiler-indexed strings |    22 | UTF-16 character indexing; no enumerator object                          |
-| Value return             | 1,825 | Concrete value protocol, with source and traversal-storage caveats below |
-| Reference return         |   375 | 240 reviewed test sites and 135 retained production sites                |
+| Value return             | 1,830 | Concrete value protocol, with source and traversal-storage caveats below |
+| Reference return         |   377 | 242 reviewed test sites and 135 retained production sites                |
 
 The changes avoid boxing for interface-held arrays, exact lists, exact hash sets and exact
 dictionaries. Custom sequences and derived collections retain their original acquisition,
@@ -78,14 +77,14 @@ enumerator can allocate its internal stack. The 68 trie sites use pooled travers
 cold rents and growth can allocate, and string results can allocate. Other factories, conversions
 and loop bodies remain independent of the enumerator representation.
 
-The 240 retained test reference sites have specific reviewed dispositions:
+The 242 retained test reference sites have specific reviewed dispositions:
 
 | Disposition                | Sites | Reason                                                         |
 | -------------------------- | ----: | -------------------------------------------------------------- |
 | Protocol and compatibility |    72 | Directly exercises the original iterator or interface contract |
 | Lazy iterator or query     |   109 | The source factory already owns its reference iterator         |
 | Independent oracle         |    24 | Keeps behavior comparisons and allocation controls independent |
-| Framework collection       |    13 | Backing storage or traversal belongs to the framework          |
+| Framework collection       |    15 | Backing storage or traversal belongs to the framework          |
 | Reflection stream          |     8 | Reflection discovery or its deferred filter owns the iterator  |
 | Filesystem source          |     7 | Keeps deferred file discovery and cleanup                      |
 | Concurrent registry        |     5 | Retains the BCL concurrent traversal protocol                  |
@@ -116,6 +115,10 @@ fail against the previous generator and pass against the changed generator. The 
 protobuf compatibility suites pass 1,250 v3 cases and 1,218 v2 cases without skips.
 
 ## Validation Limits
+
+Fresh native controls on the loaded required-source API pass 117 cases across the value views,
+collection marshals and generated repeated/map fixtures. One dictionary allocation case skips
+because its positive control observes no allocation. These are editor behavior results.
 
 The Release host enumeration suite passes 67 tests without skips. Native Unity 6000.4.6 passes the
 array behavior controls, dictionary protocols and affected extension, geometry, JSON, editor and

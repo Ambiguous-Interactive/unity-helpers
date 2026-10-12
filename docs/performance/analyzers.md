@@ -1112,3 +1112,6 @@ buffers that escape or whose disposal is shared with consumers.
 The same internal helpers centralize existing private cache and serializer array rentals without
 changing their lifetimes, clearing flags, or failure behavior. Serializer owner leases still use
 their existing runtime checks; storing an array in its private owner does not issue another lease.
+
+The [ownership audit](./ownership-audit.md) records current producer bindings and private-operation
+candidates, including the reasons to retain shared and extended lifetimes.
