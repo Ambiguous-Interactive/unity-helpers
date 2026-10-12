@@ -125,13 +125,30 @@ before stronger adoption claims.
 
 The manual Unity Tests workflow accepts `acceptance: borrowed`. It runs exactly the existing
 clock/allocation preflight, 35-row decoder comparison and private/borrowed lease control.
-The 2021.3 floor uses Mono; later versions use IL2CPP. Older IL2CPP allocation counters remain
-unsupported. Use `test-mode: standalone` to limit the ordinary test modes. The licensed workflow
+The 2021.3 floor uses Mono; later versions use IL2CPP. The managed byte counter can remain inert;
+the isolated Windows profile also compiles a native profiler allocation-event probe with the
+x64 Visual C++ compiler. Use `test-mode: standalone` to limit the ordinary test modes. The licensed workflow
 retains its fixed four-version matrix even when a Unity version input is supplied.
 
 The profile freezes tracked runtime, editor and test inputs plus the canonical 47-row corpus.
 The existing runner checks those inputs and the complete player payload around build and launch.
 Verification requires all three native cases, stable provenance, matching runtime/corpus records
 and working clock/allocation positive controls. Skipped, inert or unmatched results fail qualification.
-The summary keeps campaign and adoption eligibility false: these channel controls do not measure
-whole-call gains, retained memory, code size or startup/callback effects.
+Native qualification requires matching source and compiled binary hashes, fifteen chronological
+fresh-box, preboxed and empty windows, and three repetitions of the four supported collection
+shapes at 1, 16 and 4,096 elements. Each comparison must observe 128 interface allocations and
+zero value-view allocations. Whole-call timing runs before native profiler registration and
+retains positive tick batches. A failed byte channel stays failed even when the count channel passes.
+
+The native callback remains installed in the isolated process; its DLL is pinned until exit.
+Classic profiler setters are configured once because they target the latest descriptor. Count
+windows observe only the calling thread. Logical object sizes exclude allocator rounding,
+native allocations and retained heap size. The profile records the compiler command, source,
+binary and generated identity header alongside the sealed player payload.
+
+The summary keeps campaign and adoption eligibility false: these controls do not establish
+whole-call ownership gains, retained memory, code size or startup/callback effects. The local
+IL2CPP diagnostic traversal results in the [enumeration audit](./enumeration-audit.md#validation-limits)
+do not replace the canonical four-version acceptance run. Unity 6000.6 ordinary Standalone tests
+enable temporary-allocation stack diagnostics after repeated engine lifetime warnings; those
+warnings remain failures until their source is classified.

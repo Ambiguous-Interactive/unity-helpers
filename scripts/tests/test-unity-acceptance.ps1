@@ -11,7 +11,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../unity/run-acceptance.ps1') -
 $environmentKeys = @('ACCEPTANCE_CONTROL_LOG', 'ACCEPTANCE_CONTROL_ACTIVE', 'ACCEPTANCE_CONTROL_FAIL', 'ACCEPTANCE_CONTROL_START_ACTIVE',
     'WALLSTOP_SENTINEL_INTERACTION_TOKEN', 'WALLSTOP_SENTINEL_INTERACTION_PROJECT',
     'WALLSTOP_SENTINEL_CAPTURE_TOKEN', 'WALLSTOP_SENTINEL_CAPTURE_PROJECT', 'WALLSTOP_SENTINEL_CAPTURE_OUTPUT',
-    'WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN', 'WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT')
+    'WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN', 'WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT', 'UH_NATIVE_PROBE_SOURCE_SHA256')
 $originalEnvironment = @{}
 foreach ($key in $environmentKeys) {
     $originalEnvironment[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
@@ -39,10 +39,19 @@ try {
     Set-Content -LiteralPath (Join-Path $temporary 'assert-no-active-unity-editor.ps1') -Value @'
 if ($env:ACCEPTANCE_CONTROL_ACTIVE -eq 'true') { throw 'Editor is already active.' }
 '@
+    Set-Content -LiteralPath (Join-Path $temporary 'build-native-allocation-probe.ps1') -Value @'
+param($ProjectPath, $ArtifactsPath, $Repository)
+$sourceHash = (Get-FileHash -LiteralPath (Join-Path $Repository 'Tests/Acceptance~/NativeAllocation/native-allocation-probe.cpp') -Algorithm SHA256).Hash.ToLowerInvariant()
+$directory = Join-Path $ArtifactsPath 'native-allocation-probe'
+$null = New-Item -ItemType Directory -Force -Path $directory
+@{ SourcePath = 'Tests/Acceptance~/NativeAllocation/native-allocation-probe.cpp'; SourceSha256 = $sourceHash; BinarySha256 = ('a' * 64) } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'build.json')
+return $sourceHash
+'@
     Set-Content -LiteralPath (Join-Path $temporary 'run-ci-tests.ps1') -Value @'
 param($UnityVersion, $RepoRoot, $ArtifactsPath, $ReleaseCodeOptimization, $ReleasePlayerBuild,
     $Il2CppCompilerConfiguration, $ProjectPath, $TestMode, $AssemblyNames, $TestFilter,
-    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics, $TestCategory, $FrozenPlayerDeclarationPath)
+    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics, $TestCategory, $FrozenPlayerDeclarationPath, $AdditionalScriptingDefines)
 if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
     if ($env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne $ProjectPath -or
         [IO.File]::ReadAllText((Join-Path $ProjectPath '.sentinel-interaction-disposable')) -ne
@@ -100,6 +109,11 @@ if ($TestFilter -match 'BorrowedBufferPreflightTests') {
     }
     if ($declaration.CorpusFiles[0].Sha256 -cne 'd3933603fc240334440040824a7d56316a4e5bafc0124c611cffa6daf2ef8052') {
         throw 'Borrowed qualification uses a different corpus.'
+    }
+    $nativeSource = @($declaration.SourceFiles | Where-Object { $_.Path -ceq 'Tests/Acceptance~/NativeAllocation/native-allocation-probe.cpp' })
+    if ($nativeSource.Count -ne 1 -or $nativeSource[0].Sha256 -cne $env:UH_NATIVE_PROBE_SOURCE_SHA256 -or
+        ($AdditionalScriptingDefines -join ';') -cne 'UNITY_HELPERS_NATIVE_ALLOCATION_PROBE') {
+        throw 'Borrowed qualification lost the native probe source or global define.'
     }
 }
 $PSBoundParameters | ConvertTo-Json -Compress | Add-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
@@ -581,6 +595,81 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             $summary = Get-Content -LiteralPath (Join-Path $temporary 'acceptance-summary.json') -Raw | ConvertFrom-Json
             if ($summary.ChannelQualification -ne 'passed' -or $summary.CampaignEligible -or $summary.AdoptionEligible) {
                 throw 'Channel controls must not authorize candidate adoption.'
+            }
+        }
+        $checks++
+    }
+    Remove-Item -LiteralPath (Join-Path $borrowedDirectory 'provenance.json')
+    $nativeSource = @($declaration.SourceFiles | Where-Object { $_.Path -ceq 'Tests/Acceptance~/NativeAllocation/native-allocation-probe.cpp' })[0]
+    foreach ($shape in @('pass', 'inert', 'preboxed-allocation', 'wrong-request', 'wrong-index', 'incomplete', 'invalid-values', 'wrong-scale', 'wrong-source', 'wrong-backend', 'wrong-binary', 'missing-payload', 'missing-window', 'string-count', 'string-boolean', 'missing-traversal', 'inert-traversal-control', 'allocating-value-view', 'zero-timing', 'duplicate-traversal')) {
+        $windows = @()
+        for ($index = 0; $index -lt 15; $index++) {
+            $pattern = @(8192, 8192, 0, 0, 8192, 4096, 8192, 0, 8192, 4096, 8192, 0, 8192, 4096, 8192)
+            $preboxed = $index -in @(1, 4, 8, 12)
+            $count = if ($preboxed) { 0 } else { $pattern[$index] }
+            $windows += @{
+                ChronologicalIndex = $index; IsWarmup = $index -lt 3; Requested = $pattern[$index]; Preboxed = $preboxed
+                Count = $count; LogicalObjectBytes = $count * 20; Completed = $true; ValuesVerified = $true
+            }
+        }
+        $record = @{
+            RuntimeIdentity = @{ Commit = $declaration.SourceCommit }; RuntimeReleasePlayerState = 'passed'; ClockState = 'passed'; AllocatedBytesState = 'rejected'
+            NativeAllocationCountState = 'passed'; NativeAllocationSourceSha256 = $nativeSource.Sha256; NativeAllocationBackend = 3
+            NativeAllocationError = $null; NativeAllocationObservations = $windows
+            TraversalTimingObservations = @(); TraversalAllocationObservations = @()
+        }
+        foreach ($traversalShape in @('array', 'list', 'hash-set', 'dictionary')) {
+            foreach ($size in @(1, 16, 4096)) {
+                foreach ($repetition in @(0, 1, 2)) {
+                    $record.TraversalTimingObservations += @{ Shape = $traversalShape; Size = $size; Repetition = $repetition
+                        Calls = [int][Math]::Max(128, [Math]::Floor(131072 / $size)); ReferenceTicks = 100000; ValueTicks = 100001 }
+                    $record.TraversalAllocationObservations += @{ Shape = $traversalShape; Size = $size; Repetition = $repetition
+                        Calls = 128; ReferenceCount = 128; ValueCount = 0 }
+                }
+            }
+        }
+        $snapshots = @(0..2 | ForEach-Object {
+            @{ State = 'passed'; PayloadFiles = @(@{ Path = 'Probe_Data/Plugins/x86_64/unity-helpers-allocation-probe.dll'; Sha256 = 'a' * 64 }) }
+        })
+        $report = @{
+            DeclarationSha256 = (Get-FileHash -LiteralPath $declarationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            RunId = $declaration.RunId; RequestedUnityVersion = '6000.6.0f1'; RequestedBackend = 'IL2CPP'
+            ProvenanceStableState = 'passed'; JointCorrectness = @{ State = 'passed' }; RuntimeRecordJoinState = 'passed'
+            CorrectnessCorpusConsumptionState = 'passed'; LaunchAttempted = $true; InvocationObserved = $true
+            ResultsValidated = $true; ExecutionError = $null; CampaignEligible = $false; AdoptionEligible = $false
+            RuntimeJoin = @{ RawRecords = @(@{ Marker = 'BORROWED_PREFLIGHT'; Record = $record }) }; Snapshots = $snapshots
+        }
+        switch ($shape) {
+            'inert' { $windows[5].Count = 0 }
+            'preboxed-allocation' { $windows[4].Count = 1 }
+            'wrong-request' { $windows[5].Requested = 0 }
+            'wrong-index' { $windows[5].ChronologicalIndex = 4 }
+            'incomplete' { $windows[5].Completed = $false }
+            'invalid-values' { $windows[5].ValuesVerified = $false }
+            'wrong-scale' { $windows[6].LogicalObjectBytes = 1 + $windows[6].LogicalObjectBytes }
+            'wrong-source' { $record.NativeAllocationSourceSha256 = '0' * 64 }
+            'wrong-backend' { $record.NativeAllocationBackend = 1 }
+            'wrong-binary' { $snapshots[1].PayloadFiles[0].Sha256 = '0' * 64 }
+            'missing-payload' { $report.Snapshots = @($snapshots[0]) }
+            'missing-window' { $record.NativeAllocationObservations = @($windows[0..13]) }
+            'string-count' { $windows[5].Count = '4096' }
+            'string-boolean' { $windows[5].ValuesVerified = 'true' }
+            'missing-traversal' { $record.TraversalAllocationObservations = @() }
+            'inert-traversal-control' { $record.TraversalAllocationObservations[0].ReferenceCount = 0 }
+            'allocating-value-view' { $record.TraversalAllocationObservations[0].ValueCount = 1 }
+            'zero-timing' { $record.TraversalTimingObservations[0].ValueTicks = 0 }
+            'duplicate-traversal' { $record.TraversalAllocationObservations[1] = $record.TraversalAllocationObservations[0] }
+        }
+        $report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $reportPath
+        $failed = $false
+        try {
+            & (Join-Path $PSScriptRoot '../unity/verify-acceptance.ps1') -Acceptance borrowed -ArtifactsPath $temporary -Commit $declaration.SourceCommit -UnityVersion '6000.6.0f1'
+        } catch { $failed = $true }
+        if ($failed -ne ($shape -ne 'pass')) { throw "Wrong native allocation qualification for $shape." }
+        if ($shape -eq 'pass') {
+            $summary = Get-Content -LiteralPath (Join-Path $temporary 'acceptance-summary.json') -Raw | ConvertFrom-Json
+            if ($summary.AllocationChannel -cne 'native-managed-object-counts' -or $summary.CampaignEligible -or $summary.AdoptionEligible) {
+                throw 'Native counts must remain distinct from allocated bytes and adoption evidence.'
             }
         }
         $checks++

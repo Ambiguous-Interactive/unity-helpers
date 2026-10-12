@@ -3229,6 +3229,12 @@ function Get-FrozenPlayerRuntimeJoin {
                             @('SchemaVersion', 'FrozenRunId', 'FrozenDeclarationSha256', 'FrozenCorpusSha256', 'ActualCorpusSha256',
                                 'RuntimeIdentity', 'UnityVersion', 'Backend', 'Platform', 'ProcessBits', 'IsEditor', 'DevelopmentBuild')
                         } else { @('SchemaVersion', 'CorpusSha256', 'VerifiedRows', 'DecoderAssertions', 'DeclaredCampaignRows') }
+                        if ($observation.Marker -ceq 'BORROWED_PREFLIGHT' -and
+                            $record.PSObject.Properties.Name -contains 'NativeAllocationCountState') {
+                            $requiredKeys += @('NativeAllocationCountState', 'NativeAllocationBackend',
+                                'NativeAllocationSourceSha256', 'NativeAllocationError', 'NativeAllocationObservations',
+                                'TraversalTimingObservations', 'TraversalAllocationObservations')
+                        }
                         foreach ($key in $requiredKeys) {
                             if ([regex]::Matches($json, '(?<!\\)"' + [regex]::Escape($key) + '"\s*:').Count -ne 1) {
                                 throw "Marker must contain exactly one literal $key field."
@@ -3464,6 +3470,9 @@ function Invoke-StandaloneTestPlayer {
         '-logFile', '-',
         '-uhTestResults', $ResultsPath
     )
+    if ($env:UH_NATIVE_ALLOCATOR_DIAGNOSTICS -eq '1') {
+        $playerArgs += '-diag-job-temp-memory-leak-validation'
+    }
 
     # No -StallSeconds here (only the wall-clock backstop): the no-output stall guard is
     # deliberately scoped to the in-editor -runTests pass, whose silent-hang class -- a

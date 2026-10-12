@@ -7,7 +7,7 @@ its source hash, compiler binding, concrete enumerator type and retained-allocat
 
 ## Coverage
 
-The inventory covers 2,560 C# files and 3,475 distinct `foreach` or explicit `GetEnumerator` sites.
+The inventory covers 2,563 C# files and 3,484 distinct `foreach` or explicit `GetEnumerator` sites.
 Syntax discovery parses every combination of conditional symbols in each file, deduplicating sites
 by path, source offset and syntax kind. It includes tracked sources and the new enumeration files;
 generated build outputs are excluded.
@@ -31,10 +31,10 @@ included explicitly because Unity does not import those package folders automati
 
 | Binding                  | Sites | Interpretation                                                           |
 | ------------------------ | ----: | ------------------------------------------------------------------------ |
-| Compiler-indexed arrays  | 1,246 | No enumerator object; element conversions can still box                  |
+| Compiler-indexed arrays  | 1,251 | No enumerator object; element conversions can still box                  |
 | Compiler-indexed strings |    22 | UTF-16 character indexing; no enumerator object                          |
-| Value return             | 1,830 | Concrete value protocol, with source and traversal-storage caveats below |
-| Reference return         |   377 | 242 reviewed test sites and 135 retained production sites                |
+| Value return             | 1,832 | Concrete value protocol, with source and traversal-storage caveats below |
+| Reference return         |   379 | 244 reviewed test sites and 135 retained production sites                |
 
 The changes avoid boxing for interface-held arrays, exact lists, exact hash sets and exact
 dictionaries. Custom sequences and derived collections retain their original acquisition,
@@ -78,13 +78,14 @@ enumerator can allocate its internal stack. The 68 trie sites use pooled travers
 cold rents and growth can allocate, and string results can allocate. Other factories, conversions
 and loop bodies remain independent of the enumerator representation.
 
-The 242 retained test reference sites have specific reviewed dispositions:
+The 244 retained test reference sites have specific reviewed dispositions:
 
 | Disposition                | Sites | Reason                                                         |
 | -------------------------- | ----: | -------------------------------------------------------------- |
 | Protocol and compatibility |    72 | Directly exercises the original iterator or interface contract |
 | Lazy iterator or query     |   109 | The source factory already owns its reference iterator         |
 | Independent oracle         |    24 | Keeps behavior comparisons and allocation controls independent |
+| Release allocation control |     2 | Measures interface traversal beside the public value view      |
 | Framework collection       |    15 | Backing storage or traversal belongs to the framework          |
 | Reflection stream          |     8 | Reflection discovery or its deferred filter owns the iterator  |
 | Filesystem source          |     7 | Keeps deferred file discovery and cleanup                      |
@@ -139,3 +140,17 @@ Unity documents its allocation counters as unavailable in
 [Release players](https://docs.unity3d.com/6000.0/Documentation/Manual/profiler-counters-reference.html).
 These editor results do not qualify Release-player or IL2CPP performance, and the CSV does not
 claim that every value-returning operation is allocation-free.
+
+The isolated Windows Release preflight now supports a native allocation-event probe alongside
+the managed byte counter. An IL2CPP 6000.5.2 diagnostic player passed three repetitions for arrays,
+lists, hash sets and dictionaries at 1, 16 and 4,096 elements. Each of the 36 comparisons observed
+128 interface-enumerator allocations over 128 calls and zero allocations for the public value
+view. Separate whole-call timing batches ran before native profiler registration, alternated
+measurement order and checked independent checksums; value/reference ratios ranged from 0.207 to
+0.962. These observations belong to one diagnostic process. Its corpus shim does not provide the
+canonical frozen-source, decoder or floor/latest acceptance evidence.
+
+The [borrowed acceptance profile](./ownership-audit.md#release-player-channel-qualification)
+requires the native source identity, sealed binary and allocating controls before accepting that
+count channel. Logical object sizes do not measure allocator rounding or retained memory. The
+probe covers the calling thread only and lives until its isolated player exits.

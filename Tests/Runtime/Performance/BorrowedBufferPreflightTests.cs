@@ -331,7 +331,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             bool clockPassed,
             bool allocationsPassed,
             int seed,
-            string counterError
+            string counterError,
+            NativeAllocationObservation[] nativeAllocations,
+            bool nativeAllocationsPassed,
+            int nativeBackend,
+            string nativeSourceSha256,
+            string nativeError
         )
         {
             string frozenRunId = null;
@@ -427,6 +432,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     );
                 }
                 writer.WriteString("CounterError", counterError);
+                WriteNativeAllocationRecord(
+                    writer,
+                    nativeAllocations,
+                    nativeAllocationsPassed,
+                    nativeBackend,
+                    nativeSourceSha256,
+                    nativeError
+                );
+                WriteTraversalRecord(writer);
                 writer.WriteBoolean("HasIncompleteWindow", counterError != null);
                 if (counterError != null)
                 {
@@ -784,10 +798,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     Stopwatch.IsHighResolution
                 );
                 bool allocationsPassed = AllocationControlsPass(allocations);
-                UnityEngine.Debug.Log(
-                    $"{RecordMarker} {CreateRecord(clock, allocations, runtimeReleasePlayer, clockPassed, allocationsPassed, seed, counterError)}"
+                CaptureTraversalTimings();
+                NativeAllocationObservation[] nativeAllocations = CaptureNativeAllocations(
+                    seed,
+                    out int nativeBackend,
+                    out string nativeSourceSha256,
+                    out string nativeError
                 );
-                if (!runtimeReleasePlayer || !clockPassed || !allocationsPassed)
+                bool nativeAllocationsPassed = NativeAllocationControlsPass(nativeAllocations);
+                string expectedNativeSourceSha256 = Environment.GetEnvironmentVariable(
+                    "UH_NATIVE_PROBE_SOURCE_SHA256"
+                );
+                nativeAllocationsPassed &=
+                    nativeSourceSha256 != null
+                    && nativeSourceSha256.Length == 64
+                    && string.Equals(
+                        nativeSourceSha256,
+                        expectedNativeSourceSha256,
+                        StringComparison.Ordinal
+                    );
+                if (nativeAllocationsPassed)
+                {
+                    CaptureTraversalAllocations();
+                }
+                UnityEngine.Debug.Log(
+                    $"{RecordMarker} {CreateRecord(clock, allocations, runtimeReleasePlayer, clockPassed, allocationsPassed, seed, counterError, nativeAllocations, nativeAllocationsPassed, nativeBackend, nativeSourceSha256, nativeError)}"
+                );
+                if (
+                    !runtimeReleasePlayer
+                    || !clockPassed
+                    || (!allocationsPassed && !nativeAllocationsPassed)
+                )
                 {
                     Assert.Ignore(
                         "Diagnostic preflight controls are unqualified or unsupported. All channel records are retained; no campaign or adoption is eligible."
@@ -803,6 +844,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 _retainedBoxes = null;
                 _preboxedValue = null;
                 _unfinishedBeforeBytes = null;
+                _traversalTimings = null;
+                _traversalAllocations = null;
+                _traversalSink = 0;
             }
         }
 

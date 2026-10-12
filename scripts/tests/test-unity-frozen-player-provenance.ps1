@@ -10,7 +10,7 @@ $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($source, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count -ne 0) { throw 'Unity runner must parse.' }
 foreach ($name in @('Assert-FrozenPlayerRegularPath', 'Get-FrozenPlayerFileInventory', 'Read-FrozenPlayerDeclaration', 'Start-FrozenPlayerProvenance',
-        'New-FrozenPlayerAnchor', 'Get-FrozenPlayerRuntimeJoin', 'Add-FrozenPlayerProvenanceSnapshot', 'Get-FrozenPlayerJointCorrectness', 'Complete-FrozenPlayerProvenance')) {
+        'New-FrozenPlayerAnchor', 'Get-FrozenPlayerRuntimeJoin', 'Add-FrozenPlayerProvenanceSnapshot', 'Get-FrozenPlayerJointCorrectness', 'Complete-FrozenPlayerProvenance', 'Invoke-StandaloneTestPlayer')) {
     $function = $ast.Find({ param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
         }, $true)
@@ -109,6 +109,21 @@ function Write-RuntimeRecords {
     [IO.File]::WriteAllText($Path, ($lines -join "`n") + "`n")
 }
 try {
+    $originalAllocatorDiagnostics = $env:UH_NATIVE_ALLOCATOR_DIAGNOSTICS
+    function Invoke-ProcessWithTreeKillTimeout {
+        param($FilePath, $Arguments, $TimeoutSeconds, $LogPath, $Label)
+        $script:observedPlayerArguments = $Arguments
+        return @{ ExitCode = 0; TimedOut = $false }
+    }
+    try {
+        foreach ($diagnostics in @('', '1', 'unexpected')) {
+            $env:UH_NATIVE_ALLOCATOR_DIAGNOSTICS = $diagnostics
+            $outcome = Invoke-StandaloneTestPlayer -EditorBuiltExePath 'never launched.exe' -ResultsPath 'retained results.xml' -LogPath 'never written.log'
+            Assert-Control ($outcome.ExitCode -eq 0 -and $script:observedPlayerArguments -contains '-uhTestResults' -and
+                $script:observedPlayerArguments -contains 'retained results.xml' -and
+                (($script:observedPlayerArguments -contains '-diag-job-temp-memory-leak-validation') -eq ($diagnostics -eq '1'))) "allocator stack diagnostics require explicit opt-in: '$diagnostics'"
+        }
+    } finally { $env:UH_NATIVE_ALLOCATOR_DIAGNOSTICS = $originalAllocatorDiagnostics }
     $fixture = New-DeclarationFixture 'positive'
     $context = Start-ControlContext $fixture
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'before-launch' -IncludePayload
@@ -300,8 +315,18 @@ try {
             'wrong-actual-corpus', 'wrong-version', 'wrong-backend', 'wrong-platform', 'editor', 'development', 'process32',
             'string-editor', 'string-schema', 'float-schema', 'bool-schema', 'string-count', 'float-count', 'bool-count',
             'string-process-bits', 'float-process-bits', 'bool-process-bits', 'missing-identity', 'array-run-id', 'array-runtime-version',
-            'array-anchor-digest', 'array-correctness-digest', 'escaped-duplicate-key', 'embedded-prefix', 'deep-json', 'wrong-correctness-digest', 'wrong-row-count', 'wrong-assertion-count', 'stale-two-decoder-count', 'wrong-campaign-count')) {
+            'array-anchor-digest', 'array-correctness-digest', 'escaped-duplicate-key', 'embedded-prefix', 'deep-json', 'wrong-correctness-digest', 'wrong-row-count', 'wrong-assertion-count', 'stale-two-decoder-count', 'wrong-campaign-count',
+            'duplicate-native-count-state', 'duplicate-native-source-hash', 'duplicate-traversal-timing', 'duplicate-traversal-allocation')) {
         $changed = New-RuntimeRecords $context
+        if ($kind -like 'duplicate-native-*' -or $kind -like 'duplicate-traversal-*') {
+            $changed.Preflight.NativeAllocationCountState = 'passed'
+            $changed.Preflight.NativeAllocationBackend = 3
+            $changed.Preflight.NativeAllocationSourceSha256 = 'a' * 64
+            $changed.Preflight.NativeAllocationError = $null
+            $changed.Preflight.NativeAllocationObservations = @()
+            $changed.Preflight.TraversalTimingObservations = @()
+            $changed.Preflight.TraversalAllocationObservations = @()
+        }
         switch ($kind) {
             'wrong-run' { $changed.Preflight.FrozenRunId = 'another-run' }
             'wrong-declaration' { $changed.Preflight.FrozenDeclarationSha256 = '0' * 64 }
@@ -337,6 +362,10 @@ try {
         Write-RuntimeRecords $log $changed
         $lines = [IO.File]::ReadAllLines($log)
         switch ($kind) {
+            'duplicate-native-count-state' { [IO.File]::WriteAllText($log, ([regex]::new('\{')).Replace($lines[0], '{"NativeAllocationCountState":"passed",', 1) + "`n" + $lines[1]) }
+            'duplicate-native-source-hash' { [IO.File]::WriteAllText($log, ([regex]::new('\{')).Replace($lines[0], '{"NativeAllocationSourceSha256":"injected",', 1) + "`n" + $lines[1]) }
+            'duplicate-traversal-timing' { [IO.File]::WriteAllText($log, ([regex]::new('\{')).Replace($lines[0], '{"TraversalTimingObservations":[],', 1) + "`n" + $lines[1]) }
+            'duplicate-traversal-allocation' { [IO.File]::WriteAllText($log, ([regex]::new('\{')).Replace($lines[0], '{"TraversalAllocationObservations":[],', 1) + "`n" + $lines[1]) }
             'missing-log' { Remove-Item -LiteralPath $log }
             'missing-preflight' { [IO.File]::WriteAllText($log, $lines[1]) }
             'missing-correctness' { [IO.File]::WriteAllText($log, $lines[0]) }
