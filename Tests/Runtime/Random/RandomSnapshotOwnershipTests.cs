@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     using System;
     using System.Collections.Generic;
     using NUnit.Framework;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -13,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [Category("Fast")]
     public sealed class RandomSnapshotOwnershipTests
     {
+        [Preserve]
         private static IEnumerable<TestCaseData> ReplayCases()
         {
             for (int shape = 0; shape < 3; ++shape)
@@ -29,6 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
+        [Preserve]
         private static IEnumerable<TestCaseData> PayloadCases()
         {
             for (int shape = 0; shape < 3; ++shape)
