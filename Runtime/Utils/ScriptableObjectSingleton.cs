@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Helper;
-#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
     using ScriptableObjectSingletonBase = Sirenix.OdinInspector.SerializedScriptableObject;
 #else
     using ScriptableObjectSingletonBase = UnityEngine.ScriptableObject;
@@ -40,7 +40,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// the correct path on editor load — see docs/features/editor-tools/editor-tools-guide.md#scriptableobject-singleton-creator.
     ///
     /// Odin compatibility: this runtime type derives from Odin's serialized base when the
-    /// <c>odininspector</c> package is installed unless <c>WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS</c> or <c>WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES</c> is defined; otherwise it falls back to <see cref="ScriptableObject"/>.
+    /// <c>odininspector</c> package is installed unless <c>WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES</c> is defined; otherwise it falls back to <see cref="ScriptableObject"/>.
     /// </remarks>
     /// <typeparam name="T">Concrete singleton ScriptableObject type that derives from this base.</typeparam>
     /// <threadsafety>

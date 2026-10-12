@@ -9,7 +9,7 @@ This package includes two lightweight, production‑ready singleton helpers that
 - `RuntimeSingleton<T>`: a component singleton that ensures one instance exists in play mode, optionally persists across scenes, and self‑initializes when first accessed.
 - `ScriptableObjectSingleton<T>`: a configuration/data singleton backed by a single asset under `Resources/`, with an editor auto‑creator to keep assets present and correctly placed.
 
-> Odin compatibility: when Odin Inspector is installed as the `odininspector` package, the singleton bases inherit from Odin's serialized base types. With `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS` or `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` defined, or without Odin, they compile against Unity's `MonoBehaviour` / `ScriptableObject` base types. Consumer assemblies do not inherit this package's `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol; use a project-local asmdef version define for your own conditional Odin code.
+> Odin compatibility: when Odin Inspector is installed as the `odininspector` package, the singleton bases inherit from Odin's serialized base types. With `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` defined, or without Odin, they compile against Unity's `MonoBehaviour` / `ScriptableObject` base types. Consumer assemblies do not inherit this package's `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol; use a project-local asmdef version define for your own conditional Odin code.
 
 ## TL;DR: What Problem This Solves
 
@@ -88,8 +88,7 @@ Contents
 
 - With Odin installed as the `odininspector` package, `RuntimeSingleton<T>` inherits from Odin's `SerializedMonoBehaviour`, and `ScriptableObjectSingleton<T>` inherits from Odin's `SerializedScriptableObject`.
 - Without Odin, those same public types compile through Unity's `MonoBehaviour` and `ScriptableObject` base classes, so registry installs do not need Sirenix assemblies.
-- Add `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS` to **Player Settings > Other Settings > Scripting Define Symbols** for each target to use Unity singleton bases while Odin is installed. This project-wide setting applies to both singleton types and keeps Odin drawers and other integrations enabled. It also works in Odin compatibility builds. It is a compile-time choice; an attribute or runtime setting cannot change a C# base class.
-- To use Unity bases for every automatically integrated runtime type, define `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` instead. It covers both singleton families and `AttributeEffect`; the singleton-only define leaves `AttributeEffect` on its Odin base. Odin drawers remain enabled with either option.
+- Add `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` to **Player Settings > Other Settings > Scripting Define Symbols** for each target to use Unity bases for both singleton families and `AttributeEffect` while Odin is installed. This project-wide setting keeps Odin drawers and other integrations enabled and works in Odin compatibility builds. It is a compile-time choice; an attribute or runtime setting cannot change a C# base class.
 - Changing the base removes Odin serialization from singleton fields. Migrate any Odin-only saved fields before switching; the symbol does not convert saved data.
 - Odin editor integrations for Odin serialized targets are enabled by the same package-owned define.
 - Consumer assemblies do not inherit this package's `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol. If your own code conditionally references Odin types, define a project-local asmdef version define for `odininspector`.

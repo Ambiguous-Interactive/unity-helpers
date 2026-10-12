@@ -1036,7 +1036,7 @@ See the guide: [Core Math & Extensions](./docs/features/utilities/math-and-exten
 - `RuntimeSingleton<T>`: Global component singleton with optional cross‑scene persistence.
 - `ScriptableObjectSingleton<T>`: Global settings/data singleton loaded from `Resources/`, auto‑created by the editor tool.
 
-Define `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` in Player Settings to use Unity bases for both singleton families and `AttributeEffect`. Use `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS` to limit the choice to singletons.
+Define `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` in Player Settings to use Unity bases for both singleton families and `AttributeEffect`.
 
 See the guide: [Singleton Utilities](./docs/features/utilities/singletons.md) and the tool: [ScriptableObject Singleton Creator](./docs/features/editor-tools/editor-tools-guide.md#scriptableobject-singleton-creator).
 

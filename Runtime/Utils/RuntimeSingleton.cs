@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using Core.Extension;
     using Core.Helper;
     using UnityEngine;
-#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
     using RuntimeSingletonBase = Sirenix.OdinInspector.SerializedMonoBehaviour;
 #else
     using RuntimeSingletonBase = UnityEngine.MonoBehaviour;
@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// - Call <see cref="ClearInstance"/> to manually drop a stale reference in editor tooling or at runtime.
     ///
     /// Odin compatibility: this runtime type derives from Odin's serialized base when the
-    /// <c>odininspector</c> package is installed unless <c>WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS</c> or <c>WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES</c> is defined; otherwise it falls back to <see cref="MonoBehaviour"/>.
+    /// <c>odininspector</c> package is installed unless <c>WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES</c> is defined; otherwise it falls back to <see cref="MonoBehaviour"/>.
     /// A component whose runtime type does not implement the requested closed generic singleton type
     /// is rejected during <see cref="Awake"/> and is never stored in that singleton's static cache.
     /// </remarks>

@@ -21,7 +21,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils.Odin
                 ScriptableObject.CreateInstance<OdinScriptableObjectSingletonTestTarget>()
             );
 
-#if WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS || WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
+#if WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
             Assert.That(instance, Is.Not.InstanceOf<SerializedScriptableObject>());
             Assert.That(instance, Is.InstanceOf<ScriptableObject>());
 #else

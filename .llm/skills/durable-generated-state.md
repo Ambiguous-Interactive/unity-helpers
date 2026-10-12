@@ -1,10 +1,11 @@
 # Skill: Durable Generated State
 
-<!-- trigger: manifest, baseline, generated, committed, repair, tool | Committing state that encodes a durable contract | Core -->
+<!-- trigger: manifest, baseline, generated, committed, repair, tool, stable ID, canonicalize, YAML | Committing state that encodes a durable contract | Core -->
 
 **Trigger**: When a tool writes a committed file that records a contract which must outlive the code
 describing it -- a wire field number, a serialized key, an ID a save file already means something by.
-Also when adding an analyzer or generator diagnostic whose remedy is "run a tool".
+Also when remapping generated asset identities or adding an analyzer or generator
+diagnostic whose remedy is "run a tool".
 
 > This is about the state, not the formatting. For committed analyzer DLLs see
 > [analyzers](../../docs/performance/analyzers.md); for the undo classification of a tool that writes
@@ -88,6 +89,22 @@ it writes an **asset**, not source, so it has no compile coupling and none of ru
 
 ---
 
+## 5. Generated identities must survive representation changes
+
+When deriving stable asset IDs, sweep every source of object ordering, including
+ordinary children, roots, legacy root order, and prefab-owned added objects.
+Stripped prefab parents can omit the normal child list; use the owning prefab's
+added-object metadata to distinguish repeated children. Do not break ties with
+volatile generated IDs.
+
+Verify renumbered and shuffled documents as well as fresh bakes and native
+reloads with references intact. Check content independently of the remapping.
+For text rewrites, recognize quoted and block values at syntax boundaries;
+punctuation inside a plain scalar does not begin a new value. Probe the native
+serializer's output and retain those cases as regressions. See
+[scene canonicalization](../../docs/features/editor-tools/scene-canonicalization.md)
+and [honest gates](./honest-gates.md).
+
 ## Checklist
 
 - [ ] Can the repair tool see its subject while the diagnostic is firing? (Rule 1)
@@ -96,3 +113,4 @@ it writes an **asset**, not source, so it has no compile coupling and none of ru
 - [ ] Is a removed entry **retired** rather than freed, and is a retired value refused?
 - [ ] Does it run without anyone remembering to run it, and is a no-op run silent? (Rule 4)
 - [ ] Is there a test that deletes the type and asserts the value is not handed out again?
+- [ ] Do remapped asset identities survive shuffled/renumbered input and native reloads? (Rule 5)

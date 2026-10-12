@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
-#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
     using Sirenix.OdinInspector;
 #endif
 
@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Track(instance.gameObject);
 
             Assert.IsInstanceOf<MonoBehaviour>(instance);
-#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
             Assert.IsInstanceOf<SerializedMonoBehaviour>(instance);
 #elif WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
             Assert.That(instance, Is.Not.InstanceOf<Sirenix.OdinInspector.SerializedMonoBehaviour>());
