@@ -7,7 +7,7 @@ its source hash, compiler binding, concrete enumerator type and retained-allocat
 
 ## Coverage
 
-The inventory covers 2,556 C# files and 3,473 distinct `foreach` or explicit `GetEnumerator` sites.
+The inventory covers 2,557 C# files and 3,473 distinct `foreach` or explicit `GetEnumerator` sites.
 Syntax discovery parses every combination of conditional symbols in each file, deduplicating sites
 by path, source offset and syntax kind. It includes tracked sources and the new enumeration files;
 generated build outputs are excluded.
@@ -22,8 +22,9 @@ unresolved enumerators or compilation errors in its input compilations:
 - The Odin editor-test configuration binds the remaining conditional array traversal.
 - The shipped protobuf generator runs before semantic analysis where source generation is needed.
 
-The authored CSV is a snapshot at source commit `35ceec70`. Source hashes detect when a row needs another audit; it is not a permanent
-allowlist or a check that silently accepts later code. The two samples and acceptance templates are
+The authored CSV includes the current variance ownership and statistics-test changes. Source hashes
+detect when a row needs another audit; it is not a permanent allowlist or a check that silently
+accepts later code. The two samples and acceptance templates are
 included explicitly because Unity does not import those package folders automatically.
 
 ## Results

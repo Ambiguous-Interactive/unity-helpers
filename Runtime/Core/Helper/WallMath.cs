@@ -1834,12 +1834,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (values is List<float> list)
             {
-                using PooledArray<float> lease = SystemArrayPool<float>.Get(
-                    count,
-                    out float[] copy
-                );
-                list.CopyTo(copy, 0);
-                return VarianceOf(copy, count, sample);
+                float[] copy = SystemArrayPool<float>.RentForPrivateOwner(count);
+                try
+                {
+                    list.CopyTo(copy, 0);
+                    return VarianceOf(copy, count, sample);
+                }
+                finally
+                {
+                    SystemArrayPool<float>.ReturnForPrivateOwner(copy, clearArray: false);
+                }
             }
 
             double mean = Sum(values, count) / count;
@@ -1877,12 +1881,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (values is List<double> list)
             {
-                using PooledArray<double> lease = SystemArrayPool<double>.Get(
-                    count,
-                    out double[] copy
-                );
-                list.CopyTo(copy, 0);
-                return VarianceOf(copy, count, sample);
+                double[] copy = SystemArrayPool<double>.RentForPrivateOwner(count);
+                try
+                {
+                    list.CopyTo(copy, 0);
+                    return VarianceOf(copy, count, sample);
+                }
+                finally
+                {
+                    SystemArrayPool<double>.ReturnForPrivateOwner(copy, clearArray: false);
+                }
             }
 
             double mean = Sum(values, count) / count;

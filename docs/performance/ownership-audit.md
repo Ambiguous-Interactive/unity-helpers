@@ -15,7 +15,7 @@ factories of package-owned disposable types, shared disposal handles, asynchrono
 and internal private-array rentals. Compiler symbols determine the produced type.
 
 A separate syntax scan of all conditional-symbol combinations in 762 runtime and editor C# files
-finds 116 explicit `SystemArrayPool<T>.Get` calls: 97 runtime and 19 editor sites. Every one has a
+finds 114 explicit `SystemArrayPool<T>.Get` calls: 95 runtime and 19 editor sites. Every one has a
 semantic witness in the inventory. The inventory also includes the forwarding call inside the
 pool, other array factories, collection pools and restoration scopes. It does not claim every
 possible consumer, generated contract, player-only branch or optional dependency configuration.
@@ -53,9 +53,9 @@ independent copies can still outlive the call.
 | Shared handle           |   665 | Preserve the producer's copy-safe ownership contract                                 |
 | Restoration or callback |    78 | Preserve dynamic restoration and exactly-once callback behavior                      |
 | Runtime owner           |   116 | Preserve resource validity, reentrancy and disposal state                            |
-| Private candidate       |   110 | Review the complete operation and measure before adopting a different lifetime shape |
+| Private candidate       |   108 | Review the complete operation and measure before adopting a different lifetime shape |
 | Source protocol         |     8 | Preserve disposal of custom traversal sources                                        |
-| Existing private owner  |    11 | Keep the current operation-owned rental, cleanup and clearing                        |
+| Existing private owner  |    13 | Keep the current operation-owned rental, cleanup and clearing                        |
 | Extended lifetime       |     6 | Preserve ownership that crosses the producing method's synchronous lifetime          |
 
 The six explicit array sites with extended lifetimes are the sparse-set enumerator, two JSON
@@ -63,8 +63,8 @@ accumulator sites, the deferred subset iterator, the asynchronous JSON stream re
 returned texture-premultiplication lease. Stored or returned ownership must not become an
 untracked local rental.
 
-The 110 synchronous array candidates include sorting, geometry, spatial construction, random
-selection, variance, UTF-8 decoding and editor image operations. Local `using` alone does not prove
+The 108 synchronous array candidates include sorting, geometry, spatial construction, random
+selection, UTF-8 decoding and editor image operations. Local `using` alone does not prove
 an operation-owned replacement safe or worthwhile. Nested helpers, callbacks, source mutation,
 engine calls, cancellation and clearing belong to each complete operation. The inventory retains
 a reason for each family and site. Collection-pool producers retain their shared contracts; they
@@ -84,8 +84,18 @@ initialization, callback work and cleanup. Retain allocating positive controls a
 identity. A smaller lease counter proves avoided lease work; it does not prove better timing,
 zero allocation or lower retained memory.
 
-The four numeric mean paths and the Base64 decoder already own their private rentals without a
-returned handle. The current Base64 host measurements show reduced cost for short inputs and
+The four numeric mean paths, two float/double list-variance paths and the Base64 decoder own their
+private rentals without a returned handle. The variance paths validate count/sample size before
+renting, copy the list once and return the numeric array in `finally` without clearing. The snapshot
+and scalar result cannot expose the rental; existing array and custom-list paths remain unchanged.
+Native statistics controls cover ordinary/derived lists, special values, invalid inputs and pool
+boundaries. Eight lease-generation controls detect acquisition/claim work before the change and
+none afterward, while a balanced-lease positive control still detects both transitions.
+
+Three alternating pairs of host Release processes show smaller whole-call cost for short variance
+lists and near parity at 4,096 elements. They preserve zero warm managed allocation with allocating
+positive controls. These host observations do not qualify Unity Release-player performance.
+The current Base64 host measurements show reduced cost for short inputs and
 near parity for large or rejected inputs, with unchanged allocation. They do not qualify Unity
 Release-player performance. The connected editor's allocation counter fails retained-box controls;
 its zero readings are unqualified. Floor/latest Release-player timing, allocation, retention and
