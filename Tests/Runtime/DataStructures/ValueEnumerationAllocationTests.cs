@@ -6,15 +6,19 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System;
     using System.Collections.Generic;
     using NUnit.Framework;
-    using Unity.Profiling;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+#if UNITY_5_3_OR_NEWER
+    using Unity.Profiling;
+#endif
 
     [TestFixture]
     public sealed class ValueEnumerationAllocationTests
     {
+#if UNITY_5_3_OR_NEWER
         private const int ProfilerCalls = 128;
         private const int ProfilerCapacity = 512;
+#endif
 
         private static int _observedSum;
 
@@ -57,6 +61,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 #endif
         }
 
+#if UNITY_5_3_OR_NEWER
         private static long MeasureProfilerAllocationCount(Action action)
         {
             for (int index = 0; index < 64; ++index)
@@ -135,6 +140,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             GC.KeepAlive(retained);
         }
+#endif
 
         [TestCase(0)]
         [TestCase(1)]
