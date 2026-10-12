@@ -1038,9 +1038,15 @@ See the guide: [Core Math & Extensions](./features/utilities/math-and-extensions
 - `RuntimeSingleton<T>`: Global component singleton with optional cross‑scene persistence.
 - `ScriptableObjectSingleton<T>`: Global settings/data singleton loaded from `Resources/`, auto‑created by the editor tool.
 
+Define `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` in Player Settings to use Unity bases for both singleton families and `AttributeEffect`. Use `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS` to limit the choice to singletons.
+
 See the guide: [Singleton Utilities](./features/utilities/singletons.md) and the tool: [ScriptableObject Singleton Creator](./features/editor-tools/editor-tools-guide.md#scriptableobject-singleton-creator).
 
 ---
+
+### Unity Object Identity
+
+Use `ReferenceIdentityComparer<T>.Instance` when keys must match the same managed reference, including destroyed Unity objects. `UnityObjectMap<TKey, TValue>` adds explicit destroyed-key pruning and optional scene-unload cleanup. See [Reference Identity](./features/utilities/reference-identity.md).
 
 ### Editor Tools
 
@@ -1051,6 +1057,7 @@ Unity Helpers includes 30+ editor tools to streamline your workflow:
 - **Animation Tools**: Event Editor, Creator, Copier, Sheet Animation Creator
 - **Validation**: Prefab Checker with validation rules
 - **Automation**: ScriptableObject Singleton Creator, Attribute Cache Generator
+- **Generated Scenes and Prefabs**: [SceneCanonicalizer](./features/editor-tools/scene-canonicalization.md) produces stable local identifiers and document order, with explicit or opt-in automatic processing.
 - **Compilation**: Request a manual script compilation via `Tools > Wallstop Studios > Unity Helpers > Request Script Compilation` or use the default shortcut (**Ctrl/Cmd + Alt + R**) registered with Unity’s Shortcut Manager (listed under _Wallstop / Request Script Compilation_). The shortcut now forces an `AssetDatabase.Refresh` before requesting compilation and logs whenever Unity is already compiling, so scripts added outside the editor are imported even while Unity is unfocused.
 
 [📖 Complete Editor Tools Documentation](./features/editor-tools/editor-tools-guide.md)

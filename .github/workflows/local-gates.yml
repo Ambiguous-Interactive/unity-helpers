@@ -178,6 +178,10 @@ jobs:
         shell: bash
         run: npm run test:enumeration
 
+      - name: Verify scene canonicalization and reference identity
+        if: matrix.phase == 'sources'
+        run: npm run test:stable-assets
+
       - name: Run IntMap correctness without Unity
         if: matrix.phase == 'sources'
         run: npm run test:intmap

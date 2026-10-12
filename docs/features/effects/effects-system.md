@@ -2380,3 +2380,17 @@ Related:
 
 - README section: "Effects, Attributes, and Tags"
 - Attribute Metadata Cache (Editor Tools) for dropdowns and performance
+
+## Odin Base Configuration
+
+With the `odininspector` package installed, `AttributeEffect` inherits from Odin’s
+`SerializedScriptableObject`. Add `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` to
+**Player Settings > Other Settings > Scripting Define Symbols** for each build
+target to use Unity’s `ScriptableObject` base instead. This also switches both
+singleton families to Unity bases while keeping Odin drawers available.
+The singleton-only `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS` define leaves
+`AttributeEffect` on its Odin base. These choices require recompilation.
+
+Before switching existing assets, migrate any fields that rely on Odin serialization
+to Unity-supported representations. See [Odin migration](../../guides/odin-migration-guide.md)
+and [singleton configuration](../utilities/singletons.md#odin-compatibility).

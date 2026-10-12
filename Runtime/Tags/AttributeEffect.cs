@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Utils;
-#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
+#if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR && !WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES
     using AttributeEffectBase = Sirenix.OdinInspector.SerializedScriptableObject;
 #else
     using AttributeEffectBase = UnityEngine.ScriptableObject;
@@ -73,6 +73,10 @@ namespace WallstopStudios.UnityHelpers.Tags
     /// Serves as the authoring unit for buffs, debuffs, and status effects.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// With Odin installed, this type uses its serialized base unless
+    /// <c>WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES</c> is defined.
+    /// </para>
     /// <para>
     /// Composition:
     /// - Attribute modifications: a list of <see cref="AttributeModification"/> applied to <see cref="Attribute"/> fields

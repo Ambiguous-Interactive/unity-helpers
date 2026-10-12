@@ -938,7 +938,8 @@
         "devpack",
         "uvx",
         "Murzak",
-        "ustar"
+        "ustar",
+        "canonicalizer"
       ]
     }
   ],

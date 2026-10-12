@@ -12,6 +12,10 @@
     opinion, where the compiler half is free. The inventory is recorded on #378.
   -->
   <PropertyGroup>
+    <DefineConstants Condition="'$(WallstopDisableOdinSingletons)' == 'true'"
+      >$(DefineConstants);WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_SINGLETONS</DefineConstants>
+    <DefineConstants Condition="'$(WallstopDisableOdinBases)' == 'true'"
+      >$(DefineConstants);WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES</DefineConstants>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningLevel>9999</WarningLevel>
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)CheckProjects.ruleset</CodeAnalysisRuleSet>
