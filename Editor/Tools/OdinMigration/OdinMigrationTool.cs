@@ -13,11 +13,161 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using WallstopStudios.UnityHelpers.Core.Helper;
     using Object = UnityEngine.Object;
 
-    internal static class OdinMigrationTool
+    /// <summary>Previews and applies conservative Odin source migrations in the current Unity project.</summary>
+    public static class OdinMigrationTool
     {
         private const string MenuRoot = "Tools/Wallstop Studios/Unity Helpers/Odin Migration/";
 
         private static string ProjectRoot => Directory.GetParent(Application.dataPath).FullName;
+
+        /// <summary>Analyzes source without reading files or displaying editor UI.</summary>
+        public static OdinMigrationAnalysis AnalyzeSource(string source)
+        {
+            try
+            {
+                return OdinMigrationSourceAnalyzer.Analyze(source);
+            }
+            catch (Exception exception)
+            {
+                return OdinMigrationAnalysis.Invalid(exception.Message);
+            }
+        }
+
+        /// <summary>Previews all source scripts and serialized assets under Assets without editor UI.</summary>
+        public static bool TryPreviewAssets(
+            out OdinMigrationPreview preview,
+            out string failure,
+            Func<string, int, int, bool> shouldCancel = null
+        )
+        {
+            try
+            {
+                return TryPreview(CollectAssetPaths(false), out preview, out failure, shouldCancel);
+            }
+            catch (Exception exception)
+            {
+                preview = null;
+                failure = exception.Message;
+                return false;
+            }
+        }
+
+        /// <summary>Previews explicit Assets script paths and all serialized Assets without editor UI.</summary>
+        public static bool TryPreview(
+            IReadOnlyList<string> sourceAssetPaths,
+            out OdinMigrationPreview preview,
+            out string failure,
+            Func<string, int, int, bool> shouldCancel = null
+        )
+        {
+            if (sourceAssetPaths == null)
+            {
+                preview = null;
+                failure = "Source asset paths are null.";
+                return false;
+            }
+            try
+            {
+                string projectRoot = ProjectRoot;
+                List<string> paths = new List<string>();
+                HashSet<string> uniquePaths = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string path in sourceAssetPaths.AsValueEnumerableRequired())
+                {
+                    ValidateAssetPath(projectRoot, path);
+                    if (!path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        preview = null;
+                        failure = "Source paths must name C# scripts under Assets.";
+                        return false;
+                    }
+                    if (uniquePaths.Add(path))
+                    {
+                        paths.Add(path);
+                    }
+                }
+                ScanResult state = BuildPlans(
+                    paths,
+                    CollectSerializedAssetPaths(),
+                    new PhysicalOdinMigrationScanContext(projectRoot, shouldCancel, false)
+                );
+                OdinMigrationPreview result = new OdinMigrationPreview(projectRoot, state);
+                if (state.Cancelled || 0 < state.Failures.Count)
+                {
+                    string scanFailure = state.Cancelled
+                        ? "The migration scan was cancelled."
+                        : string.Join("; ", state.Failures);
+                    preview = result;
+                    failure = scanFailure;
+                    return false;
+                }
+                preview = result;
+                failure = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                preview = null;
+                failure = exception.Message;
+                return false;
+            }
+        }
+
+        /// <summary>Applies a preview with byte backups without dialogs or an Asset Database refresh.</summary>
+        /// <remarks>Filesystem writes are outside Unity Undo; refresh on the editor thread after success.</remarks>
+        public static bool TryApply(
+            OdinMigrationPreview preview,
+            out string backupRoot,
+            out string failure
+        )
+        {
+            if (preview == null || !preview.CanApply)
+            {
+                backupRoot = null;
+                failure = "A complete, unapplied preview with source changes is required.";
+                return false;
+            }
+            string destination = null;
+            try
+            {
+                string projectRoot = ProjectRoot;
+                if (!string.Equals(projectRoot, preview.ProjectRoot, StringComparison.Ordinal))
+                {
+                    backupRoot = null;
+                    failure = "The preview belongs to a different Unity project.";
+                    return false;
+                }
+                foreach (OdinMigrationFilePlan plan in preview.State.Plans)
+                {
+                    ValidateAssetPath(projectRoot, plan.AssetPath);
+                }
+                destination = Path.Combine(
+                    projectRoot,
+                    "Library",
+                    "WallstopOdinMigrationBackups",
+                    DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N")
+                );
+                EnsureNoReparsePoints(projectRoot, destination);
+                bool applied = OdinMigrationFileTransaction.TryApply(
+                    preview.State.Plans,
+                    destination,
+                    new PhysicalOdinMigrationFileStore(),
+                    out string applyFailure
+                );
+                if (applied)
+                {
+                    preview.Applied = true;
+                }
+                backupRoot = destination;
+                failure = applyFailure;
+                return applied;
+            }
+            catch (Exception exception)
+            {
+                backupRoot = destination;
+                failure = exception.Message;
+                return false;
+            }
+        }
 
         internal static ScanResult BuildPlans(
             IReadOnlyList<string> assetPaths,
@@ -137,6 +287,50 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 && 0 < result.Plans.Count
                 && !result.Cancelled
                 && result.Failures.Count == 0;
+        }
+
+        internal static string BuildReport(ScanResult result)
+        {
+            StringBuilder report = new StringBuilder();
+            report.AppendLine("Odin migration analysis (no serialized-state rewrites):");
+            report.AppendLine(Summary(result));
+            foreach (FileAnalysis file in result.Analyses)
+            {
+                if (
+                    file.Analysis.ReplacementCount == 0
+                    && file.Analysis.Blockers.Count == 0
+                    && file.Analysis.ManualReviews.Count == 0
+                )
+                {
+                    continue;
+                }
+                report.AppendLine(
+                    $"{file.AssetPath}: {file.Analysis.ReplacementCount} safe replacement(s)"
+                );
+                foreach (
+                    OdinMigrationChange change in file.Analysis.Changes.AsValueEnumerableRequired()
+                )
+                {
+                    report.AppendLine(
+                        $"  CHANGE: {file.AssetPath}:{change.Line}: {change.From} => {change.To}"
+                    );
+                }
+                AppendFindings(report, "BLOCKER", file.AssetPath, file.Analysis.Blockers);
+                AppendFindings(report, "REVIEW", file.AssetPath, file.Analysis.ManualReviews);
+            }
+            foreach (SerializedFileAnalysis file in result.SerializedAnalyses)
+            {
+                AppendFindings(report, "DATA REVIEW", file.AssetPath, file.Findings);
+            }
+            foreach (string failure in result.Failures)
+            {
+                report.AppendLine($"FAILURE: {failure}");
+            }
+            foreach (string failure in result.SerializedScanFailures)
+            {
+                report.AppendLine($"DATA SCAN FAILURE: {failure}");
+            }
+            return report.ToString();
         }
 
         private static void ScanSerializedAsset(
@@ -291,17 +485,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return;
             }
 
-            string backupRoot = Path.Combine(
-                ProjectRoot,
-                "Library",
-                "WallstopOdinMigrationBackups",
-                DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N")
-            );
             if (
-                !OdinMigrationFileTransaction.TryApply(
-                    result.Plans,
-                    backupRoot,
-                    new PhysicalOdinMigrationFileStore(),
+                !TryApply(
+                    new OdinMigrationPreview(ProjectRoot, result),
+                    out string backupRoot,
                     out string failure
                 )
             )
@@ -336,50 +523,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 $"Updated {result.Plans.Count} file(s).\nBackups: {backupRoot}",
                 "OK"
             );
-        }
-
-        private static string BuildReport(ScanResult result)
-        {
-            StringBuilder report = new StringBuilder();
-            report.AppendLine("Odin migration analysis (no serialized-state rewrites):");
-            report.AppendLine(Summary(result));
-            foreach (FileAnalysis file in result.Analyses)
-            {
-                if (
-                    file.Analysis.ReplacementCount == 0
-                    && file.Analysis.Blockers.Count == 0
-                    && file.Analysis.ManualReviews.Count == 0
-                )
-                {
-                    continue;
-                }
-                report.AppendLine(
-                    $"{file.AssetPath}: {file.Analysis.ReplacementCount} safe replacement(s)"
-                );
-                foreach (
-                    OdinMigrationChange change in file.Analysis.Changes.AsValueEnumerableRequired()
-                )
-                {
-                    report.AppendLine(
-                        $"  CHANGE: {file.AssetPath}:{change.Line}: {change.From} => {change.To}"
-                    );
-                }
-                AppendFindings(report, "BLOCKER", file.AssetPath, file.Analysis.Blockers);
-                AppendFindings(report, "REVIEW", file.AssetPath, file.Analysis.ManualReviews);
-            }
-            foreach (SerializedFileAnalysis file in result.SerializedAnalyses)
-            {
-                AppendFindings(report, "DATA REVIEW", file.AssetPath, file.Findings);
-            }
-            foreach (string failure in result.Failures)
-            {
-                report.AppendLine($"FAILURE: {failure}");
-            }
-            foreach (string failure in result.SerializedScanFailures)
-            {
-                report.AppendLine($"DATA SCAN FAILURE: {failure}");
-            }
-            return report.ToString();
         }
 
         private static void AppendFindings(
@@ -485,6 +628,57 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             return new List<string>(paths);
         }
 
+        private static void ValidateAssetPath(string projectRoot, string assetPath)
+        {
+            if (
+                string.IsNullOrWhiteSpace(assetPath)
+                || !assetPath.StartsWith("Assets/", StringComparison.Ordinal)
+                || 0 <= assetPath.IndexOf('\\')
+                || 0 <= assetPath.IndexOf(':')
+            )
+            {
+                throw new IOException("Migration paths must be forward-slash paths under Assets.");
+            }
+            foreach (string segment in assetPath.Split('/'))
+            {
+                if (
+                    segment.Length == 0
+                    || string.Equals(segment, ".", StringComparison.Ordinal)
+                    || string.Equals(segment, "..", StringComparison.Ordinal)
+                )
+                {
+                    throw new IOException(
+                        "Migration paths cannot contain empty or traversal segments."
+                    );
+                }
+            }
+            EnsureNoReparsePoints(projectRoot, Path.Combine(projectRoot, assetPath));
+        }
+
+        private static void EnsureNoReparsePoints(string projectRoot, string fullPath)
+        {
+            string current = fullPath;
+            while (!string.Equals(current, projectRoot, StringComparison.Ordinal))
+            {
+                try
+                {
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        throw new IOException(
+                            "Migration refuses symbolic links and reparse points: " + current
+                        );
+                    }
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+                current = Path.GetDirectoryName(current);
+                if (string.IsNullOrWhiteSpace(current))
+                {
+                    throw new IOException("Migration path is outside the project.");
+                }
+            }
+        }
+
         internal sealed class FileAnalysis
         {
             internal readonly string AssetPath;
@@ -542,14 +736,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         private sealed class PhysicalOdinMigrationScanContext : IOdinMigrationScanContext
         {
             private readonly string _projectRoot;
+            private readonly Func<string, int, int, bool> _shouldCancel;
+            private readonly bool _interactive;
 
-            internal PhysicalOdinMigrationScanContext(string projectRoot)
+            internal PhysicalOdinMigrationScanContext(
+                string projectRoot,
+                Func<string, int, int, bool> shouldCancel = null,
+                bool interactive = true
+            )
             {
                 _projectRoot = projectRoot;
+                _shouldCancel = shouldCancel;
+                _interactive = interactive;
             }
 
             public string GetFullPath(string assetPath)
             {
+                ValidateAssetPath(_projectRoot, assetPath);
                 return Path.GetFullPath(Path.Combine(_projectRoot, assetPath));
             }
 
@@ -560,11 +763,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
             public bool ShouldCancel(string assetPath, int index, int count)
             {
-                return EditorUtility.DisplayCancelableProgressBar(
-                    "Odin Migration",
-                    $"Analyzing {assetPath}",
-                    (float)index / count
-                );
+                if (_shouldCancel != null)
+                {
+                    return _shouldCancel(assetPath, index, count);
+                }
+                return _interactive
+                    && EditorUtility.DisplayCancelableProgressBar(
+                        "Odin Migration",
+                        $"Analyzing {assetPath}",
+                        (float)index / count
+                    );
             }
         }
     }

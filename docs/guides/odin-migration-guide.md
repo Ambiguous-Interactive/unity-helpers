@@ -79,6 +79,38 @@ before Apply, keep the backup until the project has compiled and assets have bee
 version control for the authoritative rollback. The tool preserves each supported file's encoding,
 byte-order mark, and newline style, then refreshes the Asset Database once after a successful batch.
 
+## Programmatic Migration
+
+Editor scripts can use `OdinMigrationTool` in
+`WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration` without opening dialogs:
+
+- `AnalyzeSource(source)` returns the proposed source, immutable changes, blockers, and review
+  findings. It performs no file I/O. Check `IsValid` and `Failure` before using the result.
+- `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
+  `Assets` in the current project.
+- `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied
+  project-relative `.cs` paths and still scans all serialized assets under `Assets`. Duplicate
+  paths are scanned once. Paths must use forward slashes and cannot contain traversal segments,
+  symbolic links, or reparse points.
+- Both preview methods accept an optional `shouldCancel(path, index, total)` callback. Returning
+  `true` cancels before that file is read. Cancellation and source failures return `false` and
+  retain the available report in `preview`; discovery, path, and callback failures can return a
+  null preview. Neither path permits Apply after an incomplete source scan.
+- A preview exposes immutable `SourceAnalyses`, `SerializedAnalyses`, `Failures`, and
+  `SerializedScanFailures`, file/replacement counts, and the complete `Report`. A successful
+  scan can have no planned changes; check `CanApply` separately. Serialized findings and failures
+  have the same source-only scope as the menu commands.
+- `TryApply(preview, out backupRoot, out failure)` uses the preview's captured source bytes and
+  the same transaction as the menu tool. A successful preview can be applied once. A failure
+  reports any attempted backup location and rollback failures; keep those backups for review.
+
+Call project preview and apply methods on the Unity editor thread. They do not display progress
+bars or dialogs. Programmatic Apply does not refresh the Asset Database: call
+`UnityEditor.AssetDatabase.Refresh()` on the editor thread after a successful batch, when ready
+for Unity to import the changed sources. The menu tool performs that refresh itself.
+Programmatic writes remain Tier C operations outside Unity Undo. They do not convert Odin-owned
+serialized data or establish that Odin can be removed from the project.
+
 ## Quick Reference Table
 
 | Odin Feature              | Unity Helpers Equivalent                               |
