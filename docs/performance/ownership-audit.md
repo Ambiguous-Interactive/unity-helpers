@@ -96,7 +96,8 @@ callback acceptance remains open before stronger adoption claims.
 The manual Unity Tests workflow accepts `acceptance: borrowed`. It runs exactly the existing
 clock/allocation preflight, 35-row decoder comparison and private/borrowed lease control.
 The 2021.3 floor uses Mono; later versions use IL2CPP. Older IL2CPP allocation counters remain
-unsupported. Select one Unity version and `test-mode: standalone` to keep the run focused.
+unsupported. Use `test-mode: standalone` to limit the ordinary test modes. The licensed workflow
+retains its fixed four-version matrix even when a Unity version input is supplied.
 
 The profile freezes tracked runtime, editor and test inputs plus the canonical 47-row corpus.
 The existing runner checks those inputs and the complete player payload around build and launch.
