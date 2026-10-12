@@ -49,7 +49,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     }
                     else if (IsTransform(document._classId))
                     {
-                        _transformByGameObject[document._gameObjectId] = document._fileId;
+                        if (
+                            document._gameObjectId != 0
+                            && !_transformByGameObject.TryAdd(
+                                document._gameObjectId,
+                                document._fileId
+                            )
+                        )
+                        {
+                            throw new InvalidDataException(
+                                "A GameObject cannot own multiple transforms."
+                            );
+                        }
                         if (
                             int.TryParse(
                                 FindFieldValue(document._lines, FieldRootOrder),

@@ -163,6 +163,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             Assert.That(error, Is.TypeOf<InvalidDataException>());
         }
 
+        [TestCase(
+            "--- !u!4 &2\nTransform:\n  m_GameObject: {fileID: 1}\n--- !u!224 &3\nRectTransform:\n  m_GameObject: {fileID: 1}\n"
+        )]
+        [TestCase(
+            "--- !u!4 &3\nTransform:\n  m_GameObject: {fileID: 1}\n  m_Father: {fileID: 0}\n--- !u!4 &2\nTransform:\n  m_GameObject: {fileID: 1}\n  m_Father: {fileID: 5}\n--- !u!1001 &4\nPrefabInstance:\n  m_Modification:\n    m_TransformParent: {fileID: 3}\n--- !u!4 &5 stripped\nTransform:\n  m_PrefabInstance: {fileID: 4}\n"
+        )]
+        public void DuplicateTransformOwnershipIsRefusedBeforeKeyConstruction(string yaml)
+        {
+            Assert.That(
+                SceneCanonicalizer.TryCanonicalizeYaml(
+                    yaml,
+                    out string canonical,
+                    out Exception error
+                ),
+                Is.False
+            );
+            Assert.That(canonical, Is.EqualTo(yaml));
+            Assert.That(error, Is.TypeOf<InvalidDataException>());
+        }
+
         [Test]
         public void UnresolvedReferencesCannotBecomeAccidentalLiveReferences()
         {

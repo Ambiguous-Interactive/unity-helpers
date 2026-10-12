@@ -69,7 +69,9 @@ Use the explicit API after closing it, then reopen the canonical file.
 ## Limits and migration
 
 This API processes Unity's text serialization format, not arbitrary YAML or binary
-assets. Hierarchies above 1,024 levels or with a parent cycle are refused. It changes identifiers and document order only. It cannot make random
+assets. Hierarchies above 1,024 levels, parent cycles and multiple transforms
+claiming the same GameObject are refused. It changes identifiers and document
+order only. It cannot make random
 serialized values deterministic; seed random generation separately.
 
 Renaming or reparenting a GameObject, changing sibling order, or inserting a
