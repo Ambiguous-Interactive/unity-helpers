@@ -945,6 +945,7 @@ See [the roadmap](./docs/overview/roadmap.md) for details
 
 ### Improved
 
+- Reduce `BitSet.LeftShift` overhead by shifting in place without temporary storage, preserving capacity and snapshot independence ([#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924)).
 - **LRU cache eviction**: Bounded editor caches now use LRU (Least Recently Used) eviction instead of FIFO
   - Frequently-accessed cache entries are retained longer, improving cache hit rates
   - Both reads and writes update an item's "recency", preventing hot items from being evicted

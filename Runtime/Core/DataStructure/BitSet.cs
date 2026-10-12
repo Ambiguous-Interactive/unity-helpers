@@ -10,7 +10,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
-    using WallstopStudios.UnityHelpers.Utils;
 #if !WALLSTOP_PROTO_ONLY
     using ProtoBuf;
 #endif
@@ -339,8 +338,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         /// <summary>
         /// Shifts all bits left by the specified amount.
-        /// Bits shifted beyond capacity are lost, zeros fill from the right.
         /// </summary>
+        /// <remarks>
+        /// Shifts in place without temporary storage. Bits beyond capacity are lost and low bits
+        /// become zero. Nonpositive shifts leave the set unchanged.
+        /// </remarks>
         public void LeftShift(int shift)
         {
             if (shift <= 0)
@@ -354,26 +356,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            // Read a snapshot so shifted writes cannot overwrite unread source bits.
-            using PooledArray<ulong> pooled = SystemArrayPool<ulong>.Get(
-                _bits.Length,
-                out ulong[] temp
-            );
-            Array.Copy(_bits, temp, _bits.Length);
-
-            ClearAll();
-
-            for (int i = shift; i < _capacity; ++i)
-            {
-                int sourceIndex = i - shift;
-                int sourceWordIndex = sourceIndex >> 6;
-                int sourceBitIndex = sourceIndex & 63;
-                bool value = (temp[sourceWordIndex] & (1UL << sourceBitIndex)) != 0;
-                if (value)
-                {
-                    TrySet(i);
-                }
-            }
+            ShiftWordsLeft(shift);
         }
 
         /// <summary>
@@ -602,6 +585,33 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public BitEnumerator GetEnumerator()
         {
             return new BitEnumerator(this);
+        }
+
+        private void ShiftWordsLeft(int shift)
+        {
+            int wordCount = WordCountForCapacity(_capacity);
+            int wordShift = shift >> BitsPerLongShift;
+            int bitShift = shift & BitsPerLongMask;
+            for (int destination = wordCount - 1; 0 <= destination; --destination)
+            {
+                int source = destination - wordShift;
+                ulong value = 0;
+                if (0 <= source)
+                {
+                    value = _bits[source] << bitShift;
+                    if (bitShift != 0 && 0 < source)
+                    {
+                        value |= _bits[source - 1] >> (BitsPerLong - bitShift);
+                    }
+                }
+                _bits[destination] = value;
+            }
+            int remainingBits = _capacity & BitsPerLongMask;
+            if (remainingBits != 0)
+            {
+                _bits[wordCount - 1] &= (1UL << remainingBits) - 1;
+            }
+            Array.Clear(_bits, wordCount, _bits.Length - wordCount);
         }
 
         // Capacity is an untrusted claim; only delivered words contain readable bits.

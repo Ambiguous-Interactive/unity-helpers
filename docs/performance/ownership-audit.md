@@ -1,7 +1,7 @@
 # Disposal Ownership Audit
 
 This audit supports [#924](https://github.com/Ambiguous-Interactive/unity-helpers/issues/924).
-The [site inventory](./ownership-audit.csv) records 991 distinct ownership-producing sites across
+The [site inventory](./ownership-audit.csv) records 990 distinct ownership-producing sites across
 203 runtime and editor files, with source hashes, compiler-bound producers and reviewed dispositions.
 It records the current contracts and private-operation candidates; a candidate is not an adopted
 optimization or a measured result.
@@ -15,7 +15,7 @@ factories of package-owned disposable types, shared disposal handles, asynchrono
 and internal private-array rentals. Compiler symbols determine the produced type.
 
 A separate syntax scan of all conditional-symbol combinations in 762 runtime and editor C# files
-finds 111 explicit `SystemArrayPool<T>.Get` calls: 92 runtime and 19 editor sites. Every one has a
+finds 110 explicit `SystemArrayPool<T>.Get` calls: 91 runtime and 19 editor sites. Every one has a
 semantic witness in the inventory. The inventory also includes the forwarding call inside the
 pool, other array factories, collection pools and restoration scopes. It does not claim every
 possible consumer, generated contract, player-only branch or optional dependency configuration.
@@ -53,7 +53,7 @@ independent copies can still outlive the call.
 | Shared handle           |   665 | Preserve the producer's copy-safe ownership contract                                 |
 | Restoration or callback |    78 | Preserve dynamic restoration and exactly-once callback behavior                      |
 | Runtime owner           |   116 | Preserve resource validity, reentrancy and disposal state                            |
-| Private candidate       |   105 | Review the complete operation and measure before adopting a different lifetime shape |
+| Private candidate       |   104 | Review the complete operation and measure before adopting a different lifetime shape |
 | Source protocol         |     8 | Preserve disposal of custom traversal sources                                        |
 | Existing private owner  |    13 | Keep the current operation-owned rental, cleanup and clearing                        |
 | Extended lifetime       |     6 | Preserve ownership that crosses the producing method's synchronous lifetime          |
@@ -63,7 +63,7 @@ accumulator sites, the deferred subset iterator, the asynchronous JSON stream re
 returned texture-premultiplication lease. Stored or returned ownership must not become an
 untracked local rental.
 
-The 105 synchronous array candidates include sorting, geometry, spatial construction, random
+The 104 synchronous array candidates include sorting, geometry, spatial construction, random
 selection, UTF-8 decoding and editor image operations. Local `using` alone does not prove
 an operation-owned replacement safe or worthwhile. Nested helpers, callbacks, source mutation,
 engine calls, cancellation and clearing belong to each complete operation. The inventory retains
@@ -71,6 +71,14 @@ a reason for each family and site. Collection-pool producers retain their shared
 are not automatically treated as private array candidates.
 
 ## Adoption Requirements
+
+`BitSet.LeftShift` now shifts words backward in place, masks the last logical word and clears
+serialized words beyond capacity. It uses no temporary rental. Native editor tests pass all 551
+new behavior and lease cases and 151 existing bit-set cases, with no skips. Three repeated
+comparisons cover 18 capacity/shift combinations and eight trials each. For shifts below capacity,
+median candidate/current whole-call ratios range from 0.012 to 0.142. Both warm paths record zero
+profiler allocation events with fresh-box and preboxed controls. The measured operation includes
+`SetAll` before every shift; these editor observations do not qualify Release-player performance.
 
 `FlurryBurstRandom`, `PhotonSpinRandom` and `StormDropRandom` snapshots now copy their logical
 8-, 80- and 4,096-byte payloads directly into independent saved arrays. They use no pooled scratch

@@ -320,6 +320,7 @@ Tips
 
 - Capacity grows automatically when setting beyond bounds; prefer sizing appropriately upfront for fewer resizes. `TrySet` and `TryFlip` return `false` for negative indices and for `int.MaxValue`, whose required capacity cannot be represented; indexer assignments at those indices do nothing.
 - Left/Right shift drop/zero-fill at the edges; use with care if capacity is small.
+- `LeftShift` updates words in place without temporary storage or pool activity. It preserves capacity and independent immutable snapshots, ignores nonpositive shifts, and clears the set when the shift reaches capacity.
 
 ## IntMap (Int-Keyed Open-Addressing Map)
 
