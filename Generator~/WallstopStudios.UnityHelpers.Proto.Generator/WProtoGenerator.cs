@@ -4447,7 +4447,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 emissions.Add(new Emission(contract, source, registration));
             }
 
-            List<ClosureScan.TypeUse> typeUses = ClosureScan.Types(context.Compilation, models);
+            List<IArrayTypeSymbol> arrayTypes = new List<IArrayTypeSymbol>();
+            List<ClosureScan.TypeUse> typeUses = ClosureScan.Types(
+                context.Compilation,
+                models,
+                arrayTypes
+            );
 
             foreach (Emission emission in emissions)
             {
@@ -4533,6 +4538,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     announced
                 )
             );
+
+            RootCollections.Emit(context, typeUses, arrayTypes, surrogates, rootMarshals);
 
             List<string> declaredRoots = new List<string>(
                 DeclaredRootMap.Registrations(

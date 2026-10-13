@@ -4,6 +4,8 @@
 namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 {
     using System;
+    using System.Collections;
+    using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
     using ProtoBuf.Meta;
@@ -13,6 +15,96 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class RuntimeRootDifferentialTests
     {
+        private static void AssertErasedCollection<T>(
+            T value,
+            byte[] expected,
+            bool compareBytes = true
+        )
+            where T : IEnumerable
+        {
+            RuntimeTypeModel model = RuntimeTypeModel.Create();
+            using MemoryStream oracle = new MemoryStream();
+            model.Serialize(oracle, value);
+            if (compareBytes)
+            {
+                CollectionAssert.AreEqual(oracle.ToArray(), expected);
+            }
+            Assert.IsTrue(
+                WProtoFormatterProvider.TryGetRuntimeWriter(value, out IWProtoRuntimeWriter writer)
+            );
+            Assert.IsTrue(writer.TrySerialize(value, out byte[] generated));
+            CollectionAssert.AreEqual(expected, generated);
+            byte[] buffer = new byte[expected.Length + 16];
+            byte[] original = buffer;
+            WProtoWriteResult written = writer.Serialize(value, ref buffer);
+            Assert.IsTrue(written.Served);
+            Assert.AreSame(original, buffer);
+            Assert.AreEqual(expected.Length, written.Length);
+            Assert.IsTrue(buffer.AsSpan(0, written.Length).SequenceEqual(expected));
+            using MemoryStream input = new MemoryStream(generated);
+            CollectionAssert.AreEqual(
+                value,
+                (IEnumerable)model.Deserialize(input, null, typeof(T))
+            );
+            CollectionAssert.AreEqual(value, WProtoFacade.Deserialize<T>(oracle.ToArray()));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ErasedArrayRootsMatchBothOracleReadDirections(bool empty)
+        {
+            int[] value = empty ? Array.Empty<int>() : new[] { 0, -1, int.MinValue, int.MaxValue };
+            AssertErasedCollection(value, WProtoFacade.Serialize(value));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ErasedListRootsMatchBothOracleReadDirections(bool empty)
+        {
+            List<int> value = empty
+                ? new List<int>()
+                : new List<int> { 0, -1, int.MinValue, int.MaxValue };
+            AssertErasedCollection(value, WProtoFacade.Serialize(value));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ErasedDictionaryRootsMatchBothOracleReadDirections(bool empty)
+        {
+            Dictionary<int, string> value = empty
+                ? new Dictionary<int, string>()
+                : new Dictionary<int, string> { { -1, "station/café" } };
+            AssertErasedCollection(value, WProtoFacade.Serialize(value));
+        }
+
+        [Test]
+        public void NestedArrayPackingDoesNotChangeTheArrayRootEncoding()
+        {
+            List<int[]> value = new List<int[]> { new[] { 1, 2 } };
+            byte[] generated = WProtoFacade.Serialize(value);
+            CollectionAssert.AreEqual(new byte[] { 10, 4, 10, 2, 1, 2 }, generated);
+            List<int[]> restored = WProtoFacade.Deserialize<List<int[]>>(generated);
+            Assert.AreEqual(1, restored.Count);
+            CollectionAssert.AreEqual(value[0], restored[0]);
+            CollectionAssert.AreEqual(new byte[] { 8, 1, 8, 2 }, WProtoFacade.Serialize(value[0]));
+        }
+
+        [Test]
+        public void ErasedEmptyStringMapRootsPreserveBothOracleReadDirections()
+        {
+            Dictionary<string, string> value = new Dictionary<string, string>
+            {
+                { "b", string.Empty },
+            };
+            byte[] expected = WProtoFacade.Serialize(value);
+            CollectionAssert.AreEqual(new byte[] { 10, 5, 10, 1, 98, 18, 0 }, expected);
+#if PROTOBUF_NET_ORACLE_V2
+            AssertErasedCollection(value, expected, false);
+#else
+            AssertErasedCollection(value, expected);
+#endif
+        }
+
         [TestCase(0, false)]
         [TestCase(-1, false)]
         [TestCase(int.MinValue, false)]
@@ -84,10 +176,44 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
-        [Test]
-        public void WarmErasedWritesReuseTheBufferWithoutAllocating()
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void WarmErasedWritesReuseTheBufferWithoutAllocating(int rootKind)
         {
-            object value = new WProtoRuntimeSave { Health = 7, Station = "station" };
+            object value;
+            int expectedLength;
+            switch (rootKind)
+            {
+                case 1:
+                    int[] array = new[] { 0, -1, int.MaxValue };
+                    value = array;
+                    expectedLength = WProtoFacade.Serialize(array).Length;
+                    break;
+                case 2:
+                    List<int> list = new List<int> { 0, -1, int.MaxValue };
+                    value = list;
+                    expectedLength = WProtoFacade.Serialize(list).Length;
+                    break;
+                case 3:
+                    Dictionary<int, string> dictionary = new Dictionary<int, string>
+                    {
+                        { -1, "station/café" },
+                    };
+                    value = dictionary;
+                    expectedLength = WProtoFacade.Serialize(dictionary).Length;
+                    break;
+                default:
+                    WProtoRuntimeSave save = new WProtoRuntimeSave
+                    {
+                        Health = 7,
+                        Station = "station",
+                    };
+                    value = save;
+                    expectedLength = WProtoFacade.Serialize(save).Length;
+                    break;
+            }
             byte[] buffer = new byte[128];
             for (int index = 0; index < 32; ++index)
             {
@@ -114,7 +240,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
             }
             long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-            Assert.AreEqual(128 * 11, totalWritten);
+            Assert.AreEqual(128 * expectedLength, totalWritten);
             Assert.AreEqual(0, allocated);
         }
     }

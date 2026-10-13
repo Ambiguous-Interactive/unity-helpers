@@ -4,6 +4,8 @@
 namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
     using System;
+    using System.Collections;
+    using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -13,6 +15,103 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [Category("Serialization")]
     public sealed class WProtoRuntimeRootTests
     {
+        private static void AssertErasedCollection<T>(
+            T value,
+            byte[] expected,
+            bool forceRuntimeType
+        )
+            where T : IEnumerable
+        {
+            Assert.IsFalse(WProtoFacade.TrySerialize<object>(value, out byte[] declined));
+            Assert.IsTrue(declined == null);
+            Assert.IsTrue(
+                WProtoFormatterProvider.TryGetRuntimeWriter(value, out IWProtoRuntimeWriter writer)
+            );
+            Assert.IsTrue(writer.TrySerialize(value, out byte[] generated));
+            CollectionAssert.AreEqual(expected, generated);
+            CollectionAssert.AreEqual(
+                expected,
+                Serializer.ProtoSerialize<object>(value, forceRuntimeType)
+            );
+            CollectionAssert.AreEqual(
+                expected,
+                Serializer.ProtoSerialize<IEnumerable>(value, forceRuntimeType)
+            );
+            byte[] buffer = new byte[expected.Length + 16];
+            byte[] original = buffer;
+            int written = Serializer.ProtoSerialize<object>(value, ref buffer, forceRuntimeType);
+            Assert.AreSame(original, buffer);
+            Assert.AreEqual(expected.Length, written);
+            Assert.IsTrue(buffer.AsSpan(0, written).SequenceEqual(expected));
+            written = Serializer.ProtoSerialize<IEnumerable>(value, ref buffer, forceRuntimeType);
+            Assert.AreSame(original, buffer);
+            Assert.AreEqual(expected.Length, written);
+            Assert.IsTrue(buffer.AsSpan(0, written).SequenceEqual(expected));
+            CollectionAssert.AreEqual(value, WProtoFacade.Deserialize<T>(expected));
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void ErasedArrayRootsKeepTheirConcreteEncoding(bool empty, bool forceRuntimeType)
+        {
+            int[] value = empty ? Array.Empty<int>() : new[] { 0, -1, int.MinValue, int.MaxValue };
+            AssertErasedCollection(value, WProtoFacade.Serialize(value), forceRuntimeType);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void ErasedListRootsKeepTheirConcreteEncoding(bool empty, bool forceRuntimeType)
+        {
+            List<int> value = empty
+                ? new List<int>()
+                : new List<int> { 0, -1, int.MinValue, int.MaxValue };
+            AssertErasedCollection(value, WProtoFacade.Serialize(value), forceRuntimeType);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void ErasedDictionaryRootsKeepTheirConcreteEncoding(
+            bool empty,
+            bool forceRuntimeType
+        )
+        {
+            Dictionary<int, string> value = empty
+                ? new Dictionary<int, string>()
+                : new Dictionary<int, string> { { -1, "station/café" } };
+            AssertErasedCollection(value, WProtoFacade.Serialize(value), forceRuntimeType);
+        }
+
+        [Test]
+        public void NestedArrayPackingDoesNotChangeTheArrayRootEncoding()
+        {
+            List<int[]> value = new List<int[]> { new[] { 1, 2 } };
+            byte[] generated = WProtoFacade.Serialize(value);
+            CollectionAssert.AreEqual(new byte[] { 10, 4, 10, 2, 1, 2 }, generated);
+            List<int[]> restored = WProtoFacade.Deserialize<List<int[]>>(generated);
+            Assert.AreEqual(1, restored.Count);
+            CollectionAssert.AreEqual(value[0], restored[0]);
+            CollectionAssert.AreEqual(new byte[] { 8, 1, 8, 2 }, WProtoFacade.Serialize(value[0]));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ErasedEmptyStringMapRootsKeepTheGeneratedWritePolicy(bool forceRuntimeType)
+        {
+            Dictionary<string, string> value = new Dictionary<string, string>
+            {
+                { "b", string.Empty },
+            };
+            byte[] expected = WProtoFacade.Serialize(value);
+            CollectionAssert.AreEqual(new byte[] { 10, 5, 10, 1, 98, 18, 0 }, expected);
+            AssertErasedCollection(value, expected, forceRuntimeType);
+        }
+
         [TestCase(false, false)]
         [TestCase(false, true)]
         [TestCase(true, false)]

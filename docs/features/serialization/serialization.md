@@ -2756,6 +2756,14 @@ Three rules decide the rest:
   to its payload. Interface reads still need [a declared root](#declared-roots-serving-an-interface).
   Direct `WProtoFacade` calls retain their declared-type contract.
 
+Closed one-dimensional arrays (except scalar `byte[]`), `List<T>`, and `Dictionary<TKey, TValue>`
+also receive generated root codecs when their supported element types appear in source. Their root
+encoding uses tag 1, with unpacked scalar elements matching protobuf-net's legacy output. These
+registrations also serve `object` and collection-interface writes through `Serializer`, including
+reused buffers and `WALLSTOP_PROTO_ONLY`. Read through the concrete collection type. Empty root
+payloads restore empty collections. Unsupported elements retain the existing refusal and fallback
+behavior; registering a collection root does not alter collection members inside contracts.
+
 Two consequences on the read side are worth knowing:
 
 - **An empty payload is a value, not a failure.** A contract whose members all equal their defaults

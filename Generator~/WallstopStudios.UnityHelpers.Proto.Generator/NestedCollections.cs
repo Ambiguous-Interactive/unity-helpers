@@ -361,10 +361,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <param name="type">The element or value type.</param>
         /// <param name="qualified">Its fully qualified name.</param>
         /// <param name="memberName">The declaring member, for a null element's runtime message.</param>
+        /// <param name="isPacked">Whether scalar runs use packed encoding.</param>
         /// <returns>The wrapper's shape, or <c>null</c>.</returns>
-        internal Shape TryShape(ITypeSymbol type, string qualified, string memberName)
+        internal Shape TryShape(
+            ITypeSymbol type,
+            string qualified,
+            string memberName,
+            bool isPacked = true
+        )
         {
-            if (_byType.TryGetValue(qualified, out IGeneratedMessage existing))
+            string key = qualified + (isPacked ? "|packed" : "|unpacked");
+            if (_byType.TryGetValue(key, out IGeneratedMessage existing))
             {
                 if (existing.Inner == null)
                 {
@@ -411,7 +418,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     );
 
             // Register the incomplete wrapper before resolving its member to stop self-referential recursion.
-            _byType[qualified] = wrapper;
+            _byType[key] = wrapper;
 
             int enclosingChildDepth = _childDepth;
             _childDepth = 0;
@@ -440,7 +447,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         false,
                         // Wrappers have no constructor seed, so reads replace rather than append.
                         true,
-                        true,
+                        isPacked,
                         false,
                         _surrogates,
                         this,
@@ -472,7 +479,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                  * Depth failures depend on the lookup location; caching them would poison supported shallower
                  * uses.
                  */
-                _byType.Remove(qualified);
+                _byType.Remove(key);
                 return null;
             }
 

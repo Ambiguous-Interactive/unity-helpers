@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add generated protobuf roots for supported arrays, lists, and dictionaries, including writes through object and collection interfaces ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Add dialog-free Odin migration source analysis, immutable previews, bounded node reading, multi-field dictionary conversion and null object elements, cancellation, and backed-up source apply for editor scripts ([guide](./docs/guides/odin-migration-guide.md#programmatic-migration), [#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
 - Add `SceneCanonicalizer` for stable generated scenes and prefabs, with local reference remapping, Unity-reserved ID avoidance and opt-in folder imports ([guide](./docs/features/editor-tools/scene-canonicalization.md), [#999](https://github.com/Ambiguous-Interactive/unity-helpers/issues/999)).
 - Add `ReferenceIdentityComparer<T>` and `UnityObjectMap<TKey, TValue>` for managed identity, destroyed-key cleanup and optional scene-unload pruning ([guide](./docs/features/utilities/reference-identity.md), [#998](https://github.com/Ambiguous-Interactive/unity-helpers/issues/998)).
