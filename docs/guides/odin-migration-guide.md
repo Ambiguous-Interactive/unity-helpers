@@ -344,6 +344,10 @@ bundled with the running Unity Editor in a separate process. It supplies the cap
 defines, references, language version, analyzer inputs, and supported compiler options directly.
 It disables the compiler's default response file, so project-wide defaults cannot add extra defines
 or references. Unsupported compiler layouts or options fail before target writes.
+Supported layouts include the versioned bundled .NET SDK used by Unity 6000.6, the earlier
+`DotNetSdkRoslyn` layout, and the legacy Mono compiler. The versioned SDK selection follows
+[Unity's compiler discovery](https://github.com/Unity-Technologies/UnityCsReference/blob/6000.6.0f1/Editor/Mono/Scripting/ScriptCompilation/BeeDriver/BeeScriptCompilation.cs).
+An incomplete bundled SDK fails instead of falling back to a different compiler.
 Every candidate uses its captured editor compiler context, including runtime-capable assemblies.
 An IL2CPP player setting does not change the editor defines used for this receipt.
 

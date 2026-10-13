@@ -58,15 +58,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(2)]
+        [TestCase(3)]
         public void SupportedCompilerLayoutsUseOnlyOwnedArguments(int layout)
         {
             bool windows = Path.DirectorySeparatorChar == '\\';
             string compiler =
-                layout == 2
-                    ? Path.Combine(_directory, "Tools", "Roslyn", "csc.exe")
-                    : Path.Combine(_directory, "DotNetSdkRoslyn", "csc.dll");
+                layout == 3
+                    ? Path.Combine(
+                        _directory,
+                        "DotNetSdk",
+                        "sdk",
+                        "9.0.306",
+                        "Roslyn",
+                        "bincore",
+                        "csc.dll"
+                    )
+                : layout == 2 ? Path.Combine(_directory, "Tools", "Roslyn", "csc.exe")
+                : Path.Combine(_directory, "DotNetSdkRoslyn", "csc.dll");
             string runtime =
-                layout == 0
+                layout == 3
+                    ? Path.Combine(_directory, "DotNetSdk", windows ? "dotnet.exe" : "dotnet")
+                : layout == 0
                     ? Path.Combine(
                         _directory,
                         "netcorerun",
@@ -86,6 +98,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 response
             );
             Assert.AreEqual(runtime, start.FileName);
+            if (!string.Equals(compiler, runtime, StringComparison.Ordinal))
+            {
+                StringAssert.StartsWith("\"" + compiler + "\" ", start.Arguments);
+            }
             StringAssert.Contains("/noconfig @\"" + response + "\"", start.Arguments);
             Assert.IsFalse(start.UseShellExecute);
             Assert.IsTrue(start.RedirectStandardOutput);
@@ -96,6 +112,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [Test]
         public void MissingCompilerFailsBeforeAnyProcessStarts()
         {
+            Assert.Throws<FileNotFoundException>(() =>
+                OdinMigrationCompilerProcess.CompilerStartInfo(_directory, "candidate.rsp")
+            );
+        }
+
+        [TestCase("9.0.306", false, true)]
+        [TestCase("9.0.306-preview", true, true)]
+        [TestCase("invalid", true, true)]
+        [TestCase("9.0.306", true, false)]
+        public void AnIncompleteBundledSdkCannotFallBackToAnotherCompiler(
+            string version,
+            bool hasCompiler,
+            bool hasRuntime
+        )
+        {
+            bool windows = Path.DirectorySeparatorChar == '\\';
+            string sdk = Path.Combine(_directory, "DotNetSdk");
+            string compiler = Path.Combine(sdk, "sdk", version, "Roslyn", "bincore", "csc.dll");
+            Directory.CreateDirectory(Path.GetDirectoryName(compiler));
+            if (hasRuntime)
+            {
+                File.WriteAllText(
+                    Path.Combine(sdk, windows ? "dotnet.exe" : "dotnet"),
+                    "runtime control"
+                );
+            }
+            if (hasCompiler)
+            {
+                File.WriteAllText(compiler, "compiler control");
+            }
+            string legacy = Path.Combine(_directory, "Tools", "Roslyn", "csc.exe");
+            Directory.CreateDirectory(Path.GetDirectoryName(legacy));
+            File.WriteAllText(legacy, "legacy compiler control");
+            if (!windows)
+            {
+                string mono = Path.Combine(_directory, "MonoBleedingEdge", "bin", "mono");
+                Directory.CreateDirectory(Path.GetDirectoryName(mono));
+                File.WriteAllText(mono, "legacy runtime control");
+            }
             Assert.Throws<FileNotFoundException>(() =>
                 OdinMigrationCompilerProcess.CompilerStartInfo(_directory, "candidate.rsp")
             );

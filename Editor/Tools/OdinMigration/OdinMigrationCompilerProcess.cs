@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.Diagnostics;
     using System.IO;
     using System.Text;
+    using System.Text.RegularExpressions;
     using System.Threading;
     using UnityEditor;
     using UnityEditor.Compilation;
@@ -160,26 +161,63 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         internal static ProcessStartInfo CompilerStartInfo(string contentsPath, string responsePath)
         {
             bool windows = Path.DirectorySeparatorChar == '\\';
-            string compiler = Path.Combine(contentsPath, "DotNetSdkRoslyn", "csc.dll");
+            string compiler = null;
             string runtime = Path.Combine(
                 contentsPath,
-                "netcorerun",
-                windows ? "netcorerun.exe" : "netcorerun"
+                "DotNetSdk",
+                windows ? "dotnet.exe" : "dotnet"
             );
-            if (!File.Exists(runtime))
+            string sdkRoot = Path.Combine(contentsPath, "DotNetSdk", "sdk");
+            if (Directory.Exists(Path.Combine(contentsPath, "DotNetSdk")))
             {
+                if (!File.Exists(runtime) || !Directory.Exists(sdkRoot))
+                {
+                    throw new FileNotFoundException("Unity's bundled .NET SDK is incomplete.");
+                }
+                foreach (string directory in Directory.GetDirectories(sdkRoot))
+                {
+                    if (
+                        Regex.IsMatch(
+                            Path.GetFileName(directory),
+                            @"^[1-9]+[0-9]*\.[0-9]+\.[0-9]+$",
+                            RegexOptions.CultureInvariant
+                        )
+                    )
+                    {
+                        compiler = Path.Combine(directory, "Roslyn", "bincore", "csc.dll");
+                        break;
+                    }
+                }
+                if (compiler == null || !File.Exists(compiler))
+                {
+                    throw new FileNotFoundException(
+                        "Unity's bundled .NET SDK has no supported isolated C# compiler."
+                    );
+                }
+            }
+            else
+            {
+                compiler = Path.Combine(contentsPath, "DotNetSdkRoslyn", "csc.dll");
                 runtime = Path.Combine(
                     contentsPath,
-                    "NetCoreRuntime",
-                    windows ? "dotnet.exe" : "dotnet"
+                    "netcorerun",
+                    windows ? "netcorerun.exe" : "netcorerun"
                 );
-            }
-            if (!File.Exists(compiler) || !File.Exists(runtime))
-            {
-                compiler = Path.Combine(contentsPath, "Tools", "Roslyn", "csc.exe");
-                runtime = windows
-                    ? compiler
-                    : Path.Combine(contentsPath, "MonoBleedingEdge", "bin", "mono");
+                if (!File.Exists(runtime))
+                {
+                    runtime = Path.Combine(
+                        contentsPath,
+                        "NetCoreRuntime",
+                        windows ? "dotnet.exe" : "dotnet"
+                    );
+                }
+                if (!File.Exists(compiler) || !File.Exists(runtime))
+                {
+                    compiler = Path.Combine(contentsPath, "Tools", "Roslyn", "csc.exe");
+                    runtime = windows
+                        ? compiler
+                        : Path.Combine(contentsPath, "MonoBleedingEdge", "bin", "mono");
+                }
             }
             if (!File.Exists(compiler) || !File.Exists(runtime))
             {
