@@ -1193,7 +1193,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #endif
         }
 
-#if !WALLSTOP_PROTO_ONLY
         internal static bool ShouldUseRuntimeTypeForProtobuf<T>(
             Type declared,
             T instance,
@@ -1224,6 +1223,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             return false;
         }
 
+#if !WALLSTOP_PROTO_ONLY
         /// <summary>
         /// Serializes a serializable collection to a protobuf wrapper and then to bytes.
         /// Uses cached reflection accessors for performance.
@@ -1879,6 +1879,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// of. The bytes are the same either way.
         /// <paramref name="forceRuntimeType"/> does not disable that: a generated formatter already
         /// dispatches on the runtime type.
+        /// When declared dispatch declines and legacy routing selects a runtime type, a registered
+        /// concrete writer also serves interface and object roots without reflection.
         /// Legacy map writes preserve present nullable defaults instead of omitting their fields.
         /// Older payloads that omitted those fields still decode the nullable value as null.
         /// Root dictionary wrappers preserve null slots with presence data that older readers do not support.
@@ -1894,12 +1896,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static byte[] ProtoSerialize<T>(T input, bool forceRuntimeType = false)
         {
 #if WALLSTOP_PROTO_ONLY
+            if (TrySerializeGenerated(input, forceRuntimeType, out byte[] generated))
+            {
+                return generated;
+            }
             return WallstopProto.WProtoFacade.Serialize(input);
 #else
 
 #if WALLSTOP_PROTO || WALLSTOP_PROTO_ONLY
             // Generated formatters already dispatch runtime subtypes; forceRuntimeType must not divert AOT calls to reflection.
-            if (WallstopProto.WProtoFacade.TrySerialize(input, out byte[] wproto))
+            if (TrySerializeGenerated(input, forceRuntimeType, out byte[] wproto))
             {
                 return wproto;
             }
@@ -1957,9 +1963,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #if WALLSTOP_PROTO_ONLY
             try
             {
-                WallstopProto.WProtoWriteResult result = WallstopProto.WProtoFacade.Serialize(
+                WallstopProto.WProtoWriteResult result = SerializeGenerated(
                     input,
-                    ref buffer
+                    ref buffer,
+                    forceRuntimeType
                 );
                 if (result.Served)
                 {
@@ -1987,9 +1994,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
 #if WALLSTOP_PROTO || WALLSTOP_PROTO_ONLY
             // The caller-buffer overload must use the same generated formatter dispatch as the allocating overload.
-            WallstopProto.WProtoWriteResult wproto = WallstopProto.WProtoFacade.Serialize(
+            WallstopProto.WProtoWriteResult wproto = SerializeGenerated(
                 input,
-                ref buffer
+                ref buffer,
+                forceRuntimeType
             );
             if (wproto.Served)
             {
@@ -2835,6 +2843,91 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             ArraySegment<byte> seg = stream.GetWrittenSegment();
             return JsonDeserializeUtf8Slice<T>(seg.Array, seg.Count);
         }
+
+#if WALLSTOP_PROTO || WALLSTOP_PROTO_ONLY
+        private static bool TrySerializeGenerated<T>(
+            T input,
+            bool forceRuntimeType,
+            out byte[] bytes
+        )
+        {
+            try
+            {
+                if (WallstopProto.WProtoFacade.TrySerialize(input, out byte[] generated))
+                {
+                    bytes = generated;
+                    return true;
+                }
+                if (
+                    ShouldUseRuntimeTypeForProtobuf(typeof(T), input, forceRuntimeType)
+                    && WallstopProto.WProtoFormatterProvider.TryGetRuntimeWriter(
+                        input,
+                        out WallstopProto.IWProtoRuntimeWriter writer
+                    )
+                )
+                {
+                    byte[] runtimeBytes = writer.Serialize(input);
+                    bytes = runtimeBytes;
+                    return true;
+                }
+                bytes = null;
+                return false;
+            }
+            catch (Exception exception) when (exception is not SerializationFailureException)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Serialize,
+                    -1,
+                    SerializationStage.Encode,
+                    exception
+                );
+                bytes = null;
+                return false;
+            }
+        }
+
+        private static WallstopProto.WProtoWriteResult SerializeGenerated<T>(
+            T input,
+            ref byte[] buffer,
+            bool forceRuntimeType
+        )
+        {
+            try
+            {
+                WallstopProto.WProtoWriteResult generated = WallstopProto.WProtoFacade.Serialize(
+                    input,
+                    ref buffer
+                );
+                if (generated.Served)
+                {
+                    return generated;
+                }
+                if (
+                    ShouldUseRuntimeTypeForProtobuf(typeof(T), input, forceRuntimeType)
+                    && WallstopProto.WProtoFormatterProvider.TryGetRuntimeWriter(
+                        input,
+                        out WallstopProto.IWProtoRuntimeWriter writer
+                    )
+                )
+                {
+                    return writer.Serialize(input, ref buffer);
+                }
+                return generated;
+            }
+            catch (Exception exception) when (exception is not SerializationFailureException)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Protobuf,
+                    SerializationOperation.Serialize,
+                    -1,
+                    SerializationStage.Encode,
+                    exception
+                );
+                return default;
+            }
+        }
+#endif
 
         // Require an explicit root when the declared contract and its includes cannot identify one unambiguously.
 #if WALLSTOP_PROTO || WALLSTOP_PROTO_ONLY

@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix generated protobuf writes through interface and object save roots, including reusable buffers and `WALLSTOP_PROTO_ONLY` builds ([guide](./docs/features/serialization/serialization.md#serving-through-serializer), [#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Fix spurious formatter diagnostics for private two- and three-element tuples used only in implementation code, while preserving diagnostics for serialization roots, members and explicit marshal registrations ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Fix editor folder creation and singleton cleanup accepting paths that escape Assets through parent segments. Normalize paths remaining inside Assets before creating or deleting files ([#988](https://github.com/Ambiguous-Interactive/unity-helpers/issues/988)).
 - Fix generic serializer and JSON converter registration when constructed types appear only in inferred factory results ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).

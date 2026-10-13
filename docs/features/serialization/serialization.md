@@ -2744,9 +2744,14 @@ Three rules decide the rest:
   declined rather than failed, and protobuf-net's runtime model answers it.
 - **`forceRuntimeType` does not turn the swap off.** A generated formatter already dispatches on the
   runtime type, which is what that flag asks for.
-- **An `interface`-typed declared type is served only when a root is declared for it.** An interface
-  has no members, so nothing about it says which contract should answer. Say so once with
-  [a declared root](#declared-roots-serving-an-interface); `IRandom` already has one.
+- **Interface and `object` writes can use the registered concrete contract.** After declared-type
+  dispatch declines, `Serializer.ProtoSerialize` selects the runtime writer when the legacy facade
+  would select a runtime type. Generated registration supplies that writer without reflection or
+  manual registration. The allocating and reusable-buffer overloads use the same route, including
+  `WALLSTOP_PROTO_ONLY` builds. Unrelated concrete save types can share one application interface.
+  Read those bytes through the concrete save type; writing a runtime value does not add a discriminator
+  to its payload. Interface reads still need [a declared root](#declared-roots-serving-an-interface).
+  Direct `WProtoFacade` calls retain their declared-type contract.
 
 Two consequences on the read side are worth knowing:
 

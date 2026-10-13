@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+    using System.Collections.Concurrent;
 
     /// <summary>
     /// Resolves the <see cref="IWProtoFormatter{T}"/> for a message type without reflection.
@@ -12,9 +13,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <para>
     /// The lookup is a static field on a closed generic type, so <see cref="Get{T}"/> compiles to a
     /// field read and IL2CPP emits it ahead of time like any other generic call. There is no
-    /// dictionary keyed by <see cref="Type"/>, no <c>MakeGenericType</c>, and nothing that has to
+    /// per-member dictionary lookup, no <c>MakeGenericType</c>, and nothing that has to
     /// exist at runtime for a type the AOT compiler did not already see -- which is the whole reason
     /// this serializer exists.
+    /// Erased root writes use a type-keyed lookup populated by those same static registrations.
     /// </para>
     /// <para>
     /// Registration is open to consumers. A game registers formatters for its own contracts, and can
@@ -26,6 +28,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     public static class WProtoFormatterProvider
     {
         private static readonly object ReplacementRegistrationLock = new object();
+        private static readonly ConcurrentDictionary<Type, IWProtoRuntimeWriter> RuntimeWriters =
+            new ConcurrentDictionary<Type, IWProtoRuntimeWriter>();
 
         /// <summary>
         /// Registers <paramref name="formatter"/> as the formatter for <typeparamref name="T"/>.
@@ -49,6 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public static void Register<T>(IWProtoFormatter<T> formatter)
         {
             Cache<T>.Formatter = formatter;
+            RefreshRuntimeWriter<T>();
             WProtoGeneric<T>.Reset();
         }
 
@@ -197,6 +202,28 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     + "serialized at all, the value reaching here is the bug: mark the type "
                     + "[WProtoNotSerialized] and WPROTO044 will refuse the next one at build time."
             );
+        }
+
+        internal static void RefreshRuntimeWriter<T>()
+        {
+            if (Cache<T>.Formatter == null && !WProtoRootMarshalProvider.IsRegistered<T>())
+            {
+                RuntimeWriters.TryRemove(typeof(T), out _);
+            }
+            else
+            {
+                RuntimeWriters.TryAdd(typeof(T), WProtoRuntimeWriter<T>.Instance);
+            }
+        }
+
+        internal static bool TryGetRuntimeWriter(object value, out IWProtoRuntimeWriter writer)
+        {
+            if (value == null)
+            {
+                writer = null;
+                return false;
+            }
+            return RuntimeWriters.TryGetValue(value.GetType(), out writer);
         }
 
         private static void ThrowIfReplacementConflict<T>()

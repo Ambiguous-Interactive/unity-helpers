@@ -19,8 +19,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <para>
     /// The lookup is the same static field on a closed generic that
     /// <see cref="WProtoFormatterProvider"/> uses, so it costs a field read, needs no
-    /// <c>Type</c>-keyed dictionary, and is compiled ahead of time by IL2CPP like any other generic
-    /// call.
+    /// dictionary lookup, and is compiled ahead of time by IL2CPP like any other generic call.
+    /// Registration also makes that closed writer available to erased root dispatch.
     /// </para>
     /// </remarks>
     public static class WProtoRootMarshalProvider
@@ -49,6 +49,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public static void Register<T>(IWProtoFormatter<T> formatter)
         {
             Cache<T>.Formatter = formatter;
+            WProtoFormatterProvider.RefreshRuntimeWriter<T>();
         }
 
         /// <summary>

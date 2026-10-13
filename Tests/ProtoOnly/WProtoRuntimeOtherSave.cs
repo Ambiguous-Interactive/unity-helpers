@@ -1,0 +1,19 @@
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+namespace WallstopStudios.UnityHelpers.Tests.Serialization
+{
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+
+    [WProtoContract]
+    public sealed partial class WProtoRuntimeOtherSave : IWProtoRuntimeSave
+    {
+        [WProtoMember(7)]
+        public long Currency;
+
+        public string GetFileName()
+        {
+            return nameof(WProtoRuntimeOtherSave);
+        }
+    }
+}
