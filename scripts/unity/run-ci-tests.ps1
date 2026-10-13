@@ -50,6 +50,8 @@ param(
 
     [string]$TestFilter = '',
 
+    [switch]$IsolateCompilationFixtures,
+
     # Optional diagnostic frozen-file/player provenance. No measurement eligibility.
     [string]$FrozenPlayerDeclarationPath = '',
 
@@ -216,6 +218,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($IsolateCompilationFixtures -and $TestMode -ne 'editmode') {
+    throw 'Compilation fixture isolation requires EditMode.'
+}
 
 # Adding a ValueFromRemainingArguments parameter is NOT enough on its own: with positional
 # binding on, `pwsh -File <script> -AdditionalScriptingDefines a b` binds 'b' to whichever named
@@ -1100,6 +1105,98 @@ $script:WorkflowCommandStopToken = $null
 # is regenerated each call so it is neither predictable nor committed.
 function New-WorkflowCommandStopToken {
     return ('uh-stop-commands-{0}' -f [guid]::NewGuid().ToString('N'))
+}
+
+function Assert-UnityCompilationFixtureResults {
+    param([string]$Path, [string]$FixtureName)
+
+    [xml]$document = Get-Content -LiteralPath $Path -Raw
+    $cases = @($document.SelectNodes('//test-case'))
+    if ($cases.Count -lt 1) {
+        throw 'The isolated compilation fixture produced no test cases.'
+    }
+    foreach ($case in $cases) {
+        if ($case.GetAttribute('classname') -cne $FixtureName -or
+            $case.GetAttribute('result') -cne 'Passed') {
+            throw 'Every isolated compilation case must belong to the required fixture and pass.'
+        }
+    }
+}
+
+function New-UnityEditorTestPhases {
+    param(
+        [string]$ArtifactsPath,
+        [string]$TestFilter,
+        [string]$TestCategory,
+        [switch]$IsolateCompilationFixtures
+    )
+
+    $fixture = 'WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationDictionaryCompilationTests'
+    if ($IsolateCompilationFixtures) {
+        if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+            throw 'Compilation isolation cannot be combined with a caller test filter.'
+        }
+        [pscustomobject]@{
+            ArtifactsPath = Join-Path $ArtifactsPath 'compilation'
+            TestFilter = $fixture
+            TestCategory = 'CompilationIsolation'
+            RequiredFixture = $fixture
+            RequirePassedTests = $true
+        }
+        $TestCategory = (@($TestCategory, '!CompilationIsolation') |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ';'
+    }
+    [pscustomobject]@{
+        ArtifactsPath = $ArtifactsPath
+        TestFilter = $TestFilter
+        TestCategory = $TestCategory
+        RequiredFixture = ''
+        RequirePassedTests = -not [string]::IsNullOrWhiteSpace($TestFilter)
+    }
+}
+
+function New-UnityEditorPhaseArguments {
+    param([string[]]$Arguments, [string]$TestCategory, [string]$TestFilter)
+
+    $phaseArguments = @($Arguments)
+    if (-not [string]::IsNullOrWhiteSpace($TestCategory)) {
+        $phaseArguments += @('-testCategory', $TestCategory)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+        $phaseArguments += @('-testFilter', $TestFilter)
+    }
+    return $phaseArguments
+}
+
+function Invoke-UnityEditorTestPhase {
+    param(
+        [string]$EditorPath,
+        [string[]]$Arguments,
+        [string]$Label,
+        [string]$ArtifactsPath,
+        [string]$Project,
+        [string]$PackageRoot,
+        [string]$RequiredFixture,
+        [switch]$RequirePassedTests
+    )
+
+    New-Item -ItemType Directory -Force -Path $ArtifactsPath | Out-Null
+    $phaseResults = Join-Path $ArtifactsPath 'results.xml'
+    $phaseLog = Join-Path $ArtifactsPath 'unity.log'
+    if (Test-Path -LiteralPath $phaseResults -PathType Leaf) {
+        Remove-Item -LiteralPath $phaseResults -Force
+    }
+    $phaseArguments = @($Arguments) + @('-testResults', $phaseResults)
+    $phaseExit = Invoke-UnityEditorTestsWithPackageManagerRetry `
+        -EditorPath $EditorPath -Arguments $phaseArguments -Label $Label `
+        -LogPath $phaseLog -ResultsPath $phaseResults -Project $Project
+    Write-AnalyzerSetupDiagnostics -Project $Project -LogPath $phaseLog -Label $Label
+    Test-NUnitResults -Path $phaseResults -Label $Label -LogPath $phaseLog `
+        -Project $Project -UnityExitCode $phaseExit -RequirePassedTests:$RequirePassedTests
+    if (-not [string]::IsNullOrWhiteSpace($RequiredFixture)) {
+        Assert-UnityCompilationFixtureResults -Path $phaseResults -FixtureName $RequiredFixture
+    }
+    Assert-NoUnityCompilerWarnings -LogPath $phaseLog -Label $Label -PackageRoot $PackageRoot
 }
 
 # Resolve an NUnit test-case / test-suite node's display name using
@@ -5149,12 +5246,11 @@ try {
             '-projectPath', $ProjectPath,
             '-runTests',
             '-testPlatform', $testPlatform,
-            '-testResults', $resultsPath,
             '-assemblyNames', $AssemblyNames,
             '-releaseCodeOptimization',
             '-logFile', '-'
         )
-        $testArgs = $testArgs + $categoryArgs + $filterArgs + $acceleratorArgs
+        $testArgs = $testArgs + $acceleratorArgs
 
         # Delete any STALE results file first so the file validation below can only
         # honor results THIS run wrote (defensive for local re-runs; CI checkout
@@ -5168,19 +5264,17 @@ try {
         # missing/invalid/failing file AND folds the exit code into its diagnostics,
         # but PASSES a valid run that exited non-zero only because Unity crashed in a
         # background thread during shutdown AFTER RunFinished wrote the file.
-        $runExit = Invoke-UnityEditorTestsWithPackageManagerRetry `
-            -EditorPath $UnityEditorPath `
-            -Arguments $testArgs `
-            -Label "Run Unity $UnityVersion $TestMode tests" `
-            -LogPath $logPath `
-            -ResultsPath $resultsPath `
-            -Project $ProjectPath
-        Write-AnalyzerSetupDiagnostics -Project $ProjectPath -LogPath $logPath -Label "$UnityVersion $TestMode test compile"
-        Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion $TestMode" -LogPath $logPath -Project $ProjectPath -UnityExitCode $runExit -RequirePassedTests:$requireFilteredPass
-        Assert-NoUnityCompilerWarnings `
-            -LogPath $logPath `
-            -Label "Unity $UnityVersion $TestMode" `
-            -PackageRoot $RepoRoot
+        $phases = @(New-UnityEditorTestPhases -ArtifactsPath $ArtifactsPath `
+            -TestFilter $TestFilter -TestCategory $TestCategory `
+            -IsolateCompilationFixtures:$IsolateCompilationFixtures)
+        foreach ($phase in $phases) {
+            $phaseArguments = @(New-UnityEditorPhaseArguments -Arguments $testArgs `
+                -TestCategory $phase.TestCategory -TestFilter $phase.TestFilter)
+            Invoke-UnityEditorTestPhase -EditorPath $UnityEditorPath `
+                -Arguments $phaseArguments -Label "Run Unity $UnityVersion $TestMode tests" `
+                -ArtifactsPath $phase.ArtifactsPath -Project $ProjectPath -PackageRoot $RepoRoot `
+                -RequiredFixture $phase.RequiredFixture -RequirePassedTests:$phase.RequirePassedTests
+        }
     }
     # Commit the inventory only after the selected mode produced valid passing
     # NUnit output. If import/compilation fails, the old or missing marker remains

@@ -218,6 +218,14 @@ because its player build settings differ. Each mode still writes its own logs an
 separate `<unity-version>-playmode[-<scope>]` project so the second result remains
 independent of assets left by the failed run.
 
+EditMode runs compiler-isolation fixtures in a fresh editor process before the broader suite.
+These cases carry `CompilationIsolation` and must all pass without skips. Their results and log
+remain under the mode's `compilation/` artifact directory. The broader process excludes that
+category, so each case runs once. Both processes share the installed editor, project and acquired
+license context. A failed isolated phase prevents the broader process and fails the mode.
+This prevents earlier ruleset-import tests from leaving pending compilation that a later
+compiler fixture cannot drain during the same batch run.
+
 It has to. `actions/checkout` runs `git clean -ffdx` at the top of every job and `-x`
 means gitignored, so anything under the repository's `.artifacts/` tree is deleted
 before the job starts, including the `Library` the previous leg had just built on

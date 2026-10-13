@@ -13,7 +13,9 @@ if ($parseErrors.Count -ne 0) { throw 'The Unity runner must parse.' }
 foreach ($name in @('Test-NUnitResults', 'Get-UnityFailedNodeCount',
         'ConvertTo-UnsignedExitHex', 'Get-NativeExitCodeDescription',
         'Get-UnityCrashSignature', 'Write-UnityBenignExitWarning',
-        'Write-UnityExecutionSymptomDiagnostics')) {
+        'Write-UnityExecutionSymptomDiagnostics', 'New-UnityEditorTestPhases',
+        'New-UnityEditorPhaseArguments', 'Assert-UnityCompilationFixtureResults',
+        'Invoke-UnityEditorTestPhase')) {
     $function = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
@@ -98,6 +100,10 @@ foreach ($TestFilter in @('', $expectedFilter)) {
         if ($assignments.Count -lt 1) { throw "Missing $variable construction." }
         foreach ($assignment in $assignments) { Invoke-Expression $assignment.Extent.Text }
         $arguments = Get-Variable -Name $variable -ValueOnly
+        if ($TestMode -ne 'standalone') {
+            $arguments = @(New-UnityEditorPhaseArguments -Arguments $arguments `
+                -TestCategory $TestCategory -TestFilter $TestFilter)
+        }
         $position = [Array]::IndexOf($arguments, '-testFilter')
         if ($TestFilter -eq '') {
             if ($position -ne -1 -or $requireFilteredPass) { throw "$TestMode default selection changed." }
@@ -145,6 +151,92 @@ $temporary = Join-Path ([IO.Path]::GetTempPath()) ('unity-filter-' + [Guid]::New
 New-Item -ItemType Directory -Path $temporary | Out-Null
 $checks = 0
 try {
+    $isolationChecks = 0
+    $phases = @(New-UnityEditorTestPhases -ArtifactsPath $temporary `
+        -TestCategory '!Performance;!Stress' -IsolateCompilationFixtures)
+    if ($phases.Count -ne 2 -or $phases[0].TestCategory -cne 'CompilationIsolation' -or
+        $phases[0].ArtifactsPath -ceq $phases[1].ArtifactsPath -or
+        -not $phases[0].RequirePassedTests -or
+        $phases[1].TestCategory -cne '!Performance;!Stress;!CompilationIsolation') {
+        throw 'Compiler and normal tests must have separate complete selections and artifacts.'
+    }
+    $rejected = $false
+    try { New-UnityEditorTestPhases -ArtifactsPath $temporary -TestFilter 'Caller.Filter' -IsolateCompilationFixtures }
+    catch { $rejected = $true }
+    if (-not $rejected) { throw 'Isolation must not silently widen a caller filter.' }
+    $isolationChecks++
+    foreach ($fixture in @(
+            @{ Body = ''; Accepted = $false },
+            @{ Body = '<test-case classname="Subject" result="Passed" />'; Accepted = $true },
+            @{ Body = '<test-case classname="Other" result="Passed" />'; Accepted = $false },
+            @{ Body = '<test-case classname="Subject" result="Skipped" />'; Accepted = $false },
+            @{ Body = '<test-case classname="Subject" result="Inconclusive" />'; Accepted = $false },
+            @{ Body = '<test-case classname="Subject" result="Failed" />'; Accepted = $false },
+            @{ Body = '<test-case classname="Subject" result="Passed" /><test-case classname="Subject" result="Skipped" />'; Accepted = $false }
+        )) {
+        $fixtureXml = Join-Path $temporary 'fixture.xml'
+        Set-Content -LiteralPath $fixtureXml -Value ('<test-run>' + $fixture.Body + '</test-run>')
+        $accepted = $true
+        try { Assert-UnityCompilationFixtureResults -Path $fixtureXml -FixtureName 'Subject' }
+        catch { $accepted = $false }
+        if ($accepted -ne $fixture.Accepted) { throw 'Isolated fixture evidence control mismatch.' }
+        $isolationChecks++
+    }
+
+    $phaseLoop = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.ForEachStatementAst] -and
+        $node.Variable.VariablePath.UserPath -eq 'phase'
+    }, $true)
+    if ($null -eq $phaseLoop) { throw 'The shipping phase orchestration must exist.' }
+    function Invoke-UnityEditorTestsWithPackageManagerRetry {
+        param($EditorPath, $Arguments, $Label, $LogPath, $ResultsPath, $Project)
+        if (Test-Path -LiteralPath $ResultsPath) { throw 'A stale phase result reached the native runner.' }
+        $script:phaseCalls.Add(@($Arguments))
+        $first = $script:phaseCalls.Count -eq 1
+        if (($script:phaseFailure -eq 'first process' -and $first) -or
+            ($script:phaseFailure -eq 'second process' -and -not $first)) {
+            throw 'Native process failure.'
+        }
+        $caseClass = if ($first) { $phases[0].RequiredFixture } else { 'Normal.Subject' }
+        if ($script:phaseFailure -eq 'wrong subject' -and $first) { $caseClass = 'Wrong.Subject' }
+        Set-Content -LiteralPath $ResultsPath -Value ("<test-run total='1' passed='1' failed='0' skipped='0'><test-case classname='$caseClass' result='Passed' /></test-run>")
+        Set-Content -LiteralPath $LogPath -Value 'Native editor output.'
+        return 0
+    }
+    function Write-AnalyzerSetupDiagnostics { param($Project, $LogPath, $Label) }
+    function Assert-NoUnityCompilerWarnings {
+        param($LogPath, $Label, $PackageRoot)
+        if ($script:phaseFailure -eq 'compiler warning' -and $script:phaseCalls.Count -eq 1) {
+            throw 'Compiler warning.'
+        }
+    }
+    foreach ($phaseFailure in @('', 'first process', 'second process', 'wrong subject', 'compiler warning')) {
+        $script:phaseFailure = $phaseFailure
+        $script:phaseCalls = New-Object 'System.Collections.Generic.List[object]'
+        foreach ($phase in $phases) {
+            New-Item -ItemType Directory -Force -Path $phase.ArtifactsPath | Out-Null
+            Set-Content -LiteralPath (Join-Path $phase.ArtifactsPath 'results.xml') -Value '<stale />'
+        }
+        $testArgs = @('-batchmode', '-projectPath', $temporary, '-runTests')
+        $UnityEditorPath = 'native-editor'
+        $UnityVersion = '2021.3.45f1'
+        $TestMode = 'editmode'
+        $ProjectPath = $temporary
+        $RepoRoot = $temporary
+        $accepted = $true
+        try { Invoke-Expression $phaseLoop.Extent.Text }
+        catch { $accepted = $false }
+        if ($accepted -ne ($phaseFailure -eq '')) { throw 'A phase failure was hidden or a passing pair was rejected.' }
+        $expectedCalls = if ($phaseFailure -eq '' -or $phaseFailure -eq 'second process') { 2 } else { 1 }
+        if ($script:phaseCalls.Count -ne $expectedCalls) { throw 'A failed isolated phase must prevent the broad process.' }
+        foreach ($arguments in $script:phaseCalls) {
+            if (@($arguments | Where-Object { $_ -ceq '-testResults' }).Count -ne 1) {
+                throw 'Each native process must receive one owned result path.'
+            }
+        }
+        $isolationChecks++
+    }
     foreach ($fixture in @(
             @{ Name = 'passed'; Total = 1; Passed = 1; Failed = 0; Skipped = 0; Body = ''; Error = '' },
             @{ Name = 'empty'; Total = 0; Passed = 0; Failed = 0; Skipped = 0; Body = ''; Error = '0 tests ran' },
@@ -162,6 +254,12 @@ try {
         $ProjectPath = $temporary
         $playerExitForValidation = 0
         $runExit = 0
+        $phaseResults = $resultsPath
+        $phaseLog = $logPath
+        $Project = $ProjectPath
+        $phaseExit = 0
+        $Label = 'control'
+        $RequirePassedTests = $true
         $requireFilteredPass = $true
         foreach ($invocation in $invocations) {
             $message = ''
@@ -328,4 +426,4 @@ try {
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force
 }
-Write-Host "[test-unity-test-filter] All six argument propagation controls, $checks result controls, and $diagnosticChecks execution diagnostic controls, and $exitDiagnosticChecks exit/XML controls passed."
+Write-Host "[test-unity-test-filter] Six argument controls, $checks result controls, $isolationChecks isolation controls, $diagnosticChecks diagnostic controls, and $exitDiagnosticChecks exit/XML controls passed."

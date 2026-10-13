@@ -470,6 +470,7 @@ jobs:
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode 'editmode' `
+            -IsolateCompilationFixtures `
             -ShareEditorProject `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode' `
@@ -1168,6 +1169,7 @@ jobs:
             -ShareEditorProject `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded' `
+            -IsolateCompilationFixtures `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
             -ProjectScope 'single-threaded' `
             -AdditionalScriptingDefines SINGLE_THREADED,WALLSTOP_CONCAVE_HULL_STATS `
