@@ -298,7 +298,7 @@ The default is `none`. The selected normal test modes still run; acceptance adds
 same organization license lease. `unity-version` can select a supported editor to bound the run.
 Artifacts named `unity-<version>-acceptance` contain separate result directories and a summary.
 Each requested test, verification, credential redaction and upload must succeed. These optional
-runs do not restore the separate disabled benchmark or release workflows.
+runs are separate from the benchmark dispatch and release export workflows.
 
 For fresh IL2CPP conversion evidence, set `fresh-conversion=true` on a manual **Unity Tests**
 dispatch. The default is `false`, preserving normal warm CI. This clears only `Bee`,
@@ -343,6 +343,21 @@ Retain the NUnit XML and editor log, then discard the marked project. The fixtur
 recorded settings and Undo group as cleanup, but it does not promise to preserve arbitrary preexisting
 Undo/redo history or global subscribers. A pass proves callback delivery, draft retention and saved
 settings; it does not prove pixels, mouse hit testing, focus, graph dragging or domain-reload recovery.
+
+## Licensed benchmarks
+
+**Unity Benchmarks** accepts manual dispatch. The hosted weekly scheduler dispatches the same
+workflow on protected main; both workflows must be enabled in repository settings. The benchmark
+job runs the Performance and Random assemblies in PlayMode on the latest supported editor.
+It acquires the organization lock, returns the license, classifies cleanup, and releases the lock
+before reporting and artifact uploads. Hosted fallback and an always-reporting aggregate reject
+incomplete cleanup or missing execution.
+
+Superseded runs cancel within their ref group. Unity Tests uses separate groups for distinct
+pushed commits, preserving the exact validation required by automatic release publication.
+The central enrollment audit requires literal cancellation settings for the licensed queues.
+A benchmark branch dispatch records diagnostic results without replacing the canonical baseline;
+only complete successful measurements on main can refresh the published report.
 
 ## Package exports
 
