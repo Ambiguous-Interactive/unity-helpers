@@ -329,7 +329,7 @@ runTest("parallel host phases retain complete commands without fail-fast cancell
     "npm run test:enumeration",
     "npm run test:stable-assets",
     "npm run test:intmap",
-    "npm run typecheck:controls"
+    "npm run typecheck:controls -- --jobs=1"
   ]);
   assert.ok(
     phaseJob.includes(
@@ -352,6 +352,12 @@ runTest("parallel host phases retain complete commands without fail-fast cancell
       `${command} must run in its own phase without narrowing its project selection`
     );
   }
+});
+
+runTest("CI controls launch one SDK build at a time without changing local defaults", () => {
+  assert.ok(phaseJob.includes("run: npm run typecheck:controls -- --jobs=1"));
+  assert.equal(parseArguments(["node", "script", "--jobs=1"]).jobs, 1);
+  assert.ok(1 <= defaultJobs() && defaultJobs() <= 2);
 });
 
 runTest("host phases isolate build outputs and cache only phase-specific dependencies", () => {
