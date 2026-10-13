@@ -339,14 +339,16 @@ Call `TryCompileDictionaryMigration` with the paired preview on the editor threa
 handle and poll `Completed` from an editor callback. `Succeeded` requires every changed assembly and
 its transitive editor callers to compile in dependency order, against the proposed dependency DLLs.
 The compiler copies source text into an owned Library directory and never imports or loads candidate
-assemblies. Original scripts and saved assets remain unchanged. This uses Unity's `AssemblyBuilder`
-API for compatibility with Unity 2021 and 2022. Unity 6 still supports that API but marks it obsolete;
-the tool suppresses that warning only at its deliberate uses.
-Every candidate uses editor compiler context, including runtime-capable assemblies. An IL2CPP
-player setting does not change the editor defines used for this receipt.
+assemblies. Original scripts and saved assets remain unchanged. The tool invokes the C# compiler
+bundled with the running Unity Editor in a separate process. It supplies the captured assembly
+defines, references, language version, analyzer inputs, and supported compiler options directly.
+It disables the compiler's default response file, so project-wide defaults cannot add extra defines
+or references. Unsupported compiler layouts or options fail before target writes.
+Every candidate uses its captured editor compiler context, including runtime-capable assemblies.
+An IL2CPP player setting does not change the editor defines used for this receipt.
 
 The handle exposes assembly names, bounded compiler diagnostics, cancellation, and failure details.
-Call `Dispose` to cancel remaining builds; an active Unity compiler must finish before cleanup.
+Call `Dispose` to stop the isolated compiler process and clean its staging files.
 `TryValidateCurrent` rechecks source, reference, analyzer input, and compiler configuration snapshots.
 Added or removed assemblies also invalidate the result. Public Unity compiler option metadata is
 read across editor API versions; consumer members are never inspected through reflection.

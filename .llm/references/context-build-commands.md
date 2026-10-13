@@ -41,6 +41,13 @@ Re-run restore when project files, imported props, lock files, SDK versions, or 
 change. On 2026-09-23, the warm default check took 1.97 seconds without restore versus 2.90 seconds
 through the npm command on this host.
 
+For isolated Odin compiler edits, first run the native MCP `editor` fixture
+`OdinMigrationCompilerProcessTests`. Its nine controls took 2.86 seconds on Unity 6000.4.6f1 on
+2026-10-13. They cover compiler layouts, argument isolation, and actual runtime/editor assembly
+profiles. Before publication, run `OdinMigrationDictionaryCompilationTests`: its nine cases took
+247.5 seconds and cover proposed sources, transitive callers, stale inputs, and cancellation.
+The fast controls do not replace that full compiler gate. These are fixture execution times.
+
 See [unity-devcontainer-testing](../skills/unity-devcontainer-testing.md) for full details.
 
 ---

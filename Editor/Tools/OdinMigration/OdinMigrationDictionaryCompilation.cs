@@ -43,15 +43,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         private readonly string _directory;
         private readonly List<string> _diagnostics = new List<string>();
         private readonly List<string> _compiledAssemblies = new List<string>();
+        private readonly List<string> _currentInputs = new List<string>();
         private readonly Dictionary<string, string> _stagedHashes = new Dictionary<string, string>(
             OdinMigrationCompilationPlan.PathComparer
         );
         private readonly Dictionary<string, string> _outputs = new Dictionary<string, string>(
             OdinMigrationCompilationPlan.PathComparer
         );
-#pragma warning disable CS0618 // Unity 2021-2022 require this compiler API; Unity 6 still supports it.
-        private AssemblyBuilder _builder;
-#pragma warning restore CS0618
+        private OdinMigrationCompilerProcess _compiler;
         private int _nextAssembly;
 
         private OdinMigrationDictionaryCompilation(OdinMigrationCompilationPlan plan)
@@ -136,28 +135,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
         }
 
-        /// <summary>Cancels remaining builds and cleans staging after any active compiler returns.</summary>
-        /// <remarks>Call on the editor thread. Cancellation cannot interrupt Unity's active assembly compiler.</remarks>
+        /// <summary>Stops the isolated compiler and cleans its staging files.</summary>
+        /// <remarks>Call on the editor thread; cancellation stops the isolated compiler process.</remarks>
         public void Dispose()
         {
             if (!Completed)
             {
                 Cancelled = true;
-                if (_builder == null)
-                {
-                    Finish("Migration compilation was cancelled.");
-                }
+                Finish("Migration compilation was cancelled.");
             }
         }
 
         private void Update()
         {
-            if (Completed || _builder != null)
+            if (Completed)
             {
                 return;
             }
             try
             {
+                if (_compiler != null)
+                {
+                    if (_compiler.Completed)
+                    {
+                        CompleteCompilation();
+                    }
+                    return;
+                }
                 if (Cancelled)
                 {
                     Finish("Migration compilation was cancelled.");
@@ -182,6 +186,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     _nextAssembly.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 );
                 Directory.CreateDirectory(directory);
+                _currentInputs.Clear();
                 List<string> sources = new List<string>();
                 int sourceIndex = 0;
                 foreach (string source in assembly.sourceFiles)
@@ -227,62 +232,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     string target = Path.Combine(targetDirectory, Path.GetFileName(source));
                     File.WriteAllText(target, text, new UTF8Encoding(false));
                     _stagedHashes.Add(target, OdinMigrationSourceBinder.Checksum(text));
+                    _currentInputs.Add(target);
                     sources.Add(target);
                     ++sourceIndex;
                 }
-                ValidateStaging();
                 List<string> references = new List<string>();
                 foreach (string reference in assembly.allReferences)
                 {
                     string path = OdinMigrationSourceBinder.FullPath(reference);
-                    references.Add(_outputs.TryGetValue(path, out string output) ? output : path);
+                    if (_outputs.TryGetValue(path, out string output))
+                    {
+                        references.Add(output);
+                        _currentInputs.Add(output);
+                    }
+                    else
+                    {
+                        references.Add(path);
+                    }
                 }
+                ValidateCurrentStaging();
                 string candidate = Path.Combine(directory, assembly.name + ".dll");
-#pragma warning disable CS0618 // Retain the same compiler path across supported Unity versions.
-                AssemblyBuilder builder = new AssemblyBuilder(candidate, sources.ToArray())
-                {
-                    compilerOptions = assembly.compilerOptions,
-                    additionalDefines = assembly.defines,
-                    additionalReferences = references.ToArray(),
-                    flags = AssemblyBuilderFlags.EditorAssembly,
-                };
-#pragma warning restore CS0618
-                HashSet<string> exactReferences = new HashSet<string>(
+                _compiler = new OdinMigrationCompilerProcess(
+                    candidate,
+                    sources,
                     references,
-                    OdinMigrationCompilationPlan.PathComparer
+                    assembly
                 );
-                List<string> excluded = new List<string>();
-                foreach (string reference in builder.defaultReferences)
-                {
-                    if (!exactReferences.Contains(OdinMigrationSourceBinder.FullPath(reference)))
-                    {
-                        excluded.Add(reference);
-                    }
-                }
-                builder.excludeReferences = excluded.ToArray();
-                HashSet<string> exactDefines = new HashSet<string>(
-                    assembly.defines,
-                    StringComparer.Ordinal
-                );
-                foreach (string define in builder.defaultDefines)
-                {
-                    if (!exactDefines.Contains(define))
-                    {
-                        throw new InvalidDataException(
-                            "Unity's temporary compiler supplies an unexpected define: " + define
-                        );
-                    }
-                }
-                builder.buildFinished += BuildFinished;
-                _builder = builder;
-                if (!builder.Build())
-                {
-                    builder.buildFinished -= BuildFinished;
-                    _builder = null;
-                    throw new InvalidOperationException(
-                        "Unity declined the isolated assembly compilation."
-                    );
-                }
+                _stagedHashes.Add(_compiler.ArgumentsPath, _compiler.ArgumentsChecksum);
+                _currentInputs.Add(_compiler.ArgumentsPath);
             }
             catch (Exception exception)
             {
@@ -290,41 +267,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
         }
 
-        private void BuildFinished(string path, CompilerMessage[] messages)
+        private void CompleteCompilation()
         {
-            try
+            string path = _compiler.OutputPath;
+            bool failed = _compiler.ExitCode != 0;
+            foreach (string message in _compiler.Diagnostics)
             {
-                _builder.buildFinished -= BuildFinished;
-                _builder = null;
-                bool failed = false;
-                foreach (CompilerMessage message in messages)
+                if (_diagnostics.Count < MaximumDiagnostics)
                 {
-                    if (_diagnostics.Count < MaximumDiagnostics)
-                    {
-                        _diagnostics.Add(message.message);
-                    }
-                    failed |= message.type == CompilerMessageType.Error;
+                    _diagnostics.Add(message);
                 }
-                if (Cancelled || failed || !File.Exists(path))
-                {
-                    Finish(
-                        Cancelled
-                            ? "Migration compilation was cancelled."
-                            : "The proposed source or a dependent caller failed compilation."
-                    );
-                    return;
-                }
-                Assembly assembly = _plan.assemblies[_nextAssembly];
-                ValidateStaging();
-                _stagedHashes.Add(path, OdinMigrationCompilationPlan.HashFile(path));
-                _outputs.Add(OdinMigrationSourceBinder.FullPath(assembly.outputPath), path);
-                _compiledAssemblies.Add(assembly.name);
-                ++_nextAssembly;
+                failed |=
+                    message.Contains("CS8032")
+                    || message.Contains("CS8784")
+                    || message.Contains("CS8785");
             }
-            catch (Exception exception)
+            _compiler.Dispose();
+            _compiler = null;
+            if (Cancelled || failed || !File.Exists(path))
             {
-                Finish(exception.Message);
+                Finish(
+                    Cancelled
+                        ? "Migration compilation was cancelled."
+                        : "The proposed source or a dependent caller failed compilation."
+                );
+                return;
             }
+            Assembly assembly = _plan.assemblies[_nextAssembly];
+            ValidateCurrentStaging();
+            _stagedHashes.Add(path, OdinMigrationCompilationPlan.HashFile(path));
+            _outputs.Add(OdinMigrationSourceBinder.FullPath(assembly.outputPath), path);
+            _compiledAssemblies.Add(assembly.name);
+            ++_nextAssembly;
         }
 
         private void BeforeReload()
@@ -333,22 +307,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             Finish("The editor domain reloaded during migration compilation.");
         }
 
+        private void ValidateCurrentStaging()
+        {
+            foreach (string path in _currentInputs)
+            {
+                if (!_stagedHashes.TryGetValue(path, out string expected))
+                {
+                    throw new InvalidDataException(
+                        "An isolated compiler input has no captured checksum."
+                    );
+                }
+                ValidateStagedFile(path, expected);
+            }
+        }
+
         private void ValidateStaging()
         {
             foreach (KeyValuePair<string, string> entry in _stagedHashes)
             {
-                if (
-                    !string.Equals(
-                        entry.Value,
-                        OdinMigrationCompilationPlan.HashFile(entry.Key),
-                        StringComparison.Ordinal
-                    )
+                ValidateStagedFile(entry.Key, entry.Value);
+            }
+        }
+
+        private void ValidateStagedFile(string path, string expected)
+        {
+            if (
+                !string.Equals(
+                    expected,
+                    OdinMigrationCompilationPlan.HashFile(path),
+                    StringComparison.Ordinal
                 )
-                {
-                    throw new InvalidDataException(
-                        "An isolated compiler input changed in staging."
-                    );
-                }
+            )
+            {
+                throw new InvalidDataException("An isolated compiler input changed in staging.");
             }
         }
 
@@ -360,13 +351,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
             EditorApplication.update -= Update;
             AssemblyReloadEvents.beforeAssemblyReload -= BeforeReload;
-            if (_builder != null)
-            {
-                _builder.buildFinished -= BuildFinished;
-                _builder = null;
-            }
             try
             {
+                if (_compiler != null)
+                {
+                    _compiler.Dispose();
+                    _compiler = null;
+                }
                 if (Directory.Exists(_directory))
                 {
                     Directory.Delete(_directory, true);

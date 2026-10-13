@@ -18,11 +18,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             );
 
         internal readonly string signature;
+        internal readonly Dictionary<string, object> values = new Dictionary<string, object>(
+            StringComparer.Ordinal
+        );
         internal readonly List<string> inputPaths = new List<string>();
 
         internal OdinMigrationCompilerOptionsSnapshot(ScriptCompilerOptions options)
         {
-            SortedDictionary<string, string> values = new SortedDictionary<string, string>(
+            SortedDictionary<string, string> encodedValues = new SortedDictionary<string, string>(
                 StringComparer.Ordinal
             );
             foreach (PropertyInfo property in Options)
@@ -89,10 +92,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         inputPaths.Add(text);
                     }
                 }
-                values.Add(property.Name, encoded.ToString());
+                values.Add(
+                    property.Name,
+                    value is string[] array ? (string[])array.Clone() : value
+                );
+                encodedValues.Add(property.Name, encoded.ToString());
             }
             StringBuilder result = new StringBuilder();
-            foreach (KeyValuePair<string, string> value in values)
+            foreach (KeyValuePair<string, string> value in encodedValues)
             {
                 Append(result, value.Key);
                 Append(result, value.Value);

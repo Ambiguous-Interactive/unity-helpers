@@ -206,6 +206,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void EnforceBudgetPurgesAcrossMultiplePoolsWhenSinglePoolInsufficient()
         {
+            GlobalPoolRegistry.BudgetEnforcementEnabled = false;
             GlobalPoolRegistry.GlobalMaxPooledItems = 5;
 
             _currentTime = 0f;
@@ -620,6 +621,107 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(1, GlobalPoolRegistry.RegisteredCount);
 
             GC.KeepAlive(livePool);
+        }
+
+        [Test]
+        public void MaintenanceDoesNotReadTheClockOfAPoolDisposedByAnotherCallback()
+        {
+            bool disposed = false;
+            int reads = 0;
+            using WallstopGenericPool<TestPoolItem> first = new WallstopGenericPool<TestPoolItem>(
+                () => new TestPoolItem(),
+                preWarmCount: 2,
+                options: new PoolOptions<TestPoolItem>
+                {
+                    TimeProvider = () =>
+                    {
+                        Assert.IsFalse(disposed, "Maintenance reached a disposed pool's clock.");
+                        ++reads;
+                        return _currentTime;
+                    },
+                }
+            );
+            using WallstopGenericPool<TestPoolItem> second = new WallstopGenericPool<TestPoolItem>(
+                () => new TestPoolItem(),
+                preWarmCount: 2,
+                options: new PoolOptions<TestPoolItem>
+                {
+                    TimeProvider = TestTimeProvider,
+                    OnPurge = (_, _) =>
+                    {
+                        disposed = true;
+                        first.Dispose();
+                    },
+                }
+            );
+            int initialReads = reads;
+            _currentTime += 1000f;
+            GlobalPoolRegistry.RunMaintenance();
+            Assert.IsTrue(disposed);
+            Assert.AreEqual(initialReads, reads);
+            Assert.AreEqual(0, first.Count);
+            Assert.AreEqual(0, second.Count);
+        }
+
+        [TestCase(0, 0)]
+        [TestCase(3, 3)]
+        public void DefaultIdlePoolIsReapedWithoutAnotherRental(int minimum, int expected)
+        {
+            using WallstopGenericPool<TestPoolItem> pool = new WallstopGenericPool<TestPoolItem>(
+                () => new TestPoolItem(),
+                preWarmCount: 20,
+                options: new PoolOptions<TestPoolItem>
+                {
+                    MinRetainCount = minimum,
+                    TimeProvider = TestTimeProvider,
+                }
+            );
+            Assert.IsTrue(pool.UseIntelligentPurging);
+            Assert.AreEqual(PoolPurgeSettings.DefaultIdleTimeoutSeconds, pool.IdleTimeoutSeconds);
+            _currentTime = 1f + pool.PurgeIntervalSeconds;
+            GlobalPoolRegistry.RunMaintenance();
+            Assert.AreEqual(20, pool.Count);
+            _currentTime = 2f + pool.IdleTimeoutSeconds;
+            GlobalPoolRegistry.RunMaintenance();
+            Assert.AreEqual(10, pool.Count, "Maintenance preserves the gradual purge limit.");
+            _currentTime += pool.PurgeIntervalSeconds;
+            GlobalPoolRegistry.RunMaintenance();
+            Assert.AreEqual(expected, pool.Count);
+            Assert.AreEqual(0, pool.GetStatistics().RentCount);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void MaintenanceRespectsAutomaticPurgeOptOut(bool explicitOnly)
+        {
+            if (!explicitOnly)
+            {
+                PoolPurgeSettings.DisableGlobally();
+            }
+            using WallstopGenericPool<TestPoolItem> pool = new WallstopGenericPool<TestPoolItem>(
+                () => new TestPoolItem(),
+                preWarmCount: 20,
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = explicitOnly ? PurgeTrigger.Explicit : PurgeTrigger.Periodic,
+                    TimeProvider = TestTimeProvider,
+                }
+            );
+            _currentTime += 1000f;
+            GlobalPoolRegistry.RunMaintenance();
+            Assert.AreEqual(20, pool.Count);
+        }
+
+        [TestCase(true, 2)]
+        [TestCase(false, 5)]
+        public void ReturningALeaseChecksTheGlobalBudget(bool enabled, int expected)
+        {
+            GlobalPoolRegistry.GlobalMaxPooledItems = 2;
+            GlobalPoolRegistry.BudgetEnforcementEnabled = enabled;
+            using WallstopGenericPool<TestPoolItem> pool = CreateTestPool(preWarmCount: 5);
+            GlobalPoolRegistry._lastBudgetEnforcementTime = float.MinValue;
+            using (pool.Get()) { }
+            Assert.AreEqual(expected, pool.Count);
         }
 
         private float TestTimeProvider()

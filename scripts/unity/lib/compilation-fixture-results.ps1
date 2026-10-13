@@ -3,9 +3,13 @@ function Get-UnityRootNUnitResultFile {
 
     $file = Get-Item -LiteralPath (Join-Path $ResultsDirectory 'results.xml') -ErrorAction SilentlyContinue
     if ($null -eq $file -or $file.PSIsContainer) { return $null }
-    [xml]$document = Get-Content -LiteralPath $file.FullName -Raw
-    if ($null -eq $document.SelectSingleNode('/test-run')) { return $null }
-    return $file
+    try {
+        [xml]$document = Get-Content -LiteralPath $file.FullName -Raw -ErrorAction Stop
+        if ($null -eq $document -or $null -eq $document.SelectSingleNode('/test-run')) { return $null }
+        return $file
+    } catch {
+        return $null
+    }
 }
 
 function Assert-UnityCompilationFixtureResults {

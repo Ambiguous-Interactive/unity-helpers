@@ -17,6 +17,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     [TestFixture]
     [Category("Slow")]
     [Category("CompilationIsolation")]
+    [Timeout(600000)]
     public sealed class OdinMigrationDictionaryCompilationTests : CommonTestBase
     {
         private static IReadOnlyDictionary<string, OdinMigrationSourceProposal> Sources()

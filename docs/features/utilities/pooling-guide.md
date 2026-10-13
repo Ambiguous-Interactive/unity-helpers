@@ -58,7 +58,25 @@ flowchart TB
 
 ### Basic Usage (Zero Configuration)
 
-By default, intelligent purging is **enabled** with conservative settings:
+Intelligent purging is **enabled** with conservative defaults in both the Editor and players.
+Players need no Editor settings asset. A hidden runtime maintenance component checks registered
+pools every 30 seconds of real time, including when no code rents from an idle pool. Each pool
+keeps its own purge interval, idle timeout, retention floor, and gradual purge limit. Maintenance
+runs on the main thread while Unity produces frames, even when the time scale is zero.
+
+Lease returns also check the global 50,000-item budget at most once every 30 seconds. Budget
+cleanup respects each pool's absolute retention floor, so configured floors can exceed the budget.
+Callbacks run outside the registry and storage locks.
+
+Call `PoolPurgeSettings.DisableGlobally()` before creating pools to opt out of intelligent
+purging, or set `UseIntelligentPurging = false` for a pool. Set `IdleTimeoutSeconds = 0` to
+explicitly disable idle cleanup, or omit `PurgeTrigger.Periodic` to opt out of runtime periodic
+maintenance. Set `GlobalPoolRegistry.BudgetEnforcementEnabled = false` to disable automatic
+budget checks. Explicit capacity limits take priority over warm retention and spike hysteresis.
+Purges with an explicit reason retain the absolute minimum; parameterless `Purge()` keeps the
+active warm target.
+
+Basic use needs no configuration:
 
 <!-- doc-sample: compiles -->
 

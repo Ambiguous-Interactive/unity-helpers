@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix player pools retaining their peak indefinitely: enable conservative idle maintenance and automatic budget checks, while honoring explicit idle opt-outs, capacity limits, and retention floors ([#1008](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1008)).
 - Fix variable coroutine wait durations when quantization overflows or the wait cache is full; document support for computed and random values ([#1007](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1007)).
 - Require exact-source native Unity export and confirmed cleanup before release tag changes or publication ([#323](https://github.com/Ambiguous-Interactive/unity-helpers/issues/323)).
 - Fix generated protobuf writes through interface and object save roots, including reusable buffers, declined-formatter fallback, and `WALLSTOP_PROTO_ONLY` builds ([guide](./docs/features/serialization/serialization.md#serving-through-serializer), [#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).

@@ -261,10 +261,18 @@ try {
                 @{ Root = 'Failed'; Child = 'Passed'; Exit = 1 },
                 @{ Root = 'Passed'; Child = 'Failed'; Exit = 1 },
                 @{ Root = 'Passed'; Child = 'Skipped'; Exit = 1 },
-                @{ Root = 'Passed'; Child = 'Passed'; Exit = 0 }
+                @{ Root = 'Passed'; Child = 'Passed'; Exit = 0 },
+                @{ Root = $null; RootXml = ''; Child = 'Passed'; Exit = 1 },
+                @{ Root = $null; RootXml = '<test-run'; Child = 'Passed'; Exit = 1 },
+                @{ Root = $null; RootXml = '<test-run><test-case></test-run>'; Child = 'Passed'; Exit = 1 },
+                @{ Root = $null; RootXml = '<other />'; Child = 'Passed'; Exit = 1 }
             )) {
             $env:UH_RESULTS_DIR = Join-Path $temporary ('ownership-' + [Guid]::NewGuid().ToString('N'))
             New-Item -ItemType Directory -Path (Join-Path $env:UH_RESULTS_DIR 'compilation') -Force | Out-Null
+            if ($fixture.ContainsKey('RootXml')) {
+                Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'results.xml') -Value $fixture.RootXml
+                Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'unity.log') -Value 'error CS1234: malformed-result-diagnostic-control'
+            }
             if ($null -ne $fixture.Root) {
                 $failedCount = if ($fixture.Root -eq 'Failed') { 1 } else { 0 }
                 Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'results.xml') -Value ("<test-run total='1' passed='1' failed='$failedCount' skipped='0'><test-case result='$($fixture.Root)' /></test-run>")
@@ -276,6 +284,11 @@ try {
             $actualExit = $LASTEXITCODE
             if (($actualExit -eq 0) -ne ($fixture.Exit -eq 0)) {
                 throw "The actual verifier confused root and compilation evidence: $output"
+            }
+            if ($fixture.ContainsKey('RootXml') -and
+                (-not $output.Contains('malformed-result-diagnostic-control') -or
+                    -not $output.Contains('No NUnit results.xml'))) {
+                throw "An unusable root result must retain native crash diagnostics: $output"
             }
             $isolationChecks++
         }

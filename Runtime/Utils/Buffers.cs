@@ -1049,7 +1049,10 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// ]]></code>
     /// </example>
     /// </remarks>
-    public sealed class WallstopGenericPool<T> : IDisposable, GlobalPoolRegistry.IPoolStatistics
+    public sealed class WallstopGenericPool<T>
+        : IDisposable,
+            GlobalPoolRegistry.IPoolStatistics,
+            IAutomaticPoolMaintenance
     {
         private const float MinAutoPurgeIntervalSeconds = 1.0f;
 
@@ -1240,7 +1243,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 bufferMult
             );
 
-            if (useIntelligent && IdleTimeoutSeconds <= 0f)
+            if (useIntelligent && !(options?.IdleTimeoutSeconds).HasValue)
             {
                 IdleTimeoutSeconds = effectiveOptions.IdleTimeoutSeconds;
             }
@@ -1710,6 +1713,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 TryPeriodicPurge(currentTime);
             }
+
+            GlobalPoolRegistry.TryEnforceBudgetIfNeeded();
         }
 
         private void TryPeriodicPurge(float currentTime)
@@ -1802,6 +1807,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             float effectiveIdleTimeout = purgeParams.EffectiveIdleTimeout;
             int effectiveMinRetain = purgeParams.EffectiveMinRetainCount;
+            if (0 < maxSize)
+            {
+                effectiveMinRetain = Math.Max(minRetain, Math.Min(effectiveMinRetain, maxSize));
+            }
             int comfortableSize = purgeParams.ComfortableSize;
             bool inHysteresis = purgeParams.InHysteresis;
 
@@ -1809,7 +1818,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool hasMaxSize = 0 < maxSize;
             bool hasMaxPurgesLimit = 0 < maxPurgesLimit;
 
-            if (inHysteresis && !hasIdleTimeout)
+            if (inHysteresis && !hasIdleTimeout && (!hasMaxSize || _pool.Count <= maxSize))
             {
                 return 0;
             }
@@ -1878,7 +1887,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                     for (
                         int i = _pool.Count - 1;
                         0 <= i
-                            && (isExplicit || hasIdleTimeout || comfortableSize < _pool.Count)
+                            && (
+                                isExplicit
+                                || hasIdleTimeout
+                                || (hasMaxSize && maxSize < _pool.Count)
+                                || comfortableSize < _pool.Count
+                            )
                             && effectiveMinRetain < _pool.Count;
                         i--
                     )
@@ -1903,7 +1917,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                             shouldPurge = true;
                             ++_idleTimeoutPurges;
                         }
-                        else if (!inHysteresis && hasMaxSize && maxSize < _pool.Count)
+                        else if (hasMaxSize && maxSize < _pool.Count)
                         {
                             reason = PurgeReason.CapacityExceeded;
                             shouldPurge = true;
@@ -2012,6 +2026,18 @@ namespace WallstopStudios.UnityHelpers.Utils
             catch { }
         }
 
+        void IAutomaticPoolMaintenance.Maintain()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            if ((Triggers & PurgeTrigger.Periodic) != 0)
+            {
+                TryPeriodicPurge(_timeProvider());
+            }
+        }
+
         private struct PooledEntry
         {
             public T Value;
@@ -2068,7 +2094,10 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// ]]></code>
     /// </example>
     /// </remarks>
-    public sealed class WallstopGenericPool<T> : IDisposable, GlobalPoolRegistry.IPoolStatistics
+    public sealed class WallstopGenericPool<T>
+        : IDisposable,
+            GlobalPoolRegistry.IPoolStatistics,
+            IAutomaticPoolMaintenance
     {
         private const float MinAutoPurgeIntervalSeconds = 1.0f;
 
@@ -2320,7 +2349,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 bufferMult
             );
 
-            if (useIntelligent && _idleTimeoutSeconds <= 0f)
+            if (useIntelligent && !(options?.IdleTimeoutSeconds).HasValue)
             {
                 _idleTimeoutSeconds = effectiveOptions.IdleTimeoutSeconds;
             }
@@ -2851,6 +2880,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 TryPeriodicPurge(currentTime);
             }
+
+            GlobalPoolRegistry.TryEnforceBudgetIfNeeded();
         }
 
         private void TryPeriodicPurge(float currentTime)
@@ -2955,6 +2986,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             float effectiveIdleTimeout = purgeParams.EffectiveIdleTimeout;
             int effectiveMinRetain = purgeParams.EffectiveMinRetainCount;
+            if (0 < maxSize)
+            {
+                effectiveMinRetain = Math.Max(minRetain, Math.Min(effectiveMinRetain, maxSize));
+            }
             int comfortableSize = purgeParams.ComfortableSize;
             bool inHysteresis = purgeParams.InHysteresis;
 
@@ -2962,7 +2997,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool hasMaxSize = 0 < maxSize;
             bool hasMaxPurgesLimit = 0 < maxPurgesLimit;
 
-            if (inHysteresis && !hasIdleTimeout)
+            if (inHysteresis && !hasIdleTimeout && (!hasMaxSize || _pool.Count <= maxSize))
             {
                 return 0;
             }
@@ -3033,7 +3068,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                         for (
                             int i = _pool.Count - 1;
                             0 <= i
-                                && (isExplicit || hasIdleTimeout || comfortableSize < _pool.Count)
+                                && (
+                                    isExplicit
+                                    || hasIdleTimeout
+                                    || (hasMaxSize && maxSize < _pool.Count)
+                                    || comfortableSize < _pool.Count
+                                )
                                 && effectiveMinRetain < _pool.Count;
                             i--
                         )
@@ -3058,7 +3098,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                                 shouldPurge = true;
                                 Interlocked.Increment(ref _idleTimeoutPurges);
                             }
-                            else if (!inHysteresis && hasMaxSize && maxSize < _pool.Count)
+                            else if (hasMaxSize && maxSize < _pool.Count)
                             {
                                 reason = PurgeReason.CapacityExceeded;
                                 shouldPurge = true;
@@ -3187,6 +3227,18 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _onDispose(value);
             }
             catch { }
+        }
+
+        void IAutomaticPoolMaintenance.Maintain()
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                return;
+            }
+            if ((Triggers & PurgeTrigger.Periodic) != 0)
+            {
+                TryPeriodicPurge(_timeProvider());
+            }
         }
 
         private struct PooledEntry

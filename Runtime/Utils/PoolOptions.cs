@@ -118,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         /// <summary>
         /// Time in seconds after which an idle item becomes eligible for purging.
-        /// A value of 0 or null disables idle timeout purging.
+        /// An explicit value of 0 or less disables idle purging; null uses the effective defaults.
         /// Items are tracked from the time they are returned to the pool.
         /// </summary>
         public float? IdleTimeoutSeconds { get; set; }
