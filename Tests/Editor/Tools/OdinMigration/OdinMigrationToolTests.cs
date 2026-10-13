@@ -978,6 +978,89 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
+        public void TransactionChecksEveryFileBeforeWritingAnyTarget()
+        {
+            FakeFileStore store = new FakeFileStore();
+            store.Files["one"] = new byte[] { 1 };
+            store.Files["two"] = new byte[] { 99 };
+            OdinMigrationFilePlan first = CreatePlan("one", new byte[] { 1 }, new byte[] { 2 });
+            OdinMigrationFilePlan second = CreatePlan("two", new byte[] { 3 }, new byte[] { 4 });
+
+            Assert.IsFalse(
+                OdinMigrationFileTransaction.TryApply(
+                    new[] { first, second },
+                    "backup",
+                    store,
+                    out string failure
+                )
+            );
+            StringAssert.Contains("changed after preview", failure);
+            Assert.AreEqual(0, store.TargetWrites);
+            Assert.AreEqual(0, store.Backups.Count);
+            CollectionAssert.AreEqual(new byte[] { 1 }, store.ReadAllBytes("one"));
+            CollectionAssert.AreEqual(new byte[] { 99 }, store.ReadAllBytes("two"));
+        }
+
+        [Test]
+        public void LaterBackupFailureDoesNotWriteEarlierTargets()
+        {
+            FakeFileStore store = new FakeFileStore
+            {
+                FailBackupPath = Path.Combine("backup", "two.cs"),
+            };
+            store.Files["one"] = new byte[] { 1 };
+            store.Files["two"] = new byte[] { 3 };
+            OdinMigrationFilePlan first = CreatePlan("one", new byte[] { 1 }, new byte[] { 2 });
+            OdinMigrationFilePlan second = CreatePlan("two", new byte[] { 3 }, new byte[] { 4 });
+
+            Assert.IsFalse(
+                OdinMigrationFileTransaction.TryApply(
+                    new[] { first, second },
+                    "backup",
+                    store,
+                    out string failure
+                )
+            );
+            StringAssert.Contains("backup", failure);
+            Assert.AreEqual(0, store.TargetWrites);
+            Assert.AreEqual(1, store.Backups.Count);
+            CollectionAssert.AreEqual(new byte[] { 1 }, store.ReadAllBytes("one"));
+            CollectionAssert.AreEqual(new byte[] { 3 }, store.ReadAllBytes("two"));
+        }
+
+        [Test]
+        public void BackupPhaseConcurrentEditIsDetectedBeforeTargetWrites()
+        {
+            FakeFileStore store = new FakeFileStore
+            {
+                MutateAfterBackupPath = Path.Combine("backup", "two.cs"),
+                MutateFileDuringBackup = "one",
+            };
+            store.Files["one"] = new byte[] { 1 };
+            store.Files["two"] = new byte[] { 3 };
+            OdinMigrationFilePlan first = CreatePlan("one", new byte[] { 1 }, new byte[] { 2 });
+            OdinMigrationFilePlan second = CreatePlan("two", new byte[] { 3 }, new byte[] { 4 });
+
+            Assert.IsFalse(
+                OdinMigrationFileTransaction.TryApply(
+                    new[] { first, second },
+                    "backup",
+                    store,
+                    out string failure
+                )
+            );
+            StringAssert.Contains("changed after preview", failure);
+            Assert.AreEqual(0, store.TargetWrites);
+            Assert.AreEqual(2, store.Backups.Count);
+            CollectionAssert.AreEqual(new byte[] { 99 }, store.ReadAllBytes("one"));
+            CollectionAssert.AreEqual(new byte[] { 3 }, store.ReadAllBytes("two"));
+            Assert.IsTrue(
+                store.Backups.TryGetValue(Path.Combine("backup", "one.cs"), out byte[] backup)
+            );
+            CollectionAssert.AreEqual(new byte[] { 1 }, backup);
+        }
+
+        [Test]
         public void TransactionStopsWhenBackupWriteFails()
         {
             FakeFileStore store = new FakeFileStore
@@ -1054,6 +1137,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             internal string FailBackupPath;
             internal string FailTargetPath;
             internal string MutateAfterTargetPath;
+            internal string MutateAfterBackupPath;
+            internal string MutateFileDuringBackup;
             internal int TargetWrites;
 
             public byte[] ReadAllBytes(string path)
@@ -1077,6 +1162,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     throw new IOException("Simulated backup failure.");
                 }
                 Backups[path] = bytes;
+                if (string.Equals(path, MutateAfterBackupPath, System.StringComparison.Ordinal))
+                {
+                    Files[MutateFileDuringBackup] = new byte[] { 99 };
+                }
             }
 
             public void WriteTarget(string path, byte[] bytes)

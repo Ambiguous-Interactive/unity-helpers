@@ -68,9 +68,9 @@ is not a data migration or proof that all Odin-owned state has been converted.
 > disappear when the source type changes. The automated tool deliberately leaves these constructs
 > unchanged.
 
-Apply performs a best-effort check that every source file still matches its preview, writes through
-a staged durable-file replacement, and attempts to roll back completed writes if a later write
-fails. It refuses that rollback when the live bytes show a newer external edit. These checks reduce
+Apply checks the complete source batch against its preview and creates every byte backup before
+writing any target. It checks each target again immediately before its staged durable-file
+replacement, then attempts to roll back completed writes if a later write fails. It refuses that rollback when the live bytes show a newer external edit. These checks reduce
 common editor races but cannot coordinate atomically with other processes. Timestamped byte-for-byte backups are retained under
 `Library/WallstopOdinMigrationBackups`.
 

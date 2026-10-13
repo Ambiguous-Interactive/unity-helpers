@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         }
 
         /// <summary>Applies a preview with byte backups without dialogs or an Asset Database refresh.</summary>
-        /// <remarks>Filesystem writes are outside Unity Undo; refresh on the editor thread after success.</remarks>
+        /// <remarks>Validates the batch and creates all backups before target writes. Filesystem writes are outside Unity Undo; refresh on the editor thread after success.</remarks>
         public static bool TryApply(
             OdinMigrationPreview preview,
             out string backupRoot,

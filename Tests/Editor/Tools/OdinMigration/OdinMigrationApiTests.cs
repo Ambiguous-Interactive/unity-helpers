@@ -185,7 +185,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
-        public void ChangedSecondFileRollsBackFirstAndRetainsConcurrentEdit()
+        public void ChangedSecondFilePreventsAllWritesAndRetainsConcurrentEdit()
         {
             string first = WriteSource("First.cs", Source);
             string second = WriteSource("Second.cs", Source);
@@ -204,10 +204,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             StringAssert.Contains("changed after preview", failure);
             Assert.AreEqual(Source, File.ReadAllText(FullPath(first)));
             Assert.AreEqual(ExternalEdit, File.ReadAllText(FullPath(second)));
-            CollectionAssert.AreEqual(
-                File.ReadAllBytes(FullPath(first)),
-                File.ReadAllBytes(Path.Combine(backupRoot, first))
-            );
+            Assert.IsFalse(Directory.Exists(backupRoot));
         }
 
         [Test]
