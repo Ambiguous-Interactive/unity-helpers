@@ -364,6 +364,10 @@ The central enrollment audit requires literal cancellation settings for the lice
 A benchmark branch dispatch records diagnostic results without replacing the canonical baseline;
 only complete successful measurements on main can refresh the published report.
 
+The metric extractor retains dataset and operation labels for repeated tables. It accepts
+Markdown headers followed by HTML data rows, as emitted by the sorting benchmarks, and keeps
+each measured cell distinct. Duplicate identities still prevent publication.
+
 ## Package exports
 
 Release Publish creates the `.unitypackage` on an `ubuntu-latest` runner without opening Unity or
@@ -380,6 +384,9 @@ native smoke job, including successful acquire, export, return, classification, 
 confirmed-cleanup steps in order. Missing, skipped, stale, or failed evidence prevents tag mutation
 and publication. The smoke job acquires, activates, returns, classifies, and releases in the same
 physical runner context, with a final cleanup gate.
+
+The release gate script comes from the workflow commit. Its evidence query remains bound to the
+selected source SHA, allowing an older validated source to use the current release controls.
 
 The shell exporter remains available for local Docker comparison and delegates staging to the same
 Node implementation. Compare the portable and native archives by logical path, asset bytes, and

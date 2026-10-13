@@ -128,7 +128,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     out IWProtoRuntimeWriter restored
                 )
             );
-            CollectionAssert.AreEqual(expected, restored.Serialize(value));
+            Assert.IsTrue(restored.TrySerialize(value, out byte[] restoredBytes));
+            CollectionAssert.AreEqual(expected, restoredBytes);
         }
 
         [Test]

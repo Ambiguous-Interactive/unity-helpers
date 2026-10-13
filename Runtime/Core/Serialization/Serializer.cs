@@ -2864,9 +2864,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                         input,
                         out WallstopProto.IWProtoRuntimeWriter writer
                     )
+                    && writer.TrySerialize(input, out byte[] runtimeBytes)
                 )
                 {
-                    byte[] runtimeBytes = writer.Serialize(input);
                     bytes = runtimeBytes;
                     return true;
                 }

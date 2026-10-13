@@ -388,6 +388,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 WProtoFacade.TrySerialize(ring, out byte[] _),
                 "the facade claimed a request whose elements it cannot encode"
             );
+            Assert.IsTrue(
+                WProtoFormatterProvider.TryGetRuntimeWriter(ring, out IWProtoRuntimeWriter writer)
+            );
+            Assert.IsFalse(writer.TrySerialize(ring, out byte[] declined));
+            Assert.IsTrue(declined == null);
+            byte[] buffer = new byte[32];
+            byte[] original = buffer;
+            Assert.IsFalse(writer.Serialize(ring, ref buffer).Served);
+            Assert.AreSame(original, buffer);
             Assert.IsFalse(
                 WProtoFacade.TryDeserialize(
                     new byte[] { 0x0A, 0x02, 0x08, 0x01 },

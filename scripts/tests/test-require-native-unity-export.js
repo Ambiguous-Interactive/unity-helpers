@@ -151,6 +151,8 @@ async function main() {
   assert.ok(nativeGate, "Release publishing requires an independent native validation gate.");
   assert.match(nativeGate[1], /if: \$\{\{ !inputs\.export_only \}\}/);
   assert.match(nativeGate[1], /actions: read/);
+  assert.match(nativeGate[1], /ref: \$\{\{ github\.workflow_sha \}\}/);
+  assert.doesNotMatch(nativeGate[1], /ref: \$\{\{ needs\.verify-tag\.outputs\.source-sha \}\}/);
   assert.match(nativeGate[1], /SOURCE_SHA: \$\{\{ needs\.verify-tag\.outputs\.source-sha \}\}/);
   assert.match(nativeGate[1], /node scripts\/release-tools\/require-native-unity-export\.js/);
   for (const name of ["prepare-tag", "publish"]) {

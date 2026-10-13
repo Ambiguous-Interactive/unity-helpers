@@ -2722,6 +2722,9 @@ define is set, and fall back to protobuf-net when it declines. That makes the sw
 type**: annotating a contract moves it, and everything unannotated keeps working exactly as before,
 so contracts can be ported and verified one at a time.
 
+Both allocating and reusable-buffer writes fall back when a registered runtime formatter
+declines an interface or object root. Encoding failures keep their typed exceptions.
+
 WallstopProto answers when a formatter is registered for the declared type, **and** the value's
 runtime type is one that formatter writes:
 

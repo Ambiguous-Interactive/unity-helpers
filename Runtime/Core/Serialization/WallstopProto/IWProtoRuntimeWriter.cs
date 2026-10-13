@@ -5,7 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     internal interface IWProtoRuntimeWriter
     {
-        byte[] Serialize(object value);
+        bool TrySerialize(object value, out byte[] bytes);
         WProtoWriteResult Serialize(object value, ref byte[] buffer);
     }
 }

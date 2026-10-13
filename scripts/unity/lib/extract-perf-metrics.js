@@ -256,6 +256,21 @@ function splitRow(line) {
   return parts.map((cell) => cell.trim());
 }
 
+function splitDataRow(line) {
+  const markdown = splitRow(line);
+  if (markdown) {
+    return markdown;
+  }
+  const row = line.trim().match(/^<tr\b[^>]*>([\s\S]*?)<\/tr>$/i);
+  if (!row) {
+    return null;
+  }
+  const cells = [...row[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)];
+  return cells.length === 0
+    ? null
+    : cells.map((cell) => decodeXmlEntities(cell[1].replace(/<[^>]*>/g, "")).trim());
+}
+
 // Parse a unit out of a column header. "Optimized ProtoEquals (ms)" -> "ms";
 // "Size (bytes)" -> "bytes"; "Speedup" -> null.
 function unitFromHeader(header) {
@@ -299,7 +314,12 @@ function parseCell(cell) {
 // Given the lines of one test's output, find markdown tables and emit metrics.
 function metricsFromMarkdownTables(lines, context, consumedLineSet) {
   const metrics = [];
+  let section = null;
   for (let i = 0; i + 1 < lines.length; i++) {
+    if (/^.+ Benchmarks? - .+$/.test(lines[i].trim())) {
+      section = lines[i].trim();
+      continue;
+    }
     const headerCells = splitRow(lines[i]);
     if (!headerCells) {
       continue;
@@ -316,7 +336,7 @@ function metricsFromMarkdownTables(lines, context, consumedLineSet) {
 
     // First column is the row label; the rest are metric columns.
     for (let r = i + 2; r < lines.length; r++) {
-      const rowCells = splitRow(lines[r]);
+      const rowCells = splitDataRow(lines[r]);
       if (!rowCells || isDividerRow(rowCells)) {
         break; // table ended
       }
@@ -330,7 +350,10 @@ function metricsFromMarkdownTables(lines, context, consumedLineSet) {
         const header = headerCells[c];
         const unit = unitFromHeader(header) || parsed.suffixUnit;
         const columnLabel = headerLabel(header);
-        metrics.push(makeMetric(context, `${rowLabel} / ${columnLabel}`, unit, parsed.value));
+        const sampleGroup = section
+          ? `${section} / ${headerCells[0]} / ${rowLabel} / ${columnLabel}`
+          : `${rowLabel} / ${columnLabel}`;
+        metrics.push(makeMetric(context, sampleGroup, unit, parsed.value));
       }
     }
     // Continue scanning AFTER this table for additional tables in the same log.
@@ -349,7 +372,7 @@ function metricsFromTimingLines(lines, context, consumedLineSet) {
     const line = lines[i];
     // Skip lines that are clearly markdown table rows (defensive; tables are
     // handled above) so we never double-count.
-    if (line.trim().startsWith("|")) {
+    if (line.trim().startsWith("|") || line.trim().startsWith("<")) {
       continue;
     }
     const match = line.match(TIMING_LINE_RE);
@@ -615,7 +638,10 @@ function runSelfTest() {
 
   // SpatialTree cell "12,345 (0.003s)" -> value 12345, no unit from a bare
   // header "RTree" (the inline (0.003s) is an annotation, not the cell number).
-  const build = findMetric(metrics, "Build / RTree");
+  const build = findMetric(
+    metrics,
+    "SpatialTree2D Benchmarks - Tiny / Construction / Build / RTree"
+  );
   assert(
     build && build.median === 12345,
     `Build/RTree should be 12345, got ${build && build.median}`
@@ -629,8 +655,52 @@ function runSelfTest() {
   );
 
   // No metric should be double-counted from the table via the timing-line path.
-  const buildDupes = metrics.filter((m) => m.sampleGroup === "Build / RTree");
+  const buildDupes = metrics.filter(
+    (m) => m.sampleGroup === "SpatialTree2D Benchmarks - Tiny / Construction / Build / RTree"
+  );
   assert(buildDupes.length === 1, "table cells must not be double-counted as timing lines");
+
+  const repeatedTables = [
+    '<test-case fullname="Perf.Sorting" result="Passed"><output><![CDATA[',
+    "IList Sorting Benchmarks - Sorted",
+    "| List Size | Ghost | Meteor |",
+    "| --- | --- | --- |",
+    '<tr><td align="left">100</td><td align="right">0.056 ms</td><td>n/a</td></tr>',
+    "IList Sorting Benchmarks - Shuffled",
+    "| List Size | Ghost | Meteor |",
+    "| --- | --- | --- |",
+    "<tr><td>100</td><td>0.007 ms</td><td>0.006 ms</td></tr>",
+    "SpatialTree2D Benchmarks - 1,000 entries",
+    "| Elements In Range | RTree |",
+    "| --- | --- |",
+    "| Full | 70 |",
+    "| Get Elements In Bounds | RTree |",
+    "| --- | --- |",
+    "| Full | 220 |",
+    "SpatialTree2D Benchmarks - 100 entries",
+    "| Elements In Range | RTree |",
+    "| --- | --- |",
+    "| Full | 700 |",
+    "]]></output></test-case>"
+  ].join("\n");
+  const scoped = extractFromXml(repeatedTables, {
+    unityVersion: "6000.6.0f1",
+    testMode: "playmode"
+  });
+  assert(scoped.length === 6, "every measured HTML and Markdown cell must be retained once");
+  assert(
+    new Set(scoped.map((metric) => metric.sampleGroup)).size === 6,
+    "dataset and operation identities must remain distinct"
+  );
+  const sorted = findMetric(scoped, "IList Sorting Benchmarks - Sorted / List Size / 100 / Ghost");
+  assert(
+    sorted && sorted.median === 0.056 && sorted.unit === "ms",
+    "HTML cells retain their measured value and unit"
+  );
+  assert(
+    scoped.every((metric) => !metric.sampleGroup.includes("<td")),
+    "HTML rows must not become free-form timing labels"
+  );
 
   // File-name inference.
   const inferred = inferFromFileName("results-2022.3.45f1-editmode.xml");

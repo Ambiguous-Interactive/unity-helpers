@@ -50,7 +50,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(
                 WProtoFormatterProvider.TryGetRuntimeWriter(value, out IWProtoRuntimeWriter writer)
             );
-            byte[] generated = writer.Serialize(value);
+            Assert.IsTrue(writer.TrySerialize(value, out byte[] generated));
             using MemoryStream oracle = new MemoryStream();
             model.Serialize(oracle, value);
             CollectionAssert.AreEqual(oracle.ToArray(), generated);

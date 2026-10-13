@@ -3,8 +3,10 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
+    using System;
     using NUnit.Framework;
     using ProtoBuf;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
     [TestFixture]
@@ -46,6 +48,58 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(round != null, "Deserialized instance should not be null");
             Assert.AreEqual(42, round.A, "Base field A should match");
             Assert.AreEqual("obj", round.B, "Derived field B should be preserved");
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void DecliningRuntimeFormatterFallsBackForBothWriteOverloads(
+            bool callerBuffer,
+            bool forceRuntimeType
+        )
+        {
+            DerivedMsg original = new DerivedMsg { A = -1, B = "fallback/café" };
+            byte[] expected = Serializer.ProtoSerialize(original);
+            IWProtoFormatter<DerivedMsg> previous = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<DerivedMsg> current
+            )
+                ? current
+                : null;
+            try
+            {
+                WProtoFormatterProvider.Register(new DecliningProtoFormatter<DerivedMsg>());
+                Assert.IsTrue(
+                    WProtoFormatterProvider.TryGetRuntimeWriter(
+                        original,
+                        out IWProtoRuntimeWriter writer
+                    )
+                );
+                Assert.IsFalse(writer.TrySerialize(original, out byte[] declined));
+                Assert.IsTrue(declined == null);
+                if (callerBuffer)
+                {
+                    byte[] buffer = new byte[expected.Length + 16];
+                    int written = Serializer.ProtoSerialize<object>(
+                        original,
+                        ref buffer,
+                        forceRuntimeType
+                    );
+                    Assert.AreEqual(expected.Length, written);
+                    CollectionAssert.AreEqual(expected, buffer.AsSpan(0, written).ToArray());
+                }
+                else
+                {
+                    CollectionAssert.AreEqual(
+                        expected,
+                        Serializer.ProtoSerialize<object>(original, forceRuntimeType)
+                    );
+                }
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(previous);
+            }
         }
 
         [ProtoContract]

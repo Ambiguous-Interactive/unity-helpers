@@ -2169,7 +2169,10 @@ function Run-ReleasePublishTagPreparationContractTests {
     $prepareTagBlock.Value.Contains('      - verify-tag') -and
     $prepareTagBlock.Value.Contains('      - validate-package') -and
     $prepareTagBlock.Value.Contains('      - unitypackage') -and
-    $prepareTagBlock.Value.Contains('if: ${{ !inputs.export_only && needs.verify-tag.outputs.tag-action != ''none'' }}')
+    $prepareTagBlock.Value.Contains('      - native-validation') -and
+    $prepareTagBlock.Value.Contains('!inputs.export_only &&') -and
+    $prepareTagBlock.Value.Contains("needs.native-validation.result == 'success'") -and
+    $prepareTagBlock.Value.Contains('needs.verify-tag.outputs.tag-action != ''none''')
   )
 
   # DERIVE the setup-node pin from the workflow instead of restating it. A restated SHA is not a

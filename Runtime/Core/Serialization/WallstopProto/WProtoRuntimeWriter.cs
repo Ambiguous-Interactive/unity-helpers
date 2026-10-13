@@ -9,9 +9,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         private WProtoRuntimeWriter() { }
 
-        public byte[] Serialize(object value)
+        public bool TrySerialize(object value, out byte[] bytes)
         {
-            return WProtoFacade.Serialize((T)value);
+            return WProtoFacade.TrySerialize((T)value, out bytes);
         }
 
         public WProtoWriteResult Serialize(object value, ref byte[] buffer)

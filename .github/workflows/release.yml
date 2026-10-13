@@ -338,7 +338,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 1
-          ref: ${{ needs.verify-tag.outputs.source-sha }}
+          ref: ${{ github.workflow_sha }}
           persist-credentials: false
 
       - name: Setup Node.js
