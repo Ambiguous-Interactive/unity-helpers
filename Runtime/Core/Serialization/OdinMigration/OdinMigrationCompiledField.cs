@@ -4,6 +4,9 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
 {
 #if UNITY_EDITOR
+    using System;
+    using System.Collections.Generic;
+
     /// <summary>Preserves a dictionary field's compiler-resolved types and source location.</summary>
     public sealed class OdinMigrationCompiledField
     {
@@ -31,6 +34,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
         /// <summary>Gets the declared type's source character count.</summary>
         public int TypeLength { get; }
 
+        /// <summary>Gets compiler-resolved source replacements for this field.</summary>
+        public IReadOnlyList<OdinMigrationCompiledSourceEdit> SourceEdits { get; }
+
+        /// <summary>Gets an original source shape that prevents an automatic rewrite.</summary>
+        public string RewriteFailure { get; }
+
         /// <summary>Captures the original field identity emitted by the compiler.</summary>
         public OdinMigrationCompiledField(
             string name,
@@ -40,7 +49,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
             string elementAssemblyName,
             string sourcePath,
             int typeStart,
-            int typeLength
+            int typeLength,
+            OdinMigrationCompiledSourceEdit[] sourceEdits = null,
+            string rewriteFailure = null
         )
         {
             Name = name;
@@ -51,6 +62,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
             SourcePath = sourcePath;
             TypeStart = typeStart;
             TypeLength = typeLength;
+            SourceEdits = Array.AsReadOnly(
+                sourceEdits == null
+                    ? Array.Empty<OdinMigrationCompiledSourceEdit>()
+                    : (OdinMigrationCompiledSourceEdit[])sourceEdits.Clone()
+            );
+            RewriteFailure = rewriteFailure;
         }
     }
 #endif

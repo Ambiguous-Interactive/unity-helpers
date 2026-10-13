@@ -19,11 +19,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
         /// <summary>Gets the original dictionary field declarations.</summary>
         public IReadOnlyList<OdinMigrationCompiledField> Fields { get; }
 
+        /// <summary>Gets source replacements for original Odin base classes.</summary>
+        public IReadOnlyList<OdinMigrationCompiledSourceEdit> BaseEdits { get; }
+
         /// <summary>Captures immutable compiler metadata for a Unity type.</summary>
         public OdinMigrationCompiledBinding(
             Type originalType,
             OdinMigrationCompiledSource[] sources,
-            OdinMigrationCompiledField[] fields
+            OdinMigrationCompiledField[] fields,
+            OdinMigrationCompiledSourceEdit[] baseEdits = null
         )
         {
             OriginalType = originalType;
@@ -36,6 +40,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
                 fields == null
                     ? Array.Empty<OdinMigrationCompiledField>()
                     : (OdinMigrationCompiledField[])fields.Clone()
+            );
+            BaseEdits = Array.AsReadOnly(
+                baseEdits == null
+                    ? Array.Empty<OdinMigrationCompiledSourceEdit>()
+                    : (OdinMigrationCompiledSourceEdit[])baseEdits.Clone()
             );
         }
     }

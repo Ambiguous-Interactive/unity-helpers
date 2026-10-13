@@ -104,6 +104,9 @@ Editor scripts can use `OdinMigrationTool` in
 - `TryConvertBoundSerializedDictionaries(payload, fields, owningAssetPath, liveReferencedObjects,
 out binding, out yaml, out failure)` combines compiler binding, complete Nodes conversion, and
   live reference validation. Any failure returns both a null binding and a null fragment.
+- `TryPreviewDictionarySources(payload, fields, out preview, out failure)` proposes source
+  changes for compiler-bound fields without writing files. Each immutable proposal contains its
+  compiler path, original source, and proposed source.
 - `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
   `Assets` in the current project.
 - `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied
@@ -230,7 +233,8 @@ Call this method on the Unity editor thread. It checks each used object's declar
 asset GUID, and local file ID without resolving recorded type names or loading assets. Saved-scene
 references use Unity's scene identity; prefab instance references also match the saved scene's
 source asset GUID, signed source file ID, and instance ID. Scene text reads are bounded to
-4,194,304 characters and 65,536 lines.
+4,194,304 characters and 65,536 lines. Wrapped source-object flow mappings written by supported
+Unity versions are read across their continuation lines; malformed mappings are refused.
 Derived objects can satisfy a base element type. Recorded null slots remain null; missing or destroyed
 objects, wrong types or identities, and incomplete or extra live table entries return `false`
 with no fragment. Identity is checked at conversion time; validate again before a future paired apply.
@@ -244,12 +248,36 @@ enum declarations, and element class declarations; every captured source must st
 SHA-256 checksum. Each source read is bounded to 4,194,304 characters. Field names and both key and
 element assembly identities must match. Ambiguous inherited names, missing compiler metadata,
 changed source, wrong types, and invalid source spans return no binding.
+Constructed generic names retain their arguments, including nested enums and arrays. Static type
+metadata accounts for framework type forwarding between compiler facades and Unity's runtime.
 
 The binding registry and metadata are editor-only. Player compilations contain no registration
 code. Fields inherited from referenced assemblies without source declarations are not bound.
 The snapshots describe the captured declarations; they do not validate every project dependency
 or prove that replacement source compiles. Recompile and bind again after source or dependency
 changes. The combined conversion supplies evidence for a future paired preview; it writes no files.
+
+### Previewing dictionary source changes
+
+`TryPreviewDictionarySources` checks the binding and source checksums again before constructing
+proposals. The compiler records replacements for the original field type and explicit dictionary
+initializer type, rather than searching source text for a name. Aliases and private nested enums
+remain valid. Generic base fields retain their original type parameters. Private fields receive
+`SerializeField`, `OdinSerialize` becomes `SerializeField`, existing `SerializeField` attributes are
+retained without duplication, and `readonly` is removed from fields that must become Unity-serialized.
+Direct `SerializedMonoBehaviour` and `SerializedScriptableObject` bases become Unity's corresponding
+base classes. Explicit and target-typed empty or dictionary-copy constructors are supported.
+
+Every field sharing one dictionary declaration must be requested together. The preview refuses
+missing metadata, conflicting or overlapping replacements, unsupported factory/capacity initializers,
+and fields carrying `NonSerialized` or `SerializeReference`. A refusal returns no partial preview.
+Original comments, unrelated source, and line endings remain in the proposals.
+
+These proposals do not compile the consumer's replacement sources or inventory all affected assets
+and dependent callers. They are inputs to a future paired source/data preview, not an applicable
+migration batch. Check the complete retained payload with `TryConvertBoundSerializedDictionaries`,
+then compile and review every affected source and asset before a coordinated migration.
+
 The API does not apply a conversion or guarantee that the project can remove Odin. The existing
 source preview/apply API remains source-only.
 

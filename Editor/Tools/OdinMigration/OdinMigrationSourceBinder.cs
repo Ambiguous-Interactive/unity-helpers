@@ -81,13 +81,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     {
                         throw new InvalidDataException("A compiled source snapshot is incomplete.");
                     }
-                    string text = ReadSource(FullPath(source.Path));
-                    if (!string.Equals(Checksum(text), source.Checksum, StringComparison.Ordinal))
-                    {
-                        throw new InvalidDataException(
-                            "A source file changed after its binding was compiled."
-                        );
-                    }
+                    string text = ReadCompiledSource(source);
                     texts[source.Path] = text;
                     scriptCaptured |= string.Equals(
                         scriptChecksum,
@@ -179,6 +173,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 failure = exception.Message;
                 return false;
             }
+        }
+
+        internal static string ReadCompiledSource(OdinMigrationCompiledSource source)
+        {
+            if (
+                source == null
+                || string.IsNullOrWhiteSpace(source.Path)
+                || string.IsNullOrWhiteSpace(source.Checksum)
+            )
+            {
+                throw new InvalidDataException("A compiled source snapshot is incomplete.");
+            }
+            string text = ReadSource(FullPath(source.Path));
+            if (!string.Equals(Checksum(text), source.Checksum, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "A source file changed after its binding was compiled."
+                );
+            }
+            return text;
         }
 
         private static string FullPath(string compilerPath)

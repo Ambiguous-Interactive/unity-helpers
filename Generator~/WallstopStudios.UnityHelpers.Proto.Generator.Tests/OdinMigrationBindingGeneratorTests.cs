@@ -16,9 +16,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     public sealed class OdinMigrationBindingGeneratorTests
     {
         private const string UnityTypes =
-            "namespace UnityEngine { public class Object {} public class ScriptableObject : Object {} public class Texture : Object {} } namespace UnityEditor { public sealed class InitializeOnLoadMethodAttribute : System.Attribute {} }";
+            "namespace UnityEngine { public class Object {} public class ScriptableObject : Object {} public class MonoBehaviour : Object {} public class Texture : Object {} public sealed class SerializeField : System.Attribute {} public sealed class SerializeReference : System.Attribute {} } namespace UnityEditor { public sealed class InitializeOnLoadMethodAttribute : System.Attribute {} } namespace Sirenix.Serialization { public sealed class OdinSerializeAttribute : System.Attribute {} } namespace Sirenix.OdinInspector { public class SerializedScriptableObject : UnityEngine.ScriptableObject {} public class SerializedMonoBehaviour : UnityEngine.MonoBehaviour {} } namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters { public class SerializableDictionary<TKey,TValue> : System.Collections.Generic.Dictionary<TKey,TValue> { public SerializableDictionary() {} public SerializableDictionary(System.Collections.Generic.IDictionary<TKey,TValue> original) : base(original) {} } }";
 
-        private static GeneratorDriverRunResult Generate(
+        internal static GeneratorDriverRunResult Generate(
             string[] sources,
             bool editor,
             out Compilation updated
@@ -38,6 +38,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     "OdinMigrationCompiledField",
                     "OdinMigrationCompiledBinding",
                     "OdinMigrationCompiledBindings",
+                    "OdinMigrationCompiledSourceEdit",
                 }
             )
             {
@@ -176,6 +177,42 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 StringAssert.Contains("\"Assets/Source" + index + ".cs\"", generated);
             }
+        }
+
+        [Test]
+        public void ConstructedKeyAndElementNamesContainAllRuntimeArguments()
+        {
+            string generated = Generated(
+                new[]
+                {
+                    "using System.Collections.Generic; public class Keys<T> { public enum Key { A=0 } } public class Element<T> : UnityEngine.Texture {} public sealed class Asset : UnityEngine.ScriptableObject { public Dictionary<Keys<List<int[]>>.Key,List<Element<Dictionary<string,int[,]>>>> Values; }",
+                }
+            );
+            StringAssert.Contains("\"Keys`1+Key\" + \"[[\"", generated);
+            StringAssert.Contains(
+                "typeof(global::System.Collections.Generic.List<int[]>).AssemblyQualifiedName",
+                generated
+            );
+            StringAssert.Contains("\"Element`1\" + \"[[\"", generated);
+            StringAssert.Contains(
+                "typeof(global::System.Collections.Generic.Dictionary<string, int[,]>).AssemblyQualifiedName",
+                generated
+            );
+        }
+
+        [Test]
+        public void PrivateGenericArgumentsNeverNeedAnInaccessibleTypeLiteral()
+        {
+            string generated = Generated(
+                new[]
+                {
+                    "using System.Collections.Generic; public sealed class Asset : UnityEngine.ScriptableObject { private class Hidden {} private class Holder<T> { public enum Key { A=0 } } private Dictionary<Holder<Hidden>.Key,List<UnityEngine.Texture>> Values; }",
+                }
+            );
+            StringAssert.Contains("\"Asset+Holder`1+Key\" + \"[[\"", generated);
+            StringAssert.Contains("\"Asset+Hidden\"", generated);
+            StringAssert.DoesNotContain("typeof(global::Asset.Hidden)", generated);
+            StringAssert.DoesNotContain("typeof(global::Asset.Holder<", generated);
         }
 
         [TestCase(

@@ -43,6 +43,84 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 ) + type.MetadataName;
         }
 
+        private static string RuntimeFullNameExpression(ITypeSymbol type, Compilation compilation)
+        {
+            if (type is IDynamicTypeSymbol)
+            {
+                type = compilation.ObjectType;
+            }
+            if (type is IArrayTypeSymbol array)
+            {
+                return RuntimeFullNameExpression(array.ElementType, compilation)
+                    + " + "
+                    + Literal("[" + new string(',', array.Rank - 1) + "]");
+            }
+            INamedTypeSymbol named = (INamedTypeSymbol)type;
+            StringBuilder name = new StringBuilder(Literal(MetadataName(named)));
+            Stack<INamedTypeSymbol> owners = new Stack<INamedTypeSymbol>();
+            for (INamedTypeSymbol owner = named; owner != null; owner = owner.ContainingType)
+            {
+                owners.Push(owner);
+            }
+            bool first = true;
+            foreach (INamedTypeSymbol owner in owners)
+            {
+                foreach (ITypeSymbol argument in owner.TypeArguments)
+                {
+                    name.Append(" + ").Append(Literal(first ? "[[" : ",[")).Append(" + ");
+                    first = false;
+                    ITypeSymbol runtimeArgument =
+                        argument is IDynamicTypeSymbol ? compilation.ObjectType : argument;
+                    if (TypeNaming.IsNameable(runtimeArgument, compilation))
+                    {
+                        name.Append("typeof(")
+                            .Append(
+                                runtimeArgument.ToDisplayString(
+                                    SymbolDisplayFormat.FullyQualifiedFormat
+                                )
+                            )
+                            .Append(").AssemblyQualifiedName");
+                    }
+                    else
+                    {
+                        name.Append(RuntimeFullNameExpression(runtimeArgument, compilation))
+                            .Append(" + ")
+                            .Append(Literal(", "))
+                            .Append(" + ")
+                            .Append(AssemblyNameExpression(runtimeArgument, compilation));
+                    }
+                    name.Append(" + ").Append(Literal("]"));
+                }
+            }
+            if (!first)
+            {
+                name.Append(" + ").Append(Literal("]"));
+            }
+            return name.ToString();
+        }
+
+        private static string AssemblyNameExpression(ITypeSymbol type, Compilation compilation)
+        {
+            if (
+                TypeNaming.IsNameable(type, compilation)
+                && !SymbolEqualityComparer.Default.Equals(
+                    type.ContainingAssembly,
+                    compilation.Assembly
+                )
+            )
+            {
+                return "typeof("
+                    + type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                    + ").Assembly.FullName";
+            }
+            ITypeSymbol owner = type;
+            while (owner is IArrayTypeSymbol array)
+            {
+                owner = array.ElementType;
+            }
+            return Literal(owner.ContainingAssembly.Identity.ToString());
+        }
+
         private static bool IsUnityObject(ITypeSymbol type)
         {
             for (
@@ -182,6 +260,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         continue;
                     }
                     List<string> fields = new List<string>();
+                    List<string> baseEdits = new List<string>();
                     SortedDictionary<string, SyntaxTree> sources = new SortedDictionary<
                         string,
                         SyntaxTree
@@ -194,6 +273,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     )
                     {
                         CaptureDeclarations(owner, sources);
+                        OdinMigrationRewriteMetadata.CaptureBaseEdits(
+                            owner,
+                            context.Compilation,
+                            baseEdits
+                        );
                         foreach (ISymbol member in owner.GetMembers())
                         {
                             if (
@@ -216,6 +300,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                                 continue;
                             }
                             SyntaxTree fieldTree = original.SyntaxTree;
+                            List<string> edits = OdinMigrationRewriteMetadata.FieldEdits(
+                                field,
+                                variable,
+                                context.Compilation,
+                                out string rewriteFailure
+                            );
                             sources[fieldTree.FilePath] = fieldTree;
                             CaptureDeclarations(key, sources);
                             for (
@@ -232,13 +322,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                                     + "("
                                     + Literal(field.Name)
                                     + ", "
-                                    + Literal(MetadataName(key))
+                                    + RuntimeFullNameExpression(key, context.Compilation)
                                     + ", "
-                                    + Literal(MetadataName(element))
+                                    + RuntimeFullNameExpression(element, context.Compilation)
                                     + ", "
-                                    + Literal(key.ContainingAssembly.Identity.ToString())
+                                    + AssemblyNameExpression(key, context.Compilation)
                                     + ", "
-                                    + Literal(element.ContainingAssembly.Identity.ToString())
+                                    + AssemblyNameExpression(element, context.Compilation)
                                     + ", "
                                     + Literal(fieldTree.FilePath)
                                     + ", "
@@ -249,6 +339,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                                     + original.Type.Span.Length.ToString(
                                         CultureInfo.InvariantCulture
                                     )
+                                    + ", "
+                                    + OdinMigrationRewriteMetadata.ArrayExpression(edits)
+                                    + ", "
+                                    + (rewriteFailure == null ? "null" : Literal(rewriteFailure))
                                     + ")"
                             );
                         }
@@ -285,7 +379,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + Field
                         + "[] {"
                         + string.Join(",", fields)
-                        + "}));";
+                        + "}, "
+                        + OdinMigrationRewriteMetadata.ArrayExpression(baseEdits)
+                        + "));";
                 }
             }
             if (registrations.Count == 0)

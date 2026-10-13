@@ -116,9 +116,86 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         "A referenced scene file identifier occurs more than once."
                     );
                 }
-                documents.Add(document.FileId, document);
+                List<AuthoredAssetEntry> normalized = new List<AuthoredAssetEntry>();
+                foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
+                {
+                    if (
+                        (
+                            string.Equals(
+                                entry.Key,
+                                CorrespondingSourceObjectKey,
+                                StringComparison.Ordinal
+                            )
+                            || string.Equals(entry.Key, PrefabInstanceKey, StringComparison.Ordinal)
+                        )
+                        && entry.HasBlockValue
+                        && entry.InlineValue.StartsWith("{", StringComparison.Ordinal)
+                        && !entry.InlineValue.EndsWith("}", StringComparison.Ordinal)
+                    )
+                    {
+                        StringBuilder value = new StringBuilder(entry.InlineValue);
+                        for (int line = entry.LineNumber; line < entry.EndLineNumber - 1; ++line)
+                        {
+                            string continuation = lines[line];
+                            int indent = 0;
+                            while (indent < continuation.Length && continuation[indent] == ' ')
+                            {
+                                ++indent;
+                            }
+                            if (indent <= entry.Indent || string.IsNullOrWhiteSpace(continuation))
+                            {
+                                throw new InvalidDataException(
+                                    "A prefab reference continuation is malformed."
+                                );
+                            }
+                            value.Append(' ').Append(continuation.Trim());
+                        }
+                        normalized.Add(
+                            new AuthoredAssetEntry(
+                                entry.Key,
+                                value.ToString(),
+                                entry.Indent,
+                                entry.LineNumber,
+                                entry.EndLineNumber
+                            )
+                        );
+                    }
+                    else
+                    {
+                        normalized.Add(entry);
+                    }
+                }
+                documents.Add(
+                    document.FileId,
+                    new AuthoredAssetDocument(
+                        document.FileId,
+                        document.UnityTypeId,
+                        document.RootKey,
+                        document.IsStripped,
+                        document.StartLineNumber,
+                        document.EndLineNumber,
+                        normalized.AsReadOnly()
+                    )
+                );
             }
             return documents;
+        }
+
+        private static bool MatchesPrefabSource(
+            Object reference,
+            string expectedGuid,
+            long expectedFileId
+        )
+        {
+            Object source = PrefabUtility.GetCorrespondingObjectFromSource(reference);
+            return source != null
+                && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                    source,
+                    out string actualGuid,
+                    out long actualFileId
+                )
+                && actualFileId == expectedFileId
+                && string.Equals(actualGuid, expectedGuid, StringComparison.OrdinalIgnoreCase);
         }
 
         internal void Validate(int index, OdinMigrationDictionaryField field)
@@ -213,23 +290,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 )
                 && MatchesPrefabSource(reference, sourceGuid, sourceId)
                 && global.targetPrefabId == unchecked((ulong)instanceId);
-        }
-
-        private static bool MatchesPrefabSource(
-            Object reference,
-            string expectedGuid,
-            long expectedFileId
-        )
-        {
-            Object source = PrefabUtility.GetCorrespondingObjectFromSource(reference);
-            return source != null
-                && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
-                    source,
-                    out string actualGuid,
-                    out long actualFileId
-                )
-                && actualFileId == expectedFileId
-                && string.Equals(actualGuid, expectedGuid, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

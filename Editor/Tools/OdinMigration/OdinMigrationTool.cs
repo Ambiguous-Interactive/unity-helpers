@@ -210,6 +210,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             return OdinMigrationSourceBinder.TryBind(payload, fields, out binding, out failure);
         }
 
+        /// <summary>Previews compiler-resolved source replacements for original dictionary declarations.</summary>
+        /// <remarks>Call on the editor thread. This checks original source snapshots but does not compile replacements or apply source/data writes.</remarks>
+        public static bool TryPreviewDictionarySources(
+            OdinMigrationSerializedData payload,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            out OdinMigrationDictionarySourcePreview preview,
+            out string failure
+        )
+        {
+            if (
+                !TryBindSerializedDictionaryFields(
+                    payload,
+                    fields,
+                    out OdinMigrationCompiledBinding binding,
+                    out failure
+                )
+            )
+            {
+                preview = null;
+                return false;
+            }
+            return OdinMigrationDictionarySourceRewriter.TryPreview(
+                binding,
+                fields,
+                out preview,
+                out failure
+            );
+        }
+
         /// <summary>Previews all source scripts and serialized assets under Assets without editor UI.</summary>
         public static bool TryPreviewAssets(
             out OdinMigrationPreview preview,

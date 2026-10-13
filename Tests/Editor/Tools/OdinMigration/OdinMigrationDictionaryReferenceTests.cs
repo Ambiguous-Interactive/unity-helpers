@@ -270,6 +270,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [TestCase(true, true, false, 3)]
         [TestCase(false, true, false, 4)]
         [TestCase(false, true, false, 5)]
+        [TestCase(false, true, false, 6)]
+        [TestCase(false, true, false, 7)]
         public void SavedSceneObjectReferencesMatchTheirAuthoredFileIds(
             bool local,
             bool prefab,
@@ -372,6 +374,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 );
                 component.Reference = value;
                 Assert.IsTrue(EditorSceneManager.SaveScene(scene, scenePath));
+                if (prefab)
+                {
+                    string sceneSource = File.ReadAllText(sourcePath);
+                    sceneSource = Regex.Replace(
+                        sceneSource,
+                        @"(?m)^(  m_CorrespondingSourceObject: \{fileID: -?\d+, guid: [a-fA-F0-9]{32}), type: (\d+)\}(\r?)$",
+                        "$1,\n    type: $2}$3"
+                    );
+                    File.WriteAllText(sourcePath, sceneSource);
+                    Assert.IsTrue(
+                        Regex.IsMatch(
+                            sceneSource,
+                            @"m_CorrespondingSourceObject: \{fileID: -?\d+, guid: [a-fA-F0-9]{32},\r?\n    type: 3\}"
+                        ),
+                        "The scene fixture must exercise a wrapped source-object flow mapping."
+                    );
+                }
                 Match header = Regex.Match(
                     File.ReadAllText(sourcePath),
                     @"^  "
@@ -404,6 +423,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                         File.ReadAllText(sourcePath),
                         @"(m_CorrespondingSourceObject: \{fileID: -?\d+, guid: )[a-fA-F0-9]{32}",
                         "${1}00000000000000000000000000000001"
+                    );
+                    File.WriteAllText(sourcePath, altered);
+                }
+                else if (invalidScene == 6)
+                {
+                    string altered = Regex.Replace(
+                        File.ReadAllText(sourcePath),
+                        @"(m_CorrespondingSourceObject: \{fileID: -?\d+, guid: [a-fA-F0-9]{32},\r?\n    type: 3)\}",
+                        "$1"
+                    );
+                    File.WriteAllText(sourcePath, altered);
+                }
+                else if (invalidScene == 7)
+                {
+                    string altered = Regex.Replace(
+                        File.ReadAllText(sourcePath),
+                        @"(m_CorrespondingSourceObject: \{fileID: -?\d+, guid: [a-fA-F0-9]{32},\r?\n)(    type: 3\})",
+                        "$1\n$2"
                     );
                     File.WriteAllText(sourcePath, altered);
                 }
@@ -457,6 +494,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                         invalidScene == 1 ? "size limit"
                         : invalidScene == 2 ? "line limit"
                         : invalidScene == 3 ? "more than once"
+                        : invalidScene == 7 ? "malformed"
                         : "identifier";
                     StringAssert.Contains(expected, failure);
                 }
