@@ -530,12 +530,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
         }
 
-        [Test]
-        public void UndeclaredObjectRootIsRejectedBySerializationAndProtoComparers()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RegisteredObjectWritesKeepStrictFacadeAndProtoComparers(bool forceRuntimeType)
         {
-            object original = new SystemRandom(3);
+            SystemRandom concrete = new SystemRandom(3);
+            object original = concrete;
             object equivalent = new SystemRandom(3);
-            Assert.Throws<SerializationTypeException>(() => Serializer.ProtoSerialize(original));
+            byte[] expected = WProtoFacade.Serialize(concrete);
+            CollectionAssert.AreEqual(
+                expected,
+                Serializer.ProtoSerialize(original, forceRuntimeType)
+            );
+            byte[] buffer = new byte[expected.Length + 16];
+            byte[] originalBuffer = buffer;
+            int written = Serializer.ProtoSerialize(original, ref buffer, forceRuntimeType);
+            Assert.AreSame(originalBuffer, buffer);
+            Assert.AreEqual(expected.Length, written);
+            Assert.IsTrue(buffer.AsSpan(0, written).SequenceEqual(expected));
+            Assert.IsTrue(
+                concrete.ProtoEquals(Serializer.ProtoDeserialize<SystemRandom>(expected))
+            );
             ArrayBufferWriter<byte> destination = new();
             Assert.Throws<SerializationTypeException>(() =>
                 WProtoFacade.Serialize(original, destination)

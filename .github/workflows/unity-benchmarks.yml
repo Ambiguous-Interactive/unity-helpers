@@ -205,6 +205,10 @@ jobs:
           # budgets. Keep deliberate combined headroom while leaving ten minutes
           # for cleanup before this step's 120-minute hard limit.
           UH_EDITOR_TEST_TIMEOUT_SECONDS: "6600"
+          # Individual performance cases allow up to thirty minutes. Keep the
+          # silence guard above that budget and stream each started/completed case.
+          UH_EDITOR_TEST_STALL_SECONDS: "2100"
+          UH_STREAM_TEST_RESULTS: "1"
           UH_PERF_COMMIT: ${{ github.sha }}
         run: |
           # Release (not Debug) code optimization for the editmode/playmode perf

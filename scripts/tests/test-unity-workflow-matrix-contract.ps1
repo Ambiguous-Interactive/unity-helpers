@@ -13,6 +13,33 @@ function Write-Info($msg) {
     if ($VerboseOutput) { Write-Host "[test-unity-workflow-matrix-contract] $msg" -ForegroundColor Cyan }
 }
 
+function Test-BenchmarkProgressBudget {
+    param(
+        [Parameter(Mandatory = $true)][string]$JobText,
+        [Parameter(Mandatory = $true)][int]$LongestCaseSeconds
+    )
+
+    $runSteps = [regex]::Matches($JobText, '(?ms)^      - name: Run Unity Test Runner\s*$.*?(?=^      - name:|\z)')
+    if ($runSteps.Count -ne 1) {
+        return $false
+    }
+    $environments = [regex]::Matches($runSteps[0].Value, '(?ms)^        env:[ \t]*\r?\n(?<body>.*?)(?=^        \S|\z)')
+    if ($environments.Count -ne 1) {
+        return $false
+    }
+    [string]$environment = $environments[0].Groups['body'].Value
+    $streaming = [regex]::Matches($environment, '(?m)^\s+UH_STREAM_TEST_RESULTS: "1"\s*$')
+    $stall = [regex]::Matches($environment, '(?m)^\s+UH_EDITOR_TEST_STALL_SECONDS: "(?<seconds>\d+)"\s*$')
+    $total = [regex]::Matches($environment, '(?m)^\s+UH_EDITOR_TEST_TIMEOUT_SECONDS: "(?<seconds>\d+)"\s*$')
+    if ($streaming.Count -ne 1 -or $stall.Count -ne 1 -or $total.Count -ne 1 -or $LongestCaseSeconds -le 0) {
+        return $false
+    }
+
+    [int]$stallSeconds = $stall[0].Groups['seconds'].Value
+    [int]$totalSeconds = $total[0].Groups['seconds'].Value
+    return $stallSeconds -ge ($LongestCaseSeconds + 300) -and $stallSeconds -lt $totalSeconds
+}
+
 function Test-PrCapableAcquireIdentityInputs {
     param(
         [Parameter(Mandatory = $true)][string]$WorkflowContent,
@@ -748,6 +775,34 @@ if (-not $unityTestWorkflowsAvoidUnusedDependencies) {
 }
 
 $benchmarkJob = if ($benchmarksJobTexts.ContainsKey('benchmarks')) { [string]$benchmarksJobTexts['benchmarks'] } else { '' }
+$benchmarkCaseTimeouts = @(
+    foreach ($sourceFile in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'Tests/Runtime/Performance') -Filter '*.cs') {
+        [string]$sourceText = Get-Content -LiteralPath $sourceFile.FullName -Raw
+        foreach ($timeout in [regex]::Matches($sourceText, '(?:BenchmarkTimeoutMilliseconds\s*=\s*|\bTimeout\s*\(\s*)(?<milliseconds>[\d_]+)')) {
+            [int]$milliseconds = $timeout.Groups['milliseconds'].Value.Replace('_', '')
+            [int][Math]::Ceiling($milliseconds / 1000.0)
+        }
+    }
+)
+[int]$longestBenchmarkCaseSeconds = if ($benchmarkCaseTimeouts.Count -gt 0) { ($benchmarkCaseTimeouts | Measure-Object -Maximum).Maximum } else { 0 }
+if (-not (Test-BenchmarkProgressBudget -JobText $benchmarkJob -LongestCaseSeconds $longestBenchmarkCaseSeconds)) {
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::Stream benchmark test starts/completions and keep a bounded silence guard at least five minutes above the longest declared performance case timeout.'
+    $failed = $true
+}
+foreach ($invalidBudget in @(
+        $benchmarkJob.Replace('UH_STREAM_TEST_RESULTS: "1"', 'UH_STREAM_TEST_RESULTS: "0"'),
+        ($benchmarkJob.Replace('UH_STREAM_TEST_RESULTS: "1"', 'UH_STREAM_TEST_RESULTS: "0"') + "`n        env:`n          UH_STREAM_TEST_RESULTS: `"1`"`n"),
+        ($benchmarkJob -replace 'UH_EDITOR_TEST_STALL_SECONDS: "\d+"', 'UH_EDITOR_TEST_STALL_SECONDS: "300"'),
+        ($benchmarkJob -replace 'UH_EDITOR_TEST_STALL_SECONDS: "\d+"', 'UH_EDITOR_TEST_STALL_SECONDS: "0"'),
+        ($benchmarkJob -replace 'UH_EDITOR_TEST_STALL_SECONDS: "\d+"', 'UH_EDITOR_TEST_STALL_SECONDS: "6600"'),
+        ($benchmarkJob -replace '(?m)^\s+UH_EDITOR_TEST_STALL_SECONDS: "\d+"\s*$', '')
+    )) {
+    if (Test-BenchmarkProgressBudget -JobText $invalidBudget -LongestCaseSeconds $longestBenchmarkCaseSeconds) {
+        Write-Host '::error::Benchmark progress-budget contract accepted a missing, short, disabled, or unbounded watchdog configuration.'
+        $failed = $true
+    }
+}
+Write-Info "Checked benchmark progress and bounded silence budget against the longest declared case ($longestBenchmarkCaseSeconds seconds), including negative controls."
 $benchmarkInvocationCount = [regex]::Matches(
     $benchmarkJob,
     [regex]::Escape('./scripts/unity/run-ci-tests.ps1')

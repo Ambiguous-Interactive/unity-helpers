@@ -353,6 +353,11 @@ It acquires the organization lock, returns the license, classifies cleanup, and 
 before reporting and artifact uploads. Hosted fallback and an always-reporting aggregate reject
 incomplete cleanup or missing execution.
 
+The benchmark lane streams each test start and completion. Its no-output guard allows 35 minutes
+of silence because individual performance cases allow up to 30 minutes. The overall Unity pass
+remains bounded at 110 minutes, with cleanup time reserved before the step limit. Compatibility
+tests retain their shorter default silence guard.
+
 Superseded runs cancel within their ref group. Unity Tests uses separate groups for distinct
 pushed commits, preserving the exact validation required by automatic release publication.
 The central enrollment audit requires literal cancellation settings for the licensed queues.
