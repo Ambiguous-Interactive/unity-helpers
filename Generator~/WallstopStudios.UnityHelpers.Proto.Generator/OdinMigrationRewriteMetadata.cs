@@ -136,14 +136,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             if (addSerializationAttribute)
             {
-                edits.Add(
-                    Edit(
-                        member.SyntaxTree.FilePath,
-                        member.SpanStart,
-                        0,
-                        "[global::UnityEngine.SerializeField] "
-                    )
-                );
+                if (member.SpanStart == declaration.Type.SpanStart)
+                {
+                    edits[0] = Edit(
+                        declaration.Type,
+                        "[global::UnityEngine.SerializeField] " + replacement
+                    );
+                }
+                else
+                {
+                    edits.Add(
+                        Edit(
+                            member.SyntaxTree.FilePath,
+                            member.SpanStart,
+                            0,
+                            "[global::UnityEngine.SerializeField] "
+                        )
+                    );
+                }
             }
             if (variable.Initializer == null)
             {

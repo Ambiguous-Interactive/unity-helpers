@@ -168,6 +168,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             StringAssert.Contains("[global::UnityEngine.SerializeField]", rewritten);
         }
 
+        [Test]
+        public void ImplicitlyPrivateFieldCombinesItsAttributeAndTypeReplacement()
+        {
+            string rewritten = CompilingRewrite(
+                Header
+                    + "public sealed class Asset : UnityEngine.ScriptableObject { Dictionary<Key,List<UnityEngine.Texture>> Values = new(); }"
+            );
+            StringAssert.Contains(
+                "[global::UnityEngine.SerializeField] global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableDictionary<",
+                rewritten
+            );
+        }
+
         [TestCase(
             "public Dictionary<Key,List<UnityEngine.Texture>> Values = new(10);",
             "dictionary-copy constructor"

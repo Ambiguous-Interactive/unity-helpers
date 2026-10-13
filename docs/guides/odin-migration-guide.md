@@ -107,6 +107,10 @@ out binding, out yaml, out failure)` combines compiler binding, complete Nodes c
 - `TryPreviewDictionarySources(payload, fields, out preview, out failure)` proposes source
   changes for compiler-bound fields without writing files. Each immutable proposal contains its
   compiler path, original source, and proposed source.
+- `TryPreviewDictionaryMigration(targets, out preview, out failure)` coordinates source proposals
+  with complete retained asset proposals for the selected Unity documents. Each
+  `OdinMigrationDictionaryTarget` captures an asset path, owner file ID, field schemas, and the
+  complete live reference table. An optional cancellation callback runs before each asset read.
 - `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
   `Assets` in the current project.
 - `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied
@@ -277,6 +281,29 @@ These proposals do not compile the consumer's replacement sources or inventory a
 and dependent callers. They are inputs to a future paired source/data preview, not an applicable
 migration batch. Check the complete retained payload with `TryConvertBoundSerializedDictionaries`,
 then compile and review every affected source and asset before a coordinated migration.
+
+### Previewing coordinated source and asset changes
+
+Create one `OdinMigrationDictionaryTarget` per retained document, then call
+`TryPreviewDictionaryMigration` on the editor thread. The preview reads bounded existing
+`.asset`, `.prefab`, and `.unity` files under `Assets`. It verifies each selected document's original
+script, compiler binding, complete Nodes payload, and live references before replacing the payload
+with converted Unity Helpers fields in the proposed text. The original script GUID and owner file
+ID remain unchanged. Unrelated documents and fields, including unselected opaque Odin payloads,
+remain intact. Each inserted fragment uses the original payload's newline style.
+
+Multiple selected documents can share an asset, and multiple source selections can share a source
+file. Source edits are merged and identical edits are deduplicated. Conflicting source snapshots,
+overlapping edits, duplicate owner IDs or selections, existing destination fields, nested payloads,
+and incomplete declarations fail with no partial preview. Any asset, source, reference, or
+cancellation failure discards the whole proposed batch. Target arrays and returned proposal
+collections are immutable snapshots. Preview preserves the original bytes, encoding, and BOM on disk.
+
+Asset reads are bounded to 16,777,220 delivered bytes, 4,194,304 decoded characters, and 65,536 lines;
+the selection limit is 4,096 documents. These bounds do not trust counts recorded inside the payload.
+The result exposes complete original/proposed source and asset text for review. It does not inventory
+every affected asset or dependent caller, compile replacement sources, or authorize an apply.
+Those checks and coordinated source/data writes remain required before removing Odin.
 
 The API does not apply a conversion or guarantee that the project can remove Odin. The existing
 source preview/apply API remains source-only.

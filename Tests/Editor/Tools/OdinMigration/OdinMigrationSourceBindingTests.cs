@@ -475,6 +475,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.Greater(preview.Sources.Count, 0);
         }
 
+        [Test]
+        public void ImplicitlyPrivateDictionaryGetsANonoverlappingSourceProposal()
+        {
+            OdinMigrationImplicitPrivateBindingAsset asset = Track(
+                ScriptableObject.CreateInstance<OdinMigrationImplicitPrivateBindingAsset>()
+            );
+            Assert.IsTrue(
+                OdinMigrationTool.TryPreviewDictionarySources(
+                    Payload(asset),
+                    new[]
+                    {
+                        OdinMigrationDictionaryField.Create<SpriteAlignment, Texture2D>(
+                            OdinMigrationImplicitPrivateBindingAsset.FieldName
+                        ),
+                    },
+                    out OdinMigrationDictionarySourcePreview preview,
+                    out string failure
+                ),
+                failure
+            );
+            foreach (OdinMigrationSourceProposal source in preview.Sources.Values)
+            {
+                StringAssert.Contains(
+                    "[global::UnityEngine.SerializeField] global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableDictionary<",
+                    source.ProposedSource
+                );
+            }
+        }
+
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(2)]

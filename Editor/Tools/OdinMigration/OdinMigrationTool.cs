@@ -239,6 +239,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             );
         }
 
+        /// <summary>Previews coordinated dictionary source and retained asset replacements without writing files.</summary>
+        /// <remarks>Call on the editor thread with complete live reference tables. This does not prove project-wide inventory, compile replacement sources, or apply a migration.</remarks>
+        public static bool TryPreviewDictionaryMigration(
+            IReadOnlyList<OdinMigrationDictionaryTarget> targets,
+            out OdinMigrationDictionaryMigrationPreview preview,
+            out string failure,
+            Func<string, int, int, bool> shouldCancel = null
+        )
+        {
+            return OdinMigrationDictionaryMigrationBuilder.TryPreview(
+                targets,
+                out preview,
+                out failure,
+                shouldCancel
+            );
+        }
+
         /// <summary>Previews all source scripts and serialized assets under Assets without editor UI.</summary>
         public static bool TryPreviewAssets(
             out OdinMigrationPreview preview,
