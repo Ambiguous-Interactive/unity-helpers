@@ -70,13 +70,13 @@ redacted, uploaded, and required by the aggregate gate (#813).
   - Relevant targeted checks for the files changed; `npm run validate:local` is the explicit
     repository-wide lint and contract aggregate when that broader evidence is warranted.
   - `npm run validate:prepush` as the final fast Git/config safety check.
-  - The Unity MCP bridge, which compiles your working tree in a real editor **and runs real
-    fixtures against it**. `Unity_RunCommand` cannot _name_ a package type -- its sandbox
-    assembly does not reference them, and `using System.Reflection;` is refused -- but fully
-    qualified reflection reaches everything, including generic package types and their private
-    members. A timeout is an expired session, retry once; a NEW `.cs` file DOES reach the pipeline
-    (#656). See [unity-mcp-fixture-runner](../skills/unity-mcp-fixture-runner.md)
-    for the loop and its traps ([#435](https://github.com/Ambiguous-Interactive/unity-helpers/issues/435)).
+  - The Unity MCP bridge compiles the working tree in a real editor and runs real fixtures.
+    Prefer the native CLI `recompile` / `run_tests` workflow when exposed; it provides actual
+    NUnit case results without a manual reflection loop. Require successful compilation and
+    nonzero passing target cases. Use `editor` for Editor assemblies and `playmode` for
+    platform-neutral runtime fixtures; IL2CPP acceptance still needs the Standalone CI leg.
+    See [unity-mcp-fixture-runner](../skills/unity-mcp-fixture-runner.md) for backend-specific
+    commands, status polling, zero-test guards, and the older relay fallback.
 - **When a change spans both suites, update both before pushing.** A packed-encoding change in
   session 175 updated the `Generator~` differentials, missed the Unity golden vectors in
   `Tests/Runtime/Serialization/`, and cost a full matrix run to discover. Grep for the affected byte

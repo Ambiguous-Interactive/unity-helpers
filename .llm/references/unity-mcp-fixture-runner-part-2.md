@@ -2,6 +2,39 @@
 
 ## Split Content
 
+## Use the native CLI fixture runner first
+
+When the bridge exposes `recompile`, `recompile_status`, `run_tests`, and `test_status`, use those
+commands before the relay reflection loop below. Inspect the current tool schemas; backend names
+and result shapes differ. The CLI runner uses Unity's TestRunnerApi, including setup, teardown,
+parameter expansion, UnityTest coroutines, and LogAssert scopes.
+
+1. Run the smallest relevant compile gate while editing; format each changed file immediately.
+2. Request `recompile`, then require completed compilation with `compilationFailed: false`. An
+   empty `errors` array alone is insufficient. A domain reload can interrupt a tool call; query
+   `recompile_status` before deciding whether compilation succeeded.
+3. Call `run_tests` with the exact fixture filter, `filter_type: testName`, the correct `mode`,
+   and `async_tests: true`. Poll `test_status` if execution is still running.
+4. Read actual case results and require a nonzero total, zero failures, and passing target cases.
+   Skipped or inconclusive cases cannot prove the requested behavior.
+5. Run broader checks once before push; repeat them only after new changes or unresolved failures.
+
+| Fixture assembly | Native mode |
+| ---------------- | ----------- |
+| Editor-only | `editor` |
+| Platform-neutral runtime | `playmode` |
+| IL2CPP player acceptance | The licensed Standalone CI leg |
+
+An Editor filter for a platform-neutral runtime fixture can return zero tests. Treat that as
+missing evidence and select PlayMode. Editor or PlayMode success does not prove IL2CPP conversion.
+On Unity 6000.4.6f1, the runtime serialization regression ran 12/12 cases in 0.22 seconds; the
+Odin migration suite ran 82/82 in 1.41 seconds on 2026-10-13. These are test execution durations,
+not compilation or end-to-end timings.
+
+CLI `eval` can reference loaded package types directly. Use it for a targeted observation that
+existing commands cannot express; fixture execution belongs to `run_tests`. Relay sandbox
+limitations and manual NUnit expansion below apply only when the CLI runner is unavailable.
+
 ## No license? The MCP editor still runs the real fixtures
 
 **The container's working tree and the host Unity project's embedded package are the same
