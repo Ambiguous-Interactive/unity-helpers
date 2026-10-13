@@ -204,15 +204,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 && AuthoredAssetYaml.TryParseObjectReference(
                     source.InlineValue,
                     out long sourceId,
-                    out string _
+                    out string sourceGuid
                 )
                 && AuthoredAssetYaml.TryParseObjectReference(
                     instance.InlineValue,
                     out long instanceId,
                     out string _
                 )
-                && global.targetObjectId == unchecked((ulong)sourceId)
+                && MatchesPrefabSource(reference, sourceGuid, sourceId)
                 && global.targetPrefabId == unchecked((ulong)instanceId);
+        }
+
+        private static bool MatchesPrefabSource(
+            Object reference,
+            string expectedGuid,
+            long expectedFileId
+        )
+        {
+            Object source = PrefabUtility.GetCorrespondingObjectFromSource(reference);
+            return source != null
+                && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                    source,
+                    out string actualGuid,
+                    out long actualFileId
+                )
+                && actualFileId == expectedFileId
+                && string.Equals(actualGuid, expectedGuid, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

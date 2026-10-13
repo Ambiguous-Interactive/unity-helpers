@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration;
     using Object = UnityEngine.Object;
 
     /// <summary>Previews and applies conservative Odin source migrations in the current Unity project.</summary>
@@ -139,6 +140,74 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 failure = exception.Message;
                 return false;
             }
+        }
+
+        /// <summary>Converts retained dictionaries after binding original declarations and validating live references.</summary>
+        /// <remarks>Call on the editor thread before a paired preview. This validates complete fragments without changing sources or assets.</remarks>
+        /// <param name="payload">The retained payload and original script GUID.</param>
+        /// <param name="fields">The complete original dictionary field schemas.</param>
+        /// <param name="owningAssetPath">The Assets file used to resolve local reference identifiers.</param>
+        /// <param name="referencedObjects">The original live reference table in retained order.</param>
+        /// <param name="binding">Receives the verified original compiler metadata.</param>
+        /// <param name="yaml">Receives complete field fragments, or null on failure.</param>
+        /// <param name="failure">Receives the source, schema, or reference failure.</param>
+        /// <returns>True when the original binding and every retained field validate.</returns>
+        public static bool TryConvertBoundSerializedDictionaries(
+            OdinMigrationSerializedData payload,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            string owningAssetPath,
+            IReadOnlyList<Object> referencedObjects,
+            out OdinMigrationCompiledBinding binding,
+            out string yaml,
+            out string failure
+        )
+        {
+            if (
+                !TryBindSerializedDictionaryFields(
+                    payload,
+                    fields,
+                    out OdinMigrationCompiledBinding original,
+                    out failure
+                )
+            )
+            {
+                binding = null;
+                yaml = null;
+                return false;
+            }
+            if (
+                !TryConvertValidatedSerializedDictionaries(
+                    payload,
+                    fields,
+                    owningAssetPath,
+                    referencedObjects,
+                    out yaml,
+                    out failure
+                )
+            )
+            {
+                binding = null;
+                return false;
+            }
+            binding = original;
+            return true;
+        }
+
+        /// <summary>Binds retained dictionary schemas to the original script's compiler-resolved declarations.</summary>
+        /// <remarks>Checks every captured source hash without reflecting over fields. This returns binding evidence; paired apply remains separate.</remarks>
+        /// <param name="payload">The retained payload and owning script GUID.</param>
+        /// <param name="fields">The complete original dictionary field schemas.</param>
+        /// <param name="binding">Receives immutable compiler metadata, or null on failure.</param>
+        /// <param name="failure">Receives the script, source snapshot, or field mismatch.</param>
+        /// <returns>True when the script and requested declarations match current compiled sources.</returns>
+        public static bool TryBindSerializedDictionaryFields(
+            OdinMigrationSerializedData payload,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            out OdinMigrationCompiledBinding binding,
+            out string failure
+        )
+        {
+            return OdinMigrationSourceBinder.TryBind(payload, fields, out binding, out failure);
         }
 
         /// <summary>Previews all source scripts and serialized assets under Assets without editor UI.</summary>

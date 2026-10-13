@@ -269,6 +269,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [TestCase(true, true, false, 2)]
         [TestCase(true, true, false, 3)]
         [TestCase(false, true, false, 4)]
+        [TestCase(false, true, false, 5)]
         public void SavedSceneObjectReferencesMatchTheirAuthoredFileIds(
             bool local,
             bool prefab,
@@ -311,6 +312,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                             out string prefabGuid,
                             out long prefabFileId
                         )
+                    );
+                    if (0 < prefabFileId)
+                    {
+                        long negativeFileId = -prefabFileId;
+                        string prefabSourcePath = Path.Combine(
+                            Application.dataPath,
+                            prefabPath.Substring("Assets/".Length)
+                        );
+                        string positive = prefabFileId.ToString(CultureInfo.InvariantCulture);
+                        string negative = negativeFileId.ToString(CultureInfo.InvariantCulture);
+                        string prefabSource = File.ReadAllText(prefabSourcePath);
+                        prefabSource = Regex.Replace(
+                            prefabSource,
+                            @"(?m)(^--- !u!1 &)" + positive + @"(?=\r?$)",
+                            "$1" + negative
+                        );
+                        prefabSource = Regex.Replace(
+                            prefabSource,
+                            @"(fileID: )" + positive + @"(?=[},])",
+                            "$1" + negative
+                        );
+                        File.WriteAllText(prefabSourcePath, prefabSource);
+                        AssetDatabase.ImportAsset(
+                            prefabPath,
+                            ImportAssetOptions.ForceSynchronousImport
+                                | ImportAssetOptions.ForceUpdate
+                        );
+                        prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                        Assert.IsTrue(prefabAsset != null);
+                        Assert.IsTrue(
+                            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                                prefabAsset,
+                                out prefabGuid,
+                                out prefabFileId
+                            )
+                        );
+                    }
+                    Assert.Less(
+                        prefabFileId,
+                        0,
+                        "The fixture must exercise a negative source prefab file ID."
                     );
                     sourcePrefabReference =
                         "{fileID: "
@@ -355,6 +397,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                             + fileId.ToString(CultureInfo.InvariantCulture)
                             + " stripped\nGameObject:\n"
                     );
+                }
+                else if (invalidScene == 5)
+                {
+                    string altered = Regex.Replace(
+                        File.ReadAllText(sourcePath),
+                        @"(m_CorrespondingSourceObject: \{fileID: -?\d+, guid: )[a-fA-F0-9]{32}",
+                        "${1}00000000000000000000000000000001"
+                    );
+                    File.WriteAllText(sourcePath, altered);
                 }
                 string reference =
                     "{fileID: "
@@ -411,7 +462,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 }
                 else
                 {
-                    Assert.IsTrue(converted, failure);
+                    Assert.IsTrue(
+                        converted,
+                        failure
+                            + "\nLive ID: "
+                            + GlobalObjectId.GetGlobalObjectIdSlow(supplied)
+                            + "\nRetained reference: "
+                            + reference
+                            + "\nScene source:\n"
+                            + File.ReadAllText(sourcePath)
+                    );
                     StringAssert.Contains(reference, yaml);
                 }
             }

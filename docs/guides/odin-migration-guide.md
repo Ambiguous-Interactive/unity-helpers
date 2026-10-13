@@ -98,6 +98,12 @@ Editor scripts can use `OdinMigrationTool` in
   Create immutable field schemas with `OdinMigrationDictionaryField.Create<TKey, TObject>(name)`.
   Every retained root and every schema must be consumed exactly once; output follows retained
   record order and failures return a null fragment rather than partial data.
+- `TryBindSerializedDictionaryFields(payload, fields, out binding, out failure)` matches the
+  retained script GUID and requested field types to metadata generated during editor compilation.
+  It returns immutable source checksums, original field type spans, and assembly identities.
+- `TryConvertBoundSerializedDictionaries(payload, fields, owningAssetPath, liveReferencedObjects,
+out binding, out yaml, out failure)` combines compiler binding, complete Nodes conversion, and
+  live reference validation. Any failure returns both a null binding and a null fragment.
 - `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
   `Assets` in the current project.
 - `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied
@@ -223,13 +229,27 @@ if (!OdinMigrationTool.TryConvertValidatedSerializedDictionaries(
 Call this method on the Unity editor thread. It checks each used object's declared element type,
 asset GUID, and local file ID without resolving recorded type names or loading assets. Saved-scene
 references use Unity's scene identity; prefab instance references also match the saved scene's
-source-object and instance IDs. Scene text reads are bounded to 4,194,304 characters and 65,536 lines.
+source asset GUID, signed source file ID, and instance ID. Scene text reads are bounded to
+4,194,304 characters and 65,536 lines.
 Derived objects can satisfy a base element type. Recorded null slots remain null; missing or destroyed
 objects, wrong types or identities, and incomplete or extra live table entries return `false`
 with no fragment. Identity is checked at conversion time; validate again before a future paired apply.
 
-The fragment uses LF newlines and two-space field indentation. Validate the source field declaration
-and owning script GUID before preparing a paired source/asset preview.
+The fragment uses LF newlines and two-space field indentation. Use
+`TryConvertBoundSerializedDictionaries` to check the original source declarations and owning script
+before preparing a paired source/asset preview. Call it on the Unity editor thread after compilation
+completes. The generator resolves aliases, private nested enums, partial classes, and inherited
+fields declared in the same compilation. It captures the original class and base declarations,
+enum declarations, and element class declarations; every captured source must still match its
+SHA-256 checksum. Each source read is bounded to 4,194,304 characters. Field names and both key and
+element assembly identities must match. Ambiguous inherited names, missing compiler metadata,
+changed source, wrong types, and invalid source spans return no binding.
+
+The binding registry and metadata are editor-only. Player compilations contain no registration
+code. Fields inherited from referenced assemblies without source declarations are not bound.
+The snapshots describe the captured declarations; they do not validate every project dependency
+or prove that replacement source compiles. Recompile and bind again after source or dependency
+changes. The combined conversion supplies evidence for a future paired preview; it writes no files.
 The API does not apply a conversion or guarantee that the project can remove Odin. The existing
 source preview/apply API remains source-only.
 
