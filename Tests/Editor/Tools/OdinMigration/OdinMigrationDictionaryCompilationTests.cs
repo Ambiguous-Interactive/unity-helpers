@@ -62,6 +62,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             );
         }
 
+        [UnitySetUp]
+        public IEnumerator WaitForEditorReady()
+        {
+            yield return null;
+            double deadline = UnityEditor.EditorApplication.timeSinceStartup + 60;
+            while (
+                (
+                    UnityEditor.EditorApplication.isCompiling
+                    || UnityEditor.EditorApplication.isUpdating
+                )
+                && UnityEditor.EditorApplication.timeSinceStartup < deadline
+            )
+            {
+                yield return null;
+            }
+            Assert.IsFalse(
+                UnityEditor.EditorApplication.isCompiling,
+                "Editor compilation did not finish."
+            );
+            Assert.IsFalse(
+                UnityEditor.EditorApplication.isUpdating,
+                "Editor import did not finish."
+            );
+        }
+
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(2)]
