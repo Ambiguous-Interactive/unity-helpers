@@ -90,6 +90,9 @@ Editor scripts can use `OdinMigrationTool` in
   Unity text YAML without loading assets or constructing recorded types. Each immutable payload
   retains its owning document's file ID and script GUID, original payload text and line range,
   ordered Unity references, and ordered `Name`, numeric `Entry`, and `Data` records.
+- `TryConvertSerializedDictionary<TKey, TObject>(payload, fieldName, out yaml, out failure)`
+  converts a complete enum-to-object-list dictionary payload into a Unity Helpers field fragment.
+  It writes no files and does not change the source type.
 - `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
   `Assets` in the current project.
 - `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied
@@ -149,6 +152,38 @@ This API preserves raw records. It does not validate typed values, graph referen
 array counts, or prefab overrides. Prefab metadata remains in `Source` for the conversion stage.
 The source-only preview/apply APIs do not convert these payloads. Paired source/data conversion
 must validate the destination schema and retained references before removing Odin-owned state.
+
+### Converting retained dictionary nodes
+
+The dictionary converter supports int-backed enum keys and `List<TObject>` values where
+`TObject` derives from `UnityEngine.Object`. Supply the original compiled key and element types.
+Recorded generic type shapes must match those types by full name; assembly names are not used
+to construct or resolve recorded types. The output uses `SerializableDictionary<TKey, List<TObject>>`
+with Unity's packed enum keys and boxed list values. Entries and references keep their input order.
+
+The converter checks default enum comparer state, unique node identities and dictionary keys,
+complete record boundaries, delivered array counts, and reference indices. It does not allocate
+from a claimed count. Missing comparer records from older Odin data use the default comparer.
+Custom comparers, null lists, shared list references, other field shapes, additional records,
+unknown retained metadata, linked prefab state, and prefab modifications require further
+conversion and return `false` with a null fragment.
+
+```csharp
+if (!OdinMigrationTool.TryConvertSerializedDictionary<ImpactSize, UnityEngine.Sprite>(
+    retainedPayload,
+    nameof(Variations),
+    out string fieldYaml,
+    out string failure))
+{
+    ReportMigrationFailure(failure);
+    return;
+}
+```
+
+The fragment uses LF newlines and two-space field indentation. Validate the live reference types,
+source field declaration, and owning script GUID before preparing a paired source/asset preview.
+The API does not apply a conversion or guarantee that the project can remove Odin. The existing
+source preview/apply API remains source-only.
 
 ## Quick Reference Table
 

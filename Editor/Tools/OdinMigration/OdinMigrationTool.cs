@@ -48,6 +48,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             return OdinMigrationNodeReader.TryRead(source, out payloads, out failure);
         }
 
+        /// <summary>Converts an enum-to-object-list dictionary payload into Unity Helpers field YAML.</summary>
+        /// <remarks>This produces a fragment; source changes, reference type checks, and paired apply remain separate.</remarks>
+        /// <typeparam name="TKey">The recorded int-backed enum key.</typeparam>
+        /// <typeparam name="TObject">The recorded Unity object element type.</typeparam>
+        /// <param name="payload">The complete retained payload.</param>
+        /// <param name="fieldName">The dictionary field to convert.</param>
+        /// <param name="yaml">Receives the converted field fragment, or null on failure.</param>
+        /// <param name="failure">Receives the schema or payload failure.</param>
+        /// <returns>True when every record was converted without discarded state.</returns>
+        public static bool TryConvertSerializedDictionary<TKey, TObject>(
+            OdinMigrationSerializedData payload,
+            string fieldName,
+            out string yaml,
+            out string failure
+        )
+            where TKey : struct, Enum
+            where TObject : UnityEngine.Object
+        {
+            return OdinMigrationDictionaryConverter.TryConvert(
+                payload,
+                fieldName,
+                typeof(TKey),
+                typeof(TObject),
+                out yaml,
+                out failure
+            );
+        }
+
         /// <summary>Previews all source scripts and serialized assets under Assets without editor UI.</summary>
         public static bool TryPreviewAssets(
             out OdinMigrationPreview preview,
