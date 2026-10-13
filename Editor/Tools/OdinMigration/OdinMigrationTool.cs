@@ -33,6 +33,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
         }
 
+        /// <summary>Reads immutable Odin Nodes records from Unity text YAML without loading assets.</summary>
+        /// <remarks>This reads records, not typed objects; conversion and prefab override validation remain separate.</remarks>
+        /// <param name="source">The complete Unity text YAML asset.</param>
+        /// <param name="payloads">Receives complete payload snapshots, or an empty list on failure.</param>
+        /// <param name="failure">Receives the unsupported-format or parsing failure.</param>
+        /// <returns>True when the complete asset was read; check the payload count separately.</returns>
+        public static bool TryReadSerializedNodes(
+            string source,
+            out IReadOnlyList<OdinMigrationSerializedData> payloads,
+            out string failure
+        )
+        {
+            return OdinMigrationNodeReader.TryRead(source, out payloads, out failure);
+        }
+
         /// <summary>Previews all source scripts and serialized assets under Assets without editor UI.</summary>
         public static bool TryPreviewAssets(
             out OdinMigrationPreview preview,

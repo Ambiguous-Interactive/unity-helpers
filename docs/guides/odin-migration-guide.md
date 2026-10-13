@@ -86,6 +86,10 @@ Editor scripts can use `OdinMigrationTool` in
 
 - `AnalyzeSource(source)` returns the proposed source, immutable changes, blockers, and review
   findings. It performs no file I/O. Check `IsValid` and `Failure` before using the result.
+- `TryReadSerializedNodes(source, out payloads, out failure)` reads Odin Nodes format (2) from
+  Unity text YAML without loading assets or constructing recorded types. Each immutable payload
+  retains its owning document's file ID and script GUID, original payload text and line range,
+  ordered Unity references, and ordered `Name`, numeric `Entry`, and `Data` records.
 - `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
   `Assets` in the current project.
 - `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied
@@ -110,6 +114,41 @@ bars or dialogs. Programmatic Apply does not refresh the Asset Database: call
 for Unity to import the changed sources. The menu tool performs that refresh itself.
 Programmatic writes remain Tier C operations outside Unity Undo. They do not convert Odin-owned
 serialized data or establish that Odin can be removed from the project.
+
+### Reading retained serialization nodes
+
+The node reader accepts plain folded strings, single-quoted strings, and double-quoted strings
+with JSON-compatible escapes. It limits input to 4,194,304 characters and 65,536 lines. Counts
+and identifiers in record data remain strings; they do not size an allocation. Missing or
+duplicate record fields, unknown entry tags, byte payloads, other Odin formats, and unsupported
+YAML scalar/sequence forms return `false` with an empty payload list. A valid Unity asset with
+no Odin payload returns `true` and an empty list.
+
+```csharp
+using System.Collections.Generic;
+using System.IO;
+using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
+
+string yaml = File.ReadAllText(assetFileSystemPath);
+if (!OdinMigrationTool.TryReadSerializedNodes(
+    yaml,
+    out IReadOnlyList<OdinMigrationSerializedData> payloads,
+    out string failure))
+{
+    ReportMigrationFailure(failure);
+    return;
+}
+
+foreach (OdinMigrationSerializedData payload in payloads)
+{
+    ReviewRetainedNodes(payload.FileId, payload.SerializationNodes, payload.ReferencedUnityObjects);
+}
+```
+
+This API preserves raw records. It does not validate typed values, graph references, declared
+array counts, or prefab overrides. Prefab metadata remains in `Source` for the conversion stage.
+The source-only preview/apply APIs do not convert these payloads. Paired source/data conversion
+must validate the destination schema and retained references before removing Odin-owned state.
 
 ## Quick Reference Table
 
