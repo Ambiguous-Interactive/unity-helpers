@@ -383,12 +383,12 @@ async function main() {
     assert.ok(validation.concurrency.group.includes("github.event_name == 'push' && github.sha"));
     assert.equal(
       validation.concurrency["cancel-in-progress"],
-      "${{ github.event_name == 'pull_request' }}"
+      file === "unity-tests.yml" ? true : "${{ github.event_name == 'pull_request' }}"
     );
     if (file === "unity-tests.yml") {
       const access = validation.jobs["runner-preflight"].concurrency;
       assert.ok(access.group.includes("github.event_name == 'push' && github.sha"));
-      assert.equal(access["cancel-in-progress"], "${{ github.event_name == 'pull_request' }}");
+      assert.equal(access["cancel-in-progress"], true);
     }
   }
   assert.equal(workflow.concurrency["cancel-in-progress"], false);

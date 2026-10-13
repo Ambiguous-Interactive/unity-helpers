@@ -3713,7 +3713,7 @@ if (-not $failed) {
 # so prepared releases can publish the exact validated merge even when main advances.
 $cancelsSupersededLicensedRuns = (
     $workflowContent.Contains('group: unity-tests-${{ github.event_name == ''push'' && github.sha || github.event.pull_request.number || github.ref }}') -and
-    $workflowContent.Contains('cancel-in-progress: ${{ github.event_name == ''pull_request'' }}')
+    $workflowContent.Contains('cancel-in-progress: true')
 )
 if (-not $cancelsSupersededLicensedRuns) {
     Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must retain pushed-commit validation while canceling superseded pull request revisions."
