@@ -23,6 +23,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         private const string ListType =
             "System.Collections.Generic.List`1[[UnityEngine.Sprite, UnityEngine.CoreModule]], mscorlib";
 
+        internal static string SourceWithTwoDictionaries(bool withNullObjects = false)
+        {
+            string second = Source(new[] { -1 })
+                .Replace(FieldName, "Other")
+                .Replace("UnityEngine.SpriteAlignment", "UnityEngine.HideFlags")
+                .Replace("Data: 0|", "Data: 10|")
+                .Replace("Data: 1|", "Data: 11|")
+                .Replace("Data: 2|", "Data: 12|");
+            int records = second.IndexOf("    - Name: Other", StringComparison.Ordinal);
+            return Source(new[] { 0 }, withNullObjects: withNullObjects)
+                + second.Substring(records);
+        }
+
         private static void Node(StringBuilder result, string name, int entry, string data)
         {
             result
@@ -208,19 +221,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     StringComparison.Ordinal
                 )
             );
-        }
-
-        internal static string SourceWithTwoDictionaries(bool withNullObjects = false)
-        {
-            string second = Source(new[] { -1 })
-                .Replace(FieldName, "Other")
-                .Replace("UnityEngine.SpriteAlignment", "UnityEngine.HideFlags")
-                .Replace("Data: 0|", "Data: 10|")
-                .Replace("Data: 1|", "Data: 11|")
-                .Replace("Data: 2|", "Data: 12|");
-            int records = second.IndexOf("    - Name: Other", StringComparison.Ordinal);
-            return Source(new[] { 0 }, withNullObjects: withNullObjects)
-                + second.Substring(records);
         }
 
         [Test]
