@@ -30,6 +30,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
+        public void InheritedOnlyBindingRetainsOriginalAndDeclaringTypes()
+        {
+            Assert.IsTrue(
+                OdinMigrationCompiledBindings.TryGet(
+                    typeof(OdinMigrationDerivedBindingAsset),
+                    out OdinMigrationCompiledBinding binding
+                )
+            );
+            CollectionAssert.Contains(
+                binding.AffectedTypes,
+                typeof(OdinMigrationDerivedBindingAsset)
+            );
+            CollectionAssert.Contains(binding.AffectedTypes, typeof(OdinMigrationBindingAsset));
+        }
+
+        [Test]
         public void GeneratedBindingMatchesTheOriginalScriptAndFieldTypes()
         {
             Assert.IsTrue(

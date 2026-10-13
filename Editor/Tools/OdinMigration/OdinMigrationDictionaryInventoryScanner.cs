@@ -268,6 +268,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     }
                 }
                 bool complete = !cancelled && failures.Count == 0;
+                string inventoryFailure =
+                    complete ? null
+                    : cancelled ? "The affected-asset inventory was cancelled."
+                    : string.Join("; ", failures);
                 inventory = new OdinMigrationDictionaryInventory(
                     complete,
                     cancelled,
@@ -276,10 +280,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     documents,
                     failures
                 );
-                failure =
-                    complete ? null
-                    : cancelled ? "The affected-asset inventory was cancelled."
-                    : string.Join("; ", failures);
+                failure = inventoryFailure;
                 return complete;
             }
             catch (Exception exception)

@@ -22,7 +22,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
         /// <summary>Gets source replacements for original Odin base classes.</summary>
         public IReadOnlyList<OdinMigrationCompiledSourceEdit> BaseEdits { get; }
 
-        /// <summary>Gets original declaring types whose source changes affect their derived Unity objects.</summary>
+        /// <summary>Gets the original Unity type and declaring types affected by source changes.</summary>
         public IReadOnlyList<Type> AffectedTypes { get; }
 
         /// <summary>Captures immutable compiler metadata for a Unity type.</summary>

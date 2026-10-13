@@ -262,6 +262,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     List<string> fields = new List<string>();
                     List<string> baseEdits = new List<string>();
                     SortedSet<string> affectedTypes = new SortedSet<string>(StringComparer.Ordinal);
+                    string originalTypeExpression =
+                        "typeof("
+                        + type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                        + ")";
+                    affectedTypes.Add(originalTypeExpression);
+                    string inheritedTypeExpression = originalTypeExpression;
                     SortedDictionary<string, SyntaxTree> sources = new SortedDictionary<
                         string,
                         SyntaxTree
@@ -274,20 +280,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     )
                     {
                         CaptureDeclarations(owner, sources);
+                        string ownerTypeExpression = TypeNaming.IsNameable(
+                            owner,
+                            context.Compilation
+                        )
+                            ? "typeof("
+                                + owner.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                                + ")"
+                            : inheritedTypeExpression;
                         int baseEditCount = baseEdits.Count;
                         OdinMigrationRewriteMetadata.CaptureBaseEdits(
                             owner,
                             context.Compilation,
                             baseEdits
                         );
-                        if (
-                            baseEditCount != baseEdits.Count
-                            && TypeNaming.IsNameable(owner, context.Compilation)
-                        )
+                        if (baseEditCount != baseEdits.Count)
                         {
-                            affectedTypes.Add(
-                                owner.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                            );
+                            affectedTypes.Add(ownerTypeExpression);
                         }
                         foreach (ISymbol member in owner.GetMembers())
                         {
@@ -311,12 +320,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                                 continue;
                             }
                             SyntaxTree fieldTree = original.SyntaxTree;
-                            if (TypeNaming.IsNameable(owner, context.Compilation))
-                            {
-                                affectedTypes.Add(
-                                    owner.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                                );
-                            }
+                            affectedTypes.Add(ownerTypeExpression);
                             List<string> edits = OdinMigrationRewriteMetadata.FieldEdits(
                                 field,
                                 variable,
@@ -363,6 +367,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                                     + ")"
                             );
                         }
+                        inheritedTypeExpression += ".BaseType";
                     }
                     if (fields.Count == 0)
                     {
@@ -401,7 +406,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + ", new global::System.Type[] {";
                     foreach (string affected in affectedTypes)
                     {
-                        registration += "typeof(" + affected + "),";
+                        registration += affected + ",";
                     }
                     registrations[qualified] = registration + "}));";
                 }

@@ -311,7 +311,11 @@ Those checks and coordinated source/data writes remain required before removing 
 ### Inventorying affected saved data
 
 Run `TryInventoryDictionaryMigration` after constructing a paired preview. Editor compiler metadata
-records original dictionary declaring types and rewritten Odin base types. The inventory finds
+records the original bound Unity type, dictionary declaring types, and rewritten Odin base types.
+Inherited-only bindings retain the original type. When a closed declaring type cannot appear in
+a type literal, generated metadata follows the known original type's base chain instead of dropping
+that owner. This reads type identity without inspecting members or instantiating recorded types.
+The inventory finds
 saved documents whose original script type derives from those types; it uses authored script
 references and `MonoScript.GetClass`, without inspecting fields or loading consumer asset instances.
 Unrelated native asset data such as textures is identified through asset type metadata.

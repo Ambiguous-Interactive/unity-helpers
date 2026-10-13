@@ -164,6 +164,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             StringAssert.Contains("typeof(global::Asset)", generated);
             StringAssert.DoesNotContain("typeof(global::Base<T>)", generated);
             StringAssert.Contains("typeof(global::Base<global::Key>)", generated);
+            StringAssert.Contains(
+                "new global::System.Type[] {typeof(global::Asset),typeof(global::Base<global::Key>),",
+                generated
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void InheritedOnlyBindingsAlwaysIncludeTheOriginalUnityType(bool generic)
+        {
+            string source = generic
+                ? "using System.Collections.Generic; public enum Key { A=0 } public class Base<T> : UnityEngine.ScriptableObject where T:struct { public Dictionary<T,List<UnityEngine.Texture>> Values; } public class Intermediate : Base<Key> {} public sealed class Asset : Intermediate {}"
+                : "using System.Collections.Generic; public enum Key { A=0 } public class Base : UnityEngine.ScriptableObject { public Dictionary<Key,List<UnityEngine.Texture>> Values; } public class Intermediate : Base {} public sealed class Asset : Intermediate {}";
+            string generated = Generated(new[] { source });
+            string owner = generic ? "global::Base<global::Key>" : "global::Base";
+            StringAssert.Contains(
+                "new global::System.Type[] {typeof(global::Asset),typeof(" + owner + "),",
+                generated
+            );
+            StringAssert.Contains(
+                "new global::System.Type[] {typeof(" + owner + "),typeof(global::Intermediate),",
+                generated
+            );
         }
 
         [Test]
