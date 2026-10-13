@@ -256,6 +256,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             );
         }
 
+        /// <summary>Inventories saved Assets documents potentially affected by a paired dictionary preview.</summary>
+        /// <remarks>Reads authored metadata and MonoScript types without loading consumer assets. Missing retained selections remain visible even when the scan completes.</remarks>
+        public static bool TryInventoryDictionaryMigration(
+            OdinMigrationDictionaryMigrationPreview preview,
+            out OdinMigrationDictionaryInventory inventory,
+            out string failure,
+            Func<string, int, int, bool> shouldCancel = null
+        )
+        {
+            try
+            {
+                return OdinMigrationDictionaryInventoryScanner.TryScan(
+                    preview,
+                    CollectSerializedAssetPaths(),
+                    out inventory,
+                    out failure,
+                    shouldCancel
+                );
+            }
+            catch (Exception exception)
+            {
+                inventory = null;
+                failure = exception.Message;
+                return false;
+            }
+        }
+
         /// <summary>Previews all source scripts and serialized assets under Assets without editor UI.</summary>
         public static bool TryPreviewAssets(
             out OdinMigrationPreview preview,

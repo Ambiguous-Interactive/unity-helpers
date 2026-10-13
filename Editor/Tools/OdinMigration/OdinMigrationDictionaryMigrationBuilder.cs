@@ -39,6 +39,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     List<OdinMigrationDictionaryTarget>
                 >(StringComparer.Ordinal);
                 int delivered = 0;
+                List<OdinMigrationDictionaryTarget> capturedTargets =
+                    new List<OdinMigrationDictionaryTarget>();
                 foreach (
                     OdinMigrationDictionaryTarget target in targets.AsValueEnumerableRequired()
                 )
@@ -74,6 +76,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         grouped.Add(path, selections);
                     }
                     selections.Add(target);
+                    capturedTargets.Add(target);
                     ++delivered;
                 }
                 Dictionary<string, OdinMigrationAssetProposal> assets = new Dictionary<
@@ -333,7 +336,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     throw new InvalidDataException(sourceFailure);
                 }
-                preview = new OdinMigrationDictionaryMigrationPreview(sources, assets, bindings);
+                preview = new OdinMigrationDictionaryMigrationPreview(
+                    sources,
+                    assets,
+                    bindings,
+                    capturedTargets
+                );
                 failure = null;
                 return true;
             }
@@ -345,15 +353,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
         }
 
-        private static int CompareDescending(
-            OdinMigrationCompiledSourceEdit left,
-            OdinMigrationCompiledSourceEdit right
-        )
-        {
-            return right.Start.CompareTo(left.Start);
-        }
-
-        private static string ReadAsset(string assetPath)
+        internal static string ReadAsset(string assetPath)
         {
             string path = OdinMigrationTool.GetValidatedAssetPath(assetPath);
             using (FileStream stream = File.OpenRead(path))
@@ -392,6 +392,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 }
                 return decoded.Source;
             }
+        }
+
+        internal static IReadOnlyList<AuthoredAssetDocument> ReadDocuments(string source)
+        {
+            List<string> lines = new List<string>();
+            List<int> offsets = new List<int>();
+            SplitLines(source, lines, offsets);
+            return AuthoredAssetYaml.ReadDocuments(lines);
+        }
+
+        private static int CompareDescending(
+            OdinMigrationCompiledSourceEdit left,
+            OdinMigrationCompiledSourceEdit right
+        )
+        {
+            return right.Start.CompareTo(left.Start);
         }
 
         private static string Newline(string source)

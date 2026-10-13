@@ -472,6 +472,255 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             StringAssert.Contains("disagree", failure);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void InventoryReportsUnselectedOriginalAndDerivedRetainedDocuments(bool derived)
+        {
+            string selectedPath = CreateAsset(Document(123));
+            string missingSource = Document(789);
+            if (derived)
+            {
+                OdinMigrationDerivedBindingAsset asset = Track(
+                    ScriptableObject.CreateInstance<OdinMigrationDerivedBindingAsset>()
+                );
+                MonoScript script = MonoScript.FromScriptableObject(asset);
+                Assert.IsTrue(
+                    AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                        script,
+                        out string guid,
+                        out long _
+                    )
+                );
+                missingSource = missingSource.Replace(_scriptGuid, guid);
+            }
+            string missingPath = CreateAsset(missingSource);
+            Assert.IsTrue(
+                OdinMigrationTool.TryPreviewDictionaryMigration(
+                    new[] { Target(selectedPath, 123) },
+                    out OdinMigrationDictionaryMigrationPreview preview,
+                    out string failure
+                ),
+                failure
+            );
+            Assert.IsTrue(
+                OdinMigrationDictionaryInventoryScanner.TryScan(
+                    preview,
+                    new[] { selectedPath, missingPath },
+                    out OdinMigrationDictionaryInventory inventory,
+                    out failure,
+                    null
+                ),
+                failure
+            );
+            Assert.IsTrue(inventory.Complete);
+            Assert.IsFalse(inventory.AllRetainedDocumentsSelected);
+            Assert.AreEqual(1, inventory.MissingRetainedDocuments);
+            Assert.AreEqual(2, inventory.Documents.Count);
+            Assert.AreEqual(
+                derived
+                    ? typeof(OdinMigrationDerivedBindingAsset)
+                    : typeof(OdinMigrationBindingAsset),
+                inventory.Documents[1].OriginalType
+            );
+            Assert.IsFalse(inventory.Documents[1].Selected);
+            Assert.AreEqual(missingSource, File.ReadAllText(FullPath(missingPath)));
+        }
+
+        [Test]
+        public void InventoryAcceptsAllSelectedDocumentsAndDeduplicatesPaths()
+        {
+            string path = CreateAsset(Document(123) + Document(789));
+            Assert.IsTrue(
+                OdinMigrationTool.TryPreviewDictionaryMigration(
+                    new[] { Target(path, 123), Target(path, 789) },
+                    out OdinMigrationDictionaryMigrationPreview preview,
+                    out string failure
+                ),
+                failure
+            );
+            Assert.IsTrue(
+                OdinMigrationDictionaryInventoryScanner.TryScan(
+                    preview,
+                    new[] { path, path },
+                    out OdinMigrationDictionaryInventory inventory,
+                    out failure,
+                    null
+                ),
+                failure
+            );
+            Assert.IsTrue(inventory.AllRetainedDocumentsSelected);
+            Assert.AreEqual(1, inventory.ScannedFiles);
+            Assert.AreEqual(2, inventory.Documents.Count);
+            Assert.AreEqual(0, inventory.MissingRetainedDocuments);
+        }
+
+        [Test]
+        public void InventorySkipsUnrelatedNativeAssetDataUsingOnlyTypeMetadata()
+        {
+            string path = CreateAsset(Document(123));
+            Assert.IsTrue(
+                OdinMigrationTool.TryPreviewDictionaryMigration(
+                    new[] { Target(path, 123) },
+                    out OdinMigrationDictionaryMigrationPreview preview,
+                    out string failure
+                ),
+                failure
+            );
+            string texturePath = _folder + "/Texture.asset";
+            Assert.AreEqual(typeof(Texture2D), AssetDatabase.GetMainAssetTypeAtPath(texturePath));
+            Assert.IsTrue(
+                OdinMigrationDictionaryInventoryScanner.TryScan(
+                    preview,
+                    new[] { path, texturePath },
+                    out OdinMigrationDictionaryInventory inventory,
+                    out failure,
+                    null
+                ),
+                failure
+            );
+            Assert.IsTrue(inventory.AllRetainedDocumentsSelected);
+            Assert.AreEqual(2, inventory.ScannedFiles);
+            Assert.AreEqual(1, inventory.Documents.Count);
+        }
+
+        [Test]
+        public void InventoryDoesNotLoadOrValidateUnloadedConsumerAssetInstances()
+        {
+            string path = CreateAsset(Document(123));
+            Assert.IsTrue(
+                OdinMigrationTool.TryPreviewDictionaryMigration(
+                    new[] { Target(path, 123) },
+                    out OdinMigrationDictionaryMigrationPreview preview,
+                    out string failure
+                ),
+                failure
+            );
+            OdinMigrationDerivedBindingAsset derived = Track(
+                ScriptableObject.CreateInstance<OdinMigrationDerivedBindingAsset>()
+            );
+            string derivedPath = _folder + "/Unloaded.asset";
+            AssetDatabase.CreateAsset(derived, derivedPath);
+            AssetDatabase.SaveAssets();
+            Resources.UnloadAsset(derived);
+            AssetDatabase.ImportAsset(
+                derivedPath,
+                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
+            );
+            derived = Track(
+                AssetDatabase.LoadAssetAtPath<OdinMigrationDerivedBindingAsset>(derivedPath)
+            );
+            Assert.IsTrue(derived != null);
+            Assert.Greater(OdinMigrationDerivedBindingAsset.ValidationCalls, 0);
+            Resources.UnloadAsset(derived);
+            int before = OdinMigrationDerivedBindingAsset.ValidationCalls;
+            Assert.IsTrue(
+                OdinMigrationDictionaryInventoryScanner.TryScan(
+                    preview,
+                    new[] { path, derivedPath },
+                    out OdinMigrationDictionaryInventory inventory,
+                    out failure,
+                    null
+                ),
+                failure
+            );
+            Assert.AreEqual(before, OdinMigrationDerivedBindingAsset.ValidationCalls);
+            Assert.IsTrue(inventory.AllRetainedDocumentsSelected);
+            Assert.AreEqual(2, inventory.Documents.Count);
+            Assert.IsFalse(inventory.Documents[1].HasRetainedData);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void InventoryCannotCompleteWithChangedMissingOrUnreadableState(int invalid)
+        {
+            string path = CreateAsset(Document(123));
+            Assert.IsTrue(
+                OdinMigrationTool.TryPreviewDictionaryMigration(
+                    new[] { Target(path, 123) },
+                    out OdinMigrationDictionaryMigrationPreview preview,
+                    out string failure
+                ),
+                failure
+            );
+            string[] paths = { path };
+            if (invalid == 0)
+            {
+                File.AppendAllText(FullPath(path), "  Changed: 1\n");
+            }
+            else if (invalid == 1)
+            {
+                paths = Array.Empty<string>();
+            }
+            else if (invalid == 2)
+            {
+                paths = new[] { path, _folder + "/Missing.asset" };
+            }
+            else if (invalid == 3)
+            {
+                paths = new[]
+                {
+                    path,
+                    CreateAsset(
+                        Document(789).Replace(_scriptGuid, "00000000000000000000000000000001")
+                    ),
+                };
+            }
+            else
+            {
+                string source = Document(789)
+                    .Replace(
+                        "  m_Script: {fileID: 11500000, guid: " + _scriptGuid + ", type: 3}\n",
+                        string.Empty
+                    );
+                paths = new[] { path, CreateAsset(source) };
+            }
+            Assert.IsFalse(
+                OdinMigrationDictionaryInventoryScanner.TryScan(
+                    preview,
+                    paths,
+                    out OdinMigrationDictionaryInventory inventory,
+                    out failure,
+                    null
+                )
+            );
+            Assert.IsFalse(inventory.Complete);
+            Assert.IsFalse(inventory.AllRetainedDocumentsSelected);
+            Assert.Greater(inventory.Failures.Count, 0);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(failure));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void InventoryCancellationAndCallbackFailureAreIncomplete(bool throws)
+        {
+            string path = CreateAsset(Document(123));
+            Assert.IsTrue(
+                OdinMigrationTool.TryPreviewDictionaryMigration(
+                    new[] { Target(path, 123) },
+                    out OdinMigrationDictionaryMigrationPreview preview,
+                    out string failure
+                ),
+                failure
+            );
+            Assert.IsFalse(
+                OdinMigrationDictionaryInventoryScanner.TryScan(
+                    preview,
+                    new[] { path },
+                    out OdinMigrationDictionaryInventory inventory,
+                    out failure,
+                    (asset, index, total) =>
+                        throws ? throw new IOException("callback failure") : true
+                )
+            );
+            Assert.IsFalse(inventory.Complete);
+            Assert.IsFalse(inventory.AllRetainedDocumentsSelected);
+            Assert.AreEqual(!throws, inventory.Cancelled);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(failure));
+        }
+
         private string Document(long fileId)
         {
             return OdinMigrationDictionaryConverterTests

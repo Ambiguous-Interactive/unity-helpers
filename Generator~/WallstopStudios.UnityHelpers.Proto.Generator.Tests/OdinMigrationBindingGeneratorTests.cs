@@ -145,6 +145,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             StringAssert.Contains("\"Assets/Source1.cs\"", generated);
             StringAssert.Contains("\"Inherited\"", generated);
             StringAssert.Contains("\"Own\"", generated);
+            StringAssert.Contains(
+                "new global::System.Type[] {typeof(global::Asset),typeof(global::Base),",
+                generated
+            );
         }
 
         [Test]
@@ -159,6 +163,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             StringAssert.Contains("\"Key\"", generated);
             StringAssert.Contains("typeof(global::Asset)", generated);
             StringAssert.DoesNotContain("typeof(global::Base<T>)", generated);
+            StringAssert.Contains("typeof(global::Base<global::Key>)", generated);
         }
 
         [Test]

@@ -261,6 +261,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     }
                     List<string> fields = new List<string>();
                     List<string> baseEdits = new List<string>();
+                    SortedSet<string> affectedTypes = new SortedSet<string>(StringComparer.Ordinal);
                     SortedDictionary<string, SyntaxTree> sources = new SortedDictionary<
                         string,
                         SyntaxTree
@@ -273,11 +274,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     )
                     {
                         CaptureDeclarations(owner, sources);
+                        int baseEditCount = baseEdits.Count;
                         OdinMigrationRewriteMetadata.CaptureBaseEdits(
                             owner,
                             context.Compilation,
                             baseEdits
                         );
+                        if (
+                            baseEditCount != baseEdits.Count
+                            && TypeNaming.IsNameable(owner, context.Compilation)
+                        )
+                        {
+                            affectedTypes.Add(
+                                owner.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                            );
+                        }
                         foreach (ISymbol member in owner.GetMembers())
                         {
                             if (
@@ -300,6 +311,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                                 continue;
                             }
                             SyntaxTree fieldTree = original.SyntaxTree;
+                            if (TypeNaming.IsNameable(owner, context.Compilation))
+                            {
+                                affectedTypes.Add(
+                                    owner.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                                );
+                            }
                             List<string> edits = OdinMigrationRewriteMetadata.FieldEdits(
                                 field,
                                 variable,
@@ -367,7 +384,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     string qualified = type.ToDisplayString(
                         SymbolDisplayFormat.FullyQualifiedFormat
                     );
-                    registrations[qualified] =
+                    string registration =
                         Registry
                         + ".Register(new "
                         + Binding
@@ -381,7 +398,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + string.Join(",", fields)
                         + "}, "
                         + OdinMigrationRewriteMetadata.ArrayExpression(baseEdits)
-                        + "));";
+                        + ", new global::System.Type[] {";
+                    foreach (string affected in affectedTypes)
+                    {
+                        registration += "typeof(" + affected + "),";
+                    }
+                    registrations[qualified] = registration + "}));";
                 }
             }
             if (registrations.Count == 0)

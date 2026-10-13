@@ -20,10 +20,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         /// <summary>Gets the original compiler bindings used by the selected documents.</summary>
         public IReadOnlyList<OdinMigrationCompiledBinding> Bindings { get; }
 
+        /// <summary>Gets the immutable document selections used to construct this preview.</summary>
+        public IReadOnlyList<OdinMigrationDictionaryTarget> Targets { get; }
+
         internal OdinMigrationDictionaryMigrationPreview(
             Dictionary<string, OdinMigrationSourceProposal> sources,
             Dictionary<string, OdinMigrationAssetProposal> assets,
-            List<OdinMigrationCompiledBinding> bindings
+            List<OdinMigrationCompiledBinding> bindings,
+            List<OdinMigrationDictionaryTarget> targets
         )
         {
             Sources = new ReadOnlyDictionary<string, OdinMigrationSourceProposal>(
@@ -33,6 +37,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 new Dictionary<string, OdinMigrationAssetProposal>(assets, StringComparer.Ordinal)
             );
             Bindings = bindings.AsReadOnly();
+            Targets = targets.AsReadOnly();
         }
     }
 }

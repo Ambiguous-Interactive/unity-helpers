@@ -7,7 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using UnityEngine;
 
     /// <summary>Provides original dictionary declarations for compiler binding checks.</summary>
-    public sealed class OdinMigrationBindingAsset : ScriptableObject
+    public class OdinMigrationBindingAsset : ScriptableObject
     {
         /// <summary>The original variations dictionary.</summary>
         public Dictionary<SpriteAlignment, List<Texture2D>> Variations =

@@ -22,12 +22,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
         /// <summary>Gets source replacements for original Odin base classes.</summary>
         public IReadOnlyList<OdinMigrationCompiledSourceEdit> BaseEdits { get; }
 
+        /// <summary>Gets original declaring types whose source changes affect their derived Unity objects.</summary>
+        public IReadOnlyList<Type> AffectedTypes { get; }
+
         /// <summary>Captures immutable compiler metadata for a Unity type.</summary>
         public OdinMigrationCompiledBinding(
             Type originalType,
             OdinMigrationCompiledSource[] sources,
             OdinMigrationCompiledField[] fields,
-            OdinMigrationCompiledSourceEdit[] baseEdits = null
+            OdinMigrationCompiledSourceEdit[] baseEdits = null,
+            Type[] affectedTypes = null
         )
         {
             OriginalType = originalType;
@@ -45,6 +49,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
                 baseEdits == null
                     ? Array.Empty<OdinMigrationCompiledSourceEdit>()
                     : (OdinMigrationCompiledSourceEdit[])baseEdits.Clone()
+            );
+            AffectedTypes = Array.AsReadOnly(
+                affectedTypes == null ? Array.Empty<Type>() : (Type[])affectedTypes.Clone()
             );
         }
     }

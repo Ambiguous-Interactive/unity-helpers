@@ -111,6 +111,9 @@ out binding, out yaml, out failure)` combines compiler binding, complete Nodes c
   with complete retained asset proposals for the selected Unity documents. Each
   `OdinMigrationDictionaryTarget` captures an asset path, owner file ID, field schemas, and the
   complete live reference table. An optional cancellation callback runs before each asset read.
+- `TryInventoryDictionaryMigration(preview, out inventory, out failure)` scans serialized files
+  under `Assets` for original declaring types and their derived Unity scripts. It reports retained
+  documents omitted from the paired preview and failures that make the inventory incomplete.
 - `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
   `Assets` in the current project.
 - `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied
@@ -304,6 +307,27 @@ the selection limit is 4,096 documents. These bounds do not trust counts recorde
 The result exposes complete original/proposed source and asset text for review. It does not inventory
 every affected asset or dependent caller, compile replacement sources, or authorize an apply.
 Those checks and coordinated source/data writes remain required before removing Odin.
+
+### Inventorying affected saved data
+
+Run `TryInventoryDictionaryMigration` after constructing a paired preview. Editor compiler metadata
+records original dictionary declaring types and rewritten Odin base types. The inventory finds
+saved documents whose original script type derives from those types; it uses authored script
+references and `MonoScript.GetClass`, without inspecting fields or loading consumer asset instances.
+Unrelated native asset data such as textures is identified through asset type metadata.
+
+The immutable report distinguishes a complete scan from complete selection. `Complete` means
+every candidate path was inspected without failure or cancellation. `AllRetainedDocumentsSelected`
+also requires that every discovered affected Odin payload is included in the paired preview.
+Affected documents without retained payloads remain visible. Declaring-type coverage is conservative
+and can include additional instances that share an original source owner.
+
+Missing or changed selected assets, missing/unresolved script references, duplicate saved IDs,
+unreadable or oversized candidate files, stale compiler sources, and cancellation prevent a complete
+inventory. Failures retain findings for review; they never mark the scan complete. Scan bounds are
+the same as the paired asset reader. The inventory validates saved asset coverage at scan time;
+it does not prove dependent source callers compile or authorize an apply. Recheck coverage and live
+state immediately before a future coordinated migration.
 
 The API does not apply a conversion or guarantee that the project can remove Odin. The existing
 source preview/apply API remains source-only.
