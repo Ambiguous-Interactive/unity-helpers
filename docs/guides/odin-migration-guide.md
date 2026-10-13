@@ -104,6 +104,9 @@ Editor scripts can use `OdinMigrationTool` in
 - `TryConvertBoundSerializedDictionaries(payload, fields, owningAssetPath, liveReferencedObjects,
 out binding, out yaml, out failure)` combines compiler binding, complete Nodes conversion, and
   live reference validation. Any failure returns both a null binding and a null fragment.
+- `TryVerifyConvertedDictionaries(payload, fields, owningAssetPath, importedOwner,
+liveReferencedObjects, out failure)` checks a loaded imported document against its retained Nodes
+  values. It checks owner/script identity, keys, entry/list counts, nulls and object addresses.
 - `TryPreviewDictionarySources(payload, fields, out preview, out failure)` proposes source
   changes for compiler-bound fields without writing files. Each immutable proposal contains its
   compiler path, original source, and proposed source.
@@ -257,6 +260,16 @@ element assembly identities must match. Ambiguous inherited names, missing compi
 changed source, wrong types, and invalid source spans return no binding.
 Constructed generic names retain their arguments, including nested enums and arrays. Static type
 metadata accounts for framework type forwarding between compiler facades and Unity's runtime.
+
+After compilation and import finish, pass the loaded owner to `TryVerifyConvertedDictionaries`
+with the original payload, field schemas, owning path and complete live reference table. The verifier
+checks the owner's saved GUID/file ID and script GUID, then reads its serialized dictionary arrays.
+Keys and value lists must retain their counts and order. Each null and object reference must match
+the retained address. It detects unsaved live mutations as well as changed imported data.
+Call on the editor thread. The API loads no assets and writes no files or serialized properties;
+Unity can invoke serialization callbacks when it reads the loaded object. This verifies values for
+the supported conversion schemas. It does not apply files, prove project-wide migration coverage,
+or replace coordinated rollback and post-import source validation.
 
 The independent `WallstopStudios.UnityHelpers.OdinMigration.Generator.dll` compiler input produces
 these bindings without depending on the protobuf generator DLL or enabling WallstopProto.

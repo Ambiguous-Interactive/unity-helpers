@@ -239,6 +239,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             );
         }
 
+        /// <summary>Checks imported dictionary keys, list lengths, nulls, and references against the retained payload.</summary>
+        /// <remarks>Call on the editor thread after compilation and import finish, with the loaded owner and complete reference table. This reads serialized fields without loading assets or applying a migration.</remarks>
+        public static bool TryVerifyConvertedDictionaries(
+            OdinMigrationSerializedData payload,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            string owningAssetPath,
+            Object importedOwner,
+            IReadOnlyList<Object> referencedObjects,
+            out string failure
+        )
+        {
+            return OdinMigrationDictionaryImportVerifier.TryVerify(
+                payload,
+                fields,
+                owningAssetPath,
+                importedOwner,
+                referencedObjects,
+                out failure
+            );
+        }
+
         /// <summary>Previews coordinated dictionary source and retained asset replacements without writing files.</summary>
         /// <remarks>Call on the editor thread with complete live reference tables. This does not prove project-wide inventory, compile replacement sources, or apply a migration.</remarks>
         public static bool TryPreviewDictionaryMigration(

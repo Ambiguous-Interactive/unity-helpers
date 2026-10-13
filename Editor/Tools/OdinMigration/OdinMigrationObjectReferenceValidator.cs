@@ -200,8 +200,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         internal void Validate(int index, OdinMigrationDictionaryField field)
         {
-            Object reference = _objects[index];
-            string recorded = _recorded[index];
+            ValidateReference(_recorded[index], _objects[index], field);
+        }
+
+        internal void ValidateReference(
+            string recorded,
+            Object reference,
+            OdinMigrationDictionaryField field
+        )
+        {
             if (AuthoredAssetYaml.IsNullObjectReference(recorded))
             {
                 if (reference != null)
@@ -237,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
         }
 
-        private bool MatchesIdentity(Object reference, string expectedGuid, long expectedFileId)
+        internal bool MatchesIdentity(Object reference, string expectedGuid, long expectedFileId)
         {
             if (EditorUtility.IsPersistent(reference))
             {

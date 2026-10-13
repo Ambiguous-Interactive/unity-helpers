@@ -102,6 +102,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             out string failure
         )
         {
+            return TryConvert(payload, fields, references, out yaml, out failure, null);
+        }
+
+        internal static bool TryDecode(
+            OdinMigrationSerializedData payload,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            OdinMigrationObjectReferenceValidator references,
+            out IReadOnlyList<OdinMigrationConvertedDictionary> dictionaries,
+            out string failure
+        )
+        {
+            List<OdinMigrationConvertedDictionary> decoded =
+                new List<OdinMigrationConvertedDictionary>();
+            if (!TryConvert(payload, fields, references, out string _, out failure, decoded))
+            {
+                dictionaries = null;
+                return false;
+            }
+            dictionaries = decoded.AsReadOnly();
+            return true;
+        }
+
+        private static bool TryConvert(
+            OdinMigrationSerializedData payload,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            OdinMigrationObjectReferenceValidator references,
+            out string yaml,
+            out string failure,
+            List<OdinMigrationConvertedDictionary> decoded
+        )
+        {
             try
             {
                 if (payload == null || fields == null || fields.Count == 0)
@@ -152,7 +183,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             field.ElementType,
                             identities,
                             references,
-                            field
+                            field,
+                            decoded
                         )
                     );
                     remaining.Remove(name);
@@ -203,7 +235,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             Type elementType,
             HashSet<int> identities,
             OdinMigrationObjectReferenceValidator objectReferences = null,
-            OdinMigrationDictionaryField field = null
+            OdinMigrationDictionaryField field = null,
+            List<OdinMigrationConvertedDictionary> decoded = null
         )
         {
             IReadOnlyList<OdinMigrationSerializedNode> nodes = payload.SerializationNodes;
@@ -293,6 +326,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 throw new InvalidDataException(
                     "The dictionary count or remaining records require further conversion."
                 );
+            }
+            if (decoded != null)
+            {
+                decoded.Add(new OdinMigrationConvertedDictionary(fieldName, keys, values));
             }
             return Render(fieldName, keys, values);
         }
