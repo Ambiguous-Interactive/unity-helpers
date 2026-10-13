@@ -1,7 +1,7 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-namespace WallstopStudios.UnityHelpers.Proto.Generator
+namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
 {
     using System;
     using System.Collections.Generic;
@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
     using Microsoft.CodeAnalysis.Text;
+    using WallstopStudios.UnityHelpers.Proto.Generator;
 
     /// <summary>Captures compiler-resolved dictionary declarations for editor migrations.</summary>
     [Generator]

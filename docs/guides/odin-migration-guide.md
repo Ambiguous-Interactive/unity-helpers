@@ -258,7 +258,10 @@ changed source, wrong types, and invalid source spans return no binding.
 Constructed generic names retain their arguments, including nested enums and arrays. Static type
 metadata accounts for framework type forwarding between compiler facades and Unity's runtime.
 
-The binding registry and metadata are editor-only. Player compilations contain no registration
+The independent `WallstopStudios.UnityHelpers.OdinMigration.Generator.dll` compiler input produces
+these bindings without depending on the protobuf generator DLL or enabling WallstopProto.
+Its importer excludes it from runtime plugins and player builds. The binding registry and metadata
+are editor-only. Player compilations contain no registration
 code. Fields inherited from referenced assemblies without source declarations are not bound.
 The snapshots describe the captured declarations; they do not validate every project dependency
 or prove that replacement source compiles. Recompile and bind again after source or dependency

@@ -1486,6 +1486,25 @@ function Test-UnityCompilationCacheBehavior {
         $matchingRuntimeRoot = Join-Path $matchingMarkerRoot 'Runtime'
         New-Item -ItemType Directory -Force -Path $matchingRuntimeRoot | Out-Null
         Set-Content -LiteralPath (Join-Path $matchingRuntimeRoot 'Existing.cs') -Value 'class Existing {}' -Encoding utf8
+        $compilerRoot = Join-Path $matchingRuntimeRoot 'Analyzers'
+        New-Item -ItemType Directory -Force -Path $compilerRoot | Out-Null
+        foreach ($compilerName in @('WallstopStudios.UnityHelpers.Analyzers.dll', 'WallstopStudios.UnityHelpers.Proto.Generator.dll', 'WallstopStudios.UnityHelpers.OdinMigration.Generator.dll')) {
+            foreach ($suffix in @('', '.meta')) {
+                $compilerPath = Join-Path $compilerRoot "$compilerName$suffix"
+                Set-Content -LiteralPath $compilerPath -Value 'original compiler input' -Encoding utf8
+                $originalCompilerInventory = Get-UnityCompilationSourceInventory -RepoRoot $matchingMarkerRoot
+                $compilerFixture = New-UnityCompilationCacheFixture `
+                    -MarkerValue (Get-NormalizedContractRoot -Path $matchingMarkerRoot) `
+                    -SourceMarkerValue $originalCompilerInventory
+                $fixtures += $compilerFixture
+                Set-Content -LiteralPath $compilerPath -Value 'changed compiler input' -Encoding utf8
+                Clear-StaleUnityCompilationCache -Project $compilerFixture.Project -RepoRoot $matchingMarkerRoot
+                if (-not (Test-CompilationCacheDirsAbsent -Fixture $compilerFixture) -or
+                    -not (Test-Path -LiteralPath $compilerFixture.PackageCacheSentinel -PathType Leaf)) {
+                    return "changing $compilerName$suffix must invalidate compilation caches and preserve PackageCache"
+                }
+            }
+        }
         $matchingMarkerValue = Get-NormalizedContractRoot -Path $matchingMarkerRoot
         $matchingSourceInventory = Get-UnityCompilationSourceInventory -RepoRoot $matchingMarkerRoot
         $matchingMarkerFixture = New-UnityCompilationCacheFixture `

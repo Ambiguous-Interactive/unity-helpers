@@ -123,6 +123,9 @@
            validate the shipped artifact, and a run that rewrote it first could never fail. -->
       <Properties>CopyAnalyzerPayload=false</Properties>
     </ProjectReference>
+    <ProjectReference Include="../WallstopStudios.UnityHelpers.OdinMigration.Generator/WallstopStudios.UnityHelpers.OdinMigration.Generator.csproj">
+      <Properties>CopyAnalyzerPayload=false</Properties>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>

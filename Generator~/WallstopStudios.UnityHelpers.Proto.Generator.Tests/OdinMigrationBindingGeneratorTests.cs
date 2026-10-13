@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.OdinMigration.Generator;
 
     [TestFixture]
     public sealed class OdinMigrationBindingGeneratorTests
@@ -97,6 +98,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             GeneratorDriverRunResult result = Generate(sources, true, out Compilation _);
             Assert.AreEqual(1, result.GeneratedTrees.Length);
             return result.GeneratedTrees[0].GetText().ToString();
+        }
+
+        [Test]
+        public void MigrationGeneratorHasAnIndependentCompilerAssembly()
+        {
+            Assert.AreNotSame(
+                typeof(WProtoGenerator).Assembly,
+                typeof(OdinMigrationBindingGenerator).Assembly
+            );
+            Assert.AreEqual(
+                "WallstopStudios.UnityHelpers.OdinMigration.Generator",
+                typeof(OdinMigrationBindingGenerator).Assembly.GetName().Name
+            );
+            foreach (
+                System.Reflection.AssemblyName reference in typeof(OdinMigrationBindingGenerator).Assembly.GetReferencedAssemblies()
+            )
+            {
+                Assert.AreNotEqual(typeof(WProtoGenerator).Assembly.GetName().Name, reference.Name);
+            }
         }
 
         [Test]

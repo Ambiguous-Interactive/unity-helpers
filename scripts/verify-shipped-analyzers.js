@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The two analyzer DLLs this package ships are committed under `Runtime/Analyzers`, and the
+ * The compiler-input DLLs this package ships are committed under `Runtime/Analyzers`, and the
  * `WallstopProto Generator` workflow compares them byte-for-byte against a fresh
  * `dotnet build -c Release` of the sources beside them.
  *
@@ -47,6 +47,11 @@ const ANALYZERS = [
     project:
       "Generator~/WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj",
     assembly: "WallstopStudios.UnityHelpers.Proto.Generator.dll"
+  },
+  {
+    project:
+      "Generator~/WallstopStudios.UnityHelpers.OdinMigration.Generator/WallstopStudios.UnityHelpers.OdinMigration.Generator.csproj",
+    assembly: "WallstopStudios.UnityHelpers.OdinMigration.Generator.dll"
   }
 ];
 const SHIPPED = "Runtime/Analyzers";

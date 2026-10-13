@@ -226,12 +226,14 @@ console.log("Section: --fix");
 
 withCase((fixture) => {
   fs.writeFileSync(path.join(fixture.shippedDirectory, ANALYZERS[0].assembly), "stale");
-  fs.rmSync(path.join(fixture.shippedDirectory, ANALYZERS[1].assembly));
+  for (const { assembly } of ANALYZERS.slice(1)) {
+    fs.rmSync(path.join(fixture.shippedDirectory, assembly));
+  }
 
   const fixRun = run(fixture, { fix: true });
   check("--fix repairs a stale and a missing DLL together", fixRun.code === 0, fixRun.output);
   check(
-    "  ...and names both so they can be staged",
+    "  ...and names every repaired DLL so they can be staged",
     ANALYZERS.every(({ assembly }) => fixRun.output.includes(assembly)),
     fixRun.output
   );

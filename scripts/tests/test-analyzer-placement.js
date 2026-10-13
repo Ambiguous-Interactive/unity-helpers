@@ -17,8 +17,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
-// Every DLL the package ships as a compiler input. Two families, two assemblies: the WallstopProto
-// source generator, and the general-purpose WUH### analyzers. Both are subject to every contract
+// Every DLL the package ships as a compiler input: WallstopProto, general-purpose WUH### analyzers,
+// and Odin migration bindings. All are subject to every contract
 // below, and a new one added to Runtime/Analyzers without being listed here would be governed by
 // none of them.
 const analyzerDlls = fs

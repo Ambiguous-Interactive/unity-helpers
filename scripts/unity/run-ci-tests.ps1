@@ -755,7 +755,9 @@ function Get-UnityCompilationSourceInventory {
                 'Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll',
                 'Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll.meta',
                 'Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll',
-                'Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll.meta'
+                'Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll.meta',
+                'Runtime/Analyzers/WallstopStudios.UnityHelpers.OdinMigration.Generator.dll',
+                'Runtime/Analyzers/WallstopStudios.UnityHelpers.OdinMigration.Generator.dll.meta'
             )) {
             $fullPath = Join-Path $normalizedRoot $relativePath
             if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
