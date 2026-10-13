@@ -301,6 +301,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         [Test]
         [TestCaseSource(nameof(EdgeSplitRepairTestCases))]
+        [Timeout(600_000)]
         public void BuildConcaveHullEdgeSplitRepairVariousShapes(
             int width,
             int height,
