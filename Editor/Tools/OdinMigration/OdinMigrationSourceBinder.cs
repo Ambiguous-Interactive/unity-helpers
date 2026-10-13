@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     /// <summary>Matches retained field schemas to immutable editor compiler metadata.</summary>
     internal static class OdinMigrationSourceBinder
     {
-        private const int MaximumSourceCharacters = 4 * 1024 * 1024;
+        internal const int MaximumSourceCharacters = 4 * 1024 * 1024;
         private const int SourceReadBufferCharacters = 4096;
 
         internal static bool TryBind(
@@ -195,7 +195,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             return text;
         }
 
-        private static string FullPath(string compilerPath)
+        internal static string FullPath(string compilerPath)
         {
             string path = compilerPath.Replace('\\', Path.DirectorySeparatorChar);
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
@@ -204,7 +204,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             );
         }
 
-        private static string ReadSource(string path)
+        internal static string ReadSource(string path)
         {
             StringBuilder text = new StringBuilder();
             char[] buffer = new char[SourceReadBufferCharacters];
@@ -227,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             return text.ToString();
         }
 
-        private static string Checksum(string source)
+        internal static string Checksum(string source)
         {
             using (SHA256 hash = SHA256.Create())
             {

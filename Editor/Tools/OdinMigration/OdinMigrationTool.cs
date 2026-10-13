@@ -256,6 +256,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             );
         }
 
+        /// <summary>Starts isolated compilation of paired source proposals and their current editor callers.</summary>
+        /// <remarks>Call on the editor thread and poll Completed. Candidate assemblies stay in Library and are never imported or loaded. This does not apply files or validate players.</remarks>
+        public static bool TryCompileDictionaryMigration(
+            OdinMigrationDictionaryMigrationPreview preview,
+            out OdinMigrationDictionaryCompilation compilation,
+            out string failure
+        )
+        {
+            return OdinMigrationDictionaryCompilation.TryStart(
+                preview == null ? null : preview.Sources,
+                out compilation,
+                out failure
+            );
+        }
+
         /// <summary>Inventories saved Assets documents potentially affected by a paired dictionary preview.</summary>
         /// <remarks>Reads authored metadata and MonoScript types without loading consumer assets. Missing retained selections remain visible even when the scan completes.</remarks>
         public static bool TryInventoryDictionaryMigration(

@@ -333,6 +333,26 @@ the same as the paired asset reader. The inventory validates saved asset coverag
 it does not prove dependent source callers compile or authorize an apply. Recheck coverage and live
 state immediately before a future coordinated migration.
 
+### Compiling proposed sources and callers
+
+Call `TryCompileDictionaryMigration` with the paired preview on the editor thread. Keep the returned
+handle and poll `Completed` from an editor callback. `Succeeded` requires every changed assembly and
+its transitive editor callers to compile in dependency order, against the proposed dependency DLLs.
+The compiler copies source text into an owned Library directory and never imports or loads candidate
+assemblies. Original scripts and saved assets remain unchanged.
+
+The handle exposes assembly names, bounded compiler diagnostics, cancellation, and failure details.
+Call `Dispose` to cancel remaining builds; an active Unity compiler must finish before cleanup.
+`TryValidateCurrent` rechecks source, reference, analyzer input, and compiler configuration snapshots.
+Added or removed assemblies also invalidate the result. Public Unity compiler option metadata is
+read across editor API versions; consumer members are never inspected through reflection.
+
+Compilation currently refuses response files and additional arguments other than warning exclusions.
+Unknown Unity compiler options also require explicit support. A successful result covers the current
+editor configuration, not every player target or conditional symbol combination. Domain reload,
+input drift, compiler errors, and staging cleanup failures prevent success. Coordinated apply and
+post-import verification remain separate requirements.
+
 The API does not apply a conversion or guarantee that the project can remove Odin. The existing
 source preview/apply API remains source-only.
 
