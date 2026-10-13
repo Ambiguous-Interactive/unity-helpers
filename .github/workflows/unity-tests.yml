@@ -67,7 +67,7 @@ permissions:
 # evidence, releases the organization lock, and requires confirmed cleanup before the job ends.
 concurrency:
   group: unity-tests-${{ github.event_name == 'push' && github.sha || github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   matrix-config:
@@ -271,7 +271,7 @@ jobs:
     timeout-minutes: 3
     concurrency:
       group: ${{ github.workflow }}-runner-preflight-${{ github.event_name == 'push' && github.sha || github.ref }}
-      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+      cancel-in-progress: true
     steps:
       # Verifies only that every required label set has a registered runner
       # visible to the repository; the licensed jobs below depend on this job so
