@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     [Category("Fast")]
     public sealed class OdinMigrationDictionaryConverterTests
     {
-        private const string FieldName = "Variations";
+        private const string FieldName = nameof(OdinMigrationDictionaryAsset.Variations);
         private const string SpriteReference =
             "{fileID: 21300000, guid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, type: 3}";
         private const string DictionaryType =
@@ -35,7 +35,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 .Append('\n');
         }
 
-        private static string Source(int[] keys, bool emptyList = false, bool noComparer = false)
+        private static string Source(
+            int[] keys,
+            bool emptyList = false,
+            bool noComparer = false,
+            bool withNullObjects = false
+        )
         {
             StringBuilder result = new StringBuilder(
                 "--- !u!114 &123\nMonoBehaviour:\n  serializationData:\n    SerializedFormat: 2\n    SerializedBytes: \n    SerializedBytesString: \n    ReferencedUnityObjects:\n    - "
@@ -72,10 +77,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     identity.ToString(CultureInfo.InvariantCulture) + "|" + ListType
                 );
                 ++identity;
-                Node(result, string.Empty, 12, emptyList ? "0" : "1");
+                Node(
+                    result,
+                    string.Empty,
+                    12,
+                    emptyList ? "0"
+                        : withNullObjects ? "3"
+                        : "1"
+                );
                 if (!emptyList)
                 {
                     Node(result, string.Empty, 10, "0");
+                    if (withNullObjects)
+                    {
+                        Node(result, string.Empty, 6, string.Empty);
+                        Node(result, string.Empty, 10, "0");
+                    }
                 }
                 Node(result, string.Empty, 13, string.Empty);
                 Node(result, string.Empty, 8, string.Empty);
@@ -168,6 +185,193 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             );
         }
 
+        [Test]
+        public void PreservesNullObjectsAndRepeatedReferencesInListOrder()
+        {
+            string source = Source(new[] { 0 }, withNullObjects: true);
+            Assert.IsTrue(
+                OdinMigrationTool.TryConvertSerializedDictionary<SpriteAlignment, Sprite>(
+                    Read(source),
+                    FieldName,
+                    out string yaml,
+                    out string failure
+                ),
+                failure
+            );
+            Assert.IsTrue(
+                yaml.EndsWith(
+                    "      - "
+                        + SpriteReference
+                        + "\n      - {fileID: 0}\n      - "
+                        + SpriteReference
+                        + "\n",
+                    StringComparison.Ordinal
+                )
+            );
+        }
+
+        internal static string SourceWithTwoDictionaries(bool withNullObjects = false)
+        {
+            string second = Source(new[] { -1 })
+                .Replace(FieldName, "Other")
+                .Replace("UnityEngine.SpriteAlignment", "UnityEngine.HideFlags")
+                .Replace("Data: 0|", "Data: 10|")
+                .Replace("Data: 1|", "Data: 11|")
+                .Replace("Data: 2|", "Data: 12|");
+            int records = second.IndexOf("    - Name: Other", StringComparison.Ordinal);
+            return Source(new[] { 0 }, withNullObjects: withNullObjects)
+                + second.Substring(records);
+        }
+
+        [Test]
+        public void ConvertsHeterogeneousDictionariesInRetainedOrder()
+        {
+            OdinMigrationDictionaryField first = OdinMigrationDictionaryField.Create<
+                SpriteAlignment,
+                Sprite
+            >(FieldName);
+            OdinMigrationDictionaryField second = OdinMigrationDictionaryField.Create<
+                HideFlags,
+                Sprite
+            >("Other");
+            Assert.AreEqual(FieldName, first.FieldName);
+            Assert.AreEqual(typeof(SpriteAlignment), first.KeyType);
+            Assert.AreEqual(typeof(Sprite), first.ElementType);
+            Assert.IsTrue(
+                OdinMigrationTool.TryConvertSerializedDictionaries(
+                    Read(SourceWithTwoDictionaries()),
+                    new[] { second, first },
+                    out string yaml,
+                    out string failure
+                ),
+                failure
+            );
+            Assert.IsTrue(
+                yaml.StartsWith("  Variations:\n    _keys: 00000000", StringComparison.Ordinal)
+            );
+            Assert.IsTrue(yaml.Contains("  Other:\n    _keys: ffffffff"));
+            Assert.AreEqual(
+                2,
+                yaml.Split(new[] { SpriteReference }, StringSplitOptions.None).Length - 1
+            );
+        }
+
+        [TestCase("missing")]
+        [TestCase("duplicate")]
+        [TestCase("null")]
+        [TestCase("empty")]
+        [TestCase("absent")]
+        [TestCase("unsafe")]
+        [TestCase("wrongType")]
+        public void RefusesIncompleteOrAmbiguousSchemasWithoutPartialOutput(string scenario)
+        {
+            OdinMigrationDictionaryField first = OdinMigrationDictionaryField.Create<
+                SpriteAlignment,
+                Sprite
+            >(FieldName);
+            OdinMigrationDictionaryField second = OdinMigrationDictionaryField.Create<
+                HideFlags,
+                Sprite
+            >("Other");
+            IReadOnlyList<OdinMigrationDictionaryField> fields;
+            switch (scenario)
+            {
+                case "missing":
+                    fields = new[] { first };
+                    break;
+                case "duplicate":
+                    fields = new[] { first, first };
+                    break;
+                case "null":
+                    fields = new[] { first, null };
+                    break;
+                case "empty":
+                    fields = Array.Empty<OdinMigrationDictionaryField>();
+                    break;
+                case "absent":
+                    fields = new[]
+                    {
+                        first,
+                        second,
+                        OdinMigrationDictionaryField.Create<HideFlags, Sprite>("Absent"),
+                    };
+                    break;
+                case "unsafe":
+                    fields = new[]
+                    {
+                        first,
+                        OdinMigrationDictionaryField.Create<HideFlags, Sprite>("bad\nfield"),
+                    };
+                    break;
+                default:
+                    fields = new[]
+                    {
+                        first,
+                        OdinMigrationDictionaryField.Create<HideFlags, Material>("Other"),
+                    };
+                    break;
+            }
+            Assert.IsFalse(
+                OdinMigrationTool.TryConvertSerializedDictionaries(
+                    Read(SourceWithTwoDictionaries()),
+                    fields,
+                    out string yaml,
+                    out string failure
+                )
+            );
+            Assert.IsTrue(yaml == null);
+            Assert.IsTrue(!string.IsNullOrWhiteSpace(failure));
+        }
+
+        [TestCase("Data: 12|", "Data: 2|")]
+        [TestCase("Name: Other", "Name: Variations")]
+        [TestCase("Data: 12|", "Data: 9223372036854775807|")]
+        public void RefusesCrossFieldIdentityCollisionsAndInvalidState(string before, string after)
+        {
+            Assert.IsFalse(
+                OdinMigrationTool.TryConvertSerializedDictionaries(
+                    Read(SourceWithTwoDictionaries().Replace(before, after)),
+                    new[]
+                    {
+                        OdinMigrationDictionaryField.Create<SpriteAlignment, Sprite>(FieldName),
+                        OdinMigrationDictionaryField.Create<HideFlags, Sprite>("Other"),
+                    },
+                    out string yaml,
+                    out string failure
+                )
+            );
+            Assert.IsTrue(yaml == null);
+            Assert.IsTrue(!string.IsNullOrWhiteSpace(failure));
+        }
+
+        [Test]
+        public void RefusesNullPayloadOrSchemaList()
+        {
+            Assert.IsFalse(
+                OdinMigrationTool.TryConvertSerializedDictionaries(
+                    null,
+                    new[]
+                    {
+                        OdinMigrationDictionaryField.Create<SpriteAlignment, Sprite>(FieldName),
+                    },
+                    out string yaml,
+                    out string failure
+                )
+            );
+            Assert.IsTrue(yaml == null);
+            Assert.IsTrue(!string.IsNullOrWhiteSpace(failure));
+            Assert.IsFalse(
+                OdinMigrationTool.TryConvertSerializedDictionaries(
+                    Read(Source(new[] { 0 })),
+                    null,
+                    out yaml,
+                    out failure
+                )
+            );
+            Assert.IsTrue(yaml == null);
+            Assert.IsTrue(!string.IsNullOrWhiteSpace(failure));
+        }
+
         [TestCase("")]
         [TestCase("Other")]
         [TestCase("bad\nfield")]
@@ -181,7 +385,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [TestCase("Entry: 10\n      Data: 0", "Entry: 10\n      Data: -1")]
         [TestCase("Entry: 10\n      Data: 0", "Entry: 10\n      Data: 2147483647")]
         [TestCase("Entry: 10\n      Data: 0", "Entry: 9\n      Data: 2")]
-        [TestCase("Entry: 10\n      Data: 0", "Entry: 6\n      Data: ")]
+        [TestCase("Entry: 10\n      Data: 0", "Entry: 6\n      Data: lost")]
         [TestCase("Entry: 12\n      Data: 1", "Entry: 12\n      Data: 9223372036854775807")]
         [TestCase("Entry: 12\n      Data: 1", "Entry: 12\n      Data: 0")]
         [TestCase("Entry: 12\n      Data: 0", "Entry: 12\n      Data: 1")]

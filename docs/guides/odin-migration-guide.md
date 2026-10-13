@@ -93,6 +93,11 @@ Editor scripts can use `OdinMigrationTool` in
 - `TryConvertSerializedDictionary<TKey, TObject>(payload, fieldName, out yaml, out failure)`
   converts a complete enum-to-object-list dictionary payload into a Unity Helpers field fragment.
   It writes no files and does not change the source type.
+- `TryConvertSerializedDictionaries(payload, fields, out yaml, out failure)` converts a payload
+  containing multiple dictionary fields with separately declared original key and element types.
+  Create immutable field schemas with `OdinMigrationDictionaryField.Create<TKey, TObject>(name)`.
+  Every retained root and every schema must be consumed exactly once; output follows retained
+  record order and failures return a null fragment rather than partial data.
 - `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
   `Assets` in the current project.
 - `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied
@@ -160,9 +165,11 @@ The dictionary converter supports int-backed enum keys and `List<TObject>` value
 Recorded generic type shapes must match those types by full name; assembly names are not used
 to construct or resolve recorded types. The output uses `SerializableDictionary<TKey, List<TObject>>`
 with Unity's packed enum keys and boxed list values. Entries and references keep their input order.
+Null object elements become `{fileID: 0}`; repeated object references remain repeated list elements.
 
 The converter checks default enum comparer state, unique node identities and dictionary keys,
-complete record boundaries, delivered array counts, and reference indices. It does not allocate
+complete record boundaries, delivered array counts, and reference indices. Node identities are
+unique across the complete payload, including multiple dictionaries. It does not allocate
 from a claimed count. Missing comparer records from older Odin data use the default comparer.
 Custom comparers, null lists, shared list references, other field shapes, additional records,
 unknown retained metadata, linked prefab state, and prefab modifications require further
@@ -174,6 +181,22 @@ if (!OdinMigrationTool.TryConvertSerializedDictionary<ImpactSize, UnityEngine.Sp
     nameof(Variations),
     out string fieldYaml,
     out string failure))
+{
+    ReportMigrationFailure(failure);
+    return;
+}
+```
+
+For multiple retained dictionaries, declare their original shapes together:
+
+```csharp
+OdinMigrationDictionaryField[] fields =
+{
+    OdinMigrationDictionaryField.Create<ImpactSize, UnityEngine.Sprite>(nameof(Variations)),
+    OdinMigrationDictionaryField.Create<DamageType, UnityEngine.Material>(nameof(Materials)),
+};
+if (!OdinMigrationTool.TryConvertSerializedDictionaries(
+    retainedPayload, fields, out string fieldYaml, out string failure))
 {
     ReportMigrationFailure(failure);
     return;

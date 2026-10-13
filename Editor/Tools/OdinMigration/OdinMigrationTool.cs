@@ -76,6 +76,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             );
         }
 
+        /// <summary>Converts every declared dictionary in a retained payload into Unity Helpers field YAML.</summary>
+        /// <remarks>Every root record must match one schema; references, source changes, and paired apply require separate validation.</remarks>
+        /// <param name="payload">The complete retained payload.</param>
+        /// <param name="fields">The original types and names of all retained dictionary fields.</param>
+        /// <param name="yaml">Receives complete field fragments in retained record order, or null on failure.</param>
+        /// <param name="failure">Receives the schema or payload failure.</param>
+        /// <returns>True when every declared field and retained record was converted.</returns>
+        public static bool TryConvertSerializedDictionaries(
+            OdinMigrationSerializedData payload,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            out string yaml,
+            out string failure
+        )
+        {
+            return OdinMigrationDictionaryConverter.TryConvert(
+                payload,
+                fields,
+                out yaml,
+                out failure
+            );
+        }
+
         /// <summary>Previews all source scripts and serialized assets under Assets without editor UI.</summary>
         public static bool TryPreviewAssets(
             out OdinMigrationPreview preview,

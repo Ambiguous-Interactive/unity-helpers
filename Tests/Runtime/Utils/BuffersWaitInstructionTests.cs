@@ -4,8 +4,10 @@
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using System;
+    using System.Collections;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Utils;
 
     [TestFixture]
@@ -35,6 +37,104 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.AreSame(a1, a2);
             Assert.AreNotSame(a1, b);
+        }
+
+        [TestCase(1f, float.Epsilon)]
+        [TestCase(-1f, float.Epsilon)]
+        [TestCase(float.MaxValue, 1e-20f)]
+        [TestCase(float.MinValue, 1e-20f)]
+        [TestCase(float.MaxValue, 2e38f)]
+        public void QuantizationPreservesFiniteDurationWhenArithmeticOverflows(
+            float seconds,
+            float step
+        )
+        {
+            Buffers.WaitInstructionQuantizationStepSeconds = step;
+            WaitForSecondsRealtime wait = Buffers.GetWaitForSecondsRealTime(seconds);
+            Assert.AreEqual(seconds, wait.waitTime);
+            Assert.AreSame(wait, Buffers.TryGetWaitForSecondsRealtimePooled(seconds));
+        }
+
+        [Test]
+        public void QuantizedFallbackUsesSameDurationAsCachedInstruction()
+        {
+            Buffers.WaitInstructionQuantizationStepSeconds = 0.1f;
+            Buffers.WaitInstructionMaxDistinctEntries = 1;
+            Buffers.GetWaitForSecondsRealTime(0.1f);
+            WaitForSecondsRealtime fallback = Buffers.GetWaitForSecondsRealTime(0.26f);
+            Assert.AreEqual(0.3f, fallback.waitTime, 0.000001f);
+            Assert.AreEqual(1, Buffers.WaitForSecondsRealtimeCacheDiagnostics.DistinctEntries);
+        }
+
+        [UnityTest]
+        public IEnumerator VariableDurationsWaitInPlayMode()
+        {
+            float previousTimeScale = Time.timeScale;
+            try
+            {
+                Time.timeScale = 1f;
+                float[] durations = { 0.04f, 0.12f, 0.04f };
+                foreach (float seconds in durations)
+                {
+                    float started = Time.time;
+                    yield return Buffers.GetWaitForSeconds(seconds);
+                    Assert.GreaterOrEqual(Time.time - started, seconds - 0.005f);
+                    Assert.Less(Time.time - started, seconds + 2f);
+                }
+                Assert.AreEqual(2, Buffers.WaitForSecondsCacheDiagnostics.DistinctEntries);
+            }
+            finally
+            {
+                Time.timeScale = previousTimeScale;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator VariableDurationsUseQuantizationAfterCacheFills()
+        {
+            float previousTimeScale = Time.timeScale;
+            try
+            {
+                Time.timeScale = 1f;
+                Buffers.WaitInstructionQuantizationStepSeconds = 0.1f;
+                Buffers.WaitInstructionMaxDistinctEntries = 1;
+                Buffers.GetWaitForSeconds(0.2f);
+                float seconds = 0.06f;
+                float started = Time.time;
+                yield return Buffers.GetWaitForSeconds(seconds);
+                Assert.GreaterOrEqual(Time.time - started, 0.095f);
+                Assert.Less(Time.time - started, 2.1f);
+                Assert.AreEqual(1, Buffers.WaitForSecondsCacheDiagnostics.DistinctEntries);
+            }
+            finally
+            {
+                Time.timeScale = previousTimeScale;
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ComputedDurationsKeepTheCacheBounded(bool useRealtime)
+        {
+            Buffers.WaitInstructionMaxDistinctEntries = 8;
+            for (int index = 0; index < 20; ++index)
+            {
+                float seconds = index / 100f;
+                if (useRealtime)
+                {
+                    Assert.AreEqual(seconds, Buffers.GetWaitForSecondsRealTime(seconds).waitTime);
+                }
+                else
+                {
+                    Assert.IsTrue(Buffers.GetWaitForSeconds(seconds) != null);
+                }
+            }
+            Assert.AreEqual(
+                8,
+                useRealtime
+                    ? Buffers.WaitForSecondsRealtimeCacheDiagnostics.DistinctEntries
+                    : Buffers.WaitForSecondsCacheDiagnostics.DistinctEntries
+            );
         }
 
         [Test]

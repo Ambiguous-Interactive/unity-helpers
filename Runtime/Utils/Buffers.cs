@@ -203,28 +203,29 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Gets a cached WaitForSeconds instance for the specified duration.
-        /// This method caches instances to avoid repeated allocations in coroutines.
+        /// Gets a bounded cached wait instruction for a constant or variable scaled duration.
         /// </summary>
         /// <param name="seconds">The duration to wait in seconds.</param>
         /// <returns>A WaitForSeconds instance that waits for the specified duration.</returns>
         /// <remarks>
-        /// IMPORTANT: Only use with CONSTANT time values, otherwise this is a memory leak.
-        /// DO NOT USE with random or variable values as each unique value creates a cached entry that persists forever.
+        /// Variable durations are cached by value up to the configured limit, then allocated without caching.
+        /// Optional quantization applies equally to cached and uncached instructions.
+        /// Setting the cache limit to zero explicitly permits unbounded growth.
         /// </remarks>
         public static WaitForSeconds GetWaitForSeconds(float seconds)
         {
+            float duration = QuantizeSeconds(seconds);
             WaitForSeconds pooled = RentWaitInstruction(
                 WaitForSeconds,
                 WaitForSecondsOrder,
                 wait => CreateWaitForSeconds(wait),
-                seconds,
+                duration,
                 ref _waitForSecondsLimitHits,
                 ref _waitForSecondsEvictions,
                 WaitForSecondsCacheName,
                 allowEviction: true
             );
-            return pooled ?? new WaitForSeconds(seconds);
+            return pooled ?? new WaitForSeconds(duration);
         }
 
         /// <summary>
@@ -237,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 WaitForSeconds,
                 WaitForSecondsOrder,
                 wait => CreateWaitForSeconds(wait),
-                seconds,
+                QuantizeSeconds(seconds),
                 ref _waitForSecondsLimitHits,
                 ref _waitForSecondsEvictions,
                 WaitForSecondsCacheName,
@@ -246,29 +247,29 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Gets a cached WaitForSecondsRealtime instance for the specified duration.
-        /// This method caches instances to avoid repeated allocations in coroutines.
-        /// Unlike WaitForSeconds, this uses unscaled (real) time.
+        /// Gets a bounded cached wait instruction for a constant or variable unscaled duration.
         /// </summary>
         /// <param name="seconds">The duration to wait in real seconds (unaffected by Time.timeScale).</param>
         /// <returns>A WaitForSecondsRealtime instance that waits for the specified duration.</returns>
         /// <remarks>
-        /// IMPORTANT: Only use with CONSTANT time values, otherwise this is a memory leak.
-        /// DO NOT USE with random or variable values as each unique value creates a cached entry that persists forever.
+        /// Variable durations are cached by value up to the configured limit, then allocated without caching.
+        /// Optional quantization applies equally to cached and uncached instructions.
+        /// Setting the cache limit to zero explicitly permits unbounded growth.
         /// </remarks>
         public static WaitForSecondsRealtime GetWaitForSecondsRealTime(float seconds)
         {
+            float duration = QuantizeSeconds(seconds);
             WaitForSecondsRealtime pooled = RentWaitInstruction(
                 WaitForSecondsRealtime,
                 WaitForSecondsRealtimeOrder,
                 wait => CreateWaitForSecondsRealtime(wait),
-                seconds,
+                duration,
                 ref _waitForSecondsRealtimeLimitHits,
                 ref _waitForSecondsRealtimeEvictions,
                 WaitForSecondsRealtimeCacheName,
                 allowEviction: true
             );
-            return pooled ?? new WaitForSecondsRealtime(seconds);
+            return pooled ?? new WaitForSecondsRealtime(duration);
         }
 
         /// <summary>
@@ -281,7 +282,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 WaitForSecondsRealtime,
                 WaitForSecondsRealtimeOrder,
                 wait => CreateWaitForSecondsRealtime(wait),
-                seconds,
+                QuantizeSeconds(seconds),
                 ref _waitForSecondsRealtimeLimitHits,
                 ref _waitForSecondsRealtimeEvictions,
                 WaitForSecondsRealtimeCacheName,
@@ -339,7 +340,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             Dictionary<float, WaitInstructionCacheEntry<TInstruction>> cache,
             LinkedList<float> order,
             Func<float, TInstruction> factory,
-            float requestedSeconds,
+            float quantized,
             ref int limitHits,
             ref int evictionCount,
             string cacheName,
@@ -347,7 +348,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         )
             where TInstruction : class
         {
-            float quantized = QuantizeSeconds(requestedSeconds);
 #if !SINGLE_THREADED
             lock (WaitInstructionCacheLock)
             {
@@ -407,8 +407,13 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             float normalized = seconds / step;
+            if (float.IsInfinity(normalized))
+            {
+                return seconds;
+            }
             float rounded = Mathf.Round(normalized);
-            return rounded * step;
+            float quantized = rounded * step;
+            return float.IsInfinity(quantized) ? seconds : quantized;
         }
 
         private static bool CanCacheNewEntry(int currentCount)

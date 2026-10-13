@@ -52,114 +52,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             try
             {
-                if (
-                    payload == null
-                    || keyType == null
-                    || elementType == null
-                    || !IsIdentifier(fieldName)
-                )
+                ValidateSchema(fieldName, keyType, elementType);
+                if (payload == null)
                 {
-                    throw new InvalidDataException(
-                        "A payload, field name, enum key type, and Unity object type are required."
-                    );
-                }
-                if (
-                    !keyType.IsEnum
-                    || Type.GetTypeCode(keyType) != TypeCode.Int32
-                    || !typeof(UnityEngine.Object).IsAssignableFrom(elementType)
-                )
-                {
-                    throw new InvalidDataException(
-                        "This conversion requires an int-backed enum and a list of Unity objects."
-                    );
+                    throw new InvalidDataException("A retained payload is required.");
                 }
                 ValidatePrefabState(payload);
-                IReadOnlyList<OdinMigrationSerializedNode> nodes = payload.SerializationNodes;
                 int position = 0;
                 HashSet<int> identities = new HashSet<int>();
-                string listType = "System.Collections.Generic.List`1<" + elementType.FullName + ">";
-                string dictionaryType =
-                    "System.Collections.Generic.Dictionary`2<"
-                    + keyType.FullName
-                    + ","
-                    + listType
-                    + ">";
-                RequireTypedNode(nodes, ref position, fieldName, dictionaryType, identities);
-                ReadComparer(nodes, ref position, keyType.FullName, identities);
-                long claimedPairs = ReadArrayStart(nodes, ref position);
-                List<int> keys = new List<int>();
-                List<IReadOnlyList<string>> values = new List<IReadOnlyList<string>>();
-                HashSet<int> distinctKeys = new HashSet<int>();
-                while (Peek(nodes, position).Entry != EndArrayEntry)
+                string converted = ReadDictionary(
+                    payload,
+                    ref position,
+                    fieldName,
+                    keyType,
+                    elementType,
+                    identities
+                );
+                if (position != payload.SerializationNodes.Count)
                 {
-                    Require(nodes, ref position, StartNodeEntry, string.Empty, string.Empty);
-                    OdinMigrationSerializedNode key = Take(
-                        nodes,
-                        ref position,
-                        IntegerEntry,
-                        KeyName
-                    );
-                    if (
-                        !int.TryParse(
-                            key.Data,
-                            NumberStyles.Integer,
-                            CultureInfo.InvariantCulture,
-                            out int number
-                        ) || !distinctKeys.Add(number)
-                    )
-                    {
-                        throw new InvalidDataException(
-                            "A dictionary key is outside the declared enum width or is duplicated."
-                        );
-                    }
-                    RequireTypedNode(nodes, ref position, ValueName, listType, identities);
-                    long claimedValues = ReadArrayStart(nodes, ref position);
-                    List<string> references = new List<string>();
-                    while (Peek(nodes, position).Entry != EndArrayEntry)
-                    {
-                        OdinMigrationSerializedNode reference = Take(
-                            nodes,
-                            ref position,
-                            ExternalIndexEntry,
-                            string.Empty
-                        );
-                        if (
-                            !int.TryParse(
-                                reference.Data,
-                                NumberStyles.None,
-                                CultureInfo.InvariantCulture,
-                                out int index
-                            )
-                            || payload.ReferencedUnityObjects.Count <= index
-                        )
-                        {
-                            throw new InvalidDataException(
-                                "A dictionary value references an absent Unity object index."
-                            );
-                        }
-                        references.Add(payload.ReferencedUnityObjects[index]);
-                    }
-                    Require(nodes, ref position, EndArrayEntry, string.Empty, string.Empty);
-                    if (claimedValues != references.Count)
-                    {
-                        throw new InvalidDataException(
-                            "A list length does not match its delivered values."
-                        );
-                    }
-                    Require(nodes, ref position, EndNodeEntry, string.Empty, string.Empty);
-                    Require(nodes, ref position, EndNodeEntry, string.Empty, string.Empty);
-                    keys.Add(number);
-                    values.Add(references.AsReadOnly());
+                    throw new InvalidDataException("Remaining records require further conversion.");
                 }
-                Require(nodes, ref position, EndArrayEntry, string.Empty, string.Empty);
-                Require(nodes, ref position, EndNodeEntry, string.Empty, string.Empty);
-                if (position != nodes.Count || claimedPairs != keys.Count)
-                {
-                    throw new InvalidDataException(
-                        "The dictionary count or remaining records require further conversion."
-                    );
-                }
-                string converted = Render(fieldName, keys, values);
                 yaml = converted;
                 failure = null;
                 return true;
@@ -170,6 +82,200 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 failure = exception.Message;
                 return false;
             }
+        }
+
+        internal static bool TryConvert(
+            OdinMigrationSerializedData payload,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            out string yaml,
+            out string failure
+        )
+        {
+            try
+            {
+                if (payload == null || fields == null || fields.Count == 0)
+                {
+                    throw new InvalidDataException(
+                        "A retained payload and its dictionary field schemas are required."
+                    );
+                }
+                Dictionary<string, OdinMigrationDictionaryField> remaining = new Dictionary<
+                    string,
+                    OdinMigrationDictionaryField
+                >(StringComparer.Ordinal);
+                int fieldCount = fields.Count;
+                for (int index = 0; index < fieldCount; ++index)
+                {
+                    OdinMigrationDictionaryField field = fields[index];
+                    if (field == null)
+                    {
+                        throw new InvalidDataException("A dictionary field schema is null.");
+                    }
+                    ValidateSchema(field.FieldName, field.KeyType, field.ElementType);
+                    if (remaining.ContainsKey(field.FieldName))
+                    {
+                        throw new InvalidDataException("Dictionary field names must be unique.");
+                    }
+                    remaining.Add(field.FieldName, field);
+                }
+                ValidatePrefabState(payload);
+                int position = 0;
+                HashSet<int> identities = new HashSet<int>();
+                StringBuilder result = new StringBuilder();
+                int nodeCount = payload.SerializationNodes.Count;
+                while (position < nodeCount)
+                {
+                    string name = payload.SerializationNodes[position].Name;
+                    if (!remaining.TryGetValue(name, out OdinMigrationDictionaryField field))
+                    {
+                        throw new InvalidDataException(
+                            "A retained field is undeclared or occurs more than once."
+                        );
+                    }
+                    result.Append(
+                        ReadDictionary(
+                            payload,
+                            ref position,
+                            name,
+                            field.KeyType,
+                            field.ElementType,
+                            identities
+                        )
+                    );
+                    remaining.Remove(name);
+                }
+                if (remaining.Count != 0)
+                {
+                    throw new InvalidDataException(
+                        "A declared dictionary field is absent from the retained payload."
+                    );
+                }
+                yaml = result.ToString();
+                failure = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                yaml = null;
+                failure = exception.Message;
+                return false;
+            }
+        }
+
+        private static void ValidateSchema(string fieldName, Type keyType, Type elementType)
+        {
+            if (keyType == null || elementType == null || !IsIdentifier(fieldName))
+            {
+                throw new InvalidDataException(
+                    "A field name, enum key type, and Unity object type are required."
+                );
+            }
+            if (
+                !keyType.IsEnum
+                || Type.GetTypeCode(keyType) != TypeCode.Int32
+                || !typeof(UnityEngine.Object).IsAssignableFrom(elementType)
+            )
+            {
+                throw new InvalidDataException(
+                    "This conversion requires an int-backed enum and a list of Unity objects."
+                );
+            }
+        }
+
+        private static string ReadDictionary(
+            OdinMigrationSerializedData payload,
+            ref int position,
+            string fieldName,
+            Type keyType,
+            Type elementType,
+            HashSet<int> identities
+        )
+        {
+            IReadOnlyList<OdinMigrationSerializedNode> nodes = payload.SerializationNodes;
+            string listType = "System.Collections.Generic.List`1<" + elementType.FullName + ">";
+            string dictionaryType =
+                "System.Collections.Generic.Dictionary`2<"
+                + keyType.FullName
+                + ","
+                + listType
+                + ">";
+            RequireTypedNode(nodes, ref position, fieldName, dictionaryType, identities);
+            ReadComparer(nodes, ref position, keyType.FullName, identities);
+            long claimedPairs = ReadArrayStart(nodes, ref position);
+            List<int> keys = new List<int>();
+            List<IReadOnlyList<string>> values = new List<IReadOnlyList<string>>();
+            HashSet<int> distinctKeys = new HashSet<int>();
+            while (Peek(nodes, position).Entry != EndArrayEntry)
+            {
+                Require(nodes, ref position, StartNodeEntry, string.Empty, string.Empty);
+                OdinMigrationSerializedNode key = Take(nodes, ref position, IntegerEntry, KeyName);
+                if (
+                    !int.TryParse(
+                        key.Data,
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out int number
+                    ) || !distinctKeys.Add(number)
+                )
+                {
+                    throw new InvalidDataException(
+                        "A dictionary key is outside the declared enum width or is duplicated."
+                    );
+                }
+                RequireTypedNode(nodes, ref position, ValueName, listType, identities);
+                long claimedValues = ReadArrayStart(nodes, ref position);
+                List<string> references = new List<string>();
+                while (Peek(nodes, position).Entry != EndArrayEntry)
+                {
+                    if (Peek(nodes, position).Entry == NullEntry)
+                    {
+                        Require(nodes, ref position, NullEntry, string.Empty, string.Empty);
+                        references.Add("{fileID: 0}");
+                        continue;
+                    }
+                    OdinMigrationSerializedNode reference = Take(
+                        nodes,
+                        ref position,
+                        ExternalIndexEntry,
+                        string.Empty
+                    );
+                    if (
+                        !int.TryParse(
+                            reference.Data,
+                            NumberStyles.None,
+                            CultureInfo.InvariantCulture,
+                            out int index
+                        )
+                        || payload.ReferencedUnityObjects.Count <= index
+                    )
+                    {
+                        throw new InvalidDataException(
+                            "A dictionary value references an absent Unity object index."
+                        );
+                    }
+                    references.Add(payload.ReferencedUnityObjects[index]);
+                }
+                Require(nodes, ref position, EndArrayEntry, string.Empty, string.Empty);
+                if (claimedValues != references.Count)
+                {
+                    throw new InvalidDataException(
+                        "A list length does not match its delivered values."
+                    );
+                }
+                Require(nodes, ref position, EndNodeEntry, string.Empty, string.Empty);
+                Require(nodes, ref position, EndNodeEntry, string.Empty, string.Empty);
+                keys.Add(number);
+                values.Add(references.AsReadOnly());
+            }
+            Require(nodes, ref position, EndArrayEntry, string.Empty, string.Empty);
+            Require(nodes, ref position, EndNodeEntry, string.Empty, string.Empty);
+            if (claimedPairs != keys.Count)
+            {
+                throw new InvalidDataException(
+                    "The dictionary count or remaining records require further conversion."
+                );
+            }
+            return Render(fieldName, keys, values);
         }
 
         private static bool IsIdentifier(string name)
