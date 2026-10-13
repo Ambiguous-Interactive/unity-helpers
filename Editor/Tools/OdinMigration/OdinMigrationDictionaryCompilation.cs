@@ -49,7 +49,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         private readonly Dictionary<string, string> _outputs = new Dictionary<string, string>(
             OdinMigrationCompilationPlan.PathComparer
         );
+#pragma warning disable CS0618 // Unity 2021-2022 require this compiler API; Unity 6 still supports it.
         private AssemblyBuilder _builder;
+#pragma warning restore CS0618
         private int _nextAssembly;
 
         private OdinMigrationDictionaryCompilation(OdinMigrationCompilationPlan plan)
@@ -236,6 +238,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     references.Add(_outputs.TryGetValue(path, out string output) ? output : path);
                 }
                 string candidate = Path.Combine(directory, assembly.name + ".dll");
+#pragma warning disable CS0618 // Retain the same compiler path across supported Unity versions.
                 AssemblyBuilder builder = new AssemblyBuilder(candidate, sources.ToArray())
                 {
                     compilerOptions = assembly.compilerOptions,
@@ -246,6 +249,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             ? AssemblyBuilderFlags.EditorAssembly
                             : AssemblyBuilderFlags.None,
                 };
+#pragma warning restore CS0618
                 HashSet<string> exactReferences = new HashSet<string>(
                     references,
                     OdinMigrationCompilationPlan.PathComparer

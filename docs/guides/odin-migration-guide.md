@@ -339,7 +339,9 @@ Call `TryCompileDictionaryMigration` with the paired preview on the editor threa
 handle and poll `Completed` from an editor callback. `Succeeded` requires every changed assembly and
 its transitive editor callers to compile in dependency order, against the proposed dependency DLLs.
 The compiler copies source text into an owned Library directory and never imports or loads candidate
-assemblies. Original scripts and saved assets remain unchanged.
+assemblies. Original scripts and saved assets remain unchanged. This uses Unity's `AssemblyBuilder`
+API for compatibility with Unity 2021 and 2022. Unity 6 still supports that API but marks it obsolete;
+the tool suppresses that warning only at its deliberate uses.
 
 The handle exposes assembly names, bounded compiler diagnostics, cancellation, and failure details.
 Call `Dispose` to cancel remaining builds; an active Unity compiler must finish before cleanup.
