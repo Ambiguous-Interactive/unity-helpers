@@ -162,15 +162,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         private bool MatchesIdentity(Object reference, string expectedGuid, long expectedFileId)
         {
-            if (
-                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
-                    reference,
-                    out string actualGuid,
-                    out long actualFileId
-                )
-            )
+            if (EditorUtility.IsPersistent(reference))
             {
-                return actualFileId == expectedFileId
+                return AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                        reference,
+                        out string actualGuid,
+                        out long actualFileId
+                    )
+                    && actualFileId == expectedFileId
                     && string.Equals(actualGuid, expectedGuid, StringComparison.OrdinalIgnoreCase);
             }
             GlobalObjectId global = GlobalObjectId.GetGlobalObjectIdSlow(reference);

@@ -268,6 +268,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [TestCase(true, true, false, 1)]
         [TestCase(true, true, false, 2)]
         [TestCase(true, true, false, 3)]
+        [TestCase(false, true, false, 4)]
         public void SavedSceneObjectReferencesMatchTheirAuthoredFileIds(
             bool local,
             bool prefab,
@@ -297,11 +298,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 SceneManager.MoveGameObjectToScene(value, scene);
                 Assert.IsTrue(SceneManager.SetActiveScene(scene));
                 GameObject supplied = value;
+                string sourcePrefabReference = null;
                 if (prefab)
                 {
                     string prefabPath = _folder + "/Reference.prefab";
                     GameObject prefabAsset = PrefabUtility.SaveAsPrefabAsset(value, prefabPath);
                     Assert.IsTrue(prefabAsset != null);
+                    Assert.IsTrue(EditorUtility.IsPersistent(prefabAsset));
+                    Assert.IsTrue(
+                        AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                            prefabAsset,
+                            out string prefabGuid,
+                            out long prefabFileId
+                        )
+                    );
+                    sourcePrefabReference =
+                        "{fileID: "
+                        + prefabFileId.ToString(CultureInfo.InvariantCulture)
+                        + ", guid: "
+                        + prefabGuid
+                        + ", type: 3}";
                     value = Track((GameObject)PrefabUtility.InstantiatePrefab(prefabAsset, scene));
                     supplied = wrongInstance
                         ? Track((GameObject)PrefabUtility.InstantiatePrefab(prefabAsset, scene))
@@ -348,6 +364,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                             ? "}"
                             : ", guid: " + AssetDatabase.AssetPathToGUID(scenePath) + ", type: 3}"
                     );
+                Assert.IsFalse(EditorUtility.IsPersistent(supplied));
+                if (invalidScene == 4)
+                {
+                    reference = sourcePrefabReference;
+                }
                 string source = OdinMigrationDictionaryConverterTests
                     .SourceWithTwoDictionaries()
                     .Replace(RecordedReference, reference)
