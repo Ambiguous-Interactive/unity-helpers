@@ -21,6 +21,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         private string _fullFolder;
         private readonly List<string> _backupRoots = new List<string>();
 
+        private static string FullPath(string assetPath)
+        {
+            return Path.Combine(Directory.GetParent(Application.dataPath).FullName, assetPath);
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -63,7 +68,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 ((IList<OdinMigrationChange>)result.Changes).Clear()
             );
             OdinMigrationAnalysis blocked = OdinMigrationTool.AnalyzeSource(
-                "class Target : SerializedMonoBehaviour { [OdinSerialize] public int value; }"
+                "class Target { [OdinSerialize] public int value; }"
             );
             Assert.IsTrue(0 < blocked.Blockers.Count);
             Assert.AreEqual(0, blocked.ReplacementCount);
@@ -326,11 +331,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.IsTrue(backupRoot == null);
             Assert.IsFalse(OdinMigrationTool.TryApply(null, out backupRoot, out failure));
             Assert.IsTrue(backupRoot == null);
-        }
-
-        private static string FullPath(string assetPath)
-        {
-            return Path.Combine(Directory.GetParent(Application.dataPath).FullName, assetPath);
         }
 
         private string WriteSource(string name, string source, Encoding encoding = null)
