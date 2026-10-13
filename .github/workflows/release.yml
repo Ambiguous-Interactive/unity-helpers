@@ -324,13 +324,45 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
+  native-validation:
+    name: Require native Unity export and cleanup
+    needs: verify-tag
+    if: ${{ !inputs.export_only }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 1
+          ref: ${{ needs.verify-tag.outputs.source-sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.18.0"
+
+      - name: Require exact-source native export and cleanup
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_SHA: ${{ needs.verify-tag.outputs.source-sha }}
+        run: node scripts/release-tools/require-native-unity-export.js
+
   prepare-tag:
     name: Prepare release tag
     needs:
       - verify-tag
       - validate-package
       - unitypackage
-    if: ${{ !inputs.export_only && needs.verify-tag.outputs.tag-action != 'none' }}
+      - native-validation
+    if: >-
+      ${{ !inputs.export_only &&
+        needs.native-validation.result == 'success' &&
+        needs.verify-tag.outputs.tag-action != 'none' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -455,6 +487,7 @@ jobs:
       - validate-package
       - unitypackage
       - prepare-tag
+      - native-validation
     if: >-
       ${{
         always() &&
@@ -462,6 +495,7 @@ jobs:
         needs.verify-tag.result == 'success' &&
         needs.validate-package.result == 'success' &&
         needs.unitypackage.result == 'success' &&
+        needs.native-validation.result == 'success' &&
         (needs.verify-tag.outputs.tag-action == 'none' || needs.prepare-tag.result == 'success')
       }}
     runs-on: ubuntu-latest

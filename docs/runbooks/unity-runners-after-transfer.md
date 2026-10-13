@@ -374,9 +374,12 @@ paths instead of fresh values from each temporary Unity project.
 
 The Unity Tests smoke job remains on the `self-hosted`, `Windows`, `RAM-64GB` fleet. It imports and
 compiles the same staged Assets payload with release optimization before using Unity's native
-export API. This retains sample compilation and native import/export coverage without putting the
-release workflow behind runner availability or a paid license. Its acquire, activation, return,
-classification, release, and cleanup gate remain one fail-closed physical-runner lifecycle.
+export API. This retains sample compilation and native import/export coverage. Release Publish
+requires the latest Unity Tests run attempt at the selected source commit to have completed this
+native smoke job, including successful acquire, export, return, classification, lock release, and
+confirmed-cleanup steps in order. Missing, skipped, stale, or failed evidence prevents tag mutation
+and publication. The smoke job acquires, activates, returns, classifies, and releases in the same
+physical runner context, with a final cleanup gate.
 
 The shell exporter remains available for local Docker comparison and delegates staging to the same
 Node implementation. Compare the portable and native archives by logical path, asset bytes, and
