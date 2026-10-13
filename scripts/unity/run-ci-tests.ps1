@@ -218,6 +218,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'lib/compilation-fixture-results.ps1')
 if ($IsolateCompilationFixtures -and $TestMode -ne 'editmode') {
     throw 'Compilation fixture isolation requires EditMode.'
 }
@@ -1105,22 +1106,6 @@ $script:WorkflowCommandStopToken = $null
 # is regenerated each call so it is neither predictable nor committed.
 function New-WorkflowCommandStopToken {
     return ('uh-stop-commands-{0}' -f [guid]::NewGuid().ToString('N'))
-}
-
-function Assert-UnityCompilationFixtureResults {
-    param([string]$Path, [string]$FixtureName)
-
-    [xml]$document = Get-Content -LiteralPath $Path -Raw
-    $cases = @($document.SelectNodes('//test-case'))
-    if ($cases.Count -lt 1) {
-        throw 'The isolated compilation fixture produced no test cases.'
-    }
-    foreach ($case in $cases) {
-        if ($case.GetAttribute('classname') -cne $FixtureName -or
-            $case.GetAttribute('result') -cne 'Passed') {
-            throw 'Every isolated compilation case must belong to the required fixture and pass.'
-        }
-    }
 }
 
 function New-UnityEditorTestPhases {

@@ -14,7 +14,7 @@ foreach ($name in @('Test-NUnitResults', 'Get-UnityFailedNodeCount',
         'ConvertTo-UnsignedExitHex', 'Get-NativeExitCodeDescription',
         'Get-UnityCrashSignature', 'Write-UnityBenignExitWarning',
         'Write-UnityExecutionSymptomDiagnostics', 'New-UnityEditorTestPhases',
-        'New-UnityEditorPhaseArguments', 'Assert-UnityCompilationFixtureResults',
+        'New-UnityEditorPhaseArguments',
         'Invoke-UnityEditorTestPhase')) {
     $function = $ast.Find({
             param($node)
@@ -33,6 +33,7 @@ $nativeDescriptions = $ast.Find({
 if ($null -eq $nativeDescriptions) { throw 'Missing native exit-code descriptions.' }
 Invoke-Expression $nativeDescriptions.Extent.Text
 . (Join-Path $PSScriptRoot '../unity/lib/credential-redaction.ps1')
+. (Join-Path $PSScriptRoot '../unity/lib/compilation-fixture-results.ps1')
 
 $verifier = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/actions/verify-unity-results/action.yml') -Raw
 foreach ($diagnosticSource in @($source, $verifier)) {
@@ -236,6 +237,64 @@ try {
             }
         }
         $isolationChecks++
+    }
+    $runMarker = '      run: |'
+    $runStart = $verifier.IndexOf($runMarker)
+    if ($runStart -lt 0) { throw 'The shipping result verifier must have a run block.' }
+    $verifierProgram = $verifier.Substring($runStart + $runMarker.Length).TrimStart("`r", "`n")
+    $verifierProgram = ($verifierProgram -split "`n" | ForEach-Object { $_ -replace '^        ', '' }) -join "`n"
+    $verifierScript = Join-Path $temporary 'verify-action.ps1'
+    Set-Content -LiteralPath $verifierScript -Value $verifierProgram
+    $oldEnvironment = @{}
+    foreach ($key in @('GITHUB_WORKSPACE', 'UH_RESULTS_DIR', 'UH_LABEL', 'UH_EXPECTED_EMPTY', 'UH_REQUIRED_TEST_NAME', 'UH_REQUIRED_COMPILATION_FIXTURE')) {
+        $oldEnvironment[$key] = [Environment]::GetEnvironmentVariable($key)
+    }
+    try {
+        $env:GITHUB_WORKSPACE = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+        $env:UH_LABEL = 'result ownership control'
+        $env:UH_EXPECTED_EMPTY = 'false'
+        $env:UH_REQUIRED_TEST_NAME = ''
+        $env:UH_REQUIRED_COMPILATION_FIXTURE = 'Subject'
+        foreach ($fixture in @(
+                @{ Root = $null; Child = 'Passed'; Exit = 1 },
+                @{ Root = 'Passed'; Child = $null; Exit = 1 },
+                @{ Root = 'Failed'; Child = 'Passed'; Exit = 1 },
+                @{ Root = 'Passed'; Child = 'Failed'; Exit = 1 },
+                @{ Root = 'Passed'; Child = 'Skipped'; Exit = 1 },
+                @{ Root = 'Passed'; Child = 'Passed'; Exit = 0 }
+            )) {
+            $env:UH_RESULTS_DIR = Join-Path $temporary ('ownership-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path (Join-Path $env:UH_RESULTS_DIR 'compilation') -Force | Out-Null
+            if ($null -ne $fixture.Root) {
+                $failedCount = if ($fixture.Root -eq 'Failed') { 1 } else { 0 }
+                Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'results.xml') -Value ("<test-run total='1' passed='1' failed='$failedCount' skipped='0'><test-case result='$($fixture.Root)' /></test-run>")
+            }
+            if ($null -ne $fixture.Child) {
+                Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'compilation/results.xml') -Value ("<test-run total='1' passed='1' failed='0' skipped='0'><test-case classname='Subject' result='$($fixture.Child)' /></test-run>")
+            }
+            $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+            $actualExit = $LASTEXITCODE
+            if (($actualExit -eq 0) -ne ($fixture.Exit -eq 0)) {
+                throw "The actual verifier confused root and compilation evidence: $output"
+            }
+            $isolationChecks++
+        }
+        $dumpAction = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/actions/dump-unity-log-tail/action.yml') -Raw
+        $dumpStart = $dumpAction.IndexOf($runMarker)
+        if ($dumpStart -lt 0) { throw 'The shipping dump action must have a run block.' }
+        $dumpProgram = $dumpAction.Substring($dumpStart + $runMarker.Length).TrimStart("`r", "`n")
+        $dumpProgram = ($dumpProgram -split "`n" | ForEach-Object { $_ -replace '^        ', '' }) -join "`n"
+        $dumpProgram = $dumpProgram.Replace('${{ inputs.results-dir }}', '$env:UH_RESULTS_DIR').Replace('${{ inputs.label }}', '$env:UH_LABEL').Replace('${{ inputs.tail-lines }}', '20')
+        $dumpScript = Join-Path $temporary 'dump-action.ps1'
+        Set-Content -LiteralPath $dumpScript -Value $dumpProgram
+        Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'compilation/unity.log') -Value 'isolated compiler diagnostic marker'
+        $dumpOutput = & (Get-Process -Id $PID).Path -NoProfile -File $dumpScript 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0 -or -not $dumpOutput.Contains('isolated compiler diagnostic marker')) {
+            throw 'An isolated failure must retain its nested editor log tail.'
+        }
+        $isolationChecks++
+    } finally {
+        foreach ($key in $oldEnvironment.Keys) { [Environment]::SetEnvironmentVariable($key, $oldEnvironment[$key]) }
     }
     foreach ($fixture in @(
             @{ Name = 'passed'; Total = 1; Passed = 1; Failed = 0; Skipped = 0; Body = ''; Error = '' },

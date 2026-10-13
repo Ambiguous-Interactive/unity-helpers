@@ -225,6 +225,9 @@ category, so each case runs once. Both processes share the installed editor, pro
 license context. A failed isolated phase prevents the broader process and fails the mode.
 This prevents earlier ruleset-import tests from leaving pending compilation that a later
 compiler fixture cannot drain during the same batch run.
+Verification requires the mode's root `results.xml` independently of its isolated fixture XML.
+A passing nested compilation result cannot replace a missing broad-suite result. Failure dumps
+include both root and nested editor logs.
 
 It has to. `actions/checkout` runs `git clean -ffdx` at the top of every job and `-x`
 means gitignored, so anything under the repository's `.artifacts/` tree is deleted

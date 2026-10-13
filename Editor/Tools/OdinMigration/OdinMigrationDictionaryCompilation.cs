@@ -244,10 +244,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     compilerOptions = assembly.compilerOptions,
                     additionalDefines = assembly.defines,
                     additionalReferences = references.ToArray(),
-                    flags =
-                        (assembly.flags & AssemblyFlags.EditorAssembly) != 0
-                            ? AssemblyBuilderFlags.EditorAssembly
-                            : AssemblyBuilderFlags.None,
+                    flags = AssemblyBuilderFlags.EditorAssembly,
                 };
 #pragma warning restore CS0618
                 HashSet<string> exactReferences = new HashSet<string>(

@@ -24,6 +24,10 @@ inputs:
     description: "Require exactly one passed leaf case with this full name; empty disables the check."
     required: false
     default: ""
+  required-compilation-fixture:
+    description: "Require separate compilation/results.xml with every case from this fixture passed."
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -52,9 +56,11 @@ runs:
         UH_RESULTS_DIR: ${{ inputs.results-dir }}
         UH_LABEL: ${{ inputs.label }}
         UH_REQUIRED_TEST_NAME: ${{ inputs.required-test-name }}
+        UH_REQUIRED_COMPILATION_FIXTURE: ${{ inputs.required-compilation-fixture }}
       run: |
         $repoRoot = if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE } else { (Get-Location).Path }
         . (Join-Path $repoRoot 'scripts/unity/lib/credential-redaction.ps1')
+        . (Join-Path $repoRoot 'scripts/unity/lib/compilation-fixture-results.ps1')
         $dir = $env:UH_RESULTS_DIR
         $label = $env:UH_LABEL
         # When the caller resolved an empty unity-helpers test-assembly list for
@@ -662,9 +668,7 @@ runs:
           Write-Host "::error::No artifacts directory ($dir) -- Unity Test Runner did not produce results for $label"
           exit 1
         }
-        $xml = Get-ChildItem -Path $dir -Recurse -Filter *.xml -ErrorAction SilentlyContinue |
-          Where-Object { Select-String -Path $_.FullName -Pattern '<test-run' -Quiet } |
-          Select-Object -First 1
+        $xml = Get-UnityRootNUnitResultFile -ResultsDirectory $dir
         if (-not $xml) {
           # Catastrophic patterns were already scanned at the TOP of this
           # step (see the Write-UnityCatastrophicPatternHits call above the
@@ -714,4 +718,9 @@ runs:
           exit 1
         }
         Assert-RequiredNativeTest -Doc $doc -RequiredTestName $env:UH_REQUIRED_TEST_NAME
+        if (-not [string]::IsNullOrWhiteSpace($env:UH_REQUIRED_COMPILATION_FIXTURE)) {
+          Assert-UnityCompilationFixtureResults `
+            -Path (Join-Path $dir 'compilation/results.xml') `
+            -FixtureName $env:UH_REQUIRED_COMPILATION_FIXTURE
+        }
         Write-Host "::notice::${label}: total=$total passed=$passed failed=$failed skipped=$skipped"
