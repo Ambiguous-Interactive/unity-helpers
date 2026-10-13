@@ -203,8 +203,33 @@ if (!OdinMigrationTool.TryConvertSerializedDictionaries(
 }
 ```
 
-The fragment uses LF newlines and two-space field indentation. Validate the live reference types,
-source field declaration, and owning script GUID before preparing a paired source/asset preview.
+For a live editor conversion, pass the complete Unity object table in the same order as
+`ReferencedUnityObjects`. The owning asset path resolves references that carry only a local file ID:
+
+```csharp
+if (!OdinMigrationTool.TryConvertValidatedSerializedDictionaries(
+    retainedPayload,
+    fields,
+    owningAssetPath,
+    liveReferencedObjects,
+    out string fieldYaml,
+    out string failure))
+{
+    ReportMigrationFailure(failure);
+    return;
+}
+```
+
+Call this method on the Unity editor thread. It checks each used object's declared element type,
+asset GUID, and local file ID without resolving recorded type names or loading assets. Saved-scene
+references use Unity's scene identity; prefab instance references also match the saved scene's
+source-object and instance IDs. Scene text reads are bounded to 4,194,304 characters and 65,536 lines.
+Derived objects can satisfy a base element type. Recorded null slots remain null; missing or destroyed
+objects, wrong types or identities, and incomplete or extra live table entries return `false`
+with no fragment. Identity is checked at conversion time; validate again before a future paired apply.
+
+The fragment uses LF newlines and two-space field indentation. Validate the source field declaration
+and owning script GUID before preparing a paired source/asset preview.
 The API does not apply a conversion or guarantee that the project can remove Odin. The existing
 source preview/apply API remains source-only.
 

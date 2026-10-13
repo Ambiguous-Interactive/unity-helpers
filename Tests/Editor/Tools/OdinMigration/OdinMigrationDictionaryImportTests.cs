@@ -67,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     failure
                 );
                 Assert.IsTrue(
-                    OdinMigrationTool.TryConvertSerializedDictionaries(
+                    OdinMigrationTool.TryConvertValidatedSerializedDictionaries(
                         payloads[0],
                         new[]
                         {
@@ -78,6 +78,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                                 nameof(OdinMigrationDictionaryAsset.Other)
                             ),
                         },
+                        assetPath,
+                        new UnityEngine.Object[] { texture },
                         out string fragment,
                         out failure
                     ),

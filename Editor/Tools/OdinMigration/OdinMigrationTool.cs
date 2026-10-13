@@ -98,6 +98,49 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             );
         }
 
+        /// <summary>Converts retained dictionaries after checking their live Unity reference identities and types.</summary>
+        /// <remarks>Call on the editor thread with objects in retained table order. This validates fragments; source binding and paired apply remain separate.</remarks>
+        /// <param name="payload">The complete retained Nodes payload.</param>
+        /// <param name="fields">The original dictionary field schemas.</param>
+        /// <param name="owningAssetPath">The existing Assets file used to resolve local reference identifiers.</param>
+        /// <param name="referencedObjects">The complete live reference table, including null slots.</param>
+        /// <param name="yaml">Receives complete fragments, or null on failure.</param>
+        /// <param name="failure">Receives the schema, identity, or object-type failure.</param>
+        /// <returns>True when every field converts and all used references match.</returns>
+        public static bool TryConvertValidatedSerializedDictionaries(
+            OdinMigrationSerializedData payload,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            string owningAssetPath,
+            IReadOnlyList<Object> referencedObjects,
+            out string yaml,
+            out string failure
+        )
+        {
+            try
+            {
+                ValidateAssetPath(ProjectRoot, owningAssetPath);
+                OdinMigrationObjectReferenceValidator references =
+                    new OdinMigrationObjectReferenceValidator(
+                        payload,
+                        AssetDatabase.AssetPathToGUID(owningAssetPath),
+                        referencedObjects
+                    );
+                return OdinMigrationDictionaryConverter.TryConvert(
+                    payload,
+                    fields,
+                    references,
+                    out yaml,
+                    out failure
+                );
+            }
+            catch (Exception exception)
+            {
+                yaml = null;
+                failure = exception.Message;
+                return false;
+            }
+        }
+
         /// <summary>Previews all source scripts and serialized assets under Assets without editor UI.</summary>
         public static bool TryPreviewAssets(
             out OdinMigrationPreview preview,
@@ -232,6 +275,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 failure = exception.Message;
                 return false;
             }
+        }
+
+        internal static string GetValidatedAssetPath(string assetPath)
+        {
+            string projectRoot = ProjectRoot;
+            ValidateAssetPath(projectRoot, assetPath);
+            return Path.Combine(projectRoot, assetPath);
         }
 
         internal static ScanResult BuildPlans(

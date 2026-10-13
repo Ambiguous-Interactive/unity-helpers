@@ -91,6 +91,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             out string failure
         )
         {
+            return TryConvert(payload, fields, null, out yaml, out failure);
+        }
+
+        internal static bool TryConvert(
+            OdinMigrationSerializedData payload,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            OdinMigrationObjectReferenceValidator references,
+            out string yaml,
+            out string failure
+        )
+        {
             try
             {
                 if (payload == null || fields == null || fields.Count == 0)
@@ -139,7 +150,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             name,
                             field.KeyType,
                             field.ElementType,
-                            identities
+                            identities,
+                            references,
+                            field
                         )
                     );
                     remaining.Remove(name);
@@ -188,7 +201,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             string fieldName,
             Type keyType,
             Type elementType,
-            HashSet<int> identities
+            HashSet<int> identities,
+            OdinMigrationObjectReferenceValidator objectReferences = null,
+            OdinMigrationDictionaryField field = null
         )
         {
             IReadOnlyList<OdinMigrationSerializedNode> nodes = payload.SerializationNodes;
@@ -252,6 +267,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         throw new InvalidDataException(
                             "A dictionary value references an absent Unity object index."
                         );
+                    }
+                    if (objectReferences != null)
+                    {
+                        objectReferences.Validate(index, field);
                     }
                     references.Add(payload.ReferencedUnityObjects[index]);
                 }

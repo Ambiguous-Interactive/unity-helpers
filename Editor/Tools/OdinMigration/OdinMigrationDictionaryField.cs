@@ -17,11 +17,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         /// <summary>Gets the original Unity object element type.</summary>
         public Type ElementType { get; }
 
-        private OdinMigrationDictionaryField(string fieldName, Type keyType, Type elementType)
+        private readonly Func<UnityEngine.Object, bool> _acceptsObject;
+
+        private OdinMigrationDictionaryField(
+            string fieldName,
+            Type keyType,
+            Type elementType,
+            Func<UnityEngine.Object, bool> acceptsObject
+        )
         {
             FieldName = fieldName;
             KeyType = keyType;
             ElementType = elementType;
+            _acceptsObject = acceptsObject;
         }
 
         /// <summary>Captures the original field types without resolving any recorded type names.</summary>
@@ -29,7 +37,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             where TKey : struct, Enum
             where TObject : UnityEngine.Object
         {
-            return new OdinMigrationDictionaryField(fieldName, typeof(TKey), typeof(TObject));
+            return new OdinMigrationDictionaryField(
+                fieldName,
+                typeof(TKey),
+                typeof(TObject),
+                IsExpectedObject<TObject>
+            );
+        }
+
+        private static bool IsExpectedObject<TObject>(UnityEngine.Object value)
+            where TObject : UnityEngine.Object
+        {
+            return value is TObject;
+        }
+
+        /// <summary>Checks whether a live object or null slot fits the declared element type.</summary>
+        public bool AcceptsObject(UnityEngine.Object value)
+        {
+            return value == null || _acceptsObject(value);
         }
     }
 }
