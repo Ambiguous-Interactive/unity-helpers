@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IsPackable>false</IsPackable>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <AssemblyName>WallstopStudios.UnityHelpers.OdinMigration.Generator</AssemblyName>
+    <RootNamespace>WallstopStudios.UnityHelpers.OdinMigration.Generator</RootNamespace>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <DebugType>none</DebugType>
+    <CopyAnalyzerPayload
+      Condition="'$(CopyAnalyzerPayload)' == '' and '$(Configuration)' == 'Release'"
+      >true</CopyAnalyzerPayload>
+    <CopyAnalyzerPayload Condition="'$(CopyAnalyzerPayload)' == ''">false</CopyAnalyzerPayload>
+    <AnalyzerPayloadOutputDir Condition="'$(AnalyzerPayloadOutputDir)' == ''"
+      >$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../Runtime/Analyzers'))</AnalyzerPayloadOutputDir>
+    <NoWarn>$(NoWarn);RS2008;RS1032</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Source sharing keeps this compiler input independent of the protobuf generator DLL. -->
+    <Compile
+      Include="../WallstopStudios.UnityHelpers.Proto.Generator/TypeNaming.cs"
+      Link="TypeNaming.cs"
+    />
+    <Compile Include="../WallstopStudios.UnityHelpers.Proto.Generator/Writer.cs" Link="Writer.cs" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.8.0" PrivateAssets="all" />
+    <PackageReference
+      Include="Microsoft.CodeAnalysis.Analyzers"
+      Version="3.3.4"
+      PrivateAssets="all"
+    />
+  </ItemGroup>
+  <Target
+    Name="RejectNonReleaseAnalyzerPayload"
+    BeforeTargets="CopyAnalyzerToPackage"
+    Condition="'$(CopyAnalyzerPayload)' == 'true' and '$(Configuration)' != 'Release'"
+  >
+    <Error Text="Analyzer payloads can only be copied from a Release build; current configuration is '$(Configuration)'. Run dotnet build -c Release." />
+  </Target>
+  <Target
+    Name="CopyAnalyzerToPackage"
+    AfterTargets="Build"
+    Condition="'$(CopyAnalyzerPayload)' == 'true'"
+  >
+    <MakeDir
+      Directories="$(AnalyzerPayloadOutputDir)"
+      Condition="!Exists('$(AnalyzerPayloadOutputDir)')"
+    />
+    <Copy
+      SourceFiles="$(TargetPath)"
+      DestinationFolder="$(AnalyzerPayloadOutputDir)"
+      SkipUnchangedFiles="true"
+    />
+    <Message Importance="high" Text="Analyzer payload -&gt; $(AnalyzerPayloadOutputDir)" />
+  </Target>
+</Project>

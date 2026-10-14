@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add generated protobuf roots for supported arrays, lists, and dictionaries, including writes through object and collection interfaces ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
+- Add prompt-free Odin migration APIs with paired previews, inventories, isolated compilation, and source/data apply with imported-value checks, cancellation, and recovery across reloads ([guide](./docs/guides/odin-migration-guide.md#programmatic-migration), [#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
 - Add `SceneCanonicalizer` for stable generated scenes and prefabs, with local reference remapping, Unity-reserved ID avoidance and opt-in folder imports ([guide](./docs/features/editor-tools/scene-canonicalization.md), [#999](https://github.com/Ambiguous-Interactive/unity-helpers/issues/999)).
 - Add `ReferenceIdentityComparer<T>` and `UnityObjectMap<TKey, TValue>` for managed identity, destroyed-key cleanup and optional scene-unload pruning ([guide](./docs/features/utilities/reference-identity.md), [#998](https://github.com/Ambiguous-Interactive/unity-helpers/issues/998)).
 - Add the `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` opt-out to use Unity bases for both singleton families and `AttributeEffect` while retaining Odin drawers.
@@ -39,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix player pools retaining their peak indefinitely: enable conservative idle maintenance and automatic budget checks, while honoring explicit idle opt-outs, capacity limits, and retention floors ([#1008](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1008)).
+- Fix variable coroutine wait durations when quantization overflows or the wait cache is full; document support for computed and random values ([#1007](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1007)).
+- Require exact-source native Unity export and confirmed cleanup before release tag changes or publication ([#323](https://github.com/Ambiguous-Interactive/unity-helpers/issues/323)).
+- Fix generated protobuf writes through interface and object save roots, including reusable buffers, declined-formatter fallback, and `WALLSTOP_PROTO_ONLY` builds ([guide](./docs/features/serialization/serialization.md#serving-through-serializer), [#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
 - Fix spurious formatter diagnostics for private two- and three-element tuples used only in implementation code, while preserving diagnostics for serialization roots, members and explicit marshal registrations ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).
 - Fix editor folder creation and singleton cleanup accepting paths that escape Assets through parent segments. Normalize paths remaining inside Assets before creating or deleting files ([#988](https://github.com/Ambiguous-Interactive/unity-helpers/issues/988)).
 - Fix generic serializer and JSON converter registration when constructed types appear only in inferred factory results ([#937](https://github.com/Ambiguous-Interactive/unity-helpers/issues/937)).

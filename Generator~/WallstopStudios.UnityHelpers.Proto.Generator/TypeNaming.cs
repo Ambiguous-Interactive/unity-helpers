@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
     using System;
-    using System.Collections.Generic;
     using Microsoft.CodeAnalysis;
 
     /// <summary>
@@ -25,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// SomeFixture.PrivatePayload&gt;</c> reached a registrar and failed to compile.
     /// </para>
     /// </remarks>
-    internal static class TypeNaming
+    internal static partial class TypeNaming
     {
         /// <summary>
         /// The name of <paramref name="type"/> as a developer would have written it.
@@ -159,48 +158,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 default:
                     return false;
             }
-        }
-
-        /// <summary>
-        /// Announces a closed construction the registrar has to skip, once per construction.
-        /// </summary>
-        /// <param name="type">The closed construction found in source.</param>
-        /// <param name="compilation">The compilation the registrar is emitted into.</param>
-        /// <param name="location">Where the construction was written.</param>
-        /// <param name="report">Receives the warning.</param>
-        /// <param name="announced">The constructions already reported in this compilation.</param>
-        /// <returns><c>true</c> when the caller must skip it.</returns>
-        /// <remarks>
-        /// Deduplicated because the scan runs over every piece of type syntax: a closure written in
-        /// ten places is one missing registration, not ten.
-        /// </remarks>
-        internal static bool ReportIfUnnameable(
-            ITypeSymbol type,
-            Compilation compilation,
-            Location location,
-            Action<Diagnostic> report,
-            HashSet<string> announced
-        )
-        {
-            if (IsOpen(type) || !TryFindUnnameable(type, compilation, out ITypeSymbol culprit))
-            {
-                return IsOpen(type);
-            }
-
-            string qualified = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            if (announced.Add(qualified))
-            {
-                report(
-                    Diagnostic.Create(
-                        WProtoDiagnostics.UnnameableClosure,
-                        location,
-                        qualified,
-                        culprit.ToDisplayString()
-                    )
-                );
-            }
-
-            return true;
         }
 
         private static bool IsReachable(INamedTypeSymbol type, Compilation compilation)

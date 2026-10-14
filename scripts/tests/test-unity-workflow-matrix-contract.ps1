@@ -13,6 +13,33 @@ function Write-Info($msg) {
     if ($VerboseOutput) { Write-Host "[test-unity-workflow-matrix-contract] $msg" -ForegroundColor Cyan }
 }
 
+function Test-BenchmarkProgressBudget {
+    param(
+        [Parameter(Mandatory = $true)][string]$JobText,
+        [Parameter(Mandatory = $true)][int]$LongestCaseSeconds
+    )
+
+    $runSteps = [regex]::Matches($JobText, '(?ms)^      - name: Run Unity Test Runner\s*$.*?(?=^      - name:|\z)')
+    if ($runSteps.Count -ne 1) {
+        return $false
+    }
+    $environments = [regex]::Matches($runSteps[0].Value, '(?ms)^        env:[ \t]*\r?\n(?<body>.*?)(?=^        \S|\z)')
+    if ($environments.Count -ne 1) {
+        return $false
+    }
+    [string]$environment = $environments[0].Groups['body'].Value
+    $streaming = [regex]::Matches($environment, '(?m)^\s+UH_STREAM_TEST_RESULTS: "1"\s*$')
+    $stall = [regex]::Matches($environment, '(?m)^\s+UH_EDITOR_TEST_STALL_SECONDS: "(?<seconds>\d+)"\s*$')
+    $total = [regex]::Matches($environment, '(?m)^\s+UH_EDITOR_TEST_TIMEOUT_SECONDS: "(?<seconds>\d+)"\s*$')
+    if ($streaming.Count -ne 1 -or $stall.Count -ne 1 -or $total.Count -ne 1 -or $LongestCaseSeconds -le 0) {
+        return $false
+    }
+
+    [int]$stallSeconds = $stall[0].Groups['seconds'].Value
+    [int]$totalSeconds = $total[0].Groups['seconds'].Value
+    return $stallSeconds -ge ($LongestCaseSeconds + 300) -and $stallSeconds -lt $totalSeconds
+}
+
 function Test-PrCapableAcquireIdentityInputs {
     param(
         [Parameter(Mandatory = $true)][string]$WorkflowContent,
@@ -748,6 +775,34 @@ if (-not $unityTestWorkflowsAvoidUnusedDependencies) {
 }
 
 $benchmarkJob = if ($benchmarksJobTexts.ContainsKey('benchmarks')) { [string]$benchmarksJobTexts['benchmarks'] } else { '' }
+$benchmarkCaseTimeouts = @(
+    foreach ($sourceFile in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'Tests/Runtime/Performance') -Filter '*.cs') {
+        [string]$sourceText = Get-Content -LiteralPath $sourceFile.FullName -Raw
+        foreach ($timeout in [regex]::Matches($sourceText, '(?:BenchmarkTimeoutMilliseconds\s*=\s*|\bTimeout\s*\(\s*)(?<milliseconds>[\d_]+)')) {
+            [int]$milliseconds = $timeout.Groups['milliseconds'].Value.Replace('_', '')
+            [int][Math]::Ceiling($milliseconds / 1000.0)
+        }
+    }
+)
+[int]$longestBenchmarkCaseSeconds = if ($benchmarkCaseTimeouts.Count -gt 0) { ($benchmarkCaseTimeouts | Measure-Object -Maximum).Maximum } else { 0 }
+if (-not (Test-BenchmarkProgressBudget -JobText $benchmarkJob -LongestCaseSeconds $longestBenchmarkCaseSeconds)) {
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::Stream benchmark test starts/completions and keep a bounded silence guard at least five minutes above the longest declared performance case timeout.'
+    $failed = $true
+}
+foreach ($invalidBudget in @(
+        $benchmarkJob.Replace('UH_STREAM_TEST_RESULTS: "1"', 'UH_STREAM_TEST_RESULTS: "0"'),
+        ($benchmarkJob.Replace('UH_STREAM_TEST_RESULTS: "1"', 'UH_STREAM_TEST_RESULTS: "0"') + "`n        env:`n          UH_STREAM_TEST_RESULTS: `"1`"`n"),
+        ($benchmarkJob -replace 'UH_EDITOR_TEST_STALL_SECONDS: "\d+"', 'UH_EDITOR_TEST_STALL_SECONDS: "300"'),
+        ($benchmarkJob -replace 'UH_EDITOR_TEST_STALL_SECONDS: "\d+"', 'UH_EDITOR_TEST_STALL_SECONDS: "0"'),
+        ($benchmarkJob -replace 'UH_EDITOR_TEST_STALL_SECONDS: "\d+"', 'UH_EDITOR_TEST_STALL_SECONDS: "6600"'),
+        ($benchmarkJob -replace '(?m)^\s+UH_EDITOR_TEST_STALL_SECONDS: "\d+"\s*$', '')
+    )) {
+    if (Test-BenchmarkProgressBudget -JobText $invalidBudget -LongestCaseSeconds $longestBenchmarkCaseSeconds) {
+        Write-Host '::error::Benchmark progress-budget contract accepted a missing, short, disabled, or unbounded watchdog configuration.'
+        $failed = $true
+    }
+}
+Write-Info "Checked benchmark progress and bounded silence budget against the longest declared case ($longestBenchmarkCaseSeconds seconds), including negative controls."
 $benchmarkInvocationCount = [regex]::Matches(
     $benchmarkJob,
     [regex]::Escape('./scripts/unity/run-ci-tests.ps1')
@@ -1431,6 +1486,25 @@ function Test-UnityCompilationCacheBehavior {
         $matchingRuntimeRoot = Join-Path $matchingMarkerRoot 'Runtime'
         New-Item -ItemType Directory -Force -Path $matchingRuntimeRoot | Out-Null
         Set-Content -LiteralPath (Join-Path $matchingRuntimeRoot 'Existing.cs') -Value 'class Existing {}' -Encoding utf8
+        $compilerRoot = Join-Path $matchingRuntimeRoot 'Analyzers'
+        New-Item -ItemType Directory -Force -Path $compilerRoot | Out-Null
+        foreach ($compilerName in @('WallstopStudios.UnityHelpers.Analyzers.dll', 'WallstopStudios.UnityHelpers.Proto.Generator.dll', 'WallstopStudios.UnityHelpers.OdinMigration.Generator.dll')) {
+            foreach ($suffix in @('', '.meta')) {
+                $compilerPath = Join-Path $compilerRoot "$compilerName$suffix"
+                Set-Content -LiteralPath $compilerPath -Value 'original compiler input' -Encoding utf8
+                $originalCompilerInventory = Get-UnityCompilationSourceInventory -RepoRoot $matchingMarkerRoot
+                $compilerFixture = New-UnityCompilationCacheFixture `
+                    -MarkerValue (Get-NormalizedContractRoot -Path $matchingMarkerRoot) `
+                    -SourceMarkerValue $originalCompilerInventory
+                $fixtures += $compilerFixture
+                Set-Content -LiteralPath $compilerPath -Value 'changed compiler input' -Encoding utf8
+                Clear-StaleUnityCompilationCache -Project $compilerFixture.Project -RepoRoot $matchingMarkerRoot
+                if (-not (Test-CompilationCacheDirsAbsent -Fixture $compilerFixture) -or
+                    -not (Test-Path -LiteralPath $compilerFixture.PackageCacheSentinel -PathType Leaf)) {
+                    return "changing $compilerName$suffix must invalidate compilation caches and preserve PackageCache"
+                }
+            }
+        }
         $matchingMarkerValue = Get-NormalizedContractRoot -Path $matchingMarkerRoot
         $matchingSourceInventory = Get-UnityCompilationSourceInventory -RepoRoot $matchingMarkerRoot
         $matchingMarkerFixture = New-UnityCompilationCacheFixture `
@@ -3713,7 +3787,7 @@ if (-not $failed) {
 # so prepared releases can publish the exact validated merge even when main advances.
 $cancelsSupersededLicensedRuns = (
     $workflowContent.Contains('group: unity-tests-${{ github.event_name == ''push'' && github.sha || github.event.pull_request.number || github.ref }}') -and
-    $workflowContent.Contains('cancel-in-progress: ${{ github.event_name == ''pull_request'' }}')
+    $workflowContent.Contains('cancel-in-progress: true')
 )
 if (-not $cancelsSupersededLicensedRuns) {
     Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must retain pushed-commit validation while canceling superseded pull request revisions."

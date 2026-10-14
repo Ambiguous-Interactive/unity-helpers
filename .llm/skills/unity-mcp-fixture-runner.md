@@ -28,6 +28,10 @@
 
 ### [A `Unity_RunCommand` that times out is usually an expired MCP session](../references/unity-mcp-fixture-runner-part-1.md#a-unity_runcommand-that-times-out-is-usually-an-expired-mcp-session)
 
+## Use the native CLI fixture runner first
+
+[Read section](../references/unity-mcp-fixture-runner-part-2.md#use-the-native-cli-fixture-runner-first)
+
 ## No license? The MCP editor still runs the real fixtures
 
 [Read section](../references/unity-mcp-fixture-runner-part-2.md#no-license-the-mcp-editor-still-runs-the-real-fixtures)

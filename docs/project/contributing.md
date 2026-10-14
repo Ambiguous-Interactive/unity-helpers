@@ -190,6 +190,12 @@ When installing via Git URL, reference versions without the `v` prefix:
 https://github.com/wallstop/unity-helpers.git#3.1.5
 ```
 
+Maintainers can dispatch **Unity Benchmarks** to validate the licensed benchmark lifecycle. The
+weekly hosted scheduler dispatches it on protected main. Both workflows must be enabled in the
+repository. Branch dispatches retain diagnostics without updating the canonical performance
+baseline. See the [runner runbook](../runbooks/unity-runners-after-transfer.md#licensed-benchmarks)
+for cleanup, cancellation, and reporting requirements.
+
 Maintainers prepare releases from the default branch with the **Release Prepare** workflow. Choose a `major`, `minor`, or `patch` bump, review the generated release PR, and squash-merge it with the default `release: X.Y.Z` title. **Auto publish** is enabled by default. After the merged commit passes Unity Tests, Local Gates, Repo Lint, and every other triggered push validation workflow, automation starts **Release Publish** with that exact commit. It validates and packs npm, creates the `.unitypackage` without opening Unity, creates the release tag when needed, and publishes npm and GitHub Release assets.
 
 Clear **Auto publish** during preparation to publish manually. In **Release Publish**, choose a branch, tag, or commit with **source_ref**; leave **version** blank to read it from that source's `package.json`. **Export only** validates and produces downloadable archives without changing tags or publishing. Automatic publication never moves an existing tag. A failed validation or prior publication attempt requires inspection and manual recovery; duplicate completion events do not dispatch the same release twice. Remove `<!-- unity-helpers:auto-publish -->` from an unmerged release PR to cancel its automatic publication.

@@ -190,9 +190,11 @@ jobs:
       # root or a severity prints exactly what a clean tree prints. This injects a known
       # WPROTO001, WUH003 and CS0246 into each of the five check projects and asserts each build
       # names them, which is what makes the green run above evidence (#636).
+      # Parallel SDK startup hit a missing NuGet-Migrations shared-memory directory before compilation.
+      # Keep local two-worker iteration while avoiding competing SDK launches in this job.
       - name: Prove each type-check gate can still fail
         if: matrix.phase == 'controls'
-        run: npm run typecheck:controls
+        run: npm run typecheck:controls -- --jobs=1
 
   typecheck:
     name: Type-check Runtime and tests

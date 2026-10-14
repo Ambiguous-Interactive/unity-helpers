@@ -36,7 +36,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal static List<TypeUse> Types(
             Compilation compilation,
-            Dictionary<SyntaxTree, SemanticModel> models
+            Dictionary<SyntaxTree, SemanticModel> models,
+            List<IArrayTypeSymbol> arrays = null
         )
         {
             List<TypeUse> uses = new List<TypeUse>();
@@ -133,6 +134,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             model.GetTypeInfo(type).Type
                             ?? model.GetSymbolInfo(type).Symbol as ITypeSymbol;
                     }
+                    else if (node is ImplicitArrayCreationExpressionSyntax)
+                    {
+                        resolved = model.GetTypeInfo(node).Type;
+                    }
                     else if (
                         node is Microsoft.CodeAnalysis.CSharp.Syntax.TupleExpressionSyntax tuple
                     )
@@ -180,6 +185,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         continue;
                     }
 
+                    if (resolved is IArrayTypeSymbol array && arrays != null)
+                    {
+                        arrays.Add(array);
+                    }
                     CollectTypes(resolved, node.GetLocation(), uses, serializationDependency);
                 }
             }

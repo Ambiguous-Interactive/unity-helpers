@@ -26,6 +26,17 @@ Static helper classes and utilities that solve common programming problems witho
 
 Unity allocates a new `WaitForSeconds`/`WaitForSecondsRealtime` every time you yield with a literal. `Buffers.GetWaitForSeconds(...)` and `Buffers.GetWaitForSecondsRealTime(...)` pool those instructions to reduce coroutine allocations, but each distinct duration used to stick around forever. Large ranges (randomized cooldowns, tweens, etc.) could leak thousands of instances.
 
+Constant, computed, and random finite durations are supported. With the default settings, the cache
+uses the exact float value and retains at most 512 distinct durations; further values allocate a
+valid instruction without adding an entry. Optional quantization rounds both cached instructions
+and uncached fallbacks to the same duration. If quantization arithmetic would overflow, the
+original finite duration is preserved. A zero cache limit explicitly enables unbounded caching.
+
+```csharp
+float delaySeconds = random.NextFloatInRange(minimumDelay, maximumDelay);
+yield return Buffers.GetWaitForSeconds(delaySeconds);
+```
+
 **New pooling policy knobs (Runtime 2.2.1+):**
 
 | Setting                                                                                    | Default   | Purpose                                                                                                                                                                                         |

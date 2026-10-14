@@ -68,16 +68,353 @@ is not a data migration or proof that all Odin-owned state has been converted.
 > disappear when the source type changes. The automated tool deliberately leaves these constructs
 > unchanged.
 
-Apply performs a best-effort check that every source file still matches its preview, writes through
-a staged durable-file replacement, and attempts to roll back completed writes if a later write
-fails. It refuses that rollback when the live bytes show a newer external edit. These checks reduce
+Apply checks the complete source batch against its preview and creates every byte backup before
+writing any target. It checks each target again immediately before its staged durable-file
+replacement, then attempts to roll back completed writes if a later write fails. It refuses that rollback when the live bytes show a newer external edit. These checks reduce
 common editor races but cannot coordinate atomically with other processes. Timestamped byte-for-byte backups are retained under
-`Library/WallstopOdinMigrationBackups`.
+`Library/WallstopOdinMigrationBackups`. New backups include unchanged `.meta` bytes and a bounded,
+checksummed recovery record before the first target write. Backups use short numbered filenames to
+avoid extending asset paths beyond Windows limits. The recovery record maps each backup to its
+original asset path; recovery also reads the older mirrored-directory layout. Imported metadata must
+exist before Apply.
+Recovery records support source and Unity text assets under `Assets`, with 16 MiB per file,
+256 MiB of combined original and replacement bytes, and 10,000 asset/metadata entries per batch.
 
 This is a **Tier C filesystem operation**: Unity Undo does not cover it. Commit or stash your work
 before Apply, keep the backup until the project has compiled and assets have been validated, and use
 version control for the authoritative rollback. The tool preserves each supported file's encoding,
 byte-order mark, and newline style, then refreshes the Asset Database once after a successful batch.
+
+## Programmatic Migration
+
+Editor scripts can use `OdinMigrationTool` in
+`WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration` without opening dialogs:
+
+- `AnalyzeSource(source)` returns the proposed source, immutable changes, blockers, and review
+  findings. It performs no file I/O. Check `IsValid` and `Failure` before using the result.
+- `TryReadSerializedNodes(source, out payloads, out failure)` reads Odin Nodes format (2) from
+  Unity text YAML without loading assets or constructing recorded types. Each immutable payload
+  retains its owning document's file ID and script GUID, original payload text and line range,
+  ordered Unity references, and ordered `Name`, numeric `Entry`, and `Data` records.
+- `TryConvertSerializedDictionary<TKey, TObject>(payload, fieldName, out yaml, out failure)`
+  converts a complete enum-to-object-list dictionary payload into a Unity Helpers field fragment.
+  It writes no files and does not change the source type.
+- `TryConvertSerializedDictionaries(payload, fields, out yaml, out failure)` converts a payload
+  containing multiple dictionary fields with separately declared original key and element types.
+  Create immutable field schemas with `OdinMigrationDictionaryField.Create<TKey, TObject>(name)`.
+  Every retained root and every schema must be consumed exactly once; output follows retained
+  record order and failures return a null fragment rather than partial data.
+- `TryBindSerializedDictionaryFields(payload, fields, out binding, out failure)` matches the
+  retained script GUID and requested field types to metadata generated during editor compilation.
+  It returns immutable source checksums, original field type spans, and assembly identities.
+- `TryConvertBoundSerializedDictionaries(payload, fields, owningAssetPath, liveReferencedObjects,
+out binding, out yaml, out failure)` combines compiler binding, complete Nodes conversion, and
+  live reference validation. Any failure returns both a null binding and a null fragment.
+- `TryVerifyConvertedDictionaries(payload, fields, owningAssetPath, importedOwner,
+liveReferencedObjects, out failure)` checks a loaded imported document against its retained Nodes
+  values. It checks owner/script identity, keys, entry/list counts, nulls and object addresses.
+- `TryPreviewDictionarySources(payload, fields, out preview, out failure)` proposes source
+  changes for compiler-bound fields without writing files. Each immutable proposal contains its
+  compiler path, original source, and proposed source.
+- `TryPreviewDictionaryMigration(targets, out preview, out failure)` coordinates source proposals
+  with complete retained asset proposals for the selected Unity documents. Each
+  `OdinMigrationDictionaryTarget` captures an asset path, owner file ID, field schemas, and the
+  complete live reference table. An optional cancellation callback runs before each asset read.
+- `TryInventoryDictionaryMigration(preview, out inventory, out failure)` scans serialized files
+  under `Assets` for original declaring types and their derived Unity scripts. It reports retained
+  documents omitted from the paired preview and failures that make the inventory incomplete.
+- `TryApplyDictionaryMigration(preview, compilation, out apply, out failure)` starts a paired
+  source and retained-data migration after checking a successful, matching compilation receipt and
+  a fresh complete inventory. It currently refuses affected documents without retained payloads,
+  since their original live dictionaries cannot yet be captured and verified. Save scenes and assets
+  before starting, leave Prefab Mode, and wait for compilation, import, and Play Mode to finish.
+  A `true` return means the transaction started. Poll `apply.TryReadStatus(out state, out failure)`;
+  only `Verified` means the replacement assemblies loaded and the retained keys, list values,
+  nulls, reference addresses, and runtime types matched the imported documents.
+- `TryReadDictionaryApply(backupRoot, out apply, out failure)` reconnects to the durable operation
+  after domain reload or restart. Keep `apply.BackupRoot` before reload. The coordinator restores
+  the original bytes after interruption, cancellation, compilation errors, or failed verification,
+  then waits for recovery import; `Recovered` means original file and metadata hashes matched.
+  `apply.TryCancel(out failure)` requests recovery of the active operation. `RecoveryFailed`
+  retains the backups and active marker for manual repair. Changes to targets, metadata, journals,
+  or the active marker prevent unsafe replacement. This Tier C operation cannot reverse arbitrary
+  consumer import callbacks through Unity Undo.
+  Recovery records preserve full 64-bit file IDs. When the only loaded saved scene is affected,
+  the coordinator keeps an empty temporary scene while compiling and restores the saved scene
+  afterward; changes to that temporary scene prevent it from being discarded.
+- `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
+  `Assets` in the current project.
+- `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied
+  project-relative `.cs` paths and still scans all serialized assets under `Assets`. Duplicate
+  paths are scanned once. Paths must use forward slashes and cannot contain traversal segments,
+  symbolic links, or reparse points.
+- Both preview methods accept an optional `shouldCancel(path, index, total)` callback. Returning
+  `true` cancels before that file is read. Cancellation and source failures return `false` and
+  retain the available report in `preview`; discovery, path, and callback failures can return a
+  null preview. Neither path permits Apply after an incomplete source scan.
+- A preview exposes immutable `SourceAnalyses`, `SerializedAnalyses`, `Failures`, and
+  `SerializedScanFailures`, file/replacement counts, and the complete `Report`. A successful
+  scan can have no planned changes; check `CanApply` separately. Serialized findings and failures
+  have the same source-only scope as the menu commands.
+- `TryApply(preview, out backupRoot, out failure)` uses the preview's captured source bytes and
+  the same transaction as the menu tool. A successful preview can be applied once. A failure
+  reports any attempted backup location and rollback failures; keep those backups for review.
+- `TryRestoreBackup(backupRoot, out failure)` restores the recorded bytes after a reload or restart.
+  Call on the editor thread when compilation and import have finished. It first validates the entire
+  recovery record, backups, target bytes, and unchanged metadata. Changed or missing files prevent
+  recovery before writes. A write failure during recovery can leave a partially restored batch;
+  the reported failure and retained backups support manual recovery. Repeating successful recovery
+  is safe. Refresh the Asset Database after success. Backups made before recovery records were
+  introduced still require manual restoration.
+
+Call project preview and apply methods on the Unity editor thread. They do not display progress
+bars or dialogs. The source-only `TryApply` does not refresh the Asset Database: call
+`UnityEditor.AssetDatabase.Refresh()` on the editor thread after a successful batch, when ready
+for Unity to import the changed sources. The menu tool performs that refresh itself.
+Programmatic writes remain Tier C operations outside Unity Undo. They do not convert Odin-owned
+serialized data or establish that Odin can be removed from the project.
+
+### Reading retained serialization nodes
+
+The node reader accepts plain folded strings, single-quoted strings, and double-quoted strings
+with JSON-compatible escapes. It limits input to 4,194,304 characters and 65,536 lines. Counts
+and identifiers in record data remain strings; they do not size an allocation. Missing or
+duplicate record fields, unknown entry tags, byte payloads, other Odin formats, and unsupported
+YAML scalar/sequence forms return `false` with an empty payload list. A valid Unity asset with
+no Odin payload returns `true` and an empty list.
+
+```csharp
+using System.Collections.Generic;
+using System.IO;
+using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
+
+string yaml = File.ReadAllText(assetFileSystemPath);
+if (!OdinMigrationTool.TryReadSerializedNodes(
+    yaml,
+    out IReadOnlyList<OdinMigrationSerializedData> payloads,
+    out string failure))
+{
+    ReportMigrationFailure(failure);
+    return;
+}
+
+foreach (OdinMigrationSerializedData payload in payloads)
+{
+    ReviewRetainedNodes(payload.FileId, payload.SerializationNodes, payload.ReferencedUnityObjects);
+}
+```
+
+This API preserves raw records. It does not validate typed values, graph references, declared
+array counts, or prefab overrides. Prefab metadata remains in `Source` for the conversion stage.
+The source-only preview/apply APIs do not convert these payloads. Paired source/data conversion
+must validate the destination schema and retained references before removing Odin-owned state.
+
+### Converting retained dictionary nodes
+
+The dictionary converter supports int-backed enum keys and `List<TObject>` values where
+`TObject` derives from `UnityEngine.Object`. Supply the original compiled key and element types.
+Recorded generic type shapes must match those types by full name; assembly names are not used
+to construct or resolve recorded types. The output uses `SerializableDictionary<TKey, List<TObject>>`
+with Unity's packed enum keys and boxed list values. Entries and references keep their input order.
+Null object elements become `{fileID: 0}`; repeated object references remain repeated list elements.
+
+The converter checks default enum comparer state, unique node identities and dictionary keys,
+complete record boundaries, delivered array counts, and reference indices. Node identities are
+unique across the complete payload, including multiple dictionaries. It does not allocate
+from a claimed count. Missing comparer records from older Odin data use the default comparer.
+Custom comparers, null lists, shared list references, other field shapes, additional records,
+unknown retained metadata, linked prefab state, and prefab modifications require further
+conversion and return `false` with a null fragment.
+
+```csharp
+if (!OdinMigrationTool.TryConvertSerializedDictionary<ImpactSize, UnityEngine.Sprite>(
+    retainedPayload,
+    nameof(Variations),
+    out string fieldYaml,
+    out string failure))
+{
+    ReportMigrationFailure(failure);
+    return;
+}
+```
+
+For multiple retained dictionaries, declare their original shapes together:
+
+```csharp
+OdinMigrationDictionaryField[] fields =
+{
+    OdinMigrationDictionaryField.Create<ImpactSize, UnityEngine.Sprite>(nameof(Variations)),
+    OdinMigrationDictionaryField.Create<DamageType, UnityEngine.Material>(nameof(Materials)),
+};
+if (!OdinMigrationTool.TryConvertSerializedDictionaries(
+    retainedPayload, fields, out string fieldYaml, out string failure))
+{
+    ReportMigrationFailure(failure);
+    return;
+}
+```
+
+For a live editor conversion, pass the complete Unity object table in the same order as
+`ReferencedUnityObjects`. The owning asset path resolves references that carry only a local file ID:
+
+```csharp
+if (!OdinMigrationTool.TryConvertValidatedSerializedDictionaries(
+    retainedPayload,
+    fields,
+    owningAssetPath,
+    liveReferencedObjects,
+    out string fieldYaml,
+    out string failure))
+{
+    ReportMigrationFailure(failure);
+    return;
+}
+```
+
+Call this method on the Unity editor thread. It checks each used object's declared element type,
+asset GUID, and local file ID without resolving recorded type names or loading assets. Saved-scene
+references use Unity's scene identity; prefab instance references also match the saved scene's
+source asset GUID, signed source file ID, and instance ID. Scene text reads are bounded to
+4,194,304 characters and 65,536 lines. Wrapped source-object flow mappings written by supported
+Unity versions are read across their continuation lines; malformed mappings are refused.
+Derived objects can satisfy a base element type. Recorded null slots remain null; missing or destroyed
+objects, wrong types or identities, and incomplete or extra live table entries return `false`
+with no fragment. Identity is checked at conversion time; validate again before a future paired apply.
+
+The fragment uses LF newlines and two-space field indentation. Use
+`TryConvertBoundSerializedDictionaries` to check the original source declarations and owning script
+before preparing a paired source/asset preview. Call it on the Unity editor thread after compilation
+completes. The generator resolves aliases, private nested enums, partial classes, and inherited
+fields declared in the same compilation. It captures the original class and base declarations,
+enum declarations, and element class declarations; every captured source must still match its
+SHA-256 checksum. Each source read is bounded to 4,194,304 characters. Field names and both key and
+element assembly identities must match. Ambiguous inherited names, missing compiler metadata,
+changed source, wrong types, and invalid source spans return no binding.
+Constructed generic names retain their arguments, including nested enums and arrays. Static type
+metadata accounts for framework type forwarding between compiler facades and Unity's runtime.
+
+After compilation and import finish, pass the loaded owner to `TryVerifyConvertedDictionaries`
+with the original payload, field schemas, owning path and complete live reference table. The verifier
+checks the owner's saved GUID/file ID and script GUID, then reads its serialized dictionary arrays.
+Keys and value lists must retain their counts and order. Each null and object reference must match
+the retained address. It detects unsaved live mutations as well as changed imported data.
+Call on the editor thread. The API loads no assets and writes no files or serialized properties;
+Unity can invoke serialization callbacks when it reads the loaded object. This verifies values for
+the supported conversion schemas. It does not apply files, prove project-wide migration coverage,
+or replace coordinated rollback and post-import source validation.
+
+The independent `WallstopStudios.UnityHelpers.OdinMigration.Generator.dll` compiler input produces
+these bindings without depending on the protobuf generator DLL or enabling WallstopProto.
+Its importer excludes it from runtime plugins and player builds. The binding registry and metadata
+are editor-only. Player compilations contain no registration
+code. Fields inherited from referenced assemblies without source declarations are not bound.
+The snapshots describe the captured declarations; they do not validate every project dependency
+or prove that replacement source compiles. Recompile and bind again after source or dependency
+changes. The combined conversion supplies evidence for a future paired preview; it writes no files.
+
+### Previewing dictionary source changes
+
+`TryPreviewDictionarySources` checks the binding and source checksums again before constructing
+proposals. The compiler records replacements for the original field type and explicit dictionary
+initializer type, rather than searching source text for a name. Aliases and private nested enums
+remain valid. Generic base fields retain their original type parameters. Private fields receive
+`SerializeField`, `OdinSerialize` becomes `SerializeField`, existing `SerializeField` attributes are
+retained without duplication, and `readonly` is removed from fields that must become Unity-serialized.
+Direct `SerializedMonoBehaviour` and `SerializedScriptableObject` bases become Unity's corresponding
+base classes. Explicit and target-typed empty or dictionary-copy constructors are supported.
+
+Every field sharing one dictionary declaration must be requested together. The preview refuses
+missing metadata, conflicting or overlapping replacements, unsupported factory/capacity initializers,
+and fields carrying `NonSerialized` or `SerializeReference`. A refusal returns no partial preview.
+Original comments, unrelated source, and line endings remain in the proposals.
+
+These proposals do not compile the consumer's replacement sources or inventory all affected assets
+and dependent callers. They are inputs to a future paired source/data preview, not an applicable
+migration batch. Check the complete retained payload with `TryConvertBoundSerializedDictionaries`,
+then compile and review every affected source and asset before a coordinated migration.
+
+### Previewing coordinated source and asset changes
+
+Create one `OdinMigrationDictionaryTarget` per retained document, then call
+`TryPreviewDictionaryMigration` on the editor thread. The preview reads bounded existing
+`.asset`, `.prefab`, and `.unity` files under `Assets`. It verifies each selected document's original
+script, compiler binding, complete Nodes payload, and live references before replacing the payload
+with converted Unity Helpers fields in the proposed text. The original script GUID and owner file
+ID remain unchanged. Unrelated documents and fields, including unselected opaque Odin payloads,
+remain intact. Each inserted fragment uses the original payload's newline style.
+
+Multiple selected documents can share an asset, and multiple source selections can share a source
+file. Source edits are merged and identical edits are deduplicated. Conflicting source snapshots,
+overlapping edits, duplicate owner IDs or selections, existing destination fields, nested payloads,
+and incomplete declarations fail with no partial preview. Any asset, source, reference, or
+cancellation failure discards the whole proposed batch. Target arrays and returned proposal
+collections are immutable snapshots. Preview preserves the original bytes, encoding, and BOM on disk.
+
+Asset reads are bounded to 16,777,220 delivered bytes, 4,194,304 decoded characters, and 65,536 lines;
+the selection limit is 4,096 documents. These bounds do not trust counts recorded inside the payload.
+The result exposes complete original/proposed source and asset text for review. It does not inventory
+every affected asset or dependent caller, compile replacement sources, or authorize an apply.
+Those checks and coordinated source/data writes remain required before removing Odin.
+
+### Inventorying affected saved data
+
+Run `TryInventoryDictionaryMigration` after constructing a paired preview. Editor compiler metadata
+records the original bound Unity type, dictionary declaring types, and rewritten Odin base types.
+Inherited-only bindings retain the original type. When a closed declaring type cannot appear in
+a type literal, generated metadata follows the known original type's base chain instead of dropping
+that owner. This reads type identity without inspecting members or instantiating recorded types.
+The inventory finds
+saved documents whose original script type derives from those types; it uses authored script
+references and `MonoScript.GetClass`, without inspecting fields or loading consumer asset instances.
+Unrelated native asset data such as textures is identified through asset type metadata.
+
+The immutable report distinguishes a complete scan from complete selection. `Complete` means
+every candidate path was inspected without failure or cancellation. `AllRetainedDocumentsSelected`
+also requires that every discovered affected Odin payload is included in the paired preview.
+Affected documents without retained payloads remain visible. Declaring-type coverage is conservative
+and can include additional instances that share an original source owner.
+
+Missing or changed selected assets, missing/unresolved script references, duplicate saved IDs,
+unreadable or oversized candidate files, stale compiler sources, and cancellation prevent a complete
+inventory. Failures retain findings for review; they never mark the scan complete. Scan bounds are
+the same as the paired asset reader. The inventory validates saved asset coverage at scan time;
+it does not prove dependent source callers compile or authorize an apply. Recheck coverage and live
+state immediately before a future coordinated migration.
+
+### Compiling proposed sources and callers
+
+Call `TryCompileDictionaryMigration` with the paired preview on the editor thread. Keep the returned
+handle and poll `Completed` from an editor callback. `Succeeded` requires every changed assembly and
+its transitive editor callers to compile in dependency order, against the proposed dependency DLLs.
+The compiler copies source text into an owned Library directory and never imports or loads candidate
+assemblies. Original scripts and saved assets remain unchanged. The tool invokes the C# compiler
+bundled with the running Unity Editor in a separate process. It supplies the captured assembly
+defines, references, language version, analyzer inputs, and supported compiler options directly.
+It disables the compiler's default response file, so project-wide defaults cannot add extra defines
+or references. Unsupported compiler layouts or options fail before target writes.
+Supported layouts include the versioned bundled .NET SDK used by Unity 6000.6, the earlier
+`DotNetSdkRoslyn` layout, and the legacy Mono compiler. The versioned SDK selection follows
+[Unity's compiler discovery](https://github.com/Unity-Technologies/UnityCsReference/blob/6000.6.0f1/Editor/Mono/Scripting/ScriptCompilation/BeeDriver/BeeScriptCompilation.cs).
+An incomplete bundled SDK fails instead of falling back to a different compiler.
+Every candidate uses its captured editor compiler context, including runtime-capable assemblies.
+An IL2CPP player setting does not change the editor defines used for this receipt.
+
+The handle exposes assembly names, bounded compiler diagnostics, cancellation, and failure details.
+Call `Dispose` to stop the isolated compiler process and clean its staging files.
+`TryValidateCurrent` rechecks source, reference, analyzer input, and compiler configuration snapshots.
+`TryValidateSources(sources, out failure)` also requires the exact compiled source paths, original
+text, and proposed text. A receipt for another preview cannot authorize those replacements.
+Added or removed assemblies also invalidate the result. Public Unity compiler option metadata is
+read across editor API versions; consumer members are never inspected through reflection.
+
+Compilation currently refuses response files and additional arguments other than warning exclusions.
+Unknown Unity compiler options also require explicit support. A successful result covers the current
+editor configuration, not every player target or conditional symbol combination. Domain reload,
+input drift, compiler errors, and staging cleanup failures prevent success. Coordinated apply and
+post-import verification remain separate requirements.
+
+The API does not apply a conversion or guarantee that the project can remove Odin. The existing
+source preview/apply API remains source-only.
 
 ## Quick Reference Table
 

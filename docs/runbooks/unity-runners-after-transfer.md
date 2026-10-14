@@ -218,6 +218,23 @@ because its player build settings differ. Each mode still writes its own logs an
 separate `<unity-version>-playmode[-<scope>]` project so the second result remains
 independent of assets left by the failed run.
 
+EditMode runs compiler-isolation fixtures in a fresh editor process before the broader suite.
+These cases carry `CompilationIsolation` and must all pass without skips. Their results and log
+remain under the mode's `compilation/` artifact directory. The source API, backup recovery,
+import-verification, source/data apply, and recovery-record/scene fixtures each run in a separate fresh editor process
+with `MigrationIsolation`; their artifacts remain under `migration/<fixture-name>/`.
+The broader process excludes both categories, so each case runs once. All processes share the
+installed editor, project and acquired license context. A failed isolated phase prevents later
+phases and fails the mode. Verification requires passing cases from every named isolated fixture.
+Earlier ruleset-import tests can leave pending compilation and `EditorApplication.isUpdating`
+that cannot drain during the same batch run; each migration fixture needs an idle editor to test
+its real production guard without weakening it. Recovery-record scene controls also need a clean
+initial scene; ordinary broad-suite editor tests can leave an untitled scene dirty. The isolated
+process preserves this precondition without discarding authoring changes or skipping those controls.
+Verification requires the mode's root `results.xml` independently of its isolated fixture XML.
+A passing nested result cannot replace a missing broad-suite result. Failure dumps include
+root and nested editor logs.
+
 It has to. `actions/checkout` runs `git clean -ffdx` at the top of every job and `-x`
 means gitignored, so anything under the repository's `.artifacts/` tree is deleted
 before the job starts, including the `Library` the previous leg had just built on
@@ -298,7 +315,7 @@ The default is `none`. The selected normal test modes still run; acceptance adds
 same organization license lease. `unity-version` can select a supported editor to bound the run.
 Artifacts named `unity-<version>-acceptance` contain separate result directories and a summary.
 Each requested test, verification, credential redaction and upload must succeed. These optional
-runs do not restore the separate disabled benchmark or release workflows.
+runs are separate from the benchmark dispatch and release export workflows.
 
 For fresh IL2CPP conversion evidence, set `fresh-conversion=true` on a manual **Unity Tests**
 dispatch. The default is `false`, preserving normal warm CI. This clears only `Bee`,
@@ -344,6 +361,30 @@ recorded settings and Undo group as cleanup, but it does not promise to preserve
 Undo/redo history or global subscribers. A pass proves callback delivery, draft retention and saved
 settings; it does not prove pixels, mouse hit testing, focus, graph dragging or domain-reload recovery.
 
+## Licensed benchmarks
+
+**Unity Benchmarks** accepts manual dispatch. The hosted weekly scheduler dispatches the same
+workflow on protected main; both workflows must be enabled in repository settings. The benchmark
+job runs the Performance and Random assemblies in PlayMode on the latest supported editor.
+It acquires the organization lock, returns the license, classifies cleanup, and releases the lock
+before reporting and artifact uploads. Hosted fallback and an always-reporting aggregate reject
+incomplete cleanup or missing execution.
+
+The benchmark lane streams each test start and completion. Its no-output guard allows 35 minutes
+of silence because individual performance cases allow up to 30 minutes. The overall Unity pass
+remains bounded at 110 minutes, with cleanup time reserved before the step limit. Compatibility
+tests retain their shorter default silence guard.
+
+Superseded runs cancel within their ref group. Unity Tests uses separate groups for distinct
+pushed commits, preserving the exact validation required by automatic release publication.
+The central enrollment audit requires literal cancellation settings for the licensed queues.
+A benchmark branch dispatch records diagnostic results without replacing the canonical baseline;
+only complete successful measurements on main can refresh the published report.
+
+The metric extractor retains dataset and operation labels for repeated tables. It accepts
+Markdown headers followed by HTML data rows, as emitted by the sorting benchmarks, and keeps
+each measured cell distinct. Duplicate identities still prevent publication.
+
 ## Package exports
 
 Release Publish creates the `.unitypackage` on an `ubuntu-latest` runner without opening Unity or
@@ -354,9 +395,15 @@ paths instead of fresh values from each temporary Unity project.
 
 The Unity Tests smoke job remains on the `self-hosted`, `Windows`, `RAM-64GB` fleet. It imports and
 compiles the same staged Assets payload with release optimization before using Unity's native
-export API. This retains sample compilation and native import/export coverage without putting the
-release workflow behind runner availability or a paid license. Its acquire, activation, return,
-classification, release, and cleanup gate remain one fail-closed physical-runner lifecycle.
+export API. This retains sample compilation and native import/export coverage. Release Publish
+requires the latest Unity Tests run attempt at the selected source commit to have completed this
+native smoke job, including successful acquire, export, return, classification, lock release, and
+confirmed-cleanup steps in order. Missing, skipped, stale, or failed evidence prevents tag mutation
+and publication. The smoke job acquires, activates, returns, classifies, and releases in the same
+physical runner context, with a final cleanup gate.
+
+The release gate script comes from the workflow commit. Its evidence query remains bound to the
+selected source SHA, allowing an older validated source to use the current release controls.
 
 The shell exporter remains available for local Docker comparison and delegates staging to the same
 Node implementation. Compare the portable and native archives by logical path, asset bytes, and

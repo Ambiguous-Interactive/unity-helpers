@@ -29,10 +29,10 @@ Skipped or inconclusive target cases do not satisfy the requirement, even when t
 [MCP server catalog](../../scripts/mcp/README.md) documents the options. Everything measured below
 is the `relay` backend, whose tools are
 `Unity_*`-prefixed. Under the default `cli` backend the Pipeline package serves differently named
-tools with the same jobs: `Unity_RunCommand` → `eval` / `run_script`,
-`Unity_ManageEditor GetState` → `editor_status`, `Unity_ReadConsole` → `get_console_logs`. The
-result shapes differ (`eval` returns structured output, not an `executionLogs` field), so the
-timings and traps in this skill are relay measurements until re-measured against Pipeline.
+tools including `eval`, `recompile`, `recompile_status`, `run_tests`, `test_status`, and `console`.
+Use the [native CLI fixture workflow](./unity-mcp-fixture-runner-part-2.md#use-the-native-cli-fixture-runner-first)
+first when those tools are exposed. Its result shapes differ from relay's `executionLogs`; the
+RunCommand timings and sandbox traps below remain relay measurements.
 
 The host is the `com.unity.ai.assistant` package inside the editor (a throw stack names
 `AgentRunCommand.Execute` in that package), not the standalone unity-mcp-server where

@@ -88,13 +88,14 @@ runs:
         }
 
         $logFiles = @(Get-UnityDiagnosticLogFiles -ResultsDir $dir)
-        $log = if ($dir) { Join-Path $dir 'unity.log' } else { $null }
-        if (-not $log -or -not (Test-Path -LiteralPath $log -PathType Leaf)) {
+        $editorLogs = @($logFiles | Where-Object { (Split-Path -Leaf $_) -eq 'unity.log' })
+        if ($editorLogs.Count -lt 1) {
           # Cancellation before Unity launched leaves no unity.log; this is
           # NOT an error condition for this diagnostic helper.
           Write-Host "::notice::${label}: no unity.log under '$dir' to dump (Unity may not have started, or the run was cancelled before launch)."
-        } else {
-          Write-Host "::group::Unity log tail (last $tailLines lines) -- $label"
+        }
+        foreach ($log in $editorLogs) {
+          Write-Host "::group::Unity log tail (last $tailLines lines) -- $label -- $log"
           try {
             Get-Content -LiteralPath $log -Tail $tailLines | ForEach-Object {
               Write-Host (ConvertTo-UnitySafeLogText -Text $_)

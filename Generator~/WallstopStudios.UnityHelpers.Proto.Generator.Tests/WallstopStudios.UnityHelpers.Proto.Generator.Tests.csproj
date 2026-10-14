@@ -101,6 +101,9 @@
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConsumerMigrationTests.cs" />
     <Compile Include="$(RepoRoot)/Tests/ProtoOnly/WProtoBufferWriter*.cs" />
     <Compile Include="$(RepoRoot)/Tests/ProtoOnly/WProtoFaultBufferWriter.cs" />
+    <Compile Include="$(RepoRoot)/Tests/ProtoOnly/IWProtoRuntimeSave.cs" />
+    <Compile Include="$(RepoRoot)/Tests/ProtoOnly/WProtoRuntimeSave.cs" />
+    <Compile Include="$(RepoRoot)/Tests/ProtoOnly/WProtoRuntimeOtherSave.cs" />
     <Compile Include="*.cs" />
     <Compile
       Include="$(RepoRoot)/Tests/Core/DictionaryAssertions.cs"
@@ -118,6 +121,9 @@
     <ProjectReference Include="../WallstopStudios.UnityHelpers.Proto.Generator/WallstopStudios.UnityHelpers.Proto.Generator.csproj">
       <!-- Building the generator normally refreshes the shipped DLL. Not from here: these tests
            validate the shipped artifact, and a run that rewrote it first could never fail. -->
+      <Properties>CopyAnalyzerPayload=false</Properties>
+    </ProjectReference>
+    <ProjectReference Include="../WallstopStudios.UnityHelpers.OdinMigration.Generator/WallstopStudios.UnityHelpers.OdinMigration.Generator.csproj">
       <Properties>CopyAnalyzerPayload=false</Properties>
     </ProjectReference>
   </ItemGroup>

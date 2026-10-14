@@ -30,8 +30,8 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </list>
     /// </para>
     /// <para>
-    /// By default, intelligent purging is <strong>disabled</strong>. Enable it by setting
-    /// <see cref="GlobalEnabled"/> to <c>true</c> or by configuring pool settings in the Unity Editor
+    /// By default, intelligent purging is <strong>enabled</strong>. Disable it by setting
+    /// <see cref="GlobalEnabled"/> to <c>false</c> or by configuring pool settings in the Unity Editor
     /// (Edit > Project Settings > Unity Helpers > Pool Purging).
     /// </para>
     /// <para>
@@ -151,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         /// <summary>
         /// Gets or sets whether intelligent pool purging is globally enabled.
-        /// Default is <c>false</c> (disabled). Enable via Unity Editor settings or by setting this property.
+        /// Default is <c>true</c>; players use conservative idle purging without Editor settings.
         /// </summary>
         public static bool GlobalEnabled
         {
@@ -438,7 +438,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             PoolPurgeTypeOptions
         > BuiltInGenericTypeConfigurations = new Dictionary<Type, PoolPurgeTypeOptions>();
         internal static int _builtInDefaultsInitialized;
-        private static int _globalEnabled = 0;
+        private static int _globalEnabled = 1;
         private static int _purgeOnLowMemory = 1;
         private static int _purgeOnAppBackground = 1;
         private static int _purgeOnSceneUnload = 1;
@@ -722,7 +722,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         public static void ResetToDefaults()
         {
-            GlobalEnabled = false;
+            GlobalEnabled = true;
             DefaultGlobalIdleTimeoutSeconds = DefaultIdleTimeoutSeconds;
             DefaultGlobalMinRetainCount = DefaultMinRetainCount;
             DefaultGlobalWarmRetainCount = DefaultWarmRetainCount;
@@ -1961,6 +1961,43 @@ namespace WallstopStudios.UnityHelpers.Utils
             BudgetEnforcementEnabled = true;
             BudgetEnforcementIntervalSeconds = DefaultBudgetEnforcementIntervalSeconds;
             Volatile.Write(ref _lastBudgetEnforcementTime, 0f);
+        }
+
+        internal static void RunMaintenance()
+        {
+            using PurgeBufferLease<IAutomaticPoolMaintenance> lease =
+                PurgeBuffer<IAutomaticPoolMaintenance>.Get(
+                    out List<IAutomaticPoolMaintenance> pools
+                );
+            lock (RegistryLock)
+            {
+                for (int index = RegisteredPools.Count - 1; 0 <= index; index--)
+                {
+                    if (!RegisteredPools[index].TryGetTarget(out IPurgeable pool))
+                    {
+                        RegisteredPools.RemoveAt(index);
+                    }
+                    else if (pool is IAutomaticPoolMaintenance automatic)
+                    {
+                        pools.Add(automatic);
+                    }
+                }
+            }
+            foreach (IAutomaticPoolMaintenance pool in pools)
+            {
+                try
+                {
+                    pool.Maintain();
+                }
+                catch (Exception exception)
+                {
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
+                    Debug.LogWarning($"[PoolPurgeSettings] Pool maintenance failed: {exception}");
+#endif
+                    _ = exception;
+                }
+            }
+            TryEnforceBudgetIfNeeded();
         }
 
         private static int EnforceBudgetSingleFlight(long maxItems)

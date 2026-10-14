@@ -846,6 +846,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             List<PurgeReason> reasons = new();
             PoolOptions<TestPoolItem> options = new()
             {
+                WarmRetainCount = 0,
                 Triggers = PurgeTrigger.Explicit,
                 OnPurge = (_, reason) => reasons.Add(reason),
                 TimeProvider = TestTimeProvider,
@@ -1979,16 +1980,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
-        public void IntelligentPurgingDefaultsToDisabled()
+        public void IntelligentPurgingDefaultsToEnabled()
         {
             using WallstopGenericPool<TestPoolItem> pool = new(
                 () => new TestPoolItem(),
                 options: new PoolOptions<TestPoolItem> { TimeProvider = TestTimeProvider }
             );
 
-            Assert.IsFalse(
+            Assert.IsTrue(
                 pool.UseIntelligentPurging,
-                "Intelligent purging should be disabled by default"
+                "Intelligent purging should be enabled by default"
             );
         }
 
@@ -2238,27 +2239,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
-        public void PoolPurgeSettingsGlobalEnabledDefaultsToFalse()
+        public void PoolPurgeSettingsGlobalEnabledDefaultsToTrue()
         {
             PoolPurgeSettings.ResetToDefaults();
 
-            Assert.IsFalse(
-                PoolPurgeSettings.GlobalEnabled,
-                "GlobalEnabled should default to false"
-            );
+            Assert.IsTrue(PoolPurgeSettings.GlobalEnabled, "GlobalEnabled should default to true");
         }
 
         [Test]
         public void GlobalEnabledFalseDisablesIntelligentPurgingByDefault()
         {
             PoolPurgeSettings.ResetToDefaults();
+            PoolPurgeSettings.DisableGlobally();
 
             try
             {
                 Assert.That(
                     PoolPurgeSettings.GlobalEnabled,
                     Is.False,
-                    "GlobalEnabled should be false by default"
+                    "GlobalEnabled should be false after opting out"
                 );
 
                 PoolPurgeEffectiveOptions effective =
@@ -4199,6 +4198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 () => new TestPoolItem(),
                 options: new PoolOptions<TestPoolItem>
                 {
+                    WarmRetainCount = 0,
                     MaxPoolSize = 1,
                     Triggers = PurgeTrigger.OnReturn,
                     TimeProvider = TestTimeProvider,

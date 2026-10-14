@@ -162,7 +162,7 @@ foreach ($requiredCall in @(
     'Assert-NoUnityCompilerWarnings -LogPath $LogPath -Label $Label -PackageRoot $RepoRoot',
     'Assert-NoUnityCompilerWarnings -LogPath $LogPath -Label ''Unity package export'' -PackageRoot $PackageRoot',
     '-Label "Unity $UnityVersion standalone build"',
-    '-Label "Unity $UnityVersion $TestMode"'
+    'Assert-NoUnityCompilerWarnings -LogPath $phaseLog -Label $Label -PackageRoot $PackageRoot'
 )) {
     Assert-That "runner includes warning gate call: $requiredCall" $source.Contains($requiredCall)
 }

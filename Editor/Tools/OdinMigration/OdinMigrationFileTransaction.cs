@@ -130,7 +130,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             IReadOnlyList<OdinMigrationFilePlan> plans,
             string backupRoot,
             IOdinMigrationFileStore store,
-            out string failure
+            out string failure,
+            Action backupsCompleted = null,
+            bool numberedBackups = false
         )
         {
             List<OdinMigrationFilePlan> writesStarted = new List<OdinMigrationFilePlan>();
@@ -138,19 +140,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             {
                 foreach (OdinMigrationFilePlan plan in plans.AsValueEnumerableRequired())
                 {
-                    byte[] current = store.ReadAllBytes(plan.FullPath);
-                    if (!BytesEqual(current, plan.OriginalBytes))
-                    {
-                        throw new IOException(
-                            $"'{plan.AssetPath}' changed after preview. No further files were written."
+                    RequireUnchanged(plan, store);
+                }
+                int backupIndex = 0;
+                foreach (OdinMigrationFilePlan plan in plans.AsValueEnumerableRequired())
+                {
+                    string backupPath = numberedBackups
+                        ? OdinMigrationBackupReceipt.GetNumberedBackupPath(backupRoot, backupIndex)
+                        : Path.Combine(
+                            backupRoot,
+                            plan.AssetPath.Replace('/', Path.DirectorySeparatorChar)
                         );
-                    }
-
-                    string backupPath = Path.Combine(
-                        backupRoot,
-                        plan.AssetPath.Replace('/', Path.DirectorySeparatorChar)
-                    );
                     store.WriteBackup(backupPath, plan.OriginalBytes);
+                    ++backupIndex;
+                }
+                backupsCompleted?.Invoke();
+                foreach (OdinMigrationFilePlan plan in plans.AsValueEnumerableRequired())
+                {
+                    RequireUnchanged(plan, store);
+                    if (BytesEqual(plan.OriginalBytes, plan.UpgradedBytes))
+                    {
+                        continue;
+                    }
                     writesStarted.Add(plan);
                     store.WriteTarget(plan.FullPath, plan.UpgradedBytes);
                 }
@@ -214,6 +225,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
             return true;
         }
+
+        private static void RequireUnchanged(
+            OdinMigrationFilePlan plan,
+            IOdinMigrationFileStore store
+        )
+        {
+            byte[] current = store.ReadAllBytes(plan.FullPath);
+            if (!BytesEqual(current, plan.OriginalBytes))
+            {
+                throw new IOException(
+                    $"'{plan.AssetPath}' changed after preview. No further files were written."
+                );
+            }
+        }
     }
 
     internal sealed class PhysicalOdinMigrationFileStore : IOdinMigrationFileStore
@@ -222,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             if (!DurableFile.TryWriteAllBytes(path, bytes, out Exception error))
             {
-                throw new IOException($"Could not write '{path}'.", error);
+                throw new IOException($"Could not write '{path}': {error?.Message}", error);
             }
         }
 

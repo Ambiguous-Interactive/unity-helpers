@@ -13,7 +13,9 @@ if ($parseErrors.Count -ne 0) { throw 'The Unity runner must parse.' }
 foreach ($name in @('Test-NUnitResults', 'Get-UnityFailedNodeCount',
         'ConvertTo-UnsignedExitHex', 'Get-NativeExitCodeDescription',
         'Get-UnityCrashSignature', 'Write-UnityBenignExitWarning',
-        'Write-UnityExecutionSymptomDiagnostics')) {
+        'Write-UnityExecutionSymptomDiagnostics', 'New-UnityEditorTestPhases',
+        'New-UnityEditorPhaseArguments',
+        'Invoke-UnityEditorTestPhase')) {
     $function = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
@@ -31,6 +33,7 @@ $nativeDescriptions = $ast.Find({
 if ($null -eq $nativeDescriptions) { throw 'Missing native exit-code descriptions.' }
 Invoke-Expression $nativeDescriptions.Extent.Text
 . (Join-Path $PSScriptRoot '../unity/lib/credential-redaction.ps1')
+. (Join-Path $PSScriptRoot '../unity/lib/compilation-fixture-results.ps1')
 
 $verifier = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/actions/verify-unity-results/action.yml') -Raw
 foreach ($diagnosticSource in @($source, $verifier)) {
@@ -98,6 +101,10 @@ foreach ($TestFilter in @('', $expectedFilter)) {
         if ($assignments.Count -lt 1) { throw "Missing $variable construction." }
         foreach ($assignment in $assignments) { Invoke-Expression $assignment.Extent.Text }
         $arguments = Get-Variable -Name $variable -ValueOnly
+        if ($TestMode -ne 'standalone') {
+            $arguments = @(New-UnityEditorPhaseArguments -Arguments $arguments `
+                -TestCategory $TestCategory -TestFilter $TestFilter)
+        }
         $position = [Array]::IndexOf($arguments, '-testFilter')
         if ($TestFilter -eq '') {
             if ($position -ne -1 -or $requireFilteredPass) { throw "$TestMode default selection changed." }
@@ -145,6 +152,190 @@ $temporary = Join-Path ([IO.Path]::GetTempPath()) ('unity-filter-' + [Guid]::New
 New-Item -ItemType Directory -Path $temporary | Out-Null
 $checks = 0
 try {
+    $isolationChecks = 0
+    $phases = @(New-UnityEditorTestPhases -ArtifactsPath $temporary `
+        -TestCategory '!Performance;!Stress' -IsolateCompilationFixtures)
+    if ($phases.Count -ne 7 -or $phases[0].TestCategory -cne 'CompilationIsolation' -or
+        $phases[0].ArtifactsPath -ceq $phases[1].ArtifactsPath -or
+        -not $phases[0].RequirePassedTests -or
+        $phases[-1].TestCategory -cne '!Performance;!Stress;!CompilationIsolation;!MigrationIsolation') {
+        throw 'Compiler and normal tests must have separate complete selections and artifacts.'
+    }
+    $rejected = $false
+    try { New-UnityEditorTestPhases -ArtifactsPath $temporary -TestFilter 'Caller.Filter' -IsolateCompilationFixtures }
+    catch { $rejected = $true }
+    if (-not $rejected) { throw 'Isolation must not silently widen a caller filter.' }
+    $isolationChecks++
+    foreach ($fixture in @(
+            @{ Body = ''; Accepted = $false },
+            @{ Body = '<test-case classname="Subject" result="Passed" />'; Accepted = $true },
+            @{ Body = '<test-case classname="Other" result="Passed" />'; Accepted = $false },
+            @{ Body = '<test-case classname="Subject" result="Skipped" />'; Accepted = $false },
+            @{ Body = '<test-case classname="Subject" result="Inconclusive" />'; Accepted = $false },
+            @{ Body = '<test-case classname="Subject" result="Failed" />'; Accepted = $false },
+            @{ Body = '<test-case classname="Subject" result="Passed" /><test-case classname="Subject" result="Skipped" />'; Accepted = $false }
+        )) {
+        $fixtureXml = Join-Path $temporary 'fixture.xml'
+        Set-Content -LiteralPath $fixtureXml -Value ('<test-run>' + $fixture.Body + '</test-run>')
+        $accepted = $true
+        try { Assert-UnityCompilationFixtureResults -Path $fixtureXml -FixtureName 'Subject' }
+        catch { $accepted = $false }
+        if ($accepted -ne $fixture.Accepted) { throw 'Isolated fixture evidence control mismatch.' }
+        $isolationChecks++
+    }
+
+    $phaseLoop = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.ForEachStatementAst] -and
+        $node.Variable.VariablePath.UserPath -eq 'phase'
+    }, $true)
+    if ($null -eq $phaseLoop) { throw 'The shipping phase orchestration must exist.' }
+    function Invoke-UnityEditorTestsWithPackageManagerRetry {
+        param($EditorPath, $Arguments, $Label, $LogPath, $ResultsPath, $Project)
+        if (Test-Path -LiteralPath $ResultsPath) { throw 'A stale phase result reached the native runner.' }
+        $script:phaseCalls.Add(@($Arguments))
+        $first = $script:phaseCalls.Count -eq 1
+        if (($script:phaseFailure -eq 'first process' -and $first) -or
+            ($script:phaseFailure -eq 'second process' -and -not $first)) {
+            throw 'Native process failure.'
+        }
+        $phaseSubject = $phases[$script:phaseCalls.Count - 1].RequiredFixture
+        $caseClass = if ($phaseSubject) { $phaseSubject } else { 'Normal.Subject' }
+        if ($script:phaseFailure -eq 'wrong subject' -and $first) { $caseClass = 'Wrong.Subject' }
+        Set-Content -LiteralPath $ResultsPath -Value ("<test-run total='1' passed='1' failed='0' skipped='0'><test-case classname='$caseClass' result='Passed' /></test-run>")
+        Set-Content -LiteralPath $LogPath -Value 'Native editor output.'
+        return 0
+    }
+    function Write-AnalyzerSetupDiagnostics { param($Project, $LogPath, $Label) }
+    function Assert-NoUnityCompilerWarnings {
+        param($LogPath, $Label, $PackageRoot)
+        if ($script:phaseFailure -eq 'compiler warning' -and $script:phaseCalls.Count -eq 1) {
+            throw 'Compiler warning.'
+        }
+    }
+    foreach ($phaseFailure in @('', 'first process', 'second process', 'wrong subject', 'compiler warning')) {
+        $script:phaseFailure = $phaseFailure
+        $script:phaseCalls = New-Object 'System.Collections.Generic.List[object]'
+        foreach ($phase in $phases) {
+            New-Item -ItemType Directory -Force -Path $phase.ArtifactsPath | Out-Null
+            Set-Content -LiteralPath (Join-Path $phase.ArtifactsPath 'results.xml') -Value '<stale />'
+        }
+        $testArgs = @('-batchmode', '-projectPath', $temporary, '-runTests')
+        $UnityEditorPath = 'native-editor'
+        $UnityVersion = '2021.3.45f1'
+        $TestMode = 'editmode'
+        $ProjectPath = $temporary
+        $RepoRoot = $temporary
+        $accepted = $true
+        try { Invoke-Expression $phaseLoop.Extent.Text }
+        catch { $accepted = $false }
+        if ($accepted -ne ($phaseFailure -eq '')) { throw 'A phase failure was hidden or a passing pair was rejected.' }
+        $expectedCalls = if ($phaseFailure -eq '') { $phases.Count } elseif ($phaseFailure -eq 'second process') { 2 } else { 1 }
+        if ($script:phaseCalls.Count -ne $expectedCalls) { throw 'A failed isolated phase must prevent the broad process.' }
+        foreach ($arguments in $script:phaseCalls) {
+            if (@($arguments | Where-Object { $_ -ceq '-testResults' }).Count -ne 1) {
+                throw 'Each native process must receive one owned result path.'
+            }
+        }
+        $isolationChecks++
+    }
+    $runMarker = '      run: |'
+    $runStart = $verifier.IndexOf($runMarker)
+    if ($runStart -lt 0) { throw 'The shipping result verifier must have a run block.' }
+    $verifierProgram = $verifier.Substring($runStart + $runMarker.Length).TrimStart("`r", "`n")
+    $verifierProgram = ($verifierProgram -split "`n" | ForEach-Object { $_ -replace '^        ', '' }) -join "`n"
+    $verifierScript = Join-Path $temporary 'verify-action.ps1'
+    Set-Content -LiteralPath $verifierScript -Value $verifierProgram
+    $oldEnvironment = @{}
+    foreach ($key in @('GITHUB_WORKSPACE', 'UH_RESULTS_DIR', 'UH_LABEL', 'UH_EXPECTED_EMPTY', 'UH_REQUIRED_TEST_NAME', 'UH_REQUIRED_COMPILATION_FIXTURE')) {
+        $oldEnvironment[$key] = [Environment]::GetEnvironmentVariable($key)
+    }
+    try {
+        $env:GITHUB_WORKSPACE = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+        $env:UH_LABEL = 'result ownership control'
+        $env:UH_EXPECTED_EMPTY = 'false'
+        $env:UH_REQUIRED_TEST_NAME = ''
+        $env:UH_REQUIRED_COMPILATION_FIXTURE = 'Subject'
+        foreach ($fixture in @(
+                @{ Root = $null; Child = 'Passed'; Exit = 1 },
+                @{ Root = 'Passed'; Child = $null; Exit = 1 },
+                @{ Root = 'Failed'; Child = 'Passed'; Exit = 1 },
+                @{ Root = 'Passed'; Child = 'Failed'; Exit = 1 },
+                @{ Root = 'Passed'; Child = 'Skipped'; Exit = 1 },
+                @{ Root = 'Passed'; Child = 'Passed'; Exit = 0 },
+                @{ Root = $null; RootXml = ''; Child = 'Passed'; Exit = 1 },
+                @{ Root = $null; RootXml = '<test-run'; Child = 'Passed'; Exit = 1 },
+                @{ Root = $null; RootXml = '<test-run><test-case></test-run>'; Child = 'Passed'; Exit = 1 },
+                @{ Root = $null; RootXml = '<other />'; Child = 'Passed'; Exit = 1 }
+            )) {
+            $env:UH_RESULTS_DIR = Join-Path $temporary ('ownership-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path (Join-Path $env:UH_RESULTS_DIR 'compilation') -Force | Out-Null
+            if ($fixture.ContainsKey('RootXml')) {
+                Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'results.xml') -Value $fixture.RootXml
+                Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'unity.log') -Value 'error CS1234: malformed-result-diagnostic-control'
+            }
+            if ($null -ne $fixture.Root) {
+                $failedCount = if ($fixture.Root -eq 'Failed') { 1 } else { 0 }
+                Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'results.xml') -Value ("<test-run total='1' passed='1' failed='$failedCount' skipped='0'><test-case result='$($fixture.Root)' /></test-run>")
+            }
+            if ($null -ne $fixture.Child) {
+                Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'compilation/results.xml') -Value ("<test-run total='1' passed='1' failed='0' skipped='0'><test-case classname='Subject' result='$($fixture.Child)' /></test-run>")
+            }
+            foreach ($migrationFixture in @(Get-UnityMigrationIsolationFixtures)) {
+                $migrationPath = Join-Path $env:UH_RESULTS_DIR ('migration/' + $migrationFixture.Split('.')[-1])
+                New-Item -ItemType Directory -Force -Path $migrationPath | Out-Null
+                Set-Content -LiteralPath (Join-Path $migrationPath 'results.xml') -Value ("<test-run total='1' passed='1' failed='0' skipped='0'><test-case classname='$migrationFixture' result='Passed' /></test-run>")
+            }
+            $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+            $actualExit = $LASTEXITCODE
+            if (($actualExit -eq 0) -ne ($fixture.Exit -eq 0)) {
+                throw "The actual verifier confused root and compilation evidence: $output"
+            }
+            if ($fixture.ContainsKey('RootXml') -and
+                (-not $output.Contains('malformed-result-diagnostic-control') -or
+                    -not $output.Contains('No NUnit results.xml'))) {
+                throw "An unusable root result must retain native crash diagnostics: $output"
+            }
+            $isolationChecks++
+        }
+        Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'results.xml') -Value '<test-run total="1" passed="1" failed="0"><test-case result="Passed" /></test-run>'
+        $migrationFixtures = @(Get-UnityMigrationIsolationFixtures)
+        foreach ($migrationFixture in $migrationFixtures) {
+            $migrationResult = Join-Path $env:UH_RESULTS_DIR ('migration/' + $migrationFixture.Split('.')[-1] + '/results.xml')
+            foreach ($damage in @('missing', 'wrong subject', 'Skipped', 'Inconclusive', 'Failed')) {
+                if ($damage -eq 'missing') {
+                    Remove-Item -LiteralPath $migrationResult
+                } else {
+                    $classname = if ($damage -eq 'wrong subject') { 'Wrong.Subject' } else { $migrationFixture }
+                    $result = if ($damage -eq 'wrong subject') { 'Passed' } else { $damage }
+                    Set-Content -LiteralPath $migrationResult -Value ("<test-run><test-case classname='$classname' result='$result' /></test-run>")
+                }
+                $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+                if ($LASTEXITCODE -eq 0) { throw "A missing or nonpassing isolated migration fixture was accepted: $migrationFixture" }
+                $isolationChecks++
+            }
+            Set-Content -LiteralPath $migrationResult -Value ("<test-run><test-case classname='$migrationFixture' result='Passed' /></test-run>")
+            $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) { throw "Restoring the damaged isolated fixture did not restore passing evidence: $migrationFixture -- $output" }
+            $isolationChecks++
+        }
+        $dumpAction = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/actions/dump-unity-log-tail/action.yml') -Raw
+        $dumpStart = $dumpAction.IndexOf($runMarker)
+        if ($dumpStart -lt 0) { throw 'The shipping dump action must have a run block.' }
+        $dumpProgram = $dumpAction.Substring($dumpStart + $runMarker.Length).TrimStart("`r", "`n")
+        $dumpProgram = ($dumpProgram -split "`n" | ForEach-Object { $_ -replace '^        ', '' }) -join "`n"
+        $dumpProgram = $dumpProgram.Replace('${{ inputs.results-dir }}', '$env:UH_RESULTS_DIR').Replace('${{ inputs.label }}', '$env:UH_LABEL').Replace('${{ inputs.tail-lines }}', '20')
+        $dumpScript = Join-Path $temporary 'dump-action.ps1'
+        Set-Content -LiteralPath $dumpScript -Value $dumpProgram
+        Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'compilation/unity.log') -Value 'isolated compiler diagnostic marker'
+        $dumpOutput = & (Get-Process -Id $PID).Path -NoProfile -File $dumpScript 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0 -or -not $dumpOutput.Contains('isolated compiler diagnostic marker')) {
+            throw 'An isolated failure must retain its nested editor log tail.'
+        }
+        $isolationChecks++
+    } finally {
+        foreach ($key in $oldEnvironment.Keys) { [Environment]::SetEnvironmentVariable($key, $oldEnvironment[$key]) }
+    }
     foreach ($fixture in @(
             @{ Name = 'passed'; Total = 1; Passed = 1; Failed = 0; Skipped = 0; Body = ''; Error = '' },
             @{ Name = 'empty'; Total = 0; Passed = 0; Failed = 0; Skipped = 0; Body = ''; Error = '0 tests ran' },
@@ -162,6 +353,12 @@ try {
         $ProjectPath = $temporary
         $playerExitForValidation = 0
         $runExit = 0
+        $phaseResults = $resultsPath
+        $phaseLog = $logPath
+        $Project = $ProjectPath
+        $phaseExit = 0
+        $Label = 'control'
+        $RequirePassedTests = $true
         $requireFilteredPass = $true
         foreach ($invocation in $invocations) {
             $message = ''
@@ -328,4 +525,4 @@ try {
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force
 }
-Write-Host "[test-unity-test-filter] All six argument propagation controls, $checks result controls, and $diagnosticChecks execution diagnostic controls, and $exitDiagnosticChecks exit/XML controls passed."
+Write-Host "[test-unity-test-filter] Six argument controls, $checks result controls, $isolationChecks isolation controls, $diagnosticChecks diagnostic controls, and $exitDiagnosticChecks exit/XML controls passed."

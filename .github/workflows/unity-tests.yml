@@ -67,7 +67,7 @@ permissions:
 # evidence, releases the organization lock, and requires confirmed cleanup before the job ends.
 concurrency:
   group: unity-tests-${{ github.event_name == 'push' && github.sha || github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   matrix-config:
@@ -271,7 +271,7 @@ jobs:
     timeout-minutes: 3
     concurrency:
       group: ${{ github.workflow }}-runner-preflight-${{ github.event_name == 'push' && github.sha || github.ref }}
-      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+      cancel-in-progress: true
     steps:
       # Verifies only that every required label set has a registered runner
       # visible to the repository; the licensed jobs below depend on this job so
@@ -470,6 +470,7 @@ jobs:
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode 'editmode' `
+            -IsolateCompilationFixtures `
             -ShareEditorProject `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode' `
@@ -760,6 +761,7 @@ jobs:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode
           label: Unity ${{ matrix.unity-version }} editmode
           expected-empty: false
+          required-compilation-fixture: WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationDictionaryCompilationTests
 
       - name: Verify PlayMode tests actually ran
         id: verify_playmode
@@ -1168,6 +1170,7 @@ jobs:
             -ShareEditorProject `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded' `
+            -IsolateCompilationFixtures `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
             -ProjectScope 'single-threaded' `
             -AdditionalScriptingDefines SINGLE_THREADED,WALLSTOP_CONCAVE_HULL_STATS `
@@ -1364,6 +1367,7 @@ jobs:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
           label: Unity ${{ matrix.unity-version }} editmode (SINGLE_THREADED)
           expected-empty: false
+          required-compilation-fixture: WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationDictionaryCompilationTests
 
       - name: Verify PlayMode tests actually ran (SINGLE_THREADED)
         id: verify_playmode

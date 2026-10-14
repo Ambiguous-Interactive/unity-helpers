@@ -428,13 +428,13 @@
     },
     {
       "name": "unity-mcp-fixture-runner",
-      "sha256": "dd0eec377ac9416484bf33f04b298a8e08612ac912dd80d4e8b130bc410bacbb",
+      "sha256": "28d8402de14b7f7ceb64d5be1dbf78f2d225450b0dc94477443c17d6916e10cd",
       "parts": [
         "unity-mcp-fixture-runner-part-1.md",
         "unity-mcp-fixture-runner-part-2.md",
         "unity-mcp-fixture-runner-part-3.md"
       ],
-      "routerSha256": "0aabdfc757a7a062cb60843685662b97e513d94104bdfd8d53beedaa8668b1ca"
+      "routerSha256": "48c07aaf137cdb9c6912a2b75d0d8265f29baf50d1686557484c23c82c16fd4c"
     },
     {
       "name": "unity-performance-patterns",

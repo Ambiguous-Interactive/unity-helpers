@@ -2722,6 +2722,9 @@ define is set, and fall back to protobuf-net when it declines. That makes the sw
 type**: annotating a contract moves it, and everything unannotated keeps working exactly as before,
 so contracts can be ported and verified one at a time.
 
+Both allocating and reusable-buffer writes fall back when a registered runtime formatter
+declines an interface or object root. Encoding failures keep their typed exceptions.
+
 WallstopProto answers when a formatter is registered for the declared type, **and** the value's
 runtime type is one that formatter writes:
 
@@ -2744,9 +2747,22 @@ Three rules decide the rest:
   declined rather than failed, and protobuf-net's runtime model answers it.
 - **`forceRuntimeType` does not turn the swap off.** A generated formatter already dispatches on the
   runtime type, which is what that flag asks for.
-- **An `interface`-typed declared type is served only when a root is declared for it.** An interface
-  has no members, so nothing about it says which contract should answer. Say so once with
-  [a declared root](#declared-roots-serving-an-interface); `IRandom` already has one.
+- **Interface and `object` writes can use the registered concrete contract.** After declared-type
+  dispatch declines, `Serializer.ProtoSerialize` selects the runtime writer when the legacy facade
+  would select a runtime type. Generated registration supplies that writer without reflection or
+  manual registration. The allocating and reusable-buffer overloads use the same route, including
+  `WALLSTOP_PROTO_ONLY` builds. Unrelated concrete save types can share one application interface.
+  Read those bytes through the concrete save type; writing a runtime value does not add a discriminator
+  to its payload. Interface reads still need [a declared root](#declared-roots-serving-an-interface).
+  Direct `WProtoFacade` calls retain their declared-type contract.
+
+Closed one-dimensional arrays (except scalar `byte[]`), `List<T>`, and `Dictionary<TKey, TValue>`
+also receive generated root codecs when their supported element types appear in source. Their root
+encoding uses tag 1, with unpacked scalar elements matching protobuf-net's legacy output. These
+registrations also serve `object` and collection-interface writes through `Serializer`, including
+reused buffers and `WALLSTOP_PROTO_ONLY`. Read through the concrete collection type. Empty root
+payloads restore empty collections. Unsupported elements retain the existing refusal and fallback
+behavior; registering a collection root does not alter collection members inside contracts.
 
 Two consequences on the read side are worth knowing:
 
