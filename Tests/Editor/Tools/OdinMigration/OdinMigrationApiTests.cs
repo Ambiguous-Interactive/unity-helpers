@@ -192,7 +192,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 failure
             );
             _backupRoots.Add(backupRoot);
-            CollectionAssert.AreEqual(before, File.ReadAllBytes(Path.Combine(backupRoot, path)));
+            CollectionAssert.AreEqual(
+                before,
+                File.ReadAllBytes(OdinMigrationBackupReceipt.GetNumberedBackupPath(backupRoot, 0))
+            );
             byte[] after = File.ReadAllBytes(FullPath(path));
             Assert.AreEqual(before[0], after[0]);
             Assert.AreEqual(before[1], after[1]);

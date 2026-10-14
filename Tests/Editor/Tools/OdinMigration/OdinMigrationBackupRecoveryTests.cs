@@ -88,25 +88,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             }
         }
 
-        [Test]
-        public void RecoveryReadsDurableRecordAndPreservesMetadataAndEncoding()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RecoveryReadsDurableRecordAndPreservesMetadataAndEncoding(bool legacy)
         {
             byte[] metadata = File.ReadAllBytes(_plans[0].FullPath + ".meta");
             Assert.IsTrue(
                 OdinMigrationBackupReceipt.TryApply(_plans, _backup, out string failure),
                 failure
             );
+            if (legacy)
+            {
+                ConvertBackupToLegacyLayout();
+            }
+            int index = 0;
             foreach (OdinMigrationFilePlan plan in _plans)
             {
                 CollectionAssert.AreEqual(plan.UpgradedBytes, File.ReadAllBytes(plan.FullPath));
                 CollectionAssert.AreEqual(
                     plan.OriginalBytes,
-                    File.ReadAllBytes(Path.Combine(_backup, plan.AssetPath))
+                    File.ReadAllBytes(
+                        legacy
+                            ? Path.Combine(_backup, plan.AssetPath)
+                            : OdinMigrationBackupReceipt.GetNumberedBackupPath(_backup, index)
+                    )
                 );
                 CollectionAssert.AreEqual(
                     File.ReadAllBytes(plan.FullPath + ".meta"),
-                    File.ReadAllBytes(Path.Combine(_backup, plan.AssetPath + ".meta"))
+                    File.ReadAllBytes(
+                        legacy
+                            ? Path.Combine(_backup, plan.AssetPath + ".meta")
+                            : OdinMigrationBackupReceipt.GetNumberedBackupPath(_backup, index + 1)
+                    )
                 );
+                index += 2;
             }
             Assert.IsTrue(OdinMigrationTool.TryRestoreBackup(_backup, out failure), failure);
             foreach (OdinMigrationFilePlan plan in _plans)
@@ -118,6 +133,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.IsTrue(
                 File.Exists(Path.Combine(_backup, OdinMigrationBackupReceipt.ReceiptName))
             );
+        }
+
+        [Test]
+        public void LongAssetPathsUseShortBackupNamesAndRestoreExactBytes()
+        {
+            int filenameLength = 240 - _fullFolder.Length - 1;
+            Assert.That(filenameLength, Is.InRange(4, 250));
+            OdinMigrationFilePlan plan = CreatePlan(new string('a', filenameLength - 3) + ".cs");
+            byte[] metadata = File.ReadAllBytes(plan.FullPath + ".meta");
+            Assert.AreEqual(240, plan.FullPath.Length);
+            Assert.That(Path.Combine(_backup, plan.AssetPath).Length, Is.GreaterThan(260));
+            Assert.IsTrue(
+                OdinMigrationBackupReceipt.TryApply(new[] { plan }, _backup, out string failure),
+                failure
+            );
+            CollectionAssert.AreEqual(plan.UpgradedBytes, File.ReadAllBytes(plan.FullPath));
+            CollectionAssert.AreEqual(
+                plan.OriginalBytes,
+                File.ReadAllBytes(OdinMigrationBackupReceipt.GetNumberedBackupPath(_backup, 0))
+            );
+            CollectionAssert.AreEqual(
+                metadata,
+                File.ReadAllBytes(OdinMigrationBackupReceipt.GetNumberedBackupPath(_backup, 1))
+            );
+            Assert.IsTrue(OdinMigrationTool.TryRestoreBackup(_backup, out failure), failure);
+            CollectionAssert.AreEqual(plan.OriginalBytes, File.ReadAllBytes(plan.FullPath));
+            CollectionAssert.AreEqual(metadata, File.ReadAllBytes(plan.FullPath + ".meta"));
         }
 
         [TestCase(0, TestName = "Recovery.ChangedTarget.RefusesWholeBatch")]
@@ -151,10 +193,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     File.WriteAllText(_plans[1].FullPath + ".meta", "changed identity");
                     break;
                 case 2:
-                    File.WriteAllText(Path.Combine(_backup, _plans[1].AssetPath), "changed backup");
+                    File.WriteAllText(
+                        OdinMigrationBackupReceipt.GetNumberedBackupPath(_backup, 2),
+                        "changed backup"
+                    );
                     break;
                 case 3:
-                    File.Delete(Path.Combine(_backup, _plans[1].AssetPath));
+                    File.Delete(OdinMigrationBackupReceipt.GetNumberedBackupPath(_backup, 2));
                     break;
                 case 4:
                     File.WriteAllText(record, File.ReadAllText(record).TrimEnd('\n'));
@@ -336,6 +381,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 _plans[0].OriginalBytes,
                 File.ReadAllBytes(_plans[0].FullPath)
             );
+        }
+
+        private void ConvertBackupToLegacyLayout()
+        {
+            string record = Path.Combine(_backup, OdinMigrationBackupReceipt.ReceiptName);
+            string[] lines = File.ReadAllText(record).Split('\n');
+            lines[0] = "WallstopOdinMigrationBackup:1";
+            for (int index = 2; index < lines.Length - 2; ++index)
+            {
+                string assetPath = lines[index].Split('\t')[0];
+                string destination = Path.Combine(_backup, assetPath);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination));
+                File.Move(
+                    OdinMigrationBackupReceipt.GetNumberedBackupPath(_backup, index - 2),
+                    destination
+                );
+            }
+            File.WriteAllText(record, string.Join("\n", lines), new UTF8Encoding(false));
+            RewriteChecksum(record);
         }
 
         private OdinMigrationFilePlan CreatePlan(string name)

@@ -36,8 +36,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             + "namespace MigrationConsumer { using System.Collections.Generic; using UnityEngine; "
             + "public sealed class OdinMigrationApplyConsumer : ScriptableObject { "
             + "public Dictionary<SpriteAlignment, List<Texture2D>> Variations = new Dictionary<SpriteAlignment, List<Texture2D>>(); "
-            + "public Dictionary<HideFlags, List<Texture2D>> Other = new Dictionary<HideFlags, List<Texture2D>>(); } }\n";
-        private static readonly int[] ApplyCases = { 0, 1, 2 };
+            + "public Dictionary<HideFlags, List<Texture2D>> Other = new Dictionary<HideFlags, List<Texture2D>>(); "
+            + "public bool Corrupt; private void OnValidate() { if (Corrupt && Variations.Count != 0) { Variations.Clear(); } } } }\n";
+        private static readonly int[] ApplyCases = { 0, 1, 2, 3 };
 
         private static string FullPath(string path)
         {
@@ -171,6 +172,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                             + textureGuid
                             + ", type: 2}"
                     );
+                if (scenario == 3)
+                {
+                    retained = retained.Replace(
+                        "MonoBehaviour:\n",
+                        "MonoBehaviour:\n  Corrupt: 1\n"
+                    );
+                }
                 File.WriteAllText(
                     FullPath(ownerPath),
                     "%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n" + retained,
@@ -254,6 +262,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 if (scenario != 1)
                 {
                     yield return new WaitForDomainReload();
+                    if (scenario == 3)
+                    {
+                        yield return new WaitForDomainReload();
+                    }
                 }
             }
             yield return AwaitEditor();
@@ -275,7 +287,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 statusFailure
             );
             Assert.AreEqual(
-                scenario == 1
+                scenario == 1 || scenario == 3
                     ? OdinMigrationApplyState.Recovered
                     : OdinMigrationApplyState.Verified,
                 state,
@@ -283,13 +295,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             );
             folder = SessionState.GetString(FolderKey, string.Empty);
             ownerPath = folder + "/Owner.asset";
-            if (scenario == 1)
+            if (scenario == 1 || scenario == 3)
             {
+                if (scenario == 3)
+                {
+                    Assert.IsFalse(string.IsNullOrWhiteSpace(statusFailure));
+                    StringAssert.DoesNotContain("cancel", statusFailure.ToLowerInvariant());
+                }
                 Assert.AreEqual(
                     Source,
                     File.ReadAllText(FullPath(folder + "/" + ConsumerName + ".cs"))
                 );
                 StringAssert.Contains("serializationData:", File.ReadAllText(FullPath(ownerPath)));
+                string[] recoveryLines = File.ReadAllLines(
+                    Path.Combine(completed.BackupRoot, OdinMigrationBackupReceipt.ReceiptName)
+                );
+                for (int index = 2; index < recoveryLines.Length - 1; ++index)
+                {
+                    string restoredPath = recoveryLines[index].Split('\t')[0];
+                    CollectionAssert.AreEqual(
+                        File.ReadAllBytes(
+                            OdinMigrationBackupReceipt.GetNumberedBackupPath(
+                                completed.BackupRoot,
+                                index - 2
+                            )
+                        ),
+                        File.ReadAllBytes(FullPath(restoredPath)),
+                        restoredPath
+                    );
+                }
                 SessionState.SetInt(PhaseKey, 3);
                 yield break;
             }

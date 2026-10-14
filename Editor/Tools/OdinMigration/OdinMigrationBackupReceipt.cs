@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 {
     using System;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.IO;
     using System.Security.Cryptography;
     using System.Text;
@@ -17,7 +18,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         internal const long MaximumBatchBytes = 256L * 1024 * 1024;
         private const int MaximumReceiptBytes = 4 * 1024 * 1024;
         private const int MaximumEntries = 10000;
-        private const string Header = "WallstopOdinMigrationBackup:1";
+        private const string Header = "WallstopOdinMigrationBackup:2";
+        private const string LegacyHeader = "WallstopOdinMigrationBackup:1";
 
         private static readonly UTF8Encoding Encoding = new UTF8Encoding(false, true);
 
@@ -92,7 +94,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     {
                         store.WriteBackup(Path.Combine(root, ReceiptName), receipt);
                         receiptCompleted?.Invoke();
-                    }
+                    },
+                    numberedBackups: true
                 );
             }
             catch (Exception exception)
@@ -100,6 +103,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 failure = exception.Message;
                 return false;
             }
+        }
+
+        internal static string GetNumberedBackupPath(string root, int index)
+        {
+            return Path.Combine(root, index.ToString("D4", CultureInfo.InvariantCulture) + ".bin");
         }
 
         internal static bool TryRestore(string backupRoot, out string failure)
@@ -117,7 +125,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 if (
                     lineCount < 6
                     || MaximumEntries + 4 < lineCount
-                    || !string.Equals(lines[0], Header, StringComparison.Ordinal)
+                    || (
+                        !string.Equals(lines[0], Header, StringComparison.Ordinal)
+                        && !string.Equals(lines[0], LegacyHeader, StringComparison.Ordinal)
+                    )
                     || !string.Equals(
                         lines[1],
                         Hash(Encoding.GetBytes(ProjectRoot())),
@@ -167,7 +178,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             "The migration recovery record contains duplicate paths."
                         );
                     }
-                    string backupPath = Path.Combine(root, assetPath);
+                    string backupPath = string.Equals(
+                        lines[0],
+                        LegacyHeader,
+                        StringComparison.Ordinal
+                    )
+                        ? Path.Combine(root, assetPath)
+                        : GetNumberedBackupPath(root, index - 2);
                     OdinMigrationTool.EnsureNoReparsePoints(ProjectRoot(), backupPath);
                     byte[] original = ReadBounded(backupPath, MaximumFileBytes);
                     byte[] current = ReadBounded(fullPath, MaximumFileBytes);

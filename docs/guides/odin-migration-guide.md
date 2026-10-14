@@ -73,7 +73,10 @@ writing any target. It checks each target again immediately before its staged du
 replacement, then attempts to roll back completed writes if a later write fails. It refuses that rollback when the live bytes show a newer external edit. These checks reduce
 common editor races but cannot coordinate atomically with other processes. Timestamped byte-for-byte backups are retained under
 `Library/WallstopOdinMigrationBackups`. New backups include unchanged `.meta` bytes and a bounded,
-checksummed recovery record before the first target write. Imported metadata must exist before Apply.
+checksummed recovery record before the first target write. Backups use short numbered filenames to
+avoid extending asset paths beyond Windows limits. The recovery record maps each backup to its
+original asset path; recovery also reads the older mirrored-directory layout. Imported metadata must
+exist before Apply.
 Recovery records support source and Unity text assets under `Assets`, with 16 MiB per file,
 256 MiB of combined original and replacement bytes, and 10,000 asset/metadata entries per batch.
 

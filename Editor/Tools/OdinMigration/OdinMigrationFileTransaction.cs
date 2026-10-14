@@ -131,7 +131,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             string backupRoot,
             IOdinMigrationFileStore store,
             out string failure,
-            Action backupsCompleted = null
+            Action backupsCompleted = null,
+            bool numberedBackups = false
         )
         {
             List<OdinMigrationFilePlan> writesStarted = new List<OdinMigrationFilePlan>();
@@ -141,13 +142,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     RequireUnchanged(plan, store);
                 }
+                int backupIndex = 0;
                 foreach (OdinMigrationFilePlan plan in plans.AsValueEnumerableRequired())
                 {
-                    string backupPath = Path.Combine(
-                        backupRoot,
-                        plan.AssetPath.Replace('/', Path.DirectorySeparatorChar)
-                    );
+                    string backupPath = numberedBackups
+                        ? OdinMigrationBackupReceipt.GetNumberedBackupPath(backupRoot, backupIndex)
+                        : Path.Combine(
+                            backupRoot,
+                            plan.AssetPath.Replace('/', Path.DirectorySeparatorChar)
+                        );
                     store.WriteBackup(backupPath, plan.OriginalBytes);
+                    ++backupIndex;
                 }
                 backupsCompleted?.Invoke();
                 foreach (OdinMigrationFilePlan plan in plans.AsValueEnumerableRequired())
@@ -242,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             if (!DurableFile.TryWriteAllBytes(path, bytes, out Exception error))
             {
-                throw new IOException($"Could not write '{path}'.", error);
+                throw new IOException($"Could not write '{path}': {error?.Message}", error);
             }
         }
 
