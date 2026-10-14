@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using UnityEditor.Compilation;
     using UnityEngine;
     using UnityEngine.SceneManagement;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration;
     using WallstopStudios.UnityHelpers.Editor.Validation;
     using Object = UnityEngine.Object;
@@ -267,7 +268,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         internal static string ModuleVersion(string name)
         {
             RuntimeAssembly found = null;
-            foreach (RuntimeAssembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+#if UNITY_6000_6_OR_NEWER
+            IReadOnlyList<RuntimeAssembly> assemblies =
+                UnityEngine.Assemblies.CurrentAssemblies.GetLoadedAssemblies();
+#else
+            IReadOnlyList<RuntimeAssembly> assemblies = AppDomain.CurrentDomain.GetAssemblies();
+#endif
+            foreach (RuntimeAssembly assembly in assemblies.AsValueEnumerableRequired())
             {
                 if (string.Equals(assembly.GetName().Name, name, StringComparison.Ordinal))
                 {

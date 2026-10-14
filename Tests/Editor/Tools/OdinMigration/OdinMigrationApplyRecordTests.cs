@@ -7,6 +7,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using System.IO;
     using System.Text;
     using NUnit.Framework;
+    using UnityEditor;
+    using UnityEditor.SceneManagement;
+    using UnityEngine.SceneManagement;
     using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
 
     [TestFixture]
@@ -135,6 +138,105 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 string.Empty,
                 loaded.documents[0].fields[0].entries[0].references[0].typeIdentity
             );
+        }
+
+        [TestCase(9007199254740993L)]
+        [TestCase(long.MaxValue)]
+        [TestCase(long.MinValue)]
+        public void FileIdentifiersAndDeadlinesRetainExactInt64Precision(long identifier)
+        {
+            OdinMigrationApplyRecord record = Create(_root);
+            OdinMigrationApplyRecord.Document document = record.documents[0];
+            document.fileId = identifier;
+            record.documents[0] = document;
+            long deadline = record.deadlineUtcTicks;
+            record.Write(_root);
+            Assert.IsTrue(
+                OdinMigrationApplyRecord.TryRead(
+                    _root,
+                    out OdinMigrationApplyRecord loaded,
+                    out string failure
+                ),
+                failure
+            );
+            Assert.AreEqual(identifier, loaded.documents[0].fileId);
+            Assert.AreEqual(deadline, loaded.deadlineUtcTicks);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SoleAffectedSceneRestoresWhileTemporaryEditsRemainProtected(bool editTemporary)
+        {
+            SceneSetup[] previous = EditorSceneManager.GetSceneManagerSetup();
+            for (int index = 0; index < SceneManager.sceneCount; ++index)
+            {
+                Assert.IsFalse(SceneManager.GetSceneAt(index).isDirty);
+            }
+            string folder = "Assets/OdinSceneScope-" + Guid.NewGuid().ToString("N");
+            string scenePath = folder + "/Saved.unity";
+            Assert.IsFalse(
+                string.IsNullOrWhiteSpace(
+                    AssetDatabase.CreateFolder("Assets", System.IO.Path.GetFileName(folder))
+                )
+            );
+            try
+            {
+                Scene saved = EditorSceneManager.NewScene(
+                    NewSceneSetup.EmptyScene,
+                    NewSceneMode.Single
+                );
+                Assert.IsTrue(EditorSceneManager.SaveScene(saved, scenePath));
+                OdinMigrationApplyRecord record = Create(_root);
+                record.affectedPaths = new[] { scenePath };
+                record.originalActiveScene = scenePath;
+                OdinMigrationApplySceneScope.CaptureLoadedScenes(record);
+                record.Write(_root);
+                OdinMigrationApplySceneScope.CloseLoadedScenes(record, _root);
+                Scene temporary = SceneManager.GetSceneByName(record.temporaryScene);
+                Assert.IsTrue(temporary.IsValid());
+                Assert.IsFalse(
+                    temporary.isDirty,
+                    "The newly created empty migration scene must not block its own transaction."
+                );
+                if (editTemporary)
+                {
+                    EditorSceneManager.MarkSceneDirty(temporary);
+                    Assert.Throws<IOException>(() =>
+                        OdinMigrationApplySceneScope.ValidateEditorState(record.affectedPaths)
+                    );
+                    Assert.Throws<IOException>(() =>
+                        OdinMigrationApplySceneScope.Complete(record, _root)
+                    );
+                    Assert.IsTrue(temporary.IsValid());
+                }
+                else
+                {
+                    Assert.DoesNotThrow(() =>
+                        OdinMigrationApplySceneScope.ValidateEditorState(record.affectedPaths)
+                    );
+                    OdinMigrationApplySceneScope.Complete(record, _root);
+                    Assert.IsTrue(SceneManager.GetSceneByPath(scenePath).isLoaded);
+                    Assert.AreEqual(scenePath, SceneManager.GetActiveScene().path);
+                    Assert.IsFalse(SceneManager.GetSceneByName(record.temporaryScene).IsValid());
+                }
+            }
+            finally
+            {
+                bool savedSetup = true;
+                foreach (SceneSetup setup in previous)
+                {
+                    savedSetup &= !string.IsNullOrWhiteSpace(setup.path);
+                }
+                if (savedSetup && previous.Length != 0)
+                {
+                    EditorSceneManager.RestoreSceneManagerSetup(previous);
+                }
+                else
+                {
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                }
+                AssetDatabase.DeleteAsset(folder);
+            }
         }
 
         [TestCase(0)]

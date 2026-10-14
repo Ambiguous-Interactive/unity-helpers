@@ -136,6 +136,9 @@ liveReferencedObjects, out failure)` checks a loaded imported document against i
   retains the backups and active marker for manual repair. Changes to targets, metadata, journals,
   or the active marker prevent unsafe replacement. This Tier C operation cannot reverse arbitrary
   consumer import callbacks through Unity Undo.
+  Recovery records preserve full 64-bit file IDs. When the only loaded saved scene is affected,
+  the coordinator keeps an empty temporary scene while compiling and restores the saved scene
+  afterward; changes to that temporary scene prevent it from being discarded.
 - `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
   `Assets` in the current project.
 - `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied

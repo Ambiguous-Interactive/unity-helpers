@@ -72,6 +72,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                         AssetDatabase.CreateFolder("Assets", Path.GetFileName(folder))
                     )
                 );
+                string assemblyName = Path.GetFileName(folder);
+                string definition = folder + "/" + assemblyName + ".asmdef";
+                File.WriteAllText(
+                    FullPath(definition),
+                    "{\"name\":\""
+                        + assemblyName
+                        + "\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"includePlatforms\":[\"Editor\"]}",
+                    new UTF8Encoding(false)
+                );
+                File.WriteAllText(
+                    FullPath(definition) + ".meta",
+                    "fileFormatVersion: 2\nguid: "
+                        + Guid.NewGuid().ToString("N")
+                        + "\nAssemblyDefinitionImporter:\n  externalObjects: {}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n",
+                    new UTF8Encoding(false)
+                );
                 string script = folder + "/" + ConsumerName + ".cs";
                 File.WriteAllText(FullPath(script), Source, new UTF8Encoding(false));
                 File.WriteAllText(
