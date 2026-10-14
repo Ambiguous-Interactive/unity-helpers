@@ -527,6 +527,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
+        public void InventoryIgnoresUnresolvedUnrelatedDocumentsWithoutRetainedState()
+        {
+            string selected = CreateAsset(Document(123));
+            Assert.IsTrue(
+                OdinMigrationTool.TryPreviewDictionaryMigration(
+                    new[] { Target(selected, 123) },
+                    out OdinMigrationDictionaryMigrationPreview preview,
+                    out string failure
+                ),
+                failure
+            );
+            string orphan = CreateAsset(
+                "--- !u!114 &789\nMonoBehaviour:\n  m_Script: {fileID: 11500000, guid: 00000000000000000000000000000001, type: 3}\n  m_Name: MissingScript\n"
+            );
+            Assert.IsTrue(
+                OdinMigrationDictionaryInventoryScanner.TryScan(
+                    preview,
+                    new[] { selected, orphan },
+                    out OdinMigrationDictionaryInventory inventory,
+                    out failure,
+                    null
+                ),
+                failure
+            );
+            Assert.IsTrue(inventory.Complete);
+            Assert.IsTrue(inventory.AllRetainedDocumentsSelected);
+            Assert.AreEqual(1, inventory.Documents.Count);
+        }
+
+        [Test]
         public void InventoryAcceptsAllSelectedDocumentsAndDeduplicatesPaths()
         {
             string path = CreateAsset(Document(123) + Document(789));

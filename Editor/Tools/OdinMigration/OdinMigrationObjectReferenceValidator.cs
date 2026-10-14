@@ -32,6 +32,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         private readonly IReadOnlyList<string> _recorded;
         private readonly IReadOnlyList<Object> _objects;
 
+        internal OdinMigrationObjectReferenceValidator(string owningGuid)
+        {
+            if (string.IsNullOrWhiteSpace(owningGuid))
+            {
+                throw new InvalidDataException("A saved owning asset GUID is required.");
+            }
+            _owningGuid = owningGuid;
+            _recorded = Array.Empty<string>();
+            _objects = Array.Empty<Object>();
+        }
+
         internal OdinMigrationObjectReferenceValidator(
             OdinMigrationSerializedData payload,
             string owningGuid,
@@ -228,6 +239,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 throw new InvalidDataException(
                     "A live Unity object does not fit the dictionary element type."
                 );
+            }
+            ValidateReferenceIdentity(recorded, reference);
+        }
+
+        internal void ValidateReferenceIdentity(string recorded, Object reference)
+        {
+            if (AuthoredAssetYaml.IsNullObjectReference(recorded))
+            {
+                if (reference != null)
+                {
+                    throw new InvalidDataException(
+                        "A recorded null reference names a live object."
+                    );
+                }
+                return;
+            }
+            if (reference == null)
+            {
+                throw new InvalidDataException("A recorded Unity object is missing or destroyed.");
             }
             if (
                 !AuthoredAssetYaml.TryResolveObjectReference(

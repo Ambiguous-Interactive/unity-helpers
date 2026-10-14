@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 {
     using System;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.IO;
     using UnityEditor;
     using WallstopStudios.UnityHelpers.Core.Extension;
@@ -168,6 +169,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             {
                                 continue;
                             }
+                            bool retained =
+                                document.TryGetEntry("serializationData", out AuthoredAssetEntry _)
+                                || document.TryGetEntry("_serializationData", out _);
+                            bool included =
+                                selected.TryGetValue(path, out HashSet<long> selectedIds)
+                                && selectedIds.Contains(document.FileId);
                             if (
                                 !document.TryGetEntry(
                                     AuthoredAssetDocument.ScriptKey,
@@ -175,6 +182,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                                 )
                             )
                             {
+                                if (!retained && !included)
+                                {
+                                    continue;
+                                }
                                 throw new InvalidDataException(
                                     "A saved Unity document has no original script reference."
                                 );
@@ -184,35 +195,49 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                                     script.InlineValue,
                                     out long fileId,
                                     out string scriptGuid
-                                )
-                                || fileId != 11500000
-                                || string.IsNullOrWhiteSpace(scriptGuid)
+                                ) || string.IsNullOrWhiteSpace(scriptGuid)
                             )
                             {
+                                if (!retained && !included)
+                                {
+                                    continue;
+                                }
                                 throw new InvalidDataException(
                                     "A Unity script reference cannot be resolved from its authored metadata."
                                 );
                             }
-                            if (!scriptTypes.TryGetValue(scriptGuid, out Type originalType))
+                            string scriptIdentity =
+                                scriptGuid + ":" + fileId.ToString(CultureInfo.InvariantCulture);
+                            if (!scriptTypes.TryGetValue(scriptIdentity, out Type originalType))
                             {
                                 string scriptPath = AssetDatabase.GUIDToAssetPath(scriptGuid);
                                 if (string.IsNullOrWhiteSpace(scriptPath))
                                 {
+                                    if (!retained && !included)
+                                    {
+                                        continue;
+                                    }
                                     throw new InvalidDataException(
                                         "A saved Unity document's original script path is unavailable."
                                     );
                                 }
-                                MonoScript monoScript = AssetDatabase.LoadAssetAtPath<MonoScript>(
-                                    scriptPath
+                                MonoScript monoScript = ResolveScript(
+                                    scriptPath,
+                                    scriptGuid,
+                                    fileId
                                 );
                                 originalType = monoScript == null ? null : monoScript.GetClass();
                                 if (originalType == null)
                                 {
+                                    if (!retained && !included)
+                                    {
+                                        continue;
+                                    }
                                     throw new InvalidDataException(
                                         "A saved Unity document's original script type is unavailable."
                                     );
                                 }
-                                scriptTypes.Add(scriptGuid, originalType);
+                                scriptTypes.Add(scriptIdentity, originalType);
                             }
                             bool affected = false;
                             foreach (Type declaringType in affectedTypes)
@@ -227,12 +252,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             {
                                 continue;
                             }
-                            bool retained =
-                                document.TryGetEntry("serializationData", out AuthoredAssetEntry _)
-                                || document.TryGetEntry("_serializationData", out _);
-                            bool included =
-                                selected.TryGetValue(path, out HashSet<long> ids)
-                                && ids.Contains(document.FileId);
                             if (retained && !included)
                             {
                                 ++missing;
@@ -297,6 +316,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 failure = exception.Message;
                 return false;
             }
+        }
+
+        private static MonoScript ResolveScript(string path, string guid, long fileId)
+        {
+            if (path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+            {
+                return fileId == 11500000 ? AssetDatabase.LoadAssetAtPath<MonoScript>(path) : null;
+            }
+            if (path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (UnityEngine.Object metadata in AssetDatabase.LoadAllAssetsAtPath(path))
+                {
+                    if (
+                        metadata is MonoScript script
+                        && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                            script,
+                            out string actualGuid,
+                            out long actualId
+                        )
+                        && actualId == fileId
+                        && string.Equals(actualGuid, guid, StringComparison.OrdinalIgnoreCase)
+                    )
+                    {
+                        return script;
+                    }
+                }
+            }
+            return null;
         }
     }
 }

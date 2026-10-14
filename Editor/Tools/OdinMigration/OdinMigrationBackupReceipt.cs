@@ -14,9 +14,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     {
         internal const string ReceiptName = "recovery.txt";
         internal const int MaximumFileBytes = 16 * 1024 * 1024;
+        internal const long MaximumBatchBytes = 256L * 1024 * 1024;
         private const int MaximumReceiptBytes = 4 * 1024 * 1024;
         private const int MaximumEntries = 10000;
-        private const long MaximumBatchBytes = 256L * 1024 * 1024;
         private const string Header = "WallstopOdinMigrationBackup:1";
 
         private static readonly UTF8Encoding Encoding = new UTF8Encoding(false, true);
@@ -24,7 +24,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         internal static bool TryApply(
             IReadOnlyList<OdinMigrationFilePlan> plans,
             string backupRoot,
-            out string failure
+            out string failure,
+            Action receiptCompleted = null
         )
         {
             try
@@ -87,7 +88,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     root,
                     store,
                     out failure,
-                    () => store.WriteBackup(Path.Combine(root, ReceiptName), receipt)
+                    () =>
+                    {
+                        store.WriteBackup(Path.Combine(root, ReceiptName), receipt);
+                        receiptCompleted?.Invoke();
+                    }
                 );
             }
             catch (Exception exception)
@@ -288,6 +293,51 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
         }
 
+        internal static string Hash(byte[] bytes)
+        {
+            using (SHA256 hash = SHA256.Create())
+            {
+                return BitConverter
+                    .ToString(hash.ComputeHash(bytes))
+                    .Replace("-", string.Empty)
+                    .ToLowerInvariant();
+            }
+        }
+
+        internal static byte[] ReadBounded(string path, int limit)
+        {
+            using (
+                FileStream stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read
+                )
+            )
+            {
+                if (limit < stream.Length)
+                {
+                    throw new IOException("A migration recovery file exceeds its size limit.");
+                }
+                byte[] bytes = new byte[(int)stream.Length];
+                int offset = 0;
+                while (offset < bytes.Length)
+                {
+                    int read = stream.Read(bytes, offset, bytes.Length - offset);
+                    if (read == 0)
+                    {
+                        throw new IOException("A migration recovery file changed while reading.");
+                    }
+                    offset += read;
+                }
+                if (stream.ReadByte() != -1)
+                {
+                    throw new IOException("A migration recovery file changed while reading.");
+                }
+                return bytes;
+            }
+        }
+
         private static void AddCaptured(
             OdinMigrationFilePlan plan,
             List<OdinMigrationFilePlan> captured,
@@ -355,17 +405,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             return receipt;
         }
 
-        private static string Hash(byte[] bytes)
-        {
-            using (SHA256 hash = SHA256.Create())
-            {
-                return BitConverter
-                    .ToString(hash.ComputeHash(bytes))
-                    .Replace("-", string.Empty)
-                    .ToLowerInvariant();
-            }
-        }
-
         private static bool IsHash(string value)
         {
             if (value.Length != 64)
@@ -388,40 +427,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         private static string ProjectRoot()
         {
             return Directory.GetParent(Application.dataPath).FullName;
-        }
-
-        private static byte[] ReadBounded(string path, int limit)
-        {
-            using (
-                FileStream stream = new FileStream(
-                    path,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read
-                )
-            )
-            {
-                if (limit < stream.Length)
-                {
-                    throw new IOException("A migration recovery file exceeds its size limit.");
-                }
-                byte[] bytes = new byte[(int)stream.Length];
-                int offset = 0;
-                while (offset < bytes.Length)
-                {
-                    int read = stream.Read(bytes, offset, bytes.Length - offset);
-                    if (read == 0)
-                    {
-                        throw new IOException("A migration recovery file changed while reading.");
-                    }
-                    offset += read;
-                }
-                if (stream.ReadByte() != -1)
-                {
-                    throw new IOException("A migration recovery file changed while reading.");
-                }
-                return bytes;
-            }
         }
 
         private static void ValidateTarget(string assetPath)

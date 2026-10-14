@@ -84,78 +84,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     return false;
                 }
-                using SerializedObject serialized = new SerializedObject(importedOwner);
-                serialized.Update();
-                foreach (OdinMigrationConvertedDictionary dictionary in dictionaries)
-                {
-                    OdinMigrationDictionaryField field = FindField(fields, dictionary.FieldName);
-                    SerializedProperty property = serialized.FindProperty(dictionary.FieldName);
-                    SerializedProperty keys = property?.FindPropertyRelative(
-                        SerializableDictionarySerializedPropertyNames.Keys
-                    );
-                    SerializedProperty values = property?.FindPropertyRelative(
-                        SerializableDictionarySerializedPropertyNames.BoxedValues
-                    );
-                    if (
-                        keys == null
-                        || values == null
-                        || !keys.isArray
-                        || !values.isArray
-                        || keys.arraySize != dictionary.Keys.Count
-                        || values.arraySize != dictionary.Values.Count
-                    )
-                    {
-                        throw new InvalidDataException(
-                            "Imported dictionary arrays do not match the retained entry count: "
-                                + dictionary.FieldName
-                        );
-                    }
-                    for (int entry = 0; entry < dictionary.Keys.Count; ++entry)
-                    {
-                        SerializedProperty key = keys.GetArrayElementAtIndex(entry);
-                        if (
-                            (
-                                key.propertyType != SerializedPropertyType.Enum
-                                && key.propertyType != SerializedPropertyType.Integer
-                            )
-                            || key.intValue != dictionary.Keys[entry]
-                        )
-                        {
-                            throw new InvalidDataException(
-                                "An imported dictionary key differs from the retained key: "
-                                    + dictionary.FieldName
-                            );
-                        }
-                        SerializedProperty data = values
-                            .GetArrayElementAtIndex(entry)
-                            .FindPropertyRelative(
-                                SerializableDictionarySerializedPropertyNames.BoxedValueData
-                            );
-                        IReadOnlyList<string> expected = dictionary.Values[entry];
-                        if (data == null || !data.isArray || data.arraySize != expected.Count)
-                        {
-                            throw new InvalidDataException(
-                                "An imported dictionary list differs from the retained length: "
-                                    + dictionary.FieldName
-                            );
-                        }
-                        for (int index = 0; index < expected.Count; ++index)
-                        {
-                            SerializedProperty value = data.GetArrayElementAtIndex(index);
-                            if (value.propertyType != SerializedPropertyType.ObjectReference)
-                            {
-                                throw new InvalidDataException(
-                                    "An imported dictionary value is not a Unity object reference."
-                                );
-                            }
-                            references.ValidateReference(
-                                expected[index],
-                                value.objectReferenceValue,
-                                field
-                            );
-                        }
-                    }
-                }
+                VerifyValues(importedOwner, dictionaries, references, fields, null);
                 failure = null;
                 return true;
             }
@@ -163,6 +92,223 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             {
                 failure = exception.Message;
                 return false;
+            }
+        }
+
+        internal static bool TryVerifyCaptured(
+            OdinMigrationApplyRecord.Document document,
+            Object importedOwner,
+            out string failure
+        )
+        {
+            try
+            {
+                UnityMainThreadGuard.EnsureMainThread();
+                if (
+                    EditorApplication.isCompiling
+                    || EditorApplication.isUpdating
+                    || importedOwner == null
+                )
+                {
+                    throw new InvalidOperationException(
+                        "An imported owner and an idle editor are required."
+                    );
+                }
+                OdinMigrationTool.GetValidatedAssetPath(document.assetPath);
+                string guid = AssetDatabase.AssetPathToGUID(document.assetPath);
+                OdinMigrationObjectReferenceValidator references =
+                    new OdinMigrationObjectReferenceValidator(guid);
+                MonoScript script =
+                    importedOwner is MonoBehaviour component
+                        ? MonoScript.FromMonoBehaviour(component)
+                    : importedOwner is ScriptableObject asset
+                        ? MonoScript.FromScriptableObject(asset)
+                    : null;
+                if (
+                    !string.Equals(guid, document.owningGuid, StringComparison.OrdinalIgnoreCase)
+                    || !references.MatchesIdentity(importedOwner, guid, document.fileId)
+                    || script == null
+                    || !string.Equals(
+                        AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(script)),
+                        document.scriptGuid,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                    || !string.Equals(
+                        importedOwner.GetType().AssemblyQualifiedName,
+                        document.ownerTypeIdentity,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    throw new InvalidDataException(
+                        "An imported dictionary owner changed its saved or compiled identity."
+                    );
+                }
+                List<OdinMigrationConvertedDictionary> dictionaries =
+                    new List<OdinMigrationConvertedDictionary>();
+                Dictionary<string, string> types = new Dictionary<string, string>(
+                    StringComparer.Ordinal
+                );
+                foreach (OdinMigrationApplyRecord.Field field in document.fields)
+                {
+                    List<int> keys = new List<int>();
+                    List<IReadOnlyList<string>> values = new List<IReadOnlyList<string>>();
+                    foreach (OdinMigrationApplyRecord.Entry entry in field.entries)
+                    {
+                        keys.Add(entry.key);
+                        List<string> addresses = new List<string>();
+                        foreach (OdinMigrationApplyRecord.Reference reference in entry.references)
+                        {
+                            addresses.Add(reference.address);
+                            if (
+                                types.TryGetValue(reference.address, out string previous)
+                                && !string.Equals(
+                                    previous,
+                                    reference.typeIdentity,
+                                    StringComparison.Ordinal
+                                )
+                            )
+                            {
+                                throw new InvalidDataException(
+                                    "A captured Unity reference has conflicting type identities."
+                                );
+                            }
+                            types[reference.address] = reference.typeIdentity;
+                        }
+                        values.Add(addresses.AsReadOnly());
+                    }
+                    dictionaries.Add(
+                        new OdinMigrationConvertedDictionary(field.name, keys, values)
+                    );
+                }
+                VerifyValues(importedOwner, dictionaries, references, null, types);
+                failure = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                failure = exception.Message;
+                return false;
+            }
+        }
+
+        private static void VerifyValues(
+            Object importedOwner,
+            IReadOnlyList<OdinMigrationConvertedDictionary> dictionaries,
+            OdinMigrationObjectReferenceValidator references,
+            IReadOnlyList<OdinMigrationDictionaryField> fields,
+            IReadOnlyDictionary<string, string> referenceTypes
+        )
+        {
+            using SerializedObject serialized = new SerializedObject(importedOwner);
+            serialized.Update();
+            foreach (OdinMigrationConvertedDictionary dictionary in dictionaries)
+            {
+                OdinMigrationDictionaryField field =
+                    fields == null ? null : FindField(fields, dictionary.FieldName);
+                SerializedProperty property = serialized.FindProperty(dictionary.FieldName);
+                SerializedProperty keys = property?.FindPropertyRelative(
+                    SerializableDictionarySerializedPropertyNames.Keys
+                );
+                SerializedProperty values = property?.FindPropertyRelative(
+                    SerializableDictionarySerializedPropertyNames.BoxedValues
+                );
+                if (
+                    keys == null
+                    || values == null
+                    || !keys.isArray
+                    || !values.isArray
+                    || keys.arraySize != dictionary.Keys.Count
+                    || values.arraySize != dictionary.Values.Count
+                )
+                {
+                    throw new InvalidDataException(
+                        "Imported dictionary arrays do not match the retained entry count: "
+                            + dictionary.FieldName
+                    );
+                }
+                for (int entry = 0; entry < dictionary.Keys.Count; ++entry)
+                {
+                    SerializedProperty key = keys.GetArrayElementAtIndex(entry);
+                    if (
+                        (
+                            key.propertyType != SerializedPropertyType.Enum
+                            && key.propertyType != SerializedPropertyType.Integer
+                        )
+                        || key.intValue != dictionary.Keys[entry]
+                    )
+                    {
+                        throw new InvalidDataException(
+                            "An imported dictionary key differs from the retained key: "
+                                + dictionary.FieldName
+                        );
+                    }
+                    SerializedProperty data = values
+                        .GetArrayElementAtIndex(entry)
+                        .FindPropertyRelative(
+                            SerializableDictionarySerializedPropertyNames.BoxedValueData
+                        );
+                    IReadOnlyList<string> expected = dictionary.Values[entry];
+                    if (data == null || !data.isArray || data.arraySize != expected.Count)
+                    {
+                        throw new InvalidDataException(
+                            "An imported dictionary list differs from the retained length: "
+                                + dictionary.FieldName
+                        );
+                    }
+                    for (int index = 0; index < expected.Count; ++index)
+                    {
+                        SerializedProperty value = data.GetArrayElementAtIndex(index);
+                        if (value.propertyType != SerializedPropertyType.ObjectReference)
+                        {
+                            throw new InvalidDataException(
+                                "An imported dictionary value is not a Unity object reference."
+                            );
+                        }
+                        ValidateValue(
+                            referenceTypes,
+                            references,
+                            expected[index],
+                            value.objectReferenceValue,
+                            field
+                        );
+                    }
+                }
+            }
+        }
+
+        private static void ValidateValue(
+            IReadOnlyDictionary<string, string> referenceTypes,
+            OdinMigrationObjectReferenceValidator references,
+            string address,
+            Object value,
+            OdinMigrationDictionaryField field
+        )
+        {
+            if (field != null)
+            {
+                references.ValidateReference(address, value, field);
+            }
+            else
+            {
+                references.ValidateReferenceIdentity(address, value);
+            }
+            if (
+                referenceTypes != null
+                && value != null
+                && (
+                    !referenceTypes.TryGetValue(address, out string typeIdentity)
+                    || !string.Equals(
+                        value.GetType().AssemblyQualifiedName,
+                        typeIdentity,
+                        StringComparison.Ordinal
+                    )
+                )
+            )
+            {
+                throw new InvalidDataException(
+                    "An imported Unity reference changed its captured runtime type."
+                );
             }
         }
 

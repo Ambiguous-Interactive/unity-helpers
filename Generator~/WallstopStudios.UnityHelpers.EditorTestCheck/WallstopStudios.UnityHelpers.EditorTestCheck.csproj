@@ -339,6 +339,7 @@
     />
     <!-- TestCheck's shim: the com.unity.test-framework members the fixtures bind. -->
     <Compile Include="../WallstopStudios.UnityHelpers.TestCheck/Shims/*.cs" />
+    <Compile Include="Shims/*.cs" />
     <!-- The runtime, with TypeCheck's exclusions. TypeCheck remains the gate that JUDGES it. -->
     <Compile
       Include="$(RepoRoot)/Runtime/**/*.cs"

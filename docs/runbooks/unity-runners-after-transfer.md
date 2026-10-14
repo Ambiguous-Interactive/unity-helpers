@@ -220,14 +220,18 @@ independent of assets left by the failed run.
 
 EditMode runs compiler-isolation fixtures in a fresh editor process before the broader suite.
 These cases carry `CompilationIsolation` and must all pass without skips. Their results and log
-remain under the mode's `compilation/` artifact directory. The broader process excludes that
-category, so each case runs once. Both processes share the installed editor, project and acquired
-license context. A failed isolated phase prevents the broader process and fails the mode.
-This prevents earlier ruleset-import tests from leaving pending compilation that a later
-compiler fixture cannot drain during the same batch run.
+remain under the mode's `compilation/` artifact directory. The source API, backup recovery,
+import-verification, and source/data apply fixtures each run in a separate fresh editor process
+with `MigrationIsolation`; their artifacts remain under `migration/<fixture-name>/`.
+The broader process excludes both categories, so each case runs once. All processes share the
+installed editor, project and acquired license context. A failed isolated phase prevents later
+phases and fails the mode. Verification requires passing cases from every named isolated fixture.
+Earlier ruleset-import tests can leave pending compilation and `EditorApplication.isUpdating`
+that cannot drain during the same batch run; each migration fixture needs an idle editor to test
+its real production guard without weakening it.
 Verification requires the mode's root `results.xml` independently of its isolated fixture XML.
-A passing nested compilation result cannot replace a missing broad-suite result. Failure dumps
-include both root and nested editor logs.
+A passing nested result cannot replace a missing broad-suite result. Failure dumps include
+root and nested editor logs.
 
 It has to. `actions/checkout` runs `git clean -ffdx` at the top of every job and `-x`
 means gitignored, so anything under the repository's `.artifacts/` tree is deleted

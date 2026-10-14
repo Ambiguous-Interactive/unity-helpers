@@ -1130,7 +1130,16 @@ function New-UnityEditorTestPhases {
             RequiredFixture = $fixture
             RequirePassedTests = $true
         }
-        $TestCategory = (@($TestCategory, '!CompilationIsolation') |
+        foreach ($migrationFixture in @(Get-UnityMigrationIsolationFixtures)) {
+            [pscustomobject]@{
+                ArtifactsPath = Join-Path $ArtifactsPath ('migration/' + $migrationFixture.Split('.')[-1])
+                TestFilter = $migrationFixture
+                TestCategory = 'MigrationIsolation'
+                RequiredFixture = $migrationFixture
+                RequirePassedTests = $true
+            }
+        }
+        $TestCategory = (@($TestCategory, '!CompilationIsolation', '!MigrationIsolation') |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ';'
     }
     [pscustomobject]@{

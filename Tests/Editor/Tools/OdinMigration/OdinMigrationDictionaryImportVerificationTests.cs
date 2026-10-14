@@ -16,6 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using Object = UnityEngine.Object;
 
     [TestFixture]
+    [Category("MigrationIsolation")]
     [Category("Integration")]
     public sealed class OdinMigrationDictionaryImportVerificationTests : CommonTestBase
     {

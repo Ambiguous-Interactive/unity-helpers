@@ -1,3 +1,11 @@
+function Get-UnityMigrationIsolationFixtures {
+    $namespace = 'WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.'
+    foreach ($name in @('OdinMigrationApiTests', 'OdinMigrationBackupRecoveryTests',
+            'OdinMigrationDictionaryImportVerificationTests', 'OdinMigrationDictionaryApplyIntegrationTests')) {
+        $namespace + $name
+    }
+}
+
 function Get-UnityRootNUnitResultFile {
     param([string]$ResultsDirectory)
 

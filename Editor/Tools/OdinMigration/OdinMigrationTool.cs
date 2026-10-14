@@ -319,6 +319,45 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
         }
 
+        /// <summary>Starts coordinated source and saved dictionary apply with verification after domain reload.</summary>
+        /// <remarks>Call on the editor thread after successful matching compilation. True means the operation started; poll the returned handle for verified success. Requires a complete fresh inventory and saved editor state. File writes and consumer import callbacks are outside Unity Undo; keep recovery files until acceptance finishes.</remarks>
+        public static bool TryApplyDictionaryMigration(
+            OdinMigrationDictionaryMigrationPreview preview,
+            OdinMigrationDictionaryCompilation compilation,
+            out OdinMigrationDictionaryApply apply,
+            out string failure
+        )
+        {
+            return OdinMigrationDictionaryApplyCoordinator.TryStart(
+                preview,
+                compilation,
+                out apply,
+                out failure
+            );
+        }
+
+        /// <summary>Reopens a dictionary migration handle from its retained recovery directory.</summary>
+        public static bool TryReadDictionaryApply(
+            string backupRoot,
+            out OdinMigrationDictionaryApply apply,
+            out string failure
+        )
+        {
+            if (
+                !OdinMigrationDictionaryApplyCoordinator.TryReadStatus(
+                    backupRoot,
+                    out OdinMigrationApplyState _,
+                    out failure
+                )
+            )
+            {
+                apply = null;
+                return false;
+            }
+            apply = new OdinMigrationDictionaryApply(backupRoot);
+            return true;
+        }
+
         /// <summary>Previews all source scripts and serialized assets under Assets without editor UI.</summary>
         public static bool TryPreviewAssets(
             out OdinMigrationPreview preview,

@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
 
     [TestFixture]
+    [Category("MigrationIsolation")]
     [Category("Fast")]
     public sealed class OdinMigrationApiTests
     {

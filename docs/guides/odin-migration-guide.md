@@ -120,6 +120,22 @@ liveReferencedObjects, out failure)` checks a loaded imported document against i
 - `TryInventoryDictionaryMigration(preview, out inventory, out failure)` scans serialized files
   under `Assets` for original declaring types and their derived Unity scripts. It reports retained
   documents omitted from the paired preview and failures that make the inventory incomplete.
+- `TryApplyDictionaryMigration(preview, compilation, out apply, out failure)` starts a paired
+  source and retained-data migration after checking a successful, matching compilation receipt and
+  a fresh complete inventory. It currently refuses affected documents without retained payloads,
+  since their original live dictionaries cannot yet be captured and verified. Save scenes and assets
+  before starting, leave Prefab Mode, and wait for compilation, import, and Play Mode to finish.
+  A `true` return means the transaction started. Poll `apply.TryReadStatus(out state, out failure)`;
+  only `Verified` means the replacement assemblies loaded and the retained keys, list values,
+  nulls, reference addresses, and runtime types matched the imported documents.
+- `TryReadDictionaryApply(backupRoot, out apply, out failure)` reconnects to the durable operation
+  after domain reload or restart. Keep `apply.BackupRoot` before reload. The coordinator restores
+  the original bytes after interruption, cancellation, compilation errors, or failed verification,
+  then waits for recovery import; `Recovered` means original file and metadata hashes matched.
+  `apply.TryCancel(out failure)` requests recovery of the active operation. `RecoveryFailed`
+  retains the backups and active marker for manual repair. Changes to targets, metadata, journals,
+  or the active marker prevent unsafe replacement. This Tier C operation cannot reverse arbitrary
+  consumer import callbacks through Unity Undo.
 - `TryPreviewAssets(out preview, out failure)` scans all scripts and serialized assets under
   `Assets` in the current project.
 - `TryPreview(sourceAssetPaths, out preview, out failure)` limits source analysis to the supplied
@@ -146,7 +162,7 @@ liveReferencedObjects, out failure)` checks a loaded imported document against i
   introduced still require manual restoration.
 
 Call project preview and apply methods on the Unity editor thread. They do not display progress
-bars or dialogs. Programmatic Apply does not refresh the Asset Database: call
+bars or dialogs. The source-only `TryApply` does not refresh the Asset Database: call
 `UnityEditor.AssetDatabase.Refresh()` on the editor thread after a successful batch, when ready
 for Unity to import the changed sources. The menu tool performs that refresh itself.
 Programmatic writes remain Tier C operations outside Unity Undo. They do not convert Odin-owned

@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add generated protobuf roots for supported arrays, lists, and dictionaries, including writes through object and collection interfaces ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
-- Add prompt-free Odin migration APIs with paired previews, inventories, isolated compilation, live reference and imported-value checks, cancellation, and source apply with whole-batch backups and safe recovery after reload ([guide](./docs/guides/odin-migration-guide.md#programmatic-migration), [#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
+- Add prompt-free Odin migration APIs with paired previews, inventories, isolated compilation, and source/data apply with imported-value checks, cancellation, and recovery across reloads ([guide](./docs/guides/odin-migration-guide.md#programmatic-migration), [#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
 - Add `SceneCanonicalizer` for stable generated scenes and prefabs, with local reference remapping, Unity-reserved ID avoidance and opt-in folder imports ([guide](./docs/features/editor-tools/scene-canonicalization.md), [#999](https://github.com/Ambiguous-Interactive/unity-helpers/issues/999)).
 - Add `ReferenceIdentityComparer<T>` and `UnityObjectMap<TKey, TValue>` for managed identity, destroyed-key cleanup and optional scene-unload pruning ([guide](./docs/features/utilities/reference-identity.md), [#998](https://github.com/Ambiguous-Interactive/unity-helpers/issues/998)).
 - Add the `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` opt-out to use Unity bases for both singleton families and `AttributeEffect` while retaining Odin drawers.
