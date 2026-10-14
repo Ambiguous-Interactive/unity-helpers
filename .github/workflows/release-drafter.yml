@@ -33,7 +33,7 @@ jobs:
 
       - name: Draft release
         id: release_drafter
-        uses: release-drafter/release-drafter@72967cdc98ddd3160f1fc3dff619de365e137dd0
+        uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0
         with:
           config-name: release-drafter.yml
         env:

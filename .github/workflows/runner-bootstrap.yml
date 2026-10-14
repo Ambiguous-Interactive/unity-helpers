@@ -128,7 +128,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Require the selected Unity runner online
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@c5463a9e0d09e5089c7172f41425bf09b7752da2 # v1.16.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@e04369db0da0e0106af77091bf95118218ec7c02 # v1.17.0
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
@@ -306,7 +306,7 @@ jobs:
       # is a HARD failure rather than a silent empty artifact upload.
       - name: Upload host transcript
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: runner-bootstrap-host-${{ inputs.runner-label }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .artifacts/runner-bootstrap/**
@@ -403,7 +403,7 @@ jobs:
 
       - name: Upload Unity maintenance transcript
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: runner-bootstrap-unity-${{ matrix.unity-version }}-${{ inputs.runner-label }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .artifacts/runner-bootstrap/unity-${{ matrix.unity-version }}/**
