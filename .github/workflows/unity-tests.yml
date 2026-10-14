@@ -100,7 +100,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js for assembly discovery
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.18.0"
 
@@ -786,7 +786,7 @@ jobs:
       - name: Setup Node.js for credential redaction
         if: always()
         timeout-minutes: 2
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.18.0"
 
@@ -803,7 +803,7 @@ jobs:
         id: upload_editmode
         if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.redact_editmode.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-${{ matrix.unity-version }}-editmode
           path: .artifacts/unity/${{ matrix.unity-version }}-editmode
@@ -823,7 +823,7 @@ jobs:
         id: upload_playmode
         if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.redact_playmode.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-${{ matrix.unity-version }}-playmode
           path: .artifacts/unity/${{ matrix.unity-version }}-playmode
@@ -843,7 +843,7 @@ jobs:
         id: upload_standalone
         if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.redact_standalone.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-${{ matrix.unity-version }}-standalone
           path: .artifacts/unity/${{ matrix.unity-version }}-standalone
@@ -874,7 +874,7 @@ jobs:
         id: upload_proto_only
         if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.redact_proto_only.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-${{ matrix.unity-version }}-standalone-proto-only
           path: .artifacts/unity/${{ matrix.unity-version }}-standalone-proto-only
@@ -940,7 +940,7 @@ jobs:
           && inputs.acceptance != '' && inputs.acceptance != 'none'
           && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') && steps.redact_acceptance.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-${{ matrix.unity-version }}-acceptance
           path: .artifacts/unity/${{ matrix.unity-version }}-acceptance
@@ -1400,7 +1400,7 @@ jobs:
       - name: Setup Node.js for credential redaction
         if: always()
         timeout-minutes: 2
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.18.0"
 
@@ -1422,7 +1422,7 @@ jobs:
         id: upload_editmode
         if: ${{ always() && steps.redact_editmode.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-${{ matrix.unity-version }}-editmode-single-threaded
           path: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
@@ -1442,7 +1442,7 @@ jobs:
         id: upload_playmode
         if: ${{ always() && steps.redact_playmode.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-${{ matrix.unity-version }}-playmode-single-threaded
           path: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
@@ -1462,7 +1462,7 @@ jobs:
         id: upload_standalone
         if: ${{ always() && steps.redact_standalone.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-${{ matrix.unity-version }}-standalone-single-threaded
           path: .artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded
@@ -1570,7 +1570,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.18.0"
 
@@ -1702,7 +1702,7 @@ jobs:
           ${{ (failure() || cancelled())
           && steps.redact_unity_artifacts.outcome == 'success' }}
         timeout-minutes: 5
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unitypackage-smoke-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
