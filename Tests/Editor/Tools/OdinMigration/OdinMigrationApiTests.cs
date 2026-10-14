@@ -4,11 +4,13 @@
 namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.IO;
     using System.Text;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
 
     [TestFixture]
@@ -32,6 +34,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             _assetFolder = "Assets/OdinMigrationApi" + Guid.NewGuid().ToString("N");
             _fullFolder = Path.Combine(Application.dataPath, Path.GetFileName(_assetFolder));
             Directory.CreateDirectory(_fullFolder);
+        }
+
+        [UnitySetUp]
+        public IEnumerator WaitForEditorReady()
+        {
+            yield return null;
+            double deadline = UnityEditor.EditorApplication.timeSinceStartup + 60;
+            while (
+                (
+                    UnityEditor.EditorApplication.isCompiling
+                    || UnityEditor.EditorApplication.isUpdating
+                )
+                && UnityEditor.EditorApplication.timeSinceStartup < deadline
+            )
+            {
+                yield return null;
+            }
+            Assert.IsFalse(UnityEditor.EditorApplication.isCompiling);
+            Assert.IsFalse(UnityEditor.EditorApplication.isUpdating);
         }
 
         [TearDown]
@@ -334,6 +355,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         {
             string path = _assetFolder + "/" + name;
             File.WriteAllText(FullPath(path), source, encoding ?? new UTF8Encoding(false));
+            File.WriteAllText(
+                FullPath(path) + ".meta",
+                "fileFormatVersion: 2\nguid: " + Guid.NewGuid().ToString("N") + "\n"
+            );
             return path;
         }
     }

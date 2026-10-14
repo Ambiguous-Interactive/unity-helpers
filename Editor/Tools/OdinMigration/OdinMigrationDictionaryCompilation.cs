@@ -135,6 +135,71 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
         }
 
+        /// <summary>Checks that this successful receipt covers the supplied source proposals and unchanged inputs.</summary>
+        public bool TryValidateSources(
+            IReadOnlyDictionary<string, OdinMigrationSourceProposal> sources,
+            out string failure
+        )
+        {
+            try
+            {
+                if (sources == null || sources.Count != _plan.proposals.Count)
+                {
+                    throw new InvalidDataException(
+                        "The source proposals do not match this compilation receipt."
+                    );
+                }
+                HashSet<string> covered = new HashSet<string>(
+                    OdinMigrationCompilationPlan.PathComparer
+                );
+                foreach (KeyValuePair<string, OdinMigrationSourceProposal> entry in sources)
+                {
+                    OdinMigrationSourceProposal proposal = entry.Value;
+                    string path =
+                        proposal == null
+                            ? null
+                            : OdinMigrationSourceBinder.FullPath(proposal.SourcePath);
+                    if (
+                        proposal == null
+                        || !OdinMigrationCompilationPlan.PathComparer.Equals(
+                            OdinMigrationSourceBinder.FullPath(entry.Key),
+                            path
+                        )
+                        || !covered.Add(path)
+                        || !_plan.proposals.TryGetValue(
+                            path,
+                            out OdinMigrationSourceProposal captured
+                        )
+                        || !string.Equals(
+                            proposal.OriginalSource,
+                            captured.OriginalSource,
+                            StringComparison.Ordinal
+                        )
+                        || !string.Equals(
+                            proposal.ProposedSource,
+                            captured.ProposedSource,
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        throw new InvalidDataException(
+                            "A source proposal differs from this compilation receipt."
+                        );
+                    }
+                }
+                if (covered.Count != _plan.proposals.Count)
+                {
+                    throw new InvalidDataException("The source proposals omit compiled sources.");
+                }
+                return TryValidateCurrent(out failure);
+            }
+            catch (Exception exception)
+            {
+                failure = exception.Message;
+                return false;
+            }
+        }
+
         /// <summary>Stops the isolated compiler and cleans its staging files.</summary>
         /// <remarks>Call on the editor thread; cancellation stops the isolated compiler process.</remarks>
         public void Dispose()

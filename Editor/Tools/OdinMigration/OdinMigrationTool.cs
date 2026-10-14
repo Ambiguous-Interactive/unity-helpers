@@ -415,6 +415,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             string destination = null;
             try
             {
+                UnityMainThreadGuard.EnsureMainThread();
+                if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                {
+                    throw new InvalidOperationException(
+                        "Wait for editor compilation and import before applying a migration."
+                    );
+                }
                 string projectRoot = ProjectRoot;
                 if (!string.Equals(projectRoot, preview.ProjectRoot, StringComparison.Ordinal))
                 {
@@ -433,10 +440,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N")
                 );
                 EnsureNoReparsePoints(projectRoot, destination);
-                bool applied = OdinMigrationFileTransaction.TryApply(
+                bool applied = OdinMigrationBackupReceipt.TryApply(
                     preview.State.Plans,
                     destination,
-                    new PhysicalOdinMigrationFileStore(),
                     out string applyFailure
                 );
                 if (applied)
@@ -455,11 +461,57 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
         }
 
+        /// <summary>Restores source and saved asset bytes from a migration recovery record.</summary>
+        /// <remarks>Call on the editor thread after import and compilation finish. Changed targets, metadata, or backups prevent recovery. This does not refresh assets or reverse consumer import side effects; keep the backup and refresh after success.</remarks>
+        public static bool TryRestoreBackup(string backupRoot, out string failure)
+        {
+            try
+            {
+                UnityMainThreadGuard.EnsureMainThread();
+                if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                {
+                    failure =
+                        "Wait for editor compilation and import before restoring a migration backup.";
+                    return false;
+                }
+                return OdinMigrationBackupReceipt.TryRestore(backupRoot, out failure);
+            }
+            catch (Exception exception)
+            {
+                failure = exception.Message;
+                return false;
+            }
+        }
+
         internal static string GetValidatedAssetPath(string assetPath)
         {
             string projectRoot = ProjectRoot;
             ValidateAssetPath(projectRoot, assetPath);
             return Path.Combine(projectRoot, assetPath);
+        }
+
+        internal static string GetValidatedBackupRoot(string backupRoot)
+        {
+            if (string.IsNullOrWhiteSpace(backupRoot) || !Path.IsPathRooted(backupRoot))
+            {
+                throw new IOException("A project migration backup path is required.");
+            }
+            string root = Path.GetFullPath(backupRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string parent = Path.Combine(ProjectRoot, "Library", "WallstopOdinMigrationBackups");
+            if (
+                !OdinMigrationCompilationPlan.PathComparer.Equals(
+                    Path.GetDirectoryName(root),
+                    parent
+                )
+            )
+            {
+                throw new IOException(
+                    "Migration backups must be direct children of the project's Library/WallstopOdinMigrationBackups folder."
+                );
+            }
+            EnsureNoReparsePoints(ProjectRoot, root);
+            return root;
         }
 
         internal static ScanResult BuildPlans(
@@ -624,6 +676,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 report.AppendLine($"DATA SCAN FAILURE: {failure}");
             }
             return report.ToString();
+        }
+
+        internal static void EnsureNoReparsePoints(string projectRoot, string fullPath)
+        {
+            string current = fullPath;
+            while (!string.Equals(current, projectRoot, StringComparison.Ordinal))
+            {
+                try
+                {
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        throw new IOException(
+                            "Migration refuses symbolic links and reparse points: " + current
+                        );
+                    }
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+                current = Path.GetDirectoryName(current);
+                if (string.IsNullOrWhiteSpace(current))
+                {
+                    throw new IOException("Migration path is outside the project.");
+                }
+            }
         }
 
         private static void ScanSerializedAsset(
@@ -946,30 +1022,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 }
             }
             EnsureNoReparsePoints(projectRoot, Path.Combine(projectRoot, assetPath));
-        }
-
-        private static void EnsureNoReparsePoints(string projectRoot, string fullPath)
-        {
-            string current = fullPath;
-            while (!string.Equals(current, projectRoot, StringComparison.Ordinal))
-            {
-                try
-                {
-                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-                    {
-                        throw new IOException(
-                            "Migration refuses symbolic links and reparse points: " + current
-                        );
-                    }
-                }
-                catch (FileNotFoundException) { }
-                catch (DirectoryNotFoundException) { }
-                current = Path.GetDirectoryName(current);
-                if (string.IsNullOrWhiteSpace(current))
-                {
-                    throw new IOException("Migration path is outside the project.");
-                }
-            }
         }
 
         internal sealed class FileAnalysis

@@ -1061,6 +1061,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
+        public void RecoveryRecordFailureAfterBackupsWritesNoTargets()
+        {
+            FakeFileStore store = new FakeFileStore();
+            store.Files["one"] = new byte[] { 1 };
+            store.Files["two"] = new byte[] { 3 };
+            OdinMigrationFilePlan first = CreatePlan("one", new byte[] { 1 }, new byte[] { 2 });
+            OdinMigrationFilePlan second = CreatePlan("two", new byte[] { 3 }, new byte[] { 4 });
+            Assert.IsFalse(
+                OdinMigrationFileTransaction.TryApply(
+                    new[] { first, second },
+                    "backup",
+                    store,
+                    out string failure,
+                    () =>
+                    {
+                        throw new IOException("Recovery record write failed.");
+                    }
+                )
+            );
+            StringAssert.Contains("Recovery record", failure);
+            Assert.AreEqual(2, store.Backups.Count);
+            Assert.AreEqual(0, store.TargetWrites);
+            CollectionAssert.AreEqual(new byte[] { 1 }, store.ReadAllBytes("one"));
+            CollectionAssert.AreEqual(new byte[] { 3 }, store.ReadAllBytes("two"));
+        }
+
+        [Test]
         public void TransactionStopsWhenBackupWriteFails()
         {
             FakeFileStore store = new FakeFileStore

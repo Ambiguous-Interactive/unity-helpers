@@ -72,7 +72,10 @@ Apply checks the complete source batch against its preview and creates every byt
 writing any target. It checks each target again immediately before its staged durable-file
 replacement, then attempts to roll back completed writes if a later write fails. It refuses that rollback when the live bytes show a newer external edit. These checks reduce
 common editor races but cannot coordinate atomically with other processes. Timestamped byte-for-byte backups are retained under
-`Library/WallstopOdinMigrationBackups`.
+`Library/WallstopOdinMigrationBackups`. New backups include unchanged `.meta` bytes and a bounded,
+checksummed recovery record before the first target write. Imported metadata must exist before Apply.
+Recovery records support source and Unity text assets under `Assets`, with 16 MiB per file,
+256 MiB of combined original and replacement bytes, and 10,000 asset/metadata entries per batch.
 
 This is a **Tier C filesystem operation**: Unity Undo does not cover it. Commit or stash your work
 before Apply, keep the backup until the project has compiled and assets have been validated, and use
@@ -134,6 +137,13 @@ liveReferencedObjects, out failure)` checks a loaded imported document against i
 - `TryApply(preview, out backupRoot, out failure)` uses the preview's captured source bytes and
   the same transaction as the menu tool. A successful preview can be applied once. A failure
   reports any attempted backup location and rollback failures; keep those backups for review.
+- `TryRestoreBackup(backupRoot, out failure)` restores the recorded bytes after a reload or restart.
+  Call on the editor thread when compilation and import have finished. It first validates the entire
+  recovery record, backups, target bytes, and unchanged metadata. Changed or missing files prevent
+  recovery before writes. A write failure during recovery can leave a partially restored batch;
+  the reported failure and retained backups support manual recovery. Repeating successful recovery
+  is safe. Refresh the Asset Database after success. Backups made before recovery records were
+  introduced still require manual restoration.
 
 Call project preview and apply methods on the Unity editor thread. They do not display progress
 bars or dialogs. Programmatic Apply does not refresh the Asset Database: call
@@ -370,6 +380,8 @@ An IL2CPP player setting does not change the editor defines used for this receip
 The handle exposes assembly names, bounded compiler diagnostics, cancellation, and failure details.
 Call `Dispose` to stop the isolated compiler process and clean its staging files.
 `TryValidateCurrent` rechecks source, reference, analyzer input, and compiler configuration snapshots.
+`TryValidateSources(sources, out failure)` also requires the exact compiled source paths, original
+text, and proposed text. A receipt for another preview cannot authorize those replacements.
 Added or removed assemblies also invalidate the result. Public Unity compiler option metadata is
 read across editor API versions; consumer members are never inspected through reflection.
 

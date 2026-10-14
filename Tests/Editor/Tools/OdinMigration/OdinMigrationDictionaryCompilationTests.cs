@@ -147,6 +147,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     compilation.Failure + "\n" + string.Join("\n", compilation.Diagnostics)
                 );
                 Assert.IsTrue(compilation.TryValidateCurrent(out failure), failure);
+                Assert.IsTrue(compilation.TryValidateSources(sources, out failure), failure);
+                Assert.IsFalse(compilation.TryValidateSources(null, out failure));
+                Assert.IsFalse(
+                    compilation.TryValidateSources(
+                        new Dictionary<string, OdinMigrationSourceProposal>(),
+                        out failure
+                    )
+                );
+                Dictionary<string, OdinMigrationSourceProposal> changed =
+                    new Dictionary<string, OdinMigrationSourceProposal>();
+                foreach (KeyValuePair<string, OdinMigrationSourceProposal> source in sources)
+                {
+                    changed.Add(
+                        source.Key,
+                        new OdinMigrationSourceProposal(
+                            source.Value.SourcePath,
+                            source.Value.OriginalSource,
+                            source.Value.ProposedSource + " "
+                        )
+                    );
+                }
+                Assert.IsFalse(compilation.TryValidateSources(changed, out failure));
+                StringAssert.Contains("differs", failure);
+                changed.Clear();
+                foreach (KeyValuePair<string, OdinMigrationSourceProposal> source in sources)
+                {
+                    changed.Add(source.Key + ".other", source.Value);
+                }
+                Assert.IsFalse(compilation.TryValidateSources(changed, out failure));
+                StringAssert.Contains("differs", failure);
                 CollectionAssert.Contains(
                     compilation.Assemblies,
                     typeof(OdinMigrationBindingAsset).Assembly.GetName().Name

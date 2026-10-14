@@ -130,7 +130,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             IReadOnlyList<OdinMigrationFilePlan> plans,
             string backupRoot,
             IOdinMigrationFileStore store,
-            out string failure
+            out string failure,
+            Action backupsCompleted = null
         )
         {
             List<OdinMigrationFilePlan> writesStarted = new List<OdinMigrationFilePlan>();
@@ -148,9 +149,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     );
                     store.WriteBackup(backupPath, plan.OriginalBytes);
                 }
+                backupsCompleted?.Invoke();
                 foreach (OdinMigrationFilePlan plan in plans.AsValueEnumerableRequired())
                 {
                     RequireUnchanged(plan, store);
+                    if (BytesEqual(plan.OriginalBytes, plan.UpgradedBytes))
+                    {
+                        continue;
+                    }
                     writesStarted.Add(plan);
                     store.WriteTarget(plan.FullPath, plan.UpgradedBytes);
                 }
