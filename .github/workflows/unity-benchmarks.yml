@@ -41,7 +41,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Node.js for assembly discovery
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.18.0"
       - name: Resolve benchmark target
@@ -317,7 +317,7 @@ jobs:
       - name: Setup Node.js for credential redaction
         if: always()
         timeout-minutes: 2
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.18.0"
 
@@ -340,7 +340,7 @@ jobs:
         if: >-
           ${{ !cancelled() && steps.run_tests.outcome == 'success'
           && steps.redact_unity_artifacts.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: perf-results-6000.6.0f1-playmode
           path: perf-staging
@@ -349,7 +349,7 @@ jobs:
 
       - name: Upload benchmark artifacts
         if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-benchmarks-6000.6.0f1-playmode
           path: .artifacts/unity/benchmarks/6000.6.0f1-playmode/
@@ -434,14 +434,14 @@ jobs:
           persist-credentials: true
 
       - name: Download staged perf results
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: perf-results-*
           path: perf-download
           merge-multiple: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.18.0"
 
@@ -508,7 +508,7 @@ jobs:
       # known-complete committed report.
       - name: Upload invalid matrix diagnostics
         if: ${{ always() && steps.assemble.outcome == 'failure' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: invalid-perf-matrix-diagnostics
           path: perf-results/partial-results-*.xml
