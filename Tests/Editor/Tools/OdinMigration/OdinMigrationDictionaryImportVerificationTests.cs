@@ -54,6 +54,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.IsTrue(Verify(out string failure), failure);
         }
 
+        [TearDown]
+        public void RemoveTemporaryImportedAssets()
+        {
+            CleanupTrackedFoldersAndAssets();
+            if (!string.IsNullOrWhiteSpace(_folder))
+            {
+                Assert.IsFalse(
+                    System.IO.Directory.Exists(
+                        System.IO.Path.Combine(
+                            System.IO.Directory.GetParent(Application.dataPath).FullName,
+                            _folder
+                        )
+                    )
+                );
+            }
+        }
+
         [UnityTest]
         public IEnumerator ImportedAndReserializedValuesMatchRetainedKeysNullsAndRepeatedReferences()
         {
