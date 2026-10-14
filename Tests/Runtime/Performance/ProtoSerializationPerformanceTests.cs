@@ -4,12 +4,16 @@
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 {
     using System;
+    using System.Collections;
     using System.Diagnostics;
+    using System.Globalization;
     using System.IO;
+    using System.Threading;
     using NUnit.Framework;
     using ProtoBuf;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
-    using SerializerAlias = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [Category("Performance")]
@@ -19,7 +23,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     {
         private const int BenchmarkTimeoutMilliseconds = 600_000;
 
-        private const int Iterations = 10_000;
+        private const int BenchmarkSeed = 343;
+        private const int ClockControlMilliseconds = 20;
+        private const double CalibrationTargetMilliseconds = 50;
 
         private static SmallMsg MakeSmall(int i)
         {
@@ -56,74 +62,148 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             T sample = factory();
             byte[] buffer = null;
             using MemoryStream protobufNetBuffer = new();
-
-            _ = SerializerAlias.ProtoSerialize(sample, ref buffer);
-            Serializer.Serialize(protobufNetBuffer, sample);
-
-            /*
-                The alias uses WallstopProto for these dual-annotated contracts; calling ProtoBuf.Serializer
-                directly below is the reflection-based comparison.
-            */
-            Stopwatch sw = Stopwatch.StartNew();
-            int written = 0;
-            for (int i = 0; i < Iterations; ++i)
+            int expectedLength = WProtoFacade.Serialize(sample, ref buffer).Length;
+            byte[] originalBuffer = buffer;
+            Action verify = () =>
             {
-                written = SerializerAlias.ProtoSerialize(sample, ref buffer);
-            }
-            sw.Stop();
-            long wallstopProtoMs = sw.ElapsedMilliseconds;
-            payloadSize = written;
-
-            sw.Restart();
-            for (int i = 0; i < Iterations; ++i)
-            {
+                WProtoWriteResult generated = WProtoFacade.Serialize(sample, ref buffer);
+                Assert.IsTrue(generated.Served);
+                Assert.IsFalse(generated.Resized);
+                Assert.AreEqual(expectedLength, generated.Length);
+                Assert.IsTrue(ReferenceEquals(originalBuffer, buffer));
                 protobufNetBuffer.Position = 0;
                 protobufNetBuffer.SetLength(0);
                 Serializer.Serialize(protobufNetBuffer, sample);
-            }
-            sw.Stop();
-            long protobufNetMs = sw.ElapsedMilliseconds;
-
-            double speedup =
-                0 < wallstopProtoMs
-                    ? (double)protobufNetMs / wallstopProtoMs
-                    : double.PositiveInfinity;
-            UnityEngine.Debug.Log(
-                $"| {label} | {wallstopProtoMs, 18:N0} | {protobufNetMs, 16:N0} | {speedup, 7:0.00}x | {payloadSize, 12:N0} |"
+                CollectionAssert.AreEqual(
+                    protobufNetBuffer.ToArray(),
+                    buffer,
+                    "Both writers must emit the same complete payload."
+                );
+            };
+            CalibratedBenchmarkMeasurement samples = BenchmarkProtocol.MeasureCalibrated(
+                iterations =>
+                {
+                    long checksum = 0;
+                    for (int i = 0; i < iterations; ++i)
+                    {
+                        protobufNetBuffer.Position = 0;
+                        protobufNetBuffer.SetLength(0);
+                        Serializer.Serialize(protobufNetBuffer, sample);
+                        checksum += protobufNetBuffer.Length;
+                    }
+                    return checksum;
+                },
+                iterations =>
+                {
+                    long checksum = 0;
+                    for (int i = 0; i < iterations; ++i)
+                    {
+                        checksum += WProtoFacade.Serialize(sample, ref buffer).Length;
+                    }
+                    return checksum;
+                },
+                verify,
+                BenchmarkSeed,
+                CalibrationTargetMilliseconds
+            );
+            payloadSize = expectedLength;
+            ReportWarmSamples(
+                nameof(CompareCalibratedSerializeSmallMediumLarge),
+                label,
+                samples,
+                payloadSize
             );
         }
 
         private static void RunDeserializeBenchmark<T>(string label, T payload)
         {
-            byte[] data = SerializerAlias.ProtoSerialize(payload);
+            byte[] data = WProtoFacade.Serialize(payload);
             using MemoryStream protobufNetBuffer = new(data, writable: false);
-
-            _ = SerializerAlias.ProtoDeserialize<T>(data);
-            _ = (T)Serializer.Deserialize(typeof(T), protobufNetBuffer);
-
-            Stopwatch sw = Stopwatch.StartNew();
-            for (int i = 0; i < Iterations; ++i)
+            Action verify = () =>
             {
-                _ = SerializerAlias.ProtoDeserialize<T>(data);
-            }
-            sw.Stop();
-            long wallstopProtoMs = sw.ElapsedMilliseconds;
-
-            sw.Restart();
-            for (int i = 0; i < Iterations; ++i)
-            {
+                Assert.IsTrue(WProtoFacade.TryDeserialize(data, out T generated));
                 protobufNetBuffer.Position = 0;
-                _ = (T)Serializer.Deserialize(typeof(T), protobufNetBuffer);
-            }
-            sw.Stop();
-            long protobufNetMs = sw.ElapsedMilliseconds;
+                T reference = Serializer.Deserialize<T>(protobufNetBuffer);
+                CollectionAssert.AreEqual(data, WProtoFacade.Serialize(generated));
+                using MemoryStream rewritten = new();
+                Serializer.Serialize(rewritten, reference);
+                CollectionAssert.AreEqual(data, rewritten.ToArray());
+            };
+            CalibratedBenchmarkMeasurement samples = BenchmarkProtocol.MeasureCalibrated(
+                iterations =>
+                {
+                    long checksum = 0;
+                    for (int i = 0; i < iterations; ++i)
+                    {
+                        protobufNetBuffer.Position = 0;
+                        T restored = Serializer.Deserialize<T>(protobufNetBuffer);
+                        GC.KeepAlive(restored);
+                        checksum += protobufNetBuffer.Position;
+                    }
+                    return checksum;
+                },
+                iterations =>
+                {
+                    long checksum = 0;
+                    for (int i = 0; i < iterations; ++i)
+                    {
+                        T restored = WProtoFacade.Deserialize<T>(data);
+                        GC.KeepAlive(restored);
+                        checksum += data.Length;
+                    }
+                    return checksum;
+                },
+                verify,
+                BenchmarkSeed,
+                CalibrationTargetMilliseconds
+            );
+            ReportWarmSamples(
+                nameof(CompareCalibratedDeserializeSmallMediumLarge),
+                label,
+                samples,
+                data.Length
+            );
+        }
 
-            double speedup =
-                0 < wallstopProtoMs
-                    ? (double)protobufNetMs / wallstopProtoMs
-                    : double.PositiveInfinity;
+        private static void RequireObservableClock()
+        {
+            Stopwatch clock = Stopwatch.StartNew();
+            Thread.Sleep(ClockControlMilliseconds);
+            clock.Stop();
+            double elapsed = clock.Elapsed.TotalMilliseconds;
             UnityEngine.Debug.Log(
-                $"| {label} | {wallstopProtoMs, 18:N0} | {protobufNetMs, 16:N0} | {speedup, 7:0.00}x |"
+                $"WPROTO_CLOCK_CONTROL requested={ClockControlMilliseconds}ms measured={elapsed:F4}ms frequency={Stopwatch.Frequency}"
+            );
+            if (elapsed < ClockControlMilliseconds / 2.0)
+            {
+                Assert.Ignore("The timer did not observe the sleep control.");
+            }
+        }
+
+        private static void ReportWarmSamples(
+            string operation,
+            string label,
+            CalibratedBenchmarkMeasurement samples,
+            int payloadSize
+        )
+        {
+            if (samples == null)
+            {
+                Assert.Ignore("The paired workload could not reach its calibration duration.");
+            }
+            UnityEngine.Debug.Log($"WPROTO_WARM_SAMPLES {operation} {label} {samples.ToJson()}");
+            bool stable =
+                samples.HasSufficientTiming
+                && samples.Comparison.IsStable(BenchmarkProtocol.DefaultSpreadLimit);
+            string ratio = stable
+                ? samples.Comparison.Ratio.ToString("F3", CultureInfo.InvariantCulture) + "x"
+                : "inconclusive";
+            double generatedNanoseconds =
+                samples.SubjectSummary.Median * 1_000_000 / samples.Iterations;
+            double referenceNanoseconds =
+                samples.ReferenceSummary.Median * 1_000_000 / samples.Iterations;
+            UnityEngine.Debug.Log(
+                $"| {label} | {generatedNanoseconds:F2} | {referenceNanoseconds:F2} | {ratio} | {payloadSize} |"
             );
         }
 
@@ -152,29 +232,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return b;
         }
 
-        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
-        public void CompareSerializeSmallMediumLarge()
+        [UnityTest, Timeout(BenchmarkTimeoutMilliseconds)]
+        public IEnumerator CompareCalibratedSerializeSmallMediumLarge()
         {
+            yield return null;
+            RequireObservableClock();
             UnityEngine.Debug.Log(
-                "| Payload | WallstopProto (ms) | protobuf-net (ms) | Speedup | Size (bytes) |"
+                "| Payload | WallstopProto (ns) | protobuf-net (ns) | Speedup | Size (bytes) |"
             );
             UnityEngine.Debug.Log(
                 "| ------- | ------------------:| ----------------:| -------:| ------------:|"
             );
 
             RunSerializeBenchmark("Small", () => MakeSmall(123), out int smallSize);
+            yield return null;
             RunSerializeBenchmark("Medium", () => MakeMedium(123, 16), out int medSize);
+            yield return null;
             RunSerializeBenchmark("Large", () => MakeLarge(123, 8 * 1024, 64), out int largeSize);
         }
 
-        [Test, Timeout(BenchmarkTimeoutMilliseconds)]
-        public void CompareDeserializeSmallMediumLarge()
+        [UnityTest, Timeout(BenchmarkTimeoutMilliseconds)]
+        public IEnumerator CompareCalibratedDeserializeSmallMediumLarge()
         {
-            UnityEngine.Debug.Log("| Payload | WallstopProto (ms) | protobuf-net (ms) | Speedup |");
-            UnityEngine.Debug.Log("| ------- | ------------------:| ----------------:| -------:|");
+            yield return null;
+            RequireObservableClock();
+            UnityEngine.Debug.Log(
+                "| Payload | WallstopProto (ns) | protobuf-net (ns) | Speedup | Size (bytes) |"
+            );
+            UnityEngine.Debug.Log(
+                "| ------- | ------------------:| ----------------:| -------:| ------------:|"
+            );
 
             RunDeserializeBenchmark("Small", MakeSmall(123));
+            yield return null;
             RunDeserializeBenchmark("Medium", MakeMedium(123, 16));
+            yield return null;
             RunDeserializeBenchmark("Large", MakeLarge(123, 8 * 1024, 64));
         }
 
@@ -204,7 +296,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             public string Name { get; set; }
 
             [ProtoMember(3)]
-            [WProtoMember(3)]
+            [WProtoMember(3, IsPacked = false)]
             public int[] Values { get; set; }
         }
 

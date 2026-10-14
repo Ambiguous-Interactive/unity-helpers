@@ -191,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             OdinMigrationBindingAsset owner = CreateScriptableObject<OdinMigrationBindingAsset>();
             Texture2D texture = Track(new Texture2D(1, 1));
             owner.Variations.Add(SpriteAlignment.Center, new List<Texture2D> { texture });
-            Dictionary<SpriteAlignment, List<Texture2D>> original = owner.Variations;
+            IDictionary<SpriteAlignment, List<Texture2D>> original = owner.Variations;
             Assert.IsTrue(
                 OdinMigrationCompiledBindings.TryGet(
                     owner.GetType(),
