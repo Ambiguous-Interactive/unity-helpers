@@ -22,6 +22,10 @@ updates:
       - "/.github/actions/*"
     schedule:
       interval: "weekly"
+    ignore:
+      # v1.17.0 is published but absent from the reviewed enrollment SHA lists (#322).
+      - dependency-name: "Ambiguous-Interactive/ambiguous-organization-build-lock*"
+        versions: ["1.17.0"]
     groups:
       organization-build-lock:
         patterns:

@@ -27,6 +27,8 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
         private const string Source =
             "global::" + BindingNamespace + ".OdinMigrationCompiledSource";
         private const string Field = "global::" + BindingNamespace + ".OdinMigrationCompiledField";
+        private const string LiveDictionary =
+            "global::" + BindingNamespace + ".OdinMigrationLiveDictionary";
 
         private static string Literal(string value)
         {
@@ -203,6 +205,74 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
             }
         }
 
+        private static string CaptureExpression(
+            IFieldSymbol field,
+            INamedTypeSymbol owner,
+            Compilation compilation
+        )
+        {
+            if (
+                !TypeNaming.IsNameable(owner, compilation)
+                || !TypeNaming.IsNameable(field.Type, compilation)
+                || !compilation.IsSymbolAccessibleWithin(field, compilation.Assembly)
+            )
+            {
+                return "null";
+            }
+            string type = owner.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            return "(global::UnityEngine.Object value, out "
+                + LiveDictionary
+                + " captured, out string failure) => { if (!(value is "
+                + type
+                + " original)) { captured = null; failure = \"The live dictionary owner has the wrong compiled type.\"; return false; } return "
+                + LiveDictionary
+                + ".TryCapture(original.@"
+                + field.Name
+                + ", key => (int)key, out captured, out failure); }";
+        }
+
+        private static string RestoreExpression(
+            IFieldSymbol field,
+            INamedTypeSymbol owner,
+            Compilation compilation
+        )
+        {
+            if (
+                field.IsReadOnly
+                || !TypeNaming.IsNameable(owner, compilation)
+                || !TypeNaming.IsNameable(field.Type, compilation)
+                || !compilation.IsSymbolAccessibleWithin(field, compilation.Assembly)
+                || !TryDictionary(
+                    field.Type,
+                    out INamedTypeSymbol key,
+                    out INamedTypeSymbol element
+                )
+            )
+            {
+                return "null";
+            }
+            string ownerType = owner.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            string keyType = key.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            string elementType = element.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            return "(global::UnityEngine.Object value, global::System.Collections.Generic.IReadOnlyList<int> keys, global::System.Collections.Generic.IReadOnlyList<global::System.Collections.Generic.IReadOnlyList<global::UnityEngine.Object>> values, out string failure) => { if (!(value is "
+                + ownerType
+                + " original)) { failure = \"The live dictionary owner has the wrong compiled type.\"; return false; } if (!"
+                + LiveDictionary
+                + ".TryRebuild<"
+                + keyType
+                + ", "
+                + elementType
+                + ">(keys, values, key => ("
+                + keyType
+                + ")key, out global::System.Collections.Generic.Dictionary<"
+                + keyType
+                + ", global::System.Collections.Generic.List<"
+                + elementType
+                + ">> rebuilt, out failure)) { return false; } original.@"
+                + field.Name
+                + " = rebuilt; return true; }";
+        }
+
         /// <inheritdoc />
         public void Initialize(GeneratorInitializationContext context) { }
 
@@ -365,6 +435,10 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                                     + OdinMigrationRewriteMetadata.ArrayExpression(edits)
                                     + ", "
                                     + (rewriteFailure == null ? "null" : Literal(rewriteFailure))
+                                    + ", "
+                                    + CaptureExpression(field, owner, context.Compilation)
+                                    + ", "
+                                    + RestoreExpression(field, owner, context.Compilation)
                                     + ")"
                             );
                         }

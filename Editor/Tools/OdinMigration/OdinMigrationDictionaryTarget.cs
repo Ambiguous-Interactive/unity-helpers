@@ -7,7 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.Collections.Generic;
     using Object = UnityEngine.Object;
 
-    /// <summary>Identifies one retained Unity document and its original dictionary schemas.</summary>
+    /// <summary>Identifies one saved Unity document and its original dictionary schemas.</summary>
     public sealed class OdinMigrationDictionaryTarget
     {
         /// <summary>Gets the existing project-relative asset path.</summary>
@@ -22,12 +22,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         /// <summary>Gets the captured live objects in retained reference-table order.</summary>
         public IReadOnlyList<Object> ReferencedObjects { get; }
 
+        /// <summary>Gets the caller-loaded original owner for a document without retained Odin data.</summary>
+        public Object LiveOwner { get; }
+
         /// <summary>Captures a document selection without loading or writing its asset.</summary>
         public OdinMigrationDictionaryTarget(
             string assetPath,
             long fileId,
             OdinMigrationDictionaryField[] fields,
             Object[] referencedObjects
+        )
+            : this(assetPath, fileId, fields, referencedObjects, null) { }
+
+        /// <summary>Captures a retained document or a caller-loaded original live owner.</summary>
+        public OdinMigrationDictionaryTarget(
+            string assetPath,
+            long fileId,
+            OdinMigrationDictionaryField[] fields,
+            Object[] referencedObjects,
+            Object liveOwner
         )
         {
             AssetPath = assetPath;
@@ -42,6 +55,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     ? Array.Empty<Object>()
                     : (Object[])referencedObjects.Clone()
             );
+            LiveOwner = liveOwner;
         }
     }
 }

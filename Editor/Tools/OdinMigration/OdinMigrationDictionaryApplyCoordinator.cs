@@ -132,10 +132,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 HashSet<string> affected = new HashSet<string>(StringComparer.Ordinal);
                 foreach (OdinMigrationAffectedDocument document in inventory.Documents)
                 {
-                    if (!document.HasRetainedData)
+                    if (!document.Selected)
                     {
                         throw new IOException(
-                            "An affected document has no retained payload to verify: "
+                            "An affected document requires a retained payload or a selected live capture to verify: "
                                 + document.AssetPath
                         );
                     }
@@ -532,6 +532,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         _active != null
                         && _active.requiresReload
                         && string.Equals(_active.importEpoch, Epoch, StringComparison.Ordinal)
+                        && !EditorApplication.isCompiling
                     )
                     {
                         CompilationPipeline.RequestScriptCompilation();
@@ -578,6 +579,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         )
                         {
                             throw new IOException(verificationFailure);
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (OdinMigrationApplyRecord.Document document in _active.documents)
+                    {
+                        if (document.liveCaptured)
+                        {
+                            Object owner = OdinMigrationApplySceneScope.FindOwner(
+                                _active,
+                                _root,
+                                document
+                            );
+                            OdinMigrationLiveDocument.Restore(_active, _root, document, owner);
                         }
                     }
                 }

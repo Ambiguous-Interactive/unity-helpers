@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using UnityEngine;
     using UnityEngine.SceneManagement;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration;
     using WallstopStudios.UnityHelpers.Editor.Validation;
     using Object = UnityEngine.Object;
@@ -72,8 +73,57 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 new List<OdinMigrationApplyRecord.Document>();
             int delivered = 0;
             long recordBytes = 0;
+            HashSet<object> originalLists = new(ReferenceIdentityComparer<object>.Instance);
             foreach (OdinMigrationDictionaryTarget target in preview.Targets)
             {
+                if (!ReferenceEquals(target.LiveOwner, null))
+                {
+                    if (
+                        !preview.Assets.TryGetValue(
+                            target.AssetPath,
+                            out OdinMigrationAssetProposal liveAsset
+                        )
+                    )
+                    {
+                        throw new IOException(
+                            "A live dictionary target has no paired asset proposal."
+                        );
+                    }
+                    AuthoredAssetDocument originalDocument = null;
+                    foreach (
+                        AuthoredAssetDocument document in OdinMigrationDictionaryMigrationBuilder
+                            .ReadDocuments(liveAsset.OriginalSource)
+                            .AsValueEnumerableRequired()
+                    )
+                    {
+                        if (document.FileId == target.FileId)
+                        {
+                            if (originalDocument != null)
+                            {
+                                throw new IOException(
+                                    "A live dictionary document identifier is ambiguous."
+                                );
+                            }
+                            originalDocument = document;
+                        }
+                    }
+                    if (OdinMigrationApplyRecord.MaximumDocuments <= documents.Count)
+                    {
+                        throw new IOException(
+                            "The captured dictionary document count exceeds its limit."
+                        );
+                    }
+                    documents.Add(
+                        OdinMigrationLiveDocument.Capture(
+                            target,
+                            originalDocument,
+                            originalLists,
+                            out OdinMigrationCompiledBinding _,
+                            out string _
+                        )
+                    );
+                    continue;
+                }
                 if (
                     !preview.Assets.TryGetValue(
                         target.AssetPath,

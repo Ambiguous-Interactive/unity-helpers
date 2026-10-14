@@ -41,6 +41,14 @@ Re-run restore when project files, imported props, lock files, SDK versions, or 
 change. On 2026-09-23, the warm default check took 1.97 seconds without restore versus 2.90 seconds
 through the npm command on this host.
 
+For compiler feedback while editing, use `npm run typecheck:iterate -- tests` (or `runtime`,
+`editor`, `editor-tests`, `integrations`). An optional second argument selects `legacy`, `odin`,
+`singlethreaded`, or `proto-only`. This runs without restore or WUH analyzers, but retains source
+generators and compiler errors. It disables the shared compiler to avoid stale source snapshots.
+It is an iteration aid, not a validation gate: run the normal applicable typecheck commands before
+publication. On 2026-10-14, the test-tree iteration check took 5.37 seconds here versus 37.02 seconds
+for the full check after an edit. These are local observations, not CI timing claims.
+
 For isolated Odin compiler edits, first run the native MCP `editor` fixture
 `OdinMigrationCompilerProcessTests`. Its nine controls took 2.86 seconds on Unity 6000.4.6f1 on
 2026-10-13. They cover compiler layouts, argument isolation, and actual runtime/editor assembly

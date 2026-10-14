@@ -65,12 +65,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         )]
         private int maxPendingActions = DefaultQueueLimit;
 
-        internal static bool TryGetInstance(out UnityMainThreadDispatcher dispatcher)
-        {
-            dispatcher = _instance;
-            return dispatcher != null;
-        }
-
         internal static bool TryDispatchToMainThread(Action action)
         {
             if (action == null)

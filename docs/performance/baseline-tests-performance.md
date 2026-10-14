@@ -211,6 +211,15 @@ counterbalanced batches cannot claim timing acceptance and report an undefined i
 `null`. Existing fixtures that still call `MeasurePaired` retain their older advisory protocol;
 this change does not make their tables calibrated evidence.
 
+The protobuf warm serialize and deserialize fixtures use the same calibrated protocol for
+small, medium and large messages, with both contracts using unpacked integer arrays. The generated
+side calls `WProtoFacade` directly. A timed sleep control runs before each fixture measures its
+workloads. Generated and protobuf-net bytes must agree before warmup and after the retained
+samples; generated reads and oracle reads must reproduce the original payload. Each workload
+emits its raw record as `WPROTO_WARM_SAMPLES` JSON. Table timings are median nanoseconds per
+operation, and unstable or insufficient samples report an inconclusive speedup. These editor
+measurements do not establish cold-start, allocation or Release-player acceptance.
+
 For the IntMap player experiment, manually dispatch **Unity Tests** with `acceptance=intmap`
 and a supported `unity-version`. Normal selected tests remain mandatory. The extra test runs in
 a fresh Release IL2CPP player against `Dictionary` compiled in the same candidate, so its commit

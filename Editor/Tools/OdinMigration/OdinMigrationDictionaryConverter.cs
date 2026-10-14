@@ -124,6 +124,59 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             return true;
         }
 
+        internal static string Render(
+            string fieldName,
+            IReadOnlyList<int> keys,
+            IReadOnlyList<IReadOnlyList<string>> values
+        )
+        {
+            StringBuilder result = new StringBuilder();
+            result
+                .Append("  ")
+                .Append(fieldName)
+                .Append(":\n    ")
+                .Append(SerializableDictionarySerializedPropertyNames.Keys)
+                .Append(": ");
+            foreach (int key in keys)
+            {
+                uint bits = unchecked((uint)key);
+                for (int shift = 0; shift < 32; shift += 8)
+                {
+                    result.Append(
+                        ((bits >> shift) & 255).ToString("x2", CultureInfo.InvariantCulture)
+                    );
+                }
+            }
+            result
+                .Append("\n    ")
+                .Append(SerializableDictionarySerializedPropertyNames.BoxedValues)
+                .Append(':');
+            if (keys.Count == 0)
+            {
+                result.Append(" []\n");
+                return result.ToString();
+            }
+            result.Append('\n');
+            foreach (IReadOnlyList<string> references in values)
+            {
+                result
+                    .Append("    - ")
+                    .Append(SerializableDictionarySerializedPropertyNames.BoxedValueData)
+                    .Append(':');
+                if (references.Count == 0)
+                {
+                    result.Append(" []\n");
+                    continue;
+                }
+                result.Append('\n');
+                foreach (string reference in references)
+                {
+                    result.Append("      - ").Append(reference).Append('\n');
+                }
+            }
+            return result.ToString();
+        }
+
         private static bool TryConvert(
             OdinMigrationSerializedData payload,
             IReadOnlyList<OdinMigrationDictionaryField> fields,
@@ -494,59 +547,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
             Require(nodes, ref position, EndArrayEntry, string.Empty, string.Empty);
             Require(nodes, ref position, EndNodeEntry, string.Empty, string.Empty);
-        }
-
-        private static string Render(
-            string fieldName,
-            IReadOnlyList<int> keys,
-            IReadOnlyList<IReadOnlyList<string>> values
-        )
-        {
-            StringBuilder result = new StringBuilder();
-            result
-                .Append("  ")
-                .Append(fieldName)
-                .Append(":\n    ")
-                .Append(SerializableDictionarySerializedPropertyNames.Keys)
-                .Append(": ");
-            foreach (int key in keys)
-            {
-                uint bits = unchecked((uint)key);
-                for (int shift = 0; shift < 32; shift += 8)
-                {
-                    result.Append(
-                        ((bits >> shift) & 255).ToString("x2", CultureInfo.InvariantCulture)
-                    );
-                }
-            }
-            result
-                .Append("\n    ")
-                .Append(SerializableDictionarySerializedPropertyNames.BoxedValues)
-                .Append(':');
-            if (keys.Count == 0)
-            {
-                result.Append(" []\n");
-                return result.ToString();
-            }
-            result.Append('\n');
-            foreach (IReadOnlyList<string> references in values)
-            {
-                result
-                    .Append("    - ")
-                    .Append(SerializableDictionarySerializedPropertyNames.BoxedValueData)
-                    .Append(':');
-                if (references.Count == 0)
-                {
-                    result.Append(" []\n");
-                    continue;
-                }
-                result.Append('\n');
-                foreach (string reference in references)
-                {
-                    result.Append("      - ").Append(reference).Append('\n');
-                }
-            }
-            return result.ToString();
         }
 
         private static string TypeShape(string text, int depth)

@@ -4,5 +4,12 @@
 namespace UnityEngine.TestTools
 {
     /// <summary>Provides the type-check declaration for Unity's script recompilation yield instruction.</summary>
-    public sealed class RecompileScripts { }
+    public sealed class RecompileScripts
+    {
+        /// <summary>Declares the recompilation instruction requiring script compilation.</summary>
+        public RecompileScripts() { }
+
+        /// <summary>Declares whether a script compilation must occur.</summary>
+        public RecompileScripts(bool expectScriptCompilation) { }
+    }
 }

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.IO;
     using System.Text;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration;
     using WallstopStudios.UnityHelpers.Editor.Validation;
 
@@ -91,6 +92,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         OdinMigrationCompiledBinding,
                         List<OdinMigrationDictionaryField>
                     >();
+                HashSet<object> originalLists = new(ReferenceIdentityComparer<object>.Instance);
                 int index = 0;
                 foreach (KeyValuePair<string, List<OdinMigrationDictionaryTarget>> group in grouped)
                 {
@@ -153,89 +155,118 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             documentStart,
                             documentEnd - documentStart
                         );
-                        if (
-                            !OdinMigrationTool.TryReadSerializedNodes(
-                                documentSource,
-                                out IReadOnlyList<OdinMigrationSerializedData> payloads,
-                                out string readFailure
-                            )
-                            || payloads.Count != 1
-                        )
+                        OdinMigrationCompiledBinding binding;
+                        string fragment;
+                        int start;
+                        int end;
+                        string newline;
+                        if (!ReferenceEquals(target.LiveOwner, null))
                         {
-                            throw new InvalidDataException(
-                                readFailure
-                                    ?? "The selected Unity document must have exactly one retained payload."
+                            OdinMigrationLiveDocument.Capture(
+                                target,
+                                document,
+                                originalLists,
+                                out binding,
+                                out fragment
                             );
+                            start = documentEnd;
+                            end = start;
+                            newline = Newline(documentSource);
+                            if (
+                                0 < start
+                                && original[start - 1] != '\n'
+                                && original[start - 1] != '\r'
+                            )
+                            {
+                                fragment = "\n" + fragment;
+                            }
                         }
-                        OdinMigrationSerializedData payload = payloads[0];
-                        foreach (
-                            OdinMigrationDictionaryField field in target.Fields.AsValueEnumerableRequired()
-                        )
+                        else
                         {
                             if (
-                                field != null
-                                && document.TryGetEntry(
-                                    field.FieldName,
-                                    out AuthoredAssetEntry existing
+                                !OdinMigrationTool.TryReadSerializedNodes(
+                                    documentSource,
+                                    out IReadOnlyList<OdinMigrationSerializedData> payloads,
+                                    out string readFailure
                                 )
-                                && existing.Indent == 2
+                                || payloads.Count != 1
                             )
                             {
                                 throw new InvalidDataException(
-                                    "A converted dictionary field already exists in the owning Unity document."
+                                    readFailure
+                                        ?? "The selected Unity document must have exactly one retained payload."
                                 );
                             }
-                        }
-                        if (
-                            !OdinMigrationTool.TryConvertBoundSerializedDictionaries(
-                                payload,
-                                target.Fields,
-                                group.Key,
-                                target.ReferencedObjects,
-                                out OdinMigrationCompiledBinding binding,
-                                out string fragment,
-                                out string conversionFailure
+                            OdinMigrationSerializedData payload = payloads[0];
+                            foreach (
+                                OdinMigrationDictionaryField field in target.Fields.AsValueEnumerableRequired()
                             )
-                        )
-                        {
-                            throw new InvalidDataException(conversionFailure);
-                        }
-                        if (
-                            !payload.Source.StartsWith(
-                                "  serializationData:",
-                                StringComparison.Ordinal
+                            {
+                                if (
+                                    field != null
+                                    && document.TryGetEntry(
+                                        field.FieldName,
+                                        out AuthoredAssetEntry existing
+                                    )
+                                    && existing.Indent == 2
+                                )
+                                {
+                                    throw new InvalidDataException(
+                                        "A converted dictionary field already exists in the owning Unity document."
+                                    );
+                                }
+                            }
+                            if (
+                                !OdinMigrationTool.TryConvertBoundSerializedDictionaries(
+                                    payload,
+                                    target.Fields,
+                                    group.Key,
+                                    target.ReferencedObjects,
+                                    out binding,
+                                    out fragment,
+                                    out string conversionFailure
+                                )
                             )
-                            && !payload.Source.StartsWith(
-                                "  _serializationData:",
-                                StringComparison.Ordinal
+                            {
+                                throw new InvalidDataException(conversionFailure);
+                            }
+                            if (
+                                !payload.Source.StartsWith(
+                                    "  serializationData:",
+                                    StringComparison.Ordinal
+                                )
+                                && !payload.Source.StartsWith(
+                                    "  _serializationData:",
+                                    StringComparison.Ordinal
+                                )
                             )
-                        )
-                        {
-                            throw new InvalidDataException(
-                                "The retained payload must be a direct field of its owning Unity document."
-                            );
-                        }
-                        int start = offsets[document.StartLineNumber + payload.Line - 2];
-                        int end = start + payload.Source.Length;
-                        if (documentEnd < end)
-                        {
-                            throw new InvalidDataException(
-                                "The retained payload extends beyond its owning document."
-                            );
-                        }
-                        if (
-                            !string.Equals(
-                                original.Substring(start, end - start),
-                                payload.Source,
-                                StringComparison.Ordinal
+                            {
+                                throw new InvalidDataException(
+                                    "The retained payload must be a direct field of its owning Unity document."
+                                );
+                            }
+                            start = offsets[document.StartLineNumber + payload.Line - 2];
+                            end = start + payload.Source.Length;
+                            if (documentEnd < end)
+                            {
+                                throw new InvalidDataException(
+                                    "The retained payload extends beyond its owning document."
+                                );
+                            }
+                            if (
+                                !string.Equals(
+                                    original.Substring(start, end - start),
+                                    payload.Source,
+                                    StringComparison.Ordinal
+                                )
                             )
-                        )
-                        {
-                            throw new InvalidDataException(
-                                "The retained payload does not match its original asset text."
-                            );
+                            {
+                                throw new InvalidDataException(
+                                    "The retained payload does not match its original asset text."
+                                );
+                            }
+                            newline = Newline(payload.Source);
                         }
-                        string newline = Newline(payload.Source);
                         edits.Add(
                             new OdinMigrationCompiledSourceEdit(
                                 group.Key,

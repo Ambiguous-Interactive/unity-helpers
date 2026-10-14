@@ -84,6 +84,28 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
+        /// Returns the already loaded live instance without loading or creating an asset.
+        /// </summary>
+        /// <param name="instance">The loaded instance, or null when absent or destroyed.</param>
+        /// <returns>Whether a loaded instance is available.</returns>
+        public static bool TryGetInstance(out T instance)
+        {
+            Lazy<T> lazy = _lazyInstance;
+            if (lazy != null && lazy.IsValueCreated)
+            {
+                T cached = lazy.Value;
+                if (cached != null)
+                {
+                    instance = cached;
+                    return true;
+                }
+            }
+
+            instance = null;
+            return false;
+        }
+
+        /// <summary>
         /// Clears the singleton cache on the main thread, allowing a fresh load on next access.
         /// </summary>
         internal static void ClearInstance()

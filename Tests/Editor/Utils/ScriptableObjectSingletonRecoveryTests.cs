@@ -26,6 +26,130 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class ScriptableObjectSingletonRecoveryTests : CommonTestBase
     {
+        [Test]
+        public void TryGetInstanceHandlesAnAbsentLazyCacheWithoutRepairOrLoad()
+        {
+            AbsentAssetSingleton._lazyInstance = null;
+            try
+            {
+                Assert.IsFalse(
+                    AbsentAssetSingleton.TryGetInstance(out AbsentAssetSingleton instance)
+                );
+                Assert.IsTrue(ReferenceEquals(instance, null));
+                Assert.IsTrue(AbsentAssetSingleton._lazyInstance == null);
+            }
+            finally
+            {
+                AbsentAssetSingleton._lazyInstance = AbsentAssetSingleton.CreateLazy();
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TryGetInstanceNeverEvaluatesAnUnloadedFactory(bool worker)
+        {
+            int loads = 0;
+            Lazy<AbsentAssetSingleton> lazy = new(() =>
+            {
+                Interlocked.Increment(ref loads);
+                throw new InvalidOperationException("unexpected load");
+            });
+            AbsentAssetSingleton._lazyInstance = lazy;
+
+            bool found = worker ? Task.Run(ReadAbsent).GetAwaiter().GetResult() : ReadAbsent();
+
+            Assert.IsFalse(found);
+            Assert.AreEqual(0, loads);
+            Assert.IsFalse(lazy.IsValueCreated);
+            Assert.AreSame(lazy, AbsentAssetSingleton._lazyInstance);
+
+            bool ReadAbsent()
+            {
+                bool result = AbsentAssetSingleton.TryGetInstance(
+                    out AbsentAssetSingleton instance
+                );
+                Assert.IsTrue(ReferenceEquals(instance, null));
+                return result;
+            }
+        }
+
+        [Test]
+        public void TryGetInstanceDoesNotRethrowAFaultedLazy()
+        {
+            Lazy<PoisonedLoadSingleton> lazy = new(() =>
+                throw new InvalidOperationException("poisoned load")
+            );
+            PoisonedLoadSingleton._lazyInstance = lazy;
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                _ = lazy.Value;
+            });
+
+            Assert.IsFalse(
+                PoisonedLoadSingleton.TryGetInstance(out PoisonedLoadSingleton instance)
+            );
+            Assert.IsTrue(ReferenceEquals(instance, null));
+            Assert.AreSame(lazy, PoisonedLoadSingleton._lazyInstance);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void TryGetInstanceReturnsOnlyALoadedLiveAsset(bool destroyed, bool worker)
+        {
+            DestroyedAssetSingleton asset = CreateScriptableObject<DestroyedAssetSingleton>();
+            int loads = 0;
+            Lazy<DestroyedAssetSingleton> lazy = new(() =>
+            {
+                ++loads;
+                return asset;
+            });
+            DestroyedAssetSingleton._lazyInstance = lazy;
+            Assert.AreSame(asset, lazy.Value);
+            if (destroyed)
+            {
+                Object.DestroyImmediate(asset); // UNH-SUPPRESS: destroyed cache is the test subject
+            }
+
+            DestroyedAssetSingleton result = worker
+                ? Task.Run(ReadLoaded).GetAwaiter().GetResult()
+                : ReadLoaded();
+
+            Assert.AreEqual(1, loads);
+            Assert.AreSame(lazy, DestroyedAssetSingleton._lazyInstance);
+            if (destroyed)
+            {
+                Assert.IsTrue(ReferenceEquals(result, null));
+            }
+            else
+            {
+                Assert.AreSame(asset, result);
+            }
+
+            DestroyedAssetSingleton ReadLoaded()
+            {
+                bool found = DestroyedAssetSingleton.TryGetInstance(
+                    out DestroyedAssetSingleton instance
+                );
+                Assert.AreEqual(!destroyed, found);
+                return instance;
+            }
+        }
+
+        [Test]
+        public void TryGetInstanceKeepsAResolvedNullWithoutReloading()
+        {
+            Lazy<AbsentAssetSingleton> lazy = new(() => null);
+            AbsentAssetSingleton._lazyInstance = lazy;
+            Assert.IsTrue(ReferenceEquals(lazy.Value, null));
+
+            Assert.IsFalse(AbsentAssetSingleton.TryGetInstance(out AbsentAssetSingleton instance));
+            Assert.IsTrue(ReferenceEquals(instance, null));
+            Assert.AreSame(lazy, AbsentAssetSingleton._lazyInstance);
+            Assert.IsTrue(lazy.IsValueCreated);
+        }
+
         [TestCase(null, TestName = "LoadPath.NullFolder.UsesTypeName")]
         [TestCase("", TestName = "LoadPath.EmptyFolder.UsesTypeName")]
         [TestCase(" \t\r\n", TestName = "LoadPath.BlankFolder.UsesTypeName")]
