@@ -121,6 +121,9 @@ Contents
 
 - Access via `T.Instance` (creates a new `GameObject` named `"<Type>-Singleton"` and adds `T` if none exists; otherwise finds an existing active instance).
 - `HasInstance` lets you check for an existing instance without creating one.
+- `TryGetInstance(out T instance)` returns the assigned live instance in one call. It returns
+  `false` and a managed `null` when the cache is empty, destroyed, or pending destruction. It
+  never searches the scene, creates a GameObject, or enters the main-thread creation guard.
 - `Preserve` (virtual, default `true`) controls `DontDestroyOnLoad`.
 - `CreationPolicy` reports whether on-demand creation is allowed; see [Controlling on-demand creation](#controlling-on-demand-creation).
 - Handles duplicate detection and cleans up the instance reference on destroy. Before scene load, the
@@ -265,6 +268,10 @@ Notes:
 
 - Access via `T.Instance` (lazy‑loads from `Resources/` using either a custom path or the type name; warns if multiple assets found and chooses the first by name).
 - `HasInstance` indicates whether the lazy value exists and is not null.
+- `TryGetInstance(out T instance)` returns an already loaded live asset, or `false` and a
+  managed `null`. It never evaluates an unloaded or faulted lazy loader, searches Resources,
+  repairs a destroyed cache, or creates an asset. Both singleton families allow this cache
+  lookup from a worker thread; use the returned object only with Unity's usual thread rules.
 - Optional `[ScriptableSingletonPath("Sub/Folder")]` to control the `Resources` subfolder. Blank subfolders, including whitespace wrapped in slashes, fall back to the type name in the Resources root. Spaces inside a nonblank folder name are preserved.
 - Editor utility auto‑creates and relocates assets: see the “ScriptableObject Singleton Creator” in the Editor Tools Guide.
 

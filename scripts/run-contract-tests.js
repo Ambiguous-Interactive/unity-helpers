@@ -204,6 +204,11 @@ const CHECKS = [
     run: "npm run test:typecheck-controls"
   },
   {
+    id: "typecheck-iterate",
+    name: "Fast compiler iteration contract",
+    run: "npm run test:typecheck-iterate"
+  },
+  {
     id: "lint-comment-block-form",
     name: "Comment block-form linter self-test",
     run: "npm run test:lint-comment-block-form"

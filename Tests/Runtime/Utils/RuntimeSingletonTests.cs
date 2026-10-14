@@ -92,6 +92,133 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsFalse(TestRuntimeSingleton.HasInstance);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TryGetInstanceDoesNotCreateAnAbsentInstance(bool quitting)
+        {
+            if (quitting)
+            {
+                RuntimeStateTestUtilities.SimulateApplicationQuitting();
+            }
+            try
+            {
+                Assert.IsFalse(
+                    TestRuntimeSingleton.TryGetInstance(out TestRuntimeSingleton instance)
+                );
+                Assert.IsTrue(ReferenceEquals(instance, null));
+                Assert.IsFalse(TestRuntimeSingleton.HasInstance);
+                Assert.AreEqual(0, TestRuntimeSingleton.InitializeCount);
+                Assert.AreEqual(
+                    0,
+                    UnityObjectExtensions.FindObjectsOfTypeShim<TestRuntimeSingleton>(true).Length
+                );
+            }
+            finally
+            {
+                RuntimeStateTestUtilities.PrepareForSceneLoad();
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TryGetInstanceReturnsTheAssignedInstanceDuringShutdown(bool quitting)
+        {
+            TestRuntimeSingleton expected = TestRuntimeSingleton.Instance;
+            Track(expected.gameObject);
+            if (quitting)
+            {
+                RuntimeStateTestUtilities.SimulateApplicationQuitting();
+            }
+            try
+            {
+                Assert.IsTrue(
+                    TestRuntimeSingleton.TryGetInstance(out TestRuntimeSingleton instance)
+                );
+                Assert.AreSame(expected, instance);
+                Assert.AreEqual(1, TestRuntimeSingleton.InitializeCount);
+            }
+            finally
+            {
+                RuntimeStateTestUtilities.PrepareForSceneLoad();
+            }
+        }
+
+        [Test]
+        public void TryGetInstanceDoesNotSearchForAnUncachedSceneInstance()
+        {
+            TestRuntimeSingleton expected = TestRuntimeSingleton.Instance;
+            Track(expected.gameObject);
+            TestRuntimeSingleton._instance = null;
+
+            Assert.IsFalse(TestRuntimeSingleton.TryGetInstance(out TestRuntimeSingleton instance));
+            Assert.IsTrue(ReferenceEquals(instance, null));
+            Assert.IsTrue(expected != null);
+            Assert.IsTrue(ReferenceEquals(TestRuntimeSingleton._instance, null));
+        }
+
+        [Test]
+        public void TryGetInstanceRejectsAnInstancePendingDestruction()
+        {
+            TestRuntimeSingleton expected = TestRuntimeSingleton.Instance;
+            Track(expected.gameObject);
+            ((IRuntimeSingletonLifecycle)expected).MarkPendingDestruction();
+
+            Assert.IsFalse(TestRuntimeSingleton.TryGetInstance(out TestRuntimeSingleton instance));
+            Assert.IsTrue(ReferenceEquals(instance, null));
+            Assert.AreSame(expected, TestRuntimeSingleton._instance);
+            Assert.IsTrue(expected != null);
+        }
+
+        [Test]
+        public void TryGetInstanceRejectsADestroyedCachedWrapper()
+        {
+            TestRuntimeSingleton expected = TestRuntimeSingleton.Instance;
+            Track(expected.gameObject);
+            Object.DestroyImmediate(expected.gameObject); // UNH-SUPPRESS: destroyed cache is the test subject
+            TestRuntimeSingleton._instance = expected;
+
+            Assert.IsFalse(TestRuntimeSingleton.TryGetInstance(out TestRuntimeSingleton instance));
+            Assert.IsTrue(ReferenceEquals(instance, null));
+            Assert.AreSame(expected, TestRuntimeSingleton._instance);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TryGetInstanceCanReadAssignedOrAbsentCacheOnAWorker(bool assigned)
+        {
+            TestRuntimeSingleton expected = null;
+            if (assigned)
+            {
+                expected = TestRuntimeSingleton.Instance;
+                Track(expected.gameObject);
+            }
+
+            TestRuntimeSingleton result = Task.Run(() =>
+                {
+                    bool found = TestRuntimeSingleton.TryGetInstance(
+                        out TestRuntimeSingleton instance
+                    );
+                    Assert.AreEqual(assigned, found);
+                    return instance;
+                })
+                .GetAwaiter()
+                .GetResult();
+
+            Assert.AreSame(expected, result);
+            Assert.AreEqual(assigned, TestRuntimeSingleton.HasInstance);
+        }
+
+        [Test]
+        public void TryGetInstanceDoesNotCreateForNeverCreatePolicy()
+        {
+            Assert.IsFalse(
+                NeverCreatedSingleton.TryGetInstance(out NeverCreatedSingleton instance)
+            );
+            Assert.IsTrue(ReferenceEquals(instance, null));
+            Assert.AreEqual(0, NeverCreatedSingleton.InitializeCount);
+            LogAssert.NoUnexpectedReceived();
+        }
+
         [Test]
         public void HasInstanceReturnsTrueAfterAccess()
         {

@@ -260,7 +260,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             );
         }
 
-        /// <summary>Previews coordinated dictionary source and retained asset replacements without writing files.</summary>
+        /// <summary>Previews coordinated dictionary source and saved asset replacements without writing files.</summary>
         /// <remarks>Call on the editor thread with complete live reference tables. This does not prove project-wide inventory, compile replacement sources, or apply a migration.</remarks>
         public static bool TryPreviewDictionaryMigration(
             IReadOnlyList<OdinMigrationDictionaryTarget> targets,

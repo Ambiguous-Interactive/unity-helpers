@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration;
     using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -29,6 +30,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             nameof(OdinMigrationDictionaryApplyIntegrationTests) + ".Phase";
         private const string BackupKey =
             nameof(OdinMigrationDictionaryApplyIntegrationTests) + ".Backup";
+        private const string RetirementKey =
+            nameof(OdinMigrationDictionaryApplyIntegrationTests) + ".Retired";
         private const string ConsumerName = "OdinMigrationApplyConsumer";
         private const string Source =
             "// MIT License - Copyright (c) 2026 wallstop\n"
@@ -38,26 +41,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             + "public Dictionary<SpriteAlignment, List<Texture2D>> Variations = new Dictionary<SpriteAlignment, List<Texture2D>>(); "
             + "public Dictionary<HideFlags, List<Texture2D>> Other = new Dictionary<HideFlags, List<Texture2D>>(); "
             + "public bool Corrupt; private void OnValidate() { if (Corrupt && Variations.Count != 0) { Variations.Clear(); } } } }\n";
-        private static readonly int[] ApplyCases = { 0, 1, 2, 3 };
+        private static readonly int[] ApplyCases = { 0, 1, 2, 3, 4, 5, 6 };
 
         private static string FullPath(string path)
         {
             return Path.Combine(Directory.GetParent(Application.dataPath).FullName, path);
-        }
-
-        private static IEnumerator AwaitEditor()
-        {
-            yield return null;
-            double deadline = EditorApplication.timeSinceStartup + 60;
-            while (
-                (EditorApplication.isCompiling || EditorApplication.isUpdating)
-                && EditorApplication.timeSinceStartup < deadline
-            )
-            {
-                yield return null;
-            }
-            Assert.IsFalse(EditorApplication.isCompiling);
-            Assert.IsFalse(EditorApplication.isUpdating);
         }
 
         [UnitySetUp]
@@ -100,7 +88,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 SessionState.SetInt(PhaseKey, 1);
                 yield return new RecompileScripts();
             }
-            yield return AwaitEditor();
+            {
+                yield return null;
+                double readinessDeadline = EditorApplication.timeSinceStartup + 60;
+                while (
+                    (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                    && EditorApplication.timeSinceStartup < readinessDeadline
+                )
+                {
+                    if (EditorApplication.isCompiling)
+                    {
+                        yield return new RecompileScripts(false);
+                    }
+                    else
+                    {
+                        yield return null;
+                    }
+                }
+                Assert.IsFalse(EditorApplication.isCompiling, "Compilation remained pending.");
+                Assert.IsFalse(EditorApplication.isUpdating, "Import remained pending.");
+            }
         }
 
         [UnityTest]
@@ -108,7 +115,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             [ValueSource(nameof(ApplyCases))] int scenario
         )
         {
-            yield return AwaitEditor();
+            {
+                yield return null;
+                double readinessDeadline = EditorApplication.timeSinceStartup + 60;
+                while (
+                    (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                    && EditorApplication.timeSinceStartup < readinessDeadline
+                )
+                {
+                    if (EditorApplication.isCompiling)
+                    {
+                        yield return new RecompileScripts(false);
+                    }
+                    else
+                    {
+                        yield return null;
+                    }
+                }
+                Assert.IsFalse(EditorApplication.isCompiling, "Compilation remained pending.");
+                Assert.IsFalse(EditorApplication.isUpdating, "Import remained pending.");
+            }
             string folder = SessionState.GetString(FolderKey, string.Empty);
             string ownerPath = folder + "/Owner.asset";
             if (SessionState.GetInt(PhaseKey, 0) == 1)
@@ -172,18 +198,95 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                             + textureGuid
                             + ", type: 2}"
                     );
-                if (scenario == 3)
+                if (scenario == 3 || scenario == 6)
                 {
                     retained = retained.Replace(
                         "MonoBehaviour:\n",
                         "MonoBehaviour:\n  Corrupt: 1\n"
                     );
                 }
-                File.WriteAllText(
-                    FullPath(ownerPath),
-                    "%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n" + retained,
-                    new UTF8Encoding(false)
-                );
+                bool liveCapture = 4 <= scenario;
+                if (!liveCapture)
+                {
+                    File.WriteAllText(
+                        FullPath(ownerPath),
+                        "%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n" + retained,
+                        new UTF8Encoding(false)
+                    );
+                }
+                else
+                {
+                    if (scenario == 6)
+                    {
+                        string originalAsset = File.ReadAllText(FullPath(ownerPath));
+                        Assert.IsTrue(originalAsset.Contains("  Corrupt: 0"));
+                        File.WriteAllText(
+                            FullPath(ownerPath),
+                            originalAsset.Replace("  Corrupt: 0", "  Corrupt: 1"),
+                            new UTF8Encoding(false)
+                        );
+                        AssetDatabase.ImportAsset(
+                            ownerPath,
+                            ImportAssetOptions.ForceSynchronousImport
+                                | ImportAssetOptions.ForceUpdate
+                        );
+                        {
+                            yield return null;
+                            double readinessDeadline = EditorApplication.timeSinceStartup + 60;
+                            while (
+                                (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                                && EditorApplication.timeSinceStartup < readinessDeadline
+                            )
+                            {
+                                if (EditorApplication.isCompiling)
+                                {
+                                    yield return new RecompileScripts(false);
+                                }
+                                else
+                                {
+                                    yield return null;
+                                }
+                            }
+                            Assert.IsFalse(
+                                EditorApplication.isCompiling,
+                                "Compilation remained pending."
+                            );
+                            Assert.IsFalse(
+                                EditorApplication.isUpdating,
+                                "Import remained pending."
+                            );
+                        }
+                        owner = AssetDatabase.LoadAssetAtPath<ScriptableObject>(ownerPath);
+                    }
+                    Assert.IsTrue(
+                        OdinMigrationCompiledBindings.TryGet(
+                            owner.GetType(),
+                            out OdinMigrationCompiledBinding liveBinding
+                        )
+                    );
+                    foreach (OdinMigrationCompiledField field in liveBinding.Fields)
+                    {
+                        int key = string.Equals(
+                            field.Name,
+                            nameof(OdinMigrationDictionaryAsset.Variations),
+                            StringComparison.Ordinal
+                        )
+                            ? (int)SpriteAlignment.Center
+                            : (int)HideFlags.HideInHierarchy;
+                        Assert.IsTrue(
+                            field.TryRestore(
+                                owner,
+                                new[] { key },
+                                new IReadOnlyList<UnityEngine.Object>[]
+                                {
+                                    new UnityEngine.Object[] { texture, null },
+                                },
+                                out string restoreFailure
+                            ),
+                            restoreFailure
+                        );
+                    }
+                }
                 OdinMigrationDictionaryField[] fields =
                 {
                     OdinMigrationDictionaryField.Create<SpriteAlignment, Texture2D>(
@@ -201,7 +304,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                                 ownerPath,
                                 ownerId,
                                 fields,
-                                new UnityEngine.Object[] { texture }
+                                new UnityEngine.Object[] { texture },
+                                liveCapture ? owner : null
                             ),
                         },
                         out OdinMigrationDictionaryMigrationPreview preview,
@@ -240,7 +344,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     {
                         Assert.IsFalse(started);
                         Assert.IsTrue(apply == null);
-                        StringAssert.Contains("no retained payload", failure);
+                        StringAssert.Contains("selected live capture", failure);
                         Assert.AreEqual(
                             Source,
                             File.ReadAllText(FullPath(folder + "/" + ConsumerName + ".cs"))
@@ -253,22 +357,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                         yield break;
                     }
                     Assert.IsTrue(started, failure);
-                    if (scenario == 1)
+                    if (scenario == 1 || scenario == 5)
                     {
                         Assert.IsTrue(apply.TryCancel(out failure), failure);
                     }
                     SessionState.SetInt(PhaseKey, 2);
                 }
-                if (scenario != 1)
+                if (scenario != 1 && scenario != 5)
                 {
                     yield return new WaitForDomainReload();
-                    if (scenario == 3)
+                    if (scenario == 3 || scenario == 6)
                     {
                         yield return new WaitForDomainReload();
                     }
                 }
             }
-            yield return AwaitEditor();
+            {
+                yield return null;
+                double readinessDeadline = EditorApplication.timeSinceStartup + 60;
+                while (
+                    (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                    && EditorApplication.timeSinceStartup < readinessDeadline
+                )
+                {
+                    if (EditorApplication.isCompiling)
+                    {
+                        yield return new RecompileScripts(false);
+                    }
+                    else
+                    {
+                        yield return null;
+                    }
+                }
+                Assert.IsFalse(EditorApplication.isCompiling, "Compilation remained pending.");
+                Assert.IsFalse(EditorApplication.isUpdating, "Import remained pending.");
+            }
             Assert.IsTrue(
                 OdinMigrationTool.TryReadDictionaryApply(
                     SessionState.GetString(BackupKey, string.Empty),
@@ -287,7 +410,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 statusFailure
             );
             Assert.AreEqual(
-                scenario == 1 || scenario == 3
+                scenario == 1 || scenario == 3 || scenario == 5 || scenario == 6
                     ? OdinMigrationApplyState.Recovered
                     : OdinMigrationApplyState.Verified,
                 state,
@@ -295,9 +418,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             );
             folder = SessionState.GetString(FolderKey, string.Empty);
             ownerPath = folder + "/Owner.asset";
-            if (scenario == 1 || scenario == 3)
+            if (scenario == 1 || scenario == 3 || scenario == 5 || scenario == 6)
             {
-                if (scenario == 3)
+                if (scenario == 3 || scenario == 6)
                 {
                     Assert.IsFalse(string.IsNullOrWhiteSpace(statusFailure));
                     StringAssert.DoesNotContain("cancel", statusFailure.ToLowerInvariant());
@@ -306,7 +429,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     Source,
                     File.ReadAllText(FullPath(folder + "/" + ConsumerName + ".cs"))
                 );
-                StringAssert.Contains("serializationData:", File.ReadAllText(FullPath(ownerPath)));
+                if (4 <= scenario)
+                {
+                    StringAssert.DoesNotContain(
+                        "serializationData:",
+                        File.ReadAllText(FullPath(ownerPath))
+                    );
+                    ScriptableObject recovered = AssetDatabase.LoadAssetAtPath<ScriptableObject>(
+                        ownerPath
+                    );
+                    Assert.IsTrue(
+                        OdinMigrationCompiledBindings.TryGet(
+                            recovered.GetType(),
+                            out OdinMigrationCompiledBinding recoveredBinding
+                        )
+                    );
+                    foreach (OdinMigrationCompiledField field in recoveredBinding.Fields)
+                    {
+                        Assert.IsTrue(
+                            field.TryCapture(
+                                recovered,
+                                out OdinMigrationLiveDictionary values,
+                                out string captureFailure
+                            ),
+                            captureFailure
+                        );
+                        Assert.AreEqual(1, values.Keys.Count);
+                        Assert.AreEqual(2, values.Values[0].Count);
+                        Assert.IsTrue(values.Values[0][0] != null);
+                        Assert.IsTrue(ReferenceEquals(values.Values[0][1], null));
+                    }
+                }
+                else
+                {
+                    StringAssert.Contains(
+                        "serializationData:",
+                        File.ReadAllText(FullPath(ownerPath))
+                    );
+                }
                 string[] recoveryLines = File.ReadAllLines(
                     Path.Combine(completed.BackupRoot, OdinMigrationBackupReceipt.ReceiptName)
                 );
@@ -379,13 +539,51 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             )
             {
                 Assert.IsTrue(apply.TryCancel(out string cancelFailure), cancelFailure);
-                yield return AwaitEditor();
+                {
+                    yield return null;
+                    double readinessDeadline = EditorApplication.timeSinceStartup + 60;
+                    while (
+                        (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                        && EditorApplication.timeSinceStartup < readinessDeadline
+                    )
+                    {
+                        if (EditorApplication.isCompiling)
+                        {
+                            yield return new RecompileScripts(false);
+                        }
+                        else
+                        {
+                            yield return null;
+                        }
+                    }
+                    Assert.IsFalse(EditorApplication.isCompiling, "Compilation remained pending.");
+                    Assert.IsFalse(EditorApplication.isUpdating, "Import remained pending.");
+                }
                 Assert.IsTrue(
                     OdinMigrationTool.TryRestoreBackup(backup, out string restoreFailure),
                     restoreFailure
                 );
                 yield return new RecompileScripts();
-                yield return AwaitEditor();
+                {
+                    yield return null;
+                    double readinessDeadline = EditorApplication.timeSinceStartup + 60;
+                    while (
+                        (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                        && EditorApplication.timeSinceStartup < readinessDeadline
+                    )
+                    {
+                        if (EditorApplication.isCompiling)
+                        {
+                            yield return new RecompileScripts(false);
+                        }
+                        else
+                        {
+                            yield return null;
+                        }
+                    }
+                    Assert.IsFalse(EditorApplication.isCompiling, "Compilation remained pending.");
+                    Assert.IsFalse(EditorApplication.isUpdating, "Import remained pending.");
+                }
                 backup = SessionState.GetString(BackupKey, string.Empty);
                 Assert.IsTrue(
                     OdinMigrationTool.TryReadDictionaryApply(
@@ -412,8 +610,87 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             folder = SessionState.GetString(FolderKey, string.Empty);
             if (!string.IsNullOrWhiteSpace(folder) && AssetDatabase.IsValidFolder(folder))
             {
-                AssetDatabase.DeleteAsset(folder);
-                yield return new RecompileScripts();
+                string assemblyName = Path.GetFileName(folder);
+                string definition = FullPath(folder + "/" + assemblyName + ".asmdef");
+                if (File.Exists(definition) && !SessionState.GetBool(RetirementKey, false))
+                {
+                    File.WriteAllText(
+                        definition,
+                        "{\"name\":\""
+                            + assemblyName
+                            + "\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"includePlatforms\":[\"Editor\"],"
+                            + "\"defineConstraints\":[\"WALLSTOP_MIGRATION_RETIRED_CONSUMER\"]}",
+                        new UTF8Encoding(false)
+                    );
+                    SessionState.SetBool(RetirementKey, true);
+                    yield return new RecompileScripts(false);
+                }
+                {
+                    yield return null;
+                    double readinessDeadline = EditorApplication.timeSinceStartup + 60;
+                    while (
+                        (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                        && EditorApplication.timeSinceStartup < readinessDeadline
+                    )
+                    {
+                        if (EditorApplication.isCompiling)
+                        {
+                            yield return new RecompileScripts(false);
+                        }
+                        else
+                        {
+                            yield return null;
+                        }
+                    }
+                    Assert.IsFalse(EditorApplication.isCompiling, "Compilation remained pending.");
+                    Assert.IsFalse(EditorApplication.isUpdating, "Import remained pending.");
+                }
+                folder = SessionState.GetString(FolderKey, string.Empty);
+                assemblyName = Path.GetFileName(folder);
+                bool packageAssemblyPresent = false;
+                string packageAssemblyName = typeof(OdinMigrationTool).Assembly.GetName().Name;
+                foreach (
+                    UnityEditor.Compilation.Assembly assembly in UnityEditor.Compilation.CompilationPipeline.GetAssemblies()
+                )
+                {
+                    packageAssemblyPresent |= string.Equals(
+                        assembly.name,
+                        packageAssemblyName,
+                        StringComparison.Ordinal
+                    );
+                    Assert.AreNotEqual(
+                        assemblyName,
+                        assembly.name,
+                        "Retire the consumer assembly before deleting its compiler inputs."
+                    );
+                }
+                Assert.IsTrue(
+                    packageAssemblyPresent,
+                    "The compilation graph must include the package editor assembly."
+                );
+                Assert.IsTrue(File.Exists(FullPath(folder + "/" + ConsumerName + ".cs")));
+                Assert.IsTrue(AssetDatabase.DeleteAsset(folder));
+                Assert.IsFalse(Directory.Exists(FullPath(folder)));
+                {
+                    yield return null;
+                    double readinessDeadline = EditorApplication.timeSinceStartup + 60;
+                    while (
+                        (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                        && EditorApplication.timeSinceStartup < readinessDeadline
+                    )
+                    {
+                        if (EditorApplication.isCompiling)
+                        {
+                            yield return new RecompileScripts(false);
+                        }
+                        else
+                        {
+                            yield return null;
+                        }
+                    }
+                    Assert.IsFalse(EditorApplication.isCompiling, "Compilation remained pending.");
+                    Assert.IsFalse(EditorApplication.isUpdating, "Import remained pending.");
+                }
             }
             backup = SessionState.GetString(BackupKey, string.Empty);
             if (!string.IsNullOrWhiteSpace(backup) && Directory.Exists(backup))
@@ -423,6 +700,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             SessionState.EraseString(FolderKey);
             SessionState.EraseString(BackupKey);
             SessionState.EraseInt(PhaseKey);
+            SessionState.EraseBool(RetirementKey);
         }
     }
 }

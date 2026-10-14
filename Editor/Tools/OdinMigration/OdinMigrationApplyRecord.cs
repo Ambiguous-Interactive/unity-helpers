@@ -18,12 +18,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         internal const int MaximumBytes = 16 * 1024 * 1024;
         internal const int MaximumDocuments = 4096;
         internal const int MaximumValues = 65536;
-        private const string Header = "WallstopOdinDictionaryApply:1";
+        private const string Header = "WallstopOdinDictionaryApply:2";
+        private const string LegacyHeader = "WallstopOdinDictionaryApply:1";
 
         private static readonly UTF8Encoding Encoding = new UTF8Encoding(false, true);
 
         [SerializeField]
-        internal int version = 1;
+        internal int version = 2;
 
         [SerializeField]
         internal string backupName;
@@ -98,7 +99,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 if (
                     first < 0
                     || second < 0
-                    || !string.Equals(text.Substring(0, first), Header, StringComparison.Ordinal)
+                    || (
+                        !string.Equals(text.Substring(0, first), Header, StringComparison.Ordinal)
+                        && !string.Equals(
+                            text.Substring(0, first),
+                            LegacyHeader,
+                            StringComparison.Ordinal
+                        )
+                    )
                 )
                 {
                     throw new IOException(
@@ -123,6 +131,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     json
                 );
                 Validate(result, Path.GetFileName(root));
+                if (
+                    !string.Equals(
+                        text.Substring(0, first),
+                        result.version == 1 ? LegacyHeader : Header,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    throw new IOException(
+                        "The dictionary recovery record version differs from its header."
+                    );
+                }
                 result._persistedHash = OdinMigrationBackupReceipt.Hash(Encoding.GetBytes(text));
                 record = result;
                 failure = null;
@@ -142,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 record == null || record.documents == null ? 0 : record.documents.Length;
             if (
                 record == null
-                || record.version != 1
+                || (record.version != 1 && record.version != 2)
                 || !string.Equals(record.backupName, expectedName, StringComparison.Ordinal)
                 || (int)record.state < 1
                 || 7 < (int)record.state
@@ -225,6 +245,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             HashSet<string> owners = new HashSet<string>(StringComparer.Ordinal);
             foreach (Document document in record.documents)
             {
+                if (record.version == 1 && document.liveCaptured)
+                {
+                    throw new IOException(
+                        "A legacy dictionary recovery record cannot restore live captures."
+                    );
+                }
                 OdinMigrationTool.GetValidatedAssetPath(document.assetPath);
                 if (
                     !Guid.TryParseExact(document.owningGuid, "N", out Guid _)
@@ -381,7 +407,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             Validate(this, Path.GetFileName(root));
             string json = JsonUtility.ToJson(this);
             string text =
-                Header
+                (version == 1 ? LegacyHeader : Header)
                 + "\n"
                 + OdinMigrationBackupReceipt.Hash(Encoding.GetBytes(json))
                 + "\n"
@@ -457,6 +483,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
             [SerializeField]
             internal string ownerTypeIdentity;
+
+            [SerializeField]
+            internal bool liveCaptured;
 
             [SerializeField]
             internal Field[] fields;

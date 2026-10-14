@@ -262,7 +262,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             {
                 File.WriteAllText(
                     path,
-                    text.Replace("WallstopOdinDictionaryApply:1", "WallstopOdinDictionaryApply:2")
+                    text.Replace("WallstopOdinDictionaryApply:2", "WallstopOdinDictionaryApply:3")
                 );
             }
             else if (damage == 3)
@@ -292,6 +292,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             );
             Assert.IsTrue(loaded == null);
             Assert.IsFalse(string.IsNullOrWhiteSpace(failure));
+        }
+
+        [TestCase(1, false)]
+        [TestCase(2, false)]
+        [TestCase(2, true)]
+        public void RecoveryVersionsPreserveLiveCapturePolicy(int version, bool liveCaptured)
+        {
+            OdinMigrationApplyRecord record = Create(_root);
+            record.version = version;
+            record.documents[0].liveCaptured = liveCaptured;
+            record.Write(_root);
+
+            Assert.IsTrue(
+                OdinMigrationApplyRecord.TryRead(
+                    _root,
+                    out OdinMigrationApplyRecord loaded,
+                    out string failure
+                ),
+                failure
+            );
+            Assert.AreEqual(version, loaded.version);
+            Assert.AreEqual(liveCaptured, loaded.documents[0].liveCaptured);
+        }
+
+        [Test]
+        public void LegacyRecordsCannotClaimLiveDictionaryRecovery()
+        {
+            OdinMigrationApplyRecord record = Create(_root);
+            record.version = 1;
+            record.documents[0].liveCaptured = true;
+
+            Assert.Throws<IOException>(() => record.Write(_root));
+        }
+
+        [TestCase(1, 2)]
+        [TestCase(2, 1)]
+        public void RecordHeadersMustMatchTheirSerializedVersions(int original, int changed)
+        {
+            OdinMigrationApplyRecord record = Create(_root);
+            record.version = original;
+            record.Write(_root);
+            string path = System.IO.Path.Combine(_root, OdinMigrationApplyRecord.FileName);
+            string text = File.ReadAllText(path)
+                .Replace(
+                    "WallstopOdinDictionaryApply:" + original,
+                    "WallstopOdinDictionaryApply:" + changed
+                );
+            File.WriteAllText(path, text);
+
+            Assert.IsFalse(
+                OdinMigrationApplyRecord.TryRead(
+                    _root,
+                    out OdinMigrationApplyRecord _,
+                    out string failure
+                )
+            );
+            StringAssert.Contains("version", failure);
         }
 
         [TestCase(0)]

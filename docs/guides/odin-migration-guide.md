@@ -119,14 +119,15 @@ liveReferencedObjects, out failure)` checks a loaded imported document against i
 - `TryPreviewDictionaryMigration(targets, out preview, out failure)` coordinates source proposals
   with complete retained asset proposals for the selected Unity documents. Each
   `OdinMigrationDictionaryTarget` captures an asset path, owner file ID, field schemas, and the
-  complete live reference table. An optional cancellation callback runs before each asset read.
+  complete live reference table. Its five-argument constructor can also receive a caller-loaded
+  owner without retained Odin data. An optional cancellation callback runs before each asset read.
 - `TryInventoryDictionaryMigration(preview, out inventory, out failure)` scans serialized files
   under `Assets` for original declaring types and their derived Unity scripts. It reports retained
   documents omitted from the paired preview and failures that make the inventory incomplete.
 - `TryApplyDictionaryMigration(preview, compilation, out apply, out failure)` starts a paired
-  source and retained-data migration after checking a successful, matching compilation receipt and
-  a fresh complete inventory. It currently refuses affected documents without retained payloads,
-  since their original live dictionaries cannot yet be captured and verified. Save scenes and assets
+  source and data migration after checking a successful, matching compilation receipt and
+  a fresh complete inventory. Every affected document must have a selected retained payload or
+  a selected supported live capture. Save scenes and assets
   before starting, leave Prefab Mode, and wait for compilation, import, and Play Mode to finish.
   A `true` return means the transaction started. Poll `apply.TryReadStatus(out state, out failure)`;
   only `Verified` means the replacement assemblies loaded and the retained keys, list values,
@@ -134,7 +135,8 @@ liveReferencedObjects, out failure)` checks a loaded imported document against i
 - `TryReadDictionaryApply(backupRoot, out apply, out failure)` reconnects to the durable operation
   after domain reload or restart. Keep `apply.BackupRoot` before reload. The coordinator restores
   the original bytes after interruption, cancellation, compilation errors, or failed verification,
-  then waits for recovery import; `Recovered` means original file and metadata hashes matched.
+  then waits for recovery import; `Recovered` means original file and metadata hashes matched
+  and captured live dictionaries were restored through generated writers and checked again.
   `apply.TryCancel(out failure)` requests recovery of the active operation. `RecoveryFailed`
   retains the backups and active marker for manual repair. Changes to targets, metadata, journals,
   or the active marker prevent unsafe replacement. This Tier C operation cannot reverse arbitrary
@@ -342,6 +344,28 @@ script, compiler binding, complete Nodes payload, and live references before rep
 with converted Unity Helpers fields in the proposed text. The original script GUID and owner file
 ID remain unchanged. Unrelated documents and fields, including unselected opaque Odin payloads,
 remain intact. Each inserted fragment uses the original payload's newline style.
+
+For a document without retained Odin data, pass its saved, caller-loaded original owner as the
+fifth constructor argument. Generated readers copy accessible original fields directly; the preview
+does not load an owner or use reflection to read its members. Generated recovery writers must also
+be available. The preview verifies saved owner and script identity, current compiler checksums,
+dictionary order, and saved reference identities before adding the converted fields to the proposal.
+It refuses dirty or destroyed owners, existing destination fields, null dictionaries or lists,
+custom comparers, shared lists across selected fields or owners, and inaccessible or readonly fields.
+Live references may name saved assets under `Assets` or ordinary objects in the owner's saved scene;
+cross-scene references and prefab instance overrides need further conversion support.
+
+Compiler metadata exposes `CanCapture`, `CanRestore`, `TryCapture`, and `TryRestore` for original
+fields. `OdinMigrationLiveDictionary` snapshots preserve null dictionaries and lists, shared list
+identity, key order, and exact object references. They allow inspection of shapes that coordinated
+apply currently refuses. Capture accepts at most 4,096 entries and 65,536 delivered object slots,
+including repeated slots in shared lists. Snapshots do not retain later container mutations.
+
+Version 2 apply journals retain captured live values for recovery after reload or restart. The
+coordinator restores those values into the original fields after restoring source and asset bytes;
+the original class still controls whether its dictionaries persist through future editor restarts.
+Recovery keeps the journal and backups. Version 1 journals remain readable and cannot claim live
+recovery; older package versions refuse version 2 journals.
 
 Multiple selected documents can share an asset, and multiple source selections can share a source
 file. Source edits are merged and identical edits are deduplicated. Conflicting source snapshots,

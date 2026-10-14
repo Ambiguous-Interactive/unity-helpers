@@ -218,6 +218,24 @@ namespace WallstopStudios.UnityHelpers.Utils
             RuntimeSingletonRegistry.ClearInstances(_clearInstances);
         }
 
+        /// <summary>
+        /// Returns the assigned live instance without searching or creating one.
+        /// </summary>
+        /// <param name="instance">The assigned instance, or null when absent or pending destruction.</param>
+        /// <returns>Whether an assigned instance is available.</returns>
+        public static bool TryGetInstance(out T instance)
+        {
+            T cached = _instance;
+            if (cached != null && !cached._isPendingDestruction)
+            {
+                instance = cached;
+                return true;
+            }
+
+            instance = null;
+            return false;
+        }
+
         private static SingletonCreationPolicy ResolveCreationPolicy()
         {
             if (

@@ -40,6 +40,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     "OdinMigrationCompiledBinding",
                     "OdinMigrationCompiledBindings",
                     "OdinMigrationCompiledSourceEdit",
+                    "OdinMigrationDictionaryCapture",
+                    "OdinMigrationDictionaryRestore",
+                    "OdinMigrationLiveDictionary",
                 }
             )
             {
@@ -50,6 +53,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 );
                 trees.Add(CSharpSyntaxTree.ParseText(File.ReadAllText(path), options, path));
             }
+            string comparerPath = Path.Combine(
+                root,
+                "Runtime/Core/Helper/ReferenceIdentityComparer.cs"
+            );
+            trees.Add(
+                CSharpSyntaxTree.ParseText(File.ReadAllText(comparerPath), options, comparerPath)
+            );
             for (int index = 0; index < sources.Length; ++index)
             {
                 trees.Add(
@@ -117,6 +127,64 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 Assert.AreNotEqual(typeof(WProtoGenerator).Assembly.GetName().Name, reference.Name);
             }
+        }
+
+        [TestCase("public", true)]
+        [TestCase("internal", true)]
+        [TestCase("protected internal", true)]
+        [TestCase("private", false)]
+        [TestCase("protected", false)]
+        public void LiveDictionaryReadersUseOnlyAccessibleOriginalMembers(
+            string accessibility,
+            bool captured
+        )
+        {
+            string source =
+                "public enum Key { A=0 } public class Asset : UnityEngine.ScriptableObject { "
+                + accessibility
+                + " System.Collections.Generic.Dictionary<Key,System.Collections.Generic.List<UnityEngine.Texture>> Values; }";
+            string generated = Generated(new[] { source });
+
+            if (captured)
+            {
+                StringAssert.Contains("TryCapture(original.@Values, key => (int)key", generated);
+                StringAssert.Contains("value is global::Asset original", generated);
+                StringAssert.Contains("original.@Values = rebuilt", generated);
+            }
+            else
+            {
+                StringAssert.DoesNotContain("original.@Values", generated);
+            }
+            StringAssert.DoesNotContain("GetField", generated);
+            StringAssert.DoesNotContain("GetValue", generated);
+        }
+
+        [Test]
+        public void ReadonlyFieldsDoNotClaimARecoveryWriter()
+        {
+            string generated = Generated(
+                new[]
+                {
+                    "public enum Key { A=0 } public class Asset : UnityEngine.ScriptableObject { public readonly System.Collections.Generic.Dictionary<Key,System.Collections.Generic.List<UnityEngine.Texture>> Values; }",
+                }
+            );
+
+            StringAssert.Contains("TryCapture(original.@Values", generated);
+            StringAssert.DoesNotContain("original.@Values = rebuilt", generated);
+        }
+
+        [Test]
+        public void LiveDictionaryReadersBindInheritedAndHiddenFieldsToTheirDeclaringTypes()
+        {
+            string generated = Generated(
+                new[]
+                {
+                    "public enum Key { A=0 } public class Base : UnityEngine.ScriptableObject { public System.Collections.Generic.Dictionary<Key,System.Collections.Generic.List<UnityEngine.Texture>> Values; } public class Asset : Base { public new System.Collections.Generic.Dictionary<Key,System.Collections.Generic.List<UnityEngine.Texture>> Values; }",
+                }
+            );
+
+            StringAssert.Contains("value is global::Base original", generated);
+            StringAssert.Contains("value is global::Asset original", generated);
         }
 
         [Test]
