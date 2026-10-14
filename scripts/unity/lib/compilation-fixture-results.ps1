@@ -1,7 +1,8 @@
 function Get-UnityMigrationIsolationFixtures {
     $namespace = 'WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.'
     foreach ($name in @('OdinMigrationApiTests', 'OdinMigrationBackupRecoveryTests',
-            'OdinMigrationDictionaryImportVerificationTests', 'OdinMigrationDictionaryApplyIntegrationTests')) {
+            'OdinMigrationDictionaryImportVerificationTests', 'OdinMigrationDictionaryApplyIntegrationTests',
+            'OdinMigrationApplyRecordTests')) {
         $namespace + $name
     }
 }

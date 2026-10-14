@@ -221,14 +221,16 @@ independent of assets left by the failed run.
 EditMode runs compiler-isolation fixtures in a fresh editor process before the broader suite.
 These cases carry `CompilationIsolation` and must all pass without skips. Their results and log
 remain under the mode's `compilation/` artifact directory. The source API, backup recovery,
-import-verification, and source/data apply fixtures each run in a separate fresh editor process
+import-verification, source/data apply, and recovery-record/scene fixtures each run in a separate fresh editor process
 with `MigrationIsolation`; their artifacts remain under `migration/<fixture-name>/`.
 The broader process excludes both categories, so each case runs once. All processes share the
 installed editor, project and acquired license context. A failed isolated phase prevents later
 phases and fails the mode. Verification requires passing cases from every named isolated fixture.
 Earlier ruleset-import tests can leave pending compilation and `EditorApplication.isUpdating`
 that cannot drain during the same batch run; each migration fixture needs an idle editor to test
-its real production guard without weakening it.
+its real production guard without weakening it. Recovery-record scene controls also need a clean
+initial scene; ordinary broad-suite editor tests can leave an untitled scene dirty. The isolated
+process preserves this precondition without discarding authoring changes or skipping those controls.
 Verification requires the mode's root `results.xml` independently of its isolated fixture XML.
 A passing nested result cannot replace a missing broad-suite result. Failure dumps include
 root and nested editor logs.
