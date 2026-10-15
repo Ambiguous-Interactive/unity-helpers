@@ -44,10 +44,20 @@ through the npm command on this host.
 For compiler feedback while editing, use `npm run typecheck:iterate -- tests` (or `runtime`,
 `editor`, `editor-tests`, `integrations`). An optional second argument selects `legacy`, `odin`,
 `singlethreaded`, or `proto-only`. This runs without restore or WUH analyzers, but retains source
-generators and compiler errors. It disables the shared compiler to avoid stale source snapshots.
+generators and compiler errors. By default, it disables the shared compiler to avoid stale source snapshots.
 It is an iteration aid, not a validation gate: run the normal applicable typecheck commands before
 publication. On 2026-10-14, the test-tree iteration check took 5.37 seconds here versus 37.02 seconds
 for the full check after an edit. These are local observations, not CI timing claims.
+
+For an Editor fixture edit, add `--files Tests/Editor/path/Fixture.cs` after `editor-tests` and
+the optional variant. Include dependent fixture files when needed. This keeps production and shared
+test sources but omits the other Editor fixtures. Add `--server` to reuse a compiler server whose
+identity includes the project, variant, and all three shipped analyzer DLL hashes. A rebuilt
+analyzer therefore selects a new server. The default still disables shared compilation. Iteration
+outputs and intermediate files are isolated from normal publication builds. Real
+scoped controls proved fresh `CS0246` and `WPROTO001` failures and a passing compile after an edit;
+warmed controlled rebuilds took 8–9 seconds here on 2026-10-15. Normal publication gates retain
+their complete source sets and analyzers.
 
 For isolated Odin compiler edits, first run the native MCP `editor` fixture
 `OdinMigrationCompilerProcessTests`. Its nine controls took 2.86 seconds on Unity 6000.4.6f1 on

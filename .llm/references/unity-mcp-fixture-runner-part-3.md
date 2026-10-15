@@ -173,6 +173,12 @@ previous result. A response can therefore contain an old completed run. Run `edi
 A request timeout does not end the native job; poll that job until terminal before editing
 C# sources, refreshing assets or submitting another run.
 
+Reload-heavy EditMode batches can leave a pending bridge request after Unity saves passing XML.
+Check the saved case identities and results, then require Unity's actual
+`TestRunnerApi.IsRunActive()` to be false. Preserve the XML and the matching
+`Temp/pipeline_test_request.json` before removing that completed request; do not cancel or restart
+an active run. The bridge status alone reads the pending file and can remain `running` indefinitely.
+
 Capture growing validation logs and generated host-only C# samples outside the Unity
 package, for example under `/tmp`. Unity imports even gitignored package files. A changing
 log caused file-size assertions during `AssetDatabase.Refresh`; generated documentation

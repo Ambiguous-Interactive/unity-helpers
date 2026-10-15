@@ -28,8 +28,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     public static class WProtoFormatterProvider
     {
         private static readonly object ReplacementRegistrationLock = new object();
-        private static readonly ConcurrentDictionary<Type, IWProtoRuntimeWriter> RuntimeWriters =
-            new ConcurrentDictionary<Type, IWProtoRuntimeWriter>();
+        private static readonly ConcurrentDictionary<Type, IWProtoRuntimeCodec> RuntimeCodecs =
+            new ConcurrentDictionary<Type, IWProtoRuntimeCodec>();
 
         /// <summary>
         /// Registers <paramref name="formatter"/> as the formatter for <typeparamref name="T"/>.
@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public static void Register<T>(IWProtoFormatter<T> formatter)
         {
             Cache<T>.Formatter = formatter;
-            RefreshRuntimeWriter<T>();
+            RefreshRuntimeCodec<T>();
             WProtoGeneric<T>.Reset();
         }
 
@@ -204,26 +204,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             );
         }
 
-        internal static void RefreshRuntimeWriter<T>()
+        internal static void RefreshRuntimeCodec<T>()
         {
             if (Cache<T>.Formatter == null && !WProtoRootMarshalProvider.IsRegistered<T>())
             {
-                RuntimeWriters.TryRemove(typeof(T), out _);
+                RuntimeCodecs.TryRemove(typeof(T), out _);
             }
             else
             {
-                RuntimeWriters.TryAdd(typeof(T), WProtoRuntimeWriter<T>.Instance);
+                RuntimeCodecs.TryAdd(typeof(T), WProtoRuntimeCodec<T>.Instance);
             }
         }
 
-        internal static bool TryGetRuntimeWriter(object value, out IWProtoRuntimeWriter writer)
+        internal static bool TryGetRuntimeCodec(object value, out IWProtoRuntimeCodec writer)
         {
             if (value == null)
             {
                 writer = null;
                 return false;
             }
-            return RuntimeWriters.TryGetValue(value.GetType(), out writer);
+            return RuntimeCodecs.TryGetValue(value.GetType(), out writer);
+        }
+
+        internal static bool TryGetRuntimeCodecForType(Type type, out IWProtoRuntimeCodec codec)
+        {
+            codec = null;
+            return type != null && RuntimeCodecs.TryGetValue(type, out codec);
         }
 
         private static void ThrowIfReplacementConflict<T>()

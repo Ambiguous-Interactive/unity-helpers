@@ -351,7 +351,11 @@ does not load an owner or use reflection to read its members. Generated recovery
 be available. The preview verifies saved owner and script identity, current compiler checksums,
 dictionary order, and saved reference identities before adding the converted fields to the proposal.
 It refuses dirty or destroyed owners, existing destination fields, null dictionaries or lists,
-custom comparers, shared lists across selected fields or owners, and inaccessible or readonly fields.
+custom comparers, shared lists across selected fields or owners, and inaccessible fields.
+Accessible readonly dictionaries are supported when their original field holds an initialized
+dictionary with the default comparer. Recovery validates every key and object before restoring the
+contents of that dictionary. It preserves the dictionary instance; value lists are rebuilt. The
+source proposal removes `readonly` so Unity can serialize the converted field.
 Live references may name saved assets under `Assets` or ordinary objects in the owner's saved scene;
 cross-scene references and prefab instance overrides need further conversion support.
 

@@ -160,7 +160,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void ReadonlyFieldsDoNotClaimARecoveryWriter()
+        public void ReadonlyFieldsRestoreContentsWithoutAssigningTheField()
         {
             string generated = Generated(
                 new[]
@@ -170,6 +170,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
 
             StringAssert.Contains("TryCapture(original.@Values", generated);
+            StringAssert.Contains(
+                "TryRestoreContents<global::Key, global::UnityEngine.Texture>(original.@Values",
+                generated
+            );
             StringAssert.DoesNotContain("original.@Values = rebuilt", generated);
         }
 

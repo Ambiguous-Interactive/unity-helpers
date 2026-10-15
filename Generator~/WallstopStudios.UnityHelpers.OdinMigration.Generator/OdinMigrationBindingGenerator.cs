@@ -238,8 +238,7 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
         )
         {
             if (
-                field.IsReadOnly
-                || !TypeNaming.IsNameable(owner, compilation)
+                !TypeNaming.IsNameable(owner, compilation)
                 || !TypeNaming.IsNameable(field.Type, compilation)
                 || !compilation.IsSymbolAccessibleWithin(field, compilation.Assembly)
                 || !TryDictionary(
@@ -254,9 +253,27 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
             string ownerType = owner.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             string keyType = key.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             string elementType = element.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            return "(global::UnityEngine.Object value, global::System.Collections.Generic.IReadOnlyList<int> keys, global::System.Collections.Generic.IReadOnlyList<global::System.Collections.Generic.IReadOnlyList<global::UnityEngine.Object>> values, out string failure) => { if (!(value is "
+            string writer =
+                "(global::UnityEngine.Object value, global::System.Collections.Generic.IReadOnlyList<int> keys, global::System.Collections.Generic.IReadOnlyList<global::System.Collections.Generic.IReadOnlyList<global::UnityEngine.Object>> values, out string failure) => { if (!(value is "
                 + ownerType
-                + " original)) { failure = \"The live dictionary owner has the wrong compiled type.\"; return false; } if (!"
+                + " original)) { failure = \"The live dictionary owner has the wrong compiled type.\"; return false; } ";
+            if (field.IsReadOnly)
+            {
+                return writer
+                    + "return "
+                    + LiveDictionary
+                    + ".TryRestoreContents<"
+                    + keyType
+                    + ", "
+                    + elementType
+                    + ">(original.@"
+                    + field.Name
+                    + ", keys, values, key => ("
+                    + keyType
+                    + ")key, out failure); }";
+            }
+            return writer
+                + "if (!"
                 + LiveDictionary
                 + ".TryRebuild<"
                 + keyType

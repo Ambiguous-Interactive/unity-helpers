@@ -2197,7 +2197,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (contract.IsValueType)
             {
-                writer.Line("this = default(" + contract.Name + ");");
+                writer.Line("this = default;");
             }
 
             foreach (Member member in members)

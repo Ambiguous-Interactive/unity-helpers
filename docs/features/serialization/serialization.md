@@ -2407,6 +2407,15 @@ formatter is not enough. But the generator reopens the contract as `partial`, so
 constructor there**, and the formatter builds the value once every member has been read. Your type
 keeps the immutability you chose and gains no public surface.
 
+Explicit-type reads such as `Serializer.ProtoDeserialize<object>(bytes, typeof(Save))` use the
+registered generated reader when the concrete type is assignable to the declared type. Registered
+contract and declared-root rules still take precedence.
+
+Generic readonly structs use the same construction path. A closed consumer value such as
+`SavedValue<int>` or `SavedValue<string>` can retain readonly identifier and sequence fields, including
+full `Int64` limits. Use the ordinary `Serializer.ProtoSerialize` and `ProtoDeserialize` overloads;
+caller-owned buffers and explicit concrete read types use the same generated contract.
+
 An immutable class also needs a base constructor callable without arguments. A protected
 parameterless constructor is sufficient; accessible optional or `params` constructors work when
 C# resolves the zero-argument call unambiguously. If the base requires arguments or its constructor
@@ -2752,9 +2761,12 @@ Three rules decide the rest:
   would select a runtime type. Generated registration supplies that writer without reflection or
   manual registration. The allocating and reusable-buffer overloads use the same route, including
   `WALLSTOP_PROTO_ONLY` builds. Unrelated concrete save types can share one application interface.
-  Read those bytes through the concrete save type; writing a runtime value does not add a discriminator
-  to its payload. Interface reads still need [a declared root](#declared-roots-serving-an-interface).
-  Direct `WProtoFacade` calls retain their declared-type contract.
+  Read those bytes through the concrete save type or name it explicitly with
+  `ProtoDeserialize<object>(bytes, typeof(Save))`. Writing a runtime value does not add a discriminator
+  to its payload. Interface reads without an explicit concrete type still need
+  [a declared root](#declared-roots-serving-an-interface). Direct `WProtoFacade` writes retain their
+  declared-type contract; `DeserializeAs<T>` accepts an assignable explicit type when no declared
+  contract or root owns the request.
 
 Closed one-dimensional arrays (except scalar `byte[]`), `List<T>`, and `Dictionary<TKey, TValue>`
 also receive generated root codecs when their supported element types appear in source. Their root

@@ -1871,6 +1871,27 @@ See Unity's [browser scripting guide](https://docs.unity3d.com/2021.3/Documentat
 and [PlayerPrefs documentation](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/PlayerPrefs.html)
 for native string marshalling and platform storage limits.
 
+### WebGL startup class 115 diagnostics
+
+If a Unity 6000.5.2f1 WebGL build logs `Could not produce class with ID 115`,
+preserve its output and use **Clean Build** in Build Profiles. A build script can pass
+`BuildOptions.CleanBuildCache` to `BuildPipeline.BuildPlayer`, as described in
+[Unity's clean-build guide](https://docs.unity3d.com/6000.0/Documentation/Manual/build-clean-build.html).
+Keep the browser console visible when checking the rebuilt player.
+
+In the controlled [#991 investigation](https://github.com/Ambiguous-Interactive/unity-helpers/issues/991),
+a retained `Library` cache omitted `MonoScript` from native registration and produced 30 errors per
+page load. Rebuilding with an empty `Library` restored registration with all 41 authored and
+project-setting files byte-identical. A later incremental build reintroduced the omission with
+current production source; `CleanBuildCache` restored registration and removed the errors.
+The builds retained IL2CPP Release, High managed stripping, native stripping, and the same
+serialized MonoScript resources. Storage checks passed in both failing and error-free players.
+
+The [recorded counterfactual](../../performance/browser-storage-webgl-cache-evidence.json) isolates
+the retained build cache without identifying the individual cache file responsible. If a clean
+build does not help, close Unity and move `Library` aside before rebuilding all imported state.
+This recovery leaves browser storage data intact and does not require weaker stripping settings.
+
 <a id="environment-detection"></a>
 
 ## Environment Detection

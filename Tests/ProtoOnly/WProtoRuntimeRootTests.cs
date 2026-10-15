@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsFalse(WProtoFacade.TrySerialize<object>(value, out byte[] declined));
             Assert.IsTrue(declined == null);
             Assert.IsTrue(
-                WProtoFormatterProvider.TryGetRuntimeWriter(value, out IWProtoRuntimeWriter writer)
+                WProtoFormatterProvider.TryGetRuntimeCodec(value, out IWProtoRuntimeCodec writer)
             );
             Assert.IsTrue(writer.TrySerialize(value, out byte[] generated));
             CollectionAssert.AreEqual(expected, generated);
@@ -168,19 +168,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
             WProtoRuntimeSave value = new WProtoRuntimeSave();
             Assert.IsTrue(
-                WProtoFormatterProvider.TryGetRuntimeWriter(value, out IWProtoRuntimeWriter writer)
+                WProtoFormatterProvider.TryGetRuntimeCodec(value, out IWProtoRuntimeCodec writer)
             );
             try
             {
                 WProtoFormatterProvider.Register<WProtoRuntimeSave>(null);
-                Assert.IsFalse(WProtoFormatterProvider.TryGetRuntimeWriter(value, out writer));
+                Assert.IsFalse(WProtoFormatterProvider.TryGetRuntimeCodec(value, out writer));
                 Assert.IsTrue(writer == null);
             }
             finally
             {
                 WProtoFormatterProvider.Register(formatter);
             }
-            Assert.IsTrue(WProtoFormatterProvider.TryGetRuntimeWriter(value, out writer));
+            Assert.IsTrue(WProtoFormatterProvider.TryGetRuntimeCodec(value, out writer));
         }
 
         [Test]
@@ -201,9 +201,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 WProtoRootMarshalProvider.Register(formatter);
                 WProtoFormatterProvider.Register<WProtoRuntimeSave>(null);
                 Assert.IsTrue(
-                    WProtoFormatterProvider.TryGetRuntimeWriter(
+                    WProtoFormatterProvider.TryGetRuntimeCodec(
                         value,
-                        out IWProtoRuntimeWriter writer
+                        out IWProtoRuntimeCodec writer
                     )
                 );
                 CollectionAssert.AreEqual(expected, Serializer.ProtoSerialize<object>(value));
@@ -214,7 +214,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 );
                 CollectionAssert.AreEqual(expected, buffer);
                 WProtoRootMarshalProvider.Register<WProtoRuntimeSave>(null);
-                Assert.IsFalse(WProtoFormatterProvider.TryGetRuntimeWriter(value, out writer));
+                Assert.IsFalse(WProtoFormatterProvider.TryGetRuntimeCodec(value, out writer));
             }
             finally
             {
@@ -222,10 +222,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 WProtoRootMarshalProvider.Register(previousMarshal);
             }
             Assert.IsTrue(
-                WProtoFormatterProvider.TryGetRuntimeWriter(
-                    value,
-                    out IWProtoRuntimeWriter restored
-                )
+                WProtoFormatterProvider.TryGetRuntimeCodec(value, out IWProtoRuntimeCodec restored)
             );
             Assert.IsTrue(restored.TrySerialize(value, out byte[] restoredBytes));
             CollectionAssert.AreEqual(expected, restoredBytes);
@@ -235,14 +232,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void UnknownAndNullRuntimeValuesHaveNoWriter()
         {
             Assert.IsFalse(
-                WProtoFormatterProvider.TryGetRuntimeWriter(
+                WProtoFormatterProvider.TryGetRuntimeCodec(
                     new object(),
-                    out IWProtoRuntimeWriter unknown
+                    out IWProtoRuntimeCodec unknown
                 )
             );
             Assert.IsTrue(unknown == null);
             Assert.IsFalse(
-                WProtoFormatterProvider.TryGetRuntimeWriter(null, out IWProtoRuntimeWriter missing)
+                WProtoFormatterProvider.TryGetRuntimeCodec(null, out IWProtoRuntimeCodec missing)
             );
             Assert.IsTrue(missing == null);
         }

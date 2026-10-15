@@ -2860,9 +2860,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
                 if (
                     ShouldUseRuntimeTypeForProtobuf(typeof(T), input, forceRuntimeType)
-                    && WallstopProto.WProtoFormatterProvider.TryGetRuntimeWriter(
+                    && WallstopProto.WProtoFormatterProvider.TryGetRuntimeCodec(
                         input,
-                        out WallstopProto.IWProtoRuntimeWriter writer
+                        out WallstopProto.IWProtoRuntimeCodec writer
                     )
                     && writer.TrySerialize(input, out byte[] runtimeBytes)
                 )
@@ -2905,9 +2905,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
                 if (
                     ShouldUseRuntimeTypeForProtobuf(typeof(T), input, forceRuntimeType)
-                    && WallstopProto.WProtoFormatterProvider.TryGetRuntimeWriter(
+                    && WallstopProto.WProtoFormatterProvider.TryGetRuntimeCodec(
                         input,
-                        out WallstopProto.IWProtoRuntimeWriter writer
+                        out WallstopProto.IWProtoRuntimeCodec writer
                     )
                 )
                 {
