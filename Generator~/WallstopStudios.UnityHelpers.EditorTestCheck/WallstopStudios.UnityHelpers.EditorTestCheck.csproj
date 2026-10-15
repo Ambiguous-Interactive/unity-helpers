@@ -512,7 +512,7 @@
     An empty property adds no file, so an ordinary build is byte-identical to one without this.
   -->
   <ItemGroup Condition="'$(WallstopIterationTestSources)' != ''">
-    <Compile Include="$(WallstopIterationTestSources)" />
+    <Compile Include="$(WallstopIterationTestSources.Split(';'))" />
   </ItemGroup>
   <ItemGroup Condition="'$(WallstopCheckControl)' != ''">
     <Compile Include="$(WallstopCheckControl)" />

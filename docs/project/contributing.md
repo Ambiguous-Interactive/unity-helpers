@@ -10,6 +10,20 @@ The easiest way to contribute is using the included dev container, which has all
 2. Click "Reopen in Container" when prompted
 3. Run `npm run verify:tools` to confirm all tools are available
 
+### Fast C# Feedback
+
+Use fixture-scoped builds while editing runtime or Editor tests:
+
+```bash
+npm run typecheck:iterate -- tests --server --files Tests/Runtime/Serialization/WProtoEnumFormatterTests.cs
+npm run typecheck:iterate -- editor-tests --server --files Tests/Editor/Tools/OdinMigration/OdinMigrationLiveDictionaryTests.cs
+```
+
+Add dependent fixtures to the same `--files` list. Production code, shared test support, test types,
+and test doubles remain included. Each scope accepts files only from its corresponding test tree.
+These commands retain source generators and compiler errors but omit performance analyzers.
+Run the normal applicable typecheck commands and changed-file preflight before publishing.
+
 ### GitHub Credentials in the Container
 
 The container resolves github.com credentials from a cached token. The Dev Containers credential
@@ -63,6 +77,38 @@ These tools are required and installed via npm/dotnet:
 then applies `.markdownlintignore`. Tracked files remain eligible even when a Git ignore rule
 matches them. Hidden paths stay excluded, and generated, ignored local artifacts do not slow
 file discovery. The command fails if discovery fails or finds no eligible documents.
+
+`npm run lint:unsafe-code` refuses compiler-unsafe code, unchecked memory access, disabled IL2CPP
+safety checks, and unbounded stack allocations. A variable stack allocation must be the direct
+branch of an assignment whose condition compares that length with a constant. For example,
+`count <= Max ? stackalloc int[count] : default` and
+`count > Max ? default : stackalloc int[count]` are bounded. Reversing those branches is refused.
+Compound conditions and intervening expressions are refused because a nearby comparison alone
+does not establish the bound on the path that allocates.
+
+Stack-allocation checks use the existing Roslyn policy tool and require .NET SDK 9.0.306.
+Repo Lint installs that SDK before running the checks. The compiler resolves constants and the actual length symbol;
+parameters, locals, readonly fields and properties cannot borrow an unrelated constant's name.
+Constant expressions and shared constants remain supported. The scan covers conditional branches
+and follows the declarations and base types used by a bound to include their conditional symbols.
+Unresolved bounds fail validation. Compiler contexts are cached only within one source snapshot,
+with at most eight cached contexts; concurrent commands build into separate temporary output folders.
+
+To scan another package checkout with the current tool, pass `--root /path/to/checkout`.
+Report paths are relative to that checkout regardless of argument order. The checkout must contain
+the normal required source trees, runtime assembly definition and check projects.
+
+During linter development, `npm run test:lint-unsafe-code -- --filter "semantic binding"` selects
+matching controls without running the full corpus. The summary reports the unselected count, and
+an empty selection fails. Run the unfiltered suite before publication.
+
+Use `npm run lint:unsafe-code -- --sarif artifacts/unsafe-code.sarif` to retain a
+[SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json)
+report. Repo Lint retains the same report as the `unsafe-code-sarif` artifact. Findings use the
+`unsafe-code` rule, repository-relative URI paths and deterministic fingerprints. Every finding
+fails the gate; there is no exception baseline. Reports include per-tree source and assembly
+counts plus positive-control results. Missing required subjects, discovery/read errors and report
+write failures fail validation; an execution failure cannot be mistaken for a clean result list.
 
 ## Python Tooling
 

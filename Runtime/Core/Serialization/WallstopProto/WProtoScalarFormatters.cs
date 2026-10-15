@@ -4,7 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
-    using System.Runtime.CompilerServices;
+    using System.Runtime.InteropServices;
     using System.Threading;
 
     /// <summary>
@@ -98,7 +98,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// Generated registrars call this with constants obtained from Roslyn. Keeping the numeric
         /// shape in generated source lets generic contracts encode enum arguments without boxing
         /// or a reflective formatter factory under IL2CPP. Registration validates that the type
-        /// is an enum and that both constants match its underlying integer.
+        /// is an enum and that both constants match its underlying integer. Bounded value copies
+        /// preserve native integer layout without unchecked memory-access helpers.
         /// </remarks>
         /// <exception cref="ArgumentException">The type is not an enum or its declared shape is incorrect.</exception>
         /// <exception cref="ArgumentOutOfRangeException">The size is not 1, 2, 4, or 8 bytes.</exception>
@@ -254,46 +255,52 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             private long Numeric(in T value)
             {
-                ref T valueRef = ref Unsafe.AsRef(in value);
+                T copy = value;
+                ReadOnlySpan<T> buffer = MemoryMarshal.CreateReadOnlySpan(ref copy, 1);
                 switch (_size)
                 {
                     case 1:
                         return _signed
-                            ? Unsafe.As<T, sbyte>(ref valueRef)
-                            : Unsafe.As<T, byte>(ref valueRef);
+                            ? MemoryMarshal.Cast<T, sbyte>(buffer)[0]
+                            : MemoryMarshal.Cast<T, byte>(buffer)[0];
                     case 2:
                         return _signed
-                            ? Unsafe.As<T, short>(ref valueRef)
-                            : Unsafe.As<T, ushort>(ref valueRef);
+                            ? MemoryMarshal.Cast<T, short>(buffer)[0]
+                            : MemoryMarshal.Cast<T, ushort>(buffer)[0];
                     case 4:
                         return _signed
-                            ? Unsafe.As<T, int>(ref valueRef)
-                            : unchecked((int)Unsafe.As<T, uint>(ref valueRef));
+                            ? MemoryMarshal.Cast<T, int>(buffer)[0]
+                            : unchecked((int)MemoryMarshal.Cast<T, uint>(buffer)[0]);
                     default:
-                        return Unsafe.As<T, long>(ref valueRef);
+                        return MemoryMarshal.Cast<T, long>(buffer)[0];
                 }
             }
 
             private T FromNumeric(long numeric)
             {
-                T value = default;
                 switch (_size)
                 {
                     case 1:
-                        Unsafe.As<T, byte>(ref value) = unchecked((byte)numeric);
-                        break;
+                        byte narrowedByte = unchecked((byte)numeric);
+                        return MemoryMarshal.Cast<byte, T>(
+                            MemoryMarshal.CreateReadOnlySpan(ref narrowedByte, 1)
+                        )[0];
                     case 2:
-                        Unsafe.As<T, ushort>(ref value) = unchecked((ushort)numeric);
-                        break;
+                        ushort narrowedUshort = unchecked((ushort)numeric);
+                        return MemoryMarshal.Cast<ushort, T>(
+                            MemoryMarshal.CreateReadOnlySpan(ref narrowedUshort, 1)
+                        )[0];
                     case 4:
-                        Unsafe.As<T, uint>(ref value) = unchecked((uint)numeric);
-                        break;
+                        uint narrowedUint = unchecked((uint)numeric);
+                        return MemoryMarshal.Cast<uint, T>(
+                            MemoryMarshal.CreateReadOnlySpan(ref narrowedUint, 1)
+                        )[0];
                     default:
-                        Unsafe.As<T, ulong>(ref value) = unchecked((ulong)numeric);
-                        break;
+                        ulong narrowedUlong = unchecked((ulong)numeric);
+                        return MemoryMarshal.Cast<ulong, T>(
+                            MemoryMarshal.CreateReadOnlySpan(ref narrowedUlong, 1)
+                        )[0];
                 }
-
-                return value;
             }
         }
 

@@ -533,6 +533,8 @@
     {
       "name": "tech-terms",
       "words": [
+        "SARIF",
+        "msbuild",
         "CJK",
         "gtk",
         "GC",

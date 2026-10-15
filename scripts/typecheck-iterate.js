@@ -35,18 +35,21 @@ function buildArguments(args) {
     remaining.splice(serverIndex, 1);
   }
   const variant = remaining.length && remaining[0] !== "--files" ? remaining.shift() : "default";
+  const scopeRoot = projectId === "tests" ? "Tests/Runtime" : "Tests/Editor";
   const project = CHECK_PROJECTS.find((candidate) => candidate.id === projectId);
   if (
     !project ||
     !Object.hasOwn(VARIANTS, variant) ||
     (remaining.length &&
-      (projectId !== "editor-tests" || remaining[0] !== "--files" || remaining.length < 2))
+      (!["tests", "editor-tests"].includes(projectId) ||
+        remaining[0] !== "--files" ||
+        remaining.length < 2))
   ) {
     throw new Error(
       "Usage: npm run typecheck:iterate -- " +
         "<runtime|editor|tests|editor-tests|integrations> " +
         "[default|legacy|odin|singlethreaded|proto-only] " +
-        "[--server] [--files Tests/Editor/Fixture.cs ...]"
+        "[--server] [--files Tests/{Runtime,Editor}/Fixture.cs ...]"
     );
   }
   const sources = remaining.length
@@ -55,17 +58,17 @@ function buildArguments(args) {
         const resolved = path.resolve(root, file);
         const relative = path.relative(root, resolved).split(path.sep).join("/");
         if (
-          !relative.startsWith("Tests/Editor/") ||
+          !relative.startsWith(scopeRoot + "/") ||
           !relative.endsWith(".cs") ||
           /[%;,*?\[\]\r\n]/.test(file) ||
           !fs.existsSync(resolved) ||
           !fs.statSync(resolved).isFile() ||
           !fs
             .realpathSync(resolved)
-            .startsWith(fs.realpathSync(path.join(root, "Tests/Editor")) + path.sep)
+            .startsWith(fs.realpathSync(path.join(root, scopeRoot)) + path.sep)
         ) {
           throw new Error(
-            "Scoped iteration requires existing C# files under Tests/Editor: " + file
+            "Scoped iteration requires existing C# files under " + scopeRoot + ": " + file
           );
         }
         return resolved;
@@ -122,7 +125,7 @@ function run(args, launch = spawnSync, report = console.error) {
   }
   if (build.some((argument) => argument.startsWith("-p:WallstopIterationTestSources="))) {
     report(
-      "Scoped editor compilation: only the named editor fixtures are included. Production and shared test sources remain included."
+      "Scoped test compilation: only the named test fixtures are included. Production and shared test sources remain included."
     );
   }
   const result = launch("dotnet", build, {

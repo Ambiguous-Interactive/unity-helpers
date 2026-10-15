@@ -49,15 +49,19 @@ It is an iteration aid, not a validation gate: run the normal applicable typeche
 publication. On 2026-10-14, the test-tree iteration check took 5.37 seconds here versus 37.02 seconds
 for the full check after an edit. These are local observations, not CI timing claims.
 
-For an Editor fixture edit, add `--files Tests/Editor/path/Fixture.cs` after `editor-tests` and
-the optional variant. Include dependent fixture files when needed. This keeps production and shared
-test sources but omits the other Editor fixtures. Add `--server` to reuse a compiler server whose
+For a fixture edit, add `--files Tests/Runtime/path/Fixture.cs` after `tests`, or
+`--files Tests/Editor/path/Fixture.cs` after `editor-tests`, and the optional variant. Include
+dependent fixture files when needed. This keeps production, shared test sources, test types and
+test doubles but omits the other fixtures. Runtime and Editor scopes cannot be mixed. Add `--server` to reuse a compiler server whose
 identity includes the project, variant, and all three shipped analyzer DLL hashes. A rebuilt
 analyzer therefore selects a new server. The default still disables shared compilation. Iteration
 outputs and intermediate files are isolated from normal publication builds. Real
 scoped controls proved fresh `CS0246` and `WPROTO001` failures and a passing compile after an edit;
 warmed controlled rebuilds took 8–9 seconds here on 2026-10-15. Normal publication gates retain
-their complete source sets and analyzers.
+their complete source sets and analyzers. Runtime scoped controls also proved fresh `CS0246` and
+`WPROTO001` failures and recovery. Three warmed runtime edits took 8.19–10.91 seconds, versus
+35.25 seconds for the normal test gate; the cold scoped build took 48.34 seconds on this host.
+Multi-file scopes are checked against MSBuild's evaluated items to catch escaped list separators.
 
 For isolated Odin compiler edits, first run the native MCP `editor` fixture
 `OdinMigrationCompilerProcessTests`. Its nine controls took 2.86 seconds on Unity 6000.4.6f1 on

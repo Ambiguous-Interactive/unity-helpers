@@ -33,6 +33,59 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
 
         [TestCase(false)]
         [TestCase(true)]
+        public void PartialOwnerRecoveryCapturesAndRestoresPrivateFields(bool readonlyField)
+        {
+            OdinMigrationPrivateBindingAsset owner =
+                CreateScriptableObject<OdinMigrationPrivateBindingAsset>();
+            Dictionary<SpriteAlignment, List<Texture2D>> original = readonlyField
+                ? owner.ReadonlyValues
+                : owner.Values;
+            Texture2D texture = Track(new Texture2D(1, 1));
+            original.Add((SpriteAlignment)int.MinValue, new List<Texture2D> { texture, null });
+            Assert.IsTrue(
+                OdinMigrationCompiledBindings.TryGet(
+                    owner.GetType(),
+                    out OdinMigrationCompiledBinding binding
+                )
+            );
+            OdinMigrationCompiledField field = FindField(
+                binding,
+                readonlyField
+                    ? OdinMigrationPrivateBindingAsset.ReadonlyValuesFieldName
+                    : OdinMigrationPrivateBindingAsset.ValuesFieldName
+            );
+            Assert.IsTrue(field.CanCapture);
+            Assert.IsTrue(field.CanRestore);
+            Assert.IsTrue(
+                field.TryCapture(
+                    owner,
+                    out OdinMigrationLiveDictionary snapshot,
+                    out string failure
+                ),
+                failure
+            );
+            original.Clear();
+            Assert.IsTrue(
+                field.TryRestore(owner, snapshot.Keys, snapshot.Values, out failure),
+                failure
+            );
+            Dictionary<SpriteAlignment, List<Texture2D>> restored = readonlyField
+                ? owner.ReadonlyValues
+                : owner.Values;
+            if (readonlyField)
+            {
+                Assert.AreSame(original, restored);
+            }
+            Assert.AreEqual(1, restored.Count);
+            Assert.IsTrue(
+                restored.TryGetValue((SpriteAlignment)int.MinValue, out List<Texture2D> values)
+            );
+            Assert.AreSame(texture, values[0]);
+            Assert.IsTrue(ReferenceEquals(values[1], null));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
         public void CaptureDistinguishesNullAndEmptyDictionaries(bool absent)
         {
             Dictionary<SpriteAlignment, List<Texture2D>> original = absent ? null : new();

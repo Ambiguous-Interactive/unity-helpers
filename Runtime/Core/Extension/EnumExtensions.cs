@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using System.Linq;
     using System.Reflection;
     using System.Runtime.CompilerServices;
+    using System.Runtime.InteropServices;
     using System.Threading;
     using Attributes;
     using Helper;
@@ -634,33 +635,36 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </summary>
         public static readonly bool IsSigned = ResolveIsSigned();
 
-        private static readonly int Size = Unsafe.SizeOf<T>();
+        private static readonly TypeCode UnderlyingType = Type.GetTypeCode(typeof(T));
 
         // Sign-extend negative members so every width shares the same 64-bit modular key space.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryConvertToUInt64(T value, out ulong result)
         {
-            ref T valueRef = ref Unsafe.AsRef(in value);
-
-            switch (Size)
+            ReadOnlySpan<T> buffer = MemoryMarshal.CreateReadOnlySpan(ref value, 1);
+            switch (UnderlyingType)
             {
-                case 1:
-                    result = IsSigned
-                        ? unchecked((ulong)(long)Unsafe.As<T, sbyte>(ref valueRef))
-                        : Unsafe.As<T, byte>(ref valueRef);
+                case TypeCode.SByte:
+                    result = unchecked((ulong)(long)MemoryMarshal.Cast<T, sbyte>(buffer)[0]);
                     return true;
-                case 2:
-                    result = IsSigned
-                        ? unchecked((ulong)(long)Unsafe.As<T, short>(ref valueRef))
-                        : Unsafe.As<T, ushort>(ref valueRef);
+                case TypeCode.Byte:
+                    result = MemoryMarshal.Cast<T, byte>(buffer)[0];
                     return true;
-                case 4:
-                    result = IsSigned
-                        ? unchecked((ulong)(long)Unsafe.As<T, int>(ref valueRef))
-                        : Unsafe.As<T, uint>(ref valueRef);
+                case TypeCode.Int16:
+                    result = unchecked((ulong)(long)MemoryMarshal.Cast<T, short>(buffer)[0]);
                     return true;
-                case 8:
-                    result = Unsafe.As<T, ulong>(ref valueRef);
+                case TypeCode.UInt16:
+                    result = MemoryMarshal.Cast<T, ushort>(buffer)[0];
+                    return true;
+                case TypeCode.Int32:
+                    result = unchecked((ulong)(long)MemoryMarshal.Cast<T, int>(buffer)[0]);
+                    return true;
+                case TypeCode.UInt32:
+                    result = MemoryMarshal.Cast<T, uint>(buffer)[0];
+                    return true;
+                case TypeCode.Int64:
+                case TypeCode.UInt64:
+                    result = MemoryMarshal.Cast<T, ulong>(buffer)[0];
                     return true;
                 default:
                     result = default;

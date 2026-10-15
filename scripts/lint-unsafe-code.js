@@ -26,17 +26,25 @@
 
 "use strict";
 
-const { existsSync, readFileSync } = require("node:fs");
+const {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} = require("node:fs");
+const { tmpdir } = require("node:os");
+const { createHash } = require("node:crypto");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const SOURCE_ROOTS = ["Runtime", "Editor", "Tests"];
 const VENDORED_PREFIXES = ["Runtime/Utils/SevenZip/"];
 const ISSUE = "see issue #637";
-const CONST_DECLARATION = /\bconst\s+[\w.<>[\]]+\s+([A-Za-z_]\w*)\s*=/g;
-const STACKALLOC = /\bstackalloc\s+[\w.<>,\s]*?\[/g;
-const INTEGER_LITERAL = /^(?:0[xX][0-9a-fA-F]+|\d+)$/;
-const IDENTIFIER = /^[A-Za-z_]\w*$/;
+const POLICY_NAME = "WallstopStudios.UnityHelpers.SyntaxPolicy";
+let semanticPolicyDll = null;
+let semanticPolicyFailure = null;
 
 /*
     System.Runtime.CompilerServices.Unsafe members that READ, WRITE or REINTERPRET memory. A wrong
@@ -55,6 +63,9 @@ const IDENTIFIER = /^[A-Za-z_]\w*$/;
 */
 const UNSAFE_ACCESS =
   /\bUnsafe\s*\.\s*(?:As|AsRef|AsPointer|Unbox|NullRef|SkipInit|Add|Subtract|AddByteOffset|SubtractByteOffset|Read|ReadUnaligned|Write|WriteUnaligned|Copy|CopyBlock|CopyBlockUnaligned|InitBlock|InitBlockUnaligned)\b/g;
+
+const UNSAFE_IMPORT =
+  /\busing\s+(?:static\s+|@?[A-Za-z_]\w*\s*=\s*)(?:@?[A-Za-z_]\w*\s*::\s*)?(?:@?[A-Za-z_]\w*\s*\.\s*)*@?Unsafe\s*;/g;
 
 /*
     IL2CPP emits a null check on every reference dereference, a bounds check on every array index
@@ -97,17 +108,6 @@ const OPTION_ARGUMENT_RESIDUE = /^(?:\s|,|[{}()[\]]|new|Option)*$/;
 const FALSE_LITERAL = /\bfalse\b/i;
 const TRUE_LITERAL = /\btrue\b/i;
 const ARGUMENT_LABEL = /^\s*[A-Za-z_]\w*\s*:(?!:)/;
-
-/*
-    A ratchet, not an allowlist. Both remaining files reinterpret an enum's underlying storage on a
-    measured hot path, and #637 gates their safe replacement on the paired player evidence #636
-    owes. Freezing the count means a new site anywhere reds the build, and retiring one of these
-    reds it too until the number comes down -- so the exception cannot quietly grow or go stale.
-*/
-const UNSAFE_ACCESS_BASELINE = new Map([
-  ["Runtime/Core/Extension/EnumExtensions.cs", 8],
-  ["Runtime/Core/Serialization/WallstopProto/WProtoScalarFormatters.cs", 12]
-]);
 
 /** Blanks comments and string literals so the keyword scan cannot match prose. */
 function codeOnly(text) {
@@ -165,142 +165,79 @@ function isVendored(filePath) {
   return VENDORED_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 }
 
-/** Every name declared `const` anywhere in the package, so a shared bound resolves. */
-function collectConstantNames(sources) {
-  const names = new Set();
-  for (const source of sources) {
-    const code = codeOnly(source.text);
-    for (const match of code.matchAll(CONST_DECLARATION)) {
-      names.add(match[1]);
+function getSemanticPolicyDll() {
+  if (semanticPolicyFailure !== null) {
+    throw semanticPolicyFailure;
+  }
+  if (semanticPolicyDll !== null) {
+    return semanticPolicyDll;
+  }
+  const artifacts = mkdtempSync(path.join(tmpdir(), "unity-helpers-unsafe-policy-"));
+  process.once("exit", () => rmSync(artifacts, { recursive: true, force: true, maxRetries: 3 }));
+  const toolingRoot = path.resolve(__dirname, "..");
+  const project = path.join(toolingRoot, "Generator~", POLICY_NAME, POLICY_NAME + ".csproj");
+  const build = spawnSync(
+    "dotnet",
+    [
+      "build",
+      project,
+      "-c",
+      "Release",
+      "--artifacts-path",
+      artifacts,
+      "--nologo",
+      "--disable-build-servers"
+    ],
+    {
+      cwd: toolingRoot,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024
     }
+  );
+  const dll = path.join(artifacts, "bin", POLICY_NAME, "release", POLICY_NAME + ".dll");
+  if (build.status !== 0 || !existsSync(dll)) {
+    semanticPolicyFailure = new Error(
+      "Could not build the semantic stack-allocation gate: " +
+        (build.error?.message ?? build.stderr ?? "") +
+        "\n" +
+        build.stdout
+    );
+    throw semanticPolicyFailure;
   }
-  return names;
+  semanticPolicyDll = dll;
+  return dll;
 }
 
-/** The text between the previous statement boundary and `index`. */
-function statementBefore(code, index) {
-  let start = index;
-  while (
-    0 < start &&
-    code[start - 1] !== ";" &&
-    code[start - 1] !== "{" &&
-    code[start - 1] !== "}"
-  ) {
-    start--;
-  }
-  return code.slice(start, index);
-}
-
-/** The contents of the `[...]` opening at `openIndex`, or null when it never closes. */
-function bracketedLength(code, openIndex) {
-  let depth = 0;
-  for (let index = openIndex; index < code.length; index++) {
-    if (code[index] === "[") {
-      depth++;
-      continue;
-    }
-    if (code[index] !== "]") {
-      continue;
-    }
-    depth--;
-    if (depth === 0) {
-      return code.slice(openIndex + 1, index).trim();
-    }
-  }
-  return null;
-}
-
-/** Whether `length` cannot exceed a bound the compiler knows. */
-function isConstantLength(length, constantNames) {
-  /* `stackalloc T[] { a, b }` states its length by listing it, so the brackets are empty. */
-  if (length.length === 0) {
-    return true;
-  }
-  if (INTEGER_LITERAL.test(length)) {
-    return true;
-  }
-  if (/^sizeof\s*\(/.test(length)) {
-    return true;
-  }
-  if (IDENTIFIER.test(length)) {
-    return constantNames.has(length);
-  }
-  const tail = length.includes(".") ? length.slice(length.lastIndexOf(".") + 1) : null;
-  return tail !== null && IDENTIFIER.test(tail) && constantNames.has(tail);
-}
-
-/*
-    A non-constant length is accepted only when the same statement compares it against a constant.
-    Same statement rather than an enclosing block, because that is the only placement a reader can
-    verify without tracing control flow -- and it is the shape the package already uses:
-    `count <= Threshold ? stackalloc T[count] : default`, with a pooled rent on the other branch.
-*/
-function isGuardedLength(statement, length, constantNames) {
-  if (!IDENTIFIER.test(length)) {
-    return false;
-  }
-  const guard = new RegExp(`\\b${length}\\b\\s*<=?\\s*([\\w.]+)`);
-  const match = guard.exec(statement);
-  if (match !== null && isConstantLength(match[1], constantNames)) {
-    return true;
-  }
-  const reversed = new RegExp(`([\\w.]+)\\s*<=?\\s*\\b${length}\\b`);
-  const reverseMatch = reversed.exec(statement);
-  return reverseMatch !== null && isConstantLength(reverseMatch[1], constantNames);
-}
-
-/**
- * @param {{path: string, text: string}[]} sources C# sources to inspect
- * @returns {{failures: string[], inspected: number}} violations, and how many sites were judged
- */
 function findStackAllocations(sources) {
-  const constantNames = collectConstantNames(sources);
-  const failures = [];
-  let inspected = 0;
-
-  for (const source of sources) {
-    if (isVendored(source.path)) {
-      continue;
-    }
-
-    const code = codeOnly(source.text);
-    for (const match of code.matchAll(STACKALLOC)) {
-      const openIndex = match.index + match[0].length - 1;
-      const length = bracketedLength(code, openIndex);
-      if (length === null) {
-        continue;
-      }
-
-      inspected++;
-      if (isConstantLength(length, constantNames)) {
-        continue;
-      }
-      if (isGuardedLength(statementBefore(code, match.index), length, constantNames)) {
-        continue;
-      }
-
-      const line = code.slice(0, match.index).split("\n").length;
-      failures.push(
-        `${source.path}:${line}: stackalloc of '${length}', which no constant bounds. ` +
-          `A caller-sized stack allocation raises StackOverflowException, which no catch ` +
-          `intercepts; guard it against a const and rent above it, ${ISSUE}.`
-      );
-    }
+  const owned = sources.filter((source) => !isVendored(source.path));
+  if (!owned.some((source) => source.text.includes("stackalloc"))) {
+    return { failures: [], inspected: 0 };
   }
-
-  return { failures, inspected };
+  const result = spawnSync("dotnet", [getSemanticPolicyDll(), "--stackalloc-json"], {
+    input: JSON.stringify(owned.map((source) => ({ Path: source.path, Text: source.text }))),
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      "Semantic stack-allocation scan failed: " + (result.error?.message ?? result.stderr)
+    );
+  }
+  const scan = JSON.parse(result.stdout);
+  if (!Array.isArray(scan.Failures) || !Number.isInteger(scan.Inspected) || scan.Inspected < 0) {
+    throw new Error("Semantic stack-allocation scan returned an invalid result");
+  }
+  return { failures: scan.Failures, inspected: scan.Inspected };
 }
 
 /**
- * Holds the frozen per-file count of memory-access `Unsafe` members.
+ * Refuses memory-access `Unsafe` members and imports that hide their names.
  *
  * @param {{path: string, text: string}[]} sources C# sources to inspect
- * @returns {{failures: string[], inspected: number, counted: Map<string, number>}} violations,
- *   how many sites were judged, and the per-file tally the staleness ratchet reads
+ * @returns {{failures: string[], inspected: number}} violations and how many sites were judged
  */
 function findUnsafeAccess(sources) {
   const failures = [];
-  const counted = new Map();
   let inspected = 0;
 
   for (const source of sources) {
@@ -309,49 +246,29 @@ function findUnsafeAccess(sources) {
     }
 
     const code = codeOnly(source.text);
+    for (const importSite of code.matchAll(UNSAFE_IMPORT)) {
+      const line = code.slice(0, importSite.index).split("\n").length;
+      failures.push(
+        `${source.path}:${line}: aliases and static imports hide Unsafe member names. ` +
+          `Use explicit member names so the memory-access rule can inspect them, ${ISSUE}.`
+      );
+    }
     const sites = [...code.matchAll(UNSAFE_ACCESS)];
     if (sites.length === 0) {
       continue;
     }
 
     inspected += sites.length;
-    counted.set(source.path, sites.length);
-    const allowed = UNSAFE_ACCESS_BASELINE.get(source.path) ?? 0;
-    if (sites.length <= allowed) {
-      continue;
-    }
 
-    const line = code.slice(0, sites[allowed].index).split("\n").length;
+    const line = code.slice(0, sites[0].index).split("\n").length;
     failures.push(
-      `${source.path}:${line}: ${sites.length} memory-access Unsafe member(s), ` +
-        `${allowed} baselined. Reinterpreting memory is undefined behaviour on IL2CPP if the ` +
+      `${source.path}:${line}: ${sites.length} memory-access Unsafe member(s). ` +
+        `Reinterpreting memory is undefined behaviour on IL2CPP if the ` +
         `type, layout or index assumption is wrong; use a checked cast, ${ISSUE}.`
     );
   }
 
-  return { failures, inspected, counted };
-}
-
-/**
- * The other half of the ratchet: a baselined file that has shed sites must shed its excuse too.
- * It is separate from {@link findUnsafeAccess} because it is only meaningful over a corpus known
- * to be complete -- asked of one file it would report every other baselined file as retired.
- *
- * @param {Map<string, number>} counted per-file tally from a repository-wide scan
- * @returns {string[]} one message per stale baseline entry
- */
-function findStaleUnsafeBaselines(counted) {
-  const failures = [];
-  for (const [file, allowed] of UNSAFE_ACCESS_BASELINE) {
-    const actual = counted.get(file) ?? 0;
-    if (actual < allowed) {
-      failures.push(
-        `${file}: baselined at ${allowed} memory-access Unsafe member(s) but has ${actual}. ` +
-          `Lower the baseline so the exception cannot go stale, ${ISSUE}.`
-      );
-    }
-  }
-  return failures;
+  return { failures, inspected };
 }
 
 /** Every balanced `(...)` in `code`, each as its open index, close index and inner text. */
@@ -528,7 +445,12 @@ function findIl2CppSafetyDisables(sources) {
  * @param {{path: string, text: string}[]} projects check projects to inspect
  * @returns {string[]} one message per violation
  */
-function findViolations(asmdefs, sources, projects) {
+function findViolations(
+  asmdefs,
+  sources,
+  projects,
+  stackAllocations = findStackAllocations(sources)
+) {
   const failures = [];
 
   for (const asmdef of asmdefs) {
@@ -573,7 +495,7 @@ function findViolations(asmdefs, sources, projects) {
     }
   }
 
-  failures.push(...findStackAllocations(sources).failures);
+  failures.push(...stackAllocations.failures);
   failures.push(...findIl2CppSafetyDisables(sources).failures);
 
   return failures;
@@ -608,8 +530,7 @@ function trackedWithExtension(repoRoot, roots, extension) {
     maxBuffer: 64 * 1024 * 1024
   });
   if (result.status !== 0) {
-    console.error(`[unsafe-code] git ls-files failed: ${result.stderr}`);
-    process.exit(2);
+    throw new Error(`git ls-files failed: ${result.stderr}`);
   }
   return result.stdout
     .split("\0")
@@ -617,22 +538,42 @@ function trackedWithExtension(repoRoot, roots, extension) {
     .map((entry) => ({ path: entry, text: readFileSync(path.join(repoRoot, entry), "utf8") }));
 }
 
-function main() {
-  const repoRoot = path.resolve(__dirname, "..");
-  const verbose = process.argv.includes("--verbose");
-  const sources = trackedWithExtension(repoRoot, SOURCE_ROOTS, ".cs");
-  const failures = findViolations(
-    trackedWithExtension(repoRoot, SOURCE_ROOTS, ".asmdef"),
-    sources,
-    trackedWithExtension(repoRoot, ["Generator~"], ".csproj")
+function scanRepository(repoRoot) {
+  const sources = trackedWithExtension(repoRoot, SOURCE_ROOTS, ".cs").filter(
+    (source) => !isVendored(source.path)
   );
+  const asmdefs = trackedWithExtension(repoRoot, SOURCE_ROOTS, ".asmdef").filter(
+    (source) => !isVendored(source.path)
+  );
+  const projects = trackedWithExtension(repoRoot, ["Generator~"], ".csproj");
+  const stackAllocations = findStackAllocations(sources);
+  const failures = findViolations(asmdefs, sources, projects, stackAllocations);
+  const sourceFiles = {};
+  const assemblyDefinitions = {};
+  for (const root of SOURCE_ROOTS) {
+    sourceFiles[root] = sources.filter((source) => source.path.startsWith(`${root}/`)).length;
+    assemblyDefinitions[root] = asmdefs.filter((source) =>
+      source.path.startsWith(`${root}/`)
+    ).length;
+    if (sourceFiles[root] === 0 || assemblyDefinitions[root] === 0) {
+      failures.push(`${root}: missing source or assembly-definition subjects; ${ISSUE}.`);
+    }
+  }
+  if (
+    projects.length === 0 ||
+    !asmdefs.some((source) => source.path === "Runtime/WallstopStudios.UnityHelpers.asmdef")
+  ) {
+    failures.push(
+      `the runtime assembly definition or check-project subjects are missing; ${ISSUE}.`
+    );
+  }
 
   /*
       "Found no unbounded stackalloc" and "found no stackalloc" print the same clean run (#556), so
       the repository scan counts its subjects. A fixture legitimately has none, which is why this
       lives here rather than in findViolations.
   */
-  const inspected = findStackAllocations(sources).inspected;
+  const inspected = stackAllocations.inspected;
   if (inspected === 0) {
     failures.push(
       `no stackalloc site was judged across ${sources.length} source(s), so the scan saw ` +
@@ -641,13 +582,12 @@ function main() {
   }
 
   const unsafeAccess = findUnsafeAccess(sources);
-  failures.push(...unsafeAccess.failures, ...findStaleUnsafeBaselines(unsafeAccess.counted));
-  if (unsafeAccess.inspected === 0) {
-    failures.push(
-      `no memory-access Unsafe member was judged across ${sources.length} source(s), so either ` +
-        `the baseline is fully retired -- delete it and this check -- or the scan is broken; ` +
-        `${ISSUE}.`
-    );
+  failures.push(...unsafeAccess.failures);
+  const unsafeControl = findUnsafeAccess([
+    { path: "control/UnsafeAccess.cs", text: "Unsafe.As<int, long>(ref value);" }
+  ]);
+  if (unsafeControl.failures.length !== 1) {
+    failures.push(`the memory-access Unsafe control was not reported; ${ISSUE}.`);
   }
 
   const il2cppControl = findIl2CppSafetyDisables([
@@ -660,20 +600,166 @@ function main() {
     );
   }
 
+  const stackControl = findStackAllocations([
+    {
+      path: "control/StackAllocation.cs",
+      text: "class Control { const int Max = 8; void M(int count, int Max) { System.Span<int> a = stackalloc int[Max]; System.Span<int> b = count <= Max ? stackalloc int[count] : default; System.Span<int> c = stackalloc int[8]; } }"
+    }
+  ]);
+  const stackControlReported = stackControl.inspected === 3 && stackControl.failures.length === 2;
+  if (!stackControlReported) {
+    failures.push(
+      `the compiler-bound stack-allocation controls were not reported correctly; ${ISSUE}.`
+    );
+  }
+
+  return {
+    failures,
+    subjects: {
+      sourceFiles,
+      assemblyDefinitions,
+      checkProjects: projects.length,
+      stackAllocations: inspected,
+      unsafeAccessSites: unsafeAccess.inspected,
+      il2cppOptionLists: findIl2CppSafetyDisables(sources).inspected,
+      unsafeControlReported: unsafeControl.failures.length === 1,
+      stackControlReported,
+      il2cppControlReported: il2cppControl.failures.length !== 0
+    }
+  };
+}
+
+function createSarif(scan) {
+  const results = scan.failures.map((failure) => {
+    const location = /^(.*\.(?:cs|asmdef|csproj)):(?:(\d+):)?\s*(.*)$/.exec(failure);
+    const result = { ruleId: "unsafe-code", level: "error", message: { text: failure } };
+    if (location !== null) {
+      const normalized = path.posix.normalize(location[1].replace(/\\/g, "/"));
+      if (path.posix.isAbsolute(normalized) || /^(?:\.\.(?:\/|$)|[A-Za-z]:)/.test(normalized)) {
+        throw new Error("SARIF findings must use repository-relative paths");
+      }
+      const physicalLocation = {
+        artifactLocation: { uri: normalized.split("/").map(encodeURIComponent).join("/") }
+      };
+      if (location[2] !== undefined) {
+        physicalLocation.region = { startLine: Number(location[2]) };
+      }
+      result.locations = [{ physicalLocation }];
+      result.message.text = location[3];
+      result.partialFingerprints = {
+        "unsafeCode/v1": createHash("sha256")
+          .update(JSON.stringify([normalized, location[2] ?? null, location[3]]))
+          .digest("hex")
+      };
+    }
+    return result;
+  });
+  results.sort((left, right) => {
+    const a = JSON.stringify(left);
+    const b = JSON.stringify(right);
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  const invocation = {
+    executionSuccessful: scan.error === undefined,
+    exitCode: scan.error !== undefined ? 2 : results.length === 0 ? 0 : 1,
+    properties: { subjects: scan.subjects }
+  };
+  if (scan.error !== undefined) {
+    invocation.toolExecutionNotifications = [{ level: "error", message: { text: scan.error } }];
+  }
+  return {
+    $schema: "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json",
+    version: "2.1.0",
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: "UnityHelpersUnsafeCode",
+            rules: [
+              {
+                id: "unsafe-code",
+                shortDescription: { text: "Package-owned memory safety" },
+                helpUri: "https://github.com/Ambiguous-Interactive/unity-helpers/issues/637"
+              }
+            ]
+          }
+        },
+        invocations: [invocation],
+        results
+      }
+    ]
+  };
+}
+
+function main() {
+  let repoRoot = path.resolve(__dirname, "..");
+  let rootSpecified = false;
+  const args = process.argv.slice(2);
+  let verbose = false;
+  let sarifArgument = null;
+  for (let index = 0; index < args.length; index++) {
+    if (args[index] === "--verbose") {
+      verbose = true;
+    } else if (
+      args[index] === "--sarif" &&
+      index + 1 < args.length &&
+      !args[index + 1].startsWith("--") &&
+      sarifArgument === null
+    ) {
+      sarifArgument = args[++index];
+    } else if (
+      args[index] === "--root" &&
+      index + 1 < args.length &&
+      !args[index + 1].startsWith("--") &&
+      args[index + 1].trim().length !== 0 &&
+      !rootSpecified
+    ) {
+      repoRoot = path.resolve(args[++index]);
+      rootSpecified = true;
+    } else {
+      console.error(`[unsafe-code] Unexpected or incomplete argument: ${args[index]}`);
+      process.exitCode = 2;
+      return;
+    }
+  }
+
+  const sarifPath = sarifArgument === null ? null : path.resolve(repoRoot, sarifArgument);
+  let scan;
+  try {
+    scan = scanRepository(repoRoot);
+  } catch (error) {
+    scan = { failures: [], subjects: {}, error: error.message };
+  }
+  if (sarifPath !== null) {
+    try {
+      mkdirSync(path.dirname(sarifPath), { recursive: true });
+      writeFileSync(sarifPath, JSON.stringify(createSarif(scan), null, 2) + "\n");
+    } catch (error) {
+      console.error(`[unsafe-code] Could not write SARIF: ${error.message}`);
+      process.exitCode = 2;
+      return;
+    }
+  }
+  if (scan.error !== undefined) {
+    console.error(`[unsafe-code] ${scan.error}`);
+    process.exitCode = 2;
+    return;
+  }
+  const { failures, subjects } = scan;
   if (0 < failures.length) {
     for (const failure of failures) {
       console.error(`[unsafe-code] ${failure}`);
     }
     console.error(`[unsafe-code] ${failures.length} violation(s).`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (verbose) {
-    const il2cpp = findIl2CppSafetyDisables(sources).inspected;
     console.log(
-      `[unsafe-code] No compiler-unsafe code or enabling switch found; ${inspected} stackalloc ` +
-        `site(s) bounded; ${unsafeAccess.inspected} memory-access Unsafe member(s) at their ` +
-        `frozen baseline; ${il2cpp} IL2CPP check option(s) set, control site reported.`
+      `[unsafe-code] No compiler-unsafe code or enabling switch found; ${subjects.stackAllocations} stackalloc ` +
+        `site(s) bounded; ${subjects.unsafeAccessSites} memory-access Unsafe member(s), control reported; ` +
+        `${subjects.il2cppOptionLists} IL2CPP check option(s) set, control site reported.`
     );
   }
 }
@@ -684,8 +770,9 @@ module.exports = {
   isVendored,
   findStackAllocations,
   findUnsafeAccess,
-  findStaleUnsafeBaselines,
-  findIl2CppSafetyDisables
+  findIl2CppSafetyDisables,
+  scanRepository,
+  createSarif
 };
 
 if (require.main === module) {

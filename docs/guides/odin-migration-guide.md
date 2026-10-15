@@ -351,7 +351,12 @@ does not load an owner or use reflection to read its members. Generated recovery
 be available. The preview verifies saved owner and script identity, current compiler checksums,
 dictionary order, and saved reference identities before adding the converted fields to the proposal.
 It refuses dirty or destroyed owners, existing destination fields, null dictionaries or lists,
-custom comparers, shared lists across selected fields or owners, and inaccessible fields.
+custom comparers, shared lists across selected fields or owners, and inaccessible fields in
+non-partial owners. Private and protected fields can use generated accessors when their owner and
+every containing class are non-generic partial classes in the current compilation. These accessors
+live inside the owner, can use its private enum types, and also support initialized readonly
+dictionaries. No runtime reflection is used. Referenced-assembly fields still need their original
+source available for conversion.
 Accessible readonly dictionaries are supported when their original field holds an initialized
 dictionary with the default comparer. Recovery validates every key and object before restoring the
 contents of that dictionary. It preserves the dictionary instance; value lists are rebuilt. The

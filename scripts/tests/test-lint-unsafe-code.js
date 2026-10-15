@@ -18,16 +18,32 @@
 const assert = require("assert");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require("fs");
+const { tmpdir } = require("os");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const linterPath = path.join(repoRoot, "scripts", "lint-unsafe-code.js");
-const { codeOnly, findViolations, isVendored } = require(linterPath);
+const { codeOnly, createSarif, findViolations, isVendored, scanRepository } = require(linterPath);
 
 let passed = 0;
 let failed = 0;
+let skipped = 0;
 const failures = [];
+const testArgs = process.argv.slice(2);
+if (
+  testArgs.length !== 0 &&
+  (testArgs.length !== 2 || testArgs[0] !== "--filter" || testArgs[1].length === 0)
+) {
+  console.error("Usage: test-lint-unsafe-code.js [--filter text]");
+  process.exit(2);
+}
+const filter = testArgs.length === 2 ? testArgs[1] : null;
 
 function runTest(name, body) {
+  if (filter !== null && !name.includes(filter)) {
+    skipped++;
+    return;
+  }
   try {
     body();
     console.log(`  [PASS] ${name}`);
@@ -38,6 +54,23 @@ function runTest(name, body) {
     failed++;
     failures.push(name);
   }
+}
+
+for (const [label, args, status, expected] of [
+  [
+    "positive selection",
+    ["--filter", "a compiler-evaluated integer expression is bounded: 2 * (3 + 1)"],
+    0,
+    /1 passed, 0 failed/
+  ],
+  ["empty selection", ["--filter", "no-fixture-has-this-name"], 1, /No fixture matched/],
+  ["invalid selection", ["--filter"], 2, /Usage:/]
+]) {
+  runTest(`fixture selection remains explicit and nonempty: ${label}`, () => {
+    const result = spawnSync(process.execPath, [__filename, ...args], { encoding: "utf8" });
+    assert.strictEqual(result.status, status, result.stderr);
+    assert.match(result.stdout + result.stderr, expected);
+  });
 }
 
 function sources(text) {
@@ -160,11 +193,32 @@ runTest("comment stripping preserves line numbering", () => {
 });
 
 runTest("the real repository is clean, and the gate actually inspected it", () => {
-  const green = spawnSync(process.execPath, [linterPath, "--verbose"], {
-    cwd: repoRoot,
-    encoding: "utf8"
-  });
-  assert.strictEqual(green.status, 0, `expected a clean repository, got: ${green.stderr}`);
+  const scratch = mkdtempSync(path.join(tmpdir(), "unity-unsafe-report-"));
+  let report;
+  try {
+    const output = path.join(scratch, "reports", "unsafe.sarif");
+    const green = spawnSync(process.execPath, [linterPath, "--verbose", "--sarif", output], {
+      cwd: repoRoot,
+      encoding: "utf8"
+    });
+    assert.strictEqual(green.status, 0, `expected a clean repository, got: ${green.stderr}`);
+    report = JSON.parse(readFileSync(output, "utf8")).runs[0];
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+  assert.deepStrictEqual(report.results, []);
+  assert.strictEqual(report.invocations[0].executionSuccessful, true);
+  assert.strictEqual(report.invocations[0].exitCode, 0);
+  const { subjects } = report.invocations[0].properties;
+  for (const root of ["Runtime", "Editor", "Tests"]) {
+    assert.ok(0 < subjects.sourceFiles[root]);
+    assert.ok(0 < subjects.assemblyDefinitions[root]);
+  }
+  assert.ok(0 < subjects.checkProjects);
+  assert.ok(0 < subjects.stackAllocations);
+  assert.strictEqual(subjects.unsafeControlReported, true);
+  assert.strictEqual(subjects.stackControlReported, true);
+  assert.strictEqual(subjects.il2cppControlReported, true);
 
   // "Found nothing" and "looked at nothing" print the same thing (#556), so the corpus is counted
   // rather than trusted: the package ships at least one assembly definition and one check project.
@@ -189,11 +243,250 @@ runTest("the real repository is clean, and the gate actually inspected it", () =
   );
 });
 
+runTest("SARIF findings normalize paths, encode URI characters and preserve source lines", () => {
+  const failures = findViolations(
+    [{ path: "Runtime\\Odd #名.asmdef", text: '{"allowUnsafeCode":true}' }],
+    [{ path: "Editor\\Odd #名.cs", text: "// ignored\nunsafe class Sample {}" }],
+    [{ path: "Generator~/Check.csproj", text: "<AllowUnsafeBlocks>true</AllowUnsafeBlocks>" }]
+  );
+  const report = createSarif({ failures, subjects: {} });
+  assert.strictEqual(report.version, "2.1.0");
+  const run = report.runs[0];
+  assert.strictEqual(run.results.length, 3);
+  assert.strictEqual(run.invocations[0].executionSuccessful, true);
+  assert.strictEqual(run.invocations[0].exitCode, 1);
+  const byPath = new Map(
+    run.results.map((result) => {
+      assert.strictEqual(result.ruleId, run.tool.driver.rules[0].id);
+      assert.strictEqual(result.level, "error");
+      assert.match(result.partialFingerprints["unsafeCode/v1"], /^[a-f0-9]{64}$/);
+      return [result.locations[0].physicalLocation.artifactLocation.uri, result];
+    })
+  );
+  const code = byPath.get("Editor/Odd%20%23%E5%90%8D.cs").locations[0].physicalLocation;
+  assert.deepStrictEqual(code.region, { startLine: 2 });
+  assert.strictEqual(
+    byPath.get("Runtime/Odd%20%23%E5%90%8D.asmdef").locations[0].physicalLocation.region,
+    undefined
+  );
+  assert.ok(byPath.has("Generator~/Check.csproj"));
+  assert.deepStrictEqual(report, createSarif({ failures: [...failures].reverse(), subjects: {} }));
+});
+
+runTest("SARIF carries location-free gate failures without inventing a source location", () => {
+  const run = createSarif({ failures: ["Runtime: missing source subjects"], subjects: {} }).runs[0];
+  assert.strictEqual(run.results[0].message.text, "Runtime: missing source subjects");
+  assert.strictEqual(run.results[0].locations, undefined);
+  assert.strictEqual(run.invocations[0].exitCode, 1);
+});
+
+runTest("a failed scan is recorded as failed execution even when no findings were produced", () => {
+  const run = createSarif({ failures: [], subjects: {}, error: "unreadable source" }).runs[0];
+  assert.deepStrictEqual(run.results, []);
+  assert.strictEqual(run.invocations[0].executionSuccessful, false);
+  assert.strictEqual(run.invocations[0].exitCode, 2);
+  assert.strictEqual(
+    run.invocations[0].toolExecutionNotifications[0].message.text,
+    "unreadable source"
+  );
+});
+
+for (const file of ["/outside/Sample.cs", "../Sample.cs", "C:\\outside\\Sample.cs"]) {
+  runTest(`SARIF refuses a finding outside the repository: ${file}`, () => {
+    assert.throws(
+      () => createSarif({ failures: [`${file}:1: unsafe`], subjects: {} }),
+      /repository-relative/
+    );
+  });
+}
+
+for (const args of [
+  ["--sarif"],
+  ["--sarif", "--verbose"],
+  ["--root"],
+  ["--root", "--verbose"],
+  ["--root", ""],
+  ["--root", repoRoot, "--root", repoRoot],
+  ["--unknown"]
+]) {
+  runTest(`invalid report arguments fail before scanning: ${args.join(" ")}`, () => {
+    const result = spawnSync(process.execPath, [linterPath, ...args], { encoding: "utf8" });
+    assert.strictEqual(result.status, 2);
+    assert.match(result.stderr, /Unexpected or incomplete argument/);
+  });
+}
+
+runTest("a report write failure cannot report a clean gate", () => {
+  const scratch = mkdtempSync(path.join(tmpdir(), "unity-unsafe-write-"));
+  try {
+    const parent = path.join(scratch, "file");
+    writeFileSync(parent, "not a directory");
+    const result = spawnSync(
+      process.execPath,
+      [linterPath, "--sarif", path.join(parent, "out.sarif")],
+      {
+        encoding: "utf8"
+      }
+    );
+    assert.strictEqual(result.status, 2);
+    assert.match(result.stderr, /Could not write SARIF/);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+runTest("a repository discovery failure is surfaced instead of becoming an empty scan", () => {
+  const scratch = mkdtempSync(path.join(tmpdir(), "unity-unsafe-discovery-"));
+  try {
+    mkdirSync(path.join(scratch, "Runtime"));
+    assert.throws(() => scanRepository(scratch), /git ls-files failed/);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+runTest("missing source roots fail even when discovery has no files to list", () => {
+  const scratch = mkdtempSync(path.join(tmpdir(), "unity-unsafe-empty-"));
+  try {
+    const scan = scanRepository(scratch);
+    for (const root of ["Runtime", "Editor", "Tests"]) {
+      assert.strictEqual(scan.subjects.sourceFiles[root], 0);
+      assert.strictEqual(scan.subjects.assemblyDefinitions[root], 0);
+      assert.ok(scan.failures.some((failure) => failure.startsWith(`${root}: missing`)));
+    }
+    assert.strictEqual(createSarif(scan).runs[0].invocations[0].exitCode, 1);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+runTest("CLI reports agree with unsafe, corrected, missing-root and unreadable sources", () => {
+  const scratch = mkdtempSync(path.join(tmpdir(), "unity-unsafe-cli-"));
+  try {
+    const fixtureEnvironment = Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_"))
+    );
+    const inputs = {
+      "Runtime/WallstopStudios.UnityHelpers.asmdef": '{"allowUnsafeCode":false}',
+      "Editor/Sample.asmdef": '{"allowUnsafeCode":false}',
+      "Tests/Sample.asmdef": '{"allowUnsafeCode":false}',
+      "Generator~/Check.csproj": "<Project><AllowUnsafeBlocks>false</AllowUnsafeBlocks></Project>",
+      "Runtime/Sample.cs":
+        "unsafe class Sample { void M() { System.Span<int> b = stackalloc int[1]; } }",
+      "Editor/Sample.cs": "class Sample {}",
+      "Tests/Sample.cs": "class Sample {}"
+    };
+    for (const [file, text] of Object.entries(inputs)) {
+      mkdirSync(path.dirname(path.join(scratch, file)), { recursive: true });
+      writeFileSync(path.join(scratch, file), text);
+    }
+    const initialized = spawnSync("git", ["init", "--quiet", scratch], {
+      encoding: "utf8",
+      env: fixtureEnvironment
+    });
+    assert.strictEqual(initialized.status, 0, initialized.stderr);
+    const staged = spawnSync(
+      "bash",
+      [
+        "-c",
+        'source "$UNSAFE_STAGING_HELPER"\ngit_add_with_retry "$@"',
+        "unsafe-fixture",
+        ...Object.keys(inputs)
+      ],
+      {
+        cwd: scratch,
+        encoding: "utf8",
+        env: {
+          ...fixtureEnvironment,
+          UNSAFE_STAGING_HELPER: path
+            .join(repoRoot, "scripts/git-staging-helpers.sh")
+            .replace(/\\/g, "/")
+        }
+      }
+    );
+    assert.strictEqual(staged.status, 0, staged.stderr);
+    const output = path.join(scratch, "unsafe.sarif");
+    const run = (args = ["--root", scratch, "--sarif", output]) => {
+      const result = spawnSync(process.execPath, [linterPath, ...args], {
+        encoding: "utf8",
+        env: fixtureEnvironment
+      });
+      return { result, report: JSON.parse(readFileSync(output, "utf8")).runs[0] };
+    };
+    const unsafe = run();
+    assert.strictEqual(unsafe.result.status, 1, unsafe.result.stderr);
+    assert.strictEqual(unsafe.report.results.length, 1);
+    assert.strictEqual(unsafe.report.invocations[0].exitCode, 1);
+    assert.strictEqual(
+      unsafe.report.results[0].locations[0].physicalLocation.artifactLocation.uri,
+      "Runtime/Sample.cs"
+    );
+
+    writeFileSync(
+      path.join(scratch, "Runtime/Sample.cs"),
+      inputs["Runtime/Sample.cs"].replace("unsafe ", "")
+    );
+    const corrected = run();
+    assert.strictEqual(corrected.result.status, 0, corrected.result.stderr);
+    assert.deepStrictEqual(corrected.report.results, []);
+    assert.strictEqual(corrected.report.invocations[0].executionSuccessful, true);
+    const reordered = run(["--sarif", "unsafe.sarif", "--root", scratch]);
+    assert.strictEqual(reordered.result.status, 0, reordered.result.stderr);
+    assert.deepStrictEqual(reordered.report, corrected.report);
+
+    rmSync(path.join(scratch, "Tests"), { recursive: true });
+    const missingRoot = run();
+    assert.strictEqual(missingRoot.result.status, 1, missingRoot.result.stderr);
+    assert.ok(
+      missingRoot.report.results.some((result) => result.message.text.startsWith("Tests: missing"))
+    );
+    assert.strictEqual(missingRoot.report.invocations[0].properties.subjects.sourceFiles.Tests, 0);
+    assert.ok(0 < missingRoot.report.invocations[0].properties.subjects.sourceFiles.Runtime);
+    assert.ok(0 < missingRoot.report.invocations[0].properties.subjects.sourceFiles.Editor);
+    mkdirSync(path.join(scratch, "Tests"));
+    for (const file of ["Tests/Sample.cs", "Tests/Sample.asmdef"]) {
+      writeFileSync(path.join(scratch, file), inputs[file]);
+    }
+
+    rmSync(path.join(scratch, "Editor/Sample.cs"));
+    const unreadable = run();
+    assert.strictEqual(unreadable.result.status, 2, unreadable.result.stderr);
+    assert.strictEqual(unreadable.report.invocations[0].executionSuccessful, false);
+    assert.strictEqual(unreadable.report.invocations[0].exitCode, 2);
+    assert.match(
+      unreadable.report.invocations[0].toolExecutionNotifications[0].message.text,
+      /ENOENT/
+    );
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
 /*
     A length no constant bounds. Both entries are the shipped defects: PointPolygonCheck projected
     a caller-sized polygon and WButtonGUI hashed the Inspector's whole multi-selection.
 */
 const UNBOUNDED_STACKALLOC = [
+  [
+    "a parameter shadowing a constant allocation length",
+    "class Sample { const int Max = 8; void M(int Max) { System.Span<int> b = stackalloc int[Max]; } }"
+  ],
+  [
+    "a parameter shadowing a constant ternary bound",
+    "class Sample { const int Max = 8; void M(int count, int Max) { System.Span<int> b = count <= Max ? stackalloc int[count] : default; } }"
+  ],
+  [
+    "a local shadowing a constant allocation length",
+    "class Sample { const int Max = 8; void M(int count) { int Max = count; System.Span<int> b = stackalloc int[Max]; } }"
+  ],
+  [
+    "a readonly member whose name matches an unrelated constant",
+    "class Other { public static readonly int Max = 8; } class Sample { const int Max = 8; void M() { System.Span<int> b = stackalloc int[Other.Max]; } }"
+  ],
+  [
+    "a property whose name matches an unrelated constant",
+    "class Other { public static int Max => 8; } class Sample { const int Max = 8; void M() { System.Span<int> b = stackalloc int[Other.Max]; } }"
+  ],
   [
     "a caller-sized span length",
     "class Sample { void Project(System.ReadOnlySpan<int> polygon) {\n" +
@@ -232,7 +525,7 @@ const BOUNDED_STACKALLOC = [
   ],
   [
     "a const reached through its declaring type",
-    "class Sample { const int Size = 16;\n" +
+    "class Other { public const int Size = 16; } class Sample {\n" +
       "    void M() { System.Span<int> b = stackalloc int[Other.Size]; } }\n"
   ],
   [
@@ -267,6 +560,176 @@ for (const [label, text] of BOUNDED_STACKALLOC) {
   });
 }
 
+for (const length of ["2 * (3 + 1)", "((int)8)", "sizeof(long) + sizeof(int)"]) {
+  runTest(`a compiler-evaluated integer expression is bounded: ${length}`, () => {
+    assert.deepStrictEqual(
+      sources(`class Sample { void M() { System.Span<int> b = stackalloc int[${length}]; } }`),
+      []
+    );
+  });
+}
+
+for (const [label, limits, expected] of [
+  ["shared qualified constant", "public const int Max = 8;", 0],
+  ["shared readonly member", "public static readonly int Max = 8;", 1],
+  [
+    "conditional const and readonly alternatives",
+    "\n#if VARIABLE\npublic static readonly int Max = 8;\n#else\npublic const int Max = 8;\n#endif\n",
+    1
+  ],
+  [
+    "conditional constant values",
+    "\n#if VARIABLE\npublic const int Max = 8;\n#else\npublic const int Max = 16;\n#endif\n",
+    0
+  ]
+]) {
+  runTest(`semantic binding handles ${label} across files`, () => {
+    const result = require(linterPath).findStackAllocations([
+      {
+        path: "Runtime/Limits.cs",
+        text: `namespace External { public static class Limits { ${limits} } }`
+      },
+      {
+        path: "Runtime/Subject.cs",
+        text: "using Bound = External.Limits; class Subject { void M(int count) { System.Span<int> b = count <= Bound.Max ? stackalloc int[count] : default; } }"
+      }
+    ]);
+    assert.strictEqual(result.failures.length, expected);
+    assert.strictEqual(result.inspected, 1);
+  });
+}
+
+runTest("conditional inherited bindings include intermediate base-type declarations", () => {
+  const result = require(linterPath).findStackAllocations([
+    {
+      path: "Runtime/Bases.cs",
+      text: "class FixedBase { protected const int Max = 8; } class VariableBase { protected readonly int Max = 8; }"
+    },
+    {
+      path: "Runtime/Intermediate.cs",
+      text: "\n#if VARIABLE\nclass Intermediate : VariableBase {}\n#else\nclass Intermediate : FixedBase {}\n#endif\n"
+    },
+    {
+      path: "Runtime/Subject.cs",
+      text: "class Subject : Intermediate { void M(int count) { System.Span<int> b = count <= Max ? stackalloc int[count] : default; } }"
+    }
+  ]);
+  assert.strictEqual(result.failures.length, 1);
+  assert.strictEqual(result.inspected, 1);
+});
+
+for (const bound of ["Subject.Max", "Limit.Max"]) {
+  runTest(`qualified inherited bounds track intermediate conditional types: ${bound}`, () => {
+    const result = require(linterPath).findStackAllocations([
+      {
+        path: "Runtime/Bases.cs",
+        text: "class FixedBase { protected const int Max = 8; } class VariableBase { protected static readonly int Max = 8; }"
+      },
+      {
+        path: "Runtime/Intermediate.cs",
+        text: "\n#if VARIABLE\nclass Intermediate : VariableBase {}\n#else\nclass Intermediate : FixedBase {}\n#endif\n"
+      },
+      {
+        path: "Runtime/Subject.cs",
+        text: `using Limit = Subject; class Subject : Intermediate { void M(int count) { System.Span<int> b = count <= ${bound} ? stackalloc int[count] : default; } }`
+      }
+    ]);
+    assert.strictEqual(result.failures.length, 1);
+    assert.strictEqual(result.inspected, 1);
+  });
+}
+
+runTest("both branches of a conditional allocation are inspected", () => {
+  const found = sources(
+    "class Sample { const int Max = 8; void M(int count, int Max) {\n#if VARIABLE\nSystem.Span<int> b = stackalloc int[Max];\n#else\nSystem.Span<int> b = stackalloc int[8];\n#endif\n} }"
+  );
+  assert.strictEqual(found.length, 1);
+});
+
+for (const declaration of ["ref int count", "out int count"]) {
+  runTest(`an externally mutable length cannot establish a stable bound: ${declaration}`, () => {
+    assert.strictEqual(
+      sources(
+        `class Sample { const int Max = 8; void M(${declaration}) { count = 0; System.Span<int> b = count <= Max ? stackalloc int[count] : default; } }`
+      ).length,
+      1
+    );
+  });
+}
+
+for (const [condition, trueBranchBounded] of [
+  ["count < Max", true],
+  ["count <= Max", true],
+  ["count > Max", false],
+  ["count >= Max", false],
+  ["Max < count", false],
+  ["Max <= count", false],
+  ["Max > count", true],
+  ["Max >= count", true]
+]) {
+  for (const allocationInTrueBranch of [true, false]) {
+    const expression = allocationInTrueBranch
+      ? `${condition} ? stackalloc int[count] : default`
+      : `${condition} ? default : stackalloc int[count]`;
+    runTest(`stack bounds respect the selected branch: ${expression}`, () => {
+      const found = sources(
+        `class Sample { const int Max = 128; void M(int count) { ` +
+          `System.Span<int> buffer = ${expression}; } }`
+      );
+      assert.strictEqual(found.length, allocationInTrueBranch === trueBranchBounded ? 0 : 1);
+    });
+  }
+}
+
+for (const condition of [
+  "bypass || count <= Max",
+  "count <= Max || bypass",
+  "(count <= Max) == false",
+  "!(count <= Max)",
+  "count <= Max | bypass"
+]) {
+  runTest(`a comparison that does not bound the selected branch is refused: ${condition}`, () => {
+    const found = sources(
+      `class Sample { const int Max = 128; void M(int count, bool bypass) { ` +
+        `System.Span<int> buffer = ${condition} ? stackalloc int[count] : default; } }`
+    );
+    assert.strictEqual(found.length, 1);
+  });
+}
+
+for (const expression of [
+  "count > Max ? Foo(seed: stackalloc int[count]) : default",
+  "count >= Max ? Foo(first: 0, seed: stackalloc int[count]) : default",
+  "Max < count ? Foo(seed: stackalloc int[count]) : default",
+  "count <= Max ? Foo(seed: stackalloc int[count]) : default"
+]) {
+  runTest(`a nested argument cannot impersonate a direct bounded branch: ${expression}`, () => {
+    assert.strictEqual(
+      sources(
+        `class Sample { const int Max = 128; void M(int count) { ` +
+          `System.Span<int> buffer = ${expression}; } }`
+      ).length,
+      1
+    );
+  });
+}
+
+for (const fallback of [
+  "Foo(seed: 0)",
+  "Foo(first: 0, second: 1)",
+  "global::System.Span<int>.Empty"
+]) {
+  runTest(`a false-branch upper bound permits an unused named fallback: ${fallback}`, () => {
+    assert.deepStrictEqual(
+      sources(
+        `class Sample { const int Max = 128; void M(int count) { ` +
+          `System.Span<int> buffer = count > Max ? ${fallback} : stackalloc int[count]; } }`
+      ),
+      []
+    );
+  });
+}
+
 runTest("the shipped trees carry stackalloc sites for the rule to judge", () => {
   const { findStackAllocations } = require(linterPath);
   assert.strictEqual(typeof findStackAllocations, "function");
@@ -285,10 +748,8 @@ runTest("the shipped trees carry stackalloc sites for the rule to judge", () => 
   assert.deepStrictEqual(found, []);
 });
 
-// The third rule: memory-access `Unsafe` members compile without the unsafe flag, so the asmdef
-// check above cannot see them. The baseline is a ratchet, so BOTH directions are red -- a new site
-// in a file with no baseline entry, and a baselined file that has fewer than its frozen count.
-const { findUnsafeAccess, findStaleUnsafeBaselines } = require(linterPath);
+// Memory access is forbidden in every owned file, including the former exceptions.
+const { findUnsafeAccess } = require(linterPath);
 
 function unsafeAccess(text, filePath) {
   return findUnsafeAccess([{ path: filePath ?? "Runtime/Sample.cs", text }]).failures;
@@ -302,6 +763,21 @@ runTest("a memory-access Unsafe member in a file with no baseline entry is a vio
   assert.ok(found[0].includes("Runtime/Sample.cs:1"), found[0]);
 });
 
+for (const imported of [
+  "using Raw = System.Runtime.CompilerServices.Unsafe;",
+  "using Raw = global::System.Runtime.CompilerServices.Unsafe;",
+  "using Raw = Unsafe;",
+  "using @Raw = @System.@Runtime.@CompilerServices.@Unsafe;",
+  "using Raw = External::System.Runtime.CompilerServices.Unsafe;",
+  "using static System.Runtime.CompilerServices.Unsafe;",
+  "using static global::System.Runtime.CompilerServices.Unsafe;"
+]) {
+  runTest(`hidden Unsafe import is rejected: ${imported}`, () => {
+    assert.equal(unsafeAccess(imported + " class Sample {}").length, 1);
+    assert.deepEqual(unsafeAccess("// " + imported + "\nclass Sample {}"), []);
+  });
+}
+
 runTest("Unsafe.SizeOf is a size query, not memory access", () => {
   assert.deepStrictEqual(
     unsafeAccess("class Sample { static int Size() => Unsafe.SizeOf<int>(); }\n"),
@@ -313,47 +789,54 @@ runTest("the word appears in a comment without being a violation", () => {
   assert.deepStrictEqual(unsafeAccess("class Sample { /* Unsafe.As was here once. */ }\n"), []);
 });
 
-runTest("a baselined file that drops below its frozen count is a violation", () => {
-  const found = findStaleUnsafeBaselines(new Map());
-  assert.ok(0 < found.length, "an empty tally must report every baselined file as retired");
-  assert.ok(
-    found.every((message) => message.includes("Lower the baseline")),
-    JSON.stringify(found)
-  );
-});
+for (const filePath of [
+  "Runtime/Core/Extension/EnumExtensions.cs",
+  "Runtime/Core/Serialization/WallstopProto/WProtoScalarFormatters.cs"
+]) {
+  runTest(`former exception ${filePath} rejects its first access`, () => {
+    assert.strictEqual(unsafeAccess("Unsafe.As<int, long>(ref value);", filePath).length, 1);
+  });
+}
 
-runTest("a baseline matching what the scan found is silent", () => {
-  const listed = spawnSync(
-    "git",
-    ["-C", repoRoot, "ls-files", "--", "Runtime", "Editor", "Tests"],
-    {
-      encoding: "utf8",
-      maxBuffer: 64 * 1024 * 1024
-    }
-  );
-  const { readFileSync } = require("fs");
-  const corpus = listed.stdout
-    .split("\n")
-    .filter((entry) => entry.endsWith(".cs"))
-    .map((entry) => ({ path: entry, text: readFileSync(path.join(repoRoot, entry), "utf8") }));
-  const { counted } = findUnsafeAccess(corpus);
-  assert.ok(0 < counted.size, "the tally is empty, so a clean staleness run means nothing");
-  assert.deepStrictEqual(findStaleUnsafeBaselines(counted), []);
-});
+for (const member of [
+  "As",
+  "AsRef",
+  "AsPointer",
+  "Add",
+  "Subtract",
+  "AddByteOffset",
+  "SubtractByteOffset",
+  "Read",
+  "ReadUnaligned",
+  "Write",
+  "WriteUnaligned",
+  "Copy",
+  "CopyBlock",
+  "CopyBlockUnaligned",
+  "InitBlock",
+  "InitBlockUnaligned",
+  "SkipInit"
+]) {
+  runTest(`Unsafe.${member} is rejected`, () => {
+    assert.strictEqual(unsafeAccess(`Unsafe.${member}(ref value);`).length, 1);
+  });
+}
 
-runTest("the shipped trees carry memory-access Unsafe members for the rule to judge", () => {
+runTest("the shipped trees have no memory-access Unsafe members", () => {
   const listed = spawnSync(
     "git",
     ["-C", repoRoot, "ls-files", "--", "Runtime", "Editor", "Tests"],
     { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
   );
+  assert.strictEqual(listed.status, 0, listed.stderr);
   const { readFileSync } = require("fs");
   const corpus = listed.stdout
     .split("\n")
     .filter((entry) => entry.endsWith(".cs"))
     .map((entry) => ({ path: entry, text: readFileSync(path.join(repoRoot, entry), "utf8") }));
+  assert.ok(0 < corpus.length, "the source scan must have subjects");
   const { failures: found, inspected } = findUnsafeAccess(corpus);
-  assert.ok(0 < inspected, "the rule judged no site, so a clean run means nothing");
+  assert.strictEqual(inspected, 0);
   assert.deepStrictEqual(found, []);
 });
 
@@ -549,7 +1032,11 @@ runTest("the package sets no IL2CPP check option at all, which is the point of t
   );
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
+console.log(`\n${passed} passed, ${failed} failed, ${skipped} not selected`);
+if (passed + failed === 0) {
+  console.error("No fixture matched the selected scope.");
+  process.exit(1);
+}
 if (0 < failed) {
   console.error(`Failed: ${failures.join(", ")}`);
   process.exit(1);
