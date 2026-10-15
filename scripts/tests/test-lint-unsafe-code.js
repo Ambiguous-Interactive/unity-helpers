@@ -540,6 +540,39 @@ for (const condition of [
   });
 }
 
+for (const expression of [
+  "count > Max ? Foo(seed: stackalloc int[count]) : default",
+  "count >= Max ? Foo(first: 0, seed: stackalloc int[count]) : default",
+  "Max < count ? Foo(seed: stackalloc int[count]) : default",
+  "count <= Max ? Foo(seed: stackalloc int[count]) : default"
+]) {
+  runTest(`a nested argument cannot impersonate a direct bounded branch: ${expression}`, () => {
+    assert.strictEqual(
+      sources(
+        `class Sample { const int Max = 128; void M(int count) { ` +
+          `System.Span<int> buffer = ${expression}; } }`
+      ).length,
+      1
+    );
+  });
+}
+
+for (const fallback of [
+  "Foo(seed: 0)",
+  "Foo(first: 0, second: 1)",
+  "global::System.Span<int>.Empty"
+]) {
+  runTest(`a false-branch upper bound permits an unused named fallback: ${fallback}`, () => {
+    assert.deepStrictEqual(
+      sources(
+        `class Sample { const int Max = 128; void M(int count) { ` +
+          `System.Span<int> buffer = count > Max ? ${fallback} : stackalloc int[count]; } }`
+      ),
+      []
+    );
+  });
+}
+
 runTest("the shipped trees carry stackalloc sites for the rule to judge", () => {
   const { findStackAllocations } = require(linterPath);
   assert.strictEqual(typeof findStackAllocations, "function");

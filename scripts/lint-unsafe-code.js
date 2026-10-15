@@ -244,9 +244,25 @@ function isGuardedLength(statement, length, constantNames) {
   }
 
   const branch = expression.slice(question + 1);
-  const colon = branch.indexOf(":");
-  if (colon !== -1 && branch.indexOf(":", colon + 1) !== -1) {
-    return false;
+  let colon = -1;
+  let depth = 0;
+  for (let index = 0; index < branch.length; index++) {
+    const character = branch[index];
+    if (character === "(" || character === "[" || character === "{") {
+      depth++;
+    } else if (character === ")" || character === "]" || character === "}") {
+      depth--;
+    } else if (
+      character === ":" &&
+      depth === 0 &&
+      branch[index - 1] !== ":" &&
+      branch[index + 1] !== ":"
+    ) {
+      if (colon !== -1) {
+        return false;
+      }
+      colon = index;
+    }
   }
   if (!/^\s*(?:\(\s*)*$/.test(branch.slice(colon + 1))) {
     return false;
