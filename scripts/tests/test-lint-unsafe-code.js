@@ -18,7 +18,7 @@
 const assert = require("assert");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require("fs");
+const { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require("fs");
 const { tmpdir } = require("os");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
@@ -27,9 +27,23 @@ const { codeOnly, createSarif, findViolations, isVendored, scanRepository } = re
 
 let passed = 0;
 let failed = 0;
+let skipped = 0;
 const failures = [];
+const testArgs = process.argv.slice(2);
+if (
+  testArgs.length !== 0 &&
+  (testArgs.length !== 2 || testArgs[0] !== "--filter" || testArgs[1].length === 0)
+) {
+  console.error("Usage: test-lint-unsafe-code.js [--filter text]");
+  process.exit(2);
+}
+const filter = testArgs.length === 2 ? testArgs[1] : null;
 
 function runTest(name, body) {
+  if (filter !== null && !name.includes(filter)) {
+    skipped++;
+    return;
+  }
   try {
     body();
     console.log(`  [PASS] ${name}`);
@@ -40,6 +54,23 @@ function runTest(name, body) {
     failed++;
     failures.push(name);
   }
+}
+
+for (const [label, args, status, expected] of [
+  [
+    "positive selection",
+    ["--filter", "a compiler-evaluated integer expression is bounded: 2 * (3 + 1)"],
+    0,
+    /1 passed, 0 failed/
+  ],
+  ["empty selection", ["--filter", "no-fixture-has-this-name"], 1, /No fixture matched/],
+  ["invalid selection", ["--filter"], 2, /Usage:/]
+]) {
+  runTest(`fixture selection remains explicit and nonempty: ${label}`, () => {
+    const result = spawnSync(process.execPath, [__filename, ...args], { encoding: "utf8" });
+    assert.strictEqual(result.status, status, result.stderr);
+    assert.match(result.stdout + result.stderr, expected);
+  });
 }
 
 function sources(text) {
@@ -186,6 +217,7 @@ runTest("the real repository is clean, and the gate actually inspected it", () =
   assert.ok(0 < subjects.checkProjects);
   assert.ok(0 < subjects.stackAllocations);
   assert.strictEqual(subjects.unsafeControlReported, true);
+  assert.strictEqual(subjects.stackControlReported, true);
   assert.strictEqual(subjects.il2cppControlReported, true);
 
   // "Found nothing" and "looked at nothing" print the same thing (#556), so the corpus is counted
@@ -268,7 +300,15 @@ for (const file of ["/outside/Sample.cs", "../Sample.cs", "C:\\outside\\Sample.c
   });
 }
 
-for (const args of [["--sarif"], ["--sarif", "--verbose"], ["--unknown"]]) {
+for (const args of [
+  ["--sarif"],
+  ["--sarif", "--verbose"],
+  ["--root"],
+  ["--root", "--verbose"],
+  ["--root", ""],
+  ["--root", repoRoot, "--root", repoRoot],
+  ["--unknown"]
+]) {
   runTest(`invalid report arguments fail before scanning: ${args.join(" ")}`, () => {
     const result = spawnSync(process.execPath, [linterPath, ...args], { encoding: "utf8" });
     assert.strictEqual(result.status, 2);
@@ -340,9 +380,6 @@ runTest("CLI reports agree with unsafe, corrected, missing-root and unreadable s
       mkdirSync(path.dirname(path.join(scratch, file)), { recursive: true });
       writeFileSync(path.join(scratch, file), text);
     }
-    mkdirSync(path.join(scratch, "scripts"));
-    const script = path.join(scratch, "scripts", "lint-unsafe-code.js");
-    copyFileSync(linterPath, script);
     const initialized = spawnSync("git", ["init", "--quiet", scratch], {
       encoding: "utf8",
       env: fixtureEnvironment
@@ -369,8 +406,8 @@ runTest("CLI reports agree with unsafe, corrected, missing-root and unreadable s
     );
     assert.strictEqual(staged.status, 0, staged.stderr);
     const output = path.join(scratch, "unsafe.sarif");
-    const run = () => {
-      const result = spawnSync(process.execPath, [script, "--sarif", output], {
+    const run = (args = ["--root", scratch, "--sarif", output]) => {
+      const result = spawnSync(process.execPath, [linterPath, ...args], {
         encoding: "utf8",
         env: fixtureEnvironment
       });
@@ -393,6 +430,9 @@ runTest("CLI reports agree with unsafe, corrected, missing-root and unreadable s
     assert.strictEqual(corrected.result.status, 0, corrected.result.stderr);
     assert.deepStrictEqual(corrected.report.results, []);
     assert.strictEqual(corrected.report.invocations[0].executionSuccessful, true);
+    const reordered = run(["--sarif", "unsafe.sarif", "--root", scratch]);
+    assert.strictEqual(reordered.result.status, 0, reordered.result.stderr);
+    assert.deepStrictEqual(reordered.report, corrected.report);
 
     rmSync(path.join(scratch, "Tests"), { recursive: true });
     const missingRoot = run();
@@ -427,6 +467,26 @@ runTest("CLI reports agree with unsafe, corrected, missing-root and unreadable s
     a caller-sized polygon and WButtonGUI hashed the Inspector's whole multi-selection.
 */
 const UNBOUNDED_STACKALLOC = [
+  [
+    "a parameter shadowing a constant allocation length",
+    "class Sample { const int Max = 8; void M(int Max) { System.Span<int> b = stackalloc int[Max]; } }"
+  ],
+  [
+    "a parameter shadowing a constant ternary bound",
+    "class Sample { const int Max = 8; void M(int count, int Max) { System.Span<int> b = count <= Max ? stackalloc int[count] : default; } }"
+  ],
+  [
+    "a local shadowing a constant allocation length",
+    "class Sample { const int Max = 8; void M(int count) { int Max = count; System.Span<int> b = stackalloc int[Max]; } }"
+  ],
+  [
+    "a readonly member whose name matches an unrelated constant",
+    "class Other { public static readonly int Max = 8; } class Sample { const int Max = 8; void M() { System.Span<int> b = stackalloc int[Other.Max]; } }"
+  ],
+  [
+    "a property whose name matches an unrelated constant",
+    "class Other { public static int Max => 8; } class Sample { const int Max = 8; void M() { System.Span<int> b = stackalloc int[Other.Max]; } }"
+  ],
   [
     "a caller-sized span length",
     "class Sample { void Project(System.ReadOnlySpan<int> polygon) {\n" +
@@ -465,7 +525,7 @@ const BOUNDED_STACKALLOC = [
   ],
   [
     "a const reached through its declaring type",
-    "class Sample { const int Size = 16;\n" +
+    "class Other { public const int Size = 16; } class Sample {\n" +
       "    void M() { System.Span<int> b = stackalloc int[Other.Size]; } }\n"
   ],
   [
@@ -497,6 +557,103 @@ const BOUNDED_STACKALLOC = [
 for (const [label, text] of BOUNDED_STACKALLOC) {
   runTest(`${label} is not a violation`, () => {
     assert.deepStrictEqual(sources(text), []);
+  });
+}
+
+for (const length of ["2 * (3 + 1)", "((int)8)", "sizeof(long) + sizeof(int)"]) {
+  runTest(`a compiler-evaluated integer expression is bounded: ${length}`, () => {
+    assert.deepStrictEqual(
+      sources(`class Sample { void M() { System.Span<int> b = stackalloc int[${length}]; } }`),
+      []
+    );
+  });
+}
+
+for (const [label, limits, expected] of [
+  ["shared qualified constant", "public const int Max = 8;", 0],
+  ["shared readonly member", "public static readonly int Max = 8;", 1],
+  [
+    "conditional const and readonly alternatives",
+    "\n#if VARIABLE\npublic static readonly int Max = 8;\n#else\npublic const int Max = 8;\n#endif\n",
+    1
+  ],
+  [
+    "conditional constant values",
+    "\n#if VARIABLE\npublic const int Max = 8;\n#else\npublic const int Max = 16;\n#endif\n",
+    0
+  ]
+]) {
+  runTest(`semantic binding handles ${label} across files`, () => {
+    const result = require(linterPath).findStackAllocations([
+      {
+        path: "Runtime/Limits.cs",
+        text: `namespace External { public static class Limits { ${limits} } }`
+      },
+      {
+        path: "Runtime/Subject.cs",
+        text: "using Bound = External.Limits; class Subject { void M(int count) { System.Span<int> b = count <= Bound.Max ? stackalloc int[count] : default; } }"
+      }
+    ]);
+    assert.strictEqual(result.failures.length, expected);
+    assert.strictEqual(result.inspected, 1);
+  });
+}
+
+runTest("conditional inherited bindings include intermediate base-type declarations", () => {
+  const result = require(linterPath).findStackAllocations([
+    {
+      path: "Runtime/Bases.cs",
+      text: "class FixedBase { protected const int Max = 8; } class VariableBase { protected readonly int Max = 8; }"
+    },
+    {
+      path: "Runtime/Intermediate.cs",
+      text: "\n#if VARIABLE\nclass Intermediate : VariableBase {}\n#else\nclass Intermediate : FixedBase {}\n#endif\n"
+    },
+    {
+      path: "Runtime/Subject.cs",
+      text: "class Subject : Intermediate { void M(int count) { System.Span<int> b = count <= Max ? stackalloc int[count] : default; } }"
+    }
+  ]);
+  assert.strictEqual(result.failures.length, 1);
+  assert.strictEqual(result.inspected, 1);
+});
+
+for (const bound of ["Subject.Max", "Limit.Max"]) {
+  runTest(`qualified inherited bounds track intermediate conditional types: ${bound}`, () => {
+    const result = require(linterPath).findStackAllocations([
+      {
+        path: "Runtime/Bases.cs",
+        text: "class FixedBase { protected const int Max = 8; } class VariableBase { protected static readonly int Max = 8; }"
+      },
+      {
+        path: "Runtime/Intermediate.cs",
+        text: "\n#if VARIABLE\nclass Intermediate : VariableBase {}\n#else\nclass Intermediate : FixedBase {}\n#endif\n"
+      },
+      {
+        path: "Runtime/Subject.cs",
+        text: `using Limit = Subject; class Subject : Intermediate { void M(int count) { System.Span<int> b = count <= ${bound} ? stackalloc int[count] : default; } }`
+      }
+    ]);
+    assert.strictEqual(result.failures.length, 1);
+    assert.strictEqual(result.inspected, 1);
+  });
+}
+
+runTest("both branches of a conditional allocation are inspected", () => {
+  const found = sources(
+    "class Sample { const int Max = 8; void M(int count, int Max) {\n#if VARIABLE\nSystem.Span<int> b = stackalloc int[Max];\n#else\nSystem.Span<int> b = stackalloc int[8];\n#endif\n} }"
+  );
+  assert.strictEqual(found.length, 1);
+});
+
+for (const declaration of ["ref int count", "out int count"]) {
+  runTest(`an externally mutable length cannot establish a stable bound: ${declaration}`, () => {
+    assert.strictEqual(
+      sources(
+        `class Sample { const int Max = 8; void M(${declaration}) { count = 0; System.Span<int> b = count <= Max ? stackalloc int[count] : default; } }`
+      ).length,
+      1
+    );
   });
 }
 
@@ -875,7 +1032,11 @@ runTest("the package sets no IL2CPP check option at all, which is the point of t
   );
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
+console.log(`\n${passed} passed, ${failed} failed, ${skipped} not selected`);
+if (passed + failed === 0) {
+  console.error("No fixture matched the selected scope.");
+  process.exit(1);
+}
 if (0 < failed) {
   console.error(`Failed: ${failures.join(", ")}`);
   process.exit(1);

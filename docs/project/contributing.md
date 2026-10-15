@@ -86,6 +86,22 @@ branch of an assignment whose condition compares that length with a constant. Fo
 Compound conditions and intervening expressions are refused because a nearby comparison alone
 does not establish the bound on the path that allocates.
 
+Stack-allocation checks use the existing Roslyn policy tool and require .NET SDK 9.0.306, as
+configured in [Repo Lint](../../.github/workflows/repo-lint.yml). The compiler resolves constants and the actual length symbol;
+parameters, locals, readonly fields and properties cannot borrow an unrelated constant's name.
+Constant expressions and shared constants remain supported. The scan covers conditional branches
+and follows the declarations and base types used by a bound to include their conditional symbols.
+Unresolved bounds fail validation. Compiler contexts are cached only within one source snapshot,
+with at most eight cached contexts; concurrent commands build into separate temporary output folders.
+
+To scan another package checkout with the current tool, pass `--root /path/to/checkout`.
+Report paths are relative to that checkout regardless of argument order. The checkout must contain
+the normal required source trees, runtime assembly definition and check projects.
+
+During linter development, `npm run test:lint-unsafe-code -- --filter "semantic binding"` selects
+matching controls without running the full corpus. The summary reports the unselected count, and
+an empty selection fails. Run the unfiltered suite before publication.
+
 Use `npm run lint:unsafe-code -- --sarif artifacts/unsafe-code.sarif` to retain a
 [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json)
 report. Repo Lint retains the same report as the `unsafe-code-sarif` artifact. Findings use the

@@ -26,7 +26,15 @@
 
 "use strict";
 
-const { existsSync, mkdirSync, readFileSync, writeFileSync } = require("node:fs");
+const {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} = require("node:fs");
+const { tmpdir } = require("node:os");
 const { createHash } = require("node:crypto");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
@@ -34,10 +42,9 @@ const { spawnSync } = require("node:child_process");
 const SOURCE_ROOTS = ["Runtime", "Editor", "Tests"];
 const VENDORED_PREFIXES = ["Runtime/Utils/SevenZip/"];
 const ISSUE = "see issue #637";
-const CONST_DECLARATION = /\bconst\s+[\w.<>[\]]+\s+([A-Za-z_]\w*)\s*=/g;
-const STACKALLOC = /\bstackalloc\s+[\w.<>,\s]*?\[/g;
-const INTEGER_LITERAL = /^(?:0[xX][0-9a-fA-F]+|\d+)$/;
-const IDENTIFIER = /^[A-Za-z_]\w*$/;
+const POLICY_NAME = "WallstopStudios.UnityHelpers.SyntaxPolicy";
+let semanticPolicyDll = null;
+let semanticPolicyFailure = null;
 
 /*
     System.Runtime.CompilerServices.Unsafe members that READ, WRITE or REINTERPRET memory. A wrong
@@ -158,173 +165,69 @@ function isVendored(filePath) {
   return VENDORED_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 }
 
-/** Every name declared `const` anywhere in the package, so a shared bound resolves. */
-function collectConstantNames(sources) {
-  const names = new Set();
-  for (const source of sources) {
-    const code = codeOnly(source.text);
-    for (const match of code.matchAll(CONST_DECLARATION)) {
-      names.add(match[1]);
+function getSemanticPolicyDll() {
+  if (semanticPolicyFailure !== null) {
+    throw semanticPolicyFailure;
+  }
+  if (semanticPolicyDll !== null) {
+    return semanticPolicyDll;
+  }
+  const artifacts = mkdtempSync(path.join(tmpdir(), "unity-helpers-unsafe-policy-"));
+  process.once("exit", () => rmSync(artifacts, { recursive: true, force: true, maxRetries: 3 }));
+  const toolingRoot = path.resolve(__dirname, "..");
+  const project = path.join(toolingRoot, "Generator~", POLICY_NAME, POLICY_NAME + ".csproj");
+  const build = spawnSync(
+    "dotnet",
+    [
+      "build",
+      project,
+      "-c",
+      "Release",
+      "--artifacts-path",
+      artifacts,
+      "--nologo",
+      "--disable-build-servers"
+    ],
+    {
+      cwd: toolingRoot,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024
     }
-  }
-  return names;
-}
-
-/** The text between the previous statement boundary and `index`. */
-function statementBefore(code, index) {
-  let start = index;
-  while (
-    0 < start &&
-    code[start - 1] !== ";" &&
-    code[start - 1] !== "{" &&
-    code[start - 1] !== "}"
-  ) {
-    start--;
-  }
-  return code.slice(start, index);
-}
-
-/** The contents of the `[...]` opening at `openIndex`, or null when it never closes. */
-function bracketedLength(code, openIndex) {
-  let depth = 0;
-  for (let index = openIndex; index < code.length; index++) {
-    if (code[index] === "[") {
-      depth++;
-      continue;
-    }
-    if (code[index] !== "]") {
-      continue;
-    }
-    depth--;
-    if (depth === 0) {
-      return code.slice(openIndex + 1, index).trim();
-    }
-  }
-  return null;
-}
-
-/** Whether `length` cannot exceed a bound the compiler knows. */
-function isConstantLength(length, constantNames) {
-  /* `stackalloc T[] { a, b }` states its length by listing it, so the brackets are empty. */
-  if (length.length === 0) {
-    return true;
-  }
-  if (INTEGER_LITERAL.test(length)) {
-    return true;
-  }
-  if (/^sizeof\s*\(/.test(length)) {
-    return true;
-  }
-  if (IDENTIFIER.test(length)) {
-    return constantNames.has(length);
-  }
-  const tail = length.includes(".") ? length.slice(length.lastIndexOf(".") + 1) : null;
-  return tail !== null && IDENTIFIER.test(tail) && constantNames.has(tail);
-}
-
-/*
-    A non-constant length is accepted only when the same statement compares it against a constant.
-    Same statement rather than an enclosing block, because that is the only placement a reader can
-    verify without tracing control flow -- and it is the shape the package already uses:
-    `count <= Threshold ? stackalloc T[count] : default`, with a pooled rent on the other branch.
-*/
-function isGuardedLength(statement, length, constantNames) {
-  if (!IDENTIFIER.test(length)) {
-    return false;
-  }
-
-  const assignment = /(?<![=!<>])=(?!=|>)/.exec(statement);
-  if (assignment === null) {
-    return false;
-  }
-  const expression = statement.slice(assignment.index + 1);
-  const question = expression.indexOf("?");
-  if (question === -1 || expression.indexOf("?", question + 1) !== -1) {
-    return false;
-  }
-
-  const branch = expression.slice(question + 1);
-  let colon = -1;
-  let depth = 0;
-  for (let index = 0; index < branch.length; index++) {
-    const character = branch[index];
-    if (character === "(" || character === "[" || character === "{") {
-      depth++;
-    } else if (character === ")" || character === "]" || character === "}") {
-      depth--;
-    } else if (
-      character === ":" &&
-      depth === 0 &&
-      branch[index - 1] !== ":" &&
-      branch[index + 1] !== ":"
-    ) {
-      if (colon !== -1) {
-        return false;
-      }
-      colon = index;
-    }
-  }
-  if (!/^\s*(?:\(\s*)*$/.test(branch.slice(colon + 1))) {
-    return false;
-  }
-
-  const comparison = /^\s*(?:\(\s*)*([\w.]+)\s*(<=|>=|<|>)\s*([\w.]+)(?:\s*\))*\s*$/.exec(
-    expression.slice(0, question)
   );
-  if (comparison === null) {
-    return false;
+  const dll = path.join(artifacts, "bin", POLICY_NAME, "release", POLICY_NAME + ".dll");
+  if (build.status !== 0 || !existsSync(dll)) {
+    semanticPolicyFailure = new Error(
+      "Could not build the semantic stack-allocation gate: " +
+        (build.error?.message ?? build.stderr ?? "") +
+        "\n" +
+        build.stdout
+    );
+    throw semanticPolicyFailure;
   }
-  const [, left, operator, right] = comparison;
-  const allocationInTrueBranch = colon === -1;
-  if (left === length && isConstantLength(right, constantNames)) {
-    return allocationInTrueBranch === operator.startsWith("<");
-  }
-  if (right === length && isConstantLength(left, constantNames)) {
-    return allocationInTrueBranch === operator.startsWith(">");
-  }
-  return false;
+  semanticPolicyDll = dll;
+  return dll;
 }
 
-/**
- * @param {{path: string, text: string}[]} sources C# sources to inspect
- * @returns {{failures: string[], inspected: number}} violations, and how many sites were judged
- */
 function findStackAllocations(sources) {
-  const constantNames = collectConstantNames(sources);
-  const failures = [];
-  let inspected = 0;
-
-  for (const source of sources) {
-    if (isVendored(source.path)) {
-      continue;
-    }
-
-    const code = codeOnly(source.text);
-    for (const match of code.matchAll(STACKALLOC)) {
-      const openIndex = match.index + match[0].length - 1;
-      const length = bracketedLength(code, openIndex);
-      if (length === null) {
-        continue;
-      }
-
-      inspected++;
-      if (isConstantLength(length, constantNames)) {
-        continue;
-      }
-      if (isGuardedLength(statementBefore(code, match.index), length, constantNames)) {
-        continue;
-      }
-
-      const line = code.slice(0, match.index).split("\n").length;
-      failures.push(
-        `${source.path}:${line}: stackalloc of '${length}', which no constant bounds. ` +
-          `A caller-sized stack allocation raises StackOverflowException, which no catch ` +
-          `intercepts; guard it against a const and rent above it, ${ISSUE}.`
-      );
-    }
+  const owned = sources.filter((source) => !isVendored(source.path));
+  if (!owned.some((source) => source.text.includes("stackalloc"))) {
+    return { failures: [], inspected: 0 };
   }
-
-  return { failures, inspected };
+  const result = spawnSync("dotnet", [getSemanticPolicyDll(), "--stackalloc-json"], {
+    input: JSON.stringify(owned.map((source) => ({ Path: source.path, Text: source.text }))),
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      "Semantic stack-allocation scan failed: " + (result.error?.message ?? result.stderr)
+    );
+  }
+  const scan = JSON.parse(result.stdout);
+  if (!Array.isArray(scan.Failures) || !Number.isInteger(scan.Inspected) || scan.Inspected < 0) {
+    throw new Error("Semantic stack-allocation scan returned an invalid result");
+  }
+  return { failures: scan.Failures, inspected: scan.Inspected };
 }
 
 /**
@@ -542,7 +445,12 @@ function findIl2CppSafetyDisables(sources) {
  * @param {{path: string, text: string}[]} projects check projects to inspect
  * @returns {string[]} one message per violation
  */
-function findViolations(asmdefs, sources, projects) {
+function findViolations(
+  asmdefs,
+  sources,
+  projects,
+  stackAllocations = findStackAllocations(sources)
+) {
   const failures = [];
 
   for (const asmdef of asmdefs) {
@@ -587,7 +495,7 @@ function findViolations(asmdefs, sources, projects) {
     }
   }
 
-  failures.push(...findStackAllocations(sources).failures);
+  failures.push(...stackAllocations.failures);
   failures.push(...findIl2CppSafetyDisables(sources).failures);
 
   return failures;
@@ -638,7 +546,8 @@ function scanRepository(repoRoot) {
     (source) => !isVendored(source.path)
   );
   const projects = trackedWithExtension(repoRoot, ["Generator~"], ".csproj");
-  const failures = findViolations(asmdefs, sources, projects);
+  const stackAllocations = findStackAllocations(sources);
+  const failures = findViolations(asmdefs, sources, projects, stackAllocations);
   const sourceFiles = {};
   const assemblyDefinitions = {};
   for (const root of SOURCE_ROOTS) {
@@ -664,7 +573,7 @@ function scanRepository(repoRoot) {
       the repository scan counts its subjects. A fixture legitimately has none, which is why this
       lives here rather than in findViolations.
   */
-  const inspected = findStackAllocations(sources).inspected;
+  const inspected = stackAllocations.inspected;
   if (inspected === 0) {
     failures.push(
       `no stackalloc site was judged across ${sources.length} source(s), so the scan saw ` +
@@ -691,6 +600,19 @@ function scanRepository(repoRoot) {
     );
   }
 
+  const stackControl = findStackAllocations([
+    {
+      path: "control/StackAllocation.cs",
+      text: "class Control { const int Max = 8; void M(int count, int Max) { System.Span<int> a = stackalloc int[Max]; System.Span<int> b = count <= Max ? stackalloc int[count] : default; System.Span<int> c = stackalloc int[8]; } }"
+    }
+  ]);
+  const stackControlReported = stackControl.inspected === 3 && stackControl.failures.length === 2;
+  if (!stackControlReported) {
+    failures.push(
+      `the compiler-bound stack-allocation controls were not reported correctly; ${ISSUE}.`
+    );
+  }
+
   return {
     failures,
     subjects: {
@@ -701,6 +623,7 @@ function scanRepository(repoRoot) {
       unsafeAccessSites: unsafeAccess.inspected,
       il2cppOptionLists: findIl2CppSafetyDisables(sources).inspected,
       unsafeControlReported: unsafeControl.failures.length === 1,
+      stackControlReported,
       il2cppControlReported: il2cppControl.failures.length !== 0
     }
   };
@@ -769,10 +692,11 @@ function createSarif(scan) {
 }
 
 function main() {
-  const repoRoot = path.resolve(__dirname, "..");
+  let repoRoot = path.resolve(__dirname, "..");
+  let rootSpecified = false;
   const args = process.argv.slice(2);
   let verbose = false;
-  let sarifPath = null;
+  let sarifArgument = null;
   for (let index = 0; index < args.length; index++) {
     if (args[index] === "--verbose") {
       verbose = true;
@@ -780,9 +704,18 @@ function main() {
       args[index] === "--sarif" &&
       index + 1 < args.length &&
       !args[index + 1].startsWith("--") &&
-      sarifPath === null
+      sarifArgument === null
     ) {
-      sarifPath = path.resolve(repoRoot, args[++index]);
+      sarifArgument = args[++index];
+    } else if (
+      args[index] === "--root" &&
+      index + 1 < args.length &&
+      !args[index + 1].startsWith("--") &&
+      args[index + 1].trim().length !== 0 &&
+      !rootSpecified
+    ) {
+      repoRoot = path.resolve(args[++index]);
+      rootSpecified = true;
     } else {
       console.error(`[unsafe-code] Unexpected or incomplete argument: ${args[index]}`);
       process.exitCode = 2;
@@ -790,6 +723,7 @@ function main() {
     }
   }
 
+  const sarifPath = sarifArgument === null ? null : path.resolve(repoRoot, sarifArgument);
   let scan;
   try {
     scan = scanRepository(repoRoot);

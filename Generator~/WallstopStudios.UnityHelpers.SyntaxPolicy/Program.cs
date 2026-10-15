@@ -26,10 +26,49 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
             "Styles",
         };
 
+        internal static List<string> FindSymbols(string source)
+        {
+            HashSet<string> names = new(StringComparer.Ordinal);
+            SyntaxNode root = CSharpSyntaxTree.ParseText(source).GetRoot();
+            foreach (SyntaxTrivia trivia in root.DescendantTrivia(descendIntoTrivia: true))
+            {
+                ExpressionSyntax condition = null;
+                if (trivia.GetStructure() is IfDirectiveTriviaSyntax conditional)
+                {
+                    condition = conditional.Condition;
+                }
+                else if (trivia.GetStructure() is ElifDirectiveTriviaSyntax alternative)
+                {
+                    condition = alternative.Condition;
+                }
+                if (condition == null)
+                {
+                    continue;
+                }
+                foreach (SyntaxNode node in condition.DescendantNodesAndSelf())
+                {
+                    if (node is IdentifierNameSyntax identifier)
+                    {
+                        names.Add(identifier.Identifier.ValueText);
+                    }
+                }
+            }
+            List<string> symbols = new(names);
+            symbols.Sort(StringComparer.Ordinal);
+            return symbols;
+        }
+
         private static int Main(string[] arguments)
         {
             try
             {
+                if (
+                    arguments.Length == 1
+                    && string.Equals(arguments[0], "--stackalloc-json", StringComparison.Ordinal)
+                )
+                {
+                    return StackAllocationPolicy.Run();
+                }
                 if (
                     1 < arguments.Length
                     || (
@@ -39,7 +78,7 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
                 )
                 {
                     Console.Error.WriteLine(
-                        "Usage: SyntaxPolicy [--fix], from the repository root."
+                        "Usage: SyntaxPolicy [--fix | --stackalloc-json], from the repository root."
                     );
                     return 2;
                 }
@@ -262,38 +301,6 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
                 }
             }
             return edits;
-        }
-
-        private static List<string> FindSymbols(string source)
-        {
-            HashSet<string> names = new(StringComparer.Ordinal);
-            SyntaxNode root = CSharpSyntaxTree.ParseText(source).GetRoot();
-            foreach (SyntaxTrivia trivia in root.DescendantTrivia(descendIntoTrivia: true))
-            {
-                ExpressionSyntax condition = null;
-                if (trivia.GetStructure() is IfDirectiveTriviaSyntax conditional)
-                {
-                    condition = conditional.Condition;
-                }
-                else if (trivia.GetStructure() is ElifDirectiveTriviaSyntax alternative)
-                {
-                    condition = alternative.Condition;
-                }
-                if (condition == null)
-                {
-                    continue;
-                }
-                foreach (SyntaxNode node in condition.DescendantNodesAndSelf())
-                {
-                    if (node is IdentifierNameSyntax identifier)
-                    {
-                        names.Add(identifier.Identifier.ValueText);
-                    }
-                }
-            }
-            List<string> symbols = new(names);
-            symbols.Sort(StringComparer.Ordinal);
-            return symbols;
         }
 
         private static bool HasInteriorDirectives(SyntaxNode node)
