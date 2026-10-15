@@ -5,9 +5,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System.Collections.Generic;
 
-    /// <summary>Unity-free hash helper for linked runtime contracts; wire tests do not depend on its hash values.</summary>
+    /// <summary>Unity-free hash helper for standalone linked contracts.</summary>
     internal static class Objects
     {
+        internal static int HashCode<T1>(T1 value)
+        {
+            return EqualityComparer<T1>.Default.GetHashCode(value);
+        }
+
         internal static int HashCode<T1, T2>(T1 first, T2 second)
         {
             int hash = EqualityComparer<T1>.Default.GetHashCode(first);

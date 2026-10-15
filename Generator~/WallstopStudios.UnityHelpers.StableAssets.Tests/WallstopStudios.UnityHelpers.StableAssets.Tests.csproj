@@ -10,6 +10,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile
+      Include="../WallstopStudios.UnityHelpers.Proto.Generator.Tests/ObjectsHashCodeStub.cs"
+      Link="ObjectsHashCodeStub.cs"
+    />
+    <Compile
       Include="../WallstopStudios.UnityHelpers.DurableFile.Tests/MathDependency.cs"
       Link="MathDependency.cs"
     />

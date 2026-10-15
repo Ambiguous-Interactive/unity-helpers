@@ -10,6 +10,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile
+      Include="../WallstopStudios.UnityHelpers.Proto.Generator.Tests/ObjectsHashCodeStub.cs"
+      Link="ObjectsHashCodeStub.cs"
+    />
+    <Compile
       Include="../../Runtime/Core/DataStructure/ValueArrayEnumerable.cs"
       Link="ValueArrayEnumerable.cs"
     />
