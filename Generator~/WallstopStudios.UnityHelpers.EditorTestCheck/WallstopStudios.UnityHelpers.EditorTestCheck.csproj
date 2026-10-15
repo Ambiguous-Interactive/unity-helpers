@@ -392,6 +392,7 @@
       directory with one reason rather than a list of files with their own.
     -->
     <Compile
+      Condition="'$(WallstopIterationTestSources)' == ''"
       Include="$(RepoRoot)/Tests/Editor/**/*.cs"
       Exclude="$(RepoRoot)/Tests/Editor/Integrations/**/*.cs"
     />
@@ -511,7 +512,6 @@
     An empty property adds no file, so an ordinary build is byte-identical to one without this.
   -->
   <ItemGroup Condition="'$(WallstopIterationTestSources)' != ''">
-    <Compile Remove="$(RepoRoot)/Tests/Editor/**/*.cs" />
     <Compile Include="$(WallstopIterationTestSources)" />
   </ItemGroup>
   <ItemGroup Condition="'$(WallstopCheckControl)' != ''">

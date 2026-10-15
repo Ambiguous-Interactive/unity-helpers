@@ -203,7 +203,11 @@ const projectText = fs.readFileSync(
   "utf8"
 );
 assert.match(projectText, /<ItemGroup Condition="'\$\(WallstopIterationTestSources\)' != ''">/);
-assert.match(projectText, /<Compile Remove="\$\(RepoRoot\)\/Tests\/Editor\/\*\*\/\*\.cs"\s*\/>/);
+assert.match(
+  projectText,
+  /<Compile\s+Condition="'\$\(WallstopIterationTestSources\)' == ''"\s+Include="\$\(RepoRoot\)\/Tests\/Editor\/\*\*\/\*\.cs"/
+);
+assert.doesNotMatch(projectText, /<Compile Remove="\$\(RepoRoot\)\/Tests\/Editor\/\*\*\/\*\.cs"/);
 assert.match(projectText, /<Compile Include="\$\(WallstopIterationTestSources\)"\s*\/>/);
 
 assert.match(NOTICE, /compiler and source generators/);
