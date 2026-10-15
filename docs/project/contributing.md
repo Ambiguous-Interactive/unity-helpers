@@ -86,8 +86,8 @@ branch of an assignment whose condition compares that length with a constant. Fo
 Compound conditions and intervening expressions are refused because a nearby comparison alone
 does not establish the bound on the path that allocates.
 
-Stack-allocation checks use the existing Roslyn policy tool and require .NET SDK 9.0.306, as
-configured in [Repo Lint](../../.github/workflows/repo-lint.yml). The compiler resolves constants and the actual length symbol;
+Stack-allocation checks use the existing Roslyn policy tool and require .NET SDK 9.0.306.
+Repo Lint installs that SDK before running the checks. The compiler resolves constants and the actual length symbol;
 parameters, locals, readonly fields and properties cannot borrow an unrelated constant's name.
 Constant expressions and shared constants remain supported. The scan covers conditional branches
 and follows the declarations and base types used by a bound to include their conditional symbols.
