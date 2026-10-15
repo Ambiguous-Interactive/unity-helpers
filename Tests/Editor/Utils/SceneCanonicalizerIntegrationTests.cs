@@ -325,6 +325,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                     CloseWorkingScene(loaded);
                 }
             }
+            if (!string.Equals(canonical[1], canonical[0], StringComparison.Ordinal))
+            {
+                TestContext.WriteLine("First generated canonical scene:\n" + canonical[0]);
+                TestContext.WriteLine("Second generated canonical scene:\n" + canonical[1]);
+            }
             Assert.That(canonical[1], Is.EqualTo(canonical[0]));
         }
 

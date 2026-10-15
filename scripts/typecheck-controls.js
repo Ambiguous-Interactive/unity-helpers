@@ -110,6 +110,8 @@ function analyzerControl(anchor) {
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
+    public struct ControlMissingEquality { }
+
     [WProtoContract]
     internal sealed class ControlContractIsNotPartial
     {
@@ -157,6 +159,8 @@ function analyzerControl(anchor) {
 function excludedLoopControl(anchor) {
   return `namespace WallstopStudios.UnityHelpers.CheckControls
 {
+    public struct ControlExcludedMissingEquality { }
+
     internal static class ControlExcludedCountingLoop
     {
         internal static readonly System.Type Anchor = typeof(${anchor});
@@ -217,9 +221,9 @@ const CONTROLS = Object.freeze([
     fileName: "WallstopCheckControlAnalyzers.cs",
     render: analyzerControl,
     expected: ["WPROTO001", "WUH003", "WUH013", "WUH020"],
-    productionExpected: ["WUH019", "WUH021"],
+    productionExpected: ["WUH019", "WUH021", "WUH023"],
     meaning:
-      "the shipped generators and analyzers report, including the production collection-size opt-ins"
+      "the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins"
   },
   {
     id: "compiler",
@@ -232,11 +236,11 @@ const CONTROLS = Object.freeze([
     id: "excluded-loops",
     fileName: "WallstopCheckControlExcludedLoops.cs",
     render: excludedLoopControl,
-    expected: ["WUH013", "WUH019", "WUH021"],
+    expected: ["WUH013", "WUH019", "WUH021", "WUH023"],
     projectIds: ["editor"],
     property: "WallstopCountingLoopAuditControl",
     meaning:
-      "the persistent audit rejects collection-size reads in sources outside normal compilation"
+      "the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation"
   }
 ]);
 

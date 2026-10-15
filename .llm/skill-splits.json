@@ -95,7 +95,7 @@
     },
     {
       "name": "debug-il2cpp",
-      "sha256": "c786068d248f14d453c7d776aa28a6cd417300a7c6bc77c49ba7fdba571fdf3b",
+      "sha256": "b8007d9eab981a21f09295343d45dde3b2e6a13f5c7dff40334b87fe7c3b2aa7",
       "parts": ["debug-il2cpp-part-1.md", "debug-il2cpp-part-2.md"],
       "routerSha256": "64b4987f47dde9c8f66c590943e2fb4e6754bd6af2f04e9cbfbe3ffd4e1f5f4c"
     },
@@ -428,7 +428,7 @@
     },
     {
       "name": "unity-mcp-fixture-runner",
-      "sha256": "704f0102e8de5977d39fff81cae75f84375788ed914d73d29650a367f752da50",
+      "sha256": "867b3f175e61dac180a1c3f69581b2708e24b5d025de72df8a061f75b1a4aea4",
       "parts": [
         "unity-mcp-fixture-runner-part-1.md",
         "unity-mcp-fixture-runner-part-2.md",

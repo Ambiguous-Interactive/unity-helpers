@@ -9,6 +9,10 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <Compile
+      Include="../WallstopStudios.UnityHelpers.Proto.Generator.Tests/ObjectsHashCodeStub.cs"
+      Link="ObjectsHashCodeStub.cs"
+    />
     <Compile Include="../../Runtime/Core/DataStructure/IntMap.cs" Link="IntMap.cs" />
     <Compile Include="../../Tests/Runtime/DataStructures/IntMapTests.cs" Link="IntMapTests.cs" />
     <Compile Include="../../Tests/Runtime/TestUtils/GCAssert.cs" Link="GCAssert.cs" />

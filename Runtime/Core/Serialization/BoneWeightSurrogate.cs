@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct BoneWeightSurrogate
+    public partial struct BoneWeightSurrogate : global::System.IEquatable<BoneWeightSurrogate>
     {
         /// <summary>The weight0 component.</summary>
 #if !WALLSTOP_PROTO_ONLY
@@ -112,5 +112,39 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
         }
 #endif
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(BoneWeightSurrogate other)
+        {
+            return weight0.Equals(other.weight0)
+                && weight1.Equals(other.weight1)
+                && weight2.Equals(other.weight2)
+                && weight3.Equals(other.weight3)
+                && boneIndex0.Equals(other.boneIndex0)
+                && boneIndex1.Equals(other.boneIndex1)
+                && boneIndex2.Equals(other.boneIndex2)
+                && boneIndex3.Equals(other.boneIndex3);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is BoneWeightSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                weight0,
+                weight1,
+                weight2,
+                weight3,
+                boneIndex0,
+                boneIndex1,
+                boneIndex2,
+                boneIndex3
+            );
+        }
     }
 }

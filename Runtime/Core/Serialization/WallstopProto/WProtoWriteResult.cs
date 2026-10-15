@@ -3,6 +3,8 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
+    using System.Collections.Generic;
+
     /// <summary>
     /// What a buffer-reusing serialize did: how many bytes it wrote, and whether it had to replace
     /// the caller's array to fit them.
@@ -23,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// that caller re-read the buffer rather than silently keep writing into the previous array.
     /// </para>
     /// </remarks>
-    public readonly struct WProtoWriteResult
+    public readonly struct WProtoWriteResult : global::System.IEquatable<WProtoWriteResult>
     {
         /// <summary>Whether WallstopProto handled the request.</summary>
         public bool Served => BytesWritten.HasValue;
@@ -57,6 +59,28 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             BytesWritten = bytesWritten;
             Resized = resized;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(WProtoWriteResult other)
+        {
+            return EqualityComparer<int?>.Default.Equals(BytesWritten, other.BytesWritten)
+                && Resized.Equals(other.Resized);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is WProtoWriteResult other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                BytesWritten,
+                Resized
+            );
         }
     }
 }

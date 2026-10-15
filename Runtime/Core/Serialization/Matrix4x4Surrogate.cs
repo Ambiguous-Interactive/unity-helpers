@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct Matrix4x4Surrogate
+    public partial struct Matrix4x4Surrogate : global::System.IEquatable<Matrix4x4Surrogate>
     {
         /// <summary>The m00 component.</summary>
 #if !WALLSTOP_PROTO_ONLY
@@ -184,5 +184,55 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
         }
 #endif
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(Matrix4x4Surrogate other)
+        {
+            return m00.Equals(other.m00)
+                && m10.Equals(other.m10)
+                && m20.Equals(other.m20)
+                && m30.Equals(other.m30)
+                && m01.Equals(other.m01)
+                && m11.Equals(other.m11)
+                && m21.Equals(other.m21)
+                && m31.Equals(other.m31)
+                && m02.Equals(other.m02)
+                && m12.Equals(other.m12)
+                && m22.Equals(other.m22)
+                && m32.Equals(other.m32)
+                && m03.Equals(other.m03)
+                && m13.Equals(other.m13)
+                && m23.Equals(other.m23)
+                && m33.Equals(other.m33);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is Matrix4x4Surrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                m00,
+                m10,
+                m20,
+                m30,
+                m01,
+                m11,
+                m21,
+                m31,
+                m02,
+                m12,
+                m22,
+                m32,
+                m03,
+                m13,
+                m23,
+                m33
+            );
+        }
     }
 }

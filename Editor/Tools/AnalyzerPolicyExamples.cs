@@ -186,6 +186,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Keep the concrete scope type to avoid boxing. Intentional interface boundaries can be suppressed; safe copying still depends on the runtime ownership contract.";
                     break;
+                case "WUH023":
+                    selectedBadCode = "public struct Point { public int X; }";
+                    selectedGoodCode =
+                        "public struct Point : IEquatable<Point>\n{\n    public int X;\n    public bool Equals(Point other) { return X == other.X; }\n    public override bool Equals(object value) { return value is Point other && Equals(other); }\n    public override int GetHashCode() { return X; }\n}";
+                    selectedExplanation =
+                        "Implement typed equality and matching object equality and hashing. Ref structs are excluded on Unity's C# version. Stored collection references keep reference equality unless the type documents content equality.";
+                    break;
                 default:
                     badCode = string.Empty;
                     goodCode = string.Empty;

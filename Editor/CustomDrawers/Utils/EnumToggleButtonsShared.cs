@@ -733,7 +733,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <summary>
         /// Represents a single toggle option in an enum toggle button drawer.
         /// </summary>
-        public readonly struct ToggleOption
+        public readonly struct ToggleOption : global::System.IEquatable<ToggleOption>
         {
             /// <summary>
             /// Gets the display label for the option.
@@ -772,12 +772,38 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
 
                 IsZeroFlag = isZeroFlag;
             }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(ToggleOption other)
+            {
+                return EqualityComparer<string>.Default.Equals(Label, other.Label)
+                    && EqualityComparer<object>.Default.Equals(Value, other.Value)
+                    && FlagValue.Equals(other.FlagValue)
+                    && IsZeroFlag.Equals(other.IsZeroFlag);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is ToggleOption other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    Label,
+                    Value,
+                    FlagValue,
+                    IsZeroFlag
+                );
+            }
         }
 
         /// <summary>
         /// Represents a summary of selected items not visible on the current page.
         /// </summary>
-        public readonly struct SelectionSummary
+        public readonly struct SelectionSummary : global::System.IEquatable<SelectionSummary>
         {
             /// <summary>
             /// Gets a summary indicating no out-of-view selections.
@@ -805,12 +831,34 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
 
                 Content = content ?? GUIContent.none;
             }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(SelectionSummary other)
+            {
+                return HasSummary.Equals(other.HasSummary)
+                    && EqualityComparer<GUIContent>.Default.Equals(Content, other.Content);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is SelectionSummary other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    HasSummary,
+                    Content
+                );
+            }
         }
 
         /// <summary>
         /// Describes the calculated layout metrics for displaying toggle buttons.
         /// </summary>
-        public readonly struct LayoutMetrics
+        public readonly struct LayoutMetrics : global::System.IEquatable<LayoutMetrics>
         {
             /// <summary>
             /// Gets the number of columns in the layout.
@@ -891,6 +939,36 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 float y = bounds.y + row * (ButtonHeight + Spacing);
 
                 return new Rect(x, y, ButtonWidth, ButtonHeight);
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(LayoutMetrics other)
+            {
+                return Columns.Equals(other.Columns)
+                    && Rows.Equals(other.Rows)
+                    && ButtonWidth.Equals(other.ButtonWidth)
+                    && ButtonHeight.Equals(other.ButtonHeight)
+                    && Spacing.Equals(other.Spacing)
+                    && TotalHeight.Equals(other.TotalHeight);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is LayoutMetrics other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    Columns,
+                    Rows,
+                    ButtonWidth,
+                    ButtonHeight,
+                    Spacing,
+                    TotalHeight
+                );
             }
         }
 

@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct Vector4Surrogate
+    public partial struct Vector4Surrogate : global::System.IEquatable<Vector4Surrogate>
     {
         /// <summary>The x component.</summary>
 #if !WALLSTOP_PROTO_ONLY
@@ -76,5 +76,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
         }
 #endif
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(Vector4Surrogate other)
+        {
+            return x.Equals(other.x) && y.Equals(other.y) && z.Equals(other.z) && w.Equals(other.w);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is Vector4Surrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(x, y, z, w);
+        }
     }
 }

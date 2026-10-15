@@ -1070,6 +1070,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Runtime-resolved relational field metadata with <see cref="Type"/> references resolved.
         /// </summary>
         public readonly struct ResolvedRelationalFieldMetadata
+            : global::System.IEquatable<ResolvedRelationalFieldMetadata>
         {
             /// <summary>
             /// The name of the relational field.
@@ -1117,6 +1118,37 @@ namespace WallstopStudios.UnityHelpers.Tags
                 FieldKind = fieldKind;
                 ElementType = elementType;
                 IsInterface = isInterface;
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(ResolvedRelationalFieldMetadata other)
+            {
+                return EqualityComparer<string>.Default.Equals(FieldName, other.FieldName)
+                    && EqualityComparer<RelationalAttributeKind>.Default.Equals(
+                        AttributeKind,
+                        other.AttributeKind
+                    )
+                    && EqualityComparer<FieldKind>.Default.Equals(FieldKind, other.FieldKind)
+                    && EqualityComparer<Type>.Default.Equals(ElementType, other.ElementType)
+                    && IsInterface.Equals(other.IsInterface);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is ResolvedRelationalFieldMetadata other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    FieldName,
+                    AttributeKind,
+                    FieldKind,
+                    ElementType,
+                    IsInterface
+                );
             }
         }
 

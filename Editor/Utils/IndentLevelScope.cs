@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Utils
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     using System;
     using UnityEditor;
@@ -38,7 +39,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     ///     owner has warmed to the maximum concurrent nesting depth.
     ///     </para>
     /// </remarks>
-    public readonly struct IndentLevelScope : IDisposable
+    public readonly struct IndentLevelScope
+        : IDisposable,
+            global::System.IEquatable<IndentLevelScope>
     {
         private readonly RestorableGlobal<int>.Scope _scope;
 
@@ -78,6 +81,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         public void Dispose()
         {
             _scope.Dispose();
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(IndentLevelScope other)
+        {
+            return EqualityComparer<RestorableGlobal<int>.Scope>.Default.Equals(
+                _scope,
+                other._scope
+            );
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is IndentLevelScope other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(_scope);
         }
     }
 #endif

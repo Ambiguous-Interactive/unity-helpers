@@ -188,3 +188,9 @@ package before a native run, and copy completed logs into ignored progress after
 Compare summary totals with individual results. This backend can report more summary cases
 than its callback result list contains. Preserve both counts and investigate missing failed
 identities; an incomplete leaf list cannot justify accepting a failed summary.
+
+The pipeline EditMode cancel acknowledgement can clear bridge bookkeeping while Unity's job
+remains active; the observed implementation does not call `TestRunnerApi.CancelTestRun(guid)`.
+Require actual inactivity and completed teardown before editing, building, or starting another run.
+Do not send `eval` probes during native tests: a queued probe can time out and log an unexpected
+error into the current case. Use background status and console endpoints while the job is active.

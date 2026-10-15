@@ -245,6 +245,23 @@ A nonzero editor exit and an accepted result artifact are separate observations.
 
 A missing configure marker also attempts to save `configure.process-diagnostics.json` beside the configure log. It records the child process identity, UTC launch and observation boundaries, raw and returned exits, and watchdog termination provenance. On Windows, it queries Application Error and Windows Error Reporting events once, from two seconds before launch through the earlier of capture time or fifteen seconds after the process observation ended. It examines at most 64 candidates and retains at most eight matches, with explicit truncation flags. Events require the child's executable path and process ID, or a report ID joined to an event with that identity. Unrelated events and full event messages are excluded. The report distinguishes unavailable evidence and no observed matches; a missing or delayed event does not rule out a crash. The existing Package Manager cancellation retry also attempts to preserve its first attempt in `configure.first-attempt.process-diagnostics.json`.
 
+Every guarded Unity Editor invocation also attempts to save `unity.execution-diagnostics.json`
+beside its log, including an invocation that exits zero or later supplies passing NUnit XML.
+The receipt uses the same bounded Windows event matcher and records process identity, raw and
+returned exits, watchdog provenance, and UTC capture time. Its native-log summary counts
+`Native Crash Reporting` headers and `Got a UNKNOWN while executing native code` lines separately,
+retaining at most eight line numbers for each. These are two observations of a report and must
+not be added to estimate an event count. Complete counters and a truncation flag accompany the
+bounded locations; missing or unreadable logs have explicit states. The watchdog records whether
+it saved the current log; failed or unobserved persistence leaves native-log evidence unavailable,
+so an older readable file cannot certify a new attempt. Raw log lines and full
+Windows event messages are excluded from the receipt, and credential redaction still runs before
+writing it. Before a Package Manager retry overwrites the log and receipt, both first-attempt
+files are preserved with `.first-attempt` in their names.
+
+These receipts add evidence; they do not establish a native report's cause or change the existing
+result gates. A receipt write failure warns without replacing the original process outcome.
+
 Use those observations to investigate the original process on the named runner before selecting a repair. A successful later launch does not explain an earlier failure, and the diagnostic report does not replace the fresh configure marker or required player results.
 
 Operator notes:

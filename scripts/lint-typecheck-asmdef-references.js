@@ -84,7 +84,7 @@ const UNDECLARED_BY_DESIGN = new Map([
   ],
   [
     "WallstopStudios.UnityHelpers.TestCheck::System.Runtime.CompilerServices.Unsafe",
-    "Runtime/**: WProtoScalarFormatters, EnumExtensions, the R-trees and RuntimeSingleton call Unsafe.As/SizeOf"
+    "Runtime/**: WProtoReader uses Unsafe.AreSame only for reference identity, without memory access"
   ],
   [
     "WallstopStudios.UnityHelpers.TestCheck::protobuf-net",
@@ -116,7 +116,7 @@ const UNDECLARED_BY_DESIGN = new Map([
   ],
   [
     "WallstopStudios.UnityHelpers.EditorTestCheck::System.Runtime.CompilerServices.Unsafe",
-    "Runtime/**: WProtoScalarFormatters, EnumExtensions, the R-trees and RuntimeSingleton call Unsafe.As/SizeOf"
+    "Runtime/**: WProtoReader uses Unsafe.AreSame only for reference identity, without memory access"
   ],
   [
     "WallstopStudios.UnityHelpers.EditorTestCheck::System.Text.Encodings.Web",

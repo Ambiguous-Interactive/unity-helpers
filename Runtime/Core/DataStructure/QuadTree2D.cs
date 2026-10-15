@@ -736,7 +736,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Represents a value and its position used to construct the tree directly.
         /// </summary>
         [Serializable]
-        public readonly struct Entry
+        public readonly struct Entry : global::System.IEquatable<Entry>
         {
             public readonly T value;
             public readonly Vector2 position;
@@ -745,6 +745,28 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 this.value = value;
                 this.position = position;
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Entry other)
+            {
+                return EqualityComparer<T>.Default.Equals(value, other.value)
+                    && EqualityComparer<Vector2>.Default.Equals(position, other.position);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Entry other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    value,
+                    position
+                );
             }
         }
 

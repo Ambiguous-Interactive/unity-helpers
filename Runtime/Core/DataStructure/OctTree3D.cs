@@ -1136,7 +1136,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         [Serializable]
-        public readonly struct Entry
+        public readonly struct Entry : global::System.IEquatable<Entry>
         {
             public readonly T value;
             public readonly Vector3 position;
@@ -1145,6 +1145,28 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 this.value = value;
                 this.position = position;
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Entry other)
+            {
+                return EqualityComparer<T>.Default.Equals(value, other.value)
+                    && EqualityComparer<Vector3>.Default.Equals(position, other.position);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Entry other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    value,
+                    position
+                );
             }
         }
 
@@ -1254,6 +1276,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         public readonly struct BoundsQueryNodeTrace
+            : global::System.IEquatable<BoundsQueryNodeTrace>
         {
             public BoundingBox3D Boundary { get; }
 
@@ -1298,6 +1321,36 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return isTerminal
                     ? NodeVisitKind.PartiallyContainedLeaf
                     : NodeVisitKind.PartiallyContainedInternal;
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(BoundsQueryNodeTrace other)
+            {
+                return EqualityComparer<BoundingBox3D>.Default.Equals(Boundary, other.Boundary)
+                    && EqualityComparer<Bounds>.Default.Equals(UnityBounds, other.UnityBounds)
+                    && Count.Equals(other.Count)
+                    && IsTerminal.Equals(other.IsTerminal)
+                    && NodeFullyContained.Equals(other.NodeFullyContained)
+                    && EqualityComparer<NodeVisitKind>.Default.Equals(VisitKind, other.VisitKind);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is BoundsQueryNodeTrace other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    Boundary,
+                    UnityBounds,
+                    Count,
+                    IsTerminal,
+                    NodeFullyContained,
+                    VisitKind
+                );
             }
         }
 

@@ -557,6 +557,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     }
 
     public readonly struct WaitInstructionCacheDiagnostics
+        : global::System.IEquatable<WaitInstructionCacheDiagnostics>
     {
         public string CacheName { get; }
 
@@ -596,6 +597,38 @@ namespace WallstopStudios.UnityHelpers.Utils
         public override string ToString()
         {
             return $"{CacheName}: entries={DistinctEntries}, max={MaxDistinctEntries}, refusals={LimitRefusals}, evictions={Evictions}, quantizationStep={QuantizationStepSeconds}, lru={IsLruEnabled}";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(WaitInstructionCacheDiagnostics other)
+        {
+            return EqualityComparer<string>.Default.Equals(CacheName, other.CacheName)
+                && DistinctEntries.Equals(other.DistinctEntries)
+                && MaxDistinctEntries.Equals(other.MaxDistinctEntries)
+                && LimitRefusals.Equals(other.LimitRefusals)
+                && Evictions.Equals(other.Evictions)
+                && QuantizationStepSeconds.Equals(other.QuantizationStepSeconds)
+                && IsLruEnabled.Equals(other.IsLruEnabled);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is WaitInstructionCacheDiagnostics other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                CacheName,
+                DistinctEntries,
+                MaxDistinctEntries,
+                LimitRefusals,
+                Evictions,
+                QuantizationStepSeconds,
+                IsLruEnabled
+            );
         }
     }
 
@@ -3651,7 +3684,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// }
     /// </code>
     /// </example>
-    public readonly struct PooledArray<T> : IDisposable
+    public readonly struct PooledArray<T> : IDisposable, global::System.IEquatable<PooledArray<T>>
     {
         /// <summary>
         /// The underlying pooled array. May be larger than <see cref="length"/> when using
@@ -3731,6 +3764,32 @@ namespace WallstopStudios.UnityHelpers.Utils
                     PooledArrayClearPolicy<T>.ClearOnReturn
                 );
             }
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(PooledArray<T> other)
+        {
+            return EqualityComparer<T[]>.Default.Equals(array, other.array)
+                && length.Equals(other.length)
+                && EqualityComparer<Action<T[]>>.Default.Equals(_onDispose, other._onDispose)
+                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is PooledArray<T> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                array,
+                length,
+                _onDispose,
+                _lease
+            );
         }
     }
 
@@ -3959,7 +4018,9 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// This struct implements IDisposable to enable automatic resource return via 'using' statements.
     /// The resource is returned to its pool when Dispose is called, typically at the end of a 'using' block.
     /// </remarks>
-    public readonly struct PooledResource<T> : IDisposable
+    public readonly struct PooledResource<T>
+        : IDisposable,
+            global::System.IEquatable<PooledResource<T>>
     {
         /// <summary>
         /// Whether this resource is still outstanding, so a holder keeping a safety net can drop
@@ -4005,6 +4066,30 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             _onDispose?.Invoke(resource);
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(PooledResource<T> other)
+        {
+            return EqualityComparer<T>.Default.Equals(resource, other.resource)
+                && EqualityComparer<Action<T>>.Default.Equals(_onDispose, other._onDispose)
+                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is PooledResource<T> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                resource,
+                _onDispose,
+                _lease
+            );
         }
     }
 }

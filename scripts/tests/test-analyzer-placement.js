@@ -180,17 +180,19 @@ const productionRuleset = fs.readFileSync(
   "utf8"
 );
 check(
-  "the production collection-size policy imports shared policies and enables WUH019 and WUH021",
+  "the production policy imports shared policies and enables WUH019, WUH021 and WUH023",
   productionRuleset.includes('<Include Path="CheckProjects.ruleset" Action="Default" />') &&
-    ["WUH019", "WUH021"].every((id) =>
+    ["WUH019", "WUH021", "WUH023"].every((id) =>
       productionRuleset.includes(`<Rule Id="${id}" Action="Warning" />`)
     ),
-  "WUH019 and WUH021 are production-only opt-ins; tests and tooling retain the shared ruleset"
+  "WUH019, WUH021 and WUH023 are production-only opt-ins; tests and tooling retain the shared ruleset"
 );
 check(
-  "shared projects explicitly disable WUH019 and WUH021",
-  ["WUH019", "WUH021"].every((id) => checkRuleset.includes(`<Rule Id="${id}" Action="None" />`)),
-  "The shared ruleset retains the default-disabled WUH019 and WUH021 policies"
+  "shared projects explicitly disable WUH019, WUH021 and WUH023",
+  ["WUH019", "WUH021", "WUH023"].every((id) =>
+    checkRuleset.includes(`<Rule Id="${id}" Action="None" />`)
+  ),
+  "The shared ruleset retains the default-disabled WUH019, WUH021 and WUH023 policies"
 );
 for (const projectName of ["TypeCheck", "EditorCheck", "IntegrationCheck"]) {
   check(
@@ -205,20 +207,21 @@ const warningPromotions = [
   ...generatorBuildPolicy.matchAll(/<WarningsAsErrors([^>]*)>([^<]+)<\/WarningsAsErrors>/g)
 ];
 check(
-  "WUH019 and WUH021 promotion is limited to the three production projects",
+  "WUH019, WUH021 and WUH023 promotion is limited to the three production projects",
   warningPromotions.some(
-    (match) => match[1] === "" && ["WUH019", "WUH021"].every((id) => !match[2].includes(id))
+    (match) =>
+      match[1] === "" && ["WUH019", "WUH021", "WUH023"].every((id) => !match[2].includes(id))
   ) &&
     warningPromotions.some(
       (match) =>
-        ["WUH019", "WUH021"].every((id) => match[2].includes(id)) &&
+        ["WUH019", "WUH021", "WUH023"].every((id) => match[2].includes(id)) &&
         ["TypeCheck", "EditorCheck", "IntegrationCheck"].every((name) =>
           match[1].includes(`WallstopStudios.UnityHelpers.${name}`)
         ) &&
         !match[1].includes("TestCheck") &&
         !match[1].includes("EditorTestCheck")
     ),
-  "Explicit WarningsAsErrors IDs override ruleset None; only production may list WUH019 or WUH021"
+  "Explicit WarningsAsErrors IDs override ruleset None; only production may list WUH019, WUH021 or WUH023"
 );
 const generatorProjectFiles = fs
   .readdirSync(path.join(root, "Generator~"), { withFileTypes: true })
@@ -242,7 +245,7 @@ const promotedPolicyIds = [...generatorBuildPolicy.matchAll(/(?:^|;)(WUH\d{3})(?
   (match) => match[1]
 );
 check(
-  "shared WUH policies are promoted globally and WUH019 and WUH021 only in production",
+  "shared WUH policies are promoted globally and WUH019, WUH021 and WUH023 only in production",
   JSON.stringify([...promotedPolicyIds].sort()) === JSON.stringify([...descriptorIds].sort()),
   `descriptors=${descriptorIds.join(",")} promoted=${promotedPolicyIds.join(",")}`
 );

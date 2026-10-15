@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// One field a developer asked Unity to serialize and Unity declined to.
     /// </summary>
     public readonly struct DroppedSerializedField
+        : global::System.IEquatable<DroppedSerializedField>
     {
         /// <summary>The type declaring the field.</summary>
         public Type Owner { get; }
@@ -54,6 +55,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 ? described
                     + " Give it a [Serializable] type of your own, or mark it [NonSerialized]."
                 : described + $" Use {StandIn} instead.";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(DroppedSerializedField other)
+        {
+            return EqualityComparer<Type>.Default.Equals(Owner, other.Owner)
+                && EqualityComparer<string>.Default.Equals(FieldName, other.FieldName)
+                && EqualityComparer<Type>.Default.Equals(FieldType, other.FieldType)
+                && EqualityComparer<string>.Default.Equals(StandIn, other.StandIn);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is DroppedSerializedField other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                Owner,
+                FieldName,
+                FieldType,
+                StandIn
+            );
         }
     }
 

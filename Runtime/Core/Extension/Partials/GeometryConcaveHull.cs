@@ -571,7 +571,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             EdgeSplit = 2,
         }
 
-        public readonly struct ConcaveHullOptions
+        public readonly struct ConcaveHullOptions : global::System.IEquatable<ConcaveHullOptions>
         {
             private const int DefaultNearestNeighbors = 3;
             private const int DefaultBucketSize = 40;
@@ -694,7 +694,38 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 );
             }
 
-            public struct Builder
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(ConcaveHullOptions other)
+            {
+                return EqualityComparer<ConcaveHullStrategy>.Default.Equals(
+                        _strategy,
+                        other._strategy
+                    )
+                    && _nearestNeighbors.Equals(other._nearestNeighbors)
+                    && _bucketSize.Equals(other._bucketSize)
+                    && _angleThreshold.Equals(other._angleThreshold)
+                    && _initialized.Equals(other._initialized);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is ConcaveHullOptions other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _strategy,
+                    _nearestNeighbors,
+                    _bucketSize,
+                    _angleThreshold,
+                    _initialized
+                );
+            }
+
+            public struct Builder : global::System.IEquatable<Builder>
             {
                 private ConcaveHullStrategy _strategy;
                 private int _nearestNeighbors;
@@ -736,6 +767,35 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 public ConcaveHullOptions Build()
                 {
                     return new ConcaveHullOptions(
+                        _strategy,
+                        _nearestNeighbors,
+                        _bucketSize,
+                        _angleThreshold
+                    );
+                }
+
+                /// <summary>Compares the stored fields with another value.</summary>
+                public bool Equals(Builder other)
+                {
+                    return EqualityComparer<ConcaveHullStrategy>.Default.Equals(
+                            _strategy,
+                            other._strategy
+                        )
+                        && _nearestNeighbors.Equals(other._nearestNeighbors)
+                        && _bucketSize.Equals(other._bucketSize)
+                        && _angleThreshold.Equals(other._angleThreshold);
+                }
+
+                /// <inheritdoc />
+                public override bool Equals(object obj)
+                {
+                    return obj is Builder other && Equals(other);
+                }
+
+                /// <inheritdoc />
+                public override int GetHashCode()
+                {
+                    return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
                         _strategy,
                         _nearestNeighbors,
                         _bucketSize,

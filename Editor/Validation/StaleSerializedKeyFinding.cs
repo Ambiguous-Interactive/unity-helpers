@@ -3,11 +3,13 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     using System;
 
     /// <summary>One serialized key an asset records that no field of its type claims.</summary>
     public readonly struct StaleSerializedKeyFinding
+        : global::System.IEquatable<StaleSerializedKeyFinding>
     {
         /// <summary>The asset carrying the key.</summary>
         public string AssetPath { get; }
@@ -47,6 +49,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public override string ToString()
         {
             return $"{AssetPath}:{LineNumber}: {Cause}";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(StaleSerializedKeyFinding other)
+        {
+            return EqualityComparer<string>.Default.Equals(AssetPath, other.AssetPath)
+                && LineNumber.Equals(other.LineNumber)
+                && EqualityComparer<Type>.Default.Equals(OwnerType, other.OwnerType)
+                && EqualityComparer<string>.Default.Equals(Key, other.Key);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is StaleSerializedKeyFinding other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                AssetPath,
+                LineNumber,
+                OwnerType,
+                Key
+            );
         }
     }
 #endif

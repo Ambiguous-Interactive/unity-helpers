@@ -537,7 +537,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Performance: O(1) for completion checks. Allocations occur for continuation storage in dictionaries.</para>
         /// <para>Allocations: Allocates dictionary entries for tracking completions. Cleaned up on completion.</para>
         /// </remarks>
-        public readonly struct AsyncOperationAwaiter : INotifyCompletion
+        public readonly struct AsyncOperationAwaiter
+            : INotifyCompletion,
+                global::System.IEquatable<AsyncOperationAwaiter>
         {
             /// <summary>
             /// Gets a value indicating whether the async operation has completed.
@@ -593,6 +595,29 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             /// Gets the result of the async operation. Since AsyncOperation has no return value, this is a no-op.
             /// </summary>
             public void GetResult() { }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(AsyncOperationAwaiter other)
+            {
+                return EqualityComparer<AsyncOperation>.Default.Equals(
+                    _operation,
+                    other._operation
+                );
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is AsyncOperationAwaiter other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _operation
+                );
+            }
         }
     }
 }

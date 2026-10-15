@@ -10,6 +10,10 @@
     <StartupObject>WallstopStudios.UnityHelpers.DurableFile.Tests.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <Compile
+      Include="../WallstopStudios.UnityHelpers.Proto.Generator.Tests/ObjectsHashCodeStub.cs"
+      Link="ObjectsHashCodeStub.cs"
+    />
     <Compile Include="../../Runtime/Core/Helper/DurableFile.cs" Link="DurableFile.cs" />
     <Compile Include="../../Runtime/Core/Helper/FileHelper.cs" Link="FileHelper.cs" />
     <Compile Include="../../Runtime/Core/Threading/SemaphoreLease.cs" Link="SemaphoreLease.cs" />

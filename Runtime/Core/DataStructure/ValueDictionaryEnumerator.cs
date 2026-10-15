@@ -9,7 +9,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
     /// <summary>Enumerates exact dictionaries without boxing and preserves other source protocols.</summary>
     /// <remarks>Current is meaningful after MoveNext succeeds. Copies of a fallback enumerator share its lifetime.</remarks>
-    public struct ValueDictionaryEnumerator<TKey, TValue> : IDisposable
+    public struct ValueDictionaryEnumerator<TKey, TValue>
+        : IDisposable,
+            global::System.IEquatable<ValueDictionaryEnumerator<TKey, TValue>>
     {
         private const int EmptyKind = 0;
         private const int DictionaryKind = 1;
@@ -77,6 +79,36 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 _fallback.Dispose();
             }
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(ValueDictionaryEnumerator<TKey, TValue> other)
+        {
+            return _kind.Equals(other._kind)
+                && EqualityComparer<Dictionary<TKey, TValue>.Enumerator>.Default.Equals(
+                    _dictionary,
+                    other._dictionary
+                )
+                && EqualityComparer<IEnumerator<KeyValuePair<TKey, TValue>>>.Default.Equals(
+                    _fallback,
+                    other._fallback
+                );
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is ValueDictionaryEnumerator<TKey, TValue> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _kind,
+                _dictionary,
+                _fallback
+            );
         }
     }
 }

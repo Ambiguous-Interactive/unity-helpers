@@ -148,6 +148,22 @@ Assert-That "normal exit reports the real exit code 0" ($r.ExitCode -eq 0)
 Assert-That "normal exit is NOT treated as a timeout" (-not $r.TimedOut)
 
 Assert-That 'normal process provenance has child identity and raw exit' ($observation.MachineName -eq [Environment]::MachineName -and $observation.ProcessId -gt 0 -and $observation.ExitOrigin -eq 'process-exit' -and $observation.RawExitCode -eq 0 -and $null -eq $observation.KillReason -and [DateTime]$observation.EndObservedUtc -ge [DateTime]$observation.LaunchUtc)
+Assert-That 'normal process records successful current-log persistence' ($observation.LogPersistence -eq 'written')
+
+$lockedLog = Join-Path $tmp ("uh-watchdog-locked-{0}.log" -f [Guid]::NewGuid().ToString('N'))
+[IO.File]::WriteAllText($lockedLog, 'Native Crash Reporting from an older attempt')
+$lockedStream = [IO.File]::Open($lockedLog, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+try {
+    $observation = @{}
+    $r = Invoke-ProcessWithTreeKillTimeout -FilePath $pwshPath -Arguments @('-NoProfile', '-Command', 'Write-Host "current output"; exit 0') -TimeoutSeconds 30 -LogPath $lockedLog -Label 'locked-log' -ProcessObservation $observation
+    Assert-That 'log persistence failure preserves the real child exit' ($r.ExitCode -eq 0 -and $observation.RawExitCode -eq 0 -and -not $r.TimedOut)
+    $lockedStream.Dispose()
+    Assert-That 'log persistence failure is explicit even when an older log remains readable' ($observation.LogPersistence -eq 'write-failed' -and [IO.File]::ReadAllText($lockedLog) -eq 'Native Crash Reporting from an older attempt')
+} finally {
+    $lockedStream.Dispose()
+    Remove-Item -LiteralPath $lockedLog -Force
+}
+
 
 # 3b. sentinel logged but editor then EXITS CLEANLY within grace (the common non-hang
 #     path on healthy Unity): the REAL editor exit code must win over the parsed

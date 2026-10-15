@@ -3016,7 +3016,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <summary>
         /// Result of a grid detection algorithm.
         /// </summary>
-        public readonly struct AlgorithmResult
+        public readonly struct AlgorithmResult : global::System.IEquatable<AlgorithmResult>
         {
             /// <summary>
             /// Whether this result represents a valid grid detection.
@@ -3059,6 +3059,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             public static AlgorithmResult Invalid(AutoDetectionAlgorithm algorithm)
             {
                 return new AlgorithmResult(0, 0, 0f, algorithm);
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(AlgorithmResult other)
+            {
+                return CellWidth.Equals(other.CellWidth)
+                    && CellHeight.Equals(other.CellHeight)
+                    && Confidence.Equals(other.Confidence)
+                    && EqualityComparer<AutoDetectionAlgorithm>.Default.Equals(
+                        Algorithm,
+                        other.Algorithm
+                    );
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is AlgorithmResult other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    CellWidth,
+                    CellHeight,
+                    Confidence,
+                    Algorithm
+                );
             }
         }
     }

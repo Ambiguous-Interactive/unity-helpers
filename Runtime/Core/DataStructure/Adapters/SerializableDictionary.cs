@@ -1587,7 +1587,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// }
         /// ]]></code>
         /// </example>
-        public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>
+        public struct Enumerator
+            : IEnumerator<KeyValuePair<TKey, TValue>>,
+                global::System.IEquatable<Enumerator>
         {
             public KeyValuePair<TKey, TValue> Current => _enumerator.Current;
 
@@ -1615,6 +1617,29 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             public void Dispose()
             {
                 _enumerator.Dispose();
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Enumerator other)
+            {
+                return EqualityComparer<Dictionary<TKey, TValue>.Enumerator>.Default.Equals(
+                    _enumerator,
+                    other._enumerator
+                );
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Enumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _enumerator
+                );
             }
 
             /// <summary>

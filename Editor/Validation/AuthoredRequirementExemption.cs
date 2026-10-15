@@ -3,11 +3,13 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     using System;
 
     /// <summary>One annotated field the scan could not judge, and why.</summary>
     public readonly struct AuthoredRequirementExemption
+        : global::System.IEquatable<AuthoredRequirementExemption>
     {
         /// <summary>The type declaring the annotated field.</summary>
         public Type DeclaringType { get; }
@@ -38,6 +40,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public override string ToString()
         {
             return $"{DeclaringType?.FullName}.{FieldName}: {Reason}";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(AuthoredRequirementExemption other)
+        {
+            return EqualityComparer<Type>.Default.Equals(DeclaringType, other.DeclaringType)
+                && EqualityComparer<string>.Default.Equals(FieldName, other.FieldName)
+                && EqualityComparer<AuthoredRequirementExemptionReason>.Default.Equals(
+                    Reason,
+                    other.Reason
+                );
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is AuthoredRequirementExemption other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                DeclaringType,
+                FieldName,
+                Reason
+            );
         }
     }
 #endif

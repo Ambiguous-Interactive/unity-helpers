@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// <summary>Provides lazy dictionary enumeration without boxing an exact dictionary's enumerator.</summary>
     /// <remarks>Other sources preserve their enumeration protocol. The constructor treats null as empty; RequireSource retains null-source failures. The view does not snapshot its source.</remarks>
     public readonly struct ValueDictionaryEnumerable<TKey, TValue>
+        : global::System.IEquatable<ValueDictionaryEnumerable<TKey, TValue>>
     {
         private readonly IEnumerable<KeyValuePair<TKey, TValue>> _source;
         private readonly bool _required;
@@ -42,6 +43,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public ValueDictionaryEnumerator<TKey, TValue> GetEnumerator()
         {
             return new ValueDictionaryEnumerator<TKey, TValue>(_source, _required);
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(ValueDictionaryEnumerable<TKey, TValue> other)
+        {
+            return EqualityComparer<IEnumerable<KeyValuePair<TKey, TValue>>>.Default.Equals(
+                    _source,
+                    other._source
+                ) && _required.Equals(other._required);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is ValueDictionaryEnumerable<TKey, TValue> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _source,
+                _required
+            );
         }
     }
 }

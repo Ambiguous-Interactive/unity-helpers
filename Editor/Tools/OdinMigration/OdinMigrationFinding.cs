@@ -3,8 +3,10 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 {
+    using System.Collections.Generic;
+
     /// <summary>Describes a source or serialized-data review finding.</summary>
-    public readonly struct OdinMigrationFinding
+    public readonly struct OdinMigrationFinding : global::System.IEquatable<OdinMigrationFinding>
     {
         /// <summary>Gets the one-based source line.</summary>
         public readonly int Line;
@@ -16,6 +18,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             Line = line;
             Message = message;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(OdinMigrationFinding other)
+        {
+            return Line.Equals(other.Line)
+                && EqualityComparer<string>.Default.Equals(Message, other.Message);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is OdinMigrationFinding other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(Line, Message);
         }
     }
 }

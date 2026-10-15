@@ -6,10 +6,12 @@ namespace Samples.UnityHelpers.Serialization.Json
     using System;
     using System.Text.Json;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
 
+    /// <summary>Stores the values used by the JSON example.</summary>
     [Serializable]
-    public struct SampleSave
+    public struct SampleSave : IEquatable<SampleSave>
     {
 #pragma warning disable WPROTO028 // This sample demonstrates JSON, not WallstopProto serialization.
         public Vector3 position;
@@ -17,6 +19,27 @@ namespace Samples.UnityHelpers.Serialization.Json
         public Color color;
         public Rect screenRect;
 #pragma warning restore WPROTO028
+
+        /// <summary>Compares the saved values.</summary>
+        public bool Equals(SampleSave other)
+        {
+            return position.Equals(other.position)
+                && rotation.Equals(other.rotation)
+                && color.Equals(other.color)
+                && screenRect.Equals(other.screenRect);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is SampleSave other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return Objects.HashCode(position, rotation, color, screenRect);
+        }
     }
 
     /// <summary>

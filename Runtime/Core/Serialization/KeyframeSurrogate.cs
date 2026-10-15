@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct KeyframeSurrogate
+    public partial struct KeyframeSurrogate : global::System.IEquatable<KeyframeSurrogate>
     {
         /// <summary>The time component.</summary>
 #if !WALLSTOP_PROTO_ONLY
@@ -103,5 +103,37 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
         }
 #endif
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(KeyframeSurrogate other)
+        {
+            return time.Equals(other.time)
+                && value.Equals(other.value)
+                && inTangent.Equals(other.inTangent)
+                && outTangent.Equals(other.outTangent)
+                && inWeight.Equals(other.inWeight)
+                && outWeight.Equals(other.outWeight)
+                && weightedMode.Equals(other.weightedMode);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is KeyframeSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                time,
+                value,
+                inTangent,
+                outTangent,
+                inWeight,
+                outWeight,
+                weightedMode
+            );
+        }
     }
 }

@@ -4,9 +4,11 @@
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
+    using System.Collections.Generic;
     using System.Threading.Tasks;
 
     public readonly struct DeferredDisposalResult<T>
+        : global::System.IEquatable<DeferredDisposalResult<T>>
     {
         public readonly T result;
 
@@ -21,6 +23,31 @@ namespace WallstopStudios.UnityHelpers.Utils
         public ValueTask DisposeAsync()
         {
             return _disposeAsync();
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(DeferredDisposalResult<T> other)
+        {
+            return EqualityComparer<T>.Default.Equals(result, other.result)
+                && EqualityComparer<Func<ValueTask>>.Default.Equals(
+                    _disposeAsync,
+                    other._disposeAsync
+                );
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is DeferredDisposalResult<T> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                result,
+                _disposeAsync
+            );
         }
     }
 }

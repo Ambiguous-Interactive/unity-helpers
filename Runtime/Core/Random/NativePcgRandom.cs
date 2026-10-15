@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// double d = rng.NextDouble();
     /// </code>
     /// </example>
-    public struct NativePcgRandom
+    public struct NativePcgRandom : global::System.IEquatable<NativePcgRandom>
     {
         // Tests use the actual sampling scale so a rounded constant cannot evade the precision check.
         internal const float FloatScale = 1f / (1 << 24);
@@ -243,6 +243,32 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             const double scale = 1.0 / 9007199254740992.0;
             ulong combined = NextUlong() >> 11;
             return combined * scale;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(NativePcgRandom other)
+        {
+            return _increment.Equals(other._increment)
+                && _state.Equals(other._state)
+                && _bitBuffer.Equals(other._bitBuffer)
+                && _bitCount.Equals(other._bitCount);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is NativePcgRandom other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _increment,
+                _state,
+                _bitBuffer,
+                _bitCount
+            );
         }
     }
 }

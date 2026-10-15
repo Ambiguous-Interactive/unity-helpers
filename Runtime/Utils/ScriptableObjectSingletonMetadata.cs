@@ -209,7 +209,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 #endif
 
         [Serializable]
-        public struct Entry
+        public struct Entry : global::System.IEquatable<Entry>
         {
             public string assemblyQualifiedTypeName;
             public string resourcesLoadPath;
@@ -217,6 +217,38 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             // ReSharper disable once NotAccessedField.Global
             public string assetGuid;
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Entry other)
+            {
+                return EqualityComparer<string>.Default.Equals(
+                        assemblyQualifiedTypeName,
+                        other.assemblyQualifiedTypeName
+                    )
+                    && EqualityComparer<string>.Default.Equals(
+                        resourcesLoadPath,
+                        other.resourcesLoadPath
+                    )
+                    && EqualityComparer<string>.Default.Equals(resourcesPath, other.resourcesPath)
+                    && EqualityComparer<string>.Default.Equals(assetGuid, other.assetGuid);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Entry other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    assemblyQualifiedTypeName,
+                    resourcesLoadPath,
+                    resourcesPath,
+                    assetGuid
+                );
+            }
         }
     }
 }

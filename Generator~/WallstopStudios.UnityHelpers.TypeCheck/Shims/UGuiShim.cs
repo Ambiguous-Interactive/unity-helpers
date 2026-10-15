@@ -10,6 +10,7 @@
  */
 namespace UnityEngine.UI
 {
+#pragma warning disable WUH023 // External reference-API shim, not a package value type.
     public struct ColorBlock
     {
         public static ColorBlock defaultColorBlock => default;
@@ -22,4 +23,5 @@ namespace UnityEngine.UI
         public float colorMultiplier;
         public float fadeDuration;
     }
+#pragma warning restore WUH023
 }

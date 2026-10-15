@@ -3,11 +3,13 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     using System.Globalization;
 
     /// <summary>One animation keyframe naming an object the AssetDatabase cannot produce.</summary>
     public readonly struct AnimationKeyframeFinding
+        : global::System.IEquatable<AnimationKeyframeFinding>
     {
         /// <summary>The clip's asset path.</summary>
         public string ClipPath { get; }
@@ -52,6 +54,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             string seconds = Time.ToString("0.###", CultureInfo.InvariantCulture);
             return $"{ClipPath} ({ClipName}): {BindingPath}/{PropertyName} at {seconds}s resolves "
                 + "to nothing, so the subject vanishes for that frame's duration and comes back.";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(AnimationKeyframeFinding other)
+        {
+            return EqualityComparer<string>.Default.Equals(ClipPath, other.ClipPath)
+                && EqualityComparer<string>.Default.Equals(ClipName, other.ClipName)
+                && EqualityComparer<string>.Default.Equals(BindingPath, other.BindingPath)
+                && EqualityComparer<string>.Default.Equals(PropertyName, other.PropertyName)
+                && Time.Equals(other.Time);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is AnimationKeyframeFinding other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                ClipPath,
+                ClipName,
+                BindingPath,
+                PropertyName,
+                Time
+            );
         }
     }
 #endif

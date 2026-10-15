@@ -45,6 +45,13 @@ foreach ($name in @(
         'Get-UnityProcessFailureEvents',
         'Read-UnityProcessFailureEvents',
         'Write-UnityConfigureFailureObservation',
+        'Get-UnityNativeReportSummary',
+        'Write-UnityExecutionObservation',
+        'Invoke-UnityEditor',
+        'Get-EditorTestCompletionGraceSeconds',
+        'Get-EditorTestRunTimeoutSeconds',
+        'Get-EditorTestStallSeconds',
+        'Invoke-UnityEditorTestsWithPackageManagerRetry',
         'Invoke-UnityConfigurePass'
     )) {
     $functionAst = $ast.FindAll(
@@ -363,6 +370,90 @@ try {
         Write-UnityConfigureFailureObservation -LogPath (Join-Path $temporaryRoot 'missing/diagnostics.log') -ProcessObservation $observation
         Assert-That 'diagnostic persistence failure never hides original failure' $true
     } finally { $ErrorActionPreference = $savedPreferences }
+
+    $nativeLog = Join-Path $temporaryRoot 'native.log'
+    $summary = Get-UnityNativeReportSummary -LogPath $nativeLog
+    Assert-That 'missing native log is explicit missing evidence' ($summary.State -eq 'missing-log')
+    Set-Content -LiteralPath $nativeLog -Value ''
+    $summary = Get-UnityNativeReportSummary -LogPath $nativeLog
+    Assert-That 'readable empty native log is observed with zero reports' ($summary.State -eq 'observed' -and $summary.NativeReportHeaderCount -eq 0 -and $summary.UnknownNativeConditionCount -eq 0)
+    Set-Content -LiteralPath $nativeLog -Value @('Native Crash Reporting', 'Got a UNKNOWN while executing native code', 'managed stack', 'NATIVE CRASH REPORTING', 'Got a UNKNOWN while executing native code')
+    $summary = Get-UnityNativeReportSummary -LogPath $nativeLog
+    Assert-That 'headers and unknown conditions are counted independently without summing events' ($summary.NativeReportHeaderCount -eq 2 -and $summary.UnknownNativeConditionCount -eq 2)
+    Assert-That 'native summaries retain exact line locations without raw text' (($summary.NativeReportHeaderLines -join ',') -eq '1,4' -and ($summary.UnknownNativeConditionLines -join ',') -eq '2,5' -and ($summary | ConvertTo-Json -Depth 8) -notmatch 'managed stack')
+    Set-Content -LiteralPath $nativeLog -Value (@('Native Crash Reporting', 'Got a UNKNOWN while executing native code') * 12)
+    $summary = Get-UnityNativeReportSummary -LogPath $nativeLog
+    Assert-That 'native report locations are bounded while counts remain complete' ($summary.NativeReportHeaderCount -eq 12 -and $summary.UnknownNativeConditionCount -eq 12 -and $summary.NativeReportHeaderLines.Count -eq 8 -and $summary.UnknownNativeConditionLines.Count -eq 8 -and $summary.LocationsTruncated)
+    $locked = [IO.File]::Open($nativeLog, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try {
+        $summary = Get-UnityNativeReportSummary -LogPath $nativeLog
+        Assert-That 'locked native log is explicit unreadable evidence' ($summary.State -eq 'unreadable-log')
+    } finally { $locked.Dispose() }
+
+    function Write-UnityEnvironmentWarningAnnotations { }
+    function Write-UnityCatastrophicErrorAnnotations { }
+    function Write-UnityMissingModuleAnnotations { }
+    function Get-UnityProcessFailureEvents {
+        param([hashtable]$ProcessObservation)
+        return @{ State = 'controlled-event-query'; ProcessId = $ProcessObservation['ProcessId']; Events = @() }
+    }
+    $script:executionExit = 0
+    $script:executionAttempt = 0
+    $script:executionRetry = $false
+    $script:executionLogWriteFailure = $false
+    $script:EditorTestCompletionSentinel = 'Test run completed'
+    function Invoke-ProcessWithTreeKillTimeout {
+        param($FilePath, $Arguments, $TimeoutSeconds, $LogPath, $Label,
+            $CompletionPattern, $CompletionGraceSeconds, $StallSeconds, [hashtable]$ProcessObservation)
+        ++$script:executionAttempt
+        $ProcessObservation.Clear()
+        $ProcessObservation['ProcessId'] = 100 + $script:executionAttempt
+        $ProcessObservation['ExecutablePath'] = $FilePath
+        $ProcessObservation['RawExitCode'] = $script:executionExit
+        $ProcessObservation['ReturnedExitCode'] = $script:executionExit
+        $ProcessObservation['LaunchUtc'] = [DateTime]::UtcNow.ToString('o')
+        $ProcessObservation['EndObservedUtc'] = [DateTime]::UtcNow.ToString('o')
+        $ProcessObservation['LogPersistence'] = if ($script:executionLogWriteFailure) { 'write-failed' } else { 'written' }
+        if ($script:executionLogWriteFailure) {
+            return @{ ExitCode = $script:executionExit; TimedOut = $false; Stalled = $false }
+        }
+        if ($script:executionRetry -and $script:executionAttempt -eq 1) {
+            Set-Content -LiteralPath $LogPath -Value 'IPCStream (Upm-123): IPC stream failed to read'
+        } else {
+            Set-Content -LiteralPath $LogPath -Value @('Native Crash Reporting', 'Got a UNKNOWN while executing native code', 'Test run completed. Exiting with code 0')
+        }
+        return @{ ExitCode = $script:executionExit; TimedOut = $false; Stalled = $false }
+    }
+    foreach ($code in @(0, 2, 124, -1073741819)) {
+        $script:executionExit = $code
+        $exitCode = Invoke-UnityEditor -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'controlled test' -LogPath $nativeLog -TimeoutSeconds 5
+        $receipt = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($nativeLog, 'execution-diagnostics.json')) -Raw | ConvertFrom-Json
+        Assert-That "execution diagnostics preserve exit $code" ($exitCode -eq $code -and $receipt.Process.RawExitCode -eq $code -and $receipt.Process.ReturnedExitCode -eq $code)
+        Assert-That "guarded execution captures native reports even at exit $code" ($receipt.NativeReports.NativeReportHeaderCount -eq 1 -and $receipt.NativeReports.UnknownNativeConditionCount -eq 1)
+        Assert-That "guarded execution binds event query to child identity at exit $code" ($receipt.WindowsEvents.ProcessId -eq $receipt.Process.ProcessId)
+    }
+    $before = $receipt.Process.ProcessId
+    $script:executionExit = 0
+    $providedObservation = @{ Stale = $true }
+    $null = Invoke-UnityEditor -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'fresh test' -LogPath $nativeLog -TimeoutSeconds 5 -ProcessObservation $providedObservation
+    $fresh = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($nativeLog, 'execution-diagnostics.json')) -Raw | ConvertFrom-Json
+    Assert-That 'fresh receipt replaces stale diagnostics and preserves supplied observation ownership' ($fresh.Process.ProcessId -ne $before -and $providedObservation.ProcessId -eq $fresh.Process.ProcessId -and -not $providedObservation.ContainsKey('Stale'))
+    $script:executionLogWriteFailure = $true
+    $null = Invoke-UnityEditor -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'failed log persistence' -LogPath $nativeLog -TimeoutSeconds 5
+    $unavailable = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($nativeLog, 'execution-diagnostics.json')) -Raw | ConvertFrom-Json
+    Assert-That 'a stale log cannot certify a new execution when log persistence fails' ($unavailable.NativeReports.State -eq 'log-write-failed' -and $unavailable.NativeReports.NativeReportHeaderCount -eq 0 -and (Get-Content -LiteralPath $nativeLog -Raw) -match 'Native Crash Reporting')
+    $script:executionLogWriteFailure = $false
+    Write-UnityExecutionObservation -LogPath (Join-Path $temporaryRoot 'missing/diagnostics.log') -ProcessObservation @{} -Label 'missing destination'
+    Assert-That 'execution diagnostic write failure does not throw' $true
+
+    $script:executionAttempt = 0
+    $script:executionRetry = $true
+    $retryResults = Join-Path $temporaryRoot 'retry-results.xml'
+    $null = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'retry test' -LogPath $nativeLog -ResultsPath $retryResults -Project (Join-Path $temporaryRoot 'retry-project')
+    $firstReceipt = Get-Content -LiteralPath (Join-Path $temporaryRoot 'native.first-attempt.execution-diagnostics.json') -Raw | ConvertFrom-Json
+    $lastReceipt = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($nativeLog, 'execution-diagnostics.json')) -Raw | ConvertFrom-Json
+    Assert-That 'UPM retry retains distinct first and final child receipts' ($script:executionAttempt -eq 2 -and $firstReceipt.Process.ProcessId -eq 101 -and $lastReceipt.Process.ProcessId -eq 102)
+    Assert-That 'retained first receipt refers to its matching first log' ($firstReceipt.NativeReports.NativeReportHeaderCount -eq 0 -and $lastReceipt.NativeReports.NativeReportHeaderCount -eq 1 -and (Get-Content (Join-Path $temporaryRoot 'native.first-attempt.log') -Raw) -match 'IPC stream failed')
 
 } finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue

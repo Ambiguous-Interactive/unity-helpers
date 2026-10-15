@@ -11,7 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Canonicalizes Unity text scenes and prefabs using structural object identities.</summary>
-    /// <remarks>Generated IDs skip Unity-reserved values while external references remain unchanged.</remarks>
+    /// <remarks>Generated IDs preserve legacy prefab sibling order, skip Unity-reserved values and leave external references unchanged.</remarks>
     public static partial class SceneCanonicalizer
     {
         private const string DocumentMarker = "--- !u!";

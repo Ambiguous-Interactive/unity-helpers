@@ -3,10 +3,11 @@
 
 namespace WallstopStudios.UnityHelpers.Utils
 {
+    using System.Collections.Generic;
     using UnityEngine;
 
     /// <summary>Stores a bottom-left-first opaque pixel mask and its sprite-local coordinates.</summary>
-    public readonly struct SpriteAlphaMask
+    public readonly struct SpriteAlphaMask : global::System.IEquatable<SpriteAlphaMask>
     {
         /// <summary>Gets the row-major pixels, with true indicating opaque art.</summary>
         public bool[] Pixels { get; }
@@ -42,6 +43,34 @@ namespace WallstopStudios.UnityHelpers.Utils
             Height = height;
             Pivot = pivot;
             UnitsPerPixel = unitsPerPixel;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(SpriteAlphaMask other)
+        {
+            return EqualityComparer<bool[]>.Default.Equals(Pixels, other.Pixels)
+                && Width.Equals(other.Width)
+                && Height.Equals(other.Height)
+                && EqualityComparer<Vector2>.Default.Equals(Pivot, other.Pivot)
+                && EqualityComparer<Vector2>.Default.Equals(UnitsPerPixel, other.UnitsPerPixel);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is SpriteAlphaMask other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                Pixels,
+                Width,
+                Height,
+                Pivot,
+                UnitsPerPixel
+            );
         }
     }
 }

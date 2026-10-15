@@ -565,7 +565,7 @@ namespace WallstopStudios.UnityHelpers.Editor
         /// <summary>
         /// Describes an attempted texture fit, including partial changes after failure.
         /// </summary>
-        public readonly struct Result
+        public readonly struct Result : global::System.IEquatable<Result>
         {
             /// <summary>Indicates whether the operation completed.</summary>
             public bool Succeeded { get; }
@@ -610,6 +610,40 @@ namespace WallstopStudios.UnityHelpers.Editor
                 Grown = grown;
                 Shrunk = shrunk;
                 Unchanged = unchanged;
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Result other)
+            {
+                return Succeeded.Equals(other.Succeeded)
+                    && Cancelled.Equals(other.Cancelled)
+                    && EqualityComparer<string>.Default.Equals(Error, other.Error)
+                    && Total.Equals(other.Total)
+                    && Changed.Equals(other.Changed)
+                    && Grown.Equals(other.Grown)
+                    && Shrunk.Equals(other.Shrunk)
+                    && Unchanged.Equals(other.Unchanged);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Result other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    Succeeded,
+                    Cancelled,
+                    Error,
+                    Total,
+                    Changed,
+                    Grown,
+                    Shrunk,
+                    Unchanged
+                );
             }
         }
     }

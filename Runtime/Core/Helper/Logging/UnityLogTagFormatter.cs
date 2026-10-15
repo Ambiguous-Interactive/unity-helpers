@@ -18,7 +18,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
     using UnityEditor;
 #endif
 
-    public readonly struct DecorationEntry
+    public readonly struct DecorationEntry : global::System.IEquatable<DecorationEntry>
     {
         internal string Tag { get; }
         internal bool EditorOnly { get; }
@@ -36,6 +36,35 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
             EditorOnly = editorOnly;
             Predicate = predicate;
             Formatter = formatter;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(DecorationEntry other)
+        {
+            return EqualityComparer<string>.Default.Equals(Tag, other.Tag)
+                && EditorOnly.Equals(other.EditorOnly)
+                && EqualityComparer<Func<string, bool>>.Default.Equals(Predicate, other.Predicate)
+                && EqualityComparer<Func<string, object, string>>.Default.Equals(
+                    Formatter,
+                    other.Formatter
+                );
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is DecorationEntry other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                Tag,
+                EditorOnly,
+                Predicate,
+                Formatter
+            );
         }
     }
 

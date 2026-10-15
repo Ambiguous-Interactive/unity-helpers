@@ -254,7 +254,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Value-based enumerator for efficient foreach iteration without heap allocations.
         /// Implements IDisposable to return pooled StringBuilders, Stack, and List.
         /// </summary>
-        public struct Enumerator : IDisposable
+        public struct Enumerator : IDisposable, global::System.IEquatable<Enumerator>
         {
             public string Current => _current;
 
@@ -337,6 +337,51 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
                 _stackResource.Dispose();
                 _listResource.Dispose();
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Enumerator other)
+            {
+                return EqualityComparer<Trie>.Default.Equals(_trie, other._trie)
+                    && EqualityComparer<
+                        PooledResource<
+                            Stack<(
+                                int node,
+                                PooledResource<StringBuilder> sbResource,
+                                int sbLength
+                            )>
+                        >
+                    >.Default.Equals(_stackResource, other._stackResource)
+                    && EqualityComparer<
+                        Stack<(int node, PooledResource<StringBuilder> sbResource, int sbLength)>
+                    >.Default.Equals(_stack, other._stack)
+                    && EqualityComparer<
+                        PooledResource<List<PooledResource<StringBuilder>>>
+                    >.Default.Equals(_listResource, other._listResource)
+                    && EqualityComparer<List<PooledResource<StringBuilder>>>.Default.Equals(
+                        _stringBuilderResources,
+                        other._stringBuilderResources
+                    )
+                    && EqualityComparer<string>.Default.Equals(_current, other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Enumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _trie,
+                    _stackResource,
+                    _stack,
+                    _listResource,
+                    _stringBuilderResources,
+                    _current
+                );
             }
 
             private void PushChildrenAndContinue(
@@ -598,7 +643,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Value-based enumerator for efficient foreach iteration without heap allocations.
         /// Implements IDisposable to return pooled Stack.
         /// </summary>
-        public struct Enumerator : IDisposable
+        public struct Enumerator : IDisposable, global::System.IEquatable<Enumerator>
         {
             public T Current => _current;
 
@@ -648,6 +693,35 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             public void Dispose()
             {
                 _stackResource.Dispose();
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Enumerator other)
+            {
+                return EqualityComparer<Trie<T>>.Default.Equals(_trie, other._trie)
+                    && EqualityComparer<PooledResource<Stack<int>>>.Default.Equals(
+                        _stackResource,
+                        other._stackResource
+                    )
+                    && EqualityComparer<Stack<int>>.Default.Equals(_stack, other._stack)
+                    && EqualityComparer<T>.Default.Equals(_current, other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Enumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _trie,
+                    _stackResource,
+                    _stack,
+                    _current
+                );
             }
 
             private void PushChildren(int node)

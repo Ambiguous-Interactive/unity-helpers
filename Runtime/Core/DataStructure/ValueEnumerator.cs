@@ -9,7 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
     /// <summary>Enumerates arrays, exact lists, and exact hash sets without boxing their enumerators.</summary>
     /// <remarks>Other sources retain their enumeration and disposal behavior. Current is meaningful only after a successful MoveNext. Copies of a fallback enumerator share its lifetime.</remarks>
-    public struct ValueEnumerator<T> : IDisposable
+    public struct ValueEnumerator<T> : IDisposable, global::System.IEquatable<ValueEnumerator<T>>
     {
         private const int ArrayKind = 0;
         private const int ListKind = 1;
@@ -123,6 +123,36 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     }
                     break;
             }
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(ValueEnumerator<T> other)
+        {
+            return _kind.Equals(other._kind)
+                && EqualityComparer<T[]>.Default.Equals(_array, other._array)
+                && EqualityComparer<List<T>.Enumerator>.Default.Equals(_list, other._list)
+                && EqualityComparer<HashSet<T>.Enumerator>.Default.Equals(_hashSet, other._hashSet)
+                && EqualityComparer<IEnumerator<T>>.Default.Equals(_fallback, other._fallback)
+                && _index.Equals(other._index);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is ValueEnumerator<T> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _kind,
+                _array,
+                _list,
+                _hashSet,
+                _fallback,
+                _index
+            );
         }
     }
 }

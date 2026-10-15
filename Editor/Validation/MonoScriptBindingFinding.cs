@@ -3,11 +3,13 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     using System;
 
     /// <summary>One type or script asset whose binding is missing or decided by accident.</summary>
     public readonly struct MonoScriptBindingFinding
+        : global::System.IEquatable<MonoScriptBindingFinding>
     {
         /// <summary>Which of the two rules the subject breaks.</summary>
         public MonoScriptBindingProblem Problem { get; }
@@ -46,6 +48,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             return $"{Subject?.FullName} has no MonoScript, so it cannot be dragged onto a "
                 + "GameObject or created as an asset.";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(MonoScriptBindingFinding other)
+        {
+            return EqualityComparer<MonoScriptBindingProblem>.Default.Equals(Problem, other.Problem)
+                && EqualityComparer<Type>.Default.Equals(Subject, other.Subject)
+                && EqualityComparer<string>.Default.Equals(ScriptPath, other.ScriptPath);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is MonoScriptBindingFinding other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                Problem,
+                Subject,
+                ScriptPath
+            );
         }
     }
 #endif

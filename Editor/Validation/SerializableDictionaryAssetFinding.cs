@@ -3,9 +3,11 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     /// <summary>One authored dictionary whose keys and values no longer describe one mapping.</summary>
     public readonly struct SerializableDictionaryAssetFinding
+        : global::System.IEquatable<SerializableDictionaryAssetFinding>
     {
         /// <summary>The asset carrying the dictionary.</summary>
         public string AssetPath { get; }
@@ -42,6 +44,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public override string ToString()
         {
             return $"{AssetPath}:{LineNumber}: {Problem} -- {Detail}";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(SerializableDictionaryAssetFinding other)
+        {
+            return EqualityComparer<string>.Default.Equals(AssetPath, other.AssetPath)
+                && LineNumber.Equals(other.LineNumber)
+                && EqualityComparer<SerializableDictionaryAssetProblem>.Default.Equals(
+                    Problem,
+                    other.Problem
+                )
+                && EqualityComparer<string>.Default.Equals(Detail, other.Detail);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is SerializableDictionaryAssetFinding other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                AssetPath,
+                LineNumber,
+                Problem,
+                Detail
+            );
         }
     }
 #endif

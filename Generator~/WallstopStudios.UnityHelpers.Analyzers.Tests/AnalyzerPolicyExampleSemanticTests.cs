@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static IEnumerable<TestCaseData> Cases()
         {
-            for (int number = 1; number <= 22; ++number)
+            for (int number = 1; number <= 23; ++number)
             {
                 string id = $"WUH{number:000}";
                 yield return new TestCaseData(id).SetName(id + "ExamplesMatchTheActualDiagnostic");
@@ -138,6 +138,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new RepeatedCollectionCountAnalyzer();
                 case "WUH022":
                     return new DisposableStructBoxingAnalyzer();
+                case "WUH023":
+                    return new PublicStructEqualityAnalyzer();
                 default:
                     Assert.Fail("Unmapped diagnostic " + id);
                     return null;
@@ -146,6 +148,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static string SourceFor(string id, string code)
         {
+            if (string.Equals(id, "WUH023", StringComparison.Ordinal))
+            {
+                return "using System;\n" + code;
+            }
             string fields = string.Empty;
             string members = string.Empty;
             string body = code;

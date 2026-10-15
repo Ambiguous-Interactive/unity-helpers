@@ -1058,6 +1058,14 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
     } catch {
         Write-CiWarning "Could not preserve first failed Unity log before retry: $($_.Exception.Message)"
     }
+    $observationPath = [IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')
+    if (Test-Path -LiteralPath $observationPath -PathType Leaf) {
+        try {
+            Copy-Item -LiteralPath $observationPath -Destination ([IO.Path]::ChangeExtension($firstAttemptLogPath, 'execution-diagnostics.json')) -Force -ErrorAction Stop
+        } catch {
+            Write-CiWarning 'Could not preserve first failed Unity execution diagnostics before retry.'
+        }
+    }
     Clear-UnityPackageManagerRetryState -Project $Project
 
     if (Test-Path -LiteralPath $ResultsPath -PathType Leaf) {
@@ -3008,7 +3016,9 @@ function Invoke-ProcessWithTreeKillTimeout {
     # Persist the captured (already-streamed) output to $LogPath for diagnostics.
     try {
         Set-Content -LiteralPath $LogPath -Value (@($buffer.ToArray()) -join "`n") -Encoding UTF8
+        if ($null -ne $ProcessObservation) { $ProcessObservation['LogPersistence'] = 'written' }
     } catch {
+        if ($null -ne $ProcessObservation) { $ProcessObservation['LogPersistence'] = 'write-failed' }
         Write-Host "::warning::Could not persist '$Label' log to ${LogPath}: $($_.Exception.Message)"
     }
 
@@ -3631,6 +3641,7 @@ function Invoke-UnityEditor {
         # grace-kills the editor once the completion sentinel is seen, and tree-kills it
         # if it goes silent mid-run for $StallSeconds. It returns @{ ExitCode; TimedOut;
         # Stalled }; the durable results.xml remains the source of truth.
+        if ($null -eq $ProcessObservation) { $ProcessObservation = @{} }
         $watch = Invoke-ProcessWithTreeKillTimeout `
             -FilePath $EditorPath `
             -Arguments $Arguments `
@@ -3642,6 +3653,7 @@ function Invoke-UnityEditor {
             -StallSeconds $StallSeconds `
             -ProcessObservation $ProcessObservation
         $exitCode = $watch.ExitCode
+        Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $ProcessObservation -Label $Label
     } else {
         Write-Host "::group::$Label"
         Write-Host "`"$EditorPath`" $($Arguments -join ' ')"
@@ -4492,6 +4504,68 @@ function Read-UnityProcessFailureEvents {
         $report.Reason = 'event-query-failed'
     }
     return $report
+}
+
+function Get-UnityNativeReportSummary {
+    param([string]$LogPath)
+
+    $summary = [ordered]@{
+        State = 'missing-log'
+        NativeReportHeaderCount = 0
+        UnknownNativeConditionCount = 0
+        NativeReportHeaderLines = @()
+        UnknownNativeConditionLines = @()
+        LocationsTruncated = $false
+    }
+    if ([string]::IsNullOrWhiteSpace($LogPath) -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return $summary }
+    try {
+        $lineNumber = 0
+        foreach ($line in [IO.File]::ReadLines($LogPath)) {
+            ++$lineNumber
+            if (0 -le $line.IndexOf('Native Crash Reporting', [StringComparison]::OrdinalIgnoreCase)) {
+                ++$summary.NativeReportHeaderCount
+                if ($summary.NativeReportHeaderLines.Count -lt 8) { $summary.NativeReportHeaderLines += $lineNumber }
+                else { $summary.LocationsTruncated = $true }
+            }
+            if (0 -le $line.IndexOf('Got a UNKNOWN while executing native code', [StringComparison]::OrdinalIgnoreCase)) {
+                ++$summary.UnknownNativeConditionCount
+                if ($summary.UnknownNativeConditionLines.Count -lt 8) { $summary.UnknownNativeConditionLines += $lineNumber }
+                else { $summary.LocationsTruncated = $true }
+            }
+        }
+        $summary.State = 'observed'
+    } catch {
+        $summary.State = 'unreadable-log'
+    }
+    return $summary
+}
+
+function Write-UnityExecutionObservation {
+    param([string]$LogPath, [hashtable]$ProcessObservation, [string]$Label)
+
+    try {
+        $path = [IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')
+        if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force -ErrorAction Stop }
+        $nativeReports = Get-UnityNativeReportSummary -LogPath $null
+        $nativeReports.State = 'log-persistence-unavailable'
+        if ($ProcessObservation -and $ProcessObservation['LogPersistence'] -eq 'written') {
+            $nativeReports = Get-UnityNativeReportSummary -LogPath $LogPath
+        } elseif ($ProcessObservation -and $ProcessObservation['LogPersistence'] -eq 'write-failed') {
+            $nativeReports.State = 'log-write-failed'
+        }
+        $report = [ordered]@{
+            CapturedUtc = [DateTime]::UtcNow.ToString('o')
+            Label = $Label
+            Process = $ProcessObservation
+            NativeReports = $nativeReports
+            WindowsEvents = Get-UnityProcessFailureEvents -ProcessObservation $ProcessObservation
+        }
+        $json = ConvertTo-UnitySafeLogText -Text (ConvertTo-Json -InputObject $report -Depth 8)
+        Set-Content -LiteralPath $path -Value $json -Encoding UTF8 -ErrorAction Stop
+        Write-Host "::notice::Saved Unity execution diagnostics: $path"
+    } catch {
+        Write-Host '::warning::Could not persist Unity execution diagnostics; execution outcome is unchanged.'
+    }
 }
 
 function Write-UnityConfigureFailureObservation {
