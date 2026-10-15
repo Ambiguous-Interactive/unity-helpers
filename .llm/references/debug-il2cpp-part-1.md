@@ -65,6 +65,13 @@ private void EnsureGenericInstantiations()
 }
 ```
 
+NUnit fixture attributes naming generic arguments do not create concrete constructor calls.
+Unity 2021.3 IL2CPP can discover those fixtures but fail every case because their
+constructors have no AOT bodies. Use a fixture without type parameters and a
+`TestCaseSource` that directly calls helpers with every concrete type argument.
+Keep every law and subject; neither skipping player cases nor preserving metadata
+alone supplies missing compiled generic bodies.
+
 ### 3. Reflection.Emit
 
 **Symptoms**:

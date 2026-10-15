@@ -297,6 +297,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             "  m_LightingSettings: {fileID: 0}"
         );
 
+        private static string AddedChildrenScene(bool reverseDocuments, bool renumber)
+        {
+            long firstObject = renumber ? 2100 : 100;
+            long firstTransform = renumber ? 2101 : 101;
+            long secondObject = renumber ? 1100 : 200;
+            long secondTransform = renumber ? 1101 : 201;
+            string first = AddedChildDocuments(firstObject, firstTransform, 0);
+            string second = AddedChildDocuments(secondObject, secondTransform, 1);
+            return Scene(
+                "--- !u!1001 &500",
+                "PrefabInstance:",
+                "  m_Modification:",
+                "    m_TransformParent: {fileID: 0}",
+                "    m_Modifications: []",
+                "    m_RemovedComponents: []",
+                "  m_SourcePrefab: {fileID: 100100000, guid: dd44dd44dd44dd44dd44dd44dd44dd44, type: 3}",
+                "--- !u!4 &501 stripped",
+                "Transform:",
+                "  m_CorrespondingSourceObject: {fileID: 400000, guid: dd44dd44dd44dd44dd44dd44dd44dd44, type: 3}",
+                "  m_PrefabInstance: {fileID: 500}",
+                "  m_PrefabAsset: {fileID: 0}",
+                reverseDocuments ? second : first,
+                reverseDocuments ? first : second
+            );
+        }
+
+        private static string AddedChildDocuments(long gameObject, long transform, int rootOrder)
+        {
+            return string.Join(
+                "\n",
+                $"--- !u!1 &{gameObject}",
+                "GameObject:",
+                "  m_Component:",
+                $"  - component: {{fileID: {transform}}}",
+                "  m_Name: Nested",
+                $"--- !u!4 &{transform}",
+                "Transform:",
+                $"  m_GameObject: {{fileID: {gameObject}}}",
+                "  m_Children: []",
+                "  m_Father: {fileID: 501}",
+                $"  m_RootOrder: {rootOrder}"
+            );
+        }
+
         private static IEnumerable<TestCaseData> Scenes()
         {
             yield return new TestCaseData(BaseScene).SetName("{m}.BaseScene");
@@ -471,6 +515,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
         private static bool IsDigit(char value)
         {
             return '0' <= value && value <= '9';
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RootOrderDistinguishesAddedChildrenOfStrippedParents(bool reverseDocuments)
+        {
+            string first = AddedChildrenScene(false, false);
+            string second = AddedChildrenScene(reverseDocuments, true);
+            Assert.That(first, Is.Not.EqualTo(second));
+            Assert.That(
+                SceneCanonicalizer.CanonicalizeYaml(second),
+                Is.EqualTo(SceneCanonicalizer.CanonicalizeYaml(first))
+            );
         }
 
         [Test]

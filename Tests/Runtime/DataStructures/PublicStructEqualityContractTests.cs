@@ -7,238 +7,451 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime
     using System.Collections.Generic;
     using NUnit.Framework;
 
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Tags.AttributeMetadataCache.ResolvedRelationalFieldMetadata)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Tags.AttributeModification))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Tags.EffectBehaviorContext))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Tags.PeriodicEffectTickContext))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Tags.EffectHandle))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Tags.TagHandler.ActiveTagEnumerable))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Tags.TagHandler.HandleEnumerable))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Tags.TagHandler.HandleEnumerator))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Tags.TagHandler.ActiveTagEnumerator))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Utils.WaitInstructionCacheDiagnostics)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Utils.PooledArray<int>))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Utils.PooledResource<int>))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Utils.DeferredDisposalResult<int>))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Utils.DisposableScope))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Utils.DisposableScope<global::WallstopStudios.UnityHelpers.Utils.DisposableScope>)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Utils.GlobalPoolStatistics))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Utils.PoolPurgeEffectiveOptions))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Utils.PoolStatistics))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Utils.PoolFrequencyStatistics))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Utils.ScriptableObjectSingletonMetadata.Entry)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Utils.SpriteAlphaMask))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Visuals.AnimatedSpriteLayer))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.BitSet.BitEnumerator)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.BoundingBox3D))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.CacheBuilder<int, int>)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.CacheOptions<int, int>)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.CacheStatistics))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Circle))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.CyclicBuffer<int>.CyclicBufferEnumerator)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Deque<int>.DequeEnumerator)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Heap<int>.HeapEnumerator)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.ImmutableBitSet))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.ImmutableBitSet.BitEnumerator)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.IntMap<int>.Enumerator)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.IntMap<int>.KeyView)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.IntMap<int>.ValueView)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.IntMap<int>.KeyEnumerator)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.IntMap<int>.ValueEnumerator)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.KdTree2D<int>.Entry)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.OctTree3D<int>.Entry)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.OctTree3D<int>.BoundsQueryNodeTrace)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.QuadTree2D<int>.Entry)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.SparseSet.SparseSetEnumerator)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.SparseSet<int>.SparseSetEnumerator)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Sphere))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Trie.Enumerator))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Trie<int>.Enumerator)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.ValueDictionaryEnumerable<
-            int,
-            int
-        >)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.ValueDictionaryEnumerator<
-            int,
-            int
-        >)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.ValueEnumerable<int>)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.ValueEnumerator<int>)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Extension.AsyncOperationExtensions.AsyncOperationAwaiter)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Helper.RestorableGlobal<int>.Scope)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Math.Line2D))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Math.Line3D))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Math.Parabola))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Math.Range<int>))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.OneOf.FastOneOf<int, int, int>))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.OneOf.FastOneOf<int, int>))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.OneOf.FastOneOf<int, int, int, int>)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.OneOf.None))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Random.NativePcgRandom))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Random.RandomGeneratorMetadata))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Random.RandomState))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.BoneWeightSurrogate)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.KeyframeSurrogate))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.Matrix4x4Surrogate)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.Vector2Surrogate))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.Vector3Surrogate))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.QuaternionSurrogate)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.ColorSurrogate))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.Color32Surrogate))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.RectSurrogate))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.RectIntSurrogate))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.BoundsSurrogate))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.BoundsIntSurrogate)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.Vector2IntSurrogate)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.Vector3IntSurrogate)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.ResolutionSurrogate)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.ParabolaSurrogate))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.ImmutableBitSetSurrogate)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.Vector4Surrogate))]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Threading.SemaphoreLease))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.FastVector2Int)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.FastVector3Int)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableDictionaryBase<
-            int,
-            int,
-            int
-        >.Enumerator)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableNullable<int>)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableSortedDictionaryBase<
-            int,
-            int,
-            int
-        >.Enumerator)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableType)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableTypeCatalog.SerializableTypeDescriptor)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableValueTuple<
-            int,
-            int
-        >)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableValueTuple<
-            int,
-            int,
-            int
-        >)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.WGuid))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Extension.UnityExtensions.ConcaveHullOptions)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Extension.UnityExtensions.ConcaveHullOptions.Builder)
-    )]
-    [TestFixture(typeof(global::WallstopStudios.UnityHelpers.Core.Helper.Logging.DecorationEntry))]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoArrayBuilder<int>)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoConstruct)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoLengthToken)
-    )]
-    [TestFixture(
-        typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoWriteResult)
-    )]
-    public sealed class PublicStructEqualityContractTests<T>
-        where T : struct, IEquatable<T>
+    [TestFixture]
+    public sealed class PublicStructEqualityContractTests
     {
-        [Test]
-        public void DefaultValueIsReflexiveAndSymmetric()
+        private static IEnumerable<TestCaseData> ContractCases()
+        {
+            List<TestCaseData> contracts = new(400);
+            AddCases<global::WallstopStudios.UnityHelpers.Tags.AttributeMetadataCache.ResolvedRelationalFieldMetadata>(
+                contracts,
+                "Tags.AttributeMetadataCache.ResolvedRelationalFieldMetadata"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Tags.AttributeModification>(
+                contracts,
+                "Tags.AttributeModification"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Tags.EffectBehaviorContext>(
+                contracts,
+                "Tags.EffectBehaviorContext"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Tags.PeriodicEffectTickContext>(
+                contracts,
+                "Tags.PeriodicEffectTickContext"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Tags.EffectHandle>(
+                contracts,
+                "Tags.EffectHandle"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Tags.TagHandler.ActiveTagEnumerable>(
+                contracts,
+                "Tags.TagHandler.ActiveTagEnumerable"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Tags.TagHandler.HandleEnumerable>(
+                contracts,
+                "Tags.TagHandler.HandleEnumerable"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Tags.TagHandler.HandleEnumerator>(
+                contracts,
+                "Tags.TagHandler.HandleEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Tags.TagHandler.ActiveTagEnumerator>(
+                contracts,
+                "Tags.TagHandler.ActiveTagEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.WaitInstructionCacheDiagnostics>(
+                contracts,
+                "Utils.WaitInstructionCacheDiagnostics"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.PooledArray<int>>(
+                contracts,
+                "Utils.PooledArray<int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.PooledResource<int>>(
+                contracts,
+                "Utils.PooledResource<int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.DeferredDisposalResult<int>>(
+                contracts,
+                "Utils.DeferredDisposalResult<int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.DisposableScope>(
+                contracts,
+                "Utils.DisposableScope"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.DisposableScope<global::WallstopStudios.UnityHelpers.Utils.DisposableScope>>(
+                contracts,
+                "Utils.DisposableScope<global::WallstopStudios.UnityHelpers.Utils.DisposableScope>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.GlobalPoolStatistics>(
+                contracts,
+                "Utils.GlobalPoolStatistics"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.PoolPurgeEffectiveOptions>(
+                contracts,
+                "Utils.PoolPurgeEffectiveOptions"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.PoolStatistics>(
+                contracts,
+                "Utils.PoolStatistics"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.PoolFrequencyStatistics>(
+                contracts,
+                "Utils.PoolFrequencyStatistics"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.ScriptableObjectSingletonMetadata.Entry>(
+                contracts,
+                "Utils.ScriptableObjectSingletonMetadata.Entry"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Utils.SpriteAlphaMask>(
+                contracts,
+                "Utils.SpriteAlphaMask"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Visuals.AnimatedSpriteLayer>(
+                contracts,
+                "Visuals.AnimatedSpriteLayer"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.BitSet.BitEnumerator>(
+                contracts,
+                "Core.DataStructure.BitSet.BitEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.BoundingBox3D>(
+                contracts,
+                "Core.DataStructure.BoundingBox3D"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.CacheBuilder<
+                int,
+                int
+            >>(contracts, "Core.DataStructure.CacheBuilder<int,int>");
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.CacheOptions<
+                int,
+                int
+            >>(contracts, "Core.DataStructure.CacheOptions<int,int>");
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.CacheStatistics>(
+                contracts,
+                "Core.DataStructure.CacheStatistics"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Circle>(
+                contracts,
+                "Core.DataStructure.Circle"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.CyclicBuffer<int>.CyclicBufferEnumerator>(
+                contracts,
+                "Core.DataStructure.CyclicBuffer<int>.CyclicBufferEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Deque<int>.DequeEnumerator>(
+                contracts,
+                "Core.DataStructure.Deque<int>.DequeEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Heap<int>.HeapEnumerator>(
+                contracts,
+                "Core.DataStructure.Heap<int>.HeapEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.ImmutableBitSet>(
+                contracts,
+                "Core.DataStructure.ImmutableBitSet"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.ImmutableBitSet.BitEnumerator>(
+                contracts,
+                "Core.DataStructure.ImmutableBitSet.BitEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.IntMap<int>.Enumerator>(
+                contracts,
+                "Core.DataStructure.IntMap<int>.Enumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.IntMap<int>.KeyView>(
+                contracts,
+                "Core.DataStructure.IntMap<int>.KeyView"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.IntMap<int>.ValueView>(
+                contracts,
+                "Core.DataStructure.IntMap<int>.ValueView"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.IntMap<int>.KeyEnumerator>(
+                contracts,
+                "Core.DataStructure.IntMap<int>.KeyEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.IntMap<int>.ValueEnumerator>(
+                contracts,
+                "Core.DataStructure.IntMap<int>.ValueEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.KdTree2D<int>.Entry>(
+                contracts,
+                "Core.DataStructure.KdTree2D<int>.Entry"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.OctTree3D<int>.Entry>(
+                contracts,
+                "Core.DataStructure.OctTree3D<int>.Entry"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.OctTree3D<int>.BoundsQueryNodeTrace>(
+                contracts,
+                "Core.DataStructure.OctTree3D<int>.BoundsQueryNodeTrace"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.QuadTree2D<int>.Entry>(
+                contracts,
+                "Core.DataStructure.QuadTree2D<int>.Entry"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.SparseSet.SparseSetEnumerator>(
+                contracts,
+                "Core.DataStructure.SparseSet.SparseSetEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.SparseSet<int>.SparseSetEnumerator>(
+                contracts,
+                "Core.DataStructure.SparseSet<int>.SparseSetEnumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Sphere>(
+                contracts,
+                "Core.DataStructure.Sphere"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Trie.Enumerator>(
+                contracts,
+                "Core.DataStructure.Trie.Enumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Trie<int>.Enumerator>(
+                contracts,
+                "Core.DataStructure.Trie<int>.Enumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.ValueDictionaryEnumerable<
+                int,
+                int
+            >>(contracts, "Core.DataStructure.ValueDictionaryEnumerable<int,int>");
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.ValueDictionaryEnumerator<
+                int,
+                int
+            >>(contracts, "Core.DataStructure.ValueDictionaryEnumerator<int,int>");
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.ValueEnumerable<int>>(
+                contracts,
+                "Core.DataStructure.ValueEnumerable<int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.ValueEnumerator<int>>(
+                contracts,
+                "Core.DataStructure.ValueEnumerator<int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Extension.AsyncOperationExtensions.AsyncOperationAwaiter>(
+                contracts,
+                "Core.Extension.AsyncOperationExtensions.AsyncOperationAwaiter"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Helper.RestorableGlobal<int>.Scope>(
+                contracts,
+                "Core.Helper.RestorableGlobal<int>.Scope"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Math.Line2D>(
+                contracts,
+                "Core.Math.Line2D"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Math.Line3D>(
+                contracts,
+                "Core.Math.Line3D"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Math.Parabola>(
+                contracts,
+                "Core.Math.Parabola"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Math.Range<int>>(
+                contracts,
+                "Core.Math.Range<int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.OneOf.FastOneOf<int, int, int>>(
+                contracts,
+                "Core.OneOf.FastOneOf<int,int,int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.OneOf.FastOneOf<int, int>>(
+                contracts,
+                "Core.OneOf.FastOneOf<int,int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.OneOf.FastOneOf<int, int, int, int>>(
+                contracts,
+                "Core.OneOf.FastOneOf<int,int,int,int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.OneOf.None>(
+                contracts,
+                "Core.OneOf.None"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Random.NativePcgRandom>(
+                contracts,
+                "Core.Random.NativePcgRandom"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Random.RandomGeneratorMetadata>(
+                contracts,
+                "Core.Random.RandomGeneratorMetadata"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Random.RandomState>(
+                contracts,
+                "Core.Random.RandomState"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.BoneWeightSurrogate>(
+                contracts,
+                "Core.Serialization.BoneWeightSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.KeyframeSurrogate>(
+                contracts,
+                "Core.Serialization.KeyframeSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.Matrix4x4Surrogate>(
+                contracts,
+                "Core.Serialization.Matrix4x4Surrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.Vector2Surrogate>(
+                contracts,
+                "Core.Serialization.Vector2Surrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.Vector3Surrogate>(
+                contracts,
+                "Core.Serialization.Vector3Surrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.QuaternionSurrogate>(
+                contracts,
+                "Core.Serialization.QuaternionSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.ColorSurrogate>(
+                contracts,
+                "Core.Serialization.ColorSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.Color32Surrogate>(
+                contracts,
+                "Core.Serialization.Color32Surrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.RectSurrogate>(
+                contracts,
+                "Core.Serialization.RectSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.RectIntSurrogate>(
+                contracts,
+                "Core.Serialization.RectIntSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.BoundsSurrogate>(
+                contracts,
+                "Core.Serialization.BoundsSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.BoundsIntSurrogate>(
+                contracts,
+                "Core.Serialization.BoundsIntSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.Vector2IntSurrogate>(
+                contracts,
+                "Core.Serialization.Vector2IntSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.Vector3IntSurrogate>(
+                contracts,
+                "Core.Serialization.Vector3IntSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.ResolutionSurrogate>(
+                contracts,
+                "Core.Serialization.ResolutionSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.ParabolaSurrogate>(
+                contracts,
+                "Core.Serialization.ParabolaSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.ImmutableBitSetSurrogate>(
+                contracts,
+                "Core.Serialization.ImmutableBitSetSurrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.Vector4Surrogate>(
+                contracts,
+                "Core.Serialization.Vector4Surrogate"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Threading.SemaphoreLease>(
+                contracts,
+                "Core.Threading.SemaphoreLease"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.FastVector2Int>(
+                contracts,
+                "Core.DataStructure.Adapters.FastVector2Int"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.FastVector3Int>(
+                contracts,
+                "Core.DataStructure.Adapters.FastVector3Int"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableDictionaryBase<
+                int,
+                int,
+                int
+            >.Enumerator>(
+                contracts,
+                "Core.DataStructure.Adapters.SerializableDictionaryBase<int,int,int>.Enumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableNullable<int>>(
+                contracts,
+                "Core.DataStructure.Adapters.SerializableNullable<int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableSortedDictionaryBase<
+                int,
+                int,
+                int
+            >.Enumerator>(
+                contracts,
+                "Core.DataStructure.Adapters.SerializableSortedDictionaryBase<int,int,int>.Enumerator"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableType>(
+                contracts,
+                "Core.DataStructure.Adapters.SerializableType"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableTypeCatalog.SerializableTypeDescriptor>(
+                contracts,
+                "Core.DataStructure.Adapters.SerializableTypeCatalog.SerializableTypeDescriptor"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableValueTuple<
+                int,
+                int
+            >>(contracts, "Core.DataStructure.Adapters.SerializableValueTuple<int,int>");
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.SerializableValueTuple<
+                int,
+                int,
+                int
+            >>(contracts, "Core.DataStructure.Adapters.SerializableValueTuple<int,int,int>");
+            AddCases<global::WallstopStudios.UnityHelpers.Core.DataStructure.Adapters.WGuid>(
+                contracts,
+                "Core.DataStructure.Adapters.WGuid"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Extension.UnityExtensions.ConcaveHullOptions>(
+                contracts,
+                "Core.Extension.UnityExtensions.ConcaveHullOptions"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Extension.UnityExtensions.ConcaveHullOptions.Builder>(
+                contracts,
+                "Core.Extension.UnityExtensions.ConcaveHullOptions.Builder"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Helper.Logging.DecorationEntry>(
+                contracts,
+                "Core.Helper.Logging.DecorationEntry"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoArrayBuilder<int>>(
+                contracts,
+                "Core.Serialization.WallstopProto.WProtoArrayBuilder<int>"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoConstruct>(
+                contracts,
+                "Core.Serialization.WallstopProto.WProtoConstruct"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoLengthToken>(
+                contracts,
+                "Core.Serialization.WallstopProto.WProtoLengthToken"
+            );
+            AddCases<global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoWriteResult>(
+                contracts,
+                "Core.Serialization.WallstopProto.WProtoWriteResult"
+            );
+            return contracts;
+        }
+
+        private static void AddCases<T>(List<TestCaseData> contracts, string typeName)
+            where T : struct, IEquatable<T>
+        {
+            contracts.Add(
+                new TestCaseData((Action)DefaultValueIsReflexiveAndSymmetric<T>).SetName(
+                    $"{typeName}.{nameof(DefaultValueIsReflexiveAndSymmetric)}"
+                )
+            );
+            contracts.Add(
+                new TestCaseData(
+                    (Action)ObjectEqualityAgreesAndRejectsNullAndOtherTypes<T>
+                ).SetName($"{typeName}.{nameof(ObjectEqualityAgreesAndRejectsNullAndOtherTypes)}")
+            );
+            contracts.Add(
+                new TestCaseData((Action)EqualDefaultValuesHaveMatchingHashes<T>).SetName(
+                    $"{typeName}.{nameof(EqualDefaultValuesHaveMatchingHashes)}"
+                )
+            );
+            contracts.Add(
+                new TestCaseData((Action)GenericHashCollectionsFindAnEqualValue<T>).SetName(
+                    $"{typeName}.{nameof(GenericHashCollectionsFindAnEqualValue)}"
+                )
+            );
+        }
+
+        private static void DefaultValueIsReflexiveAndSymmetric<T>()
+            where T : struct, IEquatable<T>
         {
             T first = default;
             T second = default;
@@ -247,8 +460,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime
             Assert.That(EqualityComparer<T>.Default.Equals(first, second), Is.True);
         }
 
-        [Test]
-        public void ObjectEqualityAgreesAndRejectsNullAndOtherTypes()
+        private static void ObjectEqualityAgreesAndRejectsNullAndOtherTypes<T>()
+            where T : struct, IEquatable<T>
         {
             T value = default;
             object boxed = value;
@@ -257,8 +470,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime
             Assert.That(value.Equals(new object()), Is.False);
         }
 
-        [Test]
-        public void EqualDefaultValuesHaveMatchingHashes()
+        private static void EqualDefaultValuesHaveMatchingHashes<T>()
+            where T : struct, IEquatable<T>
         {
             T first = default;
             T second = default;
@@ -269,8 +482,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime
             );
         }
 
-        [Test]
-        public void GenericHashCollectionsFindAnEqualValue()
+        private static void GenericHashCollectionsFindAnEqualValue<T>()
+            where T : struct, IEquatable<T>
         {
             T first = default;
             T second = default;
@@ -280,6 +493,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime
             Dictionary<T, int> map = new() { [first] = 7 };
             Assert.That(map.TryGetValue(second, out int found), Is.True);
             Assert.That(found, Is.EqualTo(7));
+        }
+
+        [TestCaseSource(nameof(ContractCases))]
+        public void EveryPublicStructSatisfiesEqualityContract(Action assertion)
+        {
+            assertion();
         }
     }
 }

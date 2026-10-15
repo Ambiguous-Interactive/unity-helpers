@@ -32,6 +32,8 @@ input instead of treating them as a successful rewrite.
 ## Identity and byte preservation
 
 - GameObjects and transforms use hierarchy names and sibling positions.
+  Explicit child lists take precedence. Older prefab additions use `m_RootOrder`
+  when their stripped parent does not serialize a child list.
 - Components use their class and ordinal among components of that class.
 - Prefab instances use their source GUID, parent and normalized modifications.
   Repeated instances use sibling order to keep their stripped references distinct.

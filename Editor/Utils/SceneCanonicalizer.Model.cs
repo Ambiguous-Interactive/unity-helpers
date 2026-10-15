@@ -126,10 +126,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             internal int SiblingIndex(long transformId)
             {
                 bool hasFather = _father.TryGetValue(transformId, out long father) && father != 0;
-                if (hasFather)
+                if (hasFather && _childIndex.TryGetValue(transformId, out int childIndex))
                 {
-                    int childIndex;
-                    return _childIndex.TryGetValue(transformId, out childIndex) ? childIndex : 0;
+                    return childIndex;
                 }
 
                 int rootIndex;
