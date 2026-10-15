@@ -273,7 +273,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return GetEnumerator();
         }
 
-        public struct SparseSetEnumerator : IEnumerator<int>
+        public struct SparseSetEnumerator
+            : IEnumerator<int>,
+                global::System.IEquatable<SparseSetEnumerator>
         {
             public int Current => _current;
 
@@ -311,6 +313,32 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             public void Dispose() { }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(SparseSetEnumerator other)
+            {
+                return EqualityComparer<int[]>.Default.Equals(_dense, other._dense)
+                    && _count.Equals(other._count)
+                    && _index.Equals(other._index)
+                    && _current.Equals(other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is SparseSetEnumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _dense,
+                    _count,
+                    _index,
+                    _current
+                );
+            }
         }
     }
 
@@ -553,7 +581,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return GetEnumerator();
         }
 
-        public struct SparseSetEnumerator : IEnumerator<T>
+        public struct SparseSetEnumerator
+            : IEnumerator<T>,
+                global::System.IEquatable<SparseSetEnumerator>
         {
             public T Current => _current;
 
@@ -606,6 +636,39 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             public void Dispose()
             {
                 _pooledArray.Dispose();
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(SparseSetEnumerator other)
+            {
+                return EqualityComparer<T[]>.Default.Equals(_elements, other._elements)
+                    && EqualityComparer<int[]>.Default.Equals(_dense, other._dense)
+                    && _count.Equals(other._count)
+                    && EqualityComparer<PooledArray<T>>.Default.Equals(
+                        _pooledArray,
+                        other._pooledArray
+                    )
+                    && _index.Equals(other._index)
+                    && EqualityComparer<T>.Default.Equals(_current, other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is SparseSetEnumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _elements,
+                    _dense,
+                    _count,
+                    _pooledArray,
+                    _index,
+                    _current
+                );
             }
         }
     }

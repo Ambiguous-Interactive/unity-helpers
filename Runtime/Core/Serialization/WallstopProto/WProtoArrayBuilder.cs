@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// holds a reference to the builder to observe it through.
     /// </para>
     /// </remarks>
-    public struct WProtoArrayBuilder<T>
+    public struct WProtoArrayBuilder<T> : global::System.IEquatable<WProtoArrayBuilder<T>>
     {
         private const int MinimumGrowth = 4;
 
@@ -173,6 +173,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             T[] exact = new T[_count];
             Array.Copy(_items, exact, _count);
             return exact;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(WProtoArrayBuilder<T> other)
+        {
+            return EqualityComparer<T[]>.Default.Equals(_items, other._items)
+                && _count.Equals(other._count)
+                && _reserved.Equals(other._reserved);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is WProtoArrayBuilder<T> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _items,
+                _count,
+                _reserved
+            );
         }
 
         // Copy only the live prefix; Array.Resize would also copy unused reserved elements.

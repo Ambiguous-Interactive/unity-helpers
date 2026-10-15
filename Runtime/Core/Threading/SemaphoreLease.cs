@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Threading
 {
     using System;
+    using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
     using WallstopStudios.UnityHelpers.Utils;
@@ -76,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// }
     /// ]]></code>
     /// </example>
-    public readonly struct SemaphoreLease : IDisposable
+    public readonly struct SemaphoreLease : IDisposable, global::System.IEquatable<SemaphoreLease>
     {
         /// <summary>
         /// True while this lease still owns a permit. False for a default lease, for a failed
@@ -115,6 +116,28 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             {
                 // The semaphore was torn down before this lease could return its permit.
             }
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(SemaphoreLease other)
+        {
+            return EqualityComparer<SemaphoreSlim>.Default.Equals(_semaphore, other._semaphore)
+                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is SemaphoreLease other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _semaphore,
+                _lease
+            );
         }
     }
 

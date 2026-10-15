@@ -126,6 +126,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Disposable value boxing",
                 "Reports boxing conversions of disposable value types. Runtime copy safety remains required."
             ),
+            new(
+                "WUH023",
+                "Public struct equality",
+                "Reports public structs without IEquatable of themselves. This policy is opt-in by default."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </summary>
     /// <typeparam name="TKey">The type of keys in the cache.</typeparam>
     /// <typeparam name="TValue">The type of values in the cache.</typeparam>
-    public struct CacheOptions<TKey, TValue>
+    public struct CacheOptions<TKey, TValue> : global::System.IEquatable<CacheOptions<TKey, TValue>>
     {
         /// <summary>
         /// Default maximum number of entries in a cache.
@@ -224,6 +224,81 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 GrowthFactor = DefaultGrowthFactor,
                 ThrashThresholdEvictionsPerSecond = DefaultThrashThreshold,
             };
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(CacheOptions<TKey, TValue> other)
+        {
+            return MaximumSize.Equals(other.MaximumSize)
+                && EqualityComparer<IEqualityComparer<TKey>>.Default.Equals(
+                    KeyComparer,
+                    other.KeyComparer
+                )
+                && InitialCapacity.Equals(other.InitialCapacity)
+                && MaximumWeight.Equals(other.MaximumWeight)
+                && EqualityComparer<Func<TKey, TValue, long>>.Default.Equals(Weigher, other.Weigher)
+                && ExpireAfterWriteSeconds.Equals(other.ExpireAfterWriteSeconds)
+                && ExpireAfterAccessSeconds.Equals(other.ExpireAfterAccessSeconds)
+                && EqualityComparer<Func<TKey, TValue, float>>.Default.Equals(
+                    ExpireAfter,
+                    other.ExpireAfter
+                )
+                && UseJitter.Equals(other.UseJitter)
+                && JitterMaxSeconds.Equals(other.JitterMaxSeconds)
+                && EqualityComparer<EvictionPolicy>.Default.Equals(Policy, other.Policy)
+                && ProtectedRatio.Equals(other.ProtectedRatio)
+                && AllowGrowth.Equals(other.AllowGrowth)
+                && GrowthFactor.Equals(other.GrowthFactor)
+                && MaxGrowthSize.Equals(other.MaxGrowthSize)
+                && ThrashThresholdEvictionsPerSecond.Equals(other.ThrashThresholdEvictionsPerSecond)
+                && EqualityComparer<Action<TKey, TValue, EvictionReason>>.Default.Equals(
+                    OnEviction,
+                    other.OnEviction
+                )
+                && TransferOwnershipOnRemoval.Equals(other.TransferOwnershipOnRemoval)
+                && EqualityComparer<Action<TKey, TValue>>.Default.Equals(OnGet, other.OnGet)
+                && EqualityComparer<Action<TKey, TValue>>.Default.Equals(OnSet, other.OnSet)
+                && RecordStatistics.Equals(other.RecordStatistics)
+                && EqualityComparer<Func<float>>.Default.Equals(TimeProvider, other.TimeProvider)
+                && EqualityComparer<Func<TKey, TValue>>.Default.Equals(Loader, other.Loader);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is CacheOptions<TKey, TValue> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    MaximumSize,
+                    KeyComparer,
+                    InitialCapacity,
+                    MaximumWeight,
+                    Weigher,
+                    ExpireAfterWriteSeconds,
+                    ExpireAfterAccessSeconds,
+                    ExpireAfter,
+                    UseJitter,
+                    JitterMaxSeconds,
+                    Policy,
+                    ProtectedRatio,
+                    AllowGrowth,
+                    GrowthFactor,
+                    MaxGrowthSize,
+                    ThrashThresholdEvictionsPerSecond,
+                    OnEviction,
+                    TransferOwnershipOnRemoval,
+                    OnGet,
+                    OnSet
+                ),
+                RecordStatistics,
+                TimeProvider,
+                Loader
+            );
         }
     }
 }

@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
+    using System.Collections.Generic;
 
     /// <summary>
     /// Holds a cleanup followed by an earlier disposable scope.
@@ -14,7 +15,9 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// layer share a disposal lease, so a cleanup runs at most once. Concurrent disposal of copies
     /// preserves once-only execution, but cleanup order across threads is undefined.
     /// </remarks>
-    public readonly struct DisposableScope<TPrevious> : IDisposable
+    public readonly struct DisposableScope<TPrevious>
+        : IDisposable,
+            global::System.IEquatable<DisposableScope<TPrevious>>
         where TPrevious : struct, IDisposable
     {
         private readonly TPrevious _previous;
@@ -63,6 +66,30 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 // A previous scope may be a caller-defined disposable.
             }
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(DisposableScope<TPrevious> other)
+        {
+            return EqualityComparer<TPrevious>.Default.Equals(_previous, other._previous)
+                && EqualityComparer<Action>.Default.Equals(_cleanup, other._cleanup)
+                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is DisposableScope<TPrevious> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _previous,
+                _cleanup,
+                _lease
+            );
         }
     }
 }

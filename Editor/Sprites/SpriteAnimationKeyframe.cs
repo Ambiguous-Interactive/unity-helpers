@@ -3,10 +3,12 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Sprites
 {
+    using System.Collections.Generic;
     using UnityEngine;
 
     /// <summary>Identifies a sprite assignment, its clip time, and its renderer path.</summary>
     public readonly struct SpriteAnimationKeyframe
+        : global::System.IEquatable<SpriteAnimationKeyframe>
     {
         /// <summary>Gets the keyframe time in seconds.</summary>
         public float Time { get; }
@@ -22,6 +24,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Time = time;
             Sprite = sprite;
             BindingPath = bindingPath;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(SpriteAnimationKeyframe other)
+        {
+            return Time.Equals(other.Time)
+                && EqualityComparer<Sprite>.Default.Equals(Sprite, other.Sprite)
+                && EqualityComparer<string>.Default.Equals(BindingPath, other.BindingPath);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is SpriteAnimationKeyframe other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                Time,
+                Sprite,
+                BindingPath
+            );
         }
     }
 }

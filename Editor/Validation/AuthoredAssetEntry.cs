@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     /// <summary>
     /// One <c>key: value</c> pair Unity wrote inside a serialized document, with the lines it spans.
@@ -12,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// <c>path:line: field</c> and the reader opens the asset on the offending row rather than
     /// searching a file that is thousands of lines long.
     /// </remarks>
-    public readonly struct AuthoredAssetEntry
+    public readonly struct AuthoredAssetEntry : global::System.IEquatable<AuthoredAssetEntry>
     {
         /// <summary>The key Unity wrote, with any surrounding quotes removed.</summary>
         public string Key { get; }
@@ -61,6 +62,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public override string ToString()
         {
             return $"line {LineNumber}: {Key}: {InlineValue}";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(AuthoredAssetEntry other)
+        {
+            return EqualityComparer<string>.Default.Equals(Key, other.Key)
+                && EqualityComparer<string>.Default.Equals(InlineValue, other.InlineValue)
+                && Indent.Equals(other.Indent)
+                && LineNumber.Equals(other.LineNumber)
+                && EndLineNumber.Equals(other.EndLineNumber);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is AuthoredAssetEntry other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                Key,
+                InlineValue,
+                Indent,
+                LineNumber,
+                EndLineNumber
+            );
         }
     }
 #endif

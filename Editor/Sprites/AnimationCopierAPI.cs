@@ -670,7 +670,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>A source clip or destination orphan found by analysis.</summary>
-        public readonly struct Entry
+        public readonly struct Entry : global::System.IEquatable<Entry>
         {
             /// <summary>The source asset path, or empty for an orphan.</summary>
             public string SourcePath { get; }
@@ -686,6 +686,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 SourcePath = sourcePath;
                 DestinationPath = destinationPath;
                 Classification = classification;
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Entry other)
+            {
+                return EqualityComparer<string>.Default.Equals(SourcePath, other.SourcePath)
+                    && EqualityComparer<string>.Default.Equals(
+                        DestinationPath,
+                        other.DestinationPath
+                    )
+                    && EqualityComparer<Status>.Default.Equals(
+                        Classification,
+                        other.Classification
+                    );
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Entry other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    SourcePath,
+                    DestinationPath,
+                    Classification
+                );
             }
         }
 

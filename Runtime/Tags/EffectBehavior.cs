@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tags
 {
+    using System.Collections.Generic;
     using UnityEngine;
 
     /// <summary>
@@ -116,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     /// <summary>
     /// Immutable runtime data passed to behaviour callbacks.
     /// </summary>
-    public readonly struct EffectBehaviorContext
+    public readonly struct EffectBehaviorContext : global::System.IEquatable<EffectBehaviorContext>
     {
         /// <summary>
         /// Gets the effect asset backing the handle.
@@ -150,12 +151,37 @@ namespace WallstopStudios.UnityHelpers.Tags
             this.handle = handle;
             this.deltaTime = deltaTime;
         }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(EffectBehaviorContext other)
+        {
+            return deltaTime.Equals(other.deltaTime)
+                && EqualityComparer<EffectHandler>.Default.Equals(handler, other.handler)
+                && EqualityComparer<EffectHandle>.Default.Equals(handle, other.handle);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is EffectBehaviorContext other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                deltaTime,
+                handler,
+                handle
+            );
+        }
     }
 
     /// <summary>
     /// Details about a specific periodic tick that just executed.
     /// </summary>
     public readonly struct PeriodicEffectTickContext
+        : global::System.IEquatable<PeriodicEffectTickContext>
     {
         /// <summary>
         /// Gets the periodic definition that produced this tick.
@@ -181,6 +207,33 @@ namespace WallstopStudios.UnityHelpers.Tags
             this.definition = definition;
             this.executedTicks = executedTicks;
             this.currentTime = currentTime;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(PeriodicEffectTickContext other)
+        {
+            return EqualityComparer<PeriodicEffectDefinition>.Default.Equals(
+                    definition,
+                    other.definition
+                )
+                && executedTicks.Equals(other.executedTicks)
+                && currentTime.Equals(other.currentTime);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is PeriodicEffectTickContext other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                definition,
+                executedTicks,
+                currentTime
+            );
         }
     }
 }

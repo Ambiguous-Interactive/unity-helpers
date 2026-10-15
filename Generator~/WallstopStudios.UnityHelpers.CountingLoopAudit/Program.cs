@@ -100,12 +100,12 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     )
                     .ToList();
                 /*
-                    Known host API gaps leave compiler errors. Require all collection-size policies to report a control
+                    Known host API gaps leave compiler errors. Require each enabled policy to report a control
                     beside an unresolved API in this same compilation before certifying subjects.
                 */
                 trees.Add(
                     CSharpSyntaxTree.ParseText(
-                        "internal static class CountingLoopAuditControl { static int Sum(int[] values) { int total = 0; for (int index = 0; index < values.Length; index++) { total += values[index]; } return total; } static int Snapshot(System.Collections.Generic.ICollection<int> values) { if (values.Count > 0) { return values.Count; } return 0; } static void MissingApi() { DeliberatelyUnavailableModernUnityApi(); } }",
+                        "internal static class CountingLoopAuditControl { static int Sum(int[] values) { int total = 0; for (int index = 0; index < values.Length; index++) { total += values[index]; } return total; } static int Snapshot(System.Collections.Generic.ICollection<int> values) { if (values.Count > 0) { return values.Count; } return 0; } static void MissingApi() { DeliberatelyUnavailableModernUnityApi(); } } public struct EqualityAuditControl { }",
                         parseOptions,
                         ControlPath
                     )
@@ -121,6 +121,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                                 .Empty.Add("WUH013", ReportDiagnostic.Warn)
                                 .Add("WUH019", ReportDiagnostic.Warn)
                                 .Add("WUH021", ReportDiagnostic.Warn)
+                                .Add("WUH023", ReportDiagnostic.Warn)
                         )
                 );
                 ImmutableArray<Diagnostic> diagnostics = compilation
@@ -128,13 +129,14 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                         ImmutableArray.Create<DiagnosticAnalyzer>(
                             new CountingLoopAnalyzer(),
                             new LoopBoundAnalyzer(),
-                            new RepeatedCollectionCountAnalyzer()
+                            new RepeatedCollectionCountAnalyzer(),
+                            new PublicStructEqualityAnalyzer()
                         )
                     )
                     .GetAnalyzerDiagnosticsAsync()
                     .GetAwaiter()
                     .GetResult();
-                foreach (string diagnosticId in new[] { "WUH013", "WUH019", "WUH021" })
+                foreach (string diagnosticId in new[] { "WUH013", "WUH019", "WUH021", "WUH023" })
                 {
                     if (
                         diagnostics.Count(diagnostic =>
@@ -171,6 +173,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                             !string.Equals(diagnostic.Id, "WUH013", StringComparison.Ordinal)
                             && !string.Equals(diagnostic.Id, "WUH019", StringComparison.Ordinal)
                             && !string.Equals(diagnostic.Id, "WUH021", StringComparison.Ordinal)
+                            && !string.Equals(diagnostic.Id, "WUH023", StringComparison.Ordinal)
                         )
                         || !subjectPaths.Contains(
                             diagnostic.Location.SourceTree?.FilePath ?? string.Empty

@@ -450,7 +450,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         [Serializable]
-        public struct PlatformOverride
+        public struct PlatformOverride : global::System.IEquatable<PlatformOverride>
         {
             public string name; // e.g. "DefaultTexturePlatform", "Standalone", "iPhone", "Android"
 
@@ -464,10 +464,56 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             public TextureImporterCompression compression;
             public bool applyCrunchCompression;
             public bool useCrunchCompression;
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(PlatformOverride other)
+            {
+                return EqualityComparer<string>.Default.Equals(name, other.name)
+                    && applyResizeAlgorithm.Equals(other.applyResizeAlgorithm)
+                    && EqualityComparer<TextureResizeAlgorithm>.Default.Equals(
+                        resizeAlgorithm,
+                        other.resizeAlgorithm
+                    )
+                    && applyMaxTextureSize.Equals(other.applyMaxTextureSize)
+                    && maxTextureSize.Equals(other.maxTextureSize)
+                    && applyFormat.Equals(other.applyFormat)
+                    && EqualityComparer<TextureImporterFormat>.Default.Equals(format, other.format)
+                    && applyCompression.Equals(other.applyCompression)
+                    && EqualityComparer<TextureImporterCompression>.Default.Equals(
+                        compression,
+                        other.compression
+                    )
+                    && applyCrunchCompression.Equals(other.applyCrunchCompression)
+                    && useCrunchCompression.Equals(other.useCrunchCompression);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is PlatformOverride other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    name,
+                    applyResizeAlgorithm,
+                    resizeAlgorithm,
+                    applyMaxTextureSize,
+                    maxTextureSize,
+                    applyFormat,
+                    format,
+                    applyCompression,
+                    compression,
+                    applyCrunchCompression,
+                    useCrunchCompression
+                );
+            }
         }
 
         [Serializable]
-        public struct Config
+        public struct Config : global::System.IEquatable<Config>
         {
             public bool applyReadWriteEnabled;
             public bool readWriteEnabled;
@@ -497,6 +543,87 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             public bool platformUseCrunchCompression;
 
             public PlatformOverride[] platformOverrides;
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Config other)
+            {
+                return applyReadWriteEnabled.Equals(other.applyReadWriteEnabled)
+                    && readWriteEnabled.Equals(other.readWriteEnabled)
+                    && applyMipMaps.Equals(other.applyMipMaps)
+                    && generateMipMaps.Equals(other.generateMipMaps)
+                    && applyWrapMode.Equals(other.applyWrapMode)
+                    && EqualityComparer<TextureWrapMode>.Default.Equals(wrapMode, other.wrapMode)
+                    && applyFilterMode.Equals(other.applyFilterMode)
+                    && EqualityComparer<FilterMode>.Default.Equals(filterMode, other.filterMode)
+                    && applyCompression.Equals(other.applyCompression)
+                    && EqualityComparer<TextureImporterCompression>.Default.Equals(
+                        compression,
+                        other.compression
+                    )
+                    && applyCrunchCompression.Equals(other.applyCrunchCompression)
+                    && useCrunchCompression.Equals(other.useCrunchCompression)
+                    && applyPlatformResizeAlgorithm.Equals(other.applyPlatformResizeAlgorithm)
+                    && EqualityComparer<TextureResizeAlgorithm>.Default.Equals(
+                        platformResizeAlgorithm,
+                        other.platformResizeAlgorithm
+                    )
+                    && applyPlatformMaxTextureSize.Equals(other.applyPlatformMaxTextureSize)
+                    && platformMaxTextureSize.Equals(other.platformMaxTextureSize)
+                    && applyPlatformFormat.Equals(other.applyPlatformFormat)
+                    && EqualityComparer<TextureImporterFormat>.Default.Equals(
+                        platformFormat,
+                        other.platformFormat
+                    )
+                    && applyPlatformCompression.Equals(other.applyPlatformCompression)
+                    && EqualityComparer<TextureImporterCompression>.Default.Equals(
+                        platformCompression,
+                        other.platformCompression
+                    )
+                    && applyPlatformCrunchCompression.Equals(other.applyPlatformCrunchCompression)
+                    && platformUseCrunchCompression.Equals(other.platformUseCrunchCompression)
+                    && EqualityComparer<PlatformOverride[]>.Default.Equals(
+                        platformOverrides,
+                        other.platformOverrides
+                    );
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Config other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                        applyReadWriteEnabled,
+                        readWriteEnabled,
+                        applyMipMaps,
+                        generateMipMaps,
+                        applyWrapMode,
+                        wrapMode,
+                        applyFilterMode,
+                        filterMode,
+                        applyCompression,
+                        compression,
+                        applyCrunchCompression,
+                        useCrunchCompression,
+                        applyPlatformResizeAlgorithm,
+                        platformResizeAlgorithm,
+                        applyPlatformMaxTextureSize,
+                        platformMaxTextureSize,
+                        applyPlatformFormat,
+                        platformFormat,
+                        applyPlatformCompression,
+                        platformCompression
+                    ),
+                    applyPlatformCrunchCompression,
+                    platformUseCrunchCompression,
+                    platformOverrides
+                );
+            }
         }
     }
 #endif

@@ -369,6 +369,11 @@ fields. `OdinMigrationLiveDictionary` snapshots preserve null dictionaries and l
 identity, key order, and exact object references. They allow inspection of shapes that coordinated
 apply currently refuses. Capture accepts at most 4,096 entries and 65,536 delivered object slots,
 including repeated slots in shared lists. Snapshots do not retain later container mutations.
+Generated recovery restores explicit null lists and preserves list sharing within each dictionary,
+including empty shared lists. Separate lists with equal contents remain separate. Recovery validates
+all delivered references before changing an existing dictionary; inconsistent shared inputs fail
+without clearing it. These recovery guarantees do not expand the shapes accepted by coordinated
+source/data apply, whose Unity inline list fields cannot preserve null or shared lists.
 
 Version 2 apply journals retain captured live values for recovery after reload or restart. The
 coordinator restores those values into the original fields after restoring source and asset bytes;

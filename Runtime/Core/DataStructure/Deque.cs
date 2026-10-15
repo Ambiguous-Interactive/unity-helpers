@@ -599,7 +599,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return GetEnumerator();
         }
 
-        public struct DequeEnumerator : IEnumerator<T>
+        public struct DequeEnumerator : IEnumerator<T>, global::System.IEquatable<DequeEnumerator>
         {
             public T Current => _current;
 
@@ -642,6 +642,36 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             public void Dispose() { }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(DequeEnumerator other)
+            {
+                return EqualityComparer<T[]>.Default.Equals(_items, other._items)
+                    && _head.Equals(other._head)
+                    && _count.Equals(other._count)
+                    && _capacity.Equals(other._capacity)
+                    && _index.Equals(other._index)
+                    && EqualityComparer<T>.Default.Equals(_current, other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is DequeEnumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _items,
+                    _head,
+                    _count,
+                    _capacity,
+                    _index,
+                    _current
+                );
+            }
         }
     }
 }

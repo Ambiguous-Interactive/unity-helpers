@@ -5082,6 +5082,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         }
 
         public readonly struct WGroupAutoIncludeConfiguration
+            : global::System.IEquatable<WGroupAutoIncludeConfiguration>
         {
             public WGroupAutoIncludeMode Mode { get; }
 
@@ -5092,9 +5093,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 Mode = mode;
                 RowCount = rowCount < 0 ? 0 : rowCount;
             }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(WGroupAutoIncludeConfiguration other)
+            {
+                return EqualityComparer<WGroupAutoIncludeMode>.Default.Equals(Mode, other.Mode)
+                    && RowCount.Equals(other.RowCount);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is WGroupAutoIncludeConfiguration other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    Mode,
+                    RowCount
+                );
+            }
         }
 
-        public readonly struct WButtonPaletteEntry
+        public readonly struct WButtonPaletteEntry : global::System.IEquatable<WButtonPaletteEntry>
         {
             public Color ButtonColor { get; }
 
@@ -5105,9 +5128,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 ButtonColor = buttonColor;
                 TextColor = textColor;
             }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(WButtonPaletteEntry other)
+            {
+                return EqualityComparer<Color>.Default.Equals(ButtonColor, other.ButtonColor)
+                    && EqualityComparer<Color>.Default.Equals(TextColor, other.TextColor);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is WButtonPaletteEntry other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    ButtonColor,
+                    TextColor
+                );
+            }
         }
 
         public readonly struct WEnumToggleButtonsPaletteEntry
+            : global::System.IEquatable<WEnumToggleButtonsPaletteEntry>
         {
             public Color SelectedBackgroundColor { get; }
 
@@ -5128,6 +5174,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 SelectedTextColor = selectedTextColor;
                 InactiveBackgroundColor = inactiveBackgroundColor;
                 InactiveTextColor = inactiveTextColor;
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(WEnumToggleButtonsPaletteEntry other)
+            {
+                return EqualityComparer<Color>.Default.Equals(
+                        SelectedBackgroundColor,
+                        other.SelectedBackgroundColor
+                    )
+                    && EqualityComparer<Color>.Default.Equals(
+                        SelectedTextColor,
+                        other.SelectedTextColor
+                    )
+                    && EqualityComparer<Color>.Default.Equals(
+                        InactiveBackgroundColor,
+                        other.InactiveBackgroundColor
+                    )
+                    && EqualityComparer<Color>.Default.Equals(
+                        InactiveTextColor,
+                        other.InactiveTextColor
+                    );
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is WEnumToggleButtonsPaletteEntry other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    SelectedBackgroundColor,
+                    SelectedTextColor,
+                    InactiveBackgroundColor,
+                    InactiveTextColor
+                );
             }
         }
 

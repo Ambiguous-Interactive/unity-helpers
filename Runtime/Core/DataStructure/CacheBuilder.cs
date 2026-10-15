@@ -22,7 +22,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     /// <typeparam name="TKey">The type of keys in the cache.</typeparam>
     /// <typeparam name="TValue">The type of values in the cache.</typeparam>
-    public struct CacheBuilder<TKey, TValue>
+    public struct CacheBuilder<TKey, TValue> : global::System.IEquatable<CacheBuilder<TKey, TValue>>
     {
         private int _maximumSize;
         private int _initialCapacity;
@@ -415,6 +415,88 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             EnsureInitialized();
             _loader = loader;
             return new Cache<TKey, TValue>(CreateOptions());
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(CacheBuilder<TKey, TValue> other)
+        {
+            return _maximumSize.Equals(other._maximumSize)
+                && _initialCapacity.Equals(other._initialCapacity)
+                && EqualityComparer<IEqualityComparer<TKey>>.Default.Equals(
+                    _keyComparer,
+                    other._keyComparer
+                )
+                && _maximumWeight.Equals(other._maximumWeight)
+                && EqualityComparer<Func<TKey, TValue, long>>.Default.Equals(
+                    _weigher,
+                    other._weigher
+                )
+                && _expireAfterWriteSeconds.Equals(other._expireAfterWriteSeconds)
+                && _expireAfterAccessSeconds.Equals(other._expireAfterAccessSeconds)
+                && EqualityComparer<Func<TKey, TValue, float>>.Default.Equals(
+                    _expireAfter,
+                    other._expireAfter
+                )
+                && _useJitter.Equals(other._useJitter)
+                && _jitterMaxSeconds.Equals(other._jitterMaxSeconds)
+                && EqualityComparer<EvictionPolicy>.Default.Equals(_policy, other._policy)
+                && _protectedRatio.Equals(other._protectedRatio)
+                && _allowGrowth.Equals(other._allowGrowth)
+                && _growthFactor.Equals(other._growthFactor)
+                && _maxGrowthSize.Equals(other._maxGrowthSize)
+                && _thrashThresholdEvictionsPerSecond.Equals(
+                    other._thrashThresholdEvictionsPerSecond
+                )
+                && EqualityComparer<Action<TKey, TValue, EvictionReason>>.Default.Equals(
+                    _onEviction,
+                    other._onEviction
+                )
+                && _transferOwnershipOnRemoval.Equals(other._transferOwnershipOnRemoval)
+                && EqualityComparer<Action<TKey, TValue>>.Default.Equals(_onGet, other._onGet)
+                && EqualityComparer<Action<TKey, TValue>>.Default.Equals(_onSet, other._onSet)
+                && _recordStatistics.Equals(other._recordStatistics)
+                && EqualityComparer<Func<float>>.Default.Equals(_timeProvider, other._timeProvider)
+                && EqualityComparer<Func<TKey, TValue>>.Default.Equals(_loader, other._loader)
+                && _initialized.Equals(other._initialized);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is CacheBuilder<TKey, TValue> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _maximumSize,
+                    _initialCapacity,
+                    _keyComparer,
+                    _maximumWeight,
+                    _weigher,
+                    _expireAfterWriteSeconds,
+                    _expireAfterAccessSeconds,
+                    _expireAfter,
+                    _useJitter,
+                    _jitterMaxSeconds,
+                    _policy,
+                    _protectedRatio,
+                    _allowGrowth,
+                    _growthFactor,
+                    _maxGrowthSize,
+                    _thrashThresholdEvictionsPerSecond,
+                    _onEviction,
+                    _transferOwnershipOnRemoval,
+                    _onGet,
+                    _onSet
+                ),
+                _recordStatistics,
+                _timeProvider,
+                _loader,
+                _initialized
+            );
         }
 
         private void EnsureInitialized()

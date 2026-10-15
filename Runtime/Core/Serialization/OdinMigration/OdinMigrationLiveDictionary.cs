@@ -153,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
             }
         }
 
-        /// <summary>Rebuilds original enum-to-object-list values for generated recovery writers.</summary>
+        /// <summary>Rebuilds captured values, preserving null lists and list sharing within one dictionary.</summary>
         public static bool TryRebuild<TKey, TObject>(
             IReadOnlyList<int> keys,
             IReadOnlyList<IReadOnlyList<Object>> values,
@@ -181,37 +181,73 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
                     return false;
                 }
                 Dictionary<TKey, List<TObject>> rebuilt = new();
+                Dictionary<IReadOnlyList<Object>, List<TObject>> lists = new(
+                    ReferenceIdentityComparer<IReadOnlyList<Object>>.Instance
+                );
                 int delivered = 0;
                 int entryCount = keys.Count;
                 for (int index = 0; index < entryCount; ++index)
                 {
                     IReadOnlyList<Object> references = values[index];
-                    if (references == null)
+                    List<TObject> objects = null;
+                    if (references != null)
                     {
-                        dictionary = null;
-                        failure = "Original dictionary recovery cannot infer a null list.";
-                        return false;
-                    }
-                    List<TObject> objects = new();
-                    int referenceCount = references.Count;
-                    for (int referenceIndex = 0; referenceIndex < referenceCount; ++referenceIndex)
-                    {
-                        Object reference = references[referenceIndex];
-                        if (
-                            MaximumReferences <= delivered
-                            || (
-                                !ReferenceEquals(reference, null)
-                                && (reference == null || !(reference is TObject))
-                            )
-                        )
+                        int referenceCount = references.Count;
+                        if (referenceCount < 0 || MaximumReferences - delivered < referenceCount)
+                        {
+                            dictionary = null;
+                            failure = "Original dictionary recovery exceeds the reference limit.";
+                            return false;
+                        }
+                        bool shared = lists.TryGetValue(references, out objects);
+                        if (shared && objects.Count != referenceCount)
                         {
                             dictionary = null;
                             failure =
-                                "Original dictionary recovery has excessive, destroyed, or incompatible references.";
+                                "Original dictionary recovery observed a changed shared list.";
                             return false;
                         }
-                        ++delivered;
-                        objects.Add((TObject)reference);
+                        if (!shared)
+                        {
+                            objects = new List<TObject>();
+                        }
+                        for (
+                            int referenceIndex = 0;
+                            referenceIndex < referenceCount;
+                            ++referenceIndex
+                        )
+                        {
+                            Object reference = references[referenceIndex];
+                            if (
+                                !ReferenceEquals(reference, null)
+                                && (reference == null || !(reference is TObject))
+                            )
+                            {
+                                dictionary = null;
+                                failure =
+                                    "Original dictionary recovery has destroyed or incompatible references.";
+                                return false;
+                            }
+                            if (shared)
+                            {
+                                if (!ReferenceEquals(objects[referenceIndex], reference))
+                                {
+                                    dictionary = null;
+                                    failure =
+                                        "Original dictionary recovery observed a changed shared list.";
+                                    return false;
+                                }
+                            }
+                            else
+                            {
+                                objects.Add((TObject)reference);
+                            }
+                            ++delivered;
+                        }
+                        if (!shared)
+                        {
+                            lists.Add(references, objects);
+                        }
                     }
                     if (!rebuilt.TryAdd(decodeKey(keys[index]), objects))
                     {

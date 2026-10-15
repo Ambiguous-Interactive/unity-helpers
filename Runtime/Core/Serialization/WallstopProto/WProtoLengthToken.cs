@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// because the length is precisely what the caller does not yet know -- which is the point of
     /// writing the payload first and the prefix afterwards.
     /// </remarks>
-    public readonly struct WProtoLengthToken
+    public readonly struct WProtoLengthToken : global::System.IEquatable<WProtoLengthToken>
     {
         internal readonly int PrefixStart;
         internal readonly int PayloadStart;
@@ -46,6 +46,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             PayloadStart = payloadStart;
             ReservedPrefixSize = reservedPrefixSize;
             Nested = nested;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(WProtoLengthToken other)
+        {
+            return PrefixStart.Equals(other.PrefixStart)
+                && PayloadStart.Equals(other.PayloadStart)
+                && ReservedPrefixSize.Equals(other.ReservedPrefixSize)
+                && Nested.Equals(other.Nested);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is WProtoLengthToken other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                PrefixStart,
+                PayloadStart,
+                ReservedPrefixSize,
+                Nested
+            );
         }
     }
 }

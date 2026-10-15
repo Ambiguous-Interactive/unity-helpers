@@ -644,7 +644,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return GetEnumerator();
         }
 
-        public struct BitEnumerator : IEnumerator<bool>
+        public struct BitEnumerator : IEnumerator<bool>, global::System.IEquatable<BitEnumerator>
         {
             public bool Current => _current;
 
@@ -679,6 +679,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             public void Dispose() { }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(BitEnumerator other)
+            {
+                return EqualityComparer<BitSet>.Default.Equals(_bitSet, other._bitSet)
+                    && _index.Equals(other._index)
+                    && _current.Equals(other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is BitEnumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _bitSet,
+                    _index,
+                    _current
+                );
+            }
         }
     }
 }

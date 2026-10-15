@@ -37,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <c>default</c> struct does nothing.
     /// </para>
     /// </remarks>
-    internal readonly struct DisposalLease
+    internal readonly struct DisposalLease : IEquatable<DisposalLease>
     {
         /// <summary>
         /// True while this lease is still the current holder of its slot: not <c>default</c>, not
@@ -63,6 +63,30 @@ namespace WallstopStudios.UnityHelpers.Utils
             _slot = slot;
             _ownerThreadId = ownerThreadId;
             _generation = generation;
+        }
+
+        /// <summary>Compares the immutable lease identity.</summary>
+        public bool Equals(DisposalLease other)
+        {
+            return _slot == other._slot
+                && _ownerThreadId == other._ownerThreadId
+                && _generation == other._generation;
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is DisposalLease other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _slot,
+                _ownerThreadId,
+                _generation
+            );
         }
 
         /// <summary>

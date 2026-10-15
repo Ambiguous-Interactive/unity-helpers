@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Utils
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     using System;
     using System.IO;
@@ -33,7 +34,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     ///     Nested scopes are supported. The actual AssetDatabase calls are only made at the outermost scope.
     ///     </para>
     /// </remarks>
-    public readonly struct AssetDatabaseBatchScope : IDisposable
+    public readonly struct AssetDatabaseBatchScope
+        : IDisposable,
+            global::System.IEquatable<AssetDatabaseBatchScope>
     {
         /// <summary>
         ///     Whether to call <see cref="AssetDatabase.Refresh()"/> when this scope is disposed
@@ -174,6 +177,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
         }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(AssetDatabaseBatchScope other)
+        {
+            return _shouldRefreshOnDispose.Equals(other._shouldRefreshOnDispose)
+                && _isOutermostScope.Equals(other._isOutermostScope)
+                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is AssetDatabaseBatchScope other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _shouldRefreshOnDispose,
+                _isOutermostScope,
+                _lease
+            );
+        }
     }
 
     /// <summary>
@@ -202,7 +229,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     ///     this struct does nothing on disposal.
     ///     </para>
     /// </remarks>
-    public readonly struct AssetDatabasePauseScope : IDisposable
+    public readonly struct AssetDatabasePauseScope
+        : IDisposable,
+            global::System.IEquatable<AssetDatabasePauseScope>
     {
         private readonly bool _wasBatching;
         private readonly DisposalLease _lease;
@@ -251,6 +280,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     );
                 }
             }
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(AssetDatabasePauseScope other)
+        {
+            return _wasBatching.Equals(other._wasBatching)
+                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is AssetDatabasePauseScope other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _wasBatching,
+                _lease
+            );
         }
     }
 

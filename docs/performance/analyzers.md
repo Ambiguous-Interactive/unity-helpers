@@ -7,7 +7,7 @@ finds are not specific to either.
 Open `Tools > Wallstop Studios > Unity Helpers > Analyzer Policies`, or select **Configure Analyzer
 Severities** in `Project Settings > Wallstop Studios > Unity Helpers`. Each diagnostic has a severity
 selector: **Default**, **Off**, **Info**, **Warning**, **Error**, or **Hidden**. Default keeps the
-analyzer's shipped behavior, including the four opt-in policies. Enable All and Disable All still
+analyzer's shipped behavior, including the six opt-in policies. Enable All and Disable All still
 apply Warning or Off across the catalog.
 
 The compact UI Toolkit list supports searching by diagnostic ID, title, or description. Hover or
@@ -58,20 +58,21 @@ command after resolving the failure. Temporary directories are excluded from Uni
 | [`WUH020`](#wuh020-hard-stack-and-queue-reads)                           | A throwing stack or queue read with an available Try method           |
 | [`WUH021`](#wuh021-repeated-collection-count-opt-in)                     | Repeated size observations (**off by default**)                       |
 | [`WUH022`](#wuh022-boxing-a-disposable-value-type)                       | A disposable value type converted to a reference type                 |
+| [`WUH023`](#wuh023-public-struct-equality-opt-in)                        | A public struct without typed equality (**off by default**)           |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
 
-|                     | `WPROTO###`                                                  | `WUH###`                                                        |
-| ------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
-| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                        |
-| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                 |
-| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                          |
-| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, and `WUH021` |
+|                     | `WPROTO###`                                                  | `WUH###`                                                                  |
+| ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                                  |
+| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                           |
+| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                                    |
+| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, and `WUH023` |
 
 **A `WUH###` diagnostic defaults to a warning.** Taking a package upgrade does not promote it to
 a build error; an explicit Error override does. If your project treats warnings as errors, see
-[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, and `WUH021` go further and are off until you ask for them, because
+[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, and `WUH023` go further and are off until you ask for them, because
 their shapes are correct code far more often than they are defects.
 
 The compact policy list offers a severity selector beside each diagnostic:
@@ -1115,3 +1116,33 @@ their existing runtime checks; storing an array in its private owner does not is
 
 The [ownership audit](./ownership-audit.md) records current producer bindings and private-operation
 candidates, including the reasons to retain shared and extended lifetimes.
+
+## `WUH023`: public struct equality (opt-in)
+
+Enable this warning to require each publicly accessible ordinary struct to implement
+`System.IEquatable<T>` for its own type. Generic structs use their complete constructed self type.
+An unrelated interface with the same name or `IEquatable<OtherType>` does not satisfy the rule.
+Partial declarations produce one warning. Internal and private types and generated code are excluded.
+Unity's supported C# version cannot use a `ref struct` as this interface's type argument, so ref
+structs are excluded.
+
+```xml
+<Rule Id="WUH023" Action="Warning" />
+```
+
+Use **Tools > Wallstop Studios > Unity Helpers > Analyzer Policies** to configure the warning,
+or add this rule to your analyzer ruleset. The package enables it in its production compile gates.
+
+Package value records, configurations, surrogates, scopes, and enumerators provide typed equality
+and matching object equality and hashes. Existing custom contracts keep their equality rules.
+New implementations compare stored fields with their default typed comparers: strings use ordinal
+value equality, floating point values use `Equals` (including NaN and signed zero), and arrays and
+ordinary collections retain reference equality. Scope equality compares immutable lease identity;
+comparison and hashing do not claim a lease, dispose a resource, or inspect mutable disposal state.
+Enumerator equality compares stored state and does not advance either enumerator.
+
+Typed equality avoids boxing the containing struct at generic equality call sites. A stored type
+whose own default comparer uses object equality can still box internally. This warning checks the
+interface contract; it does not prove allocation counts, equality laws, hash quality, deep collection
+equality, or whether a mutable value is safe to change after use as a dictionary key. Keep hash codes
+within the current process and avoid mutating dictionary keys.

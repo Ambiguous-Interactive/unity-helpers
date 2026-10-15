@@ -471,7 +471,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>Enumerates live key-value pairs in table order.</summary>
-        public struct Enumerator : IEnumerator<KeyValuePair<int, TValue>>
+        public struct Enumerator
+            : IEnumerator<KeyValuePair<int, TValue>>,
+                global::System.IEquatable<Enumerator>
         {
             /// <inheritdoc />
             public KeyValuePair<int, TValue> Current => _current;
@@ -528,6 +530,35 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             /// <inheritdoc />
             public void Dispose() { }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Enumerator other)
+            {
+                return EqualityComparer<IntMap<TValue>>.Default.Equals(_map, other._map)
+                    && _version.Equals(other._version)
+                    && _slot.Equals(other._slot)
+                    && EqualityComparer<KeyValuePair<int, TValue>>.Default.Equals(
+                        _current,
+                        other._current
+                    );
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Enumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _map,
+                    _version,
+                    _slot,
+                    _current
+                );
+            }
         }
 
         /// <summary>A live-keys view whose typed enumerator is a struct.</summary>
@@ -536,7 +567,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// the slot storage, and an iterator that kept the old index would skip or repeat entries
         /// against new arrays instead of reporting the mutation.
         /// </remarks>
-        public readonly struct KeyView : IEnumerable<int>
+        public readonly struct KeyView : IEnumerable<int>, global::System.IEquatable<KeyView>
         {
             private readonly IntMap<TValue> _map;
 
@@ -549,6 +580,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             public KeyEnumerator GetEnumerator()
             {
                 return new KeyEnumerator(_map);
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(KeyView other)
+            {
+                return EqualityComparer<IntMap<TValue>>.Default.Equals(_map, other._map);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is KeyView other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(_map);
             }
 
             IEnumerator<int> IEnumerable<int>.GetEnumerator()
@@ -566,7 +615,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <remarks>
         /// Shares <see cref="KeyView"/>'s fail-fast contract and its no-boxing rationale.
         /// </remarks>
-        public readonly struct ValueView : IEnumerable<TValue>
+        public readonly struct ValueView : IEnumerable<TValue>, global::System.IEquatable<ValueView>
         {
             private readonly IntMap<TValue> _map;
 
@@ -581,6 +630,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return new ValueEnumerator(_map);
             }
 
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(ValueView other)
+            {
+                return EqualityComparer<IntMap<TValue>>.Default.Equals(_map, other._map);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is ValueView other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(_map);
+            }
+
             IEnumerator<TValue> IEnumerable<TValue>.GetEnumerator()
             {
                 return GetEnumerator();
@@ -593,7 +660,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>Enumerates live keys; fails fast when the map changes mid-walk.</summary>
-        public struct KeyEnumerator : IEnumerator<int>
+        public struct KeyEnumerator : IEnumerator<int>, global::System.IEquatable<KeyEnumerator>
         {
             /// <inheritdoc />
             public int Current => _current;
@@ -650,10 +717,38 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             /// <inheritdoc />
             public void Dispose() { }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(KeyEnumerator other)
+            {
+                return EqualityComparer<IntMap<TValue>>.Default.Equals(_map, other._map)
+                    && _version.Equals(other._version)
+                    && _slot.Equals(other._slot)
+                    && _current.Equals(other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is KeyEnumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _map,
+                    _version,
+                    _slot,
+                    _current
+                );
+            }
         }
 
         /// <summary>Enumerates live values; fails fast when the map changes mid-walk.</summary>
-        public struct ValueEnumerator : IEnumerator<TValue>
+        public struct ValueEnumerator
+            : IEnumerator<TValue>,
+                global::System.IEquatable<ValueEnumerator>
         {
             /// <inheritdoc />
             public TValue Current => _current;
@@ -710,6 +805,32 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             /// <inheritdoc />
             public void Dispose() { }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(ValueEnumerator other)
+            {
+                return EqualityComparer<IntMap<TValue>>.Default.Equals(_map, other._map)
+                    && _version.Equals(other._version)
+                    && _slot.Equals(other._slot)
+                    && EqualityComparer<TValue>.Default.Equals(_current, other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is ValueEnumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _map,
+                    _version,
+                    _slot,
+                    _current
+                );
+            }
         }
     }
 }

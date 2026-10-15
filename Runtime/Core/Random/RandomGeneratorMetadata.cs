@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
     using System;
+    using System.Collections.Generic;
     using WallstopStudios.UnityHelpers.Core.Helper;
 #if UNITY_5_3_OR_NEWER
     using UnityEngine.Scripting;
@@ -121,6 +122,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     }
 
     public readonly struct RandomGeneratorMetadata
+        : global::System.IEquatable<RandomGeneratorMetadata>
     {
         public static readonly RandomGeneratorMetadata Empty = new(
             typeof(object),
@@ -199,6 +201,36 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             Reference = reference ?? string.Empty;
             ReferenceUrl = referenceUrl ?? string.Empty;
             Period = period ?? string.Empty;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(RandomGeneratorMetadata other)
+        {
+            return EqualityComparer<Type>.Default.Equals(Type, other.Type)
+                && EqualityComparer<RandomQuality>.Default.Equals(Quality, other.Quality)
+                && EqualityComparer<string>.Default.Equals(Notes, other.Notes)
+                && EqualityComparer<string>.Default.Equals(Reference, other.Reference)
+                && EqualityComparer<string>.Default.Equals(ReferenceUrl, other.ReferenceUrl)
+                && EqualityComparer<string>.Default.Equals(Period, other.Period);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is RandomGeneratorMetadata other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                Type,
+                Quality,
+                Notes,
+                Reference,
+                ReferenceUrl,
+                Period
+            );
         }
     }
 }

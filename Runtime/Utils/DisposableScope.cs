@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
+    using System.Collections.Generic;
 
     /// <summary>
     /// Runs an action once when a using scope ends.
@@ -12,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// Copies share one disposal lease. A cached, noncapturing action and a warmed lease slot make
     /// creation and disposal allocation-free. A default scope or null action does nothing.
     /// </remarks>
-    public readonly struct DisposableScope : IDisposable
+    public readonly struct DisposableScope : IDisposable, global::System.IEquatable<DisposableScope>
     {
         /// <summary>
         /// True while this scope still owns its cleanup.
@@ -66,6 +67,28 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 // A cleanup failure must not replace an exception already in flight.
             }
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(DisposableScope other)
+        {
+            return EqualityComparer<Action>.Default.Equals(_cleanup, other._cleanup)
+                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is DisposableScope other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _cleanup,
+                _lease
+            );
         }
     }
 }

@@ -1409,6 +1409,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// Descriptor for inspector presentation.
         /// </summary>
         public readonly struct SerializableTypeDescriptor
+            : global::System.IEquatable<SerializableTypeDescriptor>
         {
             public Type Type { get; }
 
@@ -1445,6 +1446,35 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 AssemblyQualifiedName = assemblyQualifiedName ?? string.Empty;
                 DisplayName = displayName ?? string.Empty;
                 Tooltip = tooltip ?? string.Empty;
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(SerializableTypeDescriptor other)
+            {
+                return EqualityComparer<Type>.Default.Equals(Type, other.Type)
+                    && EqualityComparer<string>.Default.Equals(
+                        AssemblyQualifiedName,
+                        other.AssemblyQualifiedName
+                    )
+                    && EqualityComparer<string>.Default.Equals(DisplayName, other.DisplayName)
+                    && EqualityComparer<string>.Default.Equals(Tooltip, other.Tooltip);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is SerializableTypeDescriptor other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    Type,
+                    AssemblyQualifiedName,
+                    DisplayName,
+                    Tooltip
+                );
             }
 
             internal bool Matches(string search)

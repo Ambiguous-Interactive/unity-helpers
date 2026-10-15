@@ -483,7 +483,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return GetEnumerator();
         }
 
-        public struct HeapEnumerator : IEnumerator<T>
+        public struct HeapEnumerator : IEnumerator<T>, global::System.IEquatable<HeapEnumerator>
         {
             public T Current => _current;
 
@@ -521,6 +521,32 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             public void Dispose() { }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(HeapEnumerator other)
+            {
+                return EqualityComparer<T[]>.Default.Equals(_items, other._items)
+                    && _count.Equals(other._count)
+                    && _index.Equals(other._index)
+                    && EqualityComparer<T>.Default.Equals(_current, other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is HeapEnumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _items,
+                    _count,
+                    _index,
+                    _current
+                );
+            }
         }
     }
 }

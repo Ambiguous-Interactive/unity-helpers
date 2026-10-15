@@ -2150,7 +2150,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <summary>
     /// Immutable snapshot of global pool registry statistics.
     /// </summary>
-    public readonly struct GlobalPoolStatistics
+    public readonly struct GlobalPoolStatistics : global::System.IEquatable<GlobalPoolStatistics>
     {
         /// <summary>
         /// Gets the number of live (non-collected) registered pools.
@@ -2221,6 +2221,36 @@ namespace WallstopStudios.UnityHelpers.Utils
             return $"GlobalPoolStatistics(LivePools={LivePoolCount}, StatsPools={StatisticsPoolCount}, "
                 + $"TotalItems={TotalPooledItems}, MaxItems={GlobalMaxPooledItems}, "
                 + $"Utilization={BudgetUtilization:P1}, Exceeded={IsBudgetExceeded})";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(GlobalPoolStatistics other)
+        {
+            return LivePoolCount.Equals(other.LivePoolCount)
+                && StatisticsPoolCount.Equals(other.StatisticsPoolCount)
+                && TotalPooledItems.Equals(other.TotalPooledItems)
+                && GlobalMaxPooledItems.Equals(other.GlobalMaxPooledItems)
+                && OldestPoolAccessTime.Equals(other.OldestPoolAccessTime)
+                && NewestPoolAccessTime.Equals(other.NewestPoolAccessTime);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is GlobalPoolStatistics other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                LivePoolCount,
+                StatisticsPoolCount,
+                TotalPooledItems,
+                GlobalMaxPooledItems,
+                OldestPoolAccessTime,
+                NewestPoolAccessTime
+            );
         }
     }
 
@@ -2305,6 +2335,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// Immutable effective configuration for intelligent pool purging.
     /// </summary>
     public readonly struct PoolPurgeEffectiveOptions
+        : global::System.IEquatable<PoolPurgeEffectiveOptions>
     {
         /// <summary>
         /// Gets whether intelligent purging is enabled.
@@ -2403,6 +2434,49 @@ namespace WallstopStudios.UnityHelpers.Utils
                 + $"Window={RollingWindowSeconds}s, Hysteresis={HysteresisSeconds}s, "
                 + $"SpikeThreshold={SpikeThresholdMultiplier}, MaxPurgesPerOp={MaxPurgesPerOperation}, "
                 + $"MaxPoolSize={MaxPoolSize}, Source={Source})";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(PoolPurgeEffectiveOptions other)
+        {
+            return Enabled.Equals(other.Enabled)
+                && IdleTimeoutSeconds.Equals(other.IdleTimeoutSeconds)
+                && MinRetainCount.Equals(other.MinRetainCount)
+                && WarmRetainCount.Equals(other.WarmRetainCount)
+                && BufferMultiplier.Equals(other.BufferMultiplier)
+                && RollingWindowSeconds.Equals(other.RollingWindowSeconds)
+                && HysteresisSeconds.Equals(other.HysteresisSeconds)
+                && SpikeThresholdMultiplier.Equals(other.SpikeThresholdMultiplier)
+                && MaxPurgesPerOperation.Equals(other.MaxPurgesPerOperation)
+                && MaxPoolSize.Equals(other.MaxPoolSize)
+                && EqualityComparer<PoolPurgeConfigurationSource>.Default.Equals(
+                    Source,
+                    other.Source
+                );
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is PoolPurgeEffectiveOptions other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                Enabled,
+                IdleTimeoutSeconds,
+                MinRetainCount,
+                WarmRetainCount,
+                BufferMultiplier,
+                RollingWindowSeconds,
+                HysteresisSeconds,
+                SpikeThresholdMultiplier,
+                MaxPurgesPerOperation,
+                MaxPoolSize,
+                Source
+            );
         }
     }
 

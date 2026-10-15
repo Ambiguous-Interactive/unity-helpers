@@ -22,5 +22,24 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <see cref="WProtoConstruct"/>.
     /// </para>
     /// </remarks>
-    public readonly struct WProtoConstruct { }
+    public readonly struct WProtoConstruct : global::System.IEquatable<WProtoConstruct>
+    {
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(WProtoConstruct other)
+        {
+            return true;
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is WProtoConstruct other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return 0;
+        }
+    }
 }

@@ -26,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct Vector2Surrogate
+    public partial struct Vector2Surrogate : global::System.IEquatable<Vector2Surrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -43,13 +43,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static implicit operator Vector2Surrogate(Vector2 v) => new() { x = v.x, y = v.y };
 
         public static implicit operator Vector2(Vector2Surrogate s) => new(s.x, s.y);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(Vector2Surrogate other)
+        {
+            return x.Equals(other.x) && y.Equals(other.y);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is Vector2Surrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(x, y);
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct Vector3Surrogate
+    public partial struct Vector3Surrogate : global::System.IEquatable<Vector3Surrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -78,13 +96,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
 
         public static implicit operator Vector3(Vector3Surrogate s) => new(s.x, s.y, s.z);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(Vector3Surrogate other)
+        {
+            return x.Equals(other.x) && y.Equals(other.y) && z.Equals(other.z);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is Vector3Surrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(x, y, z);
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct QuaternionSurrogate
+    public partial struct QuaternionSurrogate : global::System.IEquatable<QuaternionSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -121,13 +157,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         public static implicit operator Quaternion(QuaternionSurrogate s) =>
             new(s.x, s.y, s.z, s.w);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(QuaternionSurrogate other)
+        {
+            return x.Equals(other.x) && y.Equals(other.y) && z.Equals(other.z) && w.Equals(other.w);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is QuaternionSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(x, y, z, w);
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct ColorSurrogate
+    public partial struct ColorSurrogate : global::System.IEquatable<ColorSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -163,13 +217,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
 
         public static implicit operator Color(ColorSurrogate s) => new(s.r, s.g, s.b, s.a);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(ColorSurrogate other)
+        {
+            return r.Equals(other.r) && g.Equals(other.g) && b.Equals(other.b) && a.Equals(other.a);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is ColorSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(r, g, b, a);
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct Color32Surrogate
+    public partial struct Color32Surrogate : global::System.IEquatable<Color32Surrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -205,13 +277,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
 
         public static implicit operator Color32(Color32Surrogate s) => new(s.r, s.g, s.b, s.a);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(Color32Surrogate other)
+        {
+            return r.Equals(other.r) && g.Equals(other.g) && b.Equals(other.b) && a.Equals(other.a);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is Color32Surrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(r, g, b, a);
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct RectSurrogate
+    public partial struct RectSurrogate : global::System.IEquatable<RectSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -247,13 +337,39 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
 
         public static implicit operator Rect(RectSurrogate s) => new(s.x, s.y, s.width, s.height);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(RectSurrogate other)
+        {
+            return x.Equals(other.x)
+                && y.Equals(other.y)
+                && width.Equals(other.width)
+                && height.Equals(other.height);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is RectSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                x,
+                y,
+                width,
+                height
+            );
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct RectIntSurrogate
+    public partial struct RectIntSurrogate : global::System.IEquatable<RectIntSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -290,13 +406,39 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         public static implicit operator RectInt(RectIntSurrogate s) =>
             new(s.x, s.y, s.width, s.height);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(RectIntSurrogate other)
+        {
+            return x.Equals(other.x)
+                && y.Equals(other.y)
+                && width.Equals(other.width)
+                && height.Equals(other.height);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is RectIntSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                x,
+                y,
+                width,
+                height
+            );
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct BoundsSurrogate
+    public partial struct BoundsSurrogate : global::System.IEquatable<BoundsSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -347,13 +489,43 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         public static implicit operator Bounds(BoundsSurrogate s) =>
             new(new Vector3(s.cx, s.cy, s.cz), new Vector3(s.sx, s.sy, s.sz));
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(BoundsSurrogate other)
+        {
+            return cx.Equals(other.cx)
+                && cy.Equals(other.cy)
+                && cz.Equals(other.cz)
+                && sx.Equals(other.sx)
+                && sy.Equals(other.sy)
+                && sz.Equals(other.sz);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is BoundsSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                cx,
+                cy,
+                cz,
+                sx,
+                sy,
+                sz
+            );
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct BoundsIntSurrogate
+    public partial struct BoundsIntSurrogate : global::System.IEquatable<BoundsIntSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -404,13 +576,43 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         public static implicit operator BoundsInt(BoundsIntSurrogate s) =>
             new(new Vector3Int(s.px, s.py, s.pz), new Vector3Int(s.sx, s.sy, s.sz));
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(BoundsIntSurrogate other)
+        {
+            return px.Equals(other.px)
+                && py.Equals(other.py)
+                && pz.Equals(other.pz)
+                && sx.Equals(other.sx)
+                && sy.Equals(other.sy)
+                && sz.Equals(other.sz);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is BoundsIntSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                px,
+                py,
+                pz,
+                sx,
+                sy,
+                sz
+            );
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct Vector2IntSurrogate
+    public partial struct Vector2IntSurrogate : global::System.IEquatable<Vector2IntSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -428,13 +630,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             new() { x = v.x, y = v.y };
 
         public static implicit operator Vector2Int(Vector2IntSurrogate s) => new(s.x, s.y);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(Vector2IntSurrogate other)
+        {
+            return x.Equals(other.x) && y.Equals(other.y);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is Vector2IntSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(x, y);
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct Vector3IntSurrogate
+    public partial struct Vector3IntSurrogate : global::System.IEquatable<Vector3IntSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -463,13 +683,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
 
         public static implicit operator Vector3Int(Vector3IntSurrogate s) => new(s.x, s.y, s.z);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(Vector3IntSurrogate other)
+        {
+            return x.Equals(other.x) && y.Equals(other.y) && z.Equals(other.z);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is Vector3IntSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(x, y, z);
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct ResolutionSurrogate
+    public partial struct ResolutionSurrogate : global::System.IEquatable<ResolutionSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -505,6 +743,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             r.refreshRate = s.refreshRate;
 #endif
             return r;
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(ResolutionSurrogate other)
+        {
+            return width.Equals(other.width)
+                && height.Equals(other.height)
+                && refreshRate.Equals(other.refreshRate);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is ResolutionSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                width,
+                height,
+                refreshRate
+            );
         }
     }
 #endif
@@ -609,7 +871,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     [ProtoContract]
 #endif
     [WProtoContract]
-    public partial struct ParabolaSurrogate
+    public partial struct ParabolaSurrogate : global::System.IEquatable<ParabolaSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -647,6 +909,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         // Restore stored coefficients verbatim, including default and legacy underflowed values.
         public static implicit operator Parabola(ParabolaSurrogate s) =>
             new(s.maxHeight, s.length, s.a, s.b);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(ParabolaSurrogate other)
+        {
+            return length.Equals(other.length)
+                && a.Equals(other.a)
+                && b.Equals(other.b)
+                && maxHeight.Equals(other.maxHeight);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is ParabolaSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                length,
+                a,
+                b,
+                maxHeight
+            );
+        }
     }
 
 #if !WALLSTOP_PROTO_ONLY
@@ -654,6 +942,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #endif
     [WProtoContract]
     public partial struct ImmutableBitSetSurrogate
+        : global::System.IEquatable<ImmutableBitSetSurrogate>
     {
 #if !WALLSTOP_PROTO_ONLY
         [ProtoMember(1)]
@@ -672,6 +961,28 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         public static implicit operator ImmutableBitSet(ImmutableBitSetSurrogate s) =>
             new(s.bits, s.capacity);
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(ImmutableBitSetSurrogate other)
+        {
+            return EqualityComparer<ulong[]>.Default.Equals(bits, other.bits)
+                && capacity.Equals(other.capacity);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is ImmutableBitSetSurrogate other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                bits,
+                capacity
+            );
+        }
     }
 
     // Wrappers omit IEnumerable so protobuf-net cannot reinterpret them as repeated fields.

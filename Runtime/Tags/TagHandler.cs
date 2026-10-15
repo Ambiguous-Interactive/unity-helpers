@@ -1031,7 +1031,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <summary>
         /// Struct-backed enumerable over the active tags without additional allocations.
         /// </summary>
-        public readonly struct ActiveTagEnumerable
+        public readonly struct ActiveTagEnumerable : global::System.IEquatable<ActiveTagEnumerable>
         {
             public static ActiveTagEnumerable Empty => new ActiveTagEnumerable(null);
 
@@ -1051,12 +1051,33 @@ namespace WallstopStudios.UnityHelpers.Tags
 
                 return new ActiveTagEnumerator(_source.GetEnumerator());
             }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(ActiveTagEnumerable other)
+            {
+                return EqualityComparer<Dictionary<string, uint>>.Default.Equals(
+                    _source,
+                    other._source
+                );
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is ActiveTagEnumerable other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(_source);
+            }
         }
 
         /// <summary>
         /// Struct-backed enumerable over effect handles that contribute a specific tag.
         /// </summary>
-        public readonly struct HandleEnumerable
+        public readonly struct HandleEnumerable : global::System.IEquatable<HandleEnumerable>
         {
             public static HandleEnumerable Empty =>
                 new HandleEnumerable(default, string.Empty, null);
@@ -1087,12 +1108,41 @@ namespace WallstopStudios.UnityHelpers.Tags
 
                 return new HandleEnumerator(_enumerator, _effectTag, _owner);
             }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(HandleEnumerable other)
+            {
+                return EqualityComparer<Dictionary<long, EffectHandle>.Enumerator>.Default.Equals(
+                        _enumerator,
+                        other._enumerator
+                    )
+                    && EqualityComparer<string>.Default.Equals(_effectTag, other._effectTag)
+                    && EqualityComparer<TagHandler>.Default.Equals(_owner, other._owner)
+                    && _hasData.Equals(other._hasData);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is HandleEnumerable other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _enumerator,
+                    _effectTag,
+                    _owner,
+                    _hasData
+                );
+            }
         }
 
         /// <summary>
         /// Enumerator that filters effect handles by tag without temporary lists.
         /// </summary>
-        public struct HandleEnumerator
+        public struct HandleEnumerator : global::System.IEquatable<HandleEnumerator>
         {
             public readonly EffectHandle Current => _current;
 
@@ -1136,12 +1186,43 @@ namespace WallstopStudios.UnityHelpers.Tags
                 _current = default;
                 return false;
             }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(HandleEnumerator other)
+            {
+                return EqualityComparer<Dictionary<long, EffectHandle>.Enumerator>.Default.Equals(
+                        _enumerator,
+                        other._enumerator
+                    )
+                    && EqualityComparer<string>.Default.Equals(_effectTag, other._effectTag)
+                    && EqualityComparer<TagHandler>.Default.Equals(_owner, other._owner)
+                    && _hasEnumerator.Equals(other._hasEnumerator)
+                    && EqualityComparer<EffectHandle>.Default.Equals(_current, other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is HandleEnumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _enumerator,
+                    _effectTag,
+                    _owner,
+                    _hasEnumerator,
+                    _current
+                );
+            }
         }
 
         /// <summary>
         /// Enumerator that skips tags whose counts have dropped to zero.
         /// </summary>
-        public struct ActiveTagEnumerator
+        public struct ActiveTagEnumerator : global::System.IEquatable<ActiveTagEnumerator>
         {
             public readonly string Current => _current ?? string.Empty;
 
@@ -1178,6 +1259,33 @@ namespace WallstopStudios.UnityHelpers.Tags
                 _hasEnumerator = false;
                 _current = string.Empty;
                 return false;
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(ActiveTagEnumerator other)
+            {
+                return EqualityComparer<Dictionary<string, uint>.Enumerator>.Default.Equals(
+                        _enumerator,
+                        other._enumerator
+                    )
+                    && _hasEnumerator.Equals(other._hasEnumerator)
+                    && EqualityComparer<string>.Default.Equals(_current, other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is ActiveTagEnumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _enumerator,
+                    _hasEnumerator,
+                    _current
+                );
             }
         }
     }

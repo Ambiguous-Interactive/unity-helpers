@@ -409,7 +409,7 @@ PoolPurgeSettings.LargeObjectWarmRetainCount = 1;     // Keep 1 (vs 2)
 
 ### PoolSizeEstimator
 
-Estimate object sizes for policy decisions:
+Estimate object sizes for policy decisions. Value types use marshalled sizes when available and field-based estimates otherwise; managed layout and backend overhead can differ. These are policy estimates, not allocation measurements:
 
 <!-- doc-sample: compiles -->
 

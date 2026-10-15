@@ -450,7 +450,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// Copy it, pass it by value, capture it: every copy names the same borrow, exactly one
         /// release happens, and a copy disposed after that release does nothing at all.
         /// </remarks>
-        public readonly struct Scope : IDisposable
+        public readonly struct Scope : IDisposable, global::System.IEquatable<Scope>
         {
             /// <summary>
             /// True while this borrow is still live, on every copy of the scope at once.
@@ -479,6 +479,30 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
 
                 _owner.Release(_slot, _identifier);
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Scope other)
+            {
+                return EqualityComparer<RestorableGlobal<T>>.Default.Equals(_owner, other._owner)
+                    && _slot.Equals(other._slot)
+                    && _identifier.Equals(other._identifier);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Scope other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _owner,
+                    _slot,
+                    _identifier
+                );
             }
         }
     }

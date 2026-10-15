@@ -517,7 +517,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return GetEnumerator();
         }
 
-        public struct CyclicBufferEnumerator : IEnumerator<T>
+        public struct CyclicBufferEnumerator
+            : IEnumerator<T>,
+                global::System.IEquatable<CyclicBufferEnumerator>
         {
             public T Current => _current;
 
@@ -554,6 +556,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             public void Dispose() { }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(CyclicBufferEnumerator other)
+            {
+                return EqualityComparer<CyclicBuffer<T>>.Default.Equals(_buffer, other._buffer)
+                    && _index.Equals(other._index)
+                    && EqualityComparer<T>.Default.Equals(_current, other._current);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is CyclicBufferEnumerator other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    _buffer,
+                    _index,
+                    _current
+                );
+            }
         }
     }
 }

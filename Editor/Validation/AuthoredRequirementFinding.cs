@@ -3,11 +3,13 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     using System;
 
     /// <summary>One authored slot an attribute said must be filled, and is not.</summary>
     public readonly struct AuthoredRequirementFinding
+        : global::System.IEquatable<AuthoredRequirementFinding>
     {
         /// <summary>The asset carrying the empty slot.</summary>
         public string AssetPath { get; }
@@ -44,6 +46,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public override string ToString()
         {
             return $"{AssetPath}:{LineNumber}: {DeclaringType?.Name}.{FieldName} is required and empty.";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(AuthoredRequirementFinding other)
+        {
+            return EqualityComparer<string>.Default.Equals(AssetPath, other.AssetPath)
+                && LineNumber.Equals(other.LineNumber)
+                && EqualityComparer<Type>.Default.Equals(DeclaringType, other.DeclaringType)
+                && EqualityComparer<string>.Default.Equals(FieldName, other.FieldName);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is AuthoredRequirementFinding other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                AssetPath,
+                LineNumber,
+                DeclaringType,
+                FieldName
+            );
         }
     }
 #endif

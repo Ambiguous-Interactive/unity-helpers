@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     /// <summary>
     /// One element of a block sequence Unity wrote, with the line it is on.
@@ -12,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// no key, and that shape is every element of an authored array of references.
     /// </remarks>
     public readonly struct AuthoredSequenceElement
+        : global::System.IEquatable<AuthoredSequenceElement>
     {
         /// <summary>The one-based line the element is on.</summary>
         public int LineNumber { get; }
@@ -33,6 +35,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public override string ToString()
         {
             return $"line {LineNumber}: - {Value}";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(AuthoredSequenceElement other)
+        {
+            return LineNumber.Equals(other.LineNumber)
+                && EqualityComparer<string>.Default.Equals(Value, other.Value);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is AuthoredSequenceElement other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                LineNumber,
+                Value
+            );
         }
     }
 #endif

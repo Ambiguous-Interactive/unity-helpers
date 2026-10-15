@@ -7,7 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
     /// <summary>Provides value enumeration of common collections through an enumerable interface.</summary>
     /// <remarks>Arrays, exact lists, and exact hash sets avoid enumerator boxing. Other sources retain their original enumerator. The constructor treats null as empty; RequireSource retains null-source failures. Enumeration remains lazy and does not snapshot the collection.</remarks>
-    public readonly struct ValueEnumerable<T>
+    public readonly struct ValueEnumerable<T> : global::System.IEquatable<ValueEnumerable<T>>
     {
         private readonly IEnumerable<T> _source;
         private readonly bool _required;
@@ -35,6 +35,28 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public ValueEnumerator<T> GetEnumerator()
         {
             return new ValueEnumerator<T>(_source, _required);
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(ValueEnumerable<T> other)
+        {
+            return EqualityComparer<IEnumerable<T>>.Default.Equals(_source, other._source)
+                && _required.Equals(other._required);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is ValueEnumerable<T> other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                _source,
+                _required
+            );
         }
     }
 }

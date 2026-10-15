@@ -87,12 +87,11 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         /// <typeparam name="T">The type to estimate size for.</typeparam>
         /// <returns>
-        /// An estimate of the instance size in bytes. For value types, this is exact.
-        /// For reference types, this is an approximation based on field analysis.
+        /// An estimate of the instance size in bytes; managed layout and backend overhead can differ.
         /// </returns>
         /// <remarks>
         /// <para>
-        /// For value types, uses <see cref="Unsafe.SizeOf{T}"/> for an exact size.
+        /// For value types, uses marshalled size when available and field-based estimates otherwise.
         /// </para>
         /// <para>
         /// For reference types, estimates based on:
@@ -114,8 +113,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         /// <param name="type">The type to estimate size for.</param>
         /// <returns>
-        /// An estimate of the instance size in bytes. For value types, this is exact.
-        /// For reference types, this is an approximation based on field analysis.
+        /// An estimate of the instance size in bytes; managed layout and backend overhead can differ.
         /// </returns>
         /// <remarks>
         /// If <paramref name="type"/> is <c>null</c>, returns <see cref="PointerSize"/> as a defensive default.

@@ -94,6 +94,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             SyntaxTree[] trees =
             {
                 CSharpSyntaxTree.ParseText(
+                    "namespace WallstopStudios.UnityHelpers.Core.Helper { internal static class Objects { public static int HashCode<T1,T2>(T1 first,T2 second) { return System.HashCode.Combine(first,second); } public static int HashCode<T1,T2,T3>(T1 first,T2 second,T3 third) { return System.HashCode.Combine(first,second,third); } } }",
+                    parseOptions,
+                    "HashDependency.cs"
+                ),
+                CSharpSyntaxTree.ParseText(
                     File.ReadAllText(disposalPath),
                     parseOptions,
                     disposalPath

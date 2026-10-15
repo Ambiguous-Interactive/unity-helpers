@@ -70,13 +70,13 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     inside a shipped player. `WUH###`
     (`Generator~/WallstopStudios.UnityHelpers.Analyzers`) reports an allocation or footgun in code
     that already works, so it is **capped at `DiagnosticSeverity.Warning` and suppressible**:
-    taking a package upgrade must never fail a consumer's build. On by default, with five exceptions --
+    taking a package upgrade must never fail a consumer's build. On by default, with six exceptions --
     `WUH010` (a dictionary read by indexer), `WUH013` (a counting loop that can use `foreach`),
-    `WUH018` (string equality whose comparison policy is implicit), `WUH019` (repeated stable loop bounds), and `WUH021` (repeated size observations) remain opt-in for consumers
+    `WUH018` (string equality whose comparison policy is implicit), `WUH019` (repeated stable loop bounds), `WUH021` (repeated size observations), and `WUH023` (public structs without typed equality) remain opt-in for consumers
     because their correct shapes are ubiquitous. **The package opts into WUH010, WUH013, and WUH018
-    in its shared check-project ruleset; WUH019 and WUH021 are enabled by the production-only ruleset for
-    Runtime, Editor, and integration checks. The excluded-source loop audit covers WUH013,
-    WUH019, and WUH021 with reporting controls.** Every owned `Generator~` project self-hosts all shipped compiler inputs and promotes shared `WUH###` policies; WUH019 and WUH021 promotion is limited to production checks; the five Unity source gates cover Runtime, Editor, integrations, and both test trees without changing consumer defaults.
+    in its shared check-project ruleset; WUH019, WUH021 and WUH023 are enabled by the production-only ruleset for
+    Runtime, Editor, and integration checks. The excluded-source audit covers WUH013,
+    WUH019, WUH021 and WUH023 with reporting controls.** Every owned `Generator~` project self-hosts all shipped compiler inputs and promotes shared `WUH###` policies; WUH019, WUH021 and WUH023 promotion is limited to production checks; the five Unity source gates cover Runtime, Editor, integrations, and both test trees without changing consumer defaults.
     Retain indexed loops when the index is needed or enumeration changes behavior.
     The independent Odin migration generator emits editor bindings without depending on the protobuf generator DLL.
     All three DLLs are committed under `Runtime/Analyzers`, byte-compared in CI, and **an edit to
@@ -85,7 +85,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 
 19. Named methods and local functions use brace bodies; properties, accessors, operators and lambdas may use expression bodies. Use prefix increment when the prior value is discarded; retain postfix when its value is used. `npm run lint:csharp-syntax` enforces both with Roslyn over all conditional-symbol combinations in Runtime, Editor, Tests, Generator, Samples and Styles sources; Local Gates runs it with reporting and compiled IL-equivalence controls ([#836](https://github.com/Ambiguous-Interactive/unity-helpers/issues/836), [#866](https://github.com/Ambiguous-Interactive/unity-helpers/issues/866)).
 20. Prefer `string.IsNullOrWhiteSpace` for paths and user-facing text. Use `string.IsNullOrEmpty` when whitespace is valid and only null or empty is the error case.
-21. Put each new named class in its own `.cs` file. The current file-naming gate only enforces this for `MonoBehaviour` and `ScriptableObject`; [#865](https://github.com/Ambiguous-Interactive/unity-helpers/issues/865) tracks the wider migration and enforcement policy.
+21. Public ordinary structs implement `IEquatable<TSelf>` with matching object equality and hashing; Unity C# cannot apply this interface to ref structs. Put each new named class in its own `.cs` file. The current file-naming gate only enforces this for `MonoBehaviour` and `ScriptableObject`; [#865](https://github.com/Ambiguous-Interactive/unity-helpers/issues/865) tracks the wider migration and enforcement policy.
 
 ### Documentation Rules
 

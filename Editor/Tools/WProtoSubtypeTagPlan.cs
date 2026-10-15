@@ -513,7 +513,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <summary>
         /// One <c>[WProtoSubtype]</c> as written, whether or not it stated a field number.
         /// </summary>
-        public readonly struct Declaration
+        public readonly struct Declaration : global::System.IEquatable<Declaration>
         {
             /// <summary>The fully qualified subtype name.</summary>
             public string SubTypeName { get; }
@@ -547,12 +547,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 HasTag = hasTag;
                 Tag = tag;
             }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Declaration other)
+            {
+                return EqualityComparer<string>.Default.Equals(SubTypeName, other.SubTypeName)
+                    && EqualityComparer<string>.Default.Equals(BaseTypeName, other.BaseTypeName)
+                    && HasTag.Equals(other.HasTag)
+                    && Tag.Equals(other.Tag);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Declaration other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    SubTypeName,
+                    BaseTypeName,
+                    HasTag,
+                    Tag
+                );
+            }
         }
 
         /// <summary>
         /// One field number belonging to one subtype on one base.
         /// </summary>
-        public readonly struct Entry
+        public readonly struct Entry : global::System.IEquatable<Entry>
         {
             /// <summary>The fully qualified subtype name.</summary>
             public string SubTypeName { get; }
@@ -581,6 +607,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 SubTypeName = subTypeName;
                 BaseTypeName = baseTypeName;
                 Tag = tag;
+            }
+
+            /// <summary>Compares the stored fields with another value.</summary>
+            public bool Equals(Entry other)
+            {
+                return EqualityComparer<string>.Default.Equals(SubTypeName, other.SubTypeName)
+                    && EqualityComparer<string>.Default.Equals(BaseTypeName, other.BaseTypeName)
+                    && Tag.Equals(other.Tag);
+            }
+
+            /// <inheritdoc />
+            public override bool Equals(object obj)
+            {
+                return obj is Entry other && Equals(other);
+            }
+
+            /// <inheritdoc />
+            public override int GetHashCode()
+            {
+                return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                    SubTypeName,
+                    BaseTypeName,
+                    Tag
+                );
             }
         }
     }

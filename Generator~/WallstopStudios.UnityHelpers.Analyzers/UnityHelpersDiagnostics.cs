@@ -537,5 +537,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
             );
+
+        /// <summary>A public struct without its own typed equality interface.</summary>
+        internal static readonly DiagnosticDescriptor PublicStructMissingTypedEquality =
+            new DiagnosticDescriptor(
+                "WUH023",
+                "Public structs should implement typed equality",
+                "'{0}' does not implement IEquatable of itself. Add typed Equals and matching object equality and hashing. WUH023 is opt-in; ref structs are excluded because Unity's C# version cannot implement this interface for them.",
+                "Performance",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: false
+            );
     }
 }

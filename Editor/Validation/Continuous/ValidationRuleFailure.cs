@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 {
+    using System.Collections.Generic;
 #if UNITY_EDITOR
     using System;
 
@@ -14,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// that asset, which is not the same as answering "nothing wrong" -- presenting it as a clean
     /// result would be the run lying about coverage.
     /// </remarks>
-    public readonly struct ValidationRuleFailure
+    public readonly struct ValidationRuleFailure : global::System.IEquatable<ValidationRuleFailure>
     {
         /// <summary>
         /// The rule that threw, or <c>null</c> when loading the asset threw.
@@ -57,6 +58,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             string thrown = Exception == null ? "an exception" : Exception.ToString();
             string subject = IsLoadFailure ? "Loading the asset" : RuleId;
             return $"{subject} threw while validating {AssetPath}: {thrown}";
+        }
+
+        /// <summary>Compares the stored fields with another value.</summary>
+        public bool Equals(ValidationRuleFailure other)
+        {
+            return EqualityComparer<string>.Default.Equals(RuleId, other.RuleId)
+                && EqualityComparer<string>.Default.Equals(AssetPath, other.AssetPath)
+                && EqualityComparer<Exception>.Default.Equals(Exception, other.Exception);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is ValidationRuleFailure other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
+                RuleId,
+                AssetPath,
+                Exception
+            );
         }
     }
 #endif

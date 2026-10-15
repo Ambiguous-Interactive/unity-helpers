@@ -230,13 +230,135 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.IsEmpty(empty);
         }
 
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void GeneratedRecoveryPreservesNullAndSharedLists(
+            bool readonlyField,
+            bool emptyShared
+        )
+        {
+            OdinMigrationPrivateBindingAsset owner =
+                CreateScriptableObject<OdinMigrationPrivateBindingAsset>();
+            Dictionary<SpriteAlignment, List<Texture2D>> original = readonlyField
+                ? owner.ReadonlyValues
+                : owner.Values;
+            Texture2D texture = Track(new Texture2D(1, 1));
+            List<Texture2D> shared = emptyShared ? new() : new() { texture, null };
+            List<Texture2D> separate = emptyShared ? new() : new() { texture, null };
+            original.Add(SpriteAlignment.Center, null);
+            original.Add(SpriteAlignment.TopLeft, shared);
+            original.Add(SpriteAlignment.TopRight, shared);
+            original.Add(SpriteAlignment.BottomLeft, separate);
+            Assert.IsTrue(
+                OdinMigrationCompiledBindings.TryGet(
+                    owner.GetType(),
+                    out OdinMigrationCompiledBinding binding
+                )
+            );
+            OdinMigrationCompiledField field = FindField(
+                binding,
+                readonlyField
+                    ? OdinMigrationPrivateBindingAsset.ReadonlyValuesFieldName
+                    : OdinMigrationPrivateBindingAsset.ValuesFieldName
+            );
+            Assert.IsTrue(
+                field.TryCapture(
+                    owner,
+                    out OdinMigrationLiveDictionary snapshot,
+                    out string failure
+                ),
+                failure
+            );
+            shared.Clear();
+            shared.Add(Track(new Texture2D(1, 1)));
+            original.Clear();
+            Assert.IsTrue(
+                field.TryRestore(owner, snapshot.Keys, snapshot.Values, out failure),
+                failure
+            );
+            Dictionary<SpriteAlignment, List<Texture2D>> restored = readonlyField
+                ? owner.ReadonlyValues
+                : owner.Values;
+            if (readonlyField)
+            {
+                Assert.AreSame(original, restored);
+            }
+            Assert.AreEqual(4, restored.Count);
+            Assert.IsTrue(
+                restored.TryGetValue(SpriteAlignment.Center, out List<Texture2D> missing)
+            );
+            Assert.IsTrue(ReferenceEquals(missing, null));
+            Assert.IsTrue(restored.TryGetValue(SpriteAlignment.TopLeft, out List<Texture2D> first));
+            Assert.IsTrue(
+                restored.TryGetValue(SpriteAlignment.TopRight, out List<Texture2D> second)
+            );
+            Assert.IsTrue(
+                restored.TryGetValue(SpriteAlignment.BottomLeft, out List<Texture2D> independent)
+            );
+            Assert.AreSame(first, second);
+            Assert.AreNotSame(first, independent);
+            Assert.AreNotSame(shared, first);
+            Assert.AreEqual(emptyShared ? 0 : 2, first.Count);
+            CollectionAssert.AreEqual(first, independent);
+            if (!emptyShared)
+            {
+                Assert.AreSame(texture, first[0]);
+                Assert.IsTrue(ReferenceEquals(first[1], null));
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SharedRecoveryRejectsChangedValuesBeforeMutatingTheTarget(bool resize)
+        {
+            Texture2D texture = Track(new Texture2D(1, 1));
+            Texture2D changed = Track(new Texture2D(1, 1));
+            List<Texture2D> retained = new() { texture };
+            Dictionary<SpriteAlignment, List<Texture2D>> target = new()
+            {
+                [SpriteAlignment.Center] = retained,
+            };
+            List<Object> references = new() { texture };
+            IReadOnlyList<Object>[] values = { references, references };
+            bool restored = OdinMigrationLiveDictionary.TryRestoreContents(
+                target,
+                new[] { 1, 2 },
+                values,
+                key =>
+                {
+                    if (key == 1)
+                    {
+                        if (resize)
+                        {
+                            references.Add(changed);
+                        }
+                        else
+                        {
+                            references[0] = changed;
+                        }
+                    }
+                    return (SpriteAlignment)key;
+                },
+                out string failure
+            );
+            Assert.IsFalse(restored);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(failure));
+            Assert.AreEqual(1, target.Count);
+            Assert.IsTrue(
+                target.TryGetValue(SpriteAlignment.Center, out List<Texture2D> unchanged)
+            );
+            Assert.AreSame(retained, unchanged);
+            Assert.AreSame(texture, unchanged[0]);
+        }
+
         [TestCase(0, false)]
         [TestCase(1, false)]
         [TestCase(2, false)]
         [TestCase(3, false)]
         [TestCase(4, false)]
         [TestCase(5, false)]
-        [TestCase(6, false)]
         [TestCase(7, false)]
         [TestCase(8, false)]
         [TestCase(0, true)]
@@ -245,7 +367,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [TestCase(3, true)]
         [TestCase(4, true)]
         [TestCase(5, true)]
-        [TestCase(6, true)]
         [TestCase(7, true)]
         [TestCase(8, true)]
         public void GeneratedRecoveryWriterRefusesIncompleteOrInvalidValuesBeforeWriting(
@@ -306,9 +427,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     Texture2D destroyed = Track(new Texture2D(1, 1));
                     Object.DestroyImmediate(destroyed); // UNH-SUPPRESS: destroyed recovery reference is the subject
                     values = new IReadOnlyList<Object>[] { new Object[] { destroyed } };
-                    break;
-                case 6:
-                    values = new IReadOnlyList<Object>[] { null };
                     break;
                 case 7:
                     keys = new int[OdinMigrationLiveDictionary.MaximumEntries + 1];
