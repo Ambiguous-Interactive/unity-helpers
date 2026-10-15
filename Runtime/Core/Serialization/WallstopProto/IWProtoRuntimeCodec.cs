@@ -3,8 +3,16 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
-    internal interface IWProtoRuntimeWriter
+    using System;
+
+    internal interface IWProtoRuntimeCodec
     {
+        bool TryDeserialize(
+            ReadOnlySpan<byte> data,
+            WProtoReadLimits limits,
+            bool preserveTypedFailures,
+            out object value
+        );
         bool TrySerialize(object value, out byte[] bytes);
         WProtoWriteResult Serialize(object value, ref byte[] buffer);
     }

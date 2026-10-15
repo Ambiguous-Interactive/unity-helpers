@@ -177,21 +177,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.IsEmpty(empty);
         }
 
-        [TestCase(0)]
-        [TestCase(1)]
-        [TestCase(2)]
-        [TestCase(3)]
-        [TestCase(4)]
-        [TestCase(5)]
-        [TestCase(6)]
-        [TestCase(7)]
-        [TestCase(8)]
-        public void GeneratedRecoveryWriterRefusesIncompleteOrInvalidValuesBeforeWriting(int damage)
+        [TestCase(0, false)]
+        [TestCase(1, false)]
+        [TestCase(2, false)]
+        [TestCase(3, false)]
+        [TestCase(4, false)]
+        [TestCase(5, false)]
+        [TestCase(6, false)]
+        [TestCase(7, false)]
+        [TestCase(8, false)]
+        [TestCase(0, true)]
+        [TestCase(1, true)]
+        [TestCase(2, true)]
+        [TestCase(3, true)]
+        [TestCase(4, true)]
+        [TestCase(5, true)]
+        [TestCase(6, true)]
+        [TestCase(7, true)]
+        [TestCase(8, true)]
+        public void GeneratedRecoveryWriterRefusesIncompleteOrInvalidValuesBeforeWriting(
+            int damage,
+            bool readonlyField
+        )
         {
-            OdinMigrationBindingAsset owner = CreateScriptableObject<OdinMigrationBindingAsset>();
+            ScriptableObject owner = readonlyField
+                ? CreateScriptableObject<OdinMigrationReadonlyBindingAsset>()
+                : CreateScriptableObject<OdinMigrationBindingAsset>();
             Texture2D texture = Track(new Texture2D(1, 1));
-            owner.Variations.Add(SpriteAlignment.Center, new List<Texture2D> { texture });
-            IDictionary<SpriteAlignment, List<Texture2D>> original = owner.Variations;
+            IDictionary<SpriteAlignment, List<Texture2D>> original = readonlyField
+                ? ((OdinMigrationReadonlyBindingAsset)owner).Variations
+                : ((OdinMigrationBindingAsset)owner).Variations;
+            List<Texture2D> originalValues = new() { texture };
+            original.Add(SpriteAlignment.Center, originalValues);
             Assert.IsTrue(
                 OdinMigrationCompiledBindings.TryGet(
                     owner.GetType(),
@@ -254,12 +271,105 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
 
             Assert.IsFalse(field.TryRestore(owner, keys, values, out string failure));
             Assert.IsFalse(string.IsNullOrWhiteSpace(failure));
-            Assert.AreSame(original, owner.Variations);
+            Assert.AreSame(
+                original,
+                readonlyField
+                    ? ((OdinMigrationReadonlyBindingAsset)owner).Variations
+                    : ((OdinMigrationBindingAsset)owner).Variations
+            );
             Assert.AreEqual(1, original.Count);
             Assert.IsTrue(
                 original.TryGetValue(SpriteAlignment.Center, out List<Texture2D> retained)
             );
             Assert.AreSame(texture, retained[0]);
+            Assert.AreSame(originalValues, retained);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(5)]
+        [TestCase(OdinMigrationLiveDictionary.MaximumEntries)]
+        public void ReadonlyRecoveryPreservesTheDictionaryAndRestoresOrderedValues(int count)
+        {
+            OdinMigrationReadonlyBindingAsset owner =
+                CreateScriptableObject<OdinMigrationReadonlyBindingAsset>();
+            Texture2D texture = Track(new Texture2D(1, 1));
+            IDictionary<SpriteAlignment, List<Texture2D>> original = owner.Variations;
+            original.Add(SpriteAlignment.Center, new List<Texture2D> { texture });
+            Assert.IsTrue(
+                OdinMigrationCompiledBindings.TryGet(
+                    owner.GetType(),
+                    out OdinMigrationCompiledBinding binding
+                )
+            );
+            OdinMigrationCompiledField field = FindField(
+                binding,
+                nameof(OdinMigrationReadonlyBindingAsset.Variations)
+            );
+            Assert.IsTrue(field.CanCapture);
+            Assert.IsTrue(field.CanRestore);
+            int[] keys = new int[count];
+            IReadOnlyList<Object>[] values = new IReadOnlyList<Object>[count];
+            for (int index = 0; index < count; ++index)
+            {
+                keys[index] =
+                    index == 0 ? int.MinValue
+                    : index == count - 1 ? int.MaxValue
+                    : index;
+                values[index] = new Object[] { texture, null, texture };
+            }
+            Assert.IsTrue(field.TryRestore(owner, keys, values, out string failure), failure);
+            Assert.AreSame(original, owner.Variations);
+            Assert.AreEqual(count, original.Count);
+            int position = 0;
+            foreach (KeyValuePair<SpriteAlignment, List<Texture2D>> entry in owner.Variations)
+            {
+                Assert.AreEqual(keys[position], (int)entry.Key);
+                Assert.AreSame(texture, entry.Value[0]);
+                Assert.IsTrue(ReferenceEquals(entry.Value[1], null));
+                Assert.AreSame(texture, entry.Value[2]);
+                ++position;
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void ContentRecoveryRejectsInvalidTargetsAndDecodersBeforeClearing(int damage)
+        {
+            Dictionary<SpriteAlignment, List<Texture2D>> dictionary =
+                damage == 0 ? null
+                : damage == 1
+                    ? new Dictionary<SpriteAlignment, List<Texture2D>>(new EquivalentEnumComparer())
+                : new();
+            List<Texture2D> retained = new() { null };
+            if (dictionary != null)
+            {
+                dictionary.Add(SpriteAlignment.Center, retained);
+            }
+            Func<int, SpriteAlignment> decode =
+                damage == 2 ? null
+                : damage == 3 ? _ => throw new InvalidOperationException("decoder failed")
+                : key => (SpriteAlignment)key;
+            Assert.IsFalse(
+                OdinMigrationLiveDictionary.TryRestoreContents(
+                    dictionary,
+                    new[] { int.MaxValue },
+                    new IReadOnlyList<Object>[] { Array.Empty<Object>() },
+                    decode,
+                    out string failure
+                )
+            );
+            Assert.IsFalse(string.IsNullOrWhiteSpace(failure));
+            if (dictionary != null)
+            {
+                Assert.AreEqual(1, dictionary.Count);
+                Assert.IsTrue(
+                    dictionary.TryGetValue(SpriteAlignment.Center, out List<Texture2D> unchanged)
+                );
+                Assert.AreSame(retained, unchanged);
+            }
         }
 
         [TestCase(false)]
@@ -410,6 +520,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             );
             Assert.IsTrue(snapshot == null);
             StringAssert.Contains("encoder failed", failure);
+        }
+
+        private readonly struct EquivalentEnumComparer : IEqualityComparer<SpriteAlignment>
+        {
+            public bool Equals(SpriteAlignment left, SpriteAlignment right)
+            {
+                return left == right;
+            }
+
+            public int GetHashCode(SpriteAlignment value)
+            {
+                return (int)value;
+            }
         }
     }
 }

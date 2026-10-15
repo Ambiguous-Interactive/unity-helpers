@@ -431,7 +431,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return ReadAs(data, concrete, limits, false, out value);
         }
 
-        private static bool ReadAs<T>(
+        internal static bool ReadAs<T>(
             ReadOnlySpan<byte> data,
             Type concrete,
             WProtoReadLimits limits,
@@ -441,6 +441,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (!TryResolveForRead(concrete, out IWProtoFormatter<T> formatter))
             {
+                if (
+                    concrete != null
+                    && concrete != typeof(T)
+                    && typeof(T).IsAssignableFrom(concrete)
+                    && !WProtoFormatterProvider.IsRegistered<T>()
+                    && !WProtoDeclaredRootProvider.TryGetRoot(typeof(T), out _)
+                    && !WProtoRootMarshalProvider.IsRegistered<T>()
+                    && WProtoFormatterProvider.TryGetRuntimeCodecForType(
+                        concrete,
+                        out IWProtoRuntimeCodec codec
+                    )
+                    && codec.TryDeserialize(data, limits, preserveTypedFailures, out object decoded)
+                )
+                {
+                    value = (T)decoded;
+                    return true;
+                }
                 value = default;
                 return false;
             }

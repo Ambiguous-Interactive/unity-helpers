@@ -8,11 +8,59 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using NUnit.Framework;
     using ProtoBuf.Meta;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>Proves static consumer declarations preserve runtime-only models on both oracles.</summary>
     [TestFixture]
     public sealed class RuntimeModelConsumerMigrationTests
     {
+        private static void VerifyImmutable<TIdentifier>(
+            WProtoImmutableConsumerValue<TIdentifier> value
+        )
+        {
+            RuntimeTypeModel model = RuntimeTypeModel.Create();
+#pragma warning disable WPROTO048
+            MetaType contract = model
+                .Add(typeof(WProtoImmutableConsumerValue<TIdentifier>), false)
+                .Add(5, nameof(WProtoImmutableConsumerValue<TIdentifier>.Identifier))
+                .Add(11, nameof(WProtoImmutableConsumerValue<TIdentifier>.Sequence));
+            contract[11].DefaultValue = 0L;
+            if (typeof(TIdentifier) == typeof(int))
+            {
+                contract[5].DefaultValue = 0;
+            }
+#pragma warning restore WPROTO048
+            byte[] original = OracleBytes(model, value);
+            Assert.IsTrue(WProtoFacade.TrySerialize(value, out byte[] generated));
+            CollectionAssert.AreEqual(original, generated);
+            Assert.IsTrue(
+                WProtoFacade.TryDeserialize(
+                    original,
+                    out WProtoImmutableConsumerValue<TIdentifier> migrated
+                )
+            );
+            Assert.AreEqual(value.Identifier, migrated.Identifier);
+            Assert.AreEqual(value.Sequence, migrated.Sequence);
+            WProtoImmutableConsumerValue<TIdentifier> erased =
+                (WProtoImmutableConsumerValue<TIdentifier>)
+                    WProtoFacade.DeserializeAs<object>(
+                        original,
+                        typeof(WProtoImmutableConsumerValue<TIdentifier>)
+                    );
+            Assert.AreEqual(value.Identifier, erased.Identifier);
+            Assert.AreEqual(value.Sequence, erased.Sequence);
+            using MemoryStream stream = new(generated);
+            WProtoImmutableConsumerValue<TIdentifier> restored =
+                (WProtoImmutableConsumerValue<TIdentifier>)
+                    model.Deserialize(
+                        stream,
+                        null,
+                        typeof(WProtoImmutableConsumerValue<TIdentifier>)
+                    );
+            Assert.AreEqual(value.Identifier, restored.Identifier);
+            Assert.AreEqual(value.Sequence, restored.Sequence);
+        }
+
         private static List<RuntimeConfiguredEntry> Entries(int edge)
         {
             return new List<RuntimeConfiguredEntry>
@@ -106,6 +154,38 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         ((RuntimeConfiguredItem)actual.Entries[index]).Quantity
                     );
                 }
+            }
+        }
+
+        [TestCase(0, false)]
+        [TestCase(-1, false)]
+        [TestCase(int.MinValue, false)]
+        [TestCase(int.MaxValue, false)]
+        [TestCase(0, true)]
+        [TestCase(-1, true)]
+        [TestCase(int.MinValue, true)]
+        [TestCase(int.MaxValue, true)]
+        public void ImmutableClosedTargetsPreserveModelBytesAndBothReadDirections(
+            int edge,
+            bool textIdentifier
+        )
+        {
+            long sequence =
+                edge == 0 ? 0
+                : edge == -1 ? 9007199254740993L
+                : edge == int.MinValue ? long.MinValue
+                : long.MaxValue;
+            if (textIdentifier)
+            {
+                string identifier =
+                    edge == 0 ? string.Empty
+                    : edge == -1 ? null
+                    : "café/中/" + edge;
+                VerifyImmutable(new WProtoImmutableConsumerValue<string>(identifier, sequence));
+            }
+            else
+            {
+                VerifyImmutable(new WProtoImmutableConsumerValue<int>(edge, sequence));
             }
         }
 

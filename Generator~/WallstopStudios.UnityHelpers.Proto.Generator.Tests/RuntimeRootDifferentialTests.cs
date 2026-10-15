@@ -30,7 +30,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 CollectionAssert.AreEqual(oracle.ToArray(), expected);
             }
             Assert.IsTrue(
-                WProtoFormatterProvider.TryGetRuntimeWriter(value, out IWProtoRuntimeWriter writer)
+                WProtoFormatterProvider.TryGetRuntimeCodec(value, out IWProtoRuntimeCodec writer)
             );
             Assert.IsTrue(writer.TrySerialize(value, out byte[] generated));
             CollectionAssert.AreEqual(expected, generated);
@@ -47,6 +47,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 (IEnumerable)model.Deserialize(input, null, typeof(T))
             );
             CollectionAssert.AreEqual(value, WProtoFacade.Deserialize<T>(oracle.ToArray()));
+            CollectionAssert.AreEqual(
+                value,
+                (IEnumerable)WProtoFacade.DeserializeAs<object>(oracle.ToArray(), typeof(T))
+            );
+            CollectionAssert.AreEqual(
+                value,
+                WProtoFacade.DeserializeAs<IEnumerable>(oracle.ToArray(), typeof(T))
+            );
         }
 
         [TestCase(false)]
@@ -140,7 +148,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsFalse(WProtoFacade.TrySerialize(value, out byte[] declined));
             Assert.IsTrue(declined == null);
             Assert.IsTrue(
-                WProtoFormatterProvider.TryGetRuntimeWriter(value, out IWProtoRuntimeWriter writer)
+                WProtoFormatterProvider.TryGetRuntimeCodec(value, out IWProtoRuntimeCodec writer)
             );
             Assert.IsTrue(writer.TrySerialize(value, out byte[] generated));
             using MemoryStream oracle = new MemoryStream();
@@ -218,9 +226,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             for (int index = 0; index < 32; ++index)
             {
                 Assert.IsTrue(
-                    WProtoFormatterProvider.TryGetRuntimeWriter(
+                    WProtoFormatterProvider.TryGetRuntimeCodec(
                         value,
-                        out IWProtoRuntimeWriter writer
+                        out IWProtoRuntimeCodec writer
                     )
                 );
                 writer.Serialize(value, ref buffer);
@@ -230,9 +238,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             for (int index = 0; index < 128; ++index)
             {
                 if (
-                    WProtoFormatterProvider.TryGetRuntimeWriter(
+                    WProtoFormatterProvider.TryGetRuntimeCodec(
                         value,
-                        out IWProtoRuntimeWriter writer
+                        out IWProtoRuntimeCodec writer
                     )
                 )
                 {

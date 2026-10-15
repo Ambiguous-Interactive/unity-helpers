@@ -389,7 +389,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "the facade claimed a request whose elements it cannot encode"
             );
             Assert.IsTrue(
-                WProtoFormatterProvider.TryGetRuntimeWriter(ring, out IWProtoRuntimeWriter writer)
+                WProtoFormatterProvider.TryGetRuntimeCodec(ring, out IWProtoRuntimeCodec writer)
             );
             Assert.IsFalse(writer.TrySerialize(ring, out byte[] declined));
             Assert.IsTrue(declined == null);

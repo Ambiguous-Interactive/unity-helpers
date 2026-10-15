@@ -1,0 +1,1547 @@
+{
+  "schemaVersion": 1,
+  "issue": 991,
+  "repositoryBase": "0b216db9182495168b515a00b6fa49e8873096ea",
+  "profile": {
+    "unity": "6000.5.2f1",
+    "target": "WebGL",
+    "backend": "IL2CPP",
+    "compiler": "Release",
+    "managedStripping": "High",
+    "nativeStripping": true,
+    "development": false,
+    "compression": false,
+    "dataCaching": false,
+    "manifest": {
+      "com.unity.modules.jsonserialize": "1.0.0"
+    },
+    "authoredScene": "empty"
+  },
+  "conclusion": "An incremental WebGL build cache reproducibly omits MonoScript native registration in this minimal project. An empty Library fixes the first build, but a subsequent incremental build can reintroduce the omission. CleanBuildCache fixes the exact current production source in two successive builds with zero startup errors. The individual cache file is not identified.",
+  "unchangedInputs": {
+    "Assets/Acceptance.unity": "2dab5017419a2ee28505c5594da8f22a492895f3ae30dd8afc70a6a0c52ddc1a",
+    "Assets/Acceptance.unity.meta": "398201023b42578284f4e0daacf262fd97e6f5f38bdfa9b6e06b71bd5864e80c",
+    "Assets/BrowserAcceptance.cs": "d8dfa7dc3dd8449ca13e0676a8ff6a42f1ed4c62c380cc1ec688c67e883e8d21",
+    "Assets/BrowserAcceptance.cs.meta": "d39e90778b1926b17eff37f98d1778d8fc705ab6bedd7028c1bda3360c10bac3",
+    "Assets/BrowserStorage.cs": "0fcd5be92537cab3d6ef3a7b6a37ecf887f5134e85ccdec4a8190e56c394f10d",
+    "Assets/BrowserStorage.cs.meta": "1be904fc7e2d66d0b829c4ac92c9dec3886891077a9893f140cbe73f6696eec0",
+    "Assets/Editor.meta": "5ae2f32ad8233b9d550244eef0420e4c472c1e07962c6c0c981c8a7bb7f4bca6",
+    "Assets/Editor/BrowserAcceptanceBuilder.cs": "5e9a669cab20e7220bc9300ba8f831c626d2e7b9b4f4e8cd999fdbbbe80cbd1e",
+    "Assets/Editor/BrowserAcceptanceBuilder.cs.meta": "38183a827950148c7da9612996eb008524a00131bda3b627a5edf1e1da08a61b",
+    "Assets/Plugins.meta": "77681d09fd15972ebe13acd7daf91a605b905cb9b5462705f494508e2e6bb0d7",
+    "Assets/Plugins/WebGL.meta": "019c664bcd686f123ec22badc893c1fbb16bba1d39b78a171afb4b1119778461",
+    "Assets/Plugins/WebGL/BrowserAcceptance.jslib": "ba92dac91520cfcb8aac013bde3197aff72a93574f8e62c3a1e795ffcb8b259f",
+    "Assets/Plugins/WebGL/BrowserAcceptance.jslib.meta": "e44b1b741b7560f608f26f4317277db451fce54b8074d40964a093a3f948efa8",
+    "Assets/Plugins/WebGL/BrowserStorage.jslib": "c241dcf44c32191840f2b78c956af3deba9c8c7fdfc7326b7f80895acdf58904",
+    "Assets/Plugins/WebGL/BrowserStorage.jslib.meta": "4c19c68d90a50d11c7c1bd8741dcf4b6838d6085e56c366cec532a4d84d45b6f",
+    "Packages/manifest.json": "846062d306bdba4429d494f6ee60047711f8d865eec69df8ee44632c85cd3cb0",
+    "Packages/packages-lock.json": "f4d2f92f498fc4de656505d0a7316f7c5de33ee6612a082ff2d99d51d3dce96b",
+    "ProjectSettings/AudioManager.asset": "9543c41dbfc7d3951217c4dd9481ed026eb8e529b85ecf4463969a0fea747729",
+    "ProjectSettings/ClusterInputManager.asset": "40e65dd214bf254955d2c8829ca8ce2130fd3510485560ce012e9a1ddd93e623",
+    "ProjectSettings/DynamicsManager.asset": "fb36e677f7de32325bede8462e7e3eaf0be86ca374216d2907886fce7cb1d488",
+    "ProjectSettings/EditorBuildSettings.asset": "1942c088ddfeeef348fdf12390e2a2d6da51056e197458d67969d44e7b2cbbd3",
+    "ProjectSettings/EditorSettings.asset": "29bbdc2f4f4b92e0bead569cec8e85c94692d2644827de2b935cee5443559bc0",
+    "ProjectSettings/GraphicsSettings.asset": "8ef104b545ec651221d6806e99e8e3ee854916c6366d8db57d2d6c50eaf4a9a3",
+    "ProjectSettings/InputManager.asset": "d0f454ddb880912abcae92e3e12957a7446786ba89e24937e019ff3bbc0d4300",
+    "ProjectSettings/MemorySettings.asset": "614ea14e97e08ea3bc2e3849a35414ff708b255075f475fc8a03991c5c9b4d57",
+    "ProjectSettings/MultiplayerManager.asset": "aba89fd1a1ddad182727ad82727e536d27372e90328a8196da2a4560398983dd",
+    "ProjectSettings/NavMeshAreas.asset": "7ebbf8f53b8033104e1878b95ca07a28d0954092d81c220f14196a42f651e658",
+    "ProjectSettings/Physics2DSettings.asset": "1cfc0c8fbceec604fd7cd2a06c04ff05dddee6335b75c92b0f5715ad80ba9490",
+    "ProjectSettings/PhysicsCoreProjectSettings2D.asset": "bedc5339a832c60dc3f11b84abc4f4384dbfa20b0cd9ad6c444b907e751fc35e",
+    "ProjectSettings/PresetManager.asset": "29c125923fe6e29f90190d4fce1c82d660e7051546e2c9d02908d18c9cf2436c",
+    "ProjectSettings/ProjectSettings.asset": "bcf317107eb39eaee9945503da3410ca261765d63e6155775dcaf58281abbf48",
+    "ProjectSettings/ProjectVersion.txt": "0bd10e7d104bdb396187fb2b4c47d1f5494041120bd8fe22d47c678939c2bc47",
+    "ProjectSettings/QualitySettings.asset": "f1f893b1be47ad2442f58338dd7c860dc1986bb317e2f5bb31084454ffabbf4c",
+    "ProjectSettings/SceneTemplateSettings.json": "bb9098b3bfcde78d93e264b96f7b77b5430e64e8c57a7aad7f5a5d9c3945e16a",
+    "ProjectSettings/TagManager.asset": "996628fdc904025b83606bbfbda4fe08c0bbe916475146110e77cdc2f22c2013",
+    "ProjectSettings/TimeManager.asset": "3396f52fdc16d445024e01d7a2d99db6f0a37569d1d73c0302e9ffb857d90287",
+    "ProjectSettings/UnityConnectSettings.asset": "11251dae0356b6f43dd2c67bb511f6b7ecda4e5de425186bba3297e6f3dc1c6f",
+    "ProjectSettings/VFXManager.asset": "2973a6af930e142f62cde00076beda8a3cc3a66d9bfcde7a58ba7d4be2251c26",
+    "ProjectSettings/VersionControlSettings.asset": "e199cdfa6a8f2bf33cfd47e549198f13e3eb2a5099e908fdb4e0f14d939ccc6b",
+    "UserSettings/EditorUserSettings.asset": "414b11d137e87a59513aa78b92a85fad724eda3d9243b3f21be3c2c38f5905d2",
+    "UserSettings/Search.settings": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  "sourceProvenance": {
+    "counterfactual": "Historical probe source, bound by unchangedInputs.",
+    "currentSource": {
+      "path": "Runtime/Core/Helper/BrowserStorage.cs",
+      "sha256": "d983fc2c2b7748e24826b166d9f2b0dfe4e15b0862630b56627b117e51554198",
+      "byteIdenticalToCurrentProbe": true
+    },
+    "plugin": {
+      "path": "Runtime/Plugins/WebGL/BrowserStorage.jslib",
+      "sha256": "c241dcf44c32191840f2b78c956af3deba9c8c7fdfc7326b7f80895acdf58904"
+    },
+    "cleanBuildOptionsChange": "The builder changes BuildOptions.None to BuildOptions.CleanBuildCache; its result text records the selected flag. No player settings or runtime source differ between current-incremental and clean-cache arms.",
+    "cleanCacheRepeatSourcesIdentical": true
+  },
+  "arms": [
+    {
+      "name": "retained",
+      "build": "Succeeded\nerrors=0\nwarnings=0\ntime=00:00:30.2631925\nunity=6000.5.2f1\nbackend=IL2CPP\ncompiler=Release\nstripping=High\noptions=None\n",
+      "process": {
+        "endUtc": "2026-10-15T00:41:06.8970944Z",
+        "exitCode": 0,
+        "pid": 153704,
+        "arm": "retained-cache",
+        "naturalExit": true
+      },
+      "browserProcess": {
+        "exitCode": 0,
+        "utc": "2026-10-15T00:41:34.461Z",
+        "browserExitCode": 0,
+        "usedKillFallback": false,
+        "naturalExit": true
+      },
+      "browserResults": [
+        {
+          "run": 0,
+          "ready": true,
+          "acceptance": "PASS checks=728 unity=6000.5.2f1",
+          "cumulativeConsoleErrors": 30,
+          "cumulativeClass115": 30,
+          "utc": "2026-10-15T00:41:30.425Z"
+        },
+        {
+          "run": 1,
+          "ready": true,
+          "acceptance": "PASS PERSIST checks=3 unity=6000.5.2f1",
+          "cumulativeConsoleErrors": 60,
+          "cumulativeClass115": 60,
+          "utc": "2026-10-15T00:41:32.454Z"
+        }
+      ],
+      "consoleErrors": [
+        {
+          "timestamp": 1792024889067.404,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889067.575,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889067.64,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889067.692,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889067.744,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889067.795,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889067.856,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889067.904,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889067.957,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.09,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.171,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.228,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.287,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.342,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.392,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.441,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.488,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.534,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.58,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.627,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.673,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.717,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.765,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.81,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.856,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.907,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889068.954,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889069.007,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889069.06,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024889069.108,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890549.544,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890549.68,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890549.75,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890549.815,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890549.871,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890549.931,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890549.982,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.035,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.088,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.14,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.191,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.244,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.292,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.339,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.398,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.447,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.497,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.547,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.593,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.645,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.69,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.738,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.784,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.833,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.88,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.929,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890550.977,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890551.027,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890551.074,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792024890551.121,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        }
+      ],
+      "runtimeExceptions": 0,
+      "registeredClasses": 50,
+      "registersMonoScript": false,
+      "registersTextAsset": false,
+      "artifacts": {
+        "Output.data": {
+          "bytes": 2826929,
+          "sha256": "994bbf8685340d3ccb565592e776d3399bf053527ed1ae21bdad6f525070e387"
+        },
+        "UnityClassRegistration.cpp": {
+          "bytes": 8757,
+          "sha256": "c6e36777177320d8163fb092824668853ed81a6eb75766bbea6a4295b8734823"
+        },
+        "TypesInScenes.xml": {
+          "bytes": 1396,
+          "sha256": "6e82ecb0a6589dfd541257cd5888f427f19ebdc891a75706810d0a48fbbc6883"
+        },
+        "browser-result.json": {
+          "bytes": 852917,
+          "sha256": "fde0ee1354977eefb8285915b4a5a2d3fae7bdcb8d1469fc138a4697add59b54"
+        }
+      },
+      "serializedMonoScripts": [
+        {
+          "file": "serialized-data/globalgamemanagers.assets",
+          "count": 2,
+          "sha256": "c5f6d23bf0a82016d6c515380e6e04f2bc3573884cc0a6dcc689d49d2ddc77d2"
+        },
+        {
+          "file": "extracted-data/Resources/unity default resources",
+          "count": 30,
+          "sha256": "3eeee5cac9f93f680ac5f84a333117aef2e4dbba9efefc6799de467e76781d2a"
+        }
+      ],
+      "networkBodies": [
+        {
+          "requestId": "1ACE1F940AAC019F00CB27A8E76B6851",
+          "url": "http://127.0.0.1:19092/",
+          "status": 200,
+          "mimeType": "text/html",
+          "length": 5629,
+          "sha256": "868789dd806f7135c204045c5f193c27a926737dafd19c91daddda7e16258d87"
+        },
+        {
+          "requestId": "117328.2",
+          "url": "http://127.0.0.1:19092/TemplateData/style.css",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 1448,
+          "sha256": "8e3625e108a61dcd1d31303376d9e02d7bdc08921d254e8f4359b892b3825caa"
+        },
+        {
+          "requestId": "117328.4",
+          "url": "http://127.0.0.1:19092/Build/Output.loader.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 19668,
+          "sha256": "216c6222e4310c2b3c2e1cb98e5551836f807da30ef42f9cc141de1bc9e6a4dd"
+        },
+        {
+          "requestId": "117328.5",
+          "url": "http://127.0.0.1:19092/Build/Output.framework.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 273533,
+          "sha256": "d8d74533fd5950706d830cf6c8dd14b96b7f6b06e547ff5777145bb5254c83d2"
+        },
+        {
+          "requestId": "117328.6",
+          "url": "http://127.0.0.1:19092/Build/Output.data",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2826929,
+          "sha256": "994bbf8685340d3ccb565592e776d3399bf053527ed1ae21bdad6f525070e387"
+        },
+        {
+          "requestId": "117328.7",
+          "url": "http://127.0.0.1:19092/Build/Output.wasm",
+          "status": 200,
+          "mimeType": "application/wasm",
+          "length": 8399783,
+          "sha256": "f383a9a595e1d53bc6044a351c5aabd61341a0d19eadaade8fbcd366d305b3cc"
+        },
+        {
+          "requestId": "117328.8",
+          "url": "http://127.0.0.1:19092/TemplateData/favicon.ico",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2305,
+          "sha256": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f"
+        },
+        {
+          "requestId": "BA55BE8ADB2C5A3D9DBAF1874D321DD3",
+          "url": "http://127.0.0.1:19092/",
+          "status": 200,
+          "mimeType": "text/html",
+          "length": 5629,
+          "sha256": "868789dd806f7135c204045c5f193c27a926737dafd19c91daddda7e16258d87"
+        },
+        {
+          "requestId": "117328.10",
+          "url": "http://127.0.0.1:19092/TemplateData/style.css",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 1448,
+          "sha256": "8e3625e108a61dcd1d31303376d9e02d7bdc08921d254e8f4359b892b3825caa"
+        },
+        {
+          "requestId": "117328.12",
+          "url": "http://127.0.0.1:19092/Build/Output.loader.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 19668,
+          "sha256": "216c6222e4310c2b3c2e1cb98e5551836f807da30ef42f9cc141de1bc9e6a4dd"
+        },
+        {
+          "requestId": "117328.13",
+          "url": "http://127.0.0.1:19092/Build/Output.framework.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 273533,
+          "sha256": "d8d74533fd5950706d830cf6c8dd14b96b7f6b06e547ff5777145bb5254c83d2"
+        },
+        {
+          "requestId": "117328.14",
+          "url": "http://127.0.0.1:19092/Build/Output.data",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2826929,
+          "sha256": "994bbf8685340d3ccb565592e776d3399bf053527ed1ae21bdad6f525070e387"
+        },
+        {
+          "requestId": "117328.16",
+          "url": "http://127.0.0.1:19092/TemplateData/favicon.ico",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2305,
+          "sha256": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f"
+        },
+        {
+          "requestId": "117328.15",
+          "url": "http://127.0.0.1:19092/Build/Output.wasm",
+          "status": 200,
+          "mimeType": "application/wasm",
+          "length": 8399783,
+          "sha256": "f383a9a595e1d53bc6044a351c5aabd61341a0d19eadaade8fbcd366d305b3cc"
+        }
+      ]
+    },
+    {
+      "name": "clean",
+      "build": "Succeeded\nerrors=0\nwarnings=0\ntime=00:00:35.2247965\nunity=6000.5.2f1\nbackend=IL2CPP\ncompiler=Release\nstripping=High\noptions=None\n",
+      "process": {
+        "endUtc": "2026-10-15T00:42:57.7954758Z",
+        "exitCode": 0,
+        "pid": 428624,
+        "arm": "same-path-empty-library",
+        "naturalExit": true
+      },
+      "browserProcess": {
+        "exitCode": 0,
+        "utc": "2026-10-15T00:44:22.997Z",
+        "browserExitCode": 0,
+        "usedKillFallback": false,
+        "naturalExit": true
+      },
+      "browserResults": [
+        {
+          "run": 0,
+          "ready": true,
+          "acceptance": "PASS checks=728 unity=6000.5.2f1",
+          "cumulativeConsoleErrors": 0,
+          "cumulativeClass115": 0,
+          "utc": "2026-10-15T00:44:18.946Z"
+        },
+        {
+          "run": 1,
+          "ready": true,
+          "acceptance": "PASS PERSIST checks=3 unity=6000.5.2f1",
+          "cumulativeConsoleErrors": 0,
+          "cumulativeClass115": 0,
+          "utc": "2026-10-15T00:44:20.978Z"
+        }
+      ],
+      "consoleErrors": [],
+      "runtimeExceptions": 0,
+      "registeredClasses": 52,
+      "registersMonoScript": true,
+      "registersTextAsset": true,
+      "artifacts": {
+        "Output.data": {
+          "bytes": 2849349,
+          "sha256": "081e55402c4704540e848f6594b7368b7bd60fa9f0195ed3abe93dc99b54065c"
+        },
+        "UnityClassRegistration.cpp": {
+          "bytes": 9037,
+          "sha256": "55912007b5100a5bbf6c42d9b71bc4f6aa5682d204b608473e3ec08be3c8c200"
+        },
+        "TypesInScenes.xml": {
+          "bytes": 1523,
+          "sha256": "426ff89f942891339db1b777339223c2a07014a293ad3c28d78bfa2f07fc4001"
+        },
+        "browser-result.json": {
+          "bytes": 492779,
+          "sha256": "a11f6a0efe5541ff5e4959e95048e4c173f7f641e0a2ca3ff2b3bd9ac4c0f2ce"
+        }
+      },
+      "serializedMonoScripts": [
+        {
+          "file": "serialized-data/globalgamemanagers.assets",
+          "count": 2,
+          "sha256": "c5f6d23bf0a82016d6c515380e6e04f2bc3573884cc0a6dcc689d49d2ddc77d2"
+        },
+        {
+          "file": "extracted-data/Resources/unity default resources",
+          "count": 30,
+          "sha256": "3eeee5cac9f93f680ac5f84a333117aef2e4dbba9efefc6799de467e76781d2a"
+        }
+      ],
+      "networkBodies": [
+        {
+          "requestId": "DF1F1511E22AB716C23D8E46E463C49A",
+          "url": "http://127.0.0.1:19092/",
+          "status": 200,
+          "mimeType": "text/html",
+          "length": 5629,
+          "sha256": "868789dd806f7135c204045c5f193c27a926737dafd19c91daddda7e16258d87"
+        },
+        {
+          "requestId": "408332.2",
+          "url": "http://127.0.0.1:19092/TemplateData/style.css",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 1448,
+          "sha256": "8e3625e108a61dcd1d31303376d9e02d7bdc08921d254e8f4359b892b3825caa"
+        },
+        {
+          "requestId": "408332.4",
+          "url": "http://127.0.0.1:19092/Build/Output.loader.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 19668,
+          "sha256": "aa372f45b50cde585732654ff142aa0ad62a51c645f3cbb106830a0d64b89e88"
+        },
+        {
+          "requestId": "408332.5",
+          "url": "http://127.0.0.1:19092/Build/Output.framework.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 273533,
+          "sha256": "d8d74533fd5950706d830cf6c8dd14b96b7f6b06e547ff5777145bb5254c83d2"
+        },
+        {
+          "requestId": "408332.6",
+          "url": "http://127.0.0.1:19092/Build/Output.data",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2849349,
+          "sha256": "081e55402c4704540e848f6594b7368b7bd60fa9f0195ed3abe93dc99b54065c"
+        },
+        {
+          "requestId": "408332.8",
+          "url": "http://127.0.0.1:19092/TemplateData/favicon.ico",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2305,
+          "sha256": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f"
+        },
+        {
+          "requestId": "408332.7",
+          "url": "http://127.0.0.1:19092/Build/Output.wasm",
+          "status": 200,
+          "mimeType": "application/wasm",
+          "length": 8480750,
+          "sha256": "2355a101c283078fb3a9678c0a73d975711be29bd8dc188fff26a54420d4d276"
+        },
+        {
+          "requestId": "1F5A5895A46F9DCC3AC9D03F890C0BE3",
+          "url": "http://127.0.0.1:19092/",
+          "status": 200,
+          "mimeType": "text/html",
+          "length": 5629,
+          "sha256": "868789dd806f7135c204045c5f193c27a926737dafd19c91daddda7e16258d87"
+        },
+        {
+          "requestId": "408332.10",
+          "url": "http://127.0.0.1:19092/TemplateData/style.css",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 1448,
+          "sha256": "8e3625e108a61dcd1d31303376d9e02d7bdc08921d254e8f4359b892b3825caa"
+        },
+        {
+          "requestId": "408332.12",
+          "url": "http://127.0.0.1:19092/Build/Output.loader.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 19668,
+          "sha256": "aa372f45b50cde585732654ff142aa0ad62a51c645f3cbb106830a0d64b89e88"
+        },
+        {
+          "requestId": "408332.13",
+          "url": "http://127.0.0.1:19092/Build/Output.framework.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 273533,
+          "sha256": "d8d74533fd5950706d830cf6c8dd14b96b7f6b06e547ff5777145bb5254c83d2"
+        },
+        {
+          "requestId": "408332.14",
+          "url": "http://127.0.0.1:19092/Build/Output.data",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2849349,
+          "sha256": "081e55402c4704540e848f6594b7368b7bd60fa9f0195ed3abe93dc99b54065c"
+        },
+        {
+          "requestId": "408332.16",
+          "url": "http://127.0.0.1:19092/TemplateData/favicon.ico",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2305,
+          "sha256": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f"
+        },
+        {
+          "requestId": "408332.15",
+          "url": "http://127.0.0.1:19092/Build/Output.wasm",
+          "status": 200,
+          "mimeType": "application/wasm",
+          "length": 8480750,
+          "sha256": "2355a101c283078fb3a9678c0a73d975711be29bd8dc188fff26a54420d4d276"
+        }
+      ]
+    },
+    {
+      "name": "current-incremental",
+      "build": "Succeeded\nerrors=0\nwarnings=0\ntime=00:00:30.4263934\nunity=6000.5.2f1\nbackend=IL2CPP\ncompiler=Release\nstripping=High\noptions=None\n",
+      "process": {
+        "endUtc": "2026-10-15T00:48:54.3948937Z",
+        "exitCode": 0,
+        "pid": 91356,
+        "arm": "current-production-source",
+        "naturalExit": true
+      },
+      "browserProcess": {
+        "exitCode": 0,
+        "utc": "2026-10-15T00:49:21.974Z",
+        "browserExitCode": 0,
+        "usedKillFallback": false,
+        "naturalExit": true
+      },
+      "browserResults": [
+        {
+          "run": 0,
+          "ready": true,
+          "acceptance": "PASS checks=728 unity=6000.5.2f1",
+          "cumulativeConsoleErrors": 30,
+          "cumulativeClass115": 30,
+          "utc": "2026-10-15T00:49:17.938Z"
+        },
+        {
+          "run": 1,
+          "ready": true,
+          "acceptance": "PASS PERSIST checks=3 unity=6000.5.2f1",
+          "cumulativeConsoleErrors": 60,
+          "cumulativeClass115": 60,
+          "utc": "2026-10-15T00:49:19.964Z"
+        }
+      ],
+      "consoleErrors": [
+        {
+          "timestamp": 1792025356571.324,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356571.484,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356571.561,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356571.62,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356571.69,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356571.74,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356571.79,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356571.841,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356571.89,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356571.937,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356571.987,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.032,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.081,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.125,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.175,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.223,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.266,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.31,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.354,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.396,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.438,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.48,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.523,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.567,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.611,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.654,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.696,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.736,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.785,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025356572.829,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358058.394,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358058.545,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358058.613,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358058.672,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358058.813,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358058.957,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.031,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.094,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.152,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.216,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.271,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.328,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.404,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.464,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.522,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.585,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.645,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.699,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.755,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.81,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.871,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.925,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358059.975,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358060.025,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358060.077,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358060.127,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358060.179,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358060.227,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358060.278,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        },
+        {
+          "timestamp": 1792025358060.328,
+          "text": "Could not produce class with ID 115.\nThis could be caused by a class being stripped from the build even though it is needed. Try disabling 'Strip Engine Code' in Player Settings.\n"
+        }
+      ],
+      "runtimeExceptions": 0,
+      "registeredClasses": 50,
+      "registersMonoScript": false,
+      "registersTextAsset": false,
+      "artifacts": {
+        "Output.data": {
+          "bytes": 2826929,
+          "sha256": "7f95e52466e892df3272dd98a4caac487f21ede5c1a4bd0fe82e80f4c3f3363f"
+        },
+        "UnityClassRegistration.cpp": {
+          "bytes": 8757,
+          "sha256": "c6e36777177320d8163fb092824668853ed81a6eb75766bbea6a4295b8734823"
+        },
+        "TypesInScenes.xml": {
+          "bytes": 1396,
+          "sha256": "6e82ecb0a6589dfd541257cd5888f427f19ebdc891a75706810d0a48fbbc6883"
+        },
+        "browser-result.json": {
+          "bytes": 840025,
+          "sha256": "38caf7e0140270bb82fb2ed93c68e3d05b39194989ade22bf1c70b226ae36d31"
+        }
+      },
+      "serializedMonoScripts": [
+        {
+          "file": "serialized-data/globalgamemanagers.assets",
+          "count": 2,
+          "sha256": "c5f6d23bf0a82016d6c515380e6e04f2bc3573884cc0a6dcc689d49d2ddc77d2"
+        },
+        {
+          "file": "extracted-data/Resources/unity default resources",
+          "count": 30,
+          "sha256": "3eeee5cac9f93f680ac5f84a333117aef2e4dbba9efefc6799de467e76781d2a"
+        }
+      ],
+      "networkBodies": [
+        {
+          "requestId": "D30FFD2CF4767522FB4B24ED8562E6C1",
+          "url": "http://127.0.0.1:19092/",
+          "status": 200,
+          "mimeType": "text/html",
+          "length": 5629,
+          "sha256": "868789dd806f7135c204045c5f193c27a926737dafd19c91daddda7e16258d87"
+        },
+        {
+          "requestId": "792.2",
+          "url": "http://127.0.0.1:19092/TemplateData/style.css",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 1448,
+          "sha256": "8e3625e108a61dcd1d31303376d9e02d7bdc08921d254e8f4359b892b3825caa"
+        },
+        {
+          "requestId": "792.4",
+          "url": "http://127.0.0.1:19092/Build/Output.loader.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 19668,
+          "sha256": "2d2d0c29ccc8c2dc41c30d7bddcaa1b5459093745541440c49ccfc098f0bcd01"
+        },
+        {
+          "requestId": "792.5",
+          "url": "http://127.0.0.1:19092/Build/Output.framework.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 273533,
+          "sha256": "d8d74533fd5950706d830cf6c8dd14b96b7f6b06e547ff5777145bb5254c83d2"
+        },
+        {
+          "requestId": "792.6",
+          "url": "http://127.0.0.1:19092/Build/Output.data",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2826929,
+          "sha256": "7f95e52466e892df3272dd98a4caac487f21ede5c1a4bd0fe82e80f4c3f3363f"
+        },
+        {
+          "requestId": "792.8",
+          "url": "http://127.0.0.1:19092/TemplateData/favicon.ico",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2305,
+          "sha256": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f"
+        },
+        {
+          "requestId": "792.7",
+          "url": "http://127.0.0.1:19092/Build/Output.wasm",
+          "status": 200,
+          "mimeType": "application/wasm",
+          "length": 8399874,
+          "sha256": "f5d97336831efd564ed9dba8894efb1d428dcc01e7c39cc71401753316ea0b02"
+        },
+        {
+          "requestId": "3AC4C587BF788A77A106B85B61536B9D",
+          "url": "http://127.0.0.1:19092/",
+          "status": 200,
+          "mimeType": "text/html",
+          "length": 5629,
+          "sha256": "868789dd806f7135c204045c5f193c27a926737dafd19c91daddda7e16258d87"
+        },
+        {
+          "requestId": "792.10",
+          "url": "http://127.0.0.1:19092/TemplateData/style.css",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 1448,
+          "sha256": "8e3625e108a61dcd1d31303376d9e02d7bdc08921d254e8f4359b892b3825caa"
+        },
+        {
+          "requestId": "792.12",
+          "url": "http://127.0.0.1:19092/Build/Output.loader.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 19668,
+          "sha256": "2d2d0c29ccc8c2dc41c30d7bddcaa1b5459093745541440c49ccfc098f0bcd01"
+        },
+        {
+          "requestId": "792.13",
+          "url": "http://127.0.0.1:19092/Build/Output.framework.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 273533,
+          "sha256": "d8d74533fd5950706d830cf6c8dd14b96b7f6b06e547ff5777145bb5254c83d2"
+        },
+        {
+          "requestId": "792.14",
+          "url": "http://127.0.0.1:19092/Build/Output.data",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2826929,
+          "sha256": "7f95e52466e892df3272dd98a4caac487f21ede5c1a4bd0fe82e80f4c3f3363f"
+        },
+        {
+          "requestId": "792.16",
+          "url": "http://127.0.0.1:19092/TemplateData/favicon.ico",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2305,
+          "sha256": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f"
+        },
+        {
+          "requestId": "792.15",
+          "url": "http://127.0.0.1:19092/Build/Output.wasm",
+          "status": 200,
+          "mimeType": "application/wasm",
+          "length": 8399874,
+          "sha256": "f5d97336831efd564ed9dba8894efb1d428dcc01e7c39cc71401753316ea0b02"
+        }
+      ]
+    },
+    {
+      "name": "current-clean-cache",
+      "build": "Succeeded\nerrors=0\nwarnings=0\ntime=00:00:42.5865471\nunity=6000.5.2f1\nbackend=IL2CPP\ncompiler=Release\nstripping=High\noptions=CleanBuildCache\n",
+      "process": {
+        "endUtc": "2026-10-15T00:51:18.6422780Z",
+        "exitCode": 0,
+        "pid": 140816,
+        "arm": "current-clean-build-cache",
+        "naturalExit": true
+      },
+      "browserProcess": {
+        "exitCode": 0,
+        "utc": "2026-10-15T00:52:03.524Z",
+        "browserExitCode": 0,
+        "usedKillFallback": false,
+        "naturalExit": true
+      },
+      "browserResults": [
+        {
+          "run": 0,
+          "ready": true,
+          "acceptance": "PASS checks=728 unity=6000.5.2f1",
+          "cumulativeConsoleErrors": 0,
+          "cumulativeClass115": 0,
+          "utc": "2026-10-15T00:51:59.471Z"
+        },
+        {
+          "run": 1,
+          "ready": true,
+          "acceptance": "PASS PERSIST checks=3 unity=6000.5.2f1",
+          "cumulativeConsoleErrors": 0,
+          "cumulativeClass115": 0,
+          "utc": "2026-10-15T00:52:01.502Z"
+        }
+      ],
+      "consoleErrors": [],
+      "runtimeExceptions": 0,
+      "registeredClasses": 52,
+      "registersMonoScript": true,
+      "registersTextAsset": true,
+      "artifacts": {
+        "Output.data": {
+          "bytes": 2849349,
+          "sha256": "4ab041d4b1df12ac78da5ba0095df7ab6780cb8b80ffcea5e5d6c2d76a212480"
+        },
+        "UnityClassRegistration.cpp": {
+          "bytes": 9037,
+          "sha256": "55912007b5100a5bbf6c42d9b71bc4f6aa5682d204b608473e3ec08be3c8c200"
+        },
+        "TypesInScenes.xml": {
+          "bytes": 1523,
+          "sha256": "426ff89f942891339db1b777339223c2a07014a293ad3c28d78bfa2f07fc4001"
+        },
+        "browser-result.json": {
+          "bytes": 491764,
+          "sha256": "d1bf1e184b6a4807ba53786a7764da8e57ec0b1c855ba8cbe7841d9b8b8805cc"
+        }
+      },
+      "serializedMonoScripts": [
+        {
+          "file": "serialized-data/globalgamemanagers.assets",
+          "count": 2,
+          "sha256": "c5f6d23bf0a82016d6c515380e6e04f2bc3573884cc0a6dcc689d49d2ddc77d2"
+        },
+        {
+          "file": "extracted-data/Resources/unity default resources",
+          "count": 30,
+          "sha256": "3eeee5cac9f93f680ac5f84a333117aef2e4dbba9efefc6799de467e76781d2a"
+        }
+      ],
+      "networkBodies": [
+        {
+          "requestId": "A895FD1642EBF3F12F755FFF9F5FAAD1",
+          "url": "http://127.0.0.1:19092/",
+          "status": 200,
+          "mimeType": "text/html",
+          "length": 5629,
+          "sha256": "868789dd806f7135c204045c5f193c27a926737dafd19c91daddda7e16258d87"
+        },
+        {
+          "requestId": "111552.2",
+          "url": "http://127.0.0.1:19092/TemplateData/style.css",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 1448,
+          "sha256": "8e3625e108a61dcd1d31303376d9e02d7bdc08921d254e8f4359b892b3825caa"
+        },
+        {
+          "requestId": "111552.4",
+          "url": "http://127.0.0.1:19092/Build/Output.loader.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 19668,
+          "sha256": "f0c42bea8a886e9b9e4cbde943f12fc740d73df837313a0163e7025dc813f5ab"
+        },
+        {
+          "requestId": "111552.5",
+          "url": "http://127.0.0.1:19092/Build/Output.framework.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 273533,
+          "sha256": "d8d74533fd5950706d830cf6c8dd14b96b7f6b06e547ff5777145bb5254c83d2"
+        },
+        {
+          "requestId": "111552.6",
+          "url": "http://127.0.0.1:19092/Build/Output.data",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2849349,
+          "sha256": "4ab041d4b1df12ac78da5ba0095df7ab6780cb8b80ffcea5e5d6c2d76a212480"
+        },
+        {
+          "requestId": "111552.8",
+          "url": "http://127.0.0.1:19092/TemplateData/favicon.ico",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2305,
+          "sha256": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f"
+        },
+        {
+          "requestId": "111552.7",
+          "url": "http://127.0.0.1:19092/Build/Output.wasm",
+          "status": 200,
+          "mimeType": "application/wasm",
+          "length": 8480841,
+          "sha256": "df913f88cb1f75190d93284393c2161505f0847f055376f2fb93649d61a94f31"
+        },
+        {
+          "requestId": "73C84071255C0F3463C61A5902A50265",
+          "url": "http://127.0.0.1:19092/",
+          "status": 200,
+          "mimeType": "text/html",
+          "length": 5629,
+          "sha256": "868789dd806f7135c204045c5f193c27a926737dafd19c91daddda7e16258d87"
+        },
+        {
+          "requestId": "111552.10",
+          "url": "http://127.0.0.1:19092/TemplateData/style.css",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 1448,
+          "sha256": "8e3625e108a61dcd1d31303376d9e02d7bdc08921d254e8f4359b892b3825caa"
+        },
+        {
+          "requestId": "111552.12",
+          "url": "http://127.0.0.1:19092/Build/Output.loader.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 19668,
+          "sha256": "f0c42bea8a886e9b9e4cbde943f12fc740d73df837313a0163e7025dc813f5ab"
+        },
+        {
+          "requestId": "111552.13",
+          "url": "http://127.0.0.1:19092/Build/Output.framework.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 273533,
+          "sha256": "d8d74533fd5950706d830cf6c8dd14b96b7f6b06e547ff5777145bb5254c83d2"
+        },
+        {
+          "requestId": "111552.16",
+          "url": "http://127.0.0.1:19092/TemplateData/favicon.ico",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2305,
+          "sha256": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f"
+        },
+        {
+          "requestId": "111552.14",
+          "url": "http://127.0.0.1:19092/Build/Output.data",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2849349,
+          "sha256": "4ab041d4b1df12ac78da5ba0095df7ab6780cb8b80ffcea5e5d6c2d76a212480"
+        },
+        {
+          "requestId": "111552.15",
+          "url": "http://127.0.0.1:19092/Build/Output.wasm",
+          "status": 200,
+          "mimeType": "application/wasm",
+          "length": 8480841,
+          "sha256": "df913f88cb1f75190d93284393c2161505f0847f055376f2fb93649d61a94f31"
+        }
+      ]
+    },
+    {
+      "name": "current-clean-cache-repeat",
+      "build": "Succeeded\nerrors=0\nwarnings=0\ntime=00:00:42.3133024\nunity=6000.5.2f1\nbackend=IL2CPP\ncompiler=Release\nstripping=High\noptions=CleanBuildCache\n",
+      "process": {
+        "endUtc": "2026-10-15T00:53:45.6358952Z",
+        "exitCode": 0,
+        "pid": 415688,
+        "arm": "current-clean-build-cache-repeat",
+        "naturalExit": true
+      },
+      "browserProcess": {
+        "exitCode": 0,
+        "utc": "2026-10-15T00:54:33.175Z",
+        "browserExitCode": 0,
+        "usedKillFallback": false,
+        "naturalExit": true
+      },
+      "browserResults": [
+        {
+          "run": 0,
+          "ready": true,
+          "acceptance": "PASS checks=728 unity=6000.5.2f1",
+          "cumulativeConsoleErrors": 0,
+          "cumulativeClass115": 0,
+          "utc": "2026-10-15T00:54:29.124Z"
+        },
+        {
+          "run": 1,
+          "ready": true,
+          "acceptance": "PASS PERSIST checks=3 unity=6000.5.2f1",
+          "cumulativeConsoleErrors": 0,
+          "cumulativeClass115": 0,
+          "utc": "2026-10-15T00:54:31.153Z"
+        }
+      ],
+      "consoleErrors": [],
+      "runtimeExceptions": 0,
+      "registeredClasses": 52,
+      "registersMonoScript": true,
+      "registersTextAsset": true,
+      "artifacts": {
+        "Output.data": {
+          "bytes": 2849349,
+          "sha256": "1903d5f5351fde66fdad16d534f3e406f2c1a2db9fcaf4b8f88e5c68d3d45a8b"
+        },
+        "UnityClassRegistration.cpp": {
+          "bytes": 9037,
+          "sha256": "55912007b5100a5bbf6c42d9b71bc4f6aa5682d204b608473e3ec08be3c8c200"
+        },
+        "TypesInScenes.xml": {
+          "bytes": 1523,
+          "sha256": "426ff89f942891339db1b777339223c2a07014a293ad3c28d78bfa2f07fc4001"
+        },
+        "browser-result.json": {
+          "bytes": 497973,
+          "sha256": "f433fe649b20979acf4e5af82bf8aae53b4f104710ec9b37bcb03cf2bf47619c"
+        }
+      },
+      "serializedMonoScripts": [
+        {
+          "file": "serialized-data/globalgamemanagers.assets",
+          "count": 2,
+          "sha256": "c5f6d23bf0a82016d6c515380e6e04f2bc3573884cc0a6dcc689d49d2ddc77d2"
+        },
+        {
+          "file": "extracted-data/Resources/unity default resources",
+          "count": 30,
+          "sha256": "3eeee5cac9f93f680ac5f84a333117aef2e4dbba9efefc6799de467e76781d2a"
+        }
+      ],
+      "networkBodies": [
+        {
+          "requestId": "82134ED8ED62801CCC8DB2ED486C1617",
+          "url": "http://127.0.0.1:19092/",
+          "status": 200,
+          "mimeType": "text/html",
+          "length": 5629,
+          "sha256": "868789dd806f7135c204045c5f193c27a926737dafd19c91daddda7e16258d87"
+        },
+        {
+          "requestId": "402808.2",
+          "url": "http://127.0.0.1:19092/TemplateData/style.css",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 1448,
+          "sha256": "8e3625e108a61dcd1d31303376d9e02d7bdc08921d254e8f4359b892b3825caa"
+        },
+        {
+          "requestId": "402808.4",
+          "url": "http://127.0.0.1:19092/Build/Output.loader.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 19668,
+          "sha256": "f0c42bea8a886e9b9e4cbde943f12fc740d73df837313a0163e7025dc813f5ab"
+        },
+        {
+          "requestId": "402808.5",
+          "url": "http://127.0.0.1:19092/Build/Output.framework.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 273533,
+          "sha256": "d8d74533fd5950706d830cf6c8dd14b96b7f6b06e547ff5777145bb5254c83d2"
+        },
+        {
+          "requestId": "402808.6",
+          "url": "http://127.0.0.1:19092/Build/Output.data",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2849349,
+          "sha256": "1903d5f5351fde66fdad16d534f3e406f2c1a2db9fcaf4b8f88e5c68d3d45a8b"
+        },
+        {
+          "requestId": "402808.8",
+          "url": "http://127.0.0.1:19092/TemplateData/favicon.ico",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2305,
+          "sha256": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f"
+        },
+        {
+          "requestId": "402808.7",
+          "url": "http://127.0.0.1:19092/Build/Output.wasm",
+          "status": 200,
+          "mimeType": "application/wasm",
+          "length": 8480841,
+          "sha256": "df913f88cb1f75190d93284393c2161505f0847f055376f2fb93649d61a94f31"
+        },
+        {
+          "requestId": "4B08BA30B93077F3A98D203F2104DC82",
+          "url": "http://127.0.0.1:19092/",
+          "status": 200,
+          "mimeType": "text/html",
+          "length": 5629,
+          "sha256": "868789dd806f7135c204045c5f193c27a926737dafd19c91daddda7e16258d87"
+        },
+        {
+          "requestId": "402808.10",
+          "url": "http://127.0.0.1:19092/TemplateData/style.css",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 1448,
+          "sha256": "8e3625e108a61dcd1d31303376d9e02d7bdc08921d254e8f4359b892b3825caa"
+        },
+        {
+          "requestId": "402808.12",
+          "url": "http://127.0.0.1:19092/Build/Output.loader.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 19668,
+          "sha256": "f0c42bea8a886e9b9e4cbde943f12fc740d73df837313a0163e7025dc813f5ab"
+        },
+        {
+          "requestId": "402808.13",
+          "url": "http://127.0.0.1:19092/Build/Output.framework.js",
+          "status": 200,
+          "mimeType": "application/javascript",
+          "length": 273533,
+          "sha256": "d8d74533fd5950706d830cf6c8dd14b96b7f6b06e547ff5777145bb5254c83d2"
+        },
+        {
+          "requestId": "402808.14",
+          "url": "http://127.0.0.1:19092/Build/Output.data",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2849349,
+          "sha256": "1903d5f5351fde66fdad16d534f3e406f2c1a2db9fcaf4b8f88e5c68d3d45a8b"
+        },
+        {
+          "requestId": "402808.16",
+          "url": "http://127.0.0.1:19092/TemplateData/favicon.ico",
+          "status": 200,
+          "mimeType": "application/octet-stream",
+          "length": 2305,
+          "sha256": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f"
+        },
+        {
+          "requestId": "402808.15",
+          "url": "http://127.0.0.1:19092/Build/Output.wasm",
+          "status": 200,
+          "mimeType": "application/wasm",
+          "length": 8480841,
+          "sha256": "df913f88cb1f75190d93284393c2161505f0847f055376f2fb93649d61a94f31"
+        }
+      ]
+    }
+  ],
+  "retention": {
+    "project": "D:/Code/Goal991-Cached-20261015",
+    "originalCache": "D:/Code/Session490BrowserStorage/Library",
+    "counterfactualCache": "D:/Code/Goal991-Cached-20261015/Library-retained",
+    "localReceipts": "progress/.artifacts/goal-targeted-20261014/webgl-cache-counterfactual",
+    "qualification": "Full outputs, raw browser events and cache copies remain local; this file records bounded publication receipts."
+  },
+  "cleanBuildGuide": "https://docs.unity3d.com/6000.0/Documentation/Manual/build-clean-build.html",
+  "cleanBuildInputs": {
+    "Assets/Acceptance.unity": "2dab5017419a2ee28505c5594da8f22a492895f3ae30dd8afc70a6a0c52ddc1a",
+    "Assets/Acceptance.unity.meta": "398201023b42578284f4e0daacf262fd97e6f5f38bdfa9b6e06b71bd5864e80c",
+    "Assets/BrowserAcceptance.cs": "d8dfa7dc3dd8449ca13e0676a8ff6a42f1ed4c62c380cc1ec688c67e883e8d21",
+    "Assets/BrowserAcceptance.cs.meta": "d39e90778b1926b17eff37f98d1778d8fc705ab6bedd7028c1bda3360c10bac3",
+    "Assets/BrowserStorage.cs": "d983fc2c2b7748e24826b166d9f2b0dfe4e15b0862630b56627b117e51554198",
+    "Assets/BrowserStorage.cs.meta": "1be904fc7e2d66d0b829c4ac92c9dec3886891077a9893f140cbe73f6696eec0",
+    "Assets/Editor.meta": "5ae2f32ad8233b9d550244eef0420e4c472c1e07962c6c0c981c8a7bb7f4bca6",
+    "Assets/Plugins.meta": "77681d09fd15972ebe13acd7daf91a605b905cb9b5462705f494508e2e6bb0d7",
+    "Assets/Editor/BrowserAcceptanceBuilder.cs": "d21a2375b30159e2c687084c7b36ca08d8b6668835e7db26658e49e703f686a6",
+    "Assets/Editor/BrowserAcceptanceBuilder.cs.meta": "38183a827950148c7da9612996eb008524a00131bda3b627a5edf1e1da08a61b",
+    "Assets/Plugins/WebGL.meta": "019c664bcd686f123ec22badc893c1fbb16bba1d39b78a171afb4b1119778461",
+    "Assets/Plugins/WebGL/BrowserAcceptance.jslib": "ba92dac91520cfcb8aac013bde3197aff72a93574f8e62c3a1e795ffcb8b259f",
+    "Assets/Plugins/WebGL/BrowserAcceptance.jslib.meta": "e44b1b741b7560f608f26f4317277db451fce54b8074d40964a093a3f948efa8",
+    "Assets/Plugins/WebGL/BrowserStorage.jslib": "c241dcf44c32191840f2b78c956af3deba9c8c7fdfc7326b7f80895acdf58904",
+    "Assets/Plugins/WebGL/BrowserStorage.jslib.meta": "4c19c68d90a50d11c7c1bd8741dcf4b6838d6085e56c366cec532a4d84d45b6f",
+    "Packages/manifest.json": "846062d306bdba4429d494f6ee60047711f8d865eec69df8ee44632c85cd3cb0",
+    "Packages/packages-lock.json": "f4d2f92f498fc4de656505d0a7316f7c5de33ee6612a082ff2d99d51d3dce96b",
+    "ProjectSettings/AudioManager.asset": "9543c41dbfc7d3951217c4dd9481ed026eb8e529b85ecf4463969a0fea747729",
+    "ProjectSettings/ClusterInputManager.asset": "40e65dd214bf254955d2c8829ca8ce2130fd3510485560ce012e9a1ddd93e623",
+    "ProjectSettings/DynamicsManager.asset": "fb36e677f7de32325bede8462e7e3eaf0be86ca374216d2907886fce7cb1d488",
+    "ProjectSettings/EditorBuildSettings.asset": "1942c088ddfeeef348fdf12390e2a2d6da51056e197458d67969d44e7b2cbbd3",
+    "ProjectSettings/EditorSettings.asset": "29bbdc2f4f4b92e0bead569cec8e85c94692d2644827de2b935cee5443559bc0",
+    "ProjectSettings/GraphicsSettings.asset": "8ef104b545ec651221d6806e99e8e3ee854916c6366d8db57d2d6c50eaf4a9a3",
+    "ProjectSettings/InputManager.asset": "d0f454ddb880912abcae92e3e12957a7446786ba89e24937e019ff3bbc0d4300",
+    "ProjectSettings/MemorySettings.asset": "614ea14e97e08ea3bc2e3849a35414ff708b255075f475fc8a03991c5c9b4d57",
+    "ProjectSettings/MultiplayerManager.asset": "aba89fd1a1ddad182727ad82727e536d27372e90328a8196da2a4560398983dd",
+    "ProjectSettings/NavMeshAreas.asset": "7ebbf8f53b8033104e1878b95ca07a28d0954092d81c220f14196a42f651e658",
+    "ProjectSettings/Physics2DSettings.asset": "1cfc0c8fbceec604fd7cd2a06c04ff05dddee6335b75c92b0f5715ad80ba9490",
+    "ProjectSettings/PhysicsCoreProjectSettings2D.asset": "bedc5339a832c60dc3f11b84abc4f4384dbfa20b0cd9ad6c444b907e751fc35e",
+    "ProjectSettings/PresetManager.asset": "29c125923fe6e29f90190d4fce1c82d660e7051546e2c9d02908d18c9cf2436c",
+    "ProjectSettings/ProjectSettings.asset": "bcf317107eb39eaee9945503da3410ca261765d63e6155775dcaf58281abbf48",
+    "ProjectSettings/ProjectVersion.txt": "0bd10e7d104bdb396187fb2b4c47d1f5494041120bd8fe22d47c678939c2bc47",
+    "ProjectSettings/QualitySettings.asset": "f1f893b1be47ad2442f58338dd7c860dc1986bb317e2f5bb31084454ffabbf4c",
+    "ProjectSettings/SceneTemplateSettings.json": "bb9098b3bfcde78d93e264b96f7b77b5430e64e8c57a7aad7f5a5d9c3945e16a",
+    "ProjectSettings/TagManager.asset": "996628fdc904025b83606bbfbda4fe08c0bbe916475146110e77cdc2f22c2013",
+    "ProjectSettings/TimeManager.asset": "3396f52fdc16d445024e01d7a2d99db6f0a37569d1d73c0302e9ffb857d90287",
+    "ProjectSettings/UnityConnectSettings.asset": "11251dae0356b6f43dd2c67bb511f6b7ecda4e5de425186bba3297e6f3dc1c6f",
+    "ProjectSettings/VersionControlSettings.asset": "e199cdfa6a8f2bf33cfd47e549198f13e3eb2a5099e908fdb4e0f14d939ccc6b",
+    "ProjectSettings/VFXManager.asset": "2973a6af930e142f62cde00076beda8a3cc3a66d9bfcde7a58ba7d4be2251c26",
+    "UserSettings/EditorUserSettings.asset": "414b11d137e87a59513aa78b92a85fad724eda3d9243b3f21be3c2c38f5905d2",
+    "UserSettings/Search.settings": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  "changedInputsFromHistoricalProbe": [
+    "Assets/BrowserStorage.cs",
+    "Assets/Editor/BrowserAcceptanceBuilder.cs"
+  ],
+  "decoder": {
+    "path": "progress/.artifacts/goal-targeted-20261014/decode-current-webgl.py",
+    "sha256": "7a08b3da93fee29369fcd6f6722454b9d20537273ca97da13b1d058316387770",
+    "scope": "Bounded actual Output.data entries, UnityFS blocks and version 23 object tables. Every candidate has 30 default-resource and two owned MonoScript objects; none are removed."
+  }
+}

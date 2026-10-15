@@ -70,9 +70,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 WProtoFormatterProvider.Register(new DecliningProtoFormatter<DerivedMsg>());
                 Assert.IsTrue(
-                    WProtoFormatterProvider.TryGetRuntimeWriter(
+                    WProtoFormatterProvider.TryGetRuntimeCodec(
                         original,
-                        out IWProtoRuntimeWriter writer
+                        out IWProtoRuntimeCodec writer
                     )
                 );
                 Assert.IsFalse(writer.TrySerialize(original, out byte[] declined));

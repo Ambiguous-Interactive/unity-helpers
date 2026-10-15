@@ -510,6 +510,10 @@
 
     An empty property adds no file, so an ordinary build is byte-identical to one without this.
   -->
+  <ItemGroup Condition="'$(WallstopIterationTestSources)' != ''">
+    <Compile Remove="$(RepoRoot)/Tests/Editor/**/*.cs" />
+    <Compile Include="$(WallstopIterationTestSources)" />
+  </ItemGroup>
   <ItemGroup Condition="'$(WallstopCheckControl)' != ''">
     <Compile Include="$(WallstopCheckControl)" />
   </ItemGroup>

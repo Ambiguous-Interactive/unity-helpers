@@ -231,6 +231,56 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
                 return false;
             }
         }
+
+        /// <summary>Restores captured values into an existing dictionary after complete validation.</summary>
+        public static bool TryRestoreContents<TKey, TObject>(
+            Dictionary<TKey, List<TObject>> dictionary,
+            IReadOnlyList<int> keys,
+            IReadOnlyList<IReadOnlyList<Object>> values,
+            Func<int, TKey> decodeKey,
+            out string failure
+        )
+            where TKey : struct, Enum
+            where TObject : Object
+        {
+            try
+            {
+                if (
+                    dictionary == null
+                    || !ReferenceEquals(dictionary.Comparer, EqualityComparer<TKey>.Default)
+                )
+                {
+                    failure =
+                        "Dictionary content recovery requires an existing dictionary with the default comparer.";
+                    return false;
+                }
+                if (
+                    !TryRebuild(
+                        keys,
+                        values,
+                        decodeKey,
+                        out Dictionary<TKey, List<TObject>> rebuilt,
+                        out failure
+                    )
+                )
+                {
+                    return false;
+                }
+                dictionary.EnsureCapacity(rebuilt.Count);
+                dictionary.Clear();
+                foreach (KeyValuePair<TKey, List<TObject>> entry in rebuilt)
+                {
+                    dictionary.Add(entry.Key, entry.Value);
+                }
+                failure = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                failure = exception.Message;
+                return false;
+            }
+        }
     }
 #endif
 }
