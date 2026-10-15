@@ -80,8 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /// <summary>
-        /// The widest constructor whose every parameter has a meaningful zero, so that passing zero
-        /// for all of them describes exactly the value <c>default(T)</c> already holds.
+        /// Finds the widest constructor whose parameters accept zero arguments.
         /// </summary>
         private static ConstructorInfo ZeroableConstructor(Type type)
         {
@@ -135,6 +134,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             List<string> failures = new();
             List<string> checkedTypes = new();
             List<string> rejectedZero = new();
+            List<string> normalizedZero = new();
 
             foreach (Type type in CandidateStructs())
             {
@@ -165,6 +165,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     failures.Add(
                         $"{type.Name}: the all-zero construction threw {invocation.InnerException?.GetType().Name}"
                     );
+                    continue;
+                }
+
+                if (
+                    type == typeof(NativePcgRandom)
+                    || type == typeof(UnityExtensions.ConcaveHullOptions)
+                )
+                {
+                    /* These constructors seed or normalize state; zero arguments do not describe zero fields. */
+                    normalizedZero.Add(type.Name);
                     continue;
                 }
 
@@ -219,7 +229,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     + "needs a deliberate decision about whether default(T) is a value it admits."
             );
 
+            CollectionAssert.AreEquivalent(
+                new[] { nameof(NativePcgRandom), nameof(UnityExtensions.ConcaveHullOptions) },
+                normalizedZero,
+                "The known zero-normalizing constructors must remain covered by explicit state checks."
+            );
+
             Assert.IsEmpty(failures, string.Join(Environment.NewLine, failures));
+        }
+
+        [TestCase(typeof(NativePcgRandom))]
+        [TestCase(typeof(UnityExtensions.ConcaveHullOptions))]
+        public void ZeroNormalizingConstructorsProduceDistinctValues(Type type)
+        {
+            object zeroInitialized;
+            object constructed;
+            object repeated;
+            if (type == typeof(NativePcgRandom))
+            {
+                NativePcgRandom zeroRandom = default;
+                NativePcgRandom seededRandom = new(0);
+                Assert.AreEqual(0UL, zeroRandom._increment);
+                Assert.AreEqual(1UL, seededRandom._increment & 1UL);
+                zeroInitialized = zeroRandom;
+                constructed = seededRandom;
+                repeated = new NativePcgRandom(0);
+                Assert.AreEqual(0U, zeroRandom.NextUint());
+                Assert.AreEqual(512347103U, seededRandom.NextUint());
+            }
+            else
+            {
+                Assert.AreEqual(typeof(UnityExtensions.ConcaveHullOptions), type);
+                UnityExtensions.ConcaveHullOptions zeroOptions = default;
+                UnityExtensions.ConcaveHullOptions normalizedOptions = new(default, 0, 0, 0f);
+                Assert.AreEqual(UnityExtensions.ConcaveHullStrategy.Knn, zeroOptions.Strategy);
+                Assert.AreEqual(3, zeroOptions.NearestNeighbors);
+                Assert.AreEqual(40, zeroOptions.BucketSize);
+                Assert.AreEqual(90f, zeroOptions.AngleThreshold);
+                Assert.AreEqual(0, (int)normalizedOptions.Strategy);
+                Assert.AreEqual(3, normalizedOptions.NearestNeighbors);
+                Assert.AreEqual(1, normalizedOptions.BucketSize);
+                Assert.AreEqual(0f, normalizedOptions.AngleThreshold);
+                zeroInitialized = zeroOptions;
+                constructed = normalizedOptions;
+                repeated = new UnityExtensions.ConcaveHullOptions(default, 0, 0, 0f);
+            }
+
+            Assert.IsFalse(zeroInitialized.Equals(constructed));
+            Assert.IsFalse(constructed.Equals(zeroInitialized));
+            Assert.AreEqual(constructed, repeated);
+            Assert.AreEqual(constructed.GetHashCode(), repeated.GetHashCode());
+            Assert.AreEqual(
+                2,
+                new HashSet<object> { zeroInitialized, constructed, repeated }.Count
+            );
         }
 
         /// <summary>
