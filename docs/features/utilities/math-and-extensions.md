@@ -1357,6 +1357,11 @@ Vector2Int v = Direction.NorthWest.AsVector2Int(); // (-1, 1)
 
 **Why it exists:** Standard C# enum operations cause boxing allocations and are slow in hot paths. These helpers solve performance problems.
 
+Enum numeric conversion uses a checked span containing exactly one local enum value.
+It preserves signed extension for all eight underlying integer types, including undefined values,
+aliases, and flag combinations. Cached names and `HasFlagNoAlloc` use the same conversion.
+The implementation does not use unchecked memory-access helpers.
+
 ### Zero-Allocation Flag Checking
 
 **The problem:** Standard `HasFlag()` boxes both enums, causing GC pressure.

@@ -171,6 +171,7 @@
     />
     <Compile Include="$(RepoRoot)/Tests/ProtoOnly/**/*.cs" />
     <Compile
+      Condition="'$(WallstopIterationTestSources)' == ''"
       Include="$(RepoRoot)/Tests/Runtime/**/*.cs"
       Exclude="$(RepoRoot)/Tests/Runtime/Integrations/**/*.cs;$(RepoRoot)/Tests/Runtime/Visuals/EnhancedImageTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteAdditionalTests.cs;$(RepoRoot)/Tests/Runtime/Extensions/UnityExtensionsComprehensiveTests.cs"
     />
@@ -186,6 +187,11 @@
 
     An empty property adds no file, so an ordinary build is byte-identical to one without this.
   -->
+  <ItemGroup Condition="'$(WallstopIterationTestSources)' != ''">
+    <Compile Include="$(RepoRoot)/Tests/Runtime/TestTypes/**/*.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/TestDoubles/**/*.cs" />
+    <Compile Include="$(WallstopIterationTestSources.Split(';'))" />
+  </ItemGroup>
   <ItemGroup Condition="'$(WallstopCheckControl)' != ''">
     <Compile Include="$(WallstopCheckControl)" />
   </ItemGroup>

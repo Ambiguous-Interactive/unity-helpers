@@ -17,6 +17,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class EnumExtensionTests : CommonTestBase
     {
+        private static void AssertNumeric<T>(T value, ulong expected)
+            where T : unmanaged, Enum
+        {
+            Assert.That(EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong actual), Is.True);
+            Assert.That(actual, Is.EqualTo(expected));
+        }
+
         private static IEnumerable<TestCaseData> EnumContractCases()
         {
             yield return Contract<TestEnum>(nameof(TestEnum));
@@ -169,6 +176,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 useArray,
                 $"{typeof(T).Name} spans more than {EnumLookupStrategy<T>.MaximumArrayLength} values and must not allocate an array."
             );
+        }
+
+        [TestCase(17)]
+        [TestCase(637)]
+        public void NumericConversionPreservesRandomUndefinedUnderlyingBits(int seed)
+        {
+            Random random = new Random(seed);
+            byte[] bytes = new byte[8];
+            for (int index = 0; index < 128; ++index)
+            {
+                random.NextBytes(bytes);
+                ulong bits = BitConverter.ToUInt64(bytes, 0);
+                AssertNumeric(
+                    (SignedByteEnum)unchecked((sbyte)bits),
+                    unchecked((ulong)(long)(sbyte)bits)
+                );
+                AssertNumeric((TinyTestEnum)unchecked((byte)bits), unchecked((byte)bits));
+                AssertNumeric(
+                    (SignedShortNearEnum)unchecked((short)bits),
+                    unchecked((ulong)(long)(short)bits)
+                );
+                AssertNumeric((UnsignedShortEnum)unchecked((ushort)bits), unchecked((ushort)bits));
+                AssertNumeric(
+                    (SignedIntNearEnum)unchecked((int)bits),
+                    unchecked((ulong)(long)(int)bits)
+                );
+                AssertNumeric((UnsignedIntEnum)unchecked((uint)bits), unchecked((uint)bits));
+                AssertNumeric((SignedLongNearEnum)unchecked((long)bits), bits);
+                AssertNumeric((UnsignedLongEnum)bits, bits);
+            }
         }
 
         [Test]

@@ -110,6 +110,145 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             return result.GeneratedTrees[0].GetText().ToString();
         }
 
+        [TestCase("private", false)]
+        [TestCase("protected", false)]
+        [TestCase("private protected", true)]
+        [TestCase("private", true)]
+        public void PartialOwnersCaptureAndRestoreInaccessibleDictionaryFields(
+            string access,
+            bool readonlyField
+        )
+        {
+            string source =
+                "namespace Consumer { public partial class Asset : UnityEngine.ScriptableObject { "
+                + access
+                + " enum Key { A=0 } "
+                + access
+                + (readonlyField ? " readonly " : " ")
+                + "System.Collections.Generic.Dictionary<Key,System.Collections.Generic.List<UnityEngine.Texture>> Values = new(); } }";
+            string generated = Generated(new[] { source });
+            StringAssert.Contains("partial class @Asset", generated);
+            StringAssert.Contains("TryCapture(original.@Values", generated);
+            StringAssert.Contains(readonlyField ? "TryRestoreContents<" : "TryRebuild<", generated);
+            StringAssert.Contains(
+                "global::Consumer.Asset.CreateOdinMigrationCaptureValuesAt",
+                generated
+            );
+            StringAssert.Contains(
+                "global::Consumer.Asset.CreateOdinMigrationRestoreValuesAt",
+                generated
+            );
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void NestedPrivateAccessRequiresEveryContainingClassToBePartial(
+            bool partialContainer
+        )
+        {
+            string source =
+                "namespace @event { public "
+                + (partialContainer ? "partial " : string.Empty)
+                + "class Container { public partial class Asset : UnityEngine.ScriptableObject { private enum Key { A=0 } private System.Collections.Generic.Dictionary<Key,System.Collections.Generic.List<UnityEngine.Texture>> Values; } } }";
+            string generated = Generated(new[] { source });
+            Assert.That(
+                generated.Contains("partial class @Container"),
+                Is.EqualTo(partialContainer)
+            );
+            Assert.That(
+                generated.Contains("TryCapture(original.@Values"),
+                Is.EqualTo(partialContainer)
+            );
+        }
+
+        [Test]
+        public void SharedPartialBaseEmitsOneAccessorPerFieldAcrossDerivedOwners()
+        {
+            string[] sources =
+            {
+                "public partial class Base : UnityEngine.ScriptableObject { private enum Key { A=0 } private System.Collections.Generic.Dictionary<Key,System.Collections.Generic.List<UnityEngine.Texture>> Values; }",
+                "public partial class Base { public bool Flag; } public sealed class First : Base {} public sealed class Second : Base {}",
+            };
+            string generated = Generated(sources);
+            Assert.That(
+                generated
+                    .Split(
+                        new[]
+                        {
+                            "internal static global::WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration.OdinMigrationDictionaryCapture",
+                        },
+                        StringSplitOptions.None
+                    )
+                    .Length,
+                Is.EqualTo(2)
+            );
+            StringAssert.Contains("typeof(global::First)", generated);
+            StringAssert.Contains("typeof(global::Second)", generated);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void AccessorFactoriesAvoidExistingConsumerMemberNames(bool inherited)
+        {
+            string source =
+                (
+                    inherited
+                        ? "public partial class Parent : UnityEngine.ScriptableObject {} "
+                        : string.Empty
+                )
+                + "public partial class Asset : "
+                + (inherited ? "Parent" : "UnityEngine.ScriptableObject")
+                + " { private enum Key { A=0 } private System.Collections.Generic.Dictionary<Key,System.Collections.Generic.List<UnityEngine.Texture>> Values; }";
+            Generate(new[] { source }, true, out Compilation initial);
+            string method = null;
+            foreach (ISymbol member in initial.GetTypeByMetadataName("Asset").GetMembers())
+            {
+                if (
+                    member is IMethodSymbol
+                    && member.Name.StartsWith(
+                        "CreateOdinMigrationCapture",
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    method = member.Name;
+                    break;
+                }
+            }
+            Assert.That(method, Is.Not.Null);
+            string extra =
+                "public partial class "
+                + (inherited ? "Parent" : "Asset")
+                + " { "
+                + (inherited ? "protected" : "private")
+                + " static object "
+                + method
+                + "() { return null; } }";
+            string generated = Generated(new[] { source, extra });
+            StringAssert.Contains(method + "1()", generated);
+        }
+
+        [Test]
+        public void GeneratedFactoryNamesExcludeFieldUnderscores()
+        {
+            const string source =
+                "public partial class Asset : UnityEngine.ScriptableObject { private enum Key { A=0 } private System.Collections.Generic.Dictionary<Key,System.Collections.Generic.List<UnityEngine.Texture>> _values; }";
+            Generate(new[] { source }, true, out Compilation updated);
+            int factories = 0;
+            foreach (ISymbol member in updated.GetTypeByMetadataName("Asset").GetMembers())
+            {
+                if (
+                    member is IMethodSymbol
+                    && member.Name.StartsWith("CreateOdinMigration", StringComparison.Ordinal)
+                )
+                {
+                    StringAssert.DoesNotContain("_", member.Name);
+                    ++factories;
+                }
+            }
+            Assert.That(factories, Is.EqualTo(2));
+        }
+
         [Test]
         public void MigrationGeneratorHasAnIndependentCompilerAssembly()
         {

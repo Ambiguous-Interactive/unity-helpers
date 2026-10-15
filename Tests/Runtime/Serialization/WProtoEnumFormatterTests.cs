@@ -114,13 +114,61 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             AssertWire(default(UnsignedLong), 8, false, 0);
         }
 
+        [Test]
+        public void EveryBytePatternPreservesSignedAndUnsignedValues()
+        {
+            for (int bits = 0; bits <= byte.MaxValue; ++bits)
+            {
+                AssertWire((SignedByte)unchecked((sbyte)bits), 1, true, unchecked((sbyte)bits));
+                AssertWire((UnsignedByte)bits, 1, false, bits);
+            }
+        }
+
+        [TestCase(17)]
+        [TestCase(637)]
+        public void RandomizedUnderlyingBitsPreserveWireAndValues(int seed)
+        {
+            Random random = new Random(seed);
+            byte[] bytes = new byte[8];
+            for (int index = 0; index < 128; ++index)
+            {
+                random.NextBytes(bytes);
+                ulong bits = BitConverter.ToUInt64(bytes, 0);
+                AssertWire((SignedByte)unchecked((sbyte)bits), 1, true, unchecked((sbyte)bits));
+                AssertWire((UnsignedByte)unchecked((byte)bits), 1, false, unchecked((byte)bits));
+                AssertWire((SignedShort)unchecked((short)bits), 2, true, unchecked((short)bits));
+                AssertWire(
+                    (UnsignedShort)unchecked((ushort)bits),
+                    2,
+                    false,
+                    unchecked((ushort)bits)
+                );
+                AssertWire((SignedInt)unchecked((int)bits), 4, true, unchecked((int)bits));
+                AssertWire((UnsignedInt)unchecked((uint)bits), 4, false, unchecked((int)bits));
+                AssertWire((SignedLong)unchecked((long)bits), 8, true, unchecked((long)bits));
+                AssertWire((UnsignedLong)bits, 8, false, unchecked((long)bits));
+            }
+        }
+
+        [Test]
+        public void TruncatedVarintsReturnFailureWithoutProducingAnEnum()
+        {
+            IWProtoScalarFormatter<SignedLong> formatter = WProtoScalarFormatters.Enum<SignedLong>(
+                8,
+                true
+            );
+            WProtoReader reader = new WProtoReader(new byte[] { 0x80 });
+            Assert.That(formatter.TryReadValue(ref reader, out SignedLong value), Is.False);
+            Assert.That(value, Is.EqualTo(default(SignedLong)));
+        }
+
         private struct ReferenceSlot
         {
             public object Value { get; set; }
         }
 
         [Flags]
-        private enum SignedByte : sbyte
+        public enum SignedByte : sbyte
         {
             [Obsolete("Use a specific value.")]
             None = 0,
@@ -129,49 +177,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Second = 2,
         }
 
-        private enum UnsignedByte : byte
+        public enum UnsignedByte : byte
         {
             [Obsolete("Use a specific value.")]
             None = 0,
             First = 1,
         }
 
-        private enum SignedShort : short
+        public enum SignedShort : short
         {
             [Obsolete("Use a specific value.")]
             None = 0,
             First = 1,
         }
 
-        private enum UnsignedShort : ushort
+        public enum UnsignedShort : ushort
         {
             [Obsolete("Use a specific value.")]
             None = 0,
             First = 1,
         }
 
-        private enum SignedInt : int
+        public enum SignedInt : int
         {
             [Obsolete("Use a specific value.")]
             None = 0,
             First = 1,
         }
 
-        private enum UnsignedInt : uint
+        public enum UnsignedInt : uint
         {
             [Obsolete("Use a specific value.")]
             None = 0,
             First = 1,
         }
 
-        private enum SignedLong : long
+        public enum SignedLong : long
         {
             [Obsolete("Use a specific value.")]
             None = 0,
             First = 1,
         }
 
-        private enum UnsignedLong : ulong
+        public enum UnsignedLong : ulong
         {
             [Obsolete("Use a specific value.")]
             None = 0,

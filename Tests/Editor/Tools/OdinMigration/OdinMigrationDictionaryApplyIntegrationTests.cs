@@ -37,9 +37,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             "// MIT License - Copyright (c) 2026 wallstop\n"
             + "// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE\n"
             + "namespace MigrationConsumer { using System.Collections.Generic; using UnityEngine; "
-            + "public sealed class OdinMigrationApplyConsumer : ScriptableObject { "
+            + "public sealed partial class OdinMigrationApplyConsumer : ScriptableObject { "
             + "public Dictionary<SpriteAlignment, List<Texture2D>> Variations = new Dictionary<SpriteAlignment, List<Texture2D>>(); "
-            + "public readonly Dictionary<HideFlags, List<Texture2D>> Other = new Dictionary<HideFlags, List<Texture2D>>(); "
+            + "private readonly Dictionary<HideFlags, List<Texture2D>> Other = new Dictionary<HideFlags, List<Texture2D>>(); "
             + "public bool Corrupt; private void OnValidate() { if (Corrupt && Variations.Count != 0) { Variations.Clear(); } } } }\n";
         private static readonly int[] ApplyCases = { 0, 1, 2, 3, 4, 5, 6 };
 

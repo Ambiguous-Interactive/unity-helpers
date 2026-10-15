@@ -285,10 +285,8 @@ runTest("the shipped trees carry stackalloc sites for the rule to judge", () => 
   assert.deepStrictEqual(found, []);
 });
 
-// The third rule: memory-access `Unsafe` members compile without the unsafe flag, so the asmdef
-// check above cannot see them. The baseline is a ratchet, so BOTH directions are red -- a new site
-// in a file with no baseline entry, and a baselined file that has fewer than its frozen count.
-const { findUnsafeAccess, findStaleUnsafeBaselines } = require(linterPath);
+// Memory access is forbidden in every owned file, including the former exceptions.
+const { findUnsafeAccess } = require(linterPath);
 
 function unsafeAccess(text, filePath) {
   return findUnsafeAccess([{ path: filePath ?? "Runtime/Sample.cs", text }]).failures;
@@ -302,6 +300,21 @@ runTest("a memory-access Unsafe member in a file with no baseline entry is a vio
   assert.ok(found[0].includes("Runtime/Sample.cs:1"), found[0]);
 });
 
+for (const imported of [
+  "using Raw = System.Runtime.CompilerServices.Unsafe;",
+  "using Raw = global::System.Runtime.CompilerServices.Unsafe;",
+  "using Raw = Unsafe;",
+  "using @Raw = @System.@Runtime.@CompilerServices.@Unsafe;",
+  "using Raw = External::System.Runtime.CompilerServices.Unsafe;",
+  "using static System.Runtime.CompilerServices.Unsafe;",
+  "using static global::System.Runtime.CompilerServices.Unsafe;"
+]) {
+  runTest(`hidden Unsafe import is rejected: ${imported}`, () => {
+    assert.equal(unsafeAccess(imported + " class Sample {}").length, 1);
+    assert.deepEqual(unsafeAccess("// " + imported + "\nclass Sample {}"), []);
+  });
+}
+
 runTest("Unsafe.SizeOf is a size query, not memory access", () => {
   assert.deepStrictEqual(
     unsafeAccess("class Sample { static int Size() => Unsafe.SizeOf<int>(); }\n"),
@@ -313,47 +326,54 @@ runTest("the word appears in a comment without being a violation", () => {
   assert.deepStrictEqual(unsafeAccess("class Sample { /* Unsafe.As was here once. */ }\n"), []);
 });
 
-runTest("a baselined file that drops below its frozen count is a violation", () => {
-  const found = findStaleUnsafeBaselines(new Map());
-  assert.ok(0 < found.length, "an empty tally must report every baselined file as retired");
-  assert.ok(
-    found.every((message) => message.includes("Lower the baseline")),
-    JSON.stringify(found)
-  );
-});
+for (const filePath of [
+  "Runtime/Core/Extension/EnumExtensions.cs",
+  "Runtime/Core/Serialization/WallstopProto/WProtoScalarFormatters.cs"
+]) {
+  runTest(`former exception ${filePath} rejects its first access`, () => {
+    assert.strictEqual(unsafeAccess("Unsafe.As<int, long>(ref value);", filePath).length, 1);
+  });
+}
 
-runTest("a baseline matching what the scan found is silent", () => {
-  const listed = spawnSync(
-    "git",
-    ["-C", repoRoot, "ls-files", "--", "Runtime", "Editor", "Tests"],
-    {
-      encoding: "utf8",
-      maxBuffer: 64 * 1024 * 1024
-    }
-  );
-  const { readFileSync } = require("fs");
-  const corpus = listed.stdout
-    .split("\n")
-    .filter((entry) => entry.endsWith(".cs"))
-    .map((entry) => ({ path: entry, text: readFileSync(path.join(repoRoot, entry), "utf8") }));
-  const { counted } = findUnsafeAccess(corpus);
-  assert.ok(0 < counted.size, "the tally is empty, so a clean staleness run means nothing");
-  assert.deepStrictEqual(findStaleUnsafeBaselines(counted), []);
-});
+for (const member of [
+  "As",
+  "AsRef",
+  "AsPointer",
+  "Add",
+  "Subtract",
+  "AddByteOffset",
+  "SubtractByteOffset",
+  "Read",
+  "ReadUnaligned",
+  "Write",
+  "WriteUnaligned",
+  "Copy",
+  "CopyBlock",
+  "CopyBlockUnaligned",
+  "InitBlock",
+  "InitBlockUnaligned",
+  "SkipInit"
+]) {
+  runTest(`Unsafe.${member} is rejected`, () => {
+    assert.strictEqual(unsafeAccess(`Unsafe.${member}(ref value);`).length, 1);
+  });
+}
 
-runTest("the shipped trees carry memory-access Unsafe members for the rule to judge", () => {
+runTest("the shipped trees have no memory-access Unsafe members", () => {
   const listed = spawnSync(
     "git",
     ["-C", repoRoot, "ls-files", "--", "Runtime", "Editor", "Tests"],
     { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
   );
+  assert.strictEqual(listed.status, 0, listed.stderr);
   const { readFileSync } = require("fs");
   const corpus = listed.stdout
     .split("\n")
     .filter((entry) => entry.endsWith(".cs"))
     .map((entry) => ({ path: entry, text: readFileSync(path.join(repoRoot, entry), "utf8") }));
+  assert.ok(0 < corpus.length, "the source scan must have subjects");
   const { failures: found, inspected } = findUnsafeAccess(corpus);
-  assert.ok(0 < inspected, "the rule judged no site, so a clean run means nothing");
+  assert.strictEqual(inspected, 0);
   assert.deepStrictEqual(found, []);
 });
 

@@ -1167,6 +1167,10 @@ converter: a built-in for every primitive and enum, and a registered instance fo
 
 ## WallstopProto: the reflection-free wire layer (preview)
 
+Enum scalar formatters use bounded value copies and validate their underlying width and signedness
+before use. All eight integer underlyings retain their existing protobuf bytes, including undefined
+enum values and negative values. Reads and writes do not use unchecked memory-access helpers.
+
 `WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto` is the beginning of an in-tree
 protobuf implementation that does no runtime reflection, so it AOT-compiles cleanly under IL2CPP where
 protobuf-net's model builder cannot. `Serializer` routes through it **per annotated type** when

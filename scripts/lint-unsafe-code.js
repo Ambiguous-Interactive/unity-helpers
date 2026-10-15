@@ -56,6 +56,9 @@ const IDENTIFIER = /^[A-Za-z_]\w*$/;
 const UNSAFE_ACCESS =
   /\bUnsafe\s*\.\s*(?:As|AsRef|AsPointer|Unbox|NullRef|SkipInit|Add|Subtract|AddByteOffset|SubtractByteOffset|Read|ReadUnaligned|Write|WriteUnaligned|Copy|CopyBlock|CopyBlockUnaligned|InitBlock|InitBlockUnaligned)\b/g;
 
+const UNSAFE_IMPORT =
+  /\busing\s+(?:static\s+|@?[A-Za-z_]\w*\s*=\s*)(?:@?[A-Za-z_]\w*\s*::\s*)?(?:@?[A-Za-z_]\w*\s*\.\s*)*@?Unsafe\s*;/g;
+
 /*
     IL2CPP emits a null check on every reference dereference, a bounds check on every array index
     and a divide-by-zero check on every integer division, which is what makes a wrong assumption in
@@ -97,17 +100,6 @@ const OPTION_ARGUMENT_RESIDUE = /^(?:\s|,|[{}()[\]]|new|Option)*$/;
 const FALSE_LITERAL = /\bfalse\b/i;
 const TRUE_LITERAL = /\btrue\b/i;
 const ARGUMENT_LABEL = /^\s*[A-Za-z_]\w*\s*:(?!:)/;
-
-/*
-    A ratchet, not an allowlist. Both remaining files reinterpret an enum's underlying storage on a
-    measured hot path, and #637 gates their safe replacement on the paired player evidence #636
-    owes. Freezing the count means a new site anywhere reds the build, and retiring one of these
-    reds it too until the number comes down -- so the exception cannot quietly grow or go stale.
-*/
-const UNSAFE_ACCESS_BASELINE = new Map([
-  ["Runtime/Core/Extension/EnumExtensions.cs", 8],
-  ["Runtime/Core/Serialization/WallstopProto/WProtoScalarFormatters.cs", 12]
-]);
 
 /** Blanks comments and string literals so the keyword scan cannot match prose. */
 function codeOnly(text) {
@@ -300,7 +292,6 @@ function findStackAllocations(sources) {
  */
 function findUnsafeAccess(sources) {
   const failures = [];
-  const counted = new Map();
   let inspected = 0;
 
   for (const source of sources) {
@@ -309,49 +300,29 @@ function findUnsafeAccess(sources) {
     }
 
     const code = codeOnly(source.text);
+    for (const importSite of code.matchAll(UNSAFE_IMPORT)) {
+      const line = code.slice(0, importSite.index).split("\n").length;
+      failures.push(
+        `${source.path}:${line}: aliases and static imports hide Unsafe member names. ` +
+          `Use explicit member names so the memory-access rule can inspect them, ${ISSUE}.`
+      );
+    }
     const sites = [...code.matchAll(UNSAFE_ACCESS)];
     if (sites.length === 0) {
       continue;
     }
 
     inspected += sites.length;
-    counted.set(source.path, sites.length);
-    const allowed = UNSAFE_ACCESS_BASELINE.get(source.path) ?? 0;
-    if (sites.length <= allowed) {
-      continue;
-    }
 
-    const line = code.slice(0, sites[allowed].index).split("\n").length;
+    const line = code.slice(0, sites[0].index).split("\n").length;
     failures.push(
-      `${source.path}:${line}: ${sites.length} memory-access Unsafe member(s), ` +
-        `${allowed} baselined. Reinterpreting memory is undefined behaviour on IL2CPP if the ` +
+      `${source.path}:${line}: ${sites.length} memory-access Unsafe member(s). ` +
+        `Reinterpreting memory is undefined behaviour on IL2CPP if the ` +
         `type, layout or index assumption is wrong; use a checked cast, ${ISSUE}.`
     );
   }
 
-  return { failures, inspected, counted };
-}
-
-/**
- * The other half of the ratchet: a baselined file that has shed sites must shed its excuse too.
- * It is separate from {@link findUnsafeAccess} because it is only meaningful over a corpus known
- * to be complete -- asked of one file it would report every other baselined file as retired.
- *
- * @param {Map<string, number>} counted per-file tally from a repository-wide scan
- * @returns {string[]} one message per stale baseline entry
- */
-function findStaleUnsafeBaselines(counted) {
-  const failures = [];
-  for (const [file, allowed] of UNSAFE_ACCESS_BASELINE) {
-    const actual = counted.get(file) ?? 0;
-    if (actual < allowed) {
-      failures.push(
-        `${file}: baselined at ${allowed} memory-access Unsafe member(s) but has ${actual}. ` +
-          `Lower the baseline so the exception cannot go stale, ${ISSUE}.`
-      );
-    }
-  }
-  return failures;
+  return { failures, inspected };
 }
 
 /** Every balanced `(...)` in `code`, each as its open index, close index and inner text. */
@@ -641,13 +612,12 @@ function main() {
   }
 
   const unsafeAccess = findUnsafeAccess(sources);
-  failures.push(...unsafeAccess.failures, ...findStaleUnsafeBaselines(unsafeAccess.counted));
-  if (unsafeAccess.inspected === 0) {
-    failures.push(
-      `no memory-access Unsafe member was judged across ${sources.length} source(s), so either ` +
-        `the baseline is fully retired -- delete it and this check -- or the scan is broken; ` +
-        `${ISSUE}.`
-    );
+  failures.push(...unsafeAccess.failures);
+  const unsafeControl = findUnsafeAccess([
+    { path: "control/UnsafeAccess.cs", text: "Unsafe.As<int, long>(ref value);" }
+  ]);
+  if (unsafeControl.failures.length !== 1) {
+    failures.push(`the memory-access Unsafe control was not reported; ${ISSUE}.`);
   }
 
   const il2cppControl = findIl2CppSafetyDisables([
@@ -672,8 +642,8 @@ function main() {
     const il2cpp = findIl2CppSafetyDisables(sources).inspected;
     console.log(
       `[unsafe-code] No compiler-unsafe code or enabling switch found; ${inspected} stackalloc ` +
-        `site(s) bounded; ${unsafeAccess.inspected} memory-access Unsafe member(s) at their ` +
-        `frozen baseline; ${il2cpp} IL2CPP check option(s) set, control site reported.`
+        `site(s) bounded; ${unsafeAccess.inspected} memory-access Unsafe member(s), control reported; ` +
+        `${il2cpp} IL2CPP check option(s) set, control site reported.`
     );
   }
 }
@@ -684,7 +654,6 @@ module.exports = {
   isVendored,
   findStackAllocations,
   findUnsafeAccess,
-  findStaleUnsafeBaselines,
   findIl2CppSafetyDisables
 };
 

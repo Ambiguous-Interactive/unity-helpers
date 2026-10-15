@@ -208,13 +208,19 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
         private static string CaptureExpression(
             IFieldSymbol field,
             INamedTypeSymbol owner,
-            Compilation compilation
+            Compilation compilation,
+            bool insideOwner = false
         )
         {
             if (
                 !TypeNaming.IsNameable(owner, compilation)
-                || !TypeNaming.IsNameable(field.Type, compilation)
-                || !compilation.IsSymbolAccessibleWithin(field, compilation.Assembly)
+                || (
+                    !insideOwner
+                    && (
+                        !TypeNaming.IsNameable(field.Type, compilation)
+                        || !compilation.IsSymbolAccessibleWithin(field, compilation.Assembly)
+                    )
+                )
             )
             {
                 return "null";
@@ -234,13 +240,19 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
         private static string RestoreExpression(
             IFieldSymbol field,
             INamedTypeSymbol owner,
-            Compilation compilation
+            Compilation compilation,
+            bool insideOwner = false
         )
         {
             if (
                 !TypeNaming.IsNameable(owner, compilation)
-                || !TypeNaming.IsNameable(field.Type, compilation)
-                || !compilation.IsSymbolAccessibleWithin(field, compilation.Assembly)
+                || (
+                    !insideOwner
+                    && (
+                        !TypeNaming.IsNameable(field.Type, compilation)
+                        || !compilation.IsSymbolAccessibleWithin(field, compilation.Assembly)
+                    )
+                )
                 || !TryDictionary(
                     field.Type,
                     out INamedTypeSymbol key,
@@ -290,6 +302,155 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                 + " = rebuilt; return true; }";
         }
 
+        private static bool CanGenerateOwnerAccess(INamedTypeSymbol owner)
+        {
+            for (
+                INamedTypeSymbol current = owner;
+                current != null;
+                current = current.ContainingType
+            )
+            {
+                if (current.Arity != 0 || current.DeclaringSyntaxReferences.Length == 0)
+                {
+                    return false;
+                }
+                foreach (SyntaxReference part in current.DeclaringSyntaxReferences)
+                {
+                    if (
+                        !(part.GetSyntax() is ClassDeclarationSyntax declaration)
+                        || !declaration.Modifiers.Any(SyntaxKind.PartialKeyword)
+                    )
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        private static bool HasMemberInHierarchy(INamedTypeSymbol owner, string name)
+        {
+            for (INamedTypeSymbol current = owner; current != null; current = current.BaseType)
+            {
+                if (!current.GetMembers(name).IsEmpty)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static string AccessorName(
+            INamedTypeSymbol owner,
+            IFieldSymbol field,
+            string operation
+        )
+        {
+            string stem =
+                "CreateOdinMigration"
+                + operation
+                + field.Name.Replace("_", string.Empty)
+                + "At"
+                + field
+                    .DeclaringSyntaxReferences[0]
+                    .Span.Start.ToString(CultureInfo.InvariantCulture)
+                + "From"
+                + BitConverter
+                    .ToString(
+                        Convert.FromBase64String(
+                            Checksum(field.DeclaringSyntaxReferences[0].SyntaxTree)
+                        )
+                    )
+                    .Replace("-", string.Empty)
+                    .Substring(0, 16);
+            string name = stem;
+            int suffix = 0;
+            while (HasMemberInHierarchy(owner, name))
+            {
+                name = stem + (++suffix).ToString(CultureInfo.InvariantCulture);
+            }
+            return name;
+        }
+
+        private static string OwnerAccess(
+            IFieldSymbol field,
+            INamedTypeSymbol owner,
+            Compilation compilation,
+            SortedDictionary<string, string> accessors,
+            bool restore
+        )
+        {
+            string expression = restore
+                ? RestoreExpression(field, owner, compilation)
+                : CaptureExpression(field, owner, compilation);
+            if (
+                !string.Equals(expression, "null", StringComparison.Ordinal)
+                || !CanGenerateOwnerAccess(owner)
+                || !TypeNaming.IsNameable(owner, compilation)
+            )
+            {
+                return expression;
+            }
+            expression = restore
+                ? RestoreExpression(field, owner, compilation, insideOwner: true)
+                : CaptureExpression(field, owner, compilation, insideOwner: true);
+            if (string.Equals(expression, "null", StringComparison.Ordinal))
+            {
+                return expression;
+            }
+            string name = AccessorName(owner, field, restore ? "Restore" : "Capture");
+            string qualified = owner.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            string key = qualified + "." + name;
+            if (!accessors.ContainsKey(key))
+            {
+                StringBuilder source = new StringBuilder();
+                bool namespaced = !owner.ContainingNamespace.IsGlobalNamespace;
+                if (namespaced)
+                {
+                    source
+                        .Append("namespace ")
+                        .Append(owner.ContainingNamespace.ToDisplayString())
+                        .Append(" {");
+                }
+                Stack<INamedTypeSymbol> containers = new Stack<INamedTypeSymbol>();
+                for (
+                    INamedTypeSymbol current = owner;
+                    current != null;
+                    current = current.ContainingType
+                )
+                {
+                    containers.Push(current);
+                }
+                int depth = containers.Count;
+                foreach (INamedTypeSymbol container in containers)
+                {
+                    source.Append("partial class @").Append(container.Name).Append(" {");
+                }
+                source
+                    .Append("internal static global::")
+                    .Append(BindingNamespace)
+                    .Append(
+                        restore
+                            ? ".OdinMigrationDictionaryRestore "
+                            : ".OdinMigrationDictionaryCapture "
+                    )
+                    .Append(name)
+                    .Append("() { return ")
+                    .Append(expression)
+                    .Append("; }");
+                for (int index = 0; index < depth; ++index)
+                {
+                    source.Append('}');
+                }
+                if (namespaced)
+                {
+                    source.Append('}');
+                }
+                accessors.Add(key, source.ToString());
+            }
+            return key + "()";
+        }
+
         /// <inheritdoc />
         public void Initialize(GeneratorInitializationContext context) { }
 
@@ -324,6 +485,9 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                 SymbolEqualityComparer.Default
             );
             SortedDictionary<string, string> registrations = new SortedDictionary<string, string>(
+                StringComparer.Ordinal
+            );
+            SortedDictionary<string, string> accessors = new SortedDictionary<string, string>(
                 StringComparer.Ordinal
             );
             foreach (SyntaxTree tree in context.Compilation.SyntaxTrees)
@@ -453,9 +617,21 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                                     + ", "
                                     + (rewriteFailure == null ? "null" : Literal(rewriteFailure))
                                     + ", "
-                                    + CaptureExpression(field, owner, context.Compilation)
+                                    + OwnerAccess(
+                                        field,
+                                        owner,
+                                        context.Compilation,
+                                        accessors,
+                                        restore: false
+                                    )
                                     + ", "
-                                    + RestoreExpression(field, owner, context.Compilation)
+                                    + OwnerAccess(
+                                        field,
+                                        owner,
+                                        context.Compilation,
+                                        accessors,
+                                        restore: true
+                                    )
                                     + ")"
                             );
                         }
@@ -527,6 +703,10 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
             writer.Line("}");
             writer.Outdent();
             writer.Line("}");
+            foreach (string accessor in accessors.Values)
+            {
+                writer.Line(accessor);
+            }
             context.AddSource(
                 "OdinMigrationGeneratedBindings.g.cs",
                 SourceText.From(writer.ToString(), Encoding.UTF8)

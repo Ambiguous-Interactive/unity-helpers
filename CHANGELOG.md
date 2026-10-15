@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add `TryGetInstance(out T)` to both singleton families for reading an existing instance without creating, searching, or loading one ([#1009](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1009)).
 - Add generated protobuf roots for supported arrays, lists, and dictionaries, including object and collection-interface writes, explicit-type reads, and readonly generic consumer values ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
-- Add prompt-free Odin migration APIs with paired previews, generated live dictionary capture including readonly fields, isolated compilation, imported-value checks, and recovery across reloads ([guide](./docs/guides/odin-migration-guide.md#programmatic-migration), [#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
+- Add prompt-free Odin migration APIs with paired previews, generated live dictionary capture including readonly and private partial-owner fields, isolated compilation, imported-value checks, and recovery across reloads ([guide](./docs/guides/odin-migration-guide.md#programmatic-migration), [#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
 - Add `SceneCanonicalizer` for stable generated scenes and prefabs, with local reference remapping, Unity-reserved ID avoidance and opt-in folder imports ([guide](./docs/features/editor-tools/scene-canonicalization.md), [#999](https://github.com/Ambiguous-Interactive/unity-helpers/issues/999)).
 - Add `ReferenceIdentityComparer<T>` and `UnityObjectMap<TKey, TValue>` for managed identity, destroyed-key cleanup and optional scene-unload pruning ([guide](./docs/features/utilities/reference-identity.md), [#998](https://github.com/Ambiguous-Interactive/unity-helpers/issues/998)).
 - Add the `WALLSTOP_UNITY_HELPERS_DISABLE_ODIN_BASES` opt-out to use Unity bases for both singleton families and `AttributeEffect` while retaining Odin drawers.
@@ -477,6 +477,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `WPROTO032`, a build error when a member's collections nest more than 64 deep, which is deeper than the reader can read back ([#399](https://github.com/Ambiguous-Interactive/unity-helpers/issues/399)).
 
 ### Security
+
+- Remove unchecked enum memory access while preserving cached names, flag checks, and protobuf bytes ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)).
 
 - Ship the runtime assembly with `allowUnsafeCode` off. Two BMI2 pointer branches guarded by framework symbols no Unity player defines were the only reason it was on, so nothing that ever ran has changed ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)).
 - Clamp or refuse a capacity a payload claims in `Deque`, `SparseSet`, `BitSet` and `ImmutableBitSet`. Six bytes claiming `int.MaxValue` previously allocated 8-16 GB and crashed the player. Raise `SerializationCapacityLimits.MaximumRestoredCapacity` if your saves exceed 1,048,576 elements ([#429](https://github.com/Ambiguous-Interactive/unity-helpers/pull/429)).

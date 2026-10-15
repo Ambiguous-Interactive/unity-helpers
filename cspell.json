@@ -533,6 +533,7 @@
     {
       "name": "tech-terms",
       "words": [
+        "msbuild",
         "CJK",
         "gtk",
         "GC",

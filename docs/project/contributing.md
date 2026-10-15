@@ -10,6 +10,20 @@ The easiest way to contribute is using the included dev container, which has all
 2. Click "Reopen in Container" when prompted
 3. Run `npm run verify:tools` to confirm all tools are available
 
+### Fast C# Feedback
+
+Use fixture-scoped builds while editing runtime or Editor tests:
+
+```bash
+npm run typecheck:iterate -- tests --server --files Tests/Runtime/Serialization/WProtoEnumFormatterTests.cs
+npm run typecheck:iterate -- editor-tests --server --files Tests/Editor/Tools/OdinMigration/OdinMigrationLiveDictionaryTests.cs
+```
+
+Add dependent fixtures to the same `--files` list. Production code, shared test support, test types,
+and test doubles remain included. Each scope accepts files only from its corresponding test tree.
+These commands retain source generators and compiler errors but omit performance analyzers.
+Run the normal applicable typecheck commands and changed-file preflight before publishing.
+
 ### GitHub Credentials in the Container
 
 The container resolves github.com credentials from a cached token. The Dev Containers credential

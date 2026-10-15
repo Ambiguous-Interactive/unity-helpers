@@ -146,7 +146,7 @@ for (const variant of ["default", "odin"]) {
     0
   );
   assert.equal(messages[0], NOTICE);
-  assert.match(messages[1], /only the named editor fixtures/);
+  assert.match(messages[1], /only the named test fixtures/);
   ++controls;
 }
 assert.deepEqual(
@@ -198,6 +198,41 @@ try {
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });
 }
+const runtimeFixture = "Tests/Runtime/Serialization/WProtoEnumFormatterTests.cs";
+for (const variant of Object.keys(VARIANTS)) {
+  const scoped = buildArguments([
+    "tests",
+    variant,
+    "--server",
+    "--files",
+    runtimeFixture,
+    runtimeFixture
+  ]);
+  assert.ok(
+    scoped.includes("-p:WallstopIterationTestSources=" + path.resolve(root, runtimeFixture))
+  );
+  assert.ok(scoped.includes("-p:UseSharedCompilation=true"));
+  assert.throws(
+    () => buildArguments(["editor-tests", variant, "--files", runtimeFixture]),
+    /requires existing/
+  );
+  assert.throws(() => buildArguments(["tests", variant, "--files", first]), /requires existing/);
+  ++controls;
+}
+const runtimeProject = fs.readFileSync(
+  path.join(root, CHECK_PROJECTS.find((project) => project.id === "tests").project),
+  "utf8"
+);
+assert.match(
+  runtimeProject,
+  /<Compile\s+Condition="'\$\(WallstopIterationTestSources\)' == ''"\s+Include="\$\(RepoRoot\)\/Tests\/Runtime\/\*\*\/\*\.cs"/
+);
+assert.ok(runtimeProject.includes(`Include="$(WallstopIterationTestSources.Split(';'))"`));
+assert.doesNotMatch(
+  runtimeProject,
+  /<Compile Remove="\$\(RepoRoot\)\/Tests\/Runtime\/\*\*\/\*\.cs"/
+);
+
 const projectText = fs.readFileSync(
   path.join(root, CHECK_PROJECTS.find((project) => project.id === "editor-tests").project),
   "utf8"
@@ -208,7 +243,49 @@ assert.match(
   /<Compile\s+Condition="'\$\(WallstopIterationTestSources\)' == ''"\s+Include="\$\(RepoRoot\)\/Tests\/Editor\/\*\*\/\*\.cs"/
 );
 assert.doesNotMatch(projectText, /<Compile Remove="\$\(RepoRoot\)\/Tests\/Editor\/\*\*\/\*\.cs"/);
-assert.match(projectText, /<Compile Include="\$\(WallstopIterationTestSources\)"\s*\/>/);
+assert.ok(projectText.includes(`Include="$(WallstopIterationTestSources.Split(';'))"`));
+
+for (const [projectId, files] of [
+  ["editor-tests", [first, second]],
+  ["tests", [runtimeFixture, "Tests/Runtime/Extensions/EnumExtensionTests.cs"]]
+]) {
+  const query = buildArguments([projectId, "--files", ...files]);
+  const queryArgs = [
+    "msbuild",
+    query[1],
+    "-nologo",
+    "-verbosity:quiet",
+    ...query.filter((argument) => argument.startsWith("-p:")),
+    "-getItem:Compile"
+  ];
+  const evaluated = require("node:child_process").spawnSync("dotnet", queryArgs, {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    maxBuffer: 64 * 1024 * 1024
+  });
+  assert.equal(evaluated.status, 0, evaluated.stdout + evaluated.stderr);
+  const items = JSON.parse(evaluated.stdout).Items.Compile.map((item) =>
+    path.resolve(root, item.Identity)
+  );
+  for (const file of files) {
+    assert.ok(items.includes(path.resolve(root, file)), "MSBuild omitted " + file);
+  }
+  const fixtureRoot =
+    path.resolve(root, projectId === "tests" ? "Tests/Runtime" : "Tests/Editor") + path.sep;
+  const actualFixtures = items.filter(
+    (item) =>
+      item.startsWith(fixtureRoot) &&
+      !item.startsWith(path.join(fixtureRoot, "TestTypes") + path.sep) &&
+      !item.startsWith(path.join(fixtureRoot, "TestDoubles") + path.sep)
+  );
+  assert.deepEqual(actualFixtures.sort(), files.map((file) => path.resolve(root, file)).sort());
+  assert.ok(
+    !items.some((item) => item.includes(";")),
+    "MSBuild combined scoped files into one item"
+  );
+  ++controls;
+}
 
 assert.match(NOTICE, /compiler and source generators/);
 assert.match(NOTICE, /WUH analyzers are omitted/);
