@@ -78,6 +78,22 @@ then applies `.markdownlintignore`. Tracked files remain eligible even when a Gi
 matches them. Hidden paths stay excluded, and generated, ignored local artifacts do not slow
 file discovery. The command fails if discovery fails or finds no eligible documents.
 
+`npm run lint:unsafe-code` refuses compiler-unsafe code, unchecked memory access, disabled IL2CPP
+safety checks, and unbounded stack allocations. A variable stack allocation must be the direct
+branch of an assignment whose condition compares that length with a constant. For example,
+`count <= Max ? stackalloc int[count] : default` and
+`count > Max ? default : stackalloc int[count]` are bounded. Reversing those branches is refused.
+Compound conditions and intervening expressions are refused because a nearby comparison alone
+does not establish the bound on the path that allocates.
+
+Use `npm run lint:unsafe-code -- --sarif artifacts/unsafe-code.sarif` to retain a
+[SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json)
+report. Repo Lint retains the same report as the `unsafe-code-sarif` artifact. Findings use the
+`unsafe-code` rule, repository-relative URI paths and deterministic fingerprints. Every finding
+fails the gate; there is no exception baseline. Reports include per-tree source and assembly
+counts plus positive-control results. Missing required subjects, discovery/read errors and report
+write failures fail validation; an execution failure cannot be mistaken for a clean result list.
+
 ## Python Tooling
 
 Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.12.10` and

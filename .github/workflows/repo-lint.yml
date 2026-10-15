@@ -116,17 +116,39 @@ jobs:
         continue-on-error: true
         run: node scripts/run-repo-lint.js
 
+      - name: Report memory safety findings
+        id: safety
+        if: always()
+        continue-on-error: true
+        run: npm run lint:unsafe-code -- --sarif artifacts/unsafe-code.sarif
+
+      - name: Retain memory safety report
+        id: safety_report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: unsafe-code-sarif
+          path: artifacts/unsafe-code.sarif
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Gate
         if: always()
         env:
           ACTIONLINT: ${{ steps.actionlint.outcome }}
           YAMLLINT: ${{ steps.yamllint.outcome }}
           CHECKS: ${{ steps.checks.outcome }}
+          SAFETY: ${{ steps.safety.outcome }}
+          SAFETY_REPORT: ${{ steps.safety_report.outcome }}
         run: |
+          set -euo pipefail
           failed=""
           [ "$ACTIONLINT" = "failure" ] && failed="$failed actionlint"
           [ "$YAMLLINT" = "failure" ] && failed="$failed yamllint"
           [ "$CHECKS" = "failure" ] && failed="$failed repository-checks"
+          [ "$SAFETY" != "success" ] && failed="$failed memory-safety"
+          [ "$SAFETY_REPORT" != "success" ] && failed="$failed memory-safety-report"
           if [ -n "$failed" ]; then
             echo "::error::Repo Lint failed:$failed"
             exit 1

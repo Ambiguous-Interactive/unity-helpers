@@ -26,7 +26,8 @@
 
 "use strict";
 
-const { existsSync, readFileSync } = require("node:fs");
+const { existsSync, mkdirSync, readFileSync, writeFileSync } = require("node:fs");
+const { createHash } = require("node:crypto");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
@@ -231,14 +232,41 @@ function isGuardedLength(statement, length, constantNames) {
   if (!IDENTIFIER.test(length)) {
     return false;
   }
-  const guard = new RegExp(`\\b${length}\\b\\s*<=?\\s*([\\w.]+)`);
-  const match = guard.exec(statement);
-  if (match !== null && isConstantLength(match[1], constantNames)) {
-    return true;
+
+  const assignment = /(?<![=!<>])=(?!=|>)/.exec(statement);
+  if (assignment === null) {
+    return false;
   }
-  const reversed = new RegExp(`([\\w.]+)\\s*<=?\\s*\\b${length}\\b`);
-  const reverseMatch = reversed.exec(statement);
-  return reverseMatch !== null && isConstantLength(reverseMatch[1], constantNames);
+  const expression = statement.slice(assignment.index + 1);
+  const question = expression.indexOf("?");
+  if (question === -1 || expression.indexOf("?", question + 1) !== -1) {
+    return false;
+  }
+
+  const branch = expression.slice(question + 1);
+  const colon = branch.indexOf(":");
+  if (colon !== -1 && branch.indexOf(":", colon + 1) !== -1) {
+    return false;
+  }
+  if (!/^\s*(?:\(\s*)*$/.test(branch.slice(colon + 1))) {
+    return false;
+  }
+
+  const comparison = /^\s*(?:\(\s*)*([\w.]+)\s*(<=|>=|<|>)\s*([\w.]+)(?:\s*\))*\s*$/.exec(
+    expression.slice(0, question)
+  );
+  if (comparison === null) {
+    return false;
+  }
+  const [, left, operator, right] = comparison;
+  const allocationInTrueBranch = colon === -1;
+  if (left === length && isConstantLength(right, constantNames)) {
+    return allocationInTrueBranch === operator.startsWith("<");
+  }
+  if (right === length && isConstantLength(left, constantNames)) {
+    return allocationInTrueBranch === operator.startsWith(">");
+  }
+  return false;
 }
 
 /**
@@ -284,11 +312,10 @@ function findStackAllocations(sources) {
 }
 
 /**
- * Holds the frozen per-file count of memory-access `Unsafe` members.
+ * Refuses memory-access `Unsafe` members and imports that hide their names.
  *
  * @param {{path: string, text: string}[]} sources C# sources to inspect
- * @returns {{failures: string[], inspected: number, counted: Map<string, number>}} violations,
- *   how many sites were judged, and the per-file tally the staleness ratchet reads
+ * @returns {{failures: string[], inspected: number}} violations and how many sites were judged
  */
 function findUnsafeAccess(sources) {
   const failures = [];
@@ -579,8 +606,7 @@ function trackedWithExtension(repoRoot, roots, extension) {
     maxBuffer: 64 * 1024 * 1024
   });
   if (result.status !== 0) {
-    console.error(`[unsafe-code] git ls-files failed: ${result.stderr}`);
-    process.exit(2);
+    throw new Error(`git ls-files failed: ${result.stderr}`);
   }
   return result.stdout
     .split("\0")
@@ -588,15 +614,34 @@ function trackedWithExtension(repoRoot, roots, extension) {
     .map((entry) => ({ path: entry, text: readFileSync(path.join(repoRoot, entry), "utf8") }));
 }
 
-function main() {
-  const repoRoot = path.resolve(__dirname, "..");
-  const verbose = process.argv.includes("--verbose");
-  const sources = trackedWithExtension(repoRoot, SOURCE_ROOTS, ".cs");
-  const failures = findViolations(
-    trackedWithExtension(repoRoot, SOURCE_ROOTS, ".asmdef"),
-    sources,
-    trackedWithExtension(repoRoot, ["Generator~"], ".csproj")
+function scanRepository(repoRoot) {
+  const sources = trackedWithExtension(repoRoot, SOURCE_ROOTS, ".cs").filter(
+    (source) => !isVendored(source.path)
   );
+  const asmdefs = trackedWithExtension(repoRoot, SOURCE_ROOTS, ".asmdef").filter(
+    (source) => !isVendored(source.path)
+  );
+  const projects = trackedWithExtension(repoRoot, ["Generator~"], ".csproj");
+  const failures = findViolations(asmdefs, sources, projects);
+  const sourceFiles = {};
+  const assemblyDefinitions = {};
+  for (const root of SOURCE_ROOTS) {
+    sourceFiles[root] = sources.filter((source) => source.path.startsWith(`${root}/`)).length;
+    assemblyDefinitions[root] = asmdefs.filter((source) =>
+      source.path.startsWith(`${root}/`)
+    ).length;
+    if (sourceFiles[root] === 0 || assemblyDefinitions[root] === 0) {
+      failures.push(`${root}: missing source or assembly-definition subjects; ${ISSUE}.`);
+    }
+  }
+  if (
+    projects.length === 0 ||
+    !asmdefs.some((source) => source.path === "Runtime/WallstopStudios.UnityHelpers.asmdef")
+  ) {
+    failures.push(
+      `the runtime assembly definition or check-project subjects are missing; ${ISSUE}.`
+    );
+  }
 
   /*
       "Found no unbounded stackalloc" and "found no stackalloc" print the same clean run (#556), so
@@ -630,20 +675,141 @@ function main() {
     );
   }
 
+  return {
+    failures,
+    subjects: {
+      sourceFiles,
+      assemblyDefinitions,
+      checkProjects: projects.length,
+      stackAllocations: inspected,
+      unsafeAccessSites: unsafeAccess.inspected,
+      il2cppOptionLists: findIl2CppSafetyDisables(sources).inspected,
+      unsafeControlReported: unsafeControl.failures.length === 1,
+      il2cppControlReported: il2cppControl.failures.length !== 0
+    }
+  };
+}
+
+function createSarif(scan) {
+  const results = scan.failures.map((failure) => {
+    const location = /^(.*\.(?:cs|asmdef|csproj)):(?:(\d+):)?\s*(.*)$/.exec(failure);
+    const result = { ruleId: "unsafe-code", level: "error", message: { text: failure } };
+    if (location !== null) {
+      const normalized = path.posix.normalize(location[1].replace(/\\/g, "/"));
+      if (path.posix.isAbsolute(normalized) || /^(?:\.\.(?:\/|$)|[A-Za-z]:)/.test(normalized)) {
+        throw new Error("SARIF findings must use repository-relative paths");
+      }
+      const physicalLocation = {
+        artifactLocation: { uri: normalized.split("/").map(encodeURIComponent).join("/") }
+      };
+      if (location[2] !== undefined) {
+        physicalLocation.region = { startLine: Number(location[2]) };
+      }
+      result.locations = [{ physicalLocation }];
+      result.message.text = location[3];
+      result.partialFingerprints = {
+        "unsafeCode/v1": createHash("sha256")
+          .update(JSON.stringify([normalized, location[2] ?? null, location[3]]))
+          .digest("hex")
+      };
+    }
+    return result;
+  });
+  results.sort((left, right) => {
+    const a = JSON.stringify(left);
+    const b = JSON.stringify(right);
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  const invocation = {
+    executionSuccessful: scan.error === undefined,
+    exitCode: scan.error !== undefined ? 2 : results.length === 0 ? 0 : 1,
+    properties: { subjects: scan.subjects }
+  };
+  if (scan.error !== undefined) {
+    invocation.toolExecutionNotifications = [{ level: "error", message: { text: scan.error } }];
+  }
+  return {
+    $schema: "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json",
+    version: "2.1.0",
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: "UnityHelpersUnsafeCode",
+            rules: [
+              {
+                id: "unsafe-code",
+                shortDescription: { text: "Package-owned memory safety" },
+                helpUri: "https://github.com/Ambiguous-Interactive/unity-helpers/issues/637"
+              }
+            ]
+          }
+        },
+        invocations: [invocation],
+        results
+      }
+    ]
+  };
+}
+
+function main() {
+  const repoRoot = path.resolve(__dirname, "..");
+  const args = process.argv.slice(2);
+  let verbose = false;
+  let sarifPath = null;
+  for (let index = 0; index < args.length; index++) {
+    if (args[index] === "--verbose") {
+      verbose = true;
+    } else if (
+      args[index] === "--sarif" &&
+      index + 1 < args.length &&
+      !args[index + 1].startsWith("--") &&
+      sarifPath === null
+    ) {
+      sarifPath = path.resolve(repoRoot, args[++index]);
+    } else {
+      console.error(`[unsafe-code] Unexpected or incomplete argument: ${args[index]}`);
+      process.exitCode = 2;
+      return;
+    }
+  }
+
+  let scan;
+  try {
+    scan = scanRepository(repoRoot);
+  } catch (error) {
+    scan = { failures: [], subjects: {}, error: error.message };
+  }
+  if (sarifPath !== null) {
+    try {
+      mkdirSync(path.dirname(sarifPath), { recursive: true });
+      writeFileSync(sarifPath, JSON.stringify(createSarif(scan), null, 2) + "\n");
+    } catch (error) {
+      console.error(`[unsafe-code] Could not write SARIF: ${error.message}`);
+      process.exitCode = 2;
+      return;
+    }
+  }
+  if (scan.error !== undefined) {
+    console.error(`[unsafe-code] ${scan.error}`);
+    process.exitCode = 2;
+    return;
+  }
+  const { failures, subjects } = scan;
   if (0 < failures.length) {
     for (const failure of failures) {
       console.error(`[unsafe-code] ${failure}`);
     }
     console.error(`[unsafe-code] ${failures.length} violation(s).`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (verbose) {
-    const il2cpp = findIl2CppSafetyDisables(sources).inspected;
     console.log(
-      `[unsafe-code] No compiler-unsafe code or enabling switch found; ${inspected} stackalloc ` +
-        `site(s) bounded; ${unsafeAccess.inspected} memory-access Unsafe member(s), control reported; ` +
-        `${il2cpp} IL2CPP check option(s) set, control site reported.`
+      `[unsafe-code] No compiler-unsafe code or enabling switch found; ${subjects.stackAllocations} stackalloc ` +
+        `site(s) bounded; ${subjects.unsafeAccessSites} memory-access Unsafe member(s), control reported; ` +
+        `${subjects.il2cppOptionLists} IL2CPP check option(s) set, control site reported.`
     );
   }
 }
@@ -654,7 +820,9 @@ module.exports = {
   isVendored,
   findStackAllocations,
   findUnsafeAccess,
-  findIl2CppSafetyDisables
+  findIl2CppSafetyDisables,
+  scanRepository,
+  createSarif
 };
 
 if (require.main === module) {
