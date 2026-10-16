@@ -191,6 +191,14 @@ What does not auto‑fix:
 
 ## Run Checks Locally
 
+For browser correctness checks, `scripts/unity/run-browser-consumer.py` builds an isolated
+WebGL consumer and runs retained-map, enum, RNG, and spatial-query cases in Chromium. It requires
+an installed Unity Editor with WebGL support and Playwright. The runner uses Release IL2CPP,
+High stripping, and `SINGLE_THREADED`; it checks exact golden bytes and rejects corrupt-byte and
+stale-source controls. Run `uv run scripts/unity/run-browser-consumer.py --help` for the editor,
+browser, and artifact path options. This manual check does not replace the supported Unity CI
+matrix or provide performance measurements.
+
 - Install tools once:
   - `npm install --no-audit --no-fund` (the generated root lockfile stays ignored)
   - `dotnet tool restore`
