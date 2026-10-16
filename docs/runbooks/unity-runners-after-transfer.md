@@ -287,8 +287,12 @@ Use those observations to investigate the original process on the named runner b
 
 ### Opt-in native debugger capture
 
+<!-- cspell:ignore gflag -->
+
 For a recurring Unity 6000.6 access violation, dispatch **Unity Tests** with
 `unity-version: 6000.6.0f1`, `test-mode: editmode`, and `native-diagnostics: true`.
+The workflow retains its static version matrix: the version input does not restrict that matrix.
+Regular jobs select EditMode; the separate `SINGLE_THREADED` job still runs all three modes.
 After the regular EditMode step succeeds, the licensed runner executes one existing migration
 test directly and then under Microsoft's CDB debugger in the same prepared project. The selected
 case, editor hash, machine, process IDs, UTC boundaries, actual process exits, target exit events,
@@ -302,15 +306,24 @@ have a valid Microsoft signature. It does not register a system debugger or inst
 CDB captures second-chance access violations with exception details, registers, stack, module
 list, and a private minidump. It then continues the exception as unhandled. A separate breakpoint
 records requests to exit; the target's exit event remains distinct from the debugger's exit code.
+That breakpoint also runs read-only `!gflag` to observe the target's effective global flags.
 Control programs must preserve normal exit zero and access-violation exit `0xC0000005` before
 interpreting a new debugger configuration.
+
+Runner startup diagnostics and the capture receipt read the 64-bit local-machine `GlobalFlag`
+settings for `Unity.exe` under Image File Execution Options and for the system under Session
+Manager. Each read reports observed, absent, unavailable, or invalid. Only observed numeric values
+report whether the loader-snaps bit is set; absent or unreadable settings do not establish the
+target's effective flags. These observations do not change the registry or enable debugging.
+Loader tracing in debugger output is a lead to investigate, not proof of a Unity fault's cause.
 
 Raw dumps and logs remain under the runner account's local application data in
 `unity-helpers-native-debugger/<capture-id>`, whose exact path is in the receipt. Only the receipt
 and redacted console, editor, and Package Manager tails enter the EditMode artifacts under
 `native-diagnostics/`. Console retention is limited to 524,288 characters; each file tail reads
 at most 524,288 bytes of its initially observed file. Dump hashes are attempted only up to
-256 MiB. A missing dump or exit event is explicit. Retrieve private files on the named runner
+256 MiB. Full debugger console output is not retained beyond its tail. A missing dump or exit
+event is explicit. Retrieve available private files on the named runner
 for further analysis, then remove them after preserving the required evidence. The command can
 also be run locally with `-DebuggerDirectory` pointing to the same verified files and
 `-TestFilter` selecting a single existing case. Each artifact path must be new.

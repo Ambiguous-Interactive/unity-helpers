@@ -219,6 +219,11 @@ runs:
             Write-Output ("  - " + $entry)
         }
         Write-Output "::endgroup::"
+    - name: Observe Unity global debug flags
+      shell: pwsh
+      run: |
+        . ./scripts/unity/lib/native-global-flags.ps1
+        Get-NativeGlobalFlagSnapshot | ConvertTo-Json -Depth 5
     - name: Configure Git compression tools for Actions cache
       shell: pwsh
       run: |

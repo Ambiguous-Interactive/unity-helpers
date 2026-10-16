@@ -15,6 +15,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/credential-redaction.ps1')
 . (Join-Path $PSScriptRoot 'lib/accelerator.ps1')
+. (Join-Path $PSScriptRoot 'lib/native-global-flags.ps1')
 
 function Invoke-NativeCaptureProcess {
     param(
@@ -185,6 +186,7 @@ $record = [ordered]@{
     Machine = $env:COMPUTERNAME
     OsVersion = [Environment]::OSVersion.VersionString
     ControllerPid = $PID
+    GlobalFlagRegistry = Get-NativeGlobalFlagSnapshot
     PrivateRoot = $privateRoot
     EditorPath = [IO.Path]::GetFullPath($EditorPath)
     EditorSha256 = (Get-FileHash -LiteralPath $EditorPath -Algorithm SHA256).Hash
@@ -245,7 +247,7 @@ try {
         $executable = $EditorPath
         $arguments = $unityArguments
         if ($mode -eq 'debugger') {
-            $command = 'sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av;sxe -c ".lastevent;q" epr;bu ntdll!RtlExitUserProcess ".echo WUH_EXIT_REQUEST;r rcx;kv20;g";g'
+            $command = 'sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av;sxe -c ".lastevent;q" epr;bu ntdll!RtlExitUserProcess ".echo WUH_EXIT_REQUEST;!gflag;r rcx;kv20;g";g'
             $executable = $debugger
             $arguments = @('-c', $command, $EditorPath) + $unityArguments
         }
