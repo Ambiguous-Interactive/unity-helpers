@@ -5159,6 +5159,49 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        [TestCase(
+            "System.Collections.Generic.Dictionary<int, int?>",
+            TestName = "NullableMap.ScalarValue.Compiles"
+        )]
+        [TestCase(
+            "System.Collections.Generic.Dictionary<int?, int>",
+            TestName = "NullableMap.ScalarKey.Compiles"
+        )]
+        [TestCase(
+            "System.Collections.Generic.Dictionary<int?, int?>",
+            TestName = "NullableMap.BothHalves.Compiles"
+        )]
+        [TestCase(
+            "System.Collections.Generic.Dictionary<System.DayOfWeek?, System.DayOfWeek?>",
+            TestName = "NullableMap.EnumHalves.Compiles"
+        )]
+        [TestCase(
+            "System.Collections.Generic.Dictionary<int, Point?>",
+            TestName = "NullableMap.MessageValue.Compiles"
+        )]
+        [TestCase(
+            "System.Collections.Generic.Dictionary<Point?, int>",
+            TestName = "NullableMap.MessageKey.Compiles"
+        )]
+        [TestCase(
+            "System.Collections.Generic.IDictionary<int?, int?>",
+            TestName = "NullableMap.Interface.Compiles"
+        )]
+        [TestCase(
+            "System.Collections.Generic.IReadOnlyDictionary<int?, int?>",
+            TestName = "NullableMap.ReadOnlyInterface.Compiles"
+        )]
+        public void NullableMapMembersCompile(string mapType)
+        {
+            string source =
+                "[WProtoContract] public partial struct Point { [WProtoMember(1)] public int X; } "
+                + "[WProtoContract] public partial class NullableMap { [WProtoMember(1)] public "
+                + mapType
+                + " Values; }";
+            Assert.IsEmpty(Run(source));
+            Assert.IsEmpty(CompileGenerated(source));
+        }
+
         [TestCase("global::System.Collections.Generic.IEnumerable<int>")]
         [TestCase("global::System.Collections.Generic.ICollection<int>")]
         [TestCase("global::System.Collections.Generic.IList<int>")]

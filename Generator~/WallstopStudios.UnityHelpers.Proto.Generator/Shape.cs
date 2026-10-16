@@ -512,6 +512,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             };
         }
 
+        /// <summary>Unwraps a nullable value type before choosing its wire encoding.</summary>
+        internal static ITypeSymbol Underlying(ITypeSymbol type)
+        {
+            return
+                type is INamedTypeSymbol named
+                && named.IsGenericType
+                && named.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T
+                ? named.TypeArguments[0]
+                : type;
+        }
+
         /// <summary>
         /// The built-in formatter serving one of the base-class-library value types, or
         /// <c>null</c> for everything else.
@@ -664,16 +675,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 AssignExpression = exact ? Placeholder : "(" + qualified + ")" + Placeholder,
                 WriteCast = exact ? string.Empty : "(int)",
             };
-        }
-
-        private static ITypeSymbol Underlying(ITypeSymbol type)
-        {
-            return
-                type is INamedTypeSymbol named
-                && named.IsGenericType
-                && named.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T
-                ? named.TypeArguments[0]
-                : type;
         }
 
         /// <summary>

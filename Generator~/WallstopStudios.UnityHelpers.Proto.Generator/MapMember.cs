@@ -93,6 +93,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly bool _keyIsString;
         private readonly bool _keyIsEnum;
         private readonly bool _valueIsString;
+        private readonly bool _keyNullable;
+        private readonly bool _valueNullable;
 
         private MapMember(
             string contractName,
@@ -110,7 +112,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             bool mapIsInterface,
             bool keyIsString,
             bool keyIsEnum,
-            bool valueIsString
+            bool valueIsString,
+            bool keyNullable,
+            bool valueNullable
         )
             : base(name, tag)
         {
@@ -128,6 +132,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _keyIsString = keyIsString;
             _keyIsEnum = keyIsEnum;
             _valueIsString = valueIsString;
+            _keyNullable = keyNullable;
+            _valueNullable = valueNullable;
         }
 
         /// <summary>
@@ -214,8 +220,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
 
             // Wrapped collection keys lack stable identity and have no oracle-compatible wire form.
-            Shape key = Shape.For(keyType, keyQualified, surrogates);
-            Shape value = Shape.For(valueType, valueQualified, surrogates, nested, name);
+            ITypeSymbol keyUnderlying = Shape.Underlying(keyType);
+            ITypeSymbol valueUnderlying = Shape.Underlying(valueType);
+            bool keyNullable = !SymbolEqualityComparer.Default.Equals(keyType, keyUnderlying);
+            bool valueNullable = !SymbolEqualityComparer.Default.Equals(valueType, valueUnderlying);
+            Shape key = Shape.For(
+                keyUnderlying,
+                keyUnderlying.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                surrogates
+            );
+            Shape value = Shape.For(
+                valueUnderlying,
+                valueUnderlying.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                surrogates,
+                nested,
+                name
+            );
             if (key == null || value == null)
             {
                 return null;
@@ -250,8 +270,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 named.IsValueType,
                 named.TypeKind == TypeKind.Interface,
                 keyIsString,
-                keyType.TypeKind == TypeKind.Enum,
-                valueType.SpecialType == SpecialType.System_String
+                keyUnderlying.TypeKind == TypeKind.Enum,
+                valueType.SpecialType == SpecialType.System_String,
+                keyNullable,
+                valueNullable
             );
         }
 
@@ -554,6 +576,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             Close(writer);
             writer.Blank();
 
+            if (_keyNullable)
+            {
+                writer.Line("if (!" + keyLocal + ".HasValue)" + Writer.Open);
+                writer.Indent();
+                EmitReadFailure(writer, qualifiedContract);
+                Close(writer);
+                writer.Blank();
+            }
+
             if (_value.IsMessage)
             {
                 writer.Line("if (entryOccurrences" + Tag + ".HasValue)" + Writer.Open);
@@ -676,6 +707,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private string MapPresence(Shape shape, string access, bool isKey)
         {
+            if (isKey ? _keyNullable : _valueNullable)
+            {
+                return access + ".HasValue";
+            }
             // protobuf-net 3.2.56 retains default enum keys but omits default numeric keys.
             return isKey && _keyIsEnum ? "true" : Shape.Fill(shape.PresenceTest, access);
         }
@@ -684,7 +719,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             writer.Line("if (" + MapPresence(shape, access, isKey) + ")" + Writer.Open);
             writer.Indent();
-            writer.Line("if (!(" + shape.WriteCall(access, tag) + "))" + Writer.Open);
+            string value = (isKey ? _keyNullable : _valueNullable) ? access + ".Value" : access;
+            writer.Line("if (!(" + shape.WriteCall(value, tag) + "))" + Writer.Open);
             writer.Indent();
             writer.Line("return false;");
             Close(writer);
@@ -747,6 +783,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private void EmitHalfSize(Writer writer, Shape shape, string access, int tag, bool isKey)
         {
+            string value = (isKey ? _keyNullable : _valueNullable) ? access + ".Value" : access;
             writer.Line("if (" + MapPresence(shape, access, isKey) + ")" + Writer.Open);
             writer.Indent();
             writer.Line(
@@ -756,7 +793,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + ".WProtoSizes.TagSize("
                     + tag
                     + ") + "
-                    + Shape.Fill(shape.SizeExpression, access)
+                    + Shape.Fill(shape.SizeExpression, value)
                     + ";"
             );
             Close(writer);

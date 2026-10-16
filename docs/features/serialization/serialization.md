@@ -173,8 +173,8 @@ writing those payloads.
 Older writers could omit both null and present-default values. Such payloads still decode
 the omitted nullable field as null; the missing presence cannot be reconstructed. New writes
 preserve the distinction, so legacy comparer hashes for nullable maps can change. Use the save
-API for retained data rather than persisting comparer hashes. Generated nullable collection
-support remains separate from this legacy fix. Fresh stripped-player qualification remains tracked in
+API for retained data rather than persisting comparer hashes. Generated map members also support
+nullable keys and values; nullable repeated collection elements remain unsupported. Fresh stripped-player qualification remains tracked in
 [#953](https://github.com/Ambiguous-Interactive/unity-helpers/issues/953).
 
 ### Protobuf (protobuf-net)
@@ -1810,13 +1810,17 @@ dictionary does not simply ride the collection path.
 | `IDictionary<K,V>`, `IReadOnlyDictionary<K,V>`                                                       | Read back as a `Dictionary<K,V>` |
 | `ReadOnlyDictionary<K,V>`                                                                            | Accumulated and constructed once |
 
-A key may be any integral type, `bool`, `string`, a floating-point type or an enum: the same set
-protobuf-net accepts, which is wider than the protobuf specification's. A `byte[]` or message key is
-refused, because neither has a stable identity to key on once round-tripped.
+A key may be any integral type, `bool`, `string`, a floating-point type, an enum, or a supported
+value-type message. Nullable keys and values use their underlying wire type and retain presence.
+A `byte[]` or reference-type message key is refused because it lacks stable round-trip identity.
 
 Map entries follow protobuf-net 3.2.56. Zero enum keys and empty string keys are written.
 Default numeric keys, including `float` and `double`, and default `bool` keys are omitted.
 A zero `int` or `double` value is omitted, so `{"a": 0}` carries only its key.
+Nullable halves use `HasValue` rather than default omission: a present zero is written, and a
+null value is absent. For an entry at field 1, key `3` with nullable value `0` writes
+`0A 04 08 03 10 00`; a null value writes `0A 02 08 03`. A present default struct value
+writes an empty message. Nullable keys must be present; a keyless nullable entry is refused.
 
 A missing key or value decodes to that type's protobuf default. A missing string is `""`,
 which can serve as a dictionary key. Historical keyless enum entries and explicit zero numeric
@@ -2970,6 +2974,12 @@ and a default struct map value that 3.2.56 writes, and v2 silently drops a null 
 rejects. WallstopProto follows the safer/current v3 behavior and separately proves it can read the v2
 omissions using protobuf defaults (including `string.Empty`, never `null`) and the v2
 map bytes, so an old save migrates without claiming an impossible three-way byte identity.
+
+Nullable map writes also match both pinned oracle writers. In the .NET 9 host tests, the 2.4.9
+reader loses or changes nullable enum and struct map values even from its own identical bytes.
+Generated readers retain the encoded values. The suite records those older-reader losses
+explicitly; byte equality does not establish full v2 reader compatibility for these shapes.
+Qualify retained data with the actual reader versions before a mixed-version rollout.
 
 Three protobuf-net behaviors are worth knowing because they are easy to trip over:
 
