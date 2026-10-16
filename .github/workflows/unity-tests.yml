@@ -55,6 +55,11 @@ on:
         required: false
         default: false
         type: boolean
+      native-diagnostics:
+        description: "Capture a direct/debugger exit pair on Unity 6000.6; evidence only."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -479,6 +484,36 @@ jobs:
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
             -Il2CppCompilerConfiguration 'Release'
+
+      - name: Setup Python for native diagnostics
+        if: >-
+          ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-diagnostics
+          && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.run_editmode.outcome == 'success' }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+
+      - name: Capture native exit diagnostics
+        if: >-
+          ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-diagnostics
+          && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.run_editmode.outcome == 'success' }}
+        timeout-minutes: 30
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-integration-assemblies }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . ./scripts/unity/lib/project-workspace.ps1
+          $workspace = Resolve-UnityProjectWorkspace -RepoRoot $env:GITHUB_WORKSPACE `
+            -Version '${{ matrix.unity-version }}' -Mode editmode -ShareEditorProject `
+            -PersistentRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace')
+          ./scripts/unity/capture-native-fault.ps1 -EditorPath $env:UNITY_EDITOR_PATH `
+            -ProjectPath $workspace.ProjectPath -AssemblyNames $env:UH_TEST_ASSEMBLIES `
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode/native-diagnostics'
 
       - name: Require current PR head before PlayMode
         id: playmode_head

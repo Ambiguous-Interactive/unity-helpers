@@ -1,0 +1,65 @@
+{
+  "Source": "https://windbg.download.prss.microsoft.com/dbazure/prod/1-2610-1001-0/windbg.msixbundle",
+  "Files": [
+    {
+      "Name": "amd64/NOTICE.txt",
+      "Bytes": 99930,
+      "Sha256": "472f886cac01f834b281472fddd22418b78a451050c4ddf6fcb56422b838e882"
+    },
+    {
+      "Name": "amd64/manifestversion.txt",
+      "Bytes": 14,
+      "Sha256": "127daf2df8be88546187915fca192eb73dfcf02f48ae80f2cf6ab0a257c45810"
+    },
+    {
+      "Name": "amd64/cdb.exe",
+      "Bytes": 178016,
+      "Sha256": "a9e81c9051a7902fbd8ebd8d348cf83c96f2d8bffd6c2174171a23cef16bb039"
+    },
+    {
+      "Name": "amd64/srcsrv.dll",
+      "Bytes": 345952,
+      "Sha256": "72131ab80377a6c991921e965210c2dbfc02e95ecdabfa05763f5686383c065e"
+    },
+    {
+      "Name": "amd64/dbghelp.dll",
+      "Bytes": 747320,
+      "Sha256": "fac7ed67467df056aa904d31e66559080bc40093fbf78eecbe55e276c01ae19f"
+    },
+    {
+      "Name": "amd64/msdia140.dll",
+      "Bytes": 2700600,
+      "Sha256": "acda8b74fa81a07838c85ce2f9c81e989e416a48e1137ec4e497232f921b7267"
+    },
+    {
+      "Name": "amd64/dbgmodel.dll",
+      "Bytes": 1214264,
+      "Sha256": "700935cf0a51e1fd59ca83c54cced0446a7bb8756ee0e644f36516c3c00a1051"
+    },
+    {
+      "Name": "amd64/winxp/exts.dll",
+      "Bytes": 653152,
+      "Sha256": "7d72d459ad6b17df4e202f815a25bcb587c07a51977821b9b2de71e6fbd87501"
+    },
+    {
+      "Name": "amd64/dbgeng.dll",
+      "Bytes": 11368288,
+      "Sha256": "ad50a89dea9ec578a2db92273eccd6cd96f068a63e0b7b9fe8b9d74fdd73707b"
+    },
+    {
+      "Name": "amd64/dbgcore.dll",
+      "Bytes": 300856,
+      "Sha256": "082c216fab924cc68042365b34db16a16936ca5cc08894daf3fb758e27ab002b"
+    },
+    {
+      "Name": "amd64/winext/ext.dll",
+      "Bytes": 6554936,
+      "Sha256": "94c6d6c4acd0dd6c88eeaecd6437650e15f9844b8c8335cbeb35bf6655e7758d"
+    },
+    {
+      "Name": "amd64/symsrv.dll",
+      "Bytes": 2017080,
+      "Sha256": "40062d3a961605be345ad34dfef498f597ad326ff8ff236d96a72002c0673549"
+    }
+  ]
+}

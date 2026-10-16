@@ -365,6 +365,16 @@ const CHECKS = [
     run: "pwsh -NoProfile -File scripts/tests/test-process-watchdog.ps1 -VerboseOutput"
   },
   {
+    id: "native-debugger-download",
+    name: "Bounded native debugger download",
+    run: "python3 scripts/tests/test-native-debugger-download.py"
+  },
+  {
+    id: "native-fault-capture",
+    name: "Native fault capture controls",
+    run: "pwsh -NoProfile -File scripts/tests/test-native-fault-capture.ps1"
+  },
+  {
     id: "unity-license-activation-retry",
     name: "Unity license activation retry",
     run: "pwsh -NoProfile -File scripts/tests/test-unity-license-activation-retry.ps1 -VerboseOutput"

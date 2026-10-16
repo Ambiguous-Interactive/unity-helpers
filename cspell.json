@@ -941,7 +941,20 @@
         "uvx",
         "Murzak",
         "ustar",
-        "canonicalizer"
+        "canonicalizer",
+        "CDB",
+        "Windbg",
+        "msix",
+        "dbghelp",
+        "msdia",
+        "dbgmodel",
+        "winxp",
+        "dbgeng",
+        "dbgcore",
+        "symsrv",
+        "ntdll",
+        "rcx",
+        "dmp"
       ]
     }
   ],

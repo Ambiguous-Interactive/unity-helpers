@@ -285,6 +285,36 @@ result gates. A receipt write failure warns without replacing the original proce
 
 Use those observations to investigate the original process on the named runner before selecting a repair. A successful later launch does not explain an earlier failure, and the diagnostic report does not replace the fresh configure marker or required player results.
 
+### Opt-in native debugger capture
+
+For a recurring Unity 6000.6 access violation, dispatch **Unity Tests** with
+`unity-version: 6000.6.0f1`, `test-mode: editmode`, and `native-diagnostics: true`.
+After the regular EditMode step succeeds, the licensed runner executes one existing migration
+test directly and then under Microsoft's CDB debugger in the same prepared project. The selected
+case, editor hash, machine, process IDs, UTC boundaries, actual process exits, target exit events,
+XML outcomes, and watchdog actions are recorded separately. These are diagnostic observations;
+they cannot satisfy acceptance or explain a different earlier failure. Normal tests, license
+return, lock release, and cleanup checks still run.
+
+The driver downloads only twelve x64 debugger files from a versioned Microsoft bundle using
+bounded HTTP ranges. Each file must match its committed size and SHA-256 digest, and CDB must
+have a valid Microsoft signature. It does not register a system debugger or install tools globally.
+CDB captures second-chance access violations with exception details, registers, stack, module
+list, and a private minidump. It then continues the exception as unhandled. A separate breakpoint
+records requests to exit; the target's exit event remains distinct from the debugger's exit code.
+Control programs must preserve normal exit zero and access-violation exit `0xC0000005` before
+interpreting a new debugger configuration.
+
+Raw dumps and logs remain under the runner account's local application data in
+`unity-helpers-native-debugger/<capture-id>`, whose exact path is in the receipt. Only the receipt
+and redacted console, editor, and Package Manager tails enter the EditMode artifacts under
+`native-diagnostics/`. Console retention is limited to 524,288 characters; each file tail reads
+at most 524,288 bytes of its initially observed file. Dump hashes are attempted only up to
+256 MiB. A missing dump or exit event is explicit. Retrieve private files on the named runner
+for further analysis, then remove them after preserving the required evidence. The command can
+also be run locally with `-DebuggerDirectory` pointing to the same verified files and
+`-TestFilter` selecting a single existing case. Each artifact path must be new.
+
 Operator notes:
 
 - **Confirm reuse.** Every run logs `Library: warm (reused)` or
