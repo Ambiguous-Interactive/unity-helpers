@@ -204,6 +204,7 @@
     "test:github-token": "bash scripts/tests/test-github-token.sh",
     "test:agent-skill-migration": "node scripts/tests/test-agent-skill-migration.mjs",
     "test:normalize-container-git-config": "bash scripts/tests/test-normalize-container-git-config.sh",
+    "test:native-fault-capture": "pwsh -NoProfile -File scripts/tests/test-native-fault-capture.ps1",
     "test:lint-changelog": "pwsh -NoProfile -File scripts/tests/test-lint-changelog.ps1 -VerboseOutput",
     "test:lint-unity-test-modules": "pwsh -NoProfile -File scripts/tests/test-lint-unity-test-modules.ps1",
     "test:lint-bundled-assemblies": "pwsh -NoProfile -File scripts/tests/test-lint-bundled-assemblies.ps1",

@@ -8,6 +8,7 @@ param(
     [Parameter(Mandatory = $true)][string]$AssemblyNames,
     [string]$TestFilter = 'WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationApiTests.SourceAnalysisExposesReadOnlyChangesAndFindings',
     [string]$DebuggerDirectory,
+    [switch]$CompareLoaderSnaps,
     [ValidateRange(1, 1800)][int]$TimeoutSeconds = 600
 )
 
@@ -16,6 +17,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/credential-redaction.ps1')
 . (Join-Path $PSScriptRoot 'lib/accelerator.ps1')
 . (Join-Path $PSScriptRoot 'lib/native-global-flags.ps1')
+. (Join-Path $PSScriptRoot 'lib/native-loader-flag-lease.ps1')
 
 function Invoke-NativeCaptureProcess {
     param(
@@ -169,6 +171,12 @@ function Get-NativeCaptureXmlOutcome {
     } finally { if ($null -ne $reader) { $reader.Dispose() } }
 }
 
+function Test-NativeCaptureInputsUnchanged {
+    param([string]$EditorPath, [string]$PackageLockPath, [System.Collections.IDictionary]$Record)
+
+    return (Test-Path -LiteralPath $EditorPath -PathType Leaf) -and (Test-Path -LiteralPath $PackageLockPath -PathType Leaf) -and $Record.Contains('PackagesLockSha256') -and (Get-FileHash -LiteralPath $EditorPath -Algorithm SHA256).Hash -ceq $Record.EditorSha256 -and (Get-FileHash -LiteralPath $PackageLockPath -Algorithm SHA256).Hash -ceq $Record.PackagesLockSha256
+}
+
 if (-not $IsWindows) { throw 'Native capture requires Windows x64' }
 if ([Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -ne 'X64') { throw 'Native capture requires an x64 controller' }
 if (-not (Test-Path -LiteralPath $EditorPath -PathType Leaf)) { throw 'Editor is missing' }
@@ -187,6 +195,8 @@ $record = [ordered]@{
     OsVersion = [Environment]::OSVersion.VersionString
     ControllerPid = $PID
     GlobalFlagRegistry = Get-NativeGlobalFlagSnapshot
+    LoaderFlagLease = $null
+    LoaderFlagRestoreFailure = $null
     PrivateRoot = $privateRoot
     EditorPath = [IO.Path]::GetFullPath($EditorPath)
     EditorSha256 = (Get-FileHash -LiteralPath $EditorPath -Algorithm SHA256).Hash
@@ -199,8 +209,17 @@ function Save-NativeCaptureRecord {
     $json = $record | ConvertTo-Json -Depth 12
     [IO.File]::WriteAllText((Join-Path $artifactRoot 'receipt.json'), (ConvertTo-UnitySafeLogText -Text $json))
 }
+$flagBase = $null
+$flagKey = $null
 try {
     Save-NativeCaptureRecord
+    if ($CompareLoaderSnaps) {
+        $flagBase = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
+        $flagKey = $flagBase.OpenSubKey('SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\Unity.exe', $true)
+        if ($null -eq $flagKey) { throw 'Unity.exe image flags are missing' }
+        $record.LoaderFlagLease = New-NativeLoaderFlagLease -Key $flagKey
+        Save-NativeCaptureRecord
+    }
     if ([string]::IsNullOrWhiteSpace($DebuggerDirectory)) {
         $DebuggerDirectory = $layout.Tools
         $record.DownloadProcess = @{}
@@ -239,8 +258,15 @@ try {
         $record.TestFramework = $packageLock.dependencies.'com.unity.test-framework'
     }
     $record.State = 'running'
-    foreach ($mode in @('direct', 'debugger')) {
-        $privateCase = $layout[$mode]
+    $modes = if ($CompareLoaderSnaps) { @('direct-before', 'direct-disabled', 'direct-restored') } else { @('direct', 'debugger') }
+    foreach ($mode in $modes) {
+        if ($CompareLoaderSnaps) {
+            if (-not (Test-NativeCaptureInputsUnchanged -EditorPath $EditorPath -PackageLockPath $lockPath -Record $record)) { throw 'Comparison editor or package lock changed' }
+            if ($mode -eq 'direct-disabled') { Disable-NativeLoaderFlag -Lease $record.LoaderFlagLease -Key $flagKey -LeasePath (Join-Path $artifactRoot 'loader-flag-lease.json') }
+            if ($mode -eq 'direct-restored') { Restore-NativeLoaderFlag -Lease $record.LoaderFlagLease -Key $flagKey }
+            Save-NativeCaptureRecord
+        }
+        $privateCase = if ($CompareLoaderSnaps) { Join-Path $privateRoot $mode } else { $layout[$mode] }
         [void](New-Item -ItemType Directory -Path $privateCase)
         $xmlPath = Join-Path $privateCase 'results.xml'
         $unityArguments = @('-batchmode', '-nographics', '-timestamps', '-releaseCodeOptimization', '-projectPath', $ProjectPath, '-runTests', '-testPlatform', 'editmode', '-assemblyNames', $AssemblyNames, '-testFilter', $TestFilter, '-testResults', $xmlPath, '-logFile', (Join-Path $privateCase 'unity.log'), '-crash-report-folder', $privateCase, '-upmLogFile', (Join-Path $privateCase 'upm.log')) + $acceleratorArguments
@@ -253,6 +279,7 @@ try {
         }
         $observation = @{}
         $case = @{ Mode = $mode; Process = $observation; TargetExitEvent = $null; DumpPresent = $false }
+        if ($CompareLoaderSnaps) { $case.GlobalFlagRegistry = Get-NativeGlobalFlagSnapshot }
         $record.Cases += $case
         Save-NativeCaptureRecord
         $output = Invoke-NativeCaptureProcess -FilePath $executable -Arguments $arguments -Directory $privateCase -Seconds $TimeoutSeconds -Observation $observation -ReceiptPath (Join-Path $artifactRoot "$mode-process.json")
@@ -274,6 +301,8 @@ try {
         Save-NativeCaptureRecord
         if (-not $observation.Reaped -or $null -ne $observation.KillReason) { throw 'Diagnostic process did not exit naturally' }
         if ($mode -eq 'debugger' -and $null -eq $case.TargetExitEvent) { throw 'Debugger did not report a unique target exit event' }
+        if ($CompareLoaderSnaps -and ($case.Xml.State -ne 'observed' -or $case.Xml.Result -ne 'Passed')) { throw 'Comparison requires exactly the selected passing case in every phase' }
+        if ($CompareLoaderSnaps -and -not (Test-NativeCaptureInputsUnchanged -EditorPath $EditorPath -PackageLockPath $lockPath -Record $record)) { throw 'Comparison inputs changed during the phase' }
     }
     $record.State = 'completed'
     $record.EndedUtc = [DateTime]::UtcNow.ToString('o')
@@ -284,4 +313,17 @@ try {
     $record.Failure = $_.Exception.Message
     Save-NativeCaptureRecord
     throw
+} finally {
+    try {
+        if ($null -ne $flagKey -and $null -ne $record.LoaderFlagLease) {
+            try { Complete-NativeLoaderFlagLease -Lease $record.LoaderFlagLease -Key $flagKey } catch {
+                $record.State = 'restore-failed'
+                $record.LoaderFlagRestoreFailure = $_.Exception.Message
+                throw
+            } finally { Save-NativeCaptureRecord }
+        }
+    } finally {
+        if ($null -ne $flagKey) { $flagKey.Dispose() }
+        if ($null -ne $flagBase) { $flagBase.Dispose() }
+    }
 }

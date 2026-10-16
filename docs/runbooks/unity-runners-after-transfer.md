@@ -317,6 +317,31 @@ report whether the loader-snaps bit is set; absent or unreadable settings do not
 target's effective flags. These observations do not change the registry or enable debugging.
 Loader tracing in debugger output is a lead to investigate, not proof of a Unity fault's cause.
 
+To compare the same direct test with loader snaps enabled, disabled, and restored, also set
+`native-loader-snaps-comparison: true`. This opt-in requires `native-diagnostics: true`,
+`test-mode: editmode`, and `acceptance: none`. It temporarily changes only the image-specific
+`Unity.exe` loader-snaps bit under the acquired organization Unity lock. It preserves other bits
+and restores the exact original value and registry type. The comparison is off by default;
+normal captures leave Unity's flags unchanged.
+Use this mode only when a runner configuration change is authorized; the regular workflow matrix
+and the separate `SINGLE_THREADED` job still run as described above.
+
+Comparison requires a present supported value with loader snaps enabled and permission to write
+that image key. It saves a new checksummed `loader-flag-lease.json` before any write. Each phase
+requires the same editor and package-lock hashes, exactly one selected passing NUnit case, and a
+natural process exit. Each phase records its registry snapshot and actual exit separately.
+The driver restores its active change in `finally`; an `always()` workflow step repeats recovery
+before later steps. Automatic cleanup preserves external edits made before its write or after
+restoration. Recovery refuses a current value or type that conflicts with both saved states.
+
+After an interrupted run, preview recovery with
+`scripts/unity/restore-native-loader-snaps.ps1 -LeasePath <saved-lease>` on the original machine;
+pass `-Apply` to restore. Recovery validates the bounded receipt, checksum, machine, exact key,
+original and disabled values, and current value. Keep the original receipt until restoration is
+confirmed. A completed comparison is diagnostic evidence; it does not satisfy test acceptance.
+Windows runner startup also runs the capture controls in a fresh temporary current-user registry
+key and removes that key afterward. Those controls do not write Unity's image or system settings.
+
 Raw dumps and logs remain under the runner account's local application data in
 `unity-helpers-native-debugger/<capture-id>`, whose exact path is in the receipt. Only the receipt
 and redacted console, editor, and Package Manager tails enter the EditMode artifacts under

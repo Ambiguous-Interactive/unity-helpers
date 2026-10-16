@@ -60,6 +60,11 @@ on:
         required: false
         default: false
         type: boolean
+      native-loader-snaps-comparison:
+        description: "Temporarily clear Unity.exe loader snaps, capture, then restore; requires native diagnostics and EditMode."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -108,6 +113,18 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.18.0"
+
+      - name: Validate native comparison selection
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-loader-snaps-comparison }}
+        shell: pwsh
+        env:
+          UH_NATIVE_DIAGNOSTICS: ${{ inputs.native-diagnostics }}
+          UH_NATIVE_MODE: ${{ inputs.test-mode }}
+          UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
+        run: |
+          if ($env:UH_NATIVE_DIAGNOSTICS -ne 'true' -or $env:UH_NATIVE_MODE -ne 'editmode' -or $env:UH_NATIVE_ACCEPTANCE -ne 'none') {
+            throw 'Loader-snaps comparison requires native-diagnostics=true, test-mode=editmode and acceptance=none.'
+          }
 
       # Assembly compatibility depends on target mode and integration opt-in,
       # never on Unity version. Compute each distinct list once on this hosted
@@ -495,6 +512,7 @@ jobs:
           python-version: "3.11"
 
       - name: Capture native exit diagnostics
+        id: native_capture
         if: >-
           ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-diagnostics
           && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
@@ -506,15 +524,28 @@ jobs:
           UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-integration-assemblies }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
           UH_STREAM_TEST_RESULTS: "1"
+          UH_COMPARE_LOADER_SNAPS: ${{ inputs.native-loader-snaps-comparison }}
         run: |
           $ErrorActionPreference = 'Stop'
           . ./scripts/unity/lib/project-workspace.ps1
           $workspace = Resolve-UnityProjectWorkspace -RepoRoot $env:GITHUB_WORKSPACE `
             -Version '${{ matrix.unity-version }}' -Mode editmode -ShareEditorProject `
             -PersistentRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace')
+          $captureTimeout = if ($env:UH_COMPARE_LOADER_SNAPS -eq 'true') { 300 } else { 600 }
           ./scripts/unity/capture-native-fault.ps1 -EditorPath $env:UNITY_EDITOR_PATH `
             -ProjectPath $workspace.ProjectPath -AssemblyNames $env:UH_TEST_ASSEMBLIES `
-            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode/native-diagnostics'
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode/native-diagnostics' `
+            -CompareLoaderSnaps:($env:UH_COMPARE_LOADER_SNAPS -eq 'true') -TimeoutSeconds $captureTimeout
+
+      - name: Restore native loader-snaps comparison
+        if: >-
+          ${{ always() && github.event_name == 'workflow_dispatch' && inputs.native-loader-snaps-comparison
+          && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.native_capture.outcome != '' && steps.native_capture.outcome != 'skipped' }}
+        shell: pwsh
+        run: |
+          ./scripts/unity/restore-native-loader-snaps.ps1 -Apply `
+            -LeasePath '.artifacts/unity/${{ matrix.unity-version }}-editmode/native-diagnostics/loader-flag-lease.json'
 
       - name: Require current PR head before PlayMode
         id: playmode_head
