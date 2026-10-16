@@ -36,6 +36,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 string name in new[]
                 {
                     "OdinMigrationCompiledSource",
+                    "OdinMigrationBindingAttribute",
                     "OdinMigrationCompiledField",
                     "OdinMigrationCompiledBinding",
                     "OdinMigrationCompiledBindings",
@@ -108,6 +109,98 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             GeneratorDriverRunResult result = Generate(sources, true, out Compilation _);
             Assert.AreEqual(1, result.GeneratedTrees.Length);
             return result.GeneratedTrees[0].GetText().ToString();
+        }
+
+        [TestCase("private", false)]
+        [TestCase("protected", false)]
+        [TestCase("public", true)]
+        [TestCase("private", true)]
+        public void ReferencedOwnersAdvertiseBindingsWithoutExposingPrivateFields(
+            string access,
+            bool readonlyField
+        )
+        {
+            Generate(
+                new[]
+                {
+                    "namespace Consumer { public partial class Parent : UnityEngine.ScriptableObject { "
+                        + access
+                        + (readonlyField ? " readonly " : " ")
+                        + "System.Collections.Generic.Dictionary<System.DayOfWeek,System.Collections.Generic.List<UnityEngine.Texture>> Values = new(); } }",
+                },
+                true,
+                out Compilation parent
+            );
+            using MemoryStream image = new MemoryStream();
+            Microsoft.CodeAnalysis.Emit.EmitResult emitted = parent.Emit(image);
+            Assert.IsTrue(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            CSharpParseOptions options = new CSharpParseOptions(
+                LanguageVersion.CSharp9,
+                preprocessorSymbols: new[] { "UNITY_EDITOR" }
+            );
+            List<MetadataReference> references = new List<MetadataReference>(parent.References);
+            references.Add(MetadataReference.CreateFromImage(image.ToArray()));
+            CSharpCompilation child = CSharpCompilation.Create(
+                "ReferencedConsumer",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        "namespace Consumer { public sealed class Child : Parent {} }",
+                        options,
+                        "Child.cs"
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+            GeneratorDriver driver = CSharpGeneratorDriver.Create(
+                new[] { new OdinMigrationBindingGenerator() },
+                parseOptions: options
+            );
+            driver = driver.RunGeneratorsAndUpdateCompilation(
+                child,
+                out Compilation updated,
+                out System.Collections.Immutable.ImmutableArray<Diagnostic> diagnostics
+            );
+            Assert.IsEmpty(diagnostics);
+            foreach (Diagnostic diagnostic in updated.GetDiagnostics())
+            {
+                Assert.AreNotEqual(
+                    DiagnosticSeverity.Error,
+                    diagnostic.Severity,
+                    diagnostic.ToString()
+                );
+            }
+            GeneratorDriverRunResult result = driver.GetRunResult();
+            Assert.AreEqual(1, result.GeneratedTrees.Length);
+            string generated = result.GeneratedTrees[0].GetText().ToString();
+            StringAssert.Contains("typeof(global::Consumer.Child)", generated);
+            StringAssert.Contains("}, typeof(global::Consumer.Parent)", generated);
+            StringAssert.DoesNotContain("original.@Values", generated);
+        }
+
+        [Test]
+        public void ExistingBindingConstructorKeepsItsBinarySignatureAndOptionalArguments()
+        {
+            Generate(Array.Empty<string>(), true, out Compilation compilation);
+            INamedTypeSymbol binding = compilation.GetTypeByMetadataName(
+                "WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration.OdinMigrationCompiledBinding"
+            );
+            bool found = false;
+            foreach (IMethodSymbol constructor in binding.InstanceConstructors)
+            {
+                if (constructor.Parameters.Length != 5)
+                {
+                    continue;
+                }
+                found = true;
+                Assert.IsTrue(constructor.Parameters[3].IsOptional);
+                Assert.IsTrue(constructor.Parameters[4].IsOptional);
+            }
+            Assert.IsTrue(
+                found,
+                "Existing compiled editor integrations call this five-argument constructor."
+            );
         }
 
         [TestCase("private", false)]

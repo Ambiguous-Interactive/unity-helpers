@@ -25,6 +25,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
         /// <summary>Gets the original Unity type and declaring types affected by source changes.</summary>
         public IReadOnlyList<Type> AffectedTypes { get; }
 
+        /// <summary>Gets the referenced base type whose compiler binding must also be resolved.</summary>
+        public Type InheritedBindingType { get; }
+
         /// <summary>Captures immutable compiler metadata for a Unity type.</summary>
         public OdinMigrationCompiledBinding(
             Type originalType,
@@ -33,8 +36,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
             OdinMigrationCompiledSourceEdit[] baseEdits = null,
             Type[] affectedTypes = null
         )
+            : this(originalType, sources, fields, baseEdits, affectedTypes, null) { }
+
+        /// <summary>Captures compiler metadata and its referenced base binding.</summary>
+        public OdinMigrationCompiledBinding(
+            Type originalType,
+            OdinMigrationCompiledSource[] sources,
+            OdinMigrationCompiledField[] fields,
+            OdinMigrationCompiledSourceEdit[] baseEdits,
+            Type[] affectedTypes,
+            Type inheritedBindingType
+        )
         {
             OriginalType = originalType;
+            InheritedBindingType = inheritedBindingType;
             Sources = Array.AsReadOnly(
                 sources == null
                     ? Array.Empty<OdinMigrationCompiledSource>()

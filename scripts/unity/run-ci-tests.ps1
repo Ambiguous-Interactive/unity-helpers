@@ -3602,6 +3602,89 @@ function Invoke-StandaloneTestPlayer {
     return @{ ExitCode = $result.ExitCode; TimedOut = $result.TimedOut }
 }
 
+function New-UnityNativeEvidenceCapture {
+    param([string]$LogPath, [string]$PrivateRoot = (Join-Path ([IO.Path]::GetTempPath()) 'unity-helpers-native'))
+
+    $capture = @{ State = 'capture-setup-failed' }
+    try {
+        $identity = [Guid]::NewGuid().ToString('N')
+        $artifactRoot = Split-Path -Parent ([IO.Path]::GetFullPath($LogPath))
+        $directory = [IO.Path]::GetFullPath((Join-Path $PrivateRoot $identity))
+        $artifactPrefix = $artifactRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+        if ($directory.StartsWith($artifactPrefix, [StringComparison]::OrdinalIgnoreCase)) { return $capture }
+        $null = [IO.Directory]::CreateDirectory($PrivateRoot)
+        if ((Get-Item -LiteralPath $PrivateRoot -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { return $capture }
+        $null = [IO.Directory]::CreateDirectory($directory)
+        $upmLog = Join-Path $directory 'upm.log'
+        return @{ State = 'configured'; CaptureId = $identity; CrashDirectory = $directory; UpmLogPath = $upmLog }
+    } catch { return $capture }
+}
+
+function Get-UnityNativeEvidence {
+    param([hashtable]$Capture, [string]$LogPath)
+
+    $report = [ordered]@{ State = 'capture-unavailable'; Files = @() }
+    try {
+        if (-not $Capture -or $Capture['State'] -ne 'configured') {
+            return @{ State = if ($Capture) { $Capture['State'] } else { 'unsupported-platform' }; Files = @() }
+        }
+        $report = [ordered]@{
+            State = 'capture-unavailable'; CaptureId = $Capture.CaptureId
+            CrashDirectory = $Capture.CrashDirectory; UpmLogPath = $Capture.UpmLogPath
+            UpmLogState = if (Test-Path -LiteralPath $Capture.UpmLogPath -PathType Leaf) { 'present-at-capture' } else { 'missing-at-capture' }
+            UpmTextArtifact = $null
+            CapturedUtc = [DateTime]::UtcNow.ToString('o'); Files = @(); FileLimitReached = $false
+            MaximumDirectoryDepth = 2
+            Qualification = 'An isolated folder associates files with this invocation. Dump identity and timing still need verification. Missing or delayed files do not rule out a native failure. Raw dumps stay on the runner.'
+        }
+        $root = Get-Item -LiteralPath $Capture.CrashDirectory -Force -ErrorAction Stop
+        if ($root.Attributes -band [IO.FileAttributes]::ReparsePoint) { return $report }
+        $entries = @(Get-ChildItem -LiteralPath $Capture.CrashDirectory -File -Recurse -Depth 2 -Force -ErrorAction Stop | Select-Object -First 65)
+        $report.FileLimitReached = $entries.Count -gt 64
+        $number = 0
+        foreach ($entry in @($entries | Select-Object -First 64 | Sort-Object FullName)) {
+            if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+            $number++
+            $file = [ordered]@{
+                RelativePath = [IO.Path]::GetRelativePath($Capture.CrashDirectory, $entry.FullName)
+                Length = $entry.Length; LastWriteUtc = $entry.LastWriteTimeUtc.ToString('o')
+                Sha256 = $null; HashState = 'over-hash-limit'; TextArtifact = $null; TextTruncated = $false
+            }
+            if ($entry.Length -le 268435456) {
+                try {
+                    $file.Sha256 = (Get-FileHash -LiteralPath $entry.FullName -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
+                    $file.HashState = 'observed'
+                } catch { $file.HashState = 'unavailable' }
+            }
+            if ($entry.Extension -in @('.log', '.txt')) {
+                $reader = $null
+                try {
+                    $reader = [IO.StreamReader]::new($entry.FullName, [Text.UTF8Encoding]::new($false, $true), $true, 4096)
+                    $characters = [char[]]::new(262144)
+                    $read = $reader.ReadBlock($characters, 0, $characters.Length)
+                    $file.TextTruncated = $reader.Peek() -ne -1
+                    $text = [string]::new($characters, 0, $read)
+                    if ($text.IndexOf([char]0) -ge 0) {
+                        $file.TextArtifact = 'non-text-file'
+                    } else {
+                        $name = "native-$($Capture.CaptureId)-$number.txt"
+                        $destination = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($LogPath))) $name
+                        Set-Content -LiteralPath $destination -Value (ConvertTo-UnitySafeLogText -Text $text) -Encoding UTF8 -ErrorAction Stop
+                        $file.TextArtifact = $name
+                    }
+                } catch { $file.TextArtifact = 'capture-failed' }
+                finally { if ($reader) { $reader.Dispose() } }
+            }
+            if ([string]::Equals($entry.FullName, $Capture.UpmLogPath, [StringComparison]::OrdinalIgnoreCase)) {
+                $report.UpmTextArtifact = $file.TextArtifact
+            }
+            $report.Files += $file
+        }
+        $report.State = if ($report.Files.Count -gt 0) { 'files-observed' } else { 'no-files-at-capture' }
+    } catch { $report.State = 'capture-unavailable' }
+    return $report
+}
+
 function Invoke-UnityEditor {
     param(
         [Parameter(Mandatory = $true)][string]$EditorPath,
@@ -3642,6 +3725,13 @@ function Invoke-UnityEditor {
         # if it goes silent mid-run for $StallSeconds. It returns @{ ExitCode; TimedOut;
         # Stalled }; the durable results.xml remains the source of truth.
         if ($null -eq $ProcessObservation) { $ProcessObservation = @{} }
+        $nativeCapture = $null
+        if ($IsWindows) {
+            $nativeCapture = New-UnityNativeEvidenceCapture -LogPath $LogPath
+            if ($nativeCapture.State -eq 'configured') {
+                $Arguments = @($Arguments) + @('-crash-report-folder', $nativeCapture.CrashDirectory, '-upmLogFile', $nativeCapture.UpmLogPath)
+            }
+        }
         $watch = Invoke-ProcessWithTreeKillTimeout `
             -FilePath $EditorPath `
             -Arguments $Arguments `
@@ -3653,6 +3743,8 @@ function Invoke-UnityEditor {
             -StallSeconds $StallSeconds `
             -ProcessObservation $ProcessObservation
         $exitCode = $watch.ExitCode
+        try { $ProcessObservation['NativeEvidence'] = Get-UnityNativeEvidence -Capture $nativeCapture -LogPath $LogPath }
+        catch { $ProcessObservation['NativeEvidence'] = @{ State = 'capture-unavailable'; Files = @() } }
         Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $ProcessObservation -Label $Label
     } else {
         Write-Host "::group::$Label"

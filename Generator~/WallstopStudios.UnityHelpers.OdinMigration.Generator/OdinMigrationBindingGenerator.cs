@@ -451,6 +451,65 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
             return key + "()";
         }
 
+        private static bool HasDictionaryFields(INamedTypeSymbol owner)
+        {
+            for (
+                INamedTypeSymbol current = owner;
+                current != null && IsUnityObject(current);
+                current = current.BaseType
+            )
+            {
+                foreach (AttributeData attribute in current.ContainingAssembly.GetAttributes())
+                {
+                    if (
+                        attribute.AttributeClass != null
+                        && string.Equals(
+                            MetadataName(attribute.AttributeClass),
+                            BindingNamespace + ".OdinMigrationBindingAttribute",
+                            StringComparison.Ordinal
+                        )
+                        && attribute.ConstructorArguments.Length == 1
+                        && attribute.ConstructorArguments[0].Value is INamedTypeSymbol registered
+                        && SymbolEqualityComparer.Default.Equals(current, registered)
+                    )
+                    {
+                        return true;
+                    }
+                }
+                foreach (ISymbol member in current.GetMembers())
+                {
+                    if (
+                        member is IFieldSymbol field
+                        && !field.IsStatic
+                        && !field.IsImplicitlyDeclared
+                        && TryDictionary(field.Type, out INamedTypeSymbol _, out INamedTypeSymbol _)
+                    )
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static bool IsMigrationRootBase(INamedTypeSymbol type)
+        {
+            string name = MetadataName(type);
+            return string.Equals(name, "UnityEngine.Object", StringComparison.Ordinal)
+                || string.Equals(name, "UnityEngine.MonoBehaviour", StringComparison.Ordinal)
+                || string.Equals(name, "UnityEngine.ScriptableObject", StringComparison.Ordinal)
+                || string.Equals(
+                    name,
+                    "Sirenix.OdinInspector.SerializedMonoBehaviour",
+                    StringComparison.Ordinal
+                )
+                || string.Equals(
+                    name,
+                    "Sirenix.OdinInspector.SerializedScriptableObject",
+                    StringComparison.Ordinal
+                );
+        }
+
         /// <inheritdoc />
         public void Initialize(GeneratorInitializationContext context) { }
 
@@ -520,6 +579,7 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                         + ")";
                     affectedTypes.Add(originalTypeExpression);
                     string inheritedTypeExpression = originalTypeExpression;
+                    INamedTypeSymbol inheritedBindingType = null;
                     SortedDictionary<string, SyntaxTree> sources = new SortedDictionary<
                         string,
                         SyntaxTree
@@ -531,6 +591,22 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                         owner = owner.BaseType
                     )
                     {
+                        if (
+                            !SymbolEqualityComparer.Default.Equals(
+                                owner.ContainingAssembly,
+                                context.Compilation.Assembly
+                            )
+                        )
+                        {
+                            if (
+                                !IsMigrationRootBase(owner)
+                                && (fields.Count != 0 || HasDictionaryFields(owner))
+                            )
+                            {
+                                inheritedBindingType = owner;
+                            }
+                            break;
+                        }
                         CaptureDeclarations(owner, sources);
                         string ownerTypeExpression = TypeNaming.IsNameable(
                             owner,
@@ -637,7 +713,7 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                         }
                         inheritedTypeExpression += ".BaseType";
                     }
-                    if (fields.Count == 0)
+                    if (fields.Count == 0 && inheritedBindingType == null)
                     {
                         continue;
                     }
@@ -676,7 +752,19 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                     {
                         registration += affected + ",";
                     }
-                    registrations[qualified] = registration + "}));";
+                    registrations[qualified] =
+                        registration
+                        + "}, "
+                        + (
+                            inheritedBindingType == null
+                                ? "null"
+                                : "typeof("
+                                    + inheritedBindingType.ToDisplayString(
+                                        SymbolDisplayFormat.FullyQualifiedFormat
+                                    )
+                                    + ")"
+                        )
+                        + "));";
                 }
             }
             if (registrations.Count == 0)
@@ -686,6 +774,16 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
             Writer writer = new Writer();
             writer.Line("// <auto-generated />");
             writer.Line("#pragma warning disable");
+            foreach (string owner in registrations.Keys)
+            {
+                writer.Line(
+                    "[assembly: global::"
+                        + BindingNamespace
+                        + ".OdinMigrationBindingAttribute(typeof("
+                        + owner
+                        + "))]"
+                );
+            }
             writer.Line("namespace WallstopStudios.UnityHelpers.Generated" + Writer.Open);
             writer.Indent();
             writer.Line("internal static class OdinMigrationGeneratedBindings" + Writer.Open);

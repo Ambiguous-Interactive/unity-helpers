@@ -30,6 +30,97 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
+        public void ReferencedAssemblyBindingRetainsOriginalSourcesAndCaptureDelegates()
+        {
+            Assert.IsTrue(
+                OdinMigrationCompiledBindings.TryGet(
+                    typeof(OdinMigrationExternalDerivedBindingAsset),
+                    out OdinMigrationCompiledBinding binding
+                )
+            );
+            Assert.AreEqual(typeof(OdinMigrationExternalDerivedBindingAsset), binding.OriginalType);
+            Assert.AreEqual(2, binding.Fields.Count);
+            CollectionAssert.Contains(binding.AffectedTypes, typeof(OdinMigrationBindingAsset));
+            CollectionAssert.Contains(
+                binding.AffectedTypes,
+                typeof(OdinMigrationExternalDerivedBindingAsset)
+            );
+            OdinMigrationExternalDerivedBindingAsset owner = Track(
+                ScriptableObject.CreateInstance<OdinMigrationExternalDerivedBindingAsset>()
+            );
+            foreach (OdinMigrationCompiledField field in binding.Fields)
+            {
+                Assert.IsTrue(
+                    field.TryCapture(
+                        owner,
+                        out OdinMigrationLiveDictionary captured,
+                        out string failure
+                    ),
+                    failure
+                );
+                Assert.AreEqual(0, captured.Keys.Count);
+            }
+        }
+
+        [Test]
+        public void ReferencedPrivateAndReadonlyFieldsKeepGeneratedCaptureAndRecovery()
+        {
+            OdinMigrationExternalPrivateBindingAsset owner = Track(
+                ScriptableObject.CreateInstance<OdinMigrationExternalPrivateBindingAsset>()
+            );
+            Texture2D texture = Track(new Texture2D(1, 1));
+            Assert.IsTrue(
+                OdinMigrationCompiledBindings.TryGet(
+                    owner.GetType(),
+                    out OdinMigrationCompiledBinding binding
+                )
+            );
+            Assert.AreEqual(2, binding.Fields.Count);
+            Dictionary<SpriteAlignment, List<Texture2D>> originalReadonly = owner.ReadonlyValues;
+            foreach (OdinMigrationCompiledField field in binding.Fields)
+            {
+                Assert.IsTrue(
+                    field.TryRestore(
+                        owner,
+                        new[] { -1 },
+                        new IReadOnlyList<UnityEngine.Object>[]
+                        {
+                            new UnityEngine.Object[] { texture, null },
+                        },
+                        out string failure
+                    ),
+                    failure
+                );
+                Assert.IsTrue(
+                    field.TryCapture(owner, out OdinMigrationLiveDictionary captured, out failure),
+                    failure
+                );
+                CollectionAssert.AreEqual(new[] { -1 }, captured.Keys);
+                Assert.AreSame(texture, captured.Values[0][0]);
+                Assert.IsTrue(ReferenceEquals(captured.Values[0][1], null));
+            }
+            Assert.AreSame(originalReadonly, owner.ReadonlyValues);
+            Assert.IsTrue(
+                OdinMigrationTool.TryBindSerializedDictionaryFields(
+                    Payload(owner),
+                    new[]
+                    {
+                        OdinMigrationDictionaryField.Create<SpriteAlignment, Texture2D>(
+                            OdinMigrationPrivateBindingAsset.ValuesFieldName
+                        ),
+                        OdinMigrationDictionaryField.Create<SpriteAlignment, Texture2D>(
+                            OdinMigrationPrivateBindingAsset.ReadonlyValuesFieldName
+                        ),
+                    },
+                    out OdinMigrationCompiledBinding matched,
+                    out string bindFailure
+                ),
+                bindFailure
+            );
+            Assert.AreSame(binding, matched);
+        }
+
+        [Test]
         public void InheritedOnlyBindingRetainsOriginalAndDeclaringTypes()
         {
             Assert.IsTrue(

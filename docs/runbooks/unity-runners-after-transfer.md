@@ -245,7 +245,7 @@ A nonzero editor exit and an accepted result artifact are separate observations.
 
 A missing configure marker also attempts to save `configure.process-diagnostics.json` beside the configure log. It records the child process identity, UTC launch and observation boundaries, raw and returned exits, and watchdog termination provenance. On Windows, it queries Application Error and Windows Error Reporting events once, from two seconds before launch through the earlier of capture time or fifteen seconds after the process observation ended. It examines at most 64 candidates and retains at most eight matches, with explicit truncation flags. Events require the child's executable path and process ID, or a report ID joined to an event with that identity. Unrelated events and full event messages are excluded. The report distinguishes unavailable evidence and no observed matches; a missing or delayed event does not rule out a crash. The existing Package Manager cancellation retry also attempts to preserve its first attempt in `configure.first-attempt.process-diagnostics.json`.
 
-Every guarded Unity Editor invocation also attempts to save `unity.execution-diagnostics.json`
+Configure and in-editor test invocations also attempt to save `unity.execution-diagnostics.json`
 beside its log, including an invocation that exits zero or later supplies passing NUnit XML.
 The receipt uses the same bounded Windows event matcher and records process identity, raw and
 returned exits, watchdog provenance, and UTC capture time. Its native-log summary counts
@@ -258,6 +258,25 @@ so an older readable file cannot certify a new attempt. Raw log lines and full
 Windows event messages are excluded from the receipt, and credential redaction still runs before
 writing it. Before a Package Manager retry overwrites the log and receipt, both first-attempt
 files are preserved with `.first-attempt` in their names.
+
+On Windows, these invocations also receive an isolated `-crash-report-folder` and a unique
+`-upmLogFile`. Both write outside uploaded artifacts. The receipt's `Process.NativeEvidence`
+links the raw Package Manager log, its redacted text snapshot, and the private
+crash directory to that process observation. Each attempt has a new capture ID, so a retry cannot
+reuse the preceding attempt's Package Manager log or crash files. Late Package Manager output
+cannot append credentials to the published snapshot. This uses Unity's documented
+[crash-folder override](https://docs.unity3d.com/2021.3/Documentation/Manual/LogFiles.html) and
+[Package Manager log option](https://docs.unity.com/en-us/engine/6000.6/manual/unity-editor/command-line-arguments/editor).
+
+Raw crash files remain in the runner account's temporary directory under `unity-helpers-native`,
+outside uploaded artifacts. The inventory records up to 64 files within two directory levels,
+their observed lengths and times, and SHA-256 hashes for files no larger than 256 MiB.
+Only `.log` and `.txt` files are copied to artifacts, with credentials redacted and a
+262,144-character limit per file. File-count limits, text truncation, unavailable hashes, failed
+setup, and missing files are explicit. Review the recorded raw directory on the named runner
+when a dump is needed for native stack and symbol analysis; remove it after preserving the
+required evidence. Capture observes files available at that time, so a delayed crash writer may
+finish afterward. An empty folder does not establish that the process was safe.
 
 These receipts add evidence; they do not establish a native report's cause or change the existing
 result gates. A receipt write failure warns without replacing the original process outcome.
