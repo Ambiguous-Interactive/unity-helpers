@@ -315,6 +315,10 @@ for further analysis, then remove them after preserving the required evidence. T
 also be run locally with `-DebuggerDirectory` pointing to the same verified files and
 `-TestFilter` selecting a single existing case. Each artifact path must be new.
 
+Tool files and per-process capture directories occupy separate paths. Missing, incomplete, or
+unexpected NUnit XML is recorded as diagnostic data after log tails and dump metadata are saved;
+it does not interrupt fault-evidence collection or count as test acceptance.
+
 Operator notes:
 
 - **Confirm reuse.** Every run logs `Library: warm (reused)` or

@@ -10,7 +10,7 @@ $tokens = $null
 $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw ($errors | Out-String) }
-foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureExitEvent', 'Get-NativeCaptureXmlOutcome', 'Read-NativeCaptureTail')) {
+foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureLayout', 'Get-NativeCaptureExitEvent', 'Get-NativeCaptureXmlOutcome', 'Read-NativeCaptureTail')) {
     $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
     if ($null -eq $function) { throw "Missing shipping function $name" }
     . ([scriptblock]::Create($function.Extent.Text))
@@ -23,6 +23,9 @@ function Assert-Capture([bool]$Condition, [string]$Message) {
     ++$script:passed
 }
 try {
+    $layout = Get-NativeCaptureLayout -Root (Join-Path $root 'layout')
+    foreach ($directory in $layout.Values) { [void](New-Item -ItemType Directory -Path $directory) }
+    Assert-Capture (@(Get-ChildItem -LiteralPath (Join-Path $root 'layout') -Directory).Count -eq 3) 'Default tool and capture directories coexist without collisions'
     $normal = Get-NativeCaptureExitEvent 'Last event: abc.123: Exit process 0:abc, code 0'
     Assert-Capture ($normal.Pid -eq 2748 -and $normal.ExitCodeHex -eq '00000000') 'Normal native exit provenance'
     $crash = Get-NativeCaptureExitEvent 'Last event: 6dc84.63204: Exit process 0:6dc84, code c0000005'
@@ -34,11 +37,10 @@ try {
     Assert-Capture ((Get-NativeCaptureXmlOutcome $xml 'Fixture.Case').State -eq 'missing') 'Missing XML explicit'
     [IO.File]::WriteAllText($xml, '<test-run><test-case fullname="Fixture.Case" result="Passed" /></test-run>')
     Assert-Capture ((Get-NativeCaptureXmlOutcome $xml 'Fixture.Case').Result -eq 'Passed') 'Real single case observed'
-    foreach ($bad in @('<test-run />', '<test-run><test-case fullname="Other.Case" result="Passed" /></test-run>', '<!DOCTYPE x [<!ENTITY secret SYSTEM "file:///unavailable">]><test-run>&secret;</test-run>')) {
+    foreach ($bad in @('<test-run />', '<test-run><test-case', '<test-run><test-case fullname="Other.Case" result="Passed" /></test-run>', '<!DOCTYPE x [<!ENTITY secret SYSTEM "file:///unavailable">]><test-run>&secret;</test-run>')) {
         [IO.File]::WriteAllText($xml, $bad)
-        $rejected = $false
-        try { Get-NativeCaptureXmlOutcome $xml 'Fixture.Case' | Out-Null } catch { $rejected = $true }
-        Assert-Capture $rejected 'Invalid or unrelated XML rejected'
+        $outcome = Get-NativeCaptureXmlOutcome $xml 'Fixture.Case'
+        Assert-Capture ($outcome.State -eq 'invalid') 'Invalid or unrelated XML is recorded without interrupting evidence capture'
     }
 
     $snapshot = Join-Path $root 'writer.log'

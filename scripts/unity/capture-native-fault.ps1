@@ -137,23 +137,35 @@ function Get-NativeCaptureExitEvent {
     }
 }
 
+function Get-NativeCaptureLayout {
+    param([string]$Root)
+    return @{
+        Tools = Join-Path $Root 'tools'
+        Direct = Join-Path $Root 'direct'
+        Debugger = Join-Path $Root 'debugger'
+    }
+}
+
 function Get-NativeCaptureXmlOutcome {
     param([string]$Path, [string]$ExpectedCase)
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return @{ State = 'missing' } }
     $settings = [Xml.XmlReaderSettings]::new()
     $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
     $settings.MaxCharactersInDocument = 4194304
-    $reader = [Xml.XmlReader]::Create($Path, $settings)
+    $reader = $null
     try {
+        $reader = [Xml.XmlReader]::Create($Path, $settings)
         $document = [Xml.XmlDocument]::new()
         $document.XmlResolver = $null
         $document.Load($reader)
         $cases = @($document.SelectNodes('//test-case'))
         if ($cases.Count -ne 1 -or $cases[0].GetAttribute('fullname') -cne $ExpectedCase) {
-            throw 'Diagnostic XML does not contain exactly the requested case'
+            return @{ State = 'invalid'; Reason = 'unexpected-case-selection'; CaseCount = $cases.Count }
         }
         return @{ State = 'observed'; FullName = $ExpectedCase; Result = $cases[0].GetAttribute('result') }
-    } finally { $reader.Dispose() }
+    } catch {
+        return @{ State = 'invalid'; Reason = $_.Exception.GetType().Name }
+    } finally { if ($null -ne $reader) { $reader.Dispose() } }
 }
 
 if (-not $IsWindows) { throw 'Native capture requires Windows x64' }
@@ -165,6 +177,7 @@ if (Test-Path -LiteralPath $artifactRoot) { throw 'Diagnostic artifact path must
 [void](New-Item -ItemType Directory -Path $artifactRoot)
 $privateRoot = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) ('unity-helpers-native-debugger/' + [Guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $privateRoot)
+$layout = Get-NativeCaptureLayout -Root $privateRoot
 $record = [ordered]@{
     EvidenceOnly = $true
     State = 'preparing'
@@ -187,9 +200,9 @@ function Save-NativeCaptureRecord {
 try {
     Save-NativeCaptureRecord
     if ([string]::IsNullOrWhiteSpace($DebuggerDirectory)) {
-        $DebuggerDirectory = Join-Path $privateRoot 'debugger'
+        $DebuggerDirectory = $layout.Tools
         $record.DownloadProcess = @{}
-        $downloadOutput = Invoke-NativeCaptureProcess -FilePath (Get-Command python -CommandType Application).Source `
+        $downloadOutput = Invoke-NativeCaptureProcess -FilePath (Get-Command python.exe -CommandType Application | Select-Object -First 1).Source `
             -Arguments @((Join-Path $PSScriptRoot 'download-native-debugger.py'), $DebuggerDirectory) `
             -Directory $privateRoot -Seconds 300 -Observation $record.DownloadProcess `
             -ReceiptPath (Join-Path $artifactRoot 'download-process.json')
@@ -225,7 +238,7 @@ try {
     }
     $record.State = 'running'
     foreach ($mode in @('direct', 'debugger')) {
-        $privateCase = Join-Path $privateRoot $mode
+        $privateCase = $layout[$mode]
         [void](New-Item -ItemType Directory -Path $privateCase)
         $xmlPath = Join-Path $privateCase 'results.xml'
         $unityArguments = @('-batchmode', '-nographics', '-timestamps', '-releaseCodeOptimization', '-projectPath', $ProjectPath, '-runTests', '-testPlatform', 'editmode', '-assemblyNames', $AssemblyNames, '-testFilter', $TestFilter, '-testResults', $xmlPath, '-logFile', (Join-Path $privateCase 'unity.log'), '-crash-report-folder', $privateCase, '-upmLogFile', (Join-Path $privateCase 'upm.log')) + $acceleratorArguments
@@ -243,7 +256,6 @@ try {
         $output = Invoke-NativeCaptureProcess -FilePath $executable -Arguments $arguments -Directory $privateCase -Seconds $TimeoutSeconds -Observation $observation -ReceiptPath (Join-Path $artifactRoot "$mode-process.json")
         [IO.File]::WriteAllText((Join-Path $artifactRoot "$mode-console.log"), (ConvertTo-UnitySafeLogText -Text $output))
         if ($mode -eq 'debugger') { $case.TargetExitEvent = Get-NativeCaptureExitEvent -Text $output }
-        $case.Xml = Get-NativeCaptureXmlOutcome -Path $xmlPath -ExpectedCase $TestFilter
         foreach ($name in @('unity.log', 'upm.log')) {
             $tail = Read-NativeCaptureTail -Path (Join-Path $privateCase $name)
             [IO.File]::WriteAllText((Join-Path $artifactRoot "$mode-$name"), (ConvertTo-UnitySafeLogText -Text $tail))
@@ -255,6 +267,8 @@ try {
             if ($case.DumpBytes -le 268435456) { $case.DumpSha256 = (Get-FileHash -LiteralPath $dump -Algorithm SHA256).Hash }
         }
         $case.ConsoleTailLimitCharacters = 524288
+        Save-NativeCaptureRecord
+        $case.Xml = Get-NativeCaptureXmlOutcome -Path $xmlPath -ExpectedCase $TestFilter
         Save-NativeCaptureRecord
         if (-not $observation.Reaped -or $null -ne $observation.KillReason) { throw 'Diagnostic process did not exit naturally' }
         if ($mode -eq 'debugger' -and $null -eq $case.TargetExitEvent) { throw 'Debugger did not report a unique target exit event' }
