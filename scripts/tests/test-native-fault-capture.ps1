@@ -5,6 +5,7 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+. (Join-Path $repo 'scripts/unity/lib/native-global-flags.ps1')
 $source = Join-Path $repo 'scripts/unity/capture-native-fault.ps1'
 $tokens = $null
 $errors = $null
@@ -23,6 +24,47 @@ function Assert-Capture([bool]$Condition, [string]$Message) {
     ++$script:passed
 }
 try {
+    foreach ($case in @(
+        @{ Value = 0; Kind = 'DWord'; Hex = '00000000'; Enabled = $false }
+        @{ Value = 2; Kind = 'DWord'; Hex = '00000002'; Enabled = $true }
+        @{ Value = 16; Kind = 'DWord'; Hex = '00000010'; Enabled = $false }
+        @{ Value = -1; Kind = 'DWord'; Hex = 'FFFFFFFF'; Enabled = $true }
+        @{ Value = [int]::MinValue; Kind = 'DWord'; Hex = '80000000'; Enabled = $false }
+        @{ Value = '0x00000002'; Kind = 'String'; Hex = '00000002'; Enabled = $true }
+        @{ Value = 'aBcDeF00'; Kind = 'String'; Hex = 'ABCDEF00'; Enabled = $false }
+        @{ Value = '00000002'; Kind = 'String'; Hex = '00000002'; Enabled = $true }
+    )) {
+        $flags = ConvertTo-NativeGlobalFlagObservation -Value $case.Value -Kind $case.Kind
+        Assert-Capture ($flags.State -eq 'observed' -and $flags.Hex -eq $case.Hex -and $flags.LoaderSnapsEnabled -eq $case.Enabled) 'Registry flag types preserve all bits and distinguish loader snaps'
+    }
+    foreach ($case in @(
+        @{ Value = '100000000'; Kind = 'String' }
+        @{ Value = '0x'; Kind = 'String' }
+        @{ Value = 'garbage'; Kind = 'String' }
+        @{ Value = ' 2'; Kind = 'String' }
+        @{ Value = ''; Kind = 'String' }
+        @{ Value = $null; Kind = 'DWord' }
+        @{ Value = 2L; Kind = 'QWord' }
+        @{ Value = @('2'); Kind = 'MultiString' }
+        @{ Value = '%TEMP%'; Kind = 'ExpandString' }
+    )) {
+        $flags = ConvertTo-NativeGlobalFlagObservation -Value $case.Value -Kind $case.Kind
+        Assert-Capture ($flags.State -eq 'invalid' -and $null -eq $flags.Hex -and $null -eq $flags.LoaderSnapsEnabled) 'Invalid and unsupported registry values cannot claim disabled tracing'
+    }
+    $flags = Get-NativeGlobalFlagSnapshot
+    Assert-Capture ($flags.Settings.Count -eq 2 -and $flags.Scope -eq 'registry-settings-only') 'Registry observations cover system and Unity settings without claiming process flags'
+    foreach ($setting in $flags.Settings) {
+        Assert-Capture ($setting.State -in @('observed', 'absent', 'unavailable', 'invalid')) 'Every registry read has an explicit state'
+        if ($setting.State -ne 'observed') {
+            Assert-Capture ($null -eq $setting.LoaderSnapsEnabled) 'Missing or inaccessible settings cannot claim disabled tracing'
+        }
+    }
+    $missing = Get-NativeGlobalFlagRegistryObservation -Subject 'MissingControl' -KeyPath ('SOFTWARE\unity-helpers-missing-' + [Guid]::NewGuid().ToString('N'))
+    Assert-Capture ($missing.State -eq $(if ($IsWindows) { 'absent' } else { 'unavailable' }) -and $null -eq $missing.LoaderSnapsEnabled) 'Real missing key and unsupported platform remain distinct'
+    $captureSource = [IO.File]::ReadAllText($source)
+    Assert-Capture ($captureSource.Contains('GlobalFlagRegistry = Get-NativeGlobalFlagSnapshot') -and $captureSource.Contains('WUH_EXIT_REQUEST;!gflag;r rcx')) 'Receipt includes registry settings and exit breakpoint observes effective target flags'
+    $runnerAction = [IO.File]::ReadAllText((Join-Path $repo '.github/actions/print-self-hosted-runner-diagnostics/action.yml'))
+    Assert-Capture ($runnerAction.Contains('. ./scripts/unity/lib/native-global-flags.ps1') -and $runnerAction.Contains('Get-NativeGlobalFlagSnapshot | ConvertTo-Json')) 'Regular runner diagnostics use the same read-only snapshot'
     $layout = Get-NativeCaptureLayout -Root (Join-Path $root 'layout')
     foreach ($directory in $layout.Values) { [void](New-Item -ItemType Directory -Path $directory) }
     Assert-Capture (@(Get-ChildItem -LiteralPath (Join-Path $root 'layout') -Directory).Count -eq 3) 'Default tool and capture directories coexist without collisions'
