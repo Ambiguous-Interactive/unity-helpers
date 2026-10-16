@@ -315,6 +315,8 @@ code. Referenced owner markers expose binding identities without exposing privat
 Resolution combines source snapshots, field declarations, base edits, and affected types only after
 all referenced bindings register. Missing bindings, invalid inheritance, cycles, and conflicting
 source checksums refuse the complete binding. Replacing a registration invalidates resolved children.
+Extensible Unity object classes register compiler metadata even when they declare no dictionaries,
+so a dictionary-free helper in a referenced assembly can participate in the complete inheritance chain.
 External custom bases without compiler bindings remain unsupported; Unity and supported Odin root
 bases need no dictionary binding. Closed generic bases in referenced assemblies remain unsupported.
 The snapshots describe the captured declarations; they do not validate every project dependency

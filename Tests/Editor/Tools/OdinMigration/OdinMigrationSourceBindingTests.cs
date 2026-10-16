@@ -63,6 +63,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
+        public void ReferencedDictionaryFreeHelperAllowsDerivedDictionaryCaptureAndRecovery()
+        {
+            OdinMigrationExternalEmptyBaseBindingAsset owner = Track(
+                ScriptableObject.CreateInstance<OdinMigrationExternalEmptyBaseBindingAsset>()
+            );
+            Texture2D texture = Track(new Texture2D(1, 1));
+            Assert.IsTrue(
+                OdinMigrationCompiledBindings.TryGet(
+                    owner.GetType(),
+                    out OdinMigrationCompiledBinding binding
+                )
+            );
+            Assert.AreEqual(1, binding.Fields.Count);
+            CollectionAssert.Contains(
+                binding.AffectedTypes,
+                typeof(OdinMigrationEmptyBindingAsset)
+            );
+            OdinMigrationCompiledField field = binding.Fields[0];
+            Assert.IsTrue(
+                field.TryRestore(
+                    owner,
+                    new[] { -1 },
+                    new IReadOnlyList<UnityEngine.Object>[]
+                    {
+                        new UnityEngine.Object[] { texture, null },
+                    },
+                    out string failure
+                ),
+                failure
+            );
+            Assert.IsTrue(
+                field.TryCapture(owner, out OdinMigrationLiveDictionary captured, out failure),
+                failure
+            );
+            CollectionAssert.AreEqual(new[] { -1 }, captured.Keys);
+            Assert.AreSame(texture, captured.Values[0][0]);
+            Assert.IsTrue(ReferenceEquals(captured.Values[0][1], null));
+        }
+
+        [Test]
         public void ReferencedPrivateAndReadonlyFieldsKeepGeneratedCaptureAndRecovery()
         {
             OdinMigrationExternalPrivateBindingAsset owner = Track(

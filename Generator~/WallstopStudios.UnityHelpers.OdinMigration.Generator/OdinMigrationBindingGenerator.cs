@@ -600,7 +600,11 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                         {
                             if (
                                 !IsMigrationRootBase(owner)
-                                && (fields.Count != 0 || HasDictionaryFields(owner))
+                                && (
+                                    fields.Count != 0
+                                    || HasDictionaryFields(owner)
+                                    || !type.IsSealed
+                                )
                             )
                             {
                                 inheritedBindingType = owner;
@@ -713,7 +717,11 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                         }
                         inheritedTypeExpression += ".BaseType";
                     }
-                    if (fields.Count == 0 && inheritedBindingType == null)
+                    if (
+                        fields.Count == 0
+                        && inheritedBindingType == null
+                        && (type.IsSealed || IsMigrationRootBase(type))
+                    )
                     {
                         continue;
                     }
