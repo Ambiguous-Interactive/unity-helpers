@@ -317,6 +317,8 @@ all referenced bindings register. Missing bindings, invalid inheritance, cycles,
 source checksums refuse the complete binding. Replacing a registration invalidates resolved children.
 Extensible Unity object classes register compiler metadata even when they declare no dictionaries,
 so a dictionary-free helper in a referenced assembly can participate in the complete inheritance chain.
+Owners and containing types marked obsolete with a compile-time error are skipped; the generator
+does not introduce forbidden type references into consumer compilation.
 External custom bases without compiler bindings remain unsupported; Unity and supported Odin root
 bases need no dictionary binding. Closed generic bases in referenced assemblies remain unsupported.
 The snapshots describe the captured declarations; they do not validate every project dependency

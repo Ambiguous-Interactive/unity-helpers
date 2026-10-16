@@ -492,6 +492,31 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
             return false;
         }
 
+        private static bool HasErrorObsoleteOwner(INamedTypeSymbol type)
+        {
+            for (INamedTypeSymbol owner = type; owner != null; owner = owner.ContainingType)
+            {
+                foreach (AttributeData attribute in owner.GetAttributes())
+                {
+                    if (
+                        attribute.AttributeClass != null
+                        && string.Equals(
+                            MetadataName(attribute.AttributeClass),
+                            "System.ObsoleteAttribute",
+                            StringComparison.Ordinal
+                        )
+                        && attribute.ConstructorArguments.Length == 2
+                        && attribute.ConstructorArguments[1].Value is bool error
+                        && error
+                    )
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         private static bool IsMigrationRootBase(INamedTypeSymbol type)
         {
             string name = MetadataName(type);
@@ -566,6 +591,7 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                         || type.Arity != 0
                         || !IsUnityObject(type)
                         || !TypeNaming.IsNameable(type, context.Compilation)
+                        || HasErrorObsoleteOwner(type)
                     )
                     {
                         continue;

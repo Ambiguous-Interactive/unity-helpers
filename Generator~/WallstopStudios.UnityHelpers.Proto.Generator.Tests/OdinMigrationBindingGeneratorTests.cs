@@ -251,6 +251,48 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             StringAssert.Contains("original.@Values", generated);
         }
 
+        [TestCase(true, false, false)]
+        [TestCase(true, true, false)]
+        [TestCase(true, false, true)]
+        [TestCase(true, true, true)]
+        [TestCase(false, false, false)]
+        [TestCase(false, true, false)]
+        [TestCase(false, false, true)]
+        [TestCase(false, true, true)]
+        public void ErrorObsoleteOwnersAndContainersDoNotBreakConsumerCompilation(
+            bool error,
+            bool dictionary,
+            bool nested
+        )
+        {
+            string obsolete = "[System.Obsolete(\"retired\", " + (error ? "true" : "false") + ")] ";
+            string field = dictionary
+                ? "public System.Collections.Generic.Dictionary<System.DayOfWeek,System.Collections.Generic.List<UnityEngine.Texture>> Values;"
+                : string.Empty;
+            string source =
+                "namespace Consumer { "
+                + obsolete
+                + (nested ? "public class Container { " : string.Empty)
+                + "public class Asset : UnityEngine.ScriptableObject { "
+                + field
+                + " }"
+                + (nested ? " }" : string.Empty)
+                + " }";
+            GeneratorDriverRunResult result = Generate(new[] { source }, true, out Compilation _);
+            Assert.AreEqual(1, result.GeneratedTrees.Length);
+            string generated = result.GeneratedTrees[0].GetText().ToString();
+            string owner =
+                "typeof(global::Consumer." + (nested ? "Container." : string.Empty) + "Asset)";
+            if (error)
+            {
+                StringAssert.DoesNotContain(owner, generated);
+            }
+            else
+            {
+                StringAssert.Contains(owner, generated);
+            }
+        }
+
         [Test]
         public void ExistingBindingConstructorKeepsItsBinarySignatureAndOptionalArguments()
         {
