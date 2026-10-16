@@ -271,6 +271,8 @@ cannot append credentials to the published snapshot. This uses Unity's documente
 Raw crash files remain in the runner account's temporary directory under `unity-helpers-native`,
 outside uploaded artifacts. The inventory records up to 64 files within two directory levels,
 their observed lengths and times, and SHA-256 hashes for files no larger than 256 MiB.
+Readers permit active writers. Hashes cover at most the initially observed length, report the
+number of bytes hashed, and flag length changes; a live-file hash is a bounded observation.
 Only `.log` and `.txt` files are copied to artifacts, with credentials redacted and a
 262,144-character limit per file. File-count limits, text truncation, unavailable hashes, failed
 setup, and missing files are explicit. Review the recorded raw directory on the named runner

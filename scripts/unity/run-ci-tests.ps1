@@ -3648,18 +3648,39 @@ function Get-UnityNativeEvidence {
             $file = [ordered]@{
                 RelativePath = [IO.Path]::GetRelativePath($Capture.CrashDirectory, $entry.FullName)
                 Length = $entry.Length; LastWriteUtc = $entry.LastWriteTimeUtc.ToString('o')
-                Sha256 = $null; HashState = 'over-hash-limit'; TextArtifact = $null; TextTruncated = $false
+                Sha256 = $null; HashState = 'over-hash-limit'; HashBytes = 0L; HashScope = 'bounded-observed-bytes'
+                TextArtifact = $null; TextTruncated = $false
             }
             if ($entry.Length -le 268435456) {
+                $hashStream = $null
+                $algorithm = $null
                 try {
-                    $file.Sha256 = (Get-FileHash -LiteralPath $entry.FullName -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
-                    $file.HashState = 'observed'
+                    $hashStream = [IO.File]::Open($entry.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
+                    $algorithm = [Security.Cryptography.SHA256]::Create()
+                    $buffer = [byte[]]::new(65536)
+                    $remaining = [long]$entry.Length
+                    while ($remaining -gt 0) {
+                        $read = $hashStream.Read($buffer, 0, [int][Math]::Min($buffer.Length, $remaining))
+                        if ($read -eq 0) { break }
+                        [void]$algorithm.TransformBlock($buffer, 0, $read, $buffer, 0)
+                        $remaining -= $read
+                        $file.HashBytes += $read
+                    }
+                    [void]$algorithm.TransformFinalBlock([byte[]]::new(0), 0, 0)
+                    $file.Sha256 = [BitConverter]::ToString($algorithm.Hash).Replace('-', '').ToLowerInvariant()
+                    $file.HashState = if ($file.HashBytes -eq $entry.Length -and $hashStream.Length -eq $entry.Length) { 'observed' } else { 'changed-during-capture' }
                 } catch { $file.HashState = 'unavailable' }
+                finally {
+                    if ($hashStream) { $hashStream.Dispose() }
+                    if ($algorithm) { $algorithm.Dispose() }
+                }
             }
             if ($entry.Extension -in @('.log', '.txt')) {
                 $reader = $null
+                $textStream = $null
                 try {
-                    $reader = [IO.StreamReader]::new($entry.FullName, [Text.UTF8Encoding]::new($false, $true), $true, 4096)
+                    $textStream = [IO.File]::Open($entry.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
+                    $reader = [IO.StreamReader]::new($textStream, [Text.UTF8Encoding]::new($false, $true), $true, 4096)
                     $characters = [char[]]::new(262144)
                     $read = $reader.ReadBlock($characters, 0, $characters.Length)
                     $file.TextTruncated = $reader.Peek() -ne -1
@@ -3673,7 +3694,10 @@ function Get-UnityNativeEvidence {
                         $file.TextArtifact = $name
                     }
                 } catch { $file.TextArtifact = 'capture-failed' }
-                finally { if ($reader) { $reader.Dispose() } }
+                finally {
+                    if ($reader) { $reader.Dispose() }
+                    elseif ($textStream) { $textStream.Dispose() }
+                }
             }
             if ([string]::Equals($entry.FullName, $Capture.UpmLogPath, [StringComparison]::OrdinalIgnoreCase)) {
                 $report.UpmTextArtifact = $file.TextArtifact

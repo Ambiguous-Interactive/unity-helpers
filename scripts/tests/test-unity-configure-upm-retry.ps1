@@ -129,6 +129,23 @@ $upmSnapshotPath = Join-Path $nativeArtifacts $upmEvidence.UpmTextArtifact
 $upmSnapshot = Get-Content -LiteralPath $upmSnapshotPath -Raw
 [IO.File]::AppendAllText($capture.UpmLogPath, "late UPM output $serialCanary")
 Assert-That 'late UPM output cannot rewrite the published redacted snapshot' ((Get-Content -LiteralPath $upmSnapshotPath -Raw) -ceq $upmSnapshot)
+$liveCapture = New-UnityNativeEvidenceCapture -LogPath $captureLog -PrivateRoot $nativePrivateRoot
+$liveBytes = [Text.Encoding]::UTF8.GetBytes("live UPM output $serialCanary user@example.test access token: example-token")
+$liveWriter = [IO.File]::Open($liveCapture.UpmLogPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+try {
+    $liveWriter.Write($liveBytes, 0, $liveBytes.Length)
+    $liveWriter.Flush()
+    $liveEvidence = Get-UnityNativeEvidence -Capture $liveCapture -LogPath $captureLog
+    $liveFile = $liveEvidence.Files[0]
+    Assert-That 'a live UPM writer permits bounded hashing without changing its sharing mode' ($liveFile.HashState -eq 'observed' -and $liveFile.HashBytes -eq $liveBytes.Length -and $liveFile.Sha256 -ceq '6dbb97f92823a761b44603df3d414dbef753443b4217045980b971037041fb37')
+    $liveSnapshot = Join-Path $nativeArtifacts $liveEvidence.UpmTextArtifact
+    $liveCaptured = if (Test-Path -LiteralPath $liveSnapshot -PathType Leaf) { Get-Content -LiteralPath $liveSnapshot -Raw } else { '' }
+    Assert-That 'a live UPM writer exports a redacted text snapshot' ($liveCaptured -match 'live UPM output' -and $liveCaptured -notmatch [regex]::Escape($serialCanary) -and $liveCaptured -notmatch 'user@example.test|example-token')
+    $lateBytes = [Text.Encoding]::UTF8.GetBytes(' late unredacted writer output')
+    $liveWriter.Write($lateBytes, 0, $lateBytes.Length)
+    $liveWriter.Flush()
+    Assert-That 'a still-open UPM writer cannot append to its published snapshot' ($liveCaptured.Length -gt 0 -and (Get-Content -LiteralPath $liveSnapshot -Raw) -ceq $liveCaptured)
+} finally { $liveWriter.Dispose() }
 Assert-That 'no raw dump reaches public artifacts' (@(Get-ChildItem -LiteralPath $nativeArtifacts -Recurse -Filter '*.dmp').Count -eq 0 -and (Test-Path -LiteralPath (Join-Path $nestedCrash 'crash.dmp')))
 $textReport = @($nativeEvidence.Files | Where-Object { $_.TextArtifact })[0]
 $safeText = Get-Content -LiteralPath (Join-Path $nativeArtifacts $textReport.TextArtifact) -Raw
