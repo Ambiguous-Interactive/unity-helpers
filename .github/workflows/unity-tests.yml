@@ -505,6 +505,7 @@ jobs:
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-integration-assemblies }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_STREAM_TEST_RESULTS: "1"
         run: |
           $ErrorActionPreference = 'Stop'
           . ./scripts/unity/lib/project-workspace.ps1

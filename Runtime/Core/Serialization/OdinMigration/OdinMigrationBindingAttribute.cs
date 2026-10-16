@@ -3,10 +3,11 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
 {
-#if UNITY_EDITOR
     using System;
+    using System.Diagnostics;
 
     /// <summary>Identifies a compiler-bound migration owner in a referenced editor assembly.</summary>
+    [Conditional("UNITY_EDITOR")]
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed class OdinMigrationBindingAttribute : Attribute
     {
@@ -19,5 +20,4 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration
             OriginalType = originalType;
         }
     }
-#endif
 }

@@ -70,6 +70,7 @@ try {
     $captureStep = [regex]::Match($workflow, '(?s)- name: Capture native exit diagnostics.*?(?=\n      - name:)').Value
     Assert-Capture ($captureStep -match "inputs.native-diagnostics" -and $captureStep -match "steps.unity_lock.outputs.acquired == 'true'" -and $captureStep -match "steps.run_editmode.outcome == 'success'" -and $captureStep -match '!cancelled\(\)') 'Capture requires opt-in, live lock, and prepared project'
     Assert-Capture ($captureStep -match 'capture-native-fault.ps1' -and $captureStep -match 'native-diagnostics') 'Standalone driver is wired to uploaded EditMode artifacts'
+    Assert-Capture ($captureStep -match 'UH_STREAM_TEST_RESULTS:\s*"1"') 'Capture retains the normal CI streaming callback setting'
     Write-Host "$passed native capture controls passed"
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force

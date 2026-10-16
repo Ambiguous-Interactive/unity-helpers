@@ -715,5 +715,63 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             Assert.AreEqual(0, result.GeneratedTrees.Length);
         }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void ManualBindingMarkerRemainsAvailableAcrossEditorAndPlayerAssemblies(
+            bool metadataEditor,
+            bool consumerEditor
+        )
+        {
+            Generate(Array.Empty<string>(), metadataEditor, out Compilation metadata);
+            using MemoryStream metadataImage = new MemoryStream();
+            Microsoft.CodeAnalysis.Emit.EmitResult metadataResult = metadata.Emit(metadataImage);
+            Assert.IsTrue(metadataResult.Success, string.Join("\n", metadataResult.Diagnostics));
+            List<MetadataReference> references = new List<MetadataReference>(metadata.References);
+            references.Add(MetadataReference.CreateFromImage(metadataImage.ToArray()));
+            CSharpParseOptions options = new CSharpParseOptions(
+                LanguageVersion.CSharp9,
+                preprocessorSymbols: consumerEditor
+                    ? new[] { "UNITY_EDITOR" }
+                    : Array.Empty<string>()
+            );
+            const string source =
+                "[assembly: global::WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration.OdinMigrationBinding(typeof(Consumer))] "
+                + "public static class Consumer { "
+                + "public static System.Type MarkerType => typeof(global::WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration.OdinMigrationBindingAttribute); "
+                + "public static System.Type OwnerType => new global::WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration.OdinMigrationBindingAttribute(typeof(Consumer)).OriginalType; }";
+            CSharpCompilation consumer = CSharpCompilation.Create(
+                "ManualMarkerConsumer",
+                new[] { CSharpSyntaxTree.ParseText(source, options, "Consumer.cs") },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+            using MemoryStream consumerImage = new MemoryStream();
+            Microsoft.CodeAnalysis.Emit.EmitResult consumerResult = consumer.Emit(consumerImage);
+            Assert.IsTrue(consumerResult.Success, string.Join("\n", consumerResult.Diagnostics));
+            PortableExecutableReference emittedConsumer = MetadataReference.CreateFromImage(
+                consumerImage.ToArray()
+            );
+            Compilation reader = consumer.RemoveAllSyntaxTrees().AddReferences(emittedConsumer);
+            IAssemblySymbol assembly = (IAssemblySymbol)
+                reader.GetAssemblyOrModuleSymbol(emittedConsumer);
+            int markers = 0;
+            foreach (AttributeData attribute in assembly.GetAttributes())
+            {
+                if (
+                    string.Equals(
+                        attribute.AttributeClass.Name,
+                        "OdinMigrationBindingAttribute",
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    ++markers;
+                }
+            }
+            Assert.AreEqual(consumerEditor ? 1 : 0, markers);
+        }
     }
 }

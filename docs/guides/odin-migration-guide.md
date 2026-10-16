@@ -309,9 +309,12 @@ or replace coordinated rollback and post-import source validation.
 
 The independent `WallstopStudios.UnityHelpers.OdinMigration.Generator.dll` compiler input produces
 these bindings without depending on the protobuf generator DLL or enabling WallstopProto.
-Its importer excludes it from runtime plugins and player builds. The binding registry and metadata
-are editor-only. Player compilations contain no registration
-code. Referenced owner markers expose binding identities without exposing private field members.
+Its importer excludes it from runtime plugins and player builds. The binding registry and generated
+registration are editor-only. The public `OdinMigrationBindingAttribute` type remains available in
+both editor and player compilations, so consumer references to its type, constructor, or properties
+remain valid in both. Its `Conditional("UNITY_EDITOR")` declaration omits attribute applications
+from player assembly metadata. Referenced owner markers expose binding identities without exposing
+private field members.
 Resolution combines source snapshots, field declarations, base edits, and affected types only after
 all referenced bindings register. Missing bindings, invalid inheritance, cycles, and conflicting
 source checksums refuse the complete binding. Replacing a registration invalidates resolved children.
