@@ -245,7 +245,7 @@ A nonzero editor exit and an accepted result artifact are separate observations.
 
 A missing configure marker also attempts to save `configure.process-diagnostics.json` beside the configure log. It records the child process identity, UTC launch and observation boundaries, raw and returned exits, and watchdog termination provenance. On Windows, it queries Application Error and Windows Error Reporting events once, from two seconds before launch through the earlier of capture time or fifteen seconds after the process observation ended. It examines at most 64 candidates and retains at most eight matches, with explicit truncation flags. Events require the child's executable path and process ID, or a report ID joined to an event with that identity. Unrelated events and full event messages are excluded. The report distinguishes unavailable evidence and no observed matches; a missing or delayed event does not rule out a crash. The existing Package Manager cancellation retry also attempts to preserve its first attempt in `configure.first-attempt.process-diagnostics.json`.
 
-Every guarded Unity Editor invocation also attempts to save `unity.execution-diagnostics.json`
+Configure and in-editor test invocations also attempt to save `unity.execution-diagnostics.json`
 beside its log, including an invocation that exits zero or later supplies passing NUnit XML.
 The receipt uses the same bounded Windows event matcher and records process identity, raw and
 returned exits, watchdog provenance, and UTC capture time. Its native-log summary counts
@@ -259,10 +259,65 @@ Windows event messages are excluded from the receipt, and credential redaction s
 writing it. Before a Package Manager retry overwrites the log and receipt, both first-attempt
 files are preserved with `.first-attempt` in their names.
 
+On Windows, these invocations also receive an isolated `-crash-report-folder` and a unique
+`-upmLogFile`. Both write outside uploaded artifacts. The receipt's `Process.NativeEvidence`
+links the raw Package Manager log, its redacted text snapshot, and the private
+crash directory to that process observation. Each attempt has a new capture ID, so a retry cannot
+reuse the preceding attempt's Package Manager log or crash files. Late Package Manager output
+cannot append credentials to the published snapshot. This uses Unity's documented
+[crash-folder override](https://docs.unity3d.com/2021.3/Documentation/Manual/LogFiles.html) and
+[Package Manager log option](https://docs.unity.com/en-us/engine/6000.6/manual/unity-editor/command-line-arguments/editor).
+
+Raw crash files remain in the runner account's temporary directory under `unity-helpers-native`,
+outside uploaded artifacts. The inventory records up to 64 files within two directory levels,
+their observed lengths and times, and SHA-256 hashes for files no larger than 256 MiB.
+Readers permit active writers. Hashes cover at most the initially observed length, report the
+number of bytes hashed, and flag length changes; a live-file hash is a bounded observation.
+Only `.log` and `.txt` files are copied to artifacts, with credentials redacted and a
+262,144-character limit per file. File-count limits, text truncation, unavailable hashes, failed
+setup, and missing files are explicit. Review the recorded raw directory on the named runner
+when a dump is needed for native stack and symbol analysis; remove it after preserving the
+required evidence. Capture observes files available at that time, so a delayed crash writer may
+finish afterward. An empty folder does not establish that the process was safe.
+
 These receipts add evidence; they do not establish a native report's cause or change the existing
 result gates. A receipt write failure warns without replacing the original process outcome.
 
 Use those observations to investigate the original process on the named runner before selecting a repair. A successful later launch does not explain an earlier failure, and the diagnostic report does not replace the fresh configure marker or required player results.
+
+### Opt-in native debugger capture
+
+For a recurring Unity 6000.6 access violation, dispatch **Unity Tests** with
+`unity-version: 6000.6.0f1`, `test-mode: editmode`, and `native-diagnostics: true`.
+After the regular EditMode step succeeds, the licensed runner executes one existing migration
+test directly and then under Microsoft's CDB debugger in the same prepared project. The selected
+case, editor hash, machine, process IDs, UTC boundaries, actual process exits, target exit events,
+XML outcomes, and watchdog actions are recorded separately. These are diagnostic observations;
+they cannot satisfy acceptance or explain a different earlier failure. Normal tests, license
+return, lock release, and cleanup checks still run.
+
+The driver downloads only twelve x64 debugger files from a versioned Microsoft bundle using
+bounded HTTP ranges. Each file must match its committed size and SHA-256 digest, and CDB must
+have a valid Microsoft signature. It does not register a system debugger or install tools globally.
+CDB captures second-chance access violations with exception details, registers, stack, module
+list, and a private minidump. It then continues the exception as unhandled. A separate breakpoint
+records requests to exit; the target's exit event remains distinct from the debugger's exit code.
+Control programs must preserve normal exit zero and access-violation exit `0xC0000005` before
+interpreting a new debugger configuration.
+
+Raw dumps and logs remain under the runner account's local application data in
+`unity-helpers-native-debugger/<capture-id>`, whose exact path is in the receipt. Only the receipt
+and redacted console, editor, and Package Manager tails enter the EditMode artifacts under
+`native-diagnostics/`. Console retention is limited to 524,288 characters; each file tail reads
+at most 524,288 bytes of its initially observed file. Dump hashes are attempted only up to
+256 MiB. A missing dump or exit event is explicit. Retrieve private files on the named runner
+for further analysis, then remove them after preserving the required evidence. The command can
+also be run locally with `-DebuggerDirectory` pointing to the same verified files and
+`-TestFilter` selecting a single existing case. Each artifact path must be new.
+
+Tool files and per-process capture directories occupy separate paths. Missing, incomplete, or
+unexpected NUnit XML is recorded as diagnostic data after log tails and dump metadata are saved;
+it does not interrupt fault-evidence collection or count as test acceptance.
 
 Operator notes:
 

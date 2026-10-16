@@ -287,7 +287,9 @@ The fragment uses LF newlines and two-space field indentation. Use
 `TryConvertBoundSerializedDictionaries` to check the original source declarations and owning script
 before preparing a paired source/asset preview. Call it on the Unity editor thread after compilation
 completes. The generator resolves aliases, private nested enums, partial classes, and inherited
-fields declared in the same compilation. It captures the original class and base declarations,
+fields. A referenced base assembly must register its own generated binding; its original source
+must remain available under `Assets` for a coordinated rewrite. Private and readonly fields retain
+the base assembly's generated capture and recovery delegates. It captures the original class and base declarations,
 enum declarations, and element class declarations; every captured source must still match its
 SHA-256 checksum. Each source read is bounded to 4,194,304 characters. Field names and both key and
 element assembly identities must match. Ambiguous inherited names, missing compiler metadata,
@@ -307,9 +309,21 @@ or replace coordinated rollback and post-import source validation.
 
 The independent `WallstopStudios.UnityHelpers.OdinMigration.Generator.dll` compiler input produces
 these bindings without depending on the protobuf generator DLL or enabling WallstopProto.
-Its importer excludes it from runtime plugins and player builds. The binding registry and metadata
-are editor-only. Player compilations contain no registration
-code. Fields inherited from referenced assemblies without source declarations are not bound.
+Its importer excludes it from runtime plugins and player builds. The binding registry and generated
+registration are editor-only. The public `OdinMigrationBindingAttribute` type remains available in
+both editor and player compilations, so consumer references to its type, constructor, or properties
+remain valid in both. Its `Conditional("UNITY_EDITOR")` declaration omits attribute applications
+from player assembly metadata. Referenced owner markers expose binding identities without exposing
+private field members.
+Resolution combines source snapshots, field declarations, base edits, and affected types only after
+all referenced bindings register. Missing bindings, invalid inheritance, cycles, and conflicting
+source checksums refuse the complete binding. Replacing a registration invalidates resolved children.
+Extensible Unity object classes register compiler metadata even when they declare no dictionaries,
+so a dictionary-free helper in a referenced assembly can participate in the complete inheritance chain.
+Owners and containing types marked obsolete with a compile-time error are skipped; the generator
+does not introduce forbidden type references into consumer compilation.
+External custom bases without compiler bindings remain unsupported; Unity and supported Odin root
+bases need no dictionary binding. Closed generic bases in referenced assemblies remain unsupported.
 The snapshots describe the captured declarations; they do not validate every project dependency
 or prove that replacement source compiles. Recompile and bind again after source or dependency
 changes. The combined conversion supplies evidence for a future paired preview; it writes no files.

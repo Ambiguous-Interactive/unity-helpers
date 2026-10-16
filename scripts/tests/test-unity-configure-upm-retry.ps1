@@ -47,6 +47,8 @@ foreach ($name in @(
         'Write-UnityConfigureFailureObservation',
         'Get-UnityNativeReportSummary',
         'Write-UnityExecutionObservation',
+        'New-UnityNativeEvidenceCapture',
+        'Get-UnityNativeEvidence',
         'Invoke-UnityEditor',
         'Get-EditorTestCompletionGraceSeconds',
         'Get-EditorTestRunTimeoutSeconds',
@@ -73,6 +75,8 @@ $script:passed = 0
 $script:failed = 0
 $script:notices = New-Object System.Collections.Generic.List[string]
 $script:CatastrophicPatterns = @(Get-CatastrophicPatterns)
+$script:capturedNativeDirectories = New-Object System.Collections.Generic.List[string]
+$script:lastNativeArguments = @()
 $RepoRoot = Split-Path -Parent $scriptRoot
 
 function Assert-That {
@@ -97,6 +101,84 @@ $temporaryRoot = Join-Path (
     [System.IO.Path]::GetTempPath()
 ) ("unity-configure-upm-retry-{0}" -f [System.Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $temporaryRoot | Out-Null
+
+$nativePrivateRoot = Join-Path $temporaryRoot 'private'
+$nativeArtifacts = Join-Path $temporaryRoot 'public'
+New-Item -ItemType Directory -Force -Path $nativeArtifacts | Out-Null
+$captureLog = Join-Path $nativeArtifacts 'editor.log'
+$capture = New-UnityNativeEvidenceCapture -LogPath $captureLog -PrivateRoot $nativePrivateRoot
+$anotherCapture = New-UnityNativeEvidenceCapture -LogPath $captureLog -PrivateRoot $nativePrivateRoot
+Assert-That 'native evidence uses a fresh private folder for each invocation' ($capture.State -eq 'configured' -and $capture.CrashDirectory -ne $anotherCapture.CrashDirectory -and $capture.UpmLogPath -ne $anotherCapture.UpmLogPath)
+Assert-That 'crash dumps are staged outside the public artifact directory' (-not $capture.CrashDirectory.StartsWith($nativeArtifacts, [StringComparison]::OrdinalIgnoreCase))
+$publicCapture = New-UnityNativeEvidenceCapture -LogPath $captureLog -PrivateRoot $nativeArtifacts
+Assert-That 'capture setup refuses to place raw files under public artifacts' ($publicCapture.State -eq 'capture-setup-failed')
+$nestedCrash = Join-Path $capture.CrashDirectory 'crash-report'
+New-Item -ItemType Directory -Path $nestedCrash | Out-Null
+$dumpBytes = [byte[]]@(77, 68, 77, 80, 0, 0, 0, 0)
+[IO.File]::WriteAllBytes((Join-Path $nestedCrash 'crash.dmp'), $dumpBytes)
+$serialCanary = 'AB-' + ('1234-' * 4) + '1234'
+Set-Content -LiteralPath (Join-Path $nestedCrash 'error.log') -Value "native stack $serialCanary user@example.test access token: example-token"
+$nativeEvidence = Get-UnityNativeEvidence -Capture $capture -LogPath $captureLog
+Assert-That 'native file inventory is explicit and includes the original dump hash' ($nativeEvidence.State -eq 'files-observed' -and $nativeEvidence.Files.Count -eq 2 -and @($nativeEvidence.Files | Where-Object { $_.RelativePath -like '*.dmp' -and $_.HashState -eq 'observed' -and $_.Sha256.Length -eq 64 }).Count -eq 1)
+Assert-That 'a missing per-attempt UPM log is explicit' ($nativeEvidence.UpmLogState -eq 'missing-at-capture')
+Set-Content -LiteralPath $capture.UpmLogPath -Value 'UPM process control'
+$upmEvidence = Get-UnityNativeEvidence -Capture $capture -LogPath $captureLog
+Assert-That 'a written per-attempt UPM log is linked to the same capture' ($upmEvidence.UpmLogState -eq 'present-at-capture' -and $upmEvidence.CaptureId -eq $capture.CaptureId -and $upmEvidence.UpmLogPath -eq $capture.UpmLogPath)
+Assert-That 'the live UPM writer stays outside public artifacts' ($capture.UpmLogPath.StartsWith($capture.CrashDirectory, [StringComparison]::OrdinalIgnoreCase) -and -not [string]::IsNullOrWhiteSpace($upmEvidence.UpmTextArtifact))
+$upmSnapshotPath = Join-Path $nativeArtifacts $upmEvidence.UpmTextArtifact
+$upmSnapshot = Get-Content -LiteralPath $upmSnapshotPath -Raw
+[IO.File]::AppendAllText($capture.UpmLogPath, "late UPM output $serialCanary")
+Assert-That 'late UPM output cannot rewrite the published redacted snapshot' ((Get-Content -LiteralPath $upmSnapshotPath -Raw) -ceq $upmSnapshot)
+$liveCapture = New-UnityNativeEvidenceCapture -LogPath $captureLog -PrivateRoot $nativePrivateRoot
+$liveBytes = [Text.Encoding]::UTF8.GetBytes("live UPM output $serialCanary user@example.test access token: example-token")
+$liveWriter = [IO.File]::Open($liveCapture.UpmLogPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+try {
+    $liveWriter.Write($liveBytes, 0, $liveBytes.Length)
+    $liveWriter.Flush()
+    $liveEvidence = Get-UnityNativeEvidence -Capture $liveCapture -LogPath $captureLog
+    $liveFile = $liveEvidence.Files[0]
+    Assert-That 'a live UPM writer permits bounded hashing without changing its sharing mode' ($liveFile.HashState -eq 'observed' -and $liveFile.HashBytes -eq $liveBytes.Length -and $liveFile.Sha256 -ceq '6dbb97f92823a761b44603df3d414dbef753443b4217045980b971037041fb37')
+    $liveSnapshot = Join-Path $nativeArtifacts $liveEvidence.UpmTextArtifact
+    $liveCaptured = if (Test-Path -LiteralPath $liveSnapshot -PathType Leaf) { Get-Content -LiteralPath $liveSnapshot -Raw } else { '' }
+    Assert-That 'a live UPM writer exports a redacted text snapshot' ($liveCaptured -match 'live UPM output' -and $liveCaptured -notmatch [regex]::Escape($serialCanary) -and $liveCaptured -notmatch 'user@example.test|example-token')
+    $lateBytes = [Text.Encoding]::UTF8.GetBytes(' late unredacted writer output')
+    $liveWriter.Write($lateBytes, 0, $lateBytes.Length)
+    $liveWriter.Flush()
+    Assert-That 'a still-open UPM writer cannot append to its published snapshot' ($liveCaptured.Length -gt 0 -and (Get-Content -LiteralPath $liveSnapshot -Raw) -ceq $liveCaptured)
+} finally { $liveWriter.Dispose() }
+Assert-That 'no raw dump reaches public artifacts' (@(Get-ChildItem -LiteralPath $nativeArtifacts -Recurse -Filter '*.dmp').Count -eq 0 -and (Test-Path -LiteralPath (Join-Path $nestedCrash 'crash.dmp')))
+$textReport = @($nativeEvidence.Files | Where-Object { $_.TextArtifact })[0]
+$safeText = Get-Content -LiteralPath (Join-Path $nativeArtifacts $textReport.TextArtifact) -Raw
+Assert-That 'crash text is copied with credentials redacted' ($safeText -match 'native stack' -and $safeText -notmatch [regex]::Escape($serialCanary) -and $safeText -notmatch 'user@example.test|example-token')
+Set-Content -LiteralPath (Join-Path $nestedCrash 'error.log') -Value ('x' * 300000)
+$bounded = Get-UnityNativeEvidence -Capture $capture -LogPath $captureLog
+$boundedText = @($bounded.Files | Where-Object { $_.TextArtifact })[0]
+Assert-That 'large crash text has a fixed read limit and reports truncation' ($boundedText.TextTruncated -and (Get-Item -LiteralPath (Join-Path $nativeArtifacts $boundedText.TextArtifact)).Length -lt 262160)
+[IO.File]::WriteAllBytes((Join-Path $nestedCrash 'binary.log'), $dumpBytes)
+$binaryEvidence = Get-UnityNativeEvidence -Capture $capture -LogPath $captureLog
+$binaryReport = @($binaryEvidence.Files | Where-Object { $_.RelativePath -like '*binary.log' })[0]
+Assert-That 'a log extension cannot publish binary content' ($binaryReport.TextArtifact -eq 'non-text-file' -and -not (Test-Path -LiteralPath (Join-Path $nativeArtifacts 'non-text-file')))
+$emptyEvidence = Get-UnityNativeEvidence -Capture $anotherCapture -LogPath $captureLog
+Assert-That 'no crash file is an observation rather than a safety claim' ($emptyEvidence.State -eq 'no-files-at-capture' -and $emptyEvidence.Qualification -match 'do not rule out')
+Assert-That 'an empty crash folder remains available to a delayed crash writer' (Test-Path -LiteralPath $anotherCapture.CrashDirectory -PathType Container)
+$unavailableEvidence = Get-UnityNativeEvidence -Capture @{ State = 'capture-setup-failed' } -LogPath $captureLog
+Assert-That 'failed crash setup remains explicit' ($unavailableEvidence.State -eq 'capture-setup-failed' -and $unavailableEvidence.Files.Count -eq 0)
+$malformedEvidence = Get-UnityNativeEvidence -Capture @{ State = 'configured' } -LogPath $captureLog
+Assert-That 'malformed crash capture metadata cannot throw' ($malformedEvidence.State -eq 'capture-unavailable' -and $malformedEvidence.Files.Count -eq 0)
+$badRoot = Join-Path $temporaryRoot 'not-a-directory'
+Set-Content -LiteralPath $badRoot -Value 'file'
+$failedCapture = New-UnityNativeEvidenceCapture -LogPath $captureLog -PrivateRoot $badRoot
+Assert-That 'unwritable crash setup does not change the process result' ($failedCapture.State -eq 'capture-setup-failed')
+$limitedCapture = New-UnityNativeEvidenceCapture -LogPath $captureLog -PrivateRoot $nativePrivateRoot
+foreach ($index in 0..64) { Set-Content -LiteralPath (Join-Path $limitedCapture.CrashDirectory "$index.json") -Value 'not-published' }
+$limitedEvidence = Get-UnityNativeEvidence -Capture $limitedCapture -LogPath $captureLog
+Assert-That 'native inventory caps files and reports the limit' ($limitedEvidence.Files.Count -eq 64 -and $limitedEvidence.FileLimitReached -and @($limitedEvidence.Files | Where-Object { $_.TextArtifact }).Count -eq 0)
+$largeCapture = New-UnityNativeEvidenceCapture -LogPath $captureLog -PrivateRoot $nativePrivateRoot
+$largeDumpPath = Join-Path $largeCapture.CrashDirectory 'large.dmp'
+$largeStream = [IO.File]::Create($largeDumpPath)
+try { $largeStream.SetLength(268435457) } finally { $largeStream.Dispose() }
+$largeEvidence = Get-UnityNativeEvidence -Capture $largeCapture -LogPath $captureLog
+Assert-That 'large dumps remain private and explicitly exceed the hashing limit' ($largeEvidence.Files.Count -eq 1 -and $largeEvidence.Files[0].Length -eq 268435457 -and $largeEvidence.Files[0].HashState -eq 'over-hash-limit' -and $null -eq $largeEvidence.Files[0].Sha256 -and $null -eq $largeEvidence.Files[0].TextArtifact)
 
 function Invoke-ConfigureCase {
     param(
@@ -405,6 +487,9 @@ try {
     function Invoke-ProcessWithTreeKillTimeout {
         param($FilePath, $Arguments, $TimeoutSeconds, $LogPath, $Label,
             $CompletionPattern, $CompletionGraceSeconds, $StallSeconds, [hashtable]$ProcessObservation)
+        $script:lastNativeArguments = @($Arguments)
+        $crashArgument = [array]::IndexOf($Arguments, '-crash-report-folder')
+        if ($crashArgument -ge 0) { $script:capturedNativeDirectories.Add($Arguments[$crashArgument + 1]) }
         ++$script:executionAttempt
         $ProcessObservation.Clear()
         $ProcessObservation['ProcessId'] = 100 + $script:executionAttempt
@@ -431,6 +516,11 @@ try {
         Assert-That "execution diagnostics preserve exit $code" ($exitCode -eq $code -and $receipt.Process.RawExitCode -eq $code -and $receipt.Process.ReturnedExitCode -eq $code)
         Assert-That "guarded execution captures native reports even at exit $code" ($receipt.NativeReports.NativeReportHeaderCount -eq 1 -and $receipt.NativeReports.UnknownNativeConditionCount -eq 1)
         Assert-That "guarded execution binds event query to child identity at exit $code" ($receipt.WindowsEvents.ProcessId -eq $receipt.Process.ProcessId)
+        if ($IsWindows) {
+            $crashArgument = [array]::IndexOf($script:lastNativeArguments, '-crash-report-folder')
+            $upmArgument = [array]::IndexOf($script:lastNativeArguments, '-upmLogFile')
+            Assert-That "Windows child arguments match its native receipt at exit $code" ($crashArgument -ge 0 -and $upmArgument -ge 0 -and $script:lastNativeArguments[$crashArgument + 1] -eq $receipt.Process.NativeEvidence.CrashDirectory -and $script:lastNativeArguments[$upmArgument + 1] -eq $receipt.Process.NativeEvidence.UpmLogPath)
+        }
     }
     $before = $receipt.Process.ProcessId
     $script:executionExit = 0
@@ -457,6 +547,9 @@ try {
 
 } finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue
+    foreach ($directory in $script:capturedNativeDirectories) {
+        if (Test-Path -LiteralPath $directory -PathType Container) { Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction Stop }
+    }
 }
 
 Write-Host "Unity configure UPM retry tests: $($script:passed) passed, $($script:failed) failed"

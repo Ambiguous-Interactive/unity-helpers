@@ -85,7 +85,7 @@ function expandNpmScript(name, seen = new Set()) {
 function scriptPathsIn(commands) {
   const found = new Set();
   for (const command of commands) {
-    for (const match of command.matchAll(/scripts\/[\w./-]+\.(?:ps1|sh|js|mjs)/g)) {
+    for (const match of command.matchAll(/scripts\/[\w./-]+\.(?:ps1|sh|js|mjs|py)/g)) {
       found.add(match[0]);
     }
   }
@@ -209,7 +209,7 @@ runTest("every check resolves to a real npm script or an existing file", () => {
       );
       continue;
     }
-    const scriptPath = check.run.match(/scripts\/[\w./-]+\.(?:ps1|sh|js)/);
+    const scriptPath = check.run.match(/scripts\/[\w./-]+\.(?:ps1|sh|js|mjs|py)/);
     assert.ok(scriptPath, `check ${check.id} runs neither an npm script nor a scripts/ file`);
     assert.ok(
       fs.existsSync(path.join(repoRoot, scriptPath[0])),
@@ -645,7 +645,7 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
   const testsDirectory = path.join(repoRoot, "scripts", "tests");
   const selfTests = fs
     .readdirSync(testsDirectory)
-    .filter((name) => /\.(?:ps1|sh|js|mjs)$/.test(name) && !registries.has(name));
+    .filter((name) => /\.(?:ps1|sh|js|mjs|py)$/.test(name) && !registries.has(name));
   const selfTestSource = new Map(
     selfTests.map((name) => [
       `scripts/tests/${name}`,

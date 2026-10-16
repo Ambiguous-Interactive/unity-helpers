@@ -932,6 +932,14 @@ public static class CollectionSum
 }
 ```
 
+If a consumer also imports ZLinq, both libraries expose `AsValueEnumerable` for
+`IEnumerable<T>`. C# reports `CS0121` for an ambiguous extension call. Select the
+intended implementation explicitly: `ZLinq.ValueEnumerable.AsValueEnumerable(source)`
+for an existing ZLinq query, or
+`WallstopStudios.UnityHelpers.Core.Extension.IEnumerableExtensions.AsValueEnumerable(source)`
+for the unity-helpers view. Retain that choice when migrating consumer code so later
+query operators keep their intended library and behavior.
+
 `AsValueDictionaryEnumerable` provides the same lazy behavior for
 `IEnumerable<KeyValuePair<TKey, TValue>>`, including dictionary interfaces. Exact
 `Dictionary<TKey, TValue>` instances use their concrete value enumerator. Derived dictionaries keep their interface protocol. Other sources, including sorted

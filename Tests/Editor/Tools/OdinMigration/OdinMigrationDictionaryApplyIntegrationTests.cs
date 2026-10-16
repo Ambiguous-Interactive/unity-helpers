@@ -33,11 +33,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         private const string RetirementKey =
             nameof(OdinMigrationDictionaryApplyIntegrationTests) + ".Retired";
         private const string ConsumerName = "OdinMigrationApplyConsumer";
+        private const string BaseConsumerName = "OdinMigrationApplyConsumerBase";
         private const string Source =
             "// MIT License - Copyright (c) 2026 wallstop\n"
             + "// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE\n"
             + "namespace MigrationConsumer { using System.Collections.Generic; using UnityEngine; "
-            + "public sealed partial class OdinMigrationApplyConsumer : ScriptableObject { "
+            + "public partial class OdinMigrationApplyConsumerBase : ScriptableObject { "
             + "public Dictionary<SpriteAlignment, List<Texture2D>> Variations = new Dictionary<SpriteAlignment, List<Texture2D>>(); "
             + "private readonly Dictionary<HideFlags, List<Texture2D>> Other = new Dictionary<HideFlags, List<Texture2D>>(); "
             + "public bool Corrupt; private void OnValidate() { if (Corrupt && Variations.Count != 0) { Variations.Clear(); } } } }\n";
@@ -46,6 +47,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         private static string FullPath(string path)
         {
             return Path.Combine(Directory.GetParent(Application.dataPath).FullName, path);
+        }
+
+        private static string SourcePath(string folder)
+        {
+            return folder + "/Base/" + BaseConsumerName + ".cs";
+        }
+
+        private static void WriteImporterMeta(string path, bool assemblyDefinition)
+        {
+            File.WriteAllText(
+                FullPath(path) + ".meta",
+                "fileFormatVersion: 2\nguid: "
+                    + Guid.NewGuid().ToString("N")
+                    + (
+                        assemblyDefinition
+                            ? "\nAssemblyDefinitionImporter:\n  externalObjects: {}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n"
+                            : "\nMonoImporter:\n  externalObjects: {}\n  serializedVersion: 2\n  defaultReferences: []\n  executionOrder: 0\n  icon: {instanceID: 0}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n"
+                    ),
+                new UTF8Encoding(false)
+            );
         }
 
         [UnitySetUp]
@@ -62,29 +83,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     )
                 );
                 string assemblyName = Path.GetFileName(folder);
+                Assert.IsFalse(
+                    string.IsNullOrWhiteSpace(AssetDatabase.CreateFolder(folder, "Base"))
+                );
+                string baseDefinition = folder + "/Base/" + assemblyName + ".Base.asmdef";
+                File.WriteAllText(
+                    FullPath(baseDefinition),
+                    "{\"name\":\""
+                        + assemblyName
+                        + ".Base\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"includePlatforms\":[\"Editor\"]}",
+                    new UTF8Encoding(false)
+                );
+                File.WriteAllText(FullPath(SourcePath(folder)), Source, new UTF8Encoding(false));
+                WriteImporterMeta(baseDefinition, true);
+                WriteImporterMeta(SourcePath(folder), false);
                 string definition = folder + "/" + assemblyName + ".asmdef";
                 File.WriteAllText(
                     FullPath(definition),
                     "{\"name\":\""
                         + assemblyName
-                        + "\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"includePlatforms\":[\"Editor\"]}",
+                        + "\",\"references\":[\"WallstopStudios.UnityHelpers\",\""
+                        + assemblyName
+                        + ".Base\"],\"includePlatforms\":[\"Editor\"]}",
                     new UTF8Encoding(false)
                 );
-                File.WriteAllText(
-                    FullPath(definition) + ".meta",
-                    "fileFormatVersion: 2\nguid: "
-                        + Guid.NewGuid().ToString("N")
-                        + "\nAssemblyDefinitionImporter:\n  externalObjects: {}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n",
-                    new UTF8Encoding(false)
-                );
+                WriteImporterMeta(definition, true);
                 string script = folder + "/" + ConsumerName + ".cs";
-                File.WriteAllText(FullPath(script), Source, new UTF8Encoding(false));
                 File.WriteAllText(
-                    FullPath(script) + ".meta",
-                    "fileFormatVersion: 2\nguid: "
-                        + Guid.NewGuid().ToString("N")
-                        + "\nMonoImporter:\n  externalObjects: {}\n  serializedVersion: 2\n  defaultReferences: []\n  executionOrder: 0\n  icon: {instanceID: 0}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n"
+                    FullPath(script),
+                    "namespace MigrationConsumer { public sealed class "
+                        + ConsumerName
+                        + " : "
+                        + BaseConsumerName
+                        + " {} }",
+                    new UTF8Encoding(false)
                 );
+                WriteImporterMeta(script, false);
                 SessionState.SetInt(PhaseKey, 1);
                 yield return new RecompileScripts();
             }
@@ -345,10 +379,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                         Assert.IsFalse(started);
                         Assert.IsTrue(apply == null);
                         StringAssert.Contains("selected live capture", failure);
-                        Assert.AreEqual(
-                            Source,
-                            File.ReadAllText(FullPath(folder + "/" + ConsumerName + ".cs"))
-                        );
+                        Assert.AreEqual(Source, File.ReadAllText(FullPath(SourcePath(folder))));
                         StringAssert.Contains(
                             "serializationData:",
                             File.ReadAllText(FullPath(ownerPath))
@@ -425,10 +456,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     Assert.IsFalse(string.IsNullOrWhiteSpace(statusFailure));
                     StringAssert.DoesNotContain("cancel", statusFailure.ToLowerInvariant());
                 }
-                Assert.AreEqual(
-                    Source,
-                    File.ReadAllText(FullPath(folder + "/" + ConsumerName + ".cs"))
-                );
+                Assert.AreEqual(Source, File.ReadAllText(FullPath(SourcePath(folder))));
                 if (4 <= scenario)
                 {
                     StringAssert.DoesNotContain(
@@ -512,7 +540,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             }
             StringAssert.Contains(
                 "SerializableDictionary",
-                File.ReadAllText(FullPath(folder + "/" + ConsumerName + ".cs"))
+                File.ReadAllText(FullPath(SourcePath(folder)))
             );
             StringAssert.DoesNotContain(
                 "serializationData:",
@@ -622,6 +650,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                             + "\"defineConstraints\":[\"WALLSTOP_MIGRATION_RETIRED_CONSUMER\"]}",
                         new UTF8Encoding(false)
                     );
+                    File.WriteAllText(
+                        FullPath(folder + "/Base/" + assemblyName + ".Base.asmdef"),
+                        "{\"name\":\""
+                            + assemblyName
+                            + ".Base\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"includePlatforms\":[\"Editor\"],\"defineConstraints\":[\"WALLSTOP_MIGRATION_RETIRED_CONSUMER\"]}",
+                        new UTF8Encoding(false)
+                    );
                     SessionState.SetBool(RetirementKey, true);
                     yield return new RecompileScripts(false);
                 }
@@ -662,6 +697,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                         assemblyName,
                         assembly.name,
                         "Retire the consumer assembly before deleting its compiler inputs."
+                    );
+                    Assert.AreNotEqual(
+                        assemblyName + ".Base",
+                        assembly.name,
+                        "Retire the base assembly before deleting its compiler inputs."
                     );
                 }
                 Assert.IsTrue(

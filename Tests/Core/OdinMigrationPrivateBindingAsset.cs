@@ -7,7 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using UnityEngine;
 
     /// <summary>Provides partial-owner private dictionary declarations for migration checks.</summary>
-    public sealed partial class OdinMigrationPrivateBindingAsset : ScriptableObject
+    public partial class OdinMigrationPrivateBindingAsset : ScriptableObject
     {
         internal const string ValuesFieldName = nameof(_values);
         internal const string ReadonlyValuesFieldName = nameof(_readonlyValues);
