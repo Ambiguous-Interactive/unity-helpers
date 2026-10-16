@@ -214,6 +214,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AssertMaps(original, Decode(Encode(original)));
         }
 
+        [TestCase(null, false, TestName = "NullableMap.CustomKey.NullRefused")]
+        [TestCase(0, true, TestName = "NullableMap.CustomKey.ZeroAccepted")]
+        [TestCase(3, true, TestName = "NullableMap.CustomKey.NondefaultAccepted")]
+        public void CustomMapsRequirePresentNullableKeys(int? key, bool expected)
+        {
+            NullableMapContract original = new NullableMapContract
+            {
+                ReadOnly = new NullableKeyReadOnlyMap(key),
+            };
+            IWProtoFormatter<NullableMapContract> formatter =
+                WProtoFormatterProvider.Get<NullableMapContract>();
+            byte[] bytes = new byte[formatter.Measure(original)];
+            WProtoWriter writer = new WProtoWriter(bytes);
+            Assert.AreEqual(expected, formatter.Write(ref writer, original));
+            if (expected)
+            {
+                AssertMaps(original, Decode(bytes));
+            }
+            else
+            {
+                Assert.AreEqual(0, writer.Position);
+            }
+        }
+
         [Test]
         public void DuplicateNullableMessagesMergeWithinTheEntry()
         {

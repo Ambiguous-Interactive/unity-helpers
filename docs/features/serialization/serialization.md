@@ -1821,6 +1821,7 @@ Nullable halves use `HasValue` rather than default omission: a present zero is w
 null value is absent. For an entry at field 1, key `3` with nullable value `0` writes
 `0A 04 08 03 10 00`; a null value writes `0A 02 08 03`. A present default struct value
 writes an empty message. Nullable keys must be present; a keyless nullable entry is refused.
+Writes also refuse a null key supplied by a custom map implementation.
 
 A missing key or value decodes to that type's protobuf default. A missing string is `""`,
 which can serve as a dictionary key. Historical keyless enum entries and explicit zero numeric

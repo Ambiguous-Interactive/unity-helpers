@@ -413,6 +413,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal override void EmitWrite(Writer writer)
         {
             int open = OpenLoop(writer);
+            if (_keyNullable)
+            {
+                writer.Line("if (!" + KeyAccess + ".HasValue)" + Writer.Open);
+                writer.Indent();
+                writer.Line("return false;");
+                Close(writer);
+                writer.Blank();
+            }
 
             // Back-patch map lengths to avoid re-measuring values and repeating serialization hooks.
             string token = "entry" + Tag;
