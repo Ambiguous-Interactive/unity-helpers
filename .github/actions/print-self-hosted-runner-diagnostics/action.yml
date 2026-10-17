@@ -224,6 +224,9 @@ runs:
       run: |
         . ./scripts/unity/lib/native-global-flags.ps1
         Get-NativeGlobalFlagSnapshot | ConvertTo-Json -Depth 5
+    - name: Verify native capture controls on Windows
+      shell: pwsh
+      run: ./scripts/tests/test-native-fault-capture.ps1 -RequireWindowsRegistry
     - name: Configure Git compression tools for Actions cache
       shell: pwsh
       run: |

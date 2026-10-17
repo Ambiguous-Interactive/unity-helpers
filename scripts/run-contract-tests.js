@@ -29,6 +29,11 @@ const { runChecks, runRegistry } = require("./check-runner");
 /** A check whose `run` is executed with `bash -c` from the repository root. */
 const CHECKS = [
   {
+    id: "native-fault-capture",
+    name: "Native capture and loader-flag transaction controls",
+    run: "npm run test:native-fault-capture"
+  },
+  {
     id: "auto-publish-release",
     name: "Automatic release publication",
     run: "npm run test:auto-publish-release"
