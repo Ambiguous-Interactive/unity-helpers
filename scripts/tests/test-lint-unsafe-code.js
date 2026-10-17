@@ -853,6 +853,22 @@ function il2cpp(text) {
 
 /** Every spelling that leaves a check switched off. Each must be reported exactly once. */
 const IL2CPP_DISABLED = [
+  ...["false", "!true"].flatMap((value) =>
+    [
+      `@value: ${value}, option: Option.NullChecks`,
+      `@value: ${value}, @option: Option.ArrayBoundsChecks`,
+      `@option: Option.DivideByZeroChecks, @value: ${value}`
+    ].map((argumentsList) => [
+      `verbatim value labels cannot hide a disable: ${argumentsList}`,
+      `[Il2CppSetOption(${argumentsList})] class Sample { }\n`
+    ])
+  ),
+  ...["CheckAttribute", "OtherAttribute"].flatMap((alias) =>
+    [alias, alias.slice(0, -"Attribute".length)].map((usage) => [
+      `attribute suffix aliases cannot hide a disable: ${alias} ${usage}`,
+      `using ${alias} = Unity.IL2CPP.CompilerServices.Il2CppSetOptionAttribute; [${usage}((Option)0, false)] class Sample { }\n`
+    ])
+  ),
   ...["NullChecks", "ArrayBoundsChecks", "DivideByZeroChecks"].flatMap((name) => [
     [
       `a false value whose name matches an option: ${name}`,
@@ -964,6 +980,20 @@ for (const [label, text] of IL2CPP_DISABLED) {
     be uninstallable.
 */
 const IL2CPP_ENABLED = [
+  ...[
+    "@value: true, option: Option.NullChecks",
+    "@value: true, @option: Option.ArrayBoundsChecks",
+    "@option: Option.DivideByZeroChecks, @value: true"
+  ].map((argumentsList) => [
+    `verbatim value labels with literal true: ${argumentsList}`,
+    `[Il2CppSetOption(${argumentsList})] class Sample { }\n`
+  ]),
+  ...["CheckAttribute", "OtherAttribute"].flatMap((alias) =>
+    [alias, alias.slice(0, -"Attribute".length)].map((usage) => [
+      `attribute suffix aliases with literal true: ${alias} ${usage}`,
+      `using ${alias} = Unity.IL2CPP.CompilerServices.Il2CppSetOptionAttribute; [${usage}((Option)0, true)] class Sample { }\n`
+    ])
+  ),
   ...["Check", "@event"].flatMap((alias) =>
     ["Il2CppSetOption", "Il2CppSetOptionAttribute"].map((attribute) => [
       `an attribute alias with literal true: ${alias} ${attribute}`,

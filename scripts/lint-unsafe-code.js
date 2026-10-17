@@ -108,7 +108,7 @@ const IL2CPP_MENTION = /Il2CppSetOption|NullChecks|ArrayBoundsChecks|DivideByZer
 */
 const OPTION_ARGUMENT_RESIDUE = /^(?:\s|,|[{}()[\]]|new|Option)*$/;
 const FALSE_LITERAL = /\bfalse\b/i;
-const ARGUMENT_LABEL = /^\s*[A-Za-z_]\w*\s*:(?!:)/;
+const ARGUMENT_LABEL = /^\s*@?[A-Za-z_]\w*\s*:(?!:)/;
 
 /** Blanks comments and string literals so the keyword scan cannot match prose. */
 function codeOnly(text) {
@@ -360,7 +360,7 @@ function judgeIl2CppArguments(argumentText, isSetOption) {
   const argumentsList = splitArguments(argumentText);
   const values = isSetOption
     ? argumentsList.filter((part, index) =>
-        ARGUMENT_LABEL.test(part) ? /^\s*value\s*:/.test(part) : index !== 0
+        ARGUMENT_LABEL.test(part) ? /^\s*@?value\s*:/.test(part) : index !== 0
       )
     : argumentsList.filter((part) => !isOptionReferenceOnly(part));
   const disabling = values.find((value) => FALSE_LITERAL.test(value));
@@ -404,7 +404,11 @@ function findIl2CppSafetyDisables(sources) {
     const judged = new Map();
     const setOptionPatterns = [IL2CPP_SET_OPTION];
     for (const alias of code.matchAll(IL2CPP_SET_OPTION_IMPORT)) {
-      setOptionPatterns.push(new RegExp(`\\b${alias[1]}\\s*\\(`, "g"));
+      const name = alias[1];
+      setOptionPatterns.push(new RegExp(`\\b${name}\\s*\\(`, "g"));
+      if (name.endsWith("Attribute") && "Attribute".length < name.length) {
+        setOptionPatterns.push(new RegExp(`\\b${name.slice(0, -"Attribute".length)}\\s*\\(`, "g"));
+      }
     }
     for (const pattern of setOptionPatterns) {
       for (const match of code.matchAll(pattern)) {
