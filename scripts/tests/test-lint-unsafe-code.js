@@ -13,6 +13,8 @@
 // StackOverflowException that no catch intercepts, so a length must be a constant or guarded against one in
 // the same statement. Both shipped offenders are reproduced verbatim as red cases.
 
+// cspell:ignore nsafe ize ull alue
+
 "use strict";
 
 const assert = require("assert");
@@ -778,6 +780,90 @@ for (const imported of [
   });
 }
 
+for (const [label, text] of [
+  [
+    "escaped receiver",
+    String.raw`class Sample { int Read(ref byte b) { return \u0055nsafe.As<byte, int>(ref b); } }`
+  ],
+  [
+    "escaped member",
+    String.raw`class Sample { int Read(ref byte b) { return Unsafe.\u0041s<byte, int>(ref b); } }`
+  ],
+  [
+    "long Unicode escape",
+    String.raw`class Sample { int Read(ref byte b) { return \U00000055nsafe.As<byte, int>(ref b); } }`
+  ],
+  [
+    "interpolated expression",
+    'class Sample { string Read(ref byte b) { return $"{Unsafe.As<byte, int>(ref b)}"; } }'
+  ],
+  [
+    "verbatim interpolated expression",
+    'class Sample { string Read(ref byte b) { return $@"{Unsafe.As<byte, int>(ref b)}"; } }'
+  ],
+  [
+    "escaped alias",
+    String.raw`using Raw = System.Runtime.CompilerServices.\u0055nsafe; class Sample {}`
+  ],
+  [
+    "conditional branch",
+    '#if FEATURE\nclass Sample { string Read(ref byte b) { return $"{Unsafe.As<byte, int>(ref b)}"; } }\n#else\nclass Sample {}\n#endif'
+  ],
+  ["method group", String.raw`class Sample { object M() { return Unsafe.\u0041s<int, long>; } }`]
+]) {
+  runTest(`parsed Unsafe access cannot hide in ${label}`, () => {
+    const found = unsafeAccess(text);
+    assert.strictEqual(found.length, 1, JSON.stringify(found));
+    assert.match(found[0], /Runtime\/Sample.cs:\d+:/);
+  });
+}
+
+for (const text of [
+  String.raw`class Sample { string Text = "\u0055nsafe.As<int, long>(ref value)"; }`,
+  'class Sample { string Text = $"Unsafe.As<int, long>(ref value) {1}"; }',
+  'class Sample { string Text = $"{{Unsafe.As<int, long>(ref value)}}"; }',
+  'class Sample { string Text = $"{1:Unsafe.As}"; }',
+  'class Sample { string Text = """Unsafe.As<int, long>(ref value)"""; }',
+  String.raw`class Sample { int Size() { return \u0055nsafe.\u0053izeOf<int>(); } }`
+]) {
+  runTest(`parsed Unsafe policy leaves literal text and size queries alone: ${text}`, () => {
+    assert.deepStrictEqual(unsafeAccess(text), []);
+  });
+}
+
+runTest("parsed Unsafe access counts each source site once across conditional variants", () => {
+  const scan = findUnsafeAccess([
+    {
+      path: "Runtime/Sample.cs",
+      text: '#if FIRST\nclass First {}\n#endif\n#if SECOND\nclass Second {}\n#endif\nclass Sample { string Read(ref byte b) { return $"{Unsafe.As<byte, int>(ref b)} {Unsafe.As<byte, int>(ref b)}"; } }'
+    }
+  ]);
+  assert.strictEqual(scan.inspected, 2);
+  assert.strictEqual(scan.failures.length, 1);
+  assert.match(scan.failures[0], /Runtime\/Sample.cs:7:/);
+});
+
+runTest("parsed Unsafe access fails closed when conditional expansion exceeds its bound", () => {
+  const directives = Array.from({ length: 13 }, (_, index) => `#if FEATURE${index}\n#endif`).join(
+    "\n"
+  );
+  assert.throws(
+    () => unsafeAccess(directives + "\nUnsafe.As<int, long>(ref value);"),
+    /more than twelve conditional symbols/
+  );
+});
+
+runTest(
+  "parsed Unsafe access preserves nested interpolation expressions and skips format text",
+  () => {
+    const text =
+      'class Sample { string Read(ref byte b) { return $$"""literal Unsafe.As {{ $"{Unsafe.As<byte, int>(ref b):Unsafe.As}" }}"""; } }';
+    const scan = findUnsafeAccess([{ path: "Runtime/Sample.cs", text }]);
+    assert.strictEqual(scan.inspected, 1);
+    assert.strictEqual(scan.failures.length, 1);
+  }
+);
+
 runTest("Unsafe.SizeOf is a size query, not memory access", () => {
   assert.deepStrictEqual(
     unsafeAccess("class Sample { static int Size() => Unsafe.SizeOf<int>(); }\n"),
@@ -851,8 +937,129 @@ function il2cpp(text) {
   return findIl2CppSafetyDisables([{ path: "Runtime/Sample.cs", text }]).failures;
 }
 
+for (const [label, text] of [
+  [
+    "Unicode alias",
+    String.raw`using \u0394 = Unity.IL2CPP.CompilerServices.Il2CppSetOptionAttribute; [\u0394((Option)0, false)] class Sample {}`
+  ],
+  [
+    "Unicode suffix alias",
+    String.raw`using \u0394Attribute = Unity.IL2CPP.CompilerServices.Il2CppSetOptionAttribute; [\u0394((Option)0, false)] class Sample {}`
+  ],
+  [
+    "Unicode constructor alias",
+    String.raw`using \u0394 = Unity.IL2CPP.CompilerServices.Il2CppSetOptionAttribute; class Sample { object M() { return new \u0394((Option)0, false); } }`
+  ],
+  [
+    "escaped attribute and option",
+    String.raw`[\u0049l2CppSetOption(Option.\u004eullChecks, false)] class Sample {}`
+  ],
+  [
+    "escaped attribute with numeric option",
+    String.raw`[\u0049l2CppSetOption((Option)0, false)] class Sample {}`
+  ],
+  [
+    "escaped attribute alias",
+    String.raw`using Check = Unity.IL2CPP.CompilerServices.\u0049l2CppSetOptionAttribute; [Check((Option)0, false)] class Sample {}`
+  ],
+  [
+    "interpolated helper",
+    'class Sample { string M() { return $"{Configure(Option.NullChecks, false)}"; } }'
+  ],
+  [
+    "raw interpolated helper",
+    'class Sample { string M() { return $$"""{{Configure(Option.NullChecks, false)}}"""; } }'
+  ],
+  [
+    "disabled conditional branch",
+    "#if FEATURE\nclass Enabled {}\n#else\n[Il2CppSetOption(Option.NullChecks, false)] class Sample {}\n#endif"
+  ],
+  [
+    "escaped value label",
+    String.raw`[Il2CppSetOption(Option.NullChecks, \u0076alue: false)] class Sample {}`
+  ]
+]) {
+  runTest(`parsed IL2CPP options cannot hide in ${label}`, () => {
+    const found = il2cpp(text);
+    assert.strictEqual(found.length, 1, JSON.stringify(found));
+    assert.match(found[0], /Runtime\/Sample.cs:\d+:/);
+  });
+}
+
+for (const text of [
+  'class Sample { string Text = $$"""literal Il2CppSetOption(Option.NullChecks, false) {{1}}"""; }',
+  'class Sample { string Text = $"{1:Il2CppSetOption(Option.NullChecks, false)}"; }',
+  String.raw`[\u0049l2CppSetOption(Option.\u004eullChecks, true)] class Sample {}`,
+  String.raw`class Sample { const bool @true = false; [Il2CppSetOption(Option.NullChecks, true)] void M() {} }`
+]) {
+  runTest(`parsed IL2CPP options preserve enabled checks and literal text: ${text}`, () => {
+    assert.deepStrictEqual(il2cpp(text), []);
+  });
+}
+
+runTest("parsed IL2CPP options count a source site once across conditional variants", () => {
+  const scan = findIl2CppSafetyDisables([
+    {
+      path: "Runtime/Sample.cs",
+      text: "#if FIRST\nclass First {}\n#endif\n#if SECOND\nclass Second {}\n#endif\n[Il2CppSetOption(Option.NullChecks, false)] class Sample {}"
+    }
+  ]);
+  assert.strictEqual(scan.inspected, 1);
+  assert.strictEqual(scan.failures.length, 1);
+  assert.match(scan.failures[0], /Runtime\/Sample.cs:7:/);
+});
+
+runTest("the parsed policy controls compile without unsafe compilation or execution", () => {
+  const temporary = mkdtempSync(path.join(tmpdir(), "unity-helpers-parsed-safety-"));
+  const text = String.raw`
+using System;
+using System.Runtime.CompilerServices;
+using Unity.IL2CPP.CompilerServices;
+using \u0394 = Unity.IL2CPP.CompilerServices.Il2CppSetOptionAttribute;
+[\u0394(Option.\u004eullChecks, false)]
+internal class Sample
+{
+    static int Read(ref byte value) { return \u0055nsafe.\u0041s<byte, int>(ref value); }
+    static string Format(ref byte value) { return $"{Unsafe.As<byte, int>(ref value)} {Configure(Option.NullChecks, false)}"; }
+    static bool Configure(Option option, bool value) { return value; }
+}
+namespace Unity.IL2CPP.CompilerServices
+{
+    public enum Option { NullChecks = 0 }
+    public sealed class Il2CppSetOptionAttribute : Attribute
+    {
+        public Il2CppSetOptionAttribute(Option option, bool value) { }
+    }
+}`;
+  try {
+    writeFileSync(path.join(temporary, "Control.cs"), text);
+    writeFileSync(
+      path.join(temporary, "Control.csproj"),
+      '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework><AllowUnsafeBlocks>false</AllowUnsafeBlocks></PropertyGroup></Project>'
+    );
+    const build = spawnSync(
+      "dotnet",
+      ["build", path.join(temporary, "Control.csproj"), "--nologo", "--disable-build-servers"],
+      { cwd: temporary, encoding: "utf8" }
+    );
+    assert.strictEqual(build.status, 0, build.stdout + build.stderr);
+    const memory = findUnsafeAccess([{ path: "Runtime/Control.cs", text }]);
+    const options = findIl2CppSafetyDisables([{ path: "Runtime/Control.cs", text }]);
+    assert.strictEqual(memory.inspected, 2);
+    assert.strictEqual(memory.failures.length, 1);
+    assert.strictEqual(options.inspected, 2);
+    assert.strictEqual(options.failures.length, 2);
+  } finally {
+    rmSync(temporary, { recursive: true, force: true, maxRetries: 3 });
+  }
+});
+
 /** Every spelling that leaves a check switched off. Each must be reported exactly once. */
 const IL2CPP_DISABLED = [
+  ...['"true"', '"false"', '""', "'t'"].map((value) => [
+    `a literal value that is not boolean true: ${value}`,
+    `[Il2CppSetOption(Option.NullChecks, ${value})] class Sample {}`
+  ]),
   ...["false", "!true"].flatMap((value) =>
     [
       `@value: ${value}, option: Option.NullChecks`,

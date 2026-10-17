@@ -24,6 +24,8 @@
     undefined behaviour with neither the keyword nor the asmdef flag. See findIl2CppSafetyDisables.
 */
 
+// cspell:ignore nsafe
+
 "use strict";
 
 const {
@@ -61,12 +63,6 @@ let semanticPolicyFailure = null;
     WProtoReader uses AreSame to ask whether two spans start at the same element, which is a
     question about identity, not an access.
 */
-const UNSAFE_ACCESS =
-  /\bUnsafe\s*\.\s*(?:As|AsRef|AsPointer|Unbox|NullRef|SkipInit|Add|Subtract|AddByteOffset|SubtractByteOffset|Read|ReadUnaligned|Write|WriteUnaligned|Copy|CopyBlock|CopyBlockUnaligned|InitBlock|InitBlockUnaligned)\b/g;
-
-const UNSAFE_IMPORT =
-  /\busing\s+(?:static\s+|@?[A-Za-z_]\w*\s*=\s*)(?:@?[A-Za-z_]\w*\s*::\s*)?(?:@?[A-Za-z_]\w*\s*\.\s*)*@?Unsafe\s*;/g;
-
 /*
     IL2CPP emits a null check on every reference dereference, a bounds check on every array index
     and a divide-by-zero check on every integer division, which is what makes a wrong assumption in
@@ -83,8 +79,6 @@ const UNSAFE_IMPORT =
     nothing to baseline, so a single site is the first one.
 */
 const IL2CPP_SET_OPTION = /\bIl2CppSetOption(?:Attribute)?\s*\(/g;
-const IL2CPP_SET_OPTION_IMPORT =
-  /\busing\s+@?([A-Za-z_]\w*)\s*=\s*(?:@?[A-Za-z_]\w*\s*(?:::|\.)\s*)*@?Il2CppSetOption(?:Attribute)?\s*;/g;
 
 /*
     The three checks Unity's Option enum can switch off. Matched case-insensitively and with the
@@ -198,7 +192,7 @@ function getSemanticPolicyDll() {
   const dll = path.join(artifacts, "bin", POLICY_NAME, "release", POLICY_NAME + ".dll");
   if (build.status !== 0 || !existsSync(dll)) {
     semanticPolicyFailure = new Error(
-      "Could not build the semantic stack-allocation gate: " +
+      "Could not build the compiler syntax safety gate: " +
         (build.error?.message ?? build.stderr ?? "") +
         "\n" +
         build.stdout
@@ -214,21 +208,27 @@ function findStackAllocations(sources) {
   if (!owned.some((source) => source.text.includes("stackalloc"))) {
     return { failures: [], inspected: 0 };
   }
-  const result = spawnSync("dotnet", [getSemanticPolicyDll(), "--stackalloc-json"], {
-    input: JSON.stringify(owned.map((source) => ({ Path: source.path, Text: source.text }))),
+  return runCompilerPolicy(owned, "--stackalloc-json", "stack-allocation");
+}
+
+function runCompilerPolicy(sources, mode, label) {
+  const scan = runCompilerCommand(sources, mode, label);
+  if (!Array.isArray(scan.Failures) || !Number.isInteger(scan.Inspected) || scan.Inspected < 0) {
+    throw new Error(`Compiler ${label} scan returned an invalid result`);
+  }
+  return { failures: scan.Failures, inspected: scan.Inspected };
+}
+
+function runCompilerCommand(sources, mode, label) {
+  const result = spawnSync("dotnet", [getSemanticPolicyDll(), mode], {
+    input: JSON.stringify(sources.map((source) => ({ Path: source.path, Text: source.text }))),
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024
   });
   if (result.status !== 0) {
-    throw new Error(
-      "Semantic stack-allocation scan failed: " + (result.error?.message ?? result.stderr)
-    );
+    throw new Error(`Compiler ${label} scan failed: ` + (result.error?.message ?? result.stderr));
   }
-  const scan = JSON.parse(result.stdout);
-  if (!Array.isArray(scan.Failures) || !Number.isInteger(scan.Inspected) || scan.Inspected < 0) {
-    throw new Error("Semantic stack-allocation scan returned an invalid result");
-  }
-  return { failures: scan.Failures, inspected: scan.Inspected };
+  return JSON.parse(result.stdout);
 }
 
 /**
@@ -238,38 +238,15 @@ function findStackAllocations(sources) {
  * @returns {{failures: string[], inspected: number}} violations and how many sites were judged
  */
 function findUnsafeAccess(sources) {
-  const failures = [];
-  let inspected = 0;
-
-  for (const source of sources) {
-    if (isVendored(source.path)) {
-      continue;
-    }
-
-    const code = codeOnly(source.text);
-    for (const importSite of code.matchAll(UNSAFE_IMPORT)) {
-      const line = code.slice(0, importSite.index).split("\n").length;
-      failures.push(
-        `${source.path}:${line}: aliases and static imports hide Unsafe member names. ` +
-          `Use explicit member names so the memory-access rule can inspect them, ${ISSUE}.`
-      );
-    }
-    const sites = [...code.matchAll(UNSAFE_ACCESS)];
-    if (sites.length === 0) {
-      continue;
-    }
-
-    inspected += sites.length;
-
-    const line = code.slice(0, sites[0].index).split("\n").length;
-    failures.push(
-      `${source.path}:${line}: ${sites.length} memory-access Unsafe member(s). ` +
-        `Reinterpreting memory is undefined behaviour on IL2CPP if the ` +
-        `type, layout or index assumption is wrong; use a checked cast, ${ISSUE}.`
-    );
+  const candidates = sources.filter(
+    (source) =>
+      !isVendored(source.path) &&
+      (source.text.includes("Unsafe") || /\\[uU][0-9a-fA-F]/.test(source.text))
+  );
+  if (candidates.length === 0) {
+    return { failures: [], inspected: 0 };
   }
-
-  return { failures, inspected };
+  return runCompilerPolicy(candidates, "--unsafe-access-json", "Unsafe memory-access");
 }
 
 /** Every balanced `(...)` in `code`, each as its open index, close index and inner text. */
@@ -387,15 +364,32 @@ function judgeIl2CppArguments(argumentText, isSetOption) {
  * @returns {{failures: string[], inspected: number}} violations, and how many lists were judged
  */
 function findIl2CppSafetyDisables(sources) {
-  const failures = [];
-  let inspected = 0;
-
-  for (const source of sources) {
-    if (isVendored(source.path)) {
-      continue;
-    }
-
-    const code = codeOnly(source.text);
+  const failuresBySite = new Map();
+  const inspectedSites = new Set();
+  const candidates = sources.filter(
+    (source) =>
+      !isVendored(source.path) &&
+      (IL2CPP_MENTION.test(source.text) || /\\[uU][0-9a-fA-F]/.test(source.text))
+  );
+  if (candidates.length === 0) {
+    return { failures: [], inspected: 0 };
+  }
+  const scan = runCompilerCommand(candidates, "--il2cpp-code-json", "IL2CPP code");
+  if (
+    !Array.isArray(scan.Variants) ||
+    !scan.Variants.every(
+      (variant) =>
+        typeof variant.Path === "string" &&
+        typeof variant.Text === "string" &&
+        Array.isArray(variant.SetOptionStarts) &&
+        variant.SetOptionStarts.every((start) => Number.isInteger(start) && 0 <= start)
+    )
+  ) {
+    throw new Error("Compiler IL2CPP code scan returned an invalid result");
+  }
+  for (const variant of scan.Variants) {
+    const source = { path: variant.Path, text: variant.Text };
+    const code = source.text;
     if (!IL2CPP_MENTION.test(code)) {
       continue;
     }
@@ -403,12 +397,12 @@ function findIl2CppSafetyDisables(sources) {
     const regions = parenthesizedRegions(code);
     const judged = new Map();
     const setOptionPatterns = [IL2CPP_SET_OPTION];
-    for (const alias of code.matchAll(IL2CPP_SET_OPTION_IMPORT)) {
-      const name = alias[1];
-      setOptionPatterns.push(new RegExp(`\\b${name}\\s*\\(`, "g"));
-      if (name.endsWith("Attribute") && "Attribute".length < name.length) {
-        setOptionPatterns.push(new RegExp(`\\b${name.slice(0, -"Attribute".length)}\\s*\\(`, "g"));
+    for (const start of variant.SetOptionStarts) {
+      const region = regions.find((candidate) => candidate.start === start);
+      if (region === undefined) {
+        throw new Error("Compiler IL2CPP argument list was not present in normalized source");
       }
+      judged.set(start, { region, isSetOption: true });
     }
     for (const pattern of setOptionPatterns) {
       for (const match of code.matchAll(pattern)) {
@@ -431,7 +425,8 @@ function findIl2CppSafetyDisables(sources) {
     for (const { region, isSetOption } of [...judged.values()].sort(
       (left, right) => left.region.start - right.region.start
     )) {
-      inspected++;
+      const site = `${source.path}:${region.start}`;
+      inspectedSites.add(site);
       const finding = judgeIl2CppArguments(region.text, isSetOption);
       if (finding === null) {
         continue;
@@ -442,7 +437,8 @@ function findIl2CppSafetyDisables(sources) {
         finding.options.length === 0
           ? "an IL2CPP safety check"
           : `IL2CPP ${[...new Set(finding.options)].join(", ")}`;
-      failures.push(
+      failuresBySite.set(
+        site,
         `${source.path}:${line}: '${finding.value}' switches off ${named}. Without those ` +
           `checks a null dereference, an out-of-range index and an integer divide by zero ` +
           `are undefined behaviour rather than exceptions; write the literal true or drop ` +
@@ -451,7 +447,7 @@ function findIl2CppSafetyDisables(sources) {
     }
   }
 
-  return { failures, inspected };
+  return { failures: [...failuresBySite.values()].sort(), inspected: inspectedSites.size };
 }
 
 /**
@@ -527,7 +523,10 @@ const IL2CPP_CONTROL =
   "    [Il2CppSetOption(Option.NullChecks, false)]\n" +
   "    internal sealed class Subject { }\n" +
   "    [Il2CppSetOption(Option.ArrayBoundsChecks, !true)]\n" +
-  "    internal sealed class ExpressionSubject { }\n}\n";
+  "    internal sealed class ExpressionSubject { }\n" +
+  String.raw`    [\u0049l2CppSetOption((Option)0, false)]` +
+  "\n    internal sealed class EscapedSubject { }\n" +
+  '    class InterpolationSubject { string M() { return $"{Configure(Option.NullChecks, false)}"; } }\n}\n';
 
 /*
     Listed by directory and filtered here, never by a recursive-glob pathspec: git's double-star
@@ -601,9 +600,17 @@ function scanRepository(repoRoot) {
   const unsafeAccess = findUnsafeAccess(sources);
   failures.push(...unsafeAccess.failures);
   const unsafeControl = findUnsafeAccess([
-    { path: "control/UnsafeAccess.cs", text: "Unsafe.As<int, long>(ref value);" }
+    {
+      path: "control/UnsafeAccess.cs",
+      text:
+        "class Control { void M(ref int value) { Unsafe.As<int, long>(ref value); " +
+        String.raw`\u0055nsafe.\u0041s<int, long>(ref value);` +
+        ' string text = $"{Unsafe.As<int, long>(ref value)}"; } }'
+    }
   ]);
-  if (unsafeControl.failures.length !== 1) {
+  const unsafeControlReported =
+    unsafeControl.failures.length === 1 && unsafeControl.inspected === 3;
+  if (!unsafeControlReported) {
     failures.push(`the memory-access Unsafe control was not reported; ${ISSUE}.`);
   }
 
@@ -611,10 +618,10 @@ function scanRepository(repoRoot) {
     { path: "control/Il2CppSetOption.cs", text: IL2CPP_CONTROL }
   ]);
   const il2cppControlReported =
-    il2cppControl.inspected === 2 && il2cppControl.failures.length === 2;
+    il2cppControl.inspected === 4 && il2cppControl.failures.length === 4;
   if (!il2cppControlReported) {
     failures.push(
-      `the literal and expression IL2CPP controls were not both reported, so a clean scan ` +
+      `the literal, expression, escaped and interpolated IL2CPP controls were not all reported, so a clean scan ` +
         `cannot prove that disabled runtime checks would be seen; ${ISSUE}.`
     );
   }
@@ -641,7 +648,7 @@ function scanRepository(repoRoot) {
       stackAllocations: inspected,
       unsafeAccessSites: unsafeAccess.inspected,
       il2cppOptionLists: findIl2CppSafetyDisables(sources).inspected,
-      unsafeControlReported: unsafeControl.failures.length === 1,
+      unsafeControlReported,
       stackControlReported,
       il2cppControlReported
     }
