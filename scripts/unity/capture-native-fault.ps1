@@ -215,11 +215,18 @@ try {
     Save-NativeCaptureRecord
     if ($CompareLoaderSnaps) {
         $flagBase = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
-        $flagKey = $flagBase.OpenSubKey('SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\Unity.exe', $true)
+        $flagPath = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\Unity.exe'
+        $readOnlyFlagKey = $flagBase.OpenSubKey($flagPath, $false)
+        try {
+            if ($null -eq $readOnlyFlagKey) { throw 'Unity.exe image flags are missing' }
+            $record.LoaderFlagLease = New-NativeLoaderFlagLease -Key $readOnlyFlagKey
+            Save-NativeLoaderFlagLease -Lease $record.LoaderFlagLease -Path ((Join-Path $artifactRoot 'loader-flag-lease.json') + '.prepared')
+            Save-NativeCaptureRecord
+        } finally {
+            if ($null -ne $readOnlyFlagKey) { $readOnlyFlagKey.Dispose() }
+        }
+        $flagKey = $flagBase.OpenSubKey($flagPath, $true)
         if ($null -eq $flagKey) { throw 'Unity.exe image flags are missing' }
-        $record.LoaderFlagLease = New-NativeLoaderFlagLease -Key $flagKey
-        Save-NativeLoaderFlagLease -Lease $record.LoaderFlagLease -Path ((Join-Path $artifactRoot 'loader-flag-lease.json') + '.prepared')
-        Save-NativeCaptureRecord
     }
     if ([string]::IsNullOrWhiteSpace($DebuggerDirectory)) {
         $DebuggerDirectory = $layout.Tools

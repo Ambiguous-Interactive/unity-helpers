@@ -137,6 +137,46 @@ try {
                 try { Disable-NativeLoaderFlag -Lease $lease -Key $readOnlyKey -LeasePath (Join-Path $root 'permission.json') } catch { $refused = $true }
                 Assert-Capture ($refused -and (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value 2)) 'Permission failure leaves the original value intact'
             } finally { $readOnlyKey.Dispose() }
+            $permissionLease = Join-Path $root 'denied-open.json'
+            $readOnlyKey = $registryRoot.OpenSubKey($registryPath, $false)
+            try {
+                $prepared = New-NativeLoaderFlagLease -Key $readOnlyKey
+                Save-NativeLoaderFlagLease -Lease $prepared -Path ($permissionLease + '.prepared')
+            } finally { $readOnlyKey.Dispose() }
+            $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+            $restrictedSecurity = [Microsoft.Win32.RegistryAclExtensions]::GetAccessControl($registryKey)
+            $denyWrite = [Security.AccessControl.RegistryAccessRule]::new($identity.User, [Security.AccessControl.RegistryRights]::SetValue, [Security.AccessControl.AccessControlType]::Deny)
+            $restrictedSecurity.AddAccessRule($denyWrite)
+            try {
+                [Microsoft.Win32.RegistryAclExtensions]::SetAccessControl($registryKey, $restrictedSecurity)
+                $deniedKey = $null
+                $refused = $false
+                try { $deniedKey = $registryRoot.OpenSubKey($registryPath, $true) } catch { $refused = $true }
+                finally { if ($null -ne $deniedKey) { $deniedKey.Dispose() } }
+                Assert-Capture ($refused) 'A real registry ACL denies opening a writable handle'
+                foreach ($state in @('prepared', 'clear-requested', 'restored')) {
+                    $recovered = Read-NativeLoaderFlagRecoveryLease -Path $permissionLease
+                    $recovered.State = $state
+                    Invoke-NativeLoaderFlagRecovery -BaseKey $registryRoot -KeyPath $registryPath -Lease $recovered -Apply
+                    Assert-Capture (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value 2) 'Exact unchanged recovery succeeds without registry write permission in every valid lease phase'
+                }
+                $registryKey.SetValue('GlobalFlag', 8, [Microsoft.Win32.RegistryValueKind]::DWord)
+                $recovered = Read-NativeLoaderFlagRecoveryLease -Path $permissionLease
+                $refused = $false
+                try { Invoke-NativeLoaderFlagRecovery -BaseKey $registryRoot -KeyPath $registryPath -Lease $recovered -Apply } catch { $refused = $true }
+                Assert-Capture ($refused -and (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value 8)) 'Read-only recovery refuses a conflicting value without requesting a write'
+                $registryKey.SetValue('GlobalFlag', 0, [Microsoft.Win32.RegistryValueKind]::DWord)
+                $recovered.State = 'clear-requested'
+                $refused = $false
+                try { Invoke-NativeLoaderFlagRecovery -BaseKey $registryRoot -KeyPath $registryPath -Lease $recovered -Apply } catch { $refused = $true }
+                Assert-Capture ($refused -and (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value 0)) 'A real restoration still requires write permission and cannot claim success when denied'
+            } finally {
+                $restrictedSecurity.RemoveAccessRuleSpecific($denyWrite)
+                [Microsoft.Win32.RegistryAclExtensions]::SetAccessControl($registryKey, $restrictedSecurity)
+                $identity.Dispose()
+            }
+            Invoke-NativeLoaderFlagRecovery -BaseKey $registryRoot -KeyPath $registryPath -Lease $recovered -Apply
+            Assert-Capture (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value 2) 'Active recovery restores the exact original value once write permission is available'
             $interrupted = Join-Path $root 'interrupted.ps1'
             $interruptedLease = Join-Path $root 'interrupted-lease.json'
             [IO.File]::WriteAllText($interrupted, @'
@@ -358,8 +398,9 @@ Start-Sleep -Seconds 300
     Assert-Capture ($captureSource.Contains("@('direct-before', 'direct-disabled', 'direct-restored')") -and $captureSource.Contains('finally') -and $captureSource.Contains('-LeasePath') -and $captureSource.Contains('Complete-NativeLoaderFlagLease')) 'Comparison records three direct phases and retains durable and finally recovery paths'
     $prepareOffset = $captureSource.IndexOf("Save-NativeLoaderFlagLease -Lease `$record.LoaderFlagLease")
     Assert-Capture ($prepareOffset -gt 0 -and $prepareOffset -lt $captureSource.IndexOf('if ([string]::IsNullOrWhiteSpace($DebuggerDirectory))')) 'The original receipt is durable before debugger setup and direct-before execution'
+    Assert-Capture ($captureSource.IndexOf('$readOnlyFlagKey = $flagBase.OpenSubKey($flagPath, $false)') -lt $prepareOffset -and $prepareOffset -lt $captureSource.IndexOf('$flagKey = $flagBase.OpenSubKey($flagPath, $true)')) 'The prepared receipt precedes the first request for registry write access'
     $restoreSource = [IO.File]::ReadAllText((Join-Path $repo 'scripts/unity/restore-native-loader-snaps.ps1'))
-    Assert-Capture ($restoreSource.Contains('Read-NativeLoaderFlagRecoveryLease') -and $restoreSource.Contains('Complete-NativeLoaderFlagLease')) 'Independent recovery uses the phase-aware receipt and cleanup policy'
+    Assert-Capture ($restoreSource.Contains('Read-NativeLoaderFlagRecoveryLease') -and $restoreSource.Contains('Invoke-NativeLoaderFlagRecovery')) 'Independent recovery uses the phase-aware receipt and cleanup policy'
     Write-Host "$passed native capture controls passed"
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force

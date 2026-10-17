@@ -135,3 +135,28 @@ function Complete-NativeLoaderFlagLease {
     $Lease.State = 'conflict'
     throw 'Automatic cleanup has no active flag write to restore; external state retained'
 }
+
+function Invoke-NativeLoaderFlagRecovery {
+    param([Microsoft.Win32.RegistryKey]$BaseKey, [string]$KeyPath, [object]$Lease, [switch]$Apply)
+
+    $key = $null
+    try {
+        $key = $BaseKey.OpenSubKey($KeyPath, $false)
+        if ($null -eq $key) { throw 'Unity.exe image flags are missing' }
+        $values = Get-NativeLoaderFlagLeaseValues -Lease $Lease -Key $key
+        $unchanged = Test-NativeLoaderFlagValue -Key $key -Kind $values.Kind -Value $values.Original
+        if (-not $Apply) {
+            if (-not $unchanged -and ($Lease.State -cne 'clear-requested' -or -not (Test-NativeLoaderFlagValue -Key $key -Kind $values.Kind -Value $values.Disabled))) { throw 'Current flag differs from the restoration plan' }
+            return
+        }
+        if (-not $unchanged -and $Lease.State -in @('clear-requested', 'disabled')) {
+            $key.Dispose()
+            $key = $null
+            $key = $BaseKey.OpenSubKey($KeyPath, $true)
+            if ($null -eq $key) { throw 'Unity.exe image flags are missing' }
+        }
+        Complete-NativeLoaderFlagLease -Lease $Lease -Key $key
+    } finally {
+        if ($null -ne $key) { $key.Dispose() }
+    }
+}

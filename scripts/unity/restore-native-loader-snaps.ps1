@@ -9,19 +9,8 @@ $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'Registry restoration requires Windows' }
 $lease = Read-NativeLoaderFlagRecoveryLease -Path $LeasePath
 $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
-$key = $null
 try {
-    $key = $base.OpenSubKey('SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\Unity.exe', $Apply.IsPresent)
-    if ($null -eq $key) { throw 'Unity.exe image flags are missing' }
-    $values = Get-NativeLoaderFlagLeaseValues -Lease $lease -Key $key
-    if (-not $Apply) {
-        if (-not (Test-NativeLoaderFlagValue -Key $key -Kind $values.Kind -Value $values.Original) -and ($lease.State -cne 'clear-requested' -or -not (Test-NativeLoaderFlagValue -Key $key -Kind $values.Kind -Value $values.Disabled))) { throw 'Current flag differs from the restoration plan' }
-        Write-Host 'Validated restoration plan only; pass -Apply to restore the recorded value.'
-        return
-    }
-    Complete-NativeLoaderFlagLease -Lease $lease -Key $key
-    Write-Host 'Original Unity.exe GlobalFlag value and type are confirmed restored.'
-} finally {
-    if ($null -ne $key) { $key.Dispose() }
-    $base.Dispose()
-}
+    Invoke-NativeLoaderFlagRecovery -BaseKey $base -KeyPath 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\Unity.exe' -Lease $lease -Apply:$Apply
+    if ($Apply) { Write-Host 'Original Unity.exe GlobalFlag value and type are confirmed restored.' }
+    else { Write-Host 'Validated restoration plan only; pass -Apply to restore the recorded value.' }
+} finally { $base.Dispose() }
