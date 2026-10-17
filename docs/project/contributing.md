@@ -86,6 +86,11 @@ branch of an assignment whose condition compares that length with a constant. Fo
 Compound conditions and intervening expressions are refused because a nearby comparison alone
 does not establish the bound on the path that allocates.
 
+IL2CPP safety options must omit the value or use the exact literal `true`. A constant expression
+such as `!true` disables checks even though it contains that word. Named constants, compound
+expressions, attribute aliases and numeric option casts follow the same rule. Each scan must report both a
+literal-false control and a negated-true control before it can report a clean package.
+
 Stack-allocation checks use the existing Roslyn policy tool and require .NET SDK 9.0.306.
 Repo Lint installs that SDK before running the checks. The compiler resolves constants and the actual length symbol;
 parameters, locals, readonly fields and properties cannot borrow an unrelated constant's name.
