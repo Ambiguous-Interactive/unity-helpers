@@ -308,6 +308,7 @@
     "lint:repo": "node scripts/run-repo-lint.js",
     "test:run-repo-lint": "node scripts/tests/test-run-repo-lint.js",
     "test:browser-storage": "node --test scripts/tests/test-browser-storage.js",
+    "test:browser-consumer": "python3 scripts/tests/test-browser-consumer.py",
     "test:run-contract-tests": "node scripts/tests/test-run-contract-tests.js",
     "test:redact-unity-artifacts": "node scripts/tests/test-redact-unity-artifacts.js",
     "test:unity-artifact-redaction": "node scripts/tests/test-unity-artifact-redaction.js",
