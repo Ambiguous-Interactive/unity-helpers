@@ -24,7 +24,7 @@
     undefined behaviour with neither the keyword nor the asmdef flag. See findIl2CppSafetyDisables.
 */
 
-// cspell:ignore nsafe
+// cspell:ignore nsafe Unsa
 
 "use strict";
 
@@ -44,6 +44,7 @@ const { spawnSync } = require("node:child_process");
 const SOURCE_ROOTS = ["Runtime", "Editor", "Tests"];
 const VENDORED_PREFIXES = ["Runtime/Utils/SevenZip/"];
 const ISSUE = "see issue #637";
+const IDENTIFIER_ESCAPES_OR_FORMATTING = /\\[uU][0-9a-fA-F]|\p{Cf}/u;
 const POLICY_NAME = "WallstopStudios.UnityHelpers.SyntaxPolicy";
 let semanticPolicyDll = null;
 let semanticPolicyFailure = null;
@@ -241,7 +242,7 @@ function findUnsafeAccess(sources) {
   const candidates = sources.filter(
     (source) =>
       !isVendored(source.path) &&
-      (source.text.includes("Unsafe") || /\\[uU][0-9a-fA-F]/.test(source.text))
+      (source.text.includes("Unsafe") || IDENTIFIER_ESCAPES_OR_FORMATTING.test(source.text))
   );
   if (candidates.length === 0) {
     return { failures: [], inspected: 0 };
@@ -369,7 +370,7 @@ function findIl2CppSafetyDisables(sources) {
   const candidates = sources.filter(
     (source) =>
       !isVendored(source.path) &&
-      (IL2CPP_MENTION.test(source.text) || /\\[uU][0-9a-fA-F]/.test(source.text))
+      (IL2CPP_MENTION.test(source.text) || IDENTIFIER_ESCAPES_OR_FORMATTING.test(source.text))
   );
   if (candidates.length === 0) {
     return { failures: [], inspected: 0 };
@@ -606,22 +607,30 @@ function scanRepository(repoRoot) {
         "class Control { void M(ref int value) { Unsafe.As<int, long>(ref value); " +
         String.raw`\u0055nsafe.\u0041s<int, long>(ref value);` +
         ' string text = $"{Unsafe.As<int, long>(ref value)}"; } }'
+    },
+    {
+      path: "control/FormattedMemory.cs",
+      text: `class Control { int M(ref byte value) { return Unsa${String.fromCodePoint(0x200c)}fe.As<byte, int>(ref value); } }`
     }
   ]);
   const unsafeControlReported =
-    unsafeControl.failures.length === 1 && unsafeControl.inspected === 3;
+    unsafeControl.failures.length === 2 && unsafeControl.inspected === 4;
   if (!unsafeControlReported) {
     failures.push(`the memory-access Unsafe control was not reported; ${ISSUE}.`);
   }
 
   const il2cppControl = findIl2CppSafetyDisables([
-    { path: "control/Il2CppSetOption.cs", text: IL2CPP_CONTROL }
+    { path: "control/Il2CppSetOption.cs", text: IL2CPP_CONTROL },
+    {
+      path: "control/FormattedOption.cs",
+      text: `[Il2CppSet${String.fromCodePoint(0x200c)}Option((Option)0, false)] class Control {}`
+    }
   ]);
   const il2cppControlReported =
-    il2cppControl.inspected === 4 && il2cppControl.failures.length === 4;
+    il2cppControl.inspected === 5 && il2cppControl.failures.length === 5;
   if (!il2cppControlReported) {
     failures.push(
-      `the literal, expression, escaped and interpolated IL2CPP controls were not all reported, so a clean scan ` +
+      `the literal, expression, escaped, formatted and interpolated IL2CPP controls were not all reported, so a clean scan ` +
         `cannot prove that disabled runtime checks would be seen; ${ISSUE}.`
     );
   }

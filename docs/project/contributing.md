@@ -91,11 +91,12 @@ such as `!true` disables checks even though it contains that word. Named constan
 expressions, attribute aliases and numeric option casts follow the same rule. Each scan must report both a
 literal-false control and a negated-true control before it can report a clean package.
 
-Memory-access and IL2CPP option checks parse C# syntax, including Unicode-escaped identifiers and interpolation
-expressions. Comments, literal text and format strings remain excluded. Every conditional branch
+Memory-access and IL2CPP option checks parse C# syntax, including Unicode escapes, invisible identifier format characters and
+interpolation expressions. Comments, literal text and format strings remain excluded. Every conditional branch
 is checked, and each source site is counted once. Aliases and static imports of `Unsafe` are
 refused because they hide member names. Size and reference-identity queries remain permitted.
-The positive controls require plain, escaped and interpolated calls to be found.
+The positive controls require plain, escaped, formatted and interpolated calls to be found.
+Separate sources exercise format characters without an ordinary spelling that could mask a prefilter regression.
 
 Stack-allocation and memory-access checks use the existing Roslyn policy tool and require .NET SDK 9.0.306.
 Repo Lint installs that SDK before running the checks. The compiler resolves constants and the actual length symbol;

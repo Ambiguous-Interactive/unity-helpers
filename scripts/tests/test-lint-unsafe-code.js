@@ -13,7 +13,7 @@
 // StackOverflowException that no catch intercepts, so a length must be a constant or guarded against one in
 // the same statement. Both shipped offenders are reproduced verbatim as red cases.
 
-// cspell:ignore nsafe ize ull alue
+// cspell:ignore nsafe ize ull alue Unsa
 
 "use strict";
 
@@ -765,6 +765,16 @@ runTest("a memory-access Unsafe member in a file with no baseline entry is a vio
   assert.ok(found[0].includes("Runtime/Sample.cs:1"), found[0]);
 });
 
+for (const point of [0x200b, 0x200c, 0x2060]) {
+  const format = String.fromCodePoint(point);
+  runTest(`raw format characters cannot hide Unsafe access: ${point}`, () => {
+    const text = `using System.Runtime.CompilerServices; class Sample { int Read(ref byte value) { return Unsa${format}fe.As<byte, int>(ref value); } }`;
+    const scan = findUnsafeAccess([{ path: "Runtime/Formatted.cs", text }]);
+    assert.strictEqual(scan.inspected, 1);
+    assert.strictEqual(scan.failures.length, 1);
+  });
+}
+
 for (const imported of [
   "using Raw = System.Runtime.CompilerServices.Unsafe;",
   "using Raw = global::System.Runtime.CompilerServices.Unsafe;",
@@ -1033,6 +1043,16 @@ namespace Unity.IL2CPP.CompilerServices
 }`;
   try {
     writeFileSync(path.join(temporary, "Control.cs"), text);
+    const format = String.fromCodePoint(0x200c);
+    const raw = `using System.Runtime.CompilerServices;
+using Unity.IL2CPP.CompilerServices;
+[Il2CppSet${format}Option((Option)0, false)]
+internal class RawControl
+{
+    static int Read(ref byte value) { return Unsa${format}fe.As<byte, int>(ref value); }
+}`;
+    writeFileSync(path.join(temporary, "RawControl.cs"), raw);
+
     writeFileSync(
       path.join(temporary, "Control.csproj"),
       '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework><AllowUnsafeBlocks>false</AllowUnsafeBlocks></PropertyGroup></Project>'
@@ -1049,9 +1069,34 @@ namespace Unity.IL2CPP.CompilerServices
     assert.strictEqual(memory.failures.length, 1);
     assert.strictEqual(options.inspected, 2);
     assert.strictEqual(options.failures.length, 2);
+    assert.strictEqual(
+      findUnsafeAccess([{ path: "Runtime/RawControl.cs", text: raw }]).inspected,
+      1
+    );
+    assert.strictEqual(
+      findIl2CppSafetyDisables([{ path: "Runtime/RawControl.cs", text: raw }]).inspected,
+      1
+    );
   } finally {
     rmSync(temporary, { recursive: true, force: true, maxRetries: 3 });
   }
+});
+
+for (const point of [0x200b, 0x200c, 0x2060]) {
+  const format = String.fromCodePoint(point);
+  runTest(`raw format characters cannot hide IL2CPP options: ${point}`, () => {
+    const text = `[Il2CppSet${format}Option((Option)0, false)] class Sample {}`;
+    const scan = findIl2CppSafetyDisables([{ path: "Runtime/Formatted.cs", text }]);
+    assert.strictEqual(scan.inspected, 1);
+    assert.strictEqual(scan.failures.length, 1);
+  });
+}
+
+runTest("raw format characters in literal text remain excluded", () => {
+  const format = String.fromCodePoint(0x200c);
+  const text = `class Sample { string text = "Unsa${format}fe.As<int, long>(ref value); Il2CppSet${format}Option((Option)0, false)"; }`;
+  assert.deepStrictEqual(unsafeAccess(text), []);
+  assert.deepStrictEqual(il2cpp(text), []);
 });
 
 /** Every spelling that leaves a check switched off. Each must be reported exactly once. */
