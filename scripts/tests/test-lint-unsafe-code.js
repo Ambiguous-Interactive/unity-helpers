@@ -853,6 +853,67 @@ function il2cpp(text) {
 
 /** Every spelling that leaves a check switched off. Each must be reported exactly once. */
 const IL2CPP_DISABLED = [
+  ...["false", "!true"].flatMap((value) =>
+    [
+      `@value: ${value}, option: Option.NullChecks`,
+      `@value: ${value}, @option: Option.ArrayBoundsChecks`,
+      `@option: Option.DivideByZeroChecks, @value: ${value}`
+    ].map((argumentsList) => [
+      `verbatim value labels cannot hide a disable: ${argumentsList}`,
+      `[Il2CppSetOption(${argumentsList})] class Sample { }\n`
+    ])
+  ),
+  ...["CheckAttribute", "OtherAttribute"].flatMap((alias) =>
+    [alias, alias.slice(0, -"Attribute".length)].map((usage) => [
+      `attribute suffix aliases cannot hide a disable: ${alias} ${usage}`,
+      `using ${alias} = Unity.IL2CPP.CompilerServices.Il2CppSetOptionAttribute; [${usage}((Option)0, false)] class Sample { }\n`
+    ])
+  ),
+  ...["NullChecks", "ArrayBoundsChecks", "DivideByZeroChecks"].flatMap((name) => [
+    [
+      `a false value whose name matches an option: ${name}`,
+      `class Sample { const bool ${name} = false; [Il2CppSetOption(Option.NullChecks, ${name})] void M() { } }\n`
+    ],
+    [
+      `a named false value whose name matches an option: ${name}`,
+      `class Sample { const bool ${name} = false; [Il2CppSetOption(value: ${name}, option: Option.NullChecks)] void M() { } }\n`
+    ]
+  ]),
+  ...["Check", "@event"].flatMap((alias) =>
+    ["Il2CppSetOption", "Il2CppSetOptionAttribute"].flatMap((attribute) =>
+      ["false", "!true", "true != true"].map((value) => [
+        `an attribute alias cannot hide a disabled numeric option: ${alias} ${attribute} ${value}`,
+        `using ${alias} = global::Unity.IL2CPP.CompilerServices.${attribute}; [${alias}((Option)0, ${value})] class Sample { }\n`
+      ])
+    )
+  ),
+  ...["!true", "true != true", "true ^ true", "true ? !true : true", "default(bool)"].flatMap(
+    (value) =>
+      ["NullChecks", "ArrayBoundsChecks", "DivideByZeroChecks"].map((option) => [
+        `a false constant expression containing true or default: ${option} ${value}`,
+        `[Il2CppSetOption(Option.${option}, ${value})]\nclass Sample { }\n`
+      ])
+  ),
+  ...["TRUE", "True"].map((value) => [
+    `a false named constant whose name resembles true: ${value}`,
+    `class Sample { const bool ${value} = false; [Il2CppSetOption(Option.NullChecks, ${value})] void M() { } }\n`
+  ]),
+  ...["Option.Unknown", "(Option)0"].flatMap((option) =>
+    ["!true", "true != true", "default(bool)"].flatMap((value) => [
+      [
+        `an unnamed option with a false expression: ${option} ${value}`,
+        `[Il2CppSetOption(${option}, ${value})]\nclass Sample { }\n`
+      ],
+      [
+        `named arguments with an unnamed option and false expression: ${option} ${value}`,
+        `[Il2CppSetOption(value: ${value}, option: ${option})]\nclass Sample { }\n`
+      ]
+    ])
+  ),
+  [
+    "named arguments with a negated literal",
+    "[Il2CppSetOption(value: !true, option: Option.NullChecks)]\nclass Sample { }\n"
+  ],
   ["the attribute on a type", "[Il2CppSetOption(Option.NullChecks, false)]\nclass Sample { }\n"],
   [
     "the attribute on a method",
@@ -919,6 +980,40 @@ for (const [label, text] of IL2CPP_DISABLED) {
     be uninstallable.
 */
 const IL2CPP_ENABLED = [
+  ...[
+    "@value: true, option: Option.NullChecks",
+    "@value: true, @option: Option.ArrayBoundsChecks",
+    "@option: Option.DivideByZeroChecks, @value: true"
+  ].map((argumentsList) => [
+    `verbatim value labels with literal true: ${argumentsList}`,
+    `[Il2CppSetOption(${argumentsList})] class Sample { }\n`
+  ]),
+  ...["CheckAttribute", "OtherAttribute"].flatMap((alias) =>
+    [alias, alias.slice(0, -"Attribute".length)].map((usage) => [
+      `attribute suffix aliases with literal true: ${alias} ${usage}`,
+      `using ${alias} = Unity.IL2CPP.CompilerServices.Il2CppSetOptionAttribute; [${usage}((Option)0, true)] class Sample { }\n`
+    ])
+  ),
+  ...["Check", "@event"].flatMap((alias) =>
+    ["Il2CppSetOption", "Il2CppSetOptionAttribute"].map((attribute) => [
+      `an attribute alias with literal true: ${alias} ${attribute}`,
+      `using ${alias} = Unity.IL2CPP.CompilerServices.${attribute}; [${alias}((Option)0, true)] class Sample { }\n`
+    ])
+  ),
+  ...["Option.Unknown", "(Option)0"].flatMap((option) => [
+    [
+      `an unnamed option with literal true: ${option}`,
+      `[Il2CppSetOption(${option}, true)]\nclass Sample { }\n`
+    ],
+    [
+      `named arguments with an unnamed option and literal true: ${option}`,
+      `[Il2CppSetOption(value: true, option: ${option})]\nclass Sample { }\n`
+    ],
+    [
+      `an unnamed option with no value: ${option}`,
+      `[Il2CppSetOption(${option})]\nclass Sample { }\n`
+    ]
+  ]),
   ["the attribute with true", "[Il2CppSetOption(Option.NullChecks, true)]\nclass Sample { }\n"],
   [
     "named arguments in the reverse order with true",

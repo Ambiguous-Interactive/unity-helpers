@@ -83,6 +83,8 @@ const UNSAFE_IMPORT =
     nothing to baseline, so a single site is the first one.
 */
 const IL2CPP_SET_OPTION = /\bIl2CppSetOption(?:Attribute)?\s*\(/g;
+const IL2CPP_SET_OPTION_IMPORT =
+  /\busing\s+@?([A-Za-z_]\w*)\s*=\s*(?:@?[A-Za-z_]\w*\s*(?:::|\.)\s*)*@?Il2CppSetOption(?:Attribute)?\s*;/g;
 
 /*
     The three checks Unity's Option enum can switch off. Matched case-insensitively and with the
@@ -106,8 +108,7 @@ const IL2CPP_MENTION = /Il2CppSetOption|NullChecks|ArrayBoundsChecks|DivideByZer
 */
 const OPTION_ARGUMENT_RESIDUE = /^(?:\s|,|[{}()[\]]|new|Option)*$/;
 const FALSE_LITERAL = /\bfalse\b/i;
-const TRUE_LITERAL = /\btrue\b/i;
-const ARGUMENT_LABEL = /^\s*[A-Za-z_]\w*\s*:(?!:)/;
+const ARGUMENT_LABEL = /^\s*@?[A-Za-z_]\w*\s*:(?!:)/;
 
 /** Blanks comments and string literals so the keyword scan cannot match prose. */
 function codeOnly(text) {
@@ -356,16 +357,20 @@ function judgeIl2CppArguments(argumentText, isSetOption) {
     return null;
   }
 
-  const values = splitArguments(argumentText).filter((part) => !isOptionReferenceOnly(part));
+  const argumentsList = splitArguments(argumentText);
+  const values = isSetOption
+    ? argumentsList.filter((part, index) =>
+        ARGUMENT_LABEL.test(part) ? /^\s*@?value\s*:/.test(part) : index !== 0
+      )
+    : argumentsList.filter((part) => !isOptionReferenceOnly(part));
   const disabling = values.find((value) => FALSE_LITERAL.test(value));
   if (disabling !== undefined) {
     return { options, value: disabling.trim() };
   }
-  /* An Il2CppSetOption naming an option this gate does not know, with nothing false in it. */
-  if (options.length === 0) {
-    return null;
-  }
-  if (values.length === 0 || values.every((value) => TRUE_LITERAL.test(value))) {
+  if (
+    values.length === 0 ||
+    values.every((value) => value.replace(ARGUMENT_LABEL, " ").trim() === "true")
+  ) {
     return null;
   }
   return { options, value: values.map((value) => value.trim()).join(", ") };
@@ -397,11 +402,21 @@ function findIl2CppSafetyDisables(sources) {
 
     const regions = parenthesizedRegions(code);
     const judged = new Map();
-    for (const match of code.matchAll(IL2CPP_SET_OPTION)) {
-      const start = match.index + match[0].length - 1;
-      const region = regions.find((candidate) => candidate.start === start);
-      if (region !== undefined) {
-        judged.set(start, { region, isSetOption: true });
+    const setOptionPatterns = [IL2CPP_SET_OPTION];
+    for (const alias of code.matchAll(IL2CPP_SET_OPTION_IMPORT)) {
+      const name = alias[1];
+      setOptionPatterns.push(new RegExp(`\\b${name}\\s*\\(`, "g"));
+      if (name.endsWith("Attribute") && "Attribute".length < name.length) {
+        setOptionPatterns.push(new RegExp(`\\b${name.slice(0, -"Attribute".length)}\\s*\\(`, "g"));
+      }
+    }
+    for (const pattern of setOptionPatterns) {
+      for (const match of code.matchAll(pattern)) {
+        const start = match.index + match[0].length - 1;
+        const region = regions.find((candidate) => candidate.start === start);
+        if (region !== undefined) {
+          judged.set(start, { region, isSetOption: true });
+        }
       }
     }
     for (const match of code.matchAll(IL2CPP_OPTION_NAME)) {
@@ -510,7 +525,9 @@ function findViolations(
 const IL2CPP_CONTROL =
   "namespace Control\n{\n" +
   "    [Il2CppSetOption(Option.NullChecks, false)]\n" +
-  "    internal sealed class Subject { }\n}\n";
+  "    internal sealed class Subject { }\n" +
+  "    [Il2CppSetOption(Option.ArrayBoundsChecks, !true)]\n" +
+  "    internal sealed class ExpressionSubject { }\n}\n";
 
 /*
     Listed by directory and filtered here, never by a recursive-glob pathspec: git's double-star
@@ -593,10 +610,12 @@ function scanRepository(repoRoot) {
   const il2cppControl = findIl2CppSafetyDisables([
     { path: "control/Il2CppSetOption.cs", text: IL2CPP_CONTROL }
   ]);
-  if (il2cppControl.failures.length === 0) {
+  const il2cppControlReported =
+    il2cppControl.inspected === 2 && il2cppControl.failures.length === 2;
+  if (!il2cppControlReported) {
     failures.push(
-      `the IL2CPP control site was not reported, so a clean scan of the package proves nothing ` +
-        `about whether an [Il2CppSetOption(Option.NullChecks, false)] would be seen; ${ISSUE}.`
+      `the literal and expression IL2CPP controls were not both reported, so a clean scan ` +
+        `cannot prove that disabled runtime checks would be seen; ${ISSUE}.`
     );
   }
 
@@ -624,7 +643,7 @@ function scanRepository(repoRoot) {
       il2cppOptionLists: findIl2CppSafetyDisables(sources).inspected,
       unsafeControlReported: unsafeControl.failures.length === 1,
       stackControlReported,
-      il2cppControlReported: il2cppControl.failures.length !== 0
+      il2cppControlReported
     }
   };
 }
