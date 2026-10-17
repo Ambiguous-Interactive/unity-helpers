@@ -3709,6 +3709,43 @@ function Get-UnityNativeEvidence {
     return $report
 }
 
+function Invoke-UnityObservedEditor {
+    param(
+        [Parameter(Mandatory = $true)][string]$EditorPath,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [string]$CompletionPattern = '',
+        [int]$CompletionGraceSeconds = 120,
+        [int]$TimeoutSeconds = 0,
+        [int]$StallSeconds = 0,
+        [hashtable]$ProcessObservation
+    )
+
+    if ($null -eq $ProcessObservation) { $ProcessObservation = @{} }
+    $nativeCapture = $null
+    if ($IsWindows) {
+        $nativeCapture = New-UnityNativeEvidenceCapture -LogPath $LogPath
+        if ($nativeCapture.State -eq 'configured') {
+            $Arguments = @($Arguments) + @('-crash-report-folder', $nativeCapture.CrashDirectory, '-upmLogFile', $nativeCapture.UpmLogPath)
+        }
+    }
+    $watch = Invoke-ProcessWithTreeKillTimeout `
+        -FilePath $EditorPath `
+        -Arguments $Arguments `
+        -TimeoutSeconds $TimeoutSeconds `
+        -LogPath $LogPath `
+        -Label $Label `
+        -CompletionPattern $CompletionPattern `
+        -CompletionGraceSeconds $CompletionGraceSeconds `
+        -StallSeconds $StallSeconds `
+        -ProcessObservation $ProcessObservation
+    try { $ProcessObservation['NativeEvidence'] = Get-UnityNativeEvidence -Capture $nativeCapture -LogPath $LogPath }
+    catch { $ProcessObservation['NativeEvidence'] = @{ State = 'capture-unavailable'; Files = @() } }
+    Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $ProcessObservation -Label $Label
+    return $watch
+}
+
 function Invoke-UnityEditor {
     param(
         [Parameter(Mandatory = $true)][string]$EditorPath,
@@ -3721,7 +3758,7 @@ function Invoke-UnityEditor {
         # (a) deadlock on shutdown AFTER results.xml is written and (b) hang MID-RUN with
         # zero further output (a PlayMode test whose background coroutine throws), either
         # of which would otherwise block the `&` pipeline until the GitHub step's
-        # wall-clock timeout. Configure/license/build callers omit all of these and keep
+        # wall-clock timeout. Configure/license callers may omit these and keep
         # the proven `&` idiom unchanged.
         [string]$CompletionPattern = '',
         [int]$CompletionGraceSeconds = 120,
@@ -3748,16 +3785,8 @@ function Invoke-UnityEditor {
         # grace-kills the editor once the completion sentinel is seen, and tree-kills it
         # if it goes silent mid-run for $StallSeconds. It returns @{ ExitCode; TimedOut;
         # Stalled }; the durable results.xml remains the source of truth.
-        if ($null -eq $ProcessObservation) { $ProcessObservation = @{} }
-        $nativeCapture = $null
-        if ($IsWindows) {
-            $nativeCapture = New-UnityNativeEvidenceCapture -LogPath $LogPath
-            if ($nativeCapture.State -eq 'configured') {
-                $Arguments = @($Arguments) + @('-crash-report-folder', $nativeCapture.CrashDirectory, '-upmLogFile', $nativeCapture.UpmLogPath)
-            }
-        }
-        $watch = Invoke-ProcessWithTreeKillTimeout `
-            -FilePath $EditorPath `
+        $watch = Invoke-UnityObservedEditor `
+            -EditorPath $EditorPath `
             -Arguments $Arguments `
             -TimeoutSeconds $TimeoutSeconds `
             -LogPath $LogPath `
@@ -3767,9 +3796,6 @@ function Invoke-UnityEditor {
             -StallSeconds $StallSeconds `
             -ProcessObservation $ProcessObservation
         $exitCode = $watch.ExitCode
-        try { $ProcessObservation['NativeEvidence'] = Get-UnityNativeEvidence -Capture $nativeCapture -LogPath $LogPath }
-        catch { $ProcessObservation['NativeEvidence'] = @{ State = 'capture-unavailable'; Files = @() } }
-        Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $ProcessObservation -Label $Label
     } else {
         Write-Host "::group::$Label"
         Write-Host "`"$EditorPath`" $($Arguments -join ' ')"
@@ -5293,23 +5319,15 @@ try {
         # compilation and linking are legitimately silent for minutes under `-logFile -`,
         # so a no-output stall guard WOULD false-fire on a healthy build. The stall guard
         # is scoped to the in-editor -runTests pass instead.
-        $buildResult = Invoke-ProcessWithTreeKillTimeout `
-            -FilePath $UnityEditorPath `
+        $buildResult = Invoke-UnityObservedEditor `
+            -EditorPath $UnityEditorPath `
             -Arguments $buildArgs `
             -TimeoutSeconds (Get-StandaloneBuildTimeoutSeconds) `
             -LogPath $logPath `
             -Label "Build standalone IL2CPP test player (Unity $UnityVersion)"
 
-        # POST-BUILD ASSERT (the BUILT PLAYER EXE is the source of truth): the exe
-        # MUST exist at UH_PLAYER_BUILD_PATH, be fresh for this build, and include
-        # its companion _Data directory. A non-zero build exit code OR a watchdog
-        # tree-kill is fatal ONLY when the exe is missing/stale/incomplete: Unity can
-        # crash in a background thread during shutdown AFTER the player is fully
-        # built, or defer Application.Quit in -batchmode IL2CPP (the watchdog then
-        # tree-kills an already-finished build). Validating the exe FIRST -- before
-        # consulting the exit code -- keeps those benign post-build crashes from
-        # turning a good build red, while a genuinely failed build (which leaves no
-        # fresh, complete exe) still fails loudly with full diagnostics.
+        # Validate the fresh player independently of the process outcome. Accepted output
+        # does not establish the timing or cause of a native exit.
         $standaloneBuildProblem = Test-StandalonePlayerBuildOutput `
             -ExpectedExe $standaloneExe `
             -BuildStartedUtc $standaloneBuildStartedUtc `
@@ -5341,8 +5359,7 @@ try {
             }
             throw "Editor build produced invalid unity-helpers test player output at $standaloneExe ($standaloneBuildProblem; build exit code $($buildResult.ExitCode) / $(Get-NativeExitCodeDescription -ExitCode $buildResult.ExitCode)). The build modifier may not have run, Unity may have cleaned a Temp output, or a stale player was detected. See the build log at $logPath."
         }
-        # The exe is valid. If the build process nonetheless exited non-zero or was
-        # tree-killed, narrate the benign post-build shutdown crash and keep going.
+        # Keep the observed exit visible when the existing artifact policy accepts the player.
         if ($buildResult.TimedOut -or $buildResult.ExitCode -ne 0) {
             Write-UnityBenignExitWarning -Label "Build standalone IL2CPP test player (Unity $UnityVersion)" -ExitCode $buildResult.ExitCode -TimedOut:$buildResult.TimedOut -LogPath $logPath
         }

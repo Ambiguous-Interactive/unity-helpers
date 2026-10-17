@@ -49,6 +49,7 @@ foreach ($name in @(
         'Write-UnityExecutionObservation',
         'New-UnityNativeEvidenceCapture',
         'Get-UnityNativeEvidence',
+        'Invoke-UnityObservedEditor',
         'Invoke-UnityEditor',
         'Get-EditorTestCompletionGraceSeconds',
         'Get-EditorTestRunTimeoutSeconds',
@@ -483,11 +484,14 @@ try {
     $script:executionAttempt = 0
     $script:executionRetry = $false
     $script:executionLogWriteFailure = $false
+    $script:executionTimedOut = $false
+    $script:executionStalled = $false
     $script:EditorTestCompletionSentinel = 'Test run completed'
     function Invoke-ProcessWithTreeKillTimeout {
         param($FilePath, $Arguments, $TimeoutSeconds, $LogPath, $Label,
             $CompletionPattern, $CompletionGraceSeconds, $StallSeconds, [hashtable]$ProcessObservation)
         $script:lastNativeArguments = @($Arguments)
+        $script:lastWatchOptions = @{ TimeoutSeconds = $TimeoutSeconds; CompletionPattern = $CompletionPattern; StallSeconds = $StallSeconds }
         $crashArgument = [array]::IndexOf($Arguments, '-crash-report-folder')
         if ($crashArgument -ge 0) { $script:capturedNativeDirectories.Add($Arguments[$crashArgument + 1]) }
         ++$script:executionAttempt
@@ -500,14 +504,14 @@ try {
         $ProcessObservation['EndObservedUtc'] = [DateTime]::UtcNow.ToString('o')
         $ProcessObservation['LogPersistence'] = if ($script:executionLogWriteFailure) { 'write-failed' } else { 'written' }
         if ($script:executionLogWriteFailure) {
-            return @{ ExitCode = $script:executionExit; TimedOut = $false; Stalled = $false }
+            return @{ ExitCode = $script:executionExit; TimedOut = $script:executionTimedOut; Stalled = $script:executionStalled; ExtraEvidence = 'retained-watch-result' }
         }
         if ($script:executionRetry -and $script:executionAttempt -eq 1) {
             Set-Content -LiteralPath $LogPath -Value 'IPCStream (Upm-123): IPC stream failed to read'
         } else {
             Set-Content -LiteralPath $LogPath -Value @('Native Crash Reporting', 'Got a UNKNOWN while executing native code', 'Test run completed. Exiting with code 0')
         }
-        return @{ ExitCode = $script:executionExit; TimedOut = $false; Stalled = $false }
+        return @{ ExitCode = $script:executionExit; TimedOut = $script:executionTimedOut; Stalled = $script:executionStalled; ExtraEvidence = 'retained-watch-result' }
     }
     foreach ($code in @(0, 2, 124, -1073741819)) {
         $script:executionExit = $code
@@ -522,6 +526,35 @@ try {
             Assert-That "Windows child arguments match its native receipt at exit $code" ($crashArgument -ge 0 -and $upmArgument -ge 0 -and $script:lastNativeArguments[$crashArgument + 1] -eq $receipt.Process.NativeEvidence.CrashDirectory -and $script:lastNativeArguments[$upmArgument + 1] -eq $receipt.Process.NativeEvidence.UpmLogPath)
         }
     }
+    foreach ($outcome in @(
+            @{ Exit = 0; TimedOut = $false; Stalled = $false; Timeout = 0 },
+            @{ Exit = 124; TimedOut = $true; Stalled = $false; Timeout = 5 },
+            @{ Exit = 125; TimedOut = $false; Stalled = $true; Timeout = 5 },
+            @{ Exit = -1073741819; TimedOut = $false; Stalled = $false; Timeout = 5 }
+        )) {
+        $script:executionExit = $outcome.Exit
+        $script:executionTimedOut = $outcome.TimedOut
+        $script:executionStalled = $outcome.Stalled
+        $watch = Invoke-UnityObservedEditor -EditorPath 'owned-editor' -Arguments @('-runTests', '-testPlatform', 'StandaloneWindows64') -Label 'controlled Standalone build' -LogPath $nativeLog -TimeoutSeconds $outcome.Timeout
+        $buildReceipt = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($nativeLog, 'execution-diagnostics.json')) -Raw | ConvertFrom-Json
+        Assert-That "Standalone observation preserves the complete watchdog result at exit $($outcome.Exit)" ($watch.ExitCode -eq $outcome.Exit -and $watch.TimedOut -eq $outcome.TimedOut -and $watch.Stalled -eq $outcome.Stalled -and $watch.ExtraEvidence -eq 'retained-watch-result')
+        Assert-That "Standalone build receipt binds the native exit to its child at exit $($outcome.Exit)" ($buildReceipt.Process.RawExitCode -eq $outcome.Exit -and $buildReceipt.WindowsEvents.ProcessId -eq $buildReceipt.Process.ProcessId -and $buildReceipt.Label -eq 'controlled Standalone build')
+        Assert-That "Standalone observation preserves the deadline without a completion or stall guard at exit $($outcome.Exit)" ($script:lastWatchOptions.TimeoutSeconds -eq $outcome.Timeout -and [string]::IsNullOrEmpty($script:lastWatchOptions.CompletionPattern) -and $script:lastWatchOptions.StallSeconds -eq 0)
+    }
+    $script:executionTimedOut = $false
+    $script:executionStalled = $false
+    $buildAssignment = $ast.FindAll({ param($node)
+            $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+            $node.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+            $node.Left.VariablePath.UserPath -eq 'buildResult'
+        }, $true)
+    $buildObservation = @($buildAssignment | ForEach-Object {
+            $_.Right.FindAll({ param($node)
+                    $node -is [System.Management.Automation.Language.CommandAst] -and
+                    $node.GetCommandName() -eq 'Invoke-UnityObservedEditor'
+                }, $true)
+        })
+    Assert-That 'the shipping Standalone build uses the observed Editor path' ($buildAssignment.Count -eq 1 -and $buildObservation.Count -eq 1)
     $before = $receipt.Process.ProcessId
     $script:executionExit = 0
     $providedObservation = @{ Stale = $true }
