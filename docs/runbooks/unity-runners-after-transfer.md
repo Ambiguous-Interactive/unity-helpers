@@ -330,6 +330,12 @@ Comparison requires a present supported value with loader snaps enabled and perm
 that image key. It saves a new checksummed `loader-flag-lease.json` before any write. Each phase
 requires the same editor and package-lock hashes, exactly one selected passing NUnit case, and a
 natural process exit. Each phase records its registry snapshot and actual exit separately.
+The driver saves a checksummed `.prepared` receipt before debugger setup or the first direct
+phase. If capture fails or is cancelled before the write lease exists, recovery reads that receipt
+and verifies the exact original value and type without writing. Missing or damaged evidence and
+changed values fail recovery. An active write lease takes precedence; corrupt active evidence
+cannot fall back to the prepared receipt.
+
 The driver restores its active change in `finally`; an `always()` workflow step repeats recovery
 before later steps. Automatic cleanup preserves external edits made before its write or after
 restoration. Recovery refuses a current value or type that conflicts with both saved states.

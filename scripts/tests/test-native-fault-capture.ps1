@@ -147,6 +147,7 @@ $ErrorActionPreference = 'Stop'
 $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser, [Microsoft.Win32.RegistryView]::Registry64)
 $key = $base.OpenSubKey($KeyPath, $true)
 $lease = New-NativeLoaderFlagLease -Key $key
+Save-NativeLoaderFlagLease -Lease $lease -Path ($LeasePath + '.prepared')
 Disable-NativeLoaderFlag -Lease $lease -Key $key -LeasePath $LeasePath
 $key.Dispose()
 $base.Dispose()
@@ -155,9 +156,57 @@ exit 7
             $interruptedProcess = @{}
             Invoke-NativeCaptureProcess -FilePath (Get-Process -Id $PID).Path -Arguments @('-NoProfile', '-File', $interrupted, (Join-Path $repo 'scripts/unity/lib'), $registryPath, $interruptedLease) -Directory $root -Seconds 20 -Observation $interruptedProcess | Out-Null
             Assert-Capture ($interruptedProcess.Reaped -and $interruptedProcess.RawExitCode -eq 7 -and (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value 0)) 'An exited process leaves a real disabled value and a durable original lease'
-            $recoveredLease = Read-NativeLoaderFlagLease -Path $interruptedLease
-            Restore-NativeLoaderFlag -Lease $recoveredLease -Key $registryKey
+            $activeReceipt = [IO.File]::ReadAllBytes($interruptedLease)
+            [IO.File]::WriteAllText($interruptedLease, '{}')
+            $refused = $false
+            try { Read-NativeLoaderFlagRecoveryLease -Path $interruptedLease | Out-Null } catch { $refused = $true }
+            Assert-Capture ($refused -and (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value 0)) 'Damaged post-write evidence fails without a fallback or registry change'
+            Remove-Item -LiteralPath $interruptedLease
+            $unprovenLease = Read-NativeLoaderFlagRecoveryLease -Path $interruptedLease
+            $refused = $false
+            try { Complete-NativeLoaderFlagLease -Lease $unprovenLease -Key $registryKey } catch { $refused = $true }
+            Assert-Capture ($refused -and (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value 0)) 'Missing post-write evidence cannot use a prepared receipt to restore a changed value'
+            [IO.File]::WriteAllBytes($interruptedLease, $activeReceipt)
+            $recoveredLease = Read-NativeLoaderFlagRecoveryLease -Path $interruptedLease
+            Complete-NativeLoaderFlagLease -Lease $recoveredLease -Key $registryKey
             Assert-Capture (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value 2) 'A later process can restore the exact original value from the durable lease'
+            $beforeWriteScript = Join-Path $root 'before-write.ps1'
+            [IO.File]::WriteAllText($beforeWriteScript, @'
+param($LibraryRoot, $KeyPath, $LeasePath, $StopMode)
+$ErrorActionPreference = 'Stop'
+. (Join-Path $LibraryRoot 'native-global-flags.ps1')
+. (Join-Path $LibraryRoot 'native-loader-flag-lease.ps1')
+$base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser, [Microsoft.Win32.RegistryView]::Registry64)
+$key = $base.OpenSubKey($KeyPath, $true)
+$lease = New-NativeLoaderFlagLease -Key $key
+Save-NativeLoaderFlagLease -Lease $lease -Path ($LeasePath + '.prepared')
+$key.Dispose()
+$base.Dispose()
+if ($StopMode -eq 'failure') { throw 'Deliberate failure before a flag write' }
+Start-Sleep -Seconds 300
+'@)
+            foreach ($stopMode in @('failure', 'cancellation')) {
+                $beforeWriteLease = Join-Path $root ($stopMode + '-lease.json')
+                $beforeWriteProcess = @{}
+                Invoke-NativeCaptureProcess -FilePath (Get-Process -Id $PID).Path -Arguments @('-NoProfile', '-File', $beforeWriteScript, (Join-Path $repo 'scripts/unity/lib'), $registryPath, $beforeWriteLease, $stopMode) -Directory $root -Seconds 5 -Observation $beforeWriteProcess | Out-Null
+                Assert-Capture ($beforeWriteProcess.Reaped -and -not (Test-Path -LiteralPath $beforeWriteLease) -and (Test-Path -LiteralPath ($beforeWriteLease + '.prepared'))) 'A stopped pre-write process retains original evidence without an active write lease'
+                if ($stopMode -eq 'failure') {
+                    Assert-Capture ($beforeWriteProcess.RawExitCode -ne 0 -and $null -eq $beforeWriteProcess.KillReason) 'A deliberate pre-write failure exits naturally'
+                } else {
+                    Assert-Capture ($beforeWriteProcess.KillReason -ceq 'wall-clock-timeout') 'Cancellation kills and reaps the waiting pre-write process'
+                }
+                $preparedLease = Read-NativeLoaderFlagRecoveryLease -Path $beforeWriteLease
+                Complete-NativeLoaderFlagLease -Lease $preparedLease -Key $registryKey
+                Assert-Capture (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value 2) 'Recovery after a pre-write stop verifies the unchanged original value'
+                foreach ($conflict in @(0, 8)) {
+                    $registryKey.SetValue('GlobalFlag', $conflict, [Microsoft.Win32.RegistryValueKind]::DWord)
+                    $preparedLease = Read-NativeLoaderFlagRecoveryLease -Path $beforeWriteLease
+                    $refused = $false
+                    try { Complete-NativeLoaderFlagLease -Lease $preparedLease -Key $registryKey } catch { $refused = $true }
+                    Assert-Capture ($refused -and (Test-NativeLoaderFlagValue -Key $registryKey -Kind DWord -Value $conflict)) 'A prepared receipt cannot restore an externally changed or unproven disabled value'
+                }
+                $registryKey.SetValue('GlobalFlag', 2, [Microsoft.Win32.RegistryValueKind]::DWord)
+            }
             $registryKey.SetValue('GlobalFlag', 0, [Microsoft.Win32.RegistryValueKind]::DWord)
             $refused = $false
             try { New-NativeLoaderFlagLease -Key $registryKey | Out-Null } catch { $refused = $true }
@@ -178,6 +227,26 @@ exit 7
     $envelopeFile = Join-Path $root 'envelope.json'
     $sampleLease = [ordered]@{ SchemaVersion = 1; Machine = 'Sample'; RegistryKey = 'Sample'; OriginalKind = 'String'; OriginalValue = '0x00000002'; DisabledValue = '0x00000000'; State = 'prepared' }
     Save-NativeLoaderFlagLease -Lease $sampleLease -Path $envelopeFile
+    $recoveryPath = Join-Path $root 'recovery.json'
+    Save-NativeLoaderFlagLease -Lease $sampleLease -Path ($recoveryPath + '.prepared')
+    Assert-Capture ((Read-NativeLoaderFlagRecoveryLease -Path $recoveryPath).State -ceq 'prepared') 'Recovery reads the prepared receipt when no write lease exists'
+    foreach ($badPath in @($recoveryPath, ($recoveryPath + '.prepared'))) {
+        [IO.File]::WriteAllText($badPath, '{}')
+        $refused = $false
+        try { Read-NativeLoaderFlagRecoveryLease -Path $recoveryPath | Out-Null } catch { $refused = $true }
+        Assert-Capture ($refused) 'A damaged active or prepared receipt cannot fall back to a successful recovery'
+        Remove-Item -LiteralPath $badPath
+    }
+    $refused = $false
+    try { Read-NativeLoaderFlagRecoveryLease -Path $recoveryPath | Out-Null } catch { $refused = $true }
+    Assert-Capture ($refused) 'Absent recovery evidence cannot prove unchanged state'
+    $sampleLease.State = 'clear-requested'
+    Save-NativeLoaderFlagLease -Lease $sampleLease -Path ($recoveryPath + '.prepared')
+    $refused = $false
+    try { Read-NativeLoaderFlagRecoveryLease -Path $recoveryPath | Out-Null } catch { $refused = $true }
+    Assert-Capture ($refused) 'The fallback receipt must prove the pre-write phase'
+    Save-NativeLoaderFlagLease -Lease $sampleLease -Path $recoveryPath
+    Assert-Capture ((Read-NativeLoaderFlagRecoveryLease -Path $recoveryPath).State -ceq 'clear-requested') 'An active write lease takes precedence over the prepared receipt'
     $envelope = Get-Content -LiteralPath $envelopeFile -Raw | ConvertFrom-Json
     Assert-Capture ((Read-NativeLoaderFlagLease -Path $envelopeFile).OriginalValue -ceq '0x00000002') 'Checksummed receipt round-trips exact original data'
     foreach ($bad in @(
@@ -287,6 +356,10 @@ exit 7
     $restoreStep = [regex]::Match($workflow, '(?s)- name: Restore native loader-snaps comparison.*?(?=\n      - name:)').Value
     Assert-Capture ($restoreStep.Contains('always()') -and $restoreStep.Contains("steps.unity_lock.outputs.acquired == 'true'") -and $restoreStep.Contains('restore-native-loader-snaps.ps1 -Apply')) 'Independent restoration runs under the existing lock, including failures and cancellation'
     Assert-Capture ($captureSource.Contains("@('direct-before', 'direct-disabled', 'direct-restored')") -and $captureSource.Contains('finally') -and $captureSource.Contains('-LeasePath') -and $captureSource.Contains('Complete-NativeLoaderFlagLease')) 'Comparison records three direct phases and retains durable and finally recovery paths'
+    $prepareOffset = $captureSource.IndexOf("Save-NativeLoaderFlagLease -Lease `$record.LoaderFlagLease")
+    Assert-Capture ($prepareOffset -gt 0 -and $prepareOffset -lt $captureSource.IndexOf('if ([string]::IsNullOrWhiteSpace($DebuggerDirectory))')) 'The original receipt is durable before debugger setup and direct-before execution'
+    $restoreSource = [IO.File]::ReadAllText((Join-Path $repo 'scripts/unity/restore-native-loader-snaps.ps1'))
+    Assert-Capture ($restoreSource.Contains('Read-NativeLoaderFlagRecoveryLease') -and $restoreSource.Contains('Complete-NativeLoaderFlagLease')) 'Independent recovery uses the phase-aware receipt and cleanup policy'
     Write-Host "$passed native capture controls passed"
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force

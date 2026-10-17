@@ -218,6 +218,7 @@ try {
         $flagKey = $flagBase.OpenSubKey('SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\Unity.exe', $true)
         if ($null -eq $flagKey) { throw 'Unity.exe image flags are missing' }
         $record.LoaderFlagLease = New-NativeLoaderFlagLease -Key $flagKey
+        Save-NativeLoaderFlagLease -Lease $record.LoaderFlagLease -Path ((Join-Path $artifactRoot 'loader-flag-lease.json') + '.prepared')
         Save-NativeCaptureRecord
     }
     if ([string]::IsNullOrWhiteSpace($DebuggerDirectory)) {

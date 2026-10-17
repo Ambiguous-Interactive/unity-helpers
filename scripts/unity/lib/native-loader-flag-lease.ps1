@@ -89,6 +89,15 @@ function Read-NativeLoaderFlagLease {
     return [Text.Encoding]::UTF8.GetString($payload) | ConvertFrom-Json -Depth 5
 }
 
+function Read-NativeLoaderFlagRecoveryLease {
+    param([string]$Path)
+
+    if (Test-Path -LiteralPath $Path) { return Read-NativeLoaderFlagLease -Path $Path }
+    $lease = Read-NativeLoaderFlagLease -Path ($Path + '.prepared')
+    if ($lease.State -cne 'prepared') { throw 'Invalid prepared flag receipt state' }
+    return $lease
+}
+
 function Disable-NativeLoaderFlag {
     param([object]$Lease, [Microsoft.Win32.RegistryKey]$Key, [Parameter(Mandatory = $true)][string]$LeasePath)
 
