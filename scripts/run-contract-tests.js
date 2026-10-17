@@ -39,6 +39,11 @@ const CHECKS = [
     run: "npm run test:browser-storage"
   },
   {
+    id: "browser-consumer",
+    name: "WebGL consumer identity and failure controls",
+    run: "npm run test:browser-consumer"
+  },
+  {
     id: "durable-file",
     name: "Durable file unsupported-replacement preservation",
     run: "npm run test:durable-file"
