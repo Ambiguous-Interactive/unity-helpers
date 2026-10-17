@@ -70,6 +70,20 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
                     return StackAllocationPolicy.Run();
                 }
                 if (
+                    arguments.Length == 1
+                    && string.Equals(arguments[0], "--unsafe-access-json", StringComparison.Ordinal)
+                )
+                {
+                    return UnsafeAccessPolicy.Run();
+                }
+                if (
+                    arguments.Length == 1
+                    && string.Equals(arguments[0], "--il2cpp-code-json", StringComparison.Ordinal)
+                )
+                {
+                    return Il2CppCodePolicy.Run();
+                }
+                if (
                     1 < arguments.Length
                     || (
                         arguments.Length == 1
@@ -78,7 +92,7 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
                 )
                 {
                     Console.Error.WriteLine(
-                        "Usage: SyntaxPolicy [--fix | --stackalloc-json], from the repository root."
+                        "Usage: SyntaxPolicy [--fix | --stackalloc-json | --unsafe-access-json | --il2cpp-code-json], from the repository root."
                     );
                     return 2;
                 }
