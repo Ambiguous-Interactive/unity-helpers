@@ -18,6 +18,7 @@
   },
   "scopeLimitations": [
     "baselineSourceRevision records the original wire metadata and writer evidence. The expanded public source API inventory covers production declarations at 86ad85a3068e420ccef63b1bd08a60d3469e7921, retains all 1,150 original inventory records, and uses WALLSTOP_PROTO and UNITY_5_3_OR_NEWER. This expansion adds no backend or capability qualification.",
+    "The message-merge copy allowance API extends the 2,373-record inventory after source revision 4a7aaa2e: seven records add MaximumMessageMergeCopyBytes and WithMessageMergeCopyBytes while retaining every prior record. These additions were reviewed as an uncommitted candidate; matching source/build receipts identify execution evidence. No backend or performance qualification is added.",
     "Inventory covers Runtime source contracts and Tests/Runtime/Serialization/ConsumerMigration declarations with WALLSTOP_PROTO and UNITY_5_3_OR_NEWER.",
     "Metadata and signatures are frozen, not arbitrary constructor/hook/formatter implementation bodies or runtime model registrations.",
     "Capability witnesses are a curated initial set, not complete coverage of every advertised capability.",

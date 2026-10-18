@@ -3,13 +3,13 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
-    /// <summary>Configures immutable wire-size, field-count, packed-element, and recursion limits for a read.</summary>
+    /// <summary>Configures immutable wire, parsing-work, message-merge copy, and recursion limits for a read.</summary>
     /// <remarks>
     /// Wire and per-region tag limits apply to each reader region; packed elements and total tags
-    /// have separate shared root budgets.
+    /// have separate shared root budgets, as do duplicate-message merge copies.
     /// Field counts include
     /// unknown and duplicate tags and group terminators, but not untagged packed elements.
-    /// These limits bound encoded input, not the size of objects a custom formatter constructs.
+    /// These limits do not bound the size of objects a custom formatter constructs.
     /// </remarks>
     public sealed class WProtoReadLimits
     {
@@ -35,6 +35,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         /// <summary>Maximum packed scalar elements across all runs and nested regions in one read.</summary>
         public int MaximumPackedElementCount { get; }
+
+        /// <summary>Maximum bytes copied while accumulating duplicate sub-message occurrences in one read.</summary>
+        /// <remarks>
+        /// The default long.MaxValue disables this cumulative cap. Borrowing a first occurrence
+        /// costs no copy bytes; consolidation, growth and appends charge the bytes actually copied.
+        /// This does not bound ordinary string or byte-array reads, retained capacity, or object graphs.
+        /// </remarks>
+        public long MaximumMessageMergeCopyBytes { get; }
 
         /// <summary>Maximum combined sub-message and group depth, never above 64.</summary>
         public int MaximumNestingDepth { get; }
@@ -83,13 +91,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 maximumPackedElementCount < 0 ? 0 : maximumPackedElementCount;
             MaximumFieldCount = maximumFieldCount < 0 ? 0 : maximumFieldCount;
             MaximumTotalFieldCount = int.MaxValue;
+            MaximumMessageMergeCopyBytes = long.MaxValue;
             MaximumNestingDepth =
                 maximumNestingDepth < 0 ? 0
                 : WProtoReader.MaxNestingDepth < maximumNestingDepth ? WProtoReader.MaxNestingDepth
                 : maximumNestingDepth;
         }
 
-        private WProtoReadLimits(int maximumTotalFieldCount, WProtoReadLimits limits)
+        private WProtoReadLimits(
+            WProtoReadLimits limits,
+            int maximumTotalFieldCount,
+            long maximumMessageMergeCopyBytes
+        )
             : this(
                 limits.MaximumMessageBytes,
                 limits.MaximumLengthDelimitedBytes,
@@ -99,6 +112,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             )
         {
             MaximumTotalFieldCount = maximumTotalFieldCount < 0 ? 0 : maximumTotalFieldCount;
+            MaximumMessageMergeCopyBytes =
+                maximumMessageMergeCopyBytes < 0 ? 0 : maximumMessageMergeCopyBytes;
         }
 
         /// <summary>Copies these limits with a replacement cumulative tag work limit.</summary>
@@ -107,7 +122,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <remarks>The new budget is independent for each root reader and shared by its descendants and copies.</remarks>
         public WProtoReadLimits WithTotalFieldCount(int maximumTotalFieldCount)
         {
-            return new WProtoReadLimits(maximumTotalFieldCount, this);
+            return new WProtoReadLimits(this, maximumTotalFieldCount, MaximumMessageMergeCopyBytes);
+        }
+
+        /// <summary>Copies these limits with a replacement cumulative message-merge copy allowance.</summary>
+        /// <param name="maximumMessageMergeCopyBytes">Maximum copied bytes; negative values become zero.</param>
+        /// <returns>New immutable limits with every other setting preserved.</returns>
+        /// <remarks>
+        /// Each root reader has an independent allowance shared by its descendants and copies.
+        /// The parent-aware accumulator checks the allowance before allocating or copying a merge buffer.
+        /// </remarks>
+        public WProtoReadLimits WithMessageMergeCopyBytes(long maximumMessageMergeCopyBytes)
+        {
+            return new WProtoReadLimits(this, MaximumTotalFieldCount, maximumMessageMergeCopyBytes);
         }
     }
 }

@@ -6,6 +6,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if !UNITY_5_3_OR_NEWER
+    using HostContracts = WallstopStudios.UnityHelpers.Proto.Generator.Tests;
+#endif
 
     /// <summary>Verifies wire limits before consuming or decoding attacker-controlled regions.</summary>
     [TestFixture]
@@ -48,6 +51,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             where T : class, new()
         {
             return new T();
+        }
+
+        private static bool TryMergeCopyPair(ref WProtoReader parent, ReadOnlySpan<byte> occurrence)
+        {
+            WProtoMessageAccumulator accumulator = default;
+            return accumulator.TryAdd(occurrence, ref parent)
+                && accumulator.TryAdd(occurrence, ref parent);
+        }
+
+        private static byte[] ParseMergePayload(string hex)
+        {
+            Assert.AreEqual(0, hex.Length % 2);
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; ++index)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+            return bytes;
         }
 
         private static long? BeginAllocationMeasurement()
@@ -1206,6 +1227,656 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(3, scalarValue);
             Assert.IsFalse(reader.TryReadTag(out _, out _));
             Assert.IsFalse(reader.Malformed);
+        }
+
+        [TestCase(0L, 1, true)]
+        [TestCase(3L, 2, false)]
+        [TestCase(4L, 2, true)]
+        [TestCase(9L, 3, false)]
+        [TestCase(10L, 3, true)]
+        [TestCase(11L, 4, false)]
+        [TestCase(12L, 4, true)]
+        [TestCase(21L, 5, false)]
+        [TestCase(22L, 5, true)]
+        public void MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(
+            long maximumCopyBytes,
+            int occurrences,
+            bool accepted
+        )
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithMessageMergeCopyBytes(maximumCopyBytes)
+            );
+            WProtoMessageAccumulator accumulator = default;
+            for (int index = 1; index < occurrences; ++index)
+            {
+                Assert.IsTrue(accumulator.TryAdd(occurrence, ref parent));
+            }
+            Assert.AreEqual(accepted, accumulator.TryAdd(occurrence, ref parent));
+            Assert.AreEqual(!accepted, parent.Malformed);
+            int delivered = accepted ? occurrences : occurrences - 1;
+            Assert.AreEqual(delivered * occurrence.Length, accumulator.Payload.Length);
+            WProtoReader decoded = new WProtoReader(accumulator.Payload);
+            for (int index = 0; index < delivered; ++index)
+            {
+                Assert.IsTrue(decoded.TryReadTag(out int tag, out int wire));
+                Assert.AreEqual(1, tag);
+                Assert.AreEqual(WProtoWireType.Varint, wire);
+                Assert.IsTrue(decoded.TryReadInt32(out int value));
+                Assert.AreEqual(1, value);
+            }
+            Assert.IsTrue(decoded.End);
+            Assert.IsFalse(decoded.Malformed);
+            if (!accepted)
+            {
+                WProtoFormatterFailureTests.AssertCannotContinue(ref parent);
+            }
+        }
+
+        [TestCase(0L, false)]
+        [TestCase(1L, false)]
+        [TestCase(2L, true)]
+        public void EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes(long limit, bool accepted)
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithMessageMergeCopyBytes(limit)
+            );
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(occurrence, ref parent));
+            Assert.AreEqual(accepted, accumulator.TryAdd(ReadOnlySpan<byte>.Empty, ref parent));
+            Assert.AreEqual(!accepted, parent.Malformed);
+            CollectionAssert.AreEqual(occurrence, accumulator.Payload.ToArray());
+            if (accepted)
+            {
+                Assert.IsTrue(accumulator.TryAdd(ReadOnlySpan<byte>.Empty, ref parent));
+                Assert.IsFalse(parent.Malformed);
+            }
+        }
+
+        [Test]
+        public void ZeroMergeCopyBudgetPreservesBorrowingAndEmptyOccurrences()
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithMessageMergeCopyBytes(0)
+            );
+            WProtoMessageAccumulator warm = default;
+            Assert.IsTrue(warm.TryAdd(occurrence, ref parent));
+            WProtoMessageAccumulator accumulator = default;
+            long? before = BeginAllocationMeasurement();
+            bool accepted = accumulator.TryAdd(occurrence, ref parent);
+            long? allocated = EndAllocationMeasurement(before);
+            Assert.IsTrue(accepted);
+            AssertNoAllocationWhenMeasured(allocated);
+            occurrence[1] = 7;
+            Assert.AreEqual(7, accumulator.Payload[1]);
+            WProtoMessageAccumulator empty = default;
+            Assert.IsTrue(empty.TryAdd(ReadOnlySpan<byte>.Empty, ref parent));
+            Assert.IsTrue(empty.TryAdd(ReadOnlySpan<byte>.Empty, ref parent));
+            Assert.IsTrue(empty.TryAdd(ReadOnlySpan<byte>.Empty, ref parent));
+            Assert.IsTrue(empty.HasValue);
+            Assert.AreEqual(0, empty.Payload.Length);
+            Assert.IsFalse(parent.Malformed);
+        }
+
+        [TestCase(0, TestName = "MergeCopyBudget.SiblingAccumulator")]
+        [TestCase(1, TestName = "MergeCopyBudget.ReaderCopy")]
+        [TestCase(2, TestName = "MergeCopyBudget.ParentConstructor")]
+        [TestCase(3, TestName = "MergeCopyBudget.MessageReader")]
+        [TestCase(4, TestName = "MergeCopyBudget.UntypedPackedReader")]
+        [TestCase(5, TestName = "MergeCopyBudget.TypedPackedReader")]
+        public void MergeCopyBudgetIsSharedAcrossAccumulatorsAndReaderRoutes(int route)
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReadLimits limits = new WProtoReadLimits().WithMessageMergeCopyBytes(4);
+            WProtoReader root = new WProtoReader(new byte[] { 2, 0x08, 1 }, limits);
+            Assert.IsTrue(TryMergeCopyPair(ref root, occurrence));
+            WProtoReader derived;
+            switch (route)
+            {
+                case 0:
+                    Assert.IsFalse(TryMergeCopyPair(ref root, occurrence));
+                    WProtoFormatterFailureTests.AssertCannotContinue(ref root);
+                    return;
+                case 1:
+                    derived = root;
+                    break;
+                case 2:
+                {
+                    WProtoReader child = new WProtoReader(default, in root);
+                    Assert.IsFalse(TryMergeCopyPair(ref child, occurrence));
+                    WProtoFormatterFailureTests.AssertCannotContinue(ref child);
+                    Assert.IsFalse(root.Malformed);
+                    return;
+                }
+                case 3:
+                    Assert.IsTrue(root.TryReadMessage(out derived));
+                    break;
+                case 4:
+                    Assert.IsTrue(root.TryReadPackedRun(out derived));
+                    break;
+                default:
+                    Assert.IsTrue(root.TryReadPackedRun(WProtoWireType.Varint, out derived));
+                    break;
+            }
+            Assert.IsFalse(TryMergeCopyPair(ref derived, occurrence));
+            WProtoFormatterFailureTests.AssertCannotContinue(ref derived);
+            Assert.IsFalse(root.Malformed);
+        }
+
+        [Test]
+        public void IndependentRootsDoNotShareMergeCopyAllowances()
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReadLimits limits = new WProtoReadLimits().WithMessageMergeCopyBytes(4);
+            WProtoReader first = new WProtoReader(default, limits);
+            WProtoReader second = new WProtoReader(default, limits);
+            Assert.IsTrue(TryMergeCopyPair(ref first, occurrence));
+            Assert.IsTrue(TryMergeCopyPair(ref second, occurrence));
+            Assert.IsFalse(TryMergeCopyPair(ref first, occurrence));
+            Assert.IsFalse(second.Malformed);
+            Assert.IsFalse(second.TryReadTag(out _, out _));
+            Assert.IsFalse(second.Malformed);
+        }
+
+        [Test]
+        public void RefusedMergeCopyReservationPreservesTheRemainingAllowance()
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithMessageMergeCopyBytes(6)
+            );
+            WProtoReader copy = parent;
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(occurrence, ref parent));
+            Assert.IsTrue(accumulator.TryAdd(occurrence, ref parent));
+            Assert.IsFalse(accumulator.TryAdd(occurrence, ref parent));
+            CollectionAssert.AreEqual(
+                new byte[] { 0x08, 1, 0x08, 1 },
+                accumulator.Payload.ToArray()
+            );
+            WProtoFormatterFailureTests.AssertCannotContinue(ref parent);
+            Assert.IsFalse(copy.Malformed);
+            WProtoMessageAccumulator final = default;
+            Assert.IsTrue(final.TryAdd(occurrence, ref copy));
+            Assert.IsTrue(final.TryAdd(ReadOnlySpan<byte>.Empty, ref copy));
+            WProtoMessageAccumulator refused = default;
+            Assert.IsTrue(refused.TryAdd(occurrence, ref copy));
+            Assert.IsFalse(refused.TryAdd(ReadOnlySpan<byte>.Empty, ref copy));
+            CollectionAssert.AreEqual(occurrence, refused.Payload.ToArray());
+            WProtoFormatterFailureTests.AssertCannotContinue(ref copy);
+        }
+
+        [Test]
+        public void MalformedDuplicateDoesNotSpendMergeCopyBytes()
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithMessageMergeCopyBytes(4)
+            );
+            WProtoReader copy = parent;
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(occurrence, ref parent));
+            Assert.IsFalse(accumulator.TryAdd(new byte[] { 0x08 }, ref parent));
+            CollectionAssert.AreEqual(occurrence, accumulator.Payload.ToArray());
+            WProtoFormatterFailureTests.AssertCannotContinue(ref parent);
+            Assert.IsTrue(TryMergeCopyPair(ref copy, occurrence));
+            Assert.IsFalse(copy.Malformed);
+            Assert.IsFalse(TryMergeCopyPair(ref copy, occurrence));
+            WProtoFormatterFailureTests.AssertCannotContinue(ref copy);
+        }
+
+        [Test]
+        public void RefusedMergeCopyStillSpendsBoundaryValidationTagWork()
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReader parent = new WProtoReader(
+                occurrence,
+                new WProtoReadLimits().WithMessageMergeCopyBytes(3).WithTotalFieldCount(2)
+            );
+            WProtoReader copy = parent;
+            Assert.IsFalse(TryMergeCopyPair(ref parent, occurrence));
+            WProtoFormatterFailureTests.AssertCannotContinue(ref parent);
+            Assert.IsFalse(copy.Malformed);
+            Assert.IsFalse(copy.TryReadTag(out int tag, out int wire));
+            Assert.AreEqual(0, tag);
+            Assert.AreEqual(-1, wire);
+            Assert.AreEqual(0, copy.Position);
+            WProtoFormatterFailureTests.AssertCannotContinue(ref copy);
+        }
+
+        [TestCase(1, 3L)]
+        [TestCase(2, 9L)]
+        public void MergeCopyBudgetRefusesBeforeAllocatingOrGrowing(
+            int acceptedOccurrences,
+            long limit
+        )
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReadLimits limits = new WProtoReadLimits().WithMessageMergeCopyBytes(limit);
+            WProtoReader warmParent = new WProtoReader(default, limits);
+            WProtoMessageAccumulator warm = default;
+            for (int index = 0; index < acceptedOccurrences; ++index)
+            {
+                Assert.IsTrue(warm.TryAdd(occurrence, ref warmParent));
+            }
+            Assert.IsFalse(warm.TryAdd(occurrence, ref warmParent));
+            WProtoReader parent = new WProtoReader(default, limits);
+            WProtoMessageAccumulator accumulator = default;
+            for (int index = 0; index < acceptedOccurrences; ++index)
+            {
+                Assert.IsTrue(accumulator.TryAdd(occurrence, ref parent));
+            }
+            byte[] beforePayload = accumulator.Payload.ToArray();
+            long? before = BeginAllocationMeasurement();
+            bool accepted = accumulator.TryAdd(occurrence, ref parent);
+            long? allocated = EndAllocationMeasurement(before);
+            Assert.IsFalse(accepted);
+            AssertNoAllocationWhenMeasured(allocated);
+            CollectionAssert.AreEqual(beforePayload, accumulator.Payload.ToArray());
+            WProtoFormatterFailureTests.AssertCannotContinue(ref parent);
+        }
+
+        [TestCase(-1L, 0L)]
+        [TestCase(0L, 0L)]
+        [TestCase(4L, 4L)]
+        [TestCase(2147483648L, 2147483648L)]
+        [TestCase(long.MaxValue, long.MaxValue)]
+        public void MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(
+            long requested,
+            long expected
+        )
+        {
+            WProtoReadLimits[] originals =
+            {
+                new WProtoReadLimits(),
+                new WProtoReadLimits(10, 9, 8, 7),
+                new WProtoReadLimits(10, 9, 8, 7, 6),
+                new WProtoReadLimits(1, default),
+                new WProtoReadLimits(default, 1),
+            };
+            foreach (WProtoReadLimits original in originals)
+            {
+                Assert.AreEqual(long.MaxValue, original.MaximumMessageMergeCopyBytes);
+                WProtoReadLimits first = original
+                    .WithTotalFieldCount(3)
+                    .WithMessageMergeCopyBytes(requested);
+                WProtoReadLimits second = original
+                    .WithMessageMergeCopyBytes(requested)
+                    .WithTotalFieldCount(3);
+                foreach (WProtoReadLimits limits in new[] { first, second })
+                {
+                    Assert.AreEqual(expected, limits.MaximumMessageMergeCopyBytes);
+                    Assert.AreEqual(3, limits.MaximumTotalFieldCount);
+                    Assert.AreEqual(original.MaximumMessageBytes, limits.MaximumMessageBytes);
+                    Assert.AreEqual(
+                        original.MaximumLengthDelimitedBytes,
+                        limits.MaximumLengthDelimitedBytes
+                    );
+                    Assert.AreEqual(original.MaximumFieldCount, limits.MaximumFieldCount);
+                    Assert.AreEqual(
+                        original.MaximumPackedElementCount,
+                        limits.MaximumPackedElementCount
+                    );
+                    Assert.AreEqual(original.MaximumNestingDepth, limits.MaximumNestingDepth);
+                }
+                Assert.AreEqual(int.MaxValue, original.MaximumTotalFieldCount);
+                Assert.AreEqual(
+                    long.MaxValue,
+                    first.WithMessageMergeCopyBytes(long.MaxValue).MaximumMessageMergeCopyBytes
+                );
+                Assert.AreEqual(
+                    3,
+                    first.WithMessageMergeCopyBytes(long.MaxValue).MaximumTotalFieldCount
+                );
+                Assert.AreEqual(
+                    expected,
+                    first.WithTotalFieldCount(int.MaxValue).MaximumMessageMergeCopyBytes
+                );
+            }
+        }
+
+        [TestCase(-1L, false)]
+        [TestCase(0L, false)]
+        [TestCase(2147483648L, true)]
+        [TestCase(long.MaxValue - 1, true)]
+        [TestCase(long.MaxValue, true)]
+        public void MergeCopyBudgetNormalizationAndDisablingAffectActualReads(
+            long limit,
+            bool accepted
+        )
+        {
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithMessageMergeCopyBytes(0).WithMessageMergeCopyBytes(limit)
+            );
+            Assert.AreEqual(accepted, TryMergeCopyPair(ref parent, new byte[] { 0x08, 1 }));
+            Assert.AreEqual(!accepted, parent.Malformed);
+        }
+
+        [Test]
+        public void MergeCopyLimitLeavesLegacyAccumulatorAndOrdinaryReadsUnchanged()
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoMessageAccumulator legacy = default;
+            Assert.IsTrue(legacy.TryAdd(occurrence));
+            Assert.IsTrue(legacy.TryAdd(occurrence));
+            CollectionAssert.AreEqual(new byte[] { 0x08, 1, 0x08, 1 }, legacy.Payload.ToArray());
+            WProtoReader parent = new WProtoReader(
+                new byte[] { 0x08, 1, 0x08, 2, 2, 3, 4, 1, 65 },
+                new WProtoReadLimits().WithMessageMergeCopyBytes(0)
+            );
+            for (int index = 1; index <= 2; ++index)
+            {
+                Assert.IsTrue(parent.TryReadTag(out int tag, out int wire));
+                Assert.AreEqual(1, tag);
+                Assert.AreEqual(WProtoWireType.Varint, wire);
+                Assert.IsTrue(parent.TryReadInt32(out int value));
+                Assert.AreEqual(index, value);
+            }
+            Assert.IsTrue(parent.TryReadPackedRun(WProtoWireType.Varint, out WProtoReader packed));
+            Assert.IsTrue(packed.TryReadInt32(out int first));
+            Assert.IsTrue(packed.TryReadInt32(out int second));
+            Assert.AreEqual(3, first);
+            Assert.AreEqual(4, second);
+            Assert.IsTrue(packed.End);
+            Assert.IsTrue(parent.TryReadString(out string text));
+            Assert.AreEqual("A", text);
+            Assert.IsTrue(parent.End);
+            Assert.IsFalse(parent.Malformed);
+            Assert.IsFalse(TryMergeCopyPair(ref parent, occurrence));
+            WProtoFormatterFailureTests.AssertCannotContinue(ref parent);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void CopyAndPackedLimitsChargeIndependentResources(bool typed)
+        {
+            WProtoReader reader = new WProtoReader(
+                new byte[] { 2, 1, 2 },
+                new WProtoReadLimits(maximumPackedElementCount: 1).WithMessageMergeCopyBytes(4)
+            );
+            byte[] occurrence = { 0x08, 1 };
+            Assert.IsTrue(TryMergeCopyPair(ref reader, occurrence));
+            WProtoReader copy = reader;
+            if (typed)
+            {
+                Assert.IsFalse(
+                    reader.TryReadPackedRun(WProtoWireType.Varint, out WProtoReader packed)
+                );
+                Assert.IsTrue(packed.Malformed);
+                WProtoFormatterFailureTests.AssertCannotContinue(ref reader);
+            }
+            else
+            {
+                Assert.IsTrue(reader.TryReadPackedRun(out WProtoReader packed));
+                Assert.IsTrue(packed.TryReadInt32(out int first));
+                Assert.AreEqual(1, first);
+                Assert.IsFalse(packed.TryReadInt32(out int second));
+                Assert.AreEqual(0, second);
+                WProtoFormatterFailureTests.AssertCannotContinue(ref packed);
+                Assert.IsFalse(reader.Malformed);
+            }
+            Assert.IsFalse(copy.Malformed);
+            Assert.IsFalse(TryMergeCopyPair(ref copy, occurrence));
+            WProtoFormatterFailureTests.AssertCannotContinue(ref copy);
+        }
+
+        [Test]
+        public void DisablingMergeCopyLimitDoesNotAllocateReaderState()
+        {
+            byte[] payload = { 0x08, 1 };
+            WProtoReadLimits limits = new WProtoReadLimits()
+                .WithMessageMergeCopyBytes(0)
+                .WithMessageMergeCopyBytes(long.MaxValue);
+            WProtoReader warm = new WProtoReader(payload, limits);
+            Assert.IsTrue(warm.TryReadTag(out _, out _));
+            long? before = BeginAllocationMeasurement();
+            WProtoReader reader = new WProtoReader(payload, limits);
+            long? allocated = EndAllocationMeasurement(before);
+            AssertNoAllocationWhenMeasured(allocated);
+            Assert.IsTrue(reader.TryReadTag(out int tag, out int wire));
+            Assert.AreEqual(1, tag);
+            Assert.AreEqual(WProtoWireType.Varint, wire);
+            Assert.IsTrue(reader.TryReadInt32(out int value));
+            Assert.AreEqual(1, value);
+            Assert.IsTrue(reader.End);
+            Assert.IsFalse(reader.Malformed);
+        }
+
+        [Test]
+        public void FormatterCannotReplaceTheReaderToResetOnlyTheMergeCopyBudget()
+        {
+            WProtoReadLimits limits = new WProtoReadLimits().WithMessageMergeCopyBytes(4);
+            IWProtoFormatter<LimitMarker> previous = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<LimitMarker> registered
+            )
+                ? registered
+                : null;
+            try
+            {
+                WProtoFormatterProvider.Register<LimitMarker>(
+                    new RestartingCopyBudgetFormatter(limits)
+                );
+                Assert.Throws<InvalidOperationException>(() =>
+                    WProtoFacade.TryDeserialize(ReadOnlySpan<byte>.Empty, limits, out LimitMarker _)
+                );
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(previous);
+            }
+        }
+
+#if !UNITY_5_3_OR_NEWER
+        [TestCase(0, 3L, false, "1202080112021002")]
+        [TestCase(0, 4L, true, "1202080112021002")]
+        [TestCase(1, 3L, false, "0A0208010A021002")]
+        [TestCase(1, 4L, true, "0A0208010A021002")]
+        [TestCase(2, 3L, false, "0A0A08011202080712020809")]
+        [TestCase(2, 4L, true, "0A0A08011202080712020809")]
+        [TestCase(3, 11L, false, "0A04120208010A0412021002")]
+        [TestCase(3, 12L, true, "0A04120208010A0412021002")]
+        [TestCase(4, 7L, false, "0A0A080112020807120208090A0A08021202080B1202080D")]
+        [TestCase(4, 8L, true, "0A0A080112020807120208090A0A08021202080B1202080D")]
+        public void GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(
+            int route,
+            long limit,
+            bool accepted,
+            string hex
+        )
+        {
+            WProtoReader reader = new WProtoReader(
+                ParseMergePayload(hex),
+                new WProtoReadLimits().WithMessageMergeCopyBytes(limit)
+            );
+            switch (route)
+            {
+                case 0:
+                    Assert.AreEqual(
+                        accepted,
+                        WProtoFormatterProvider
+                            .Get<HostContracts.DuplicateHolder>()
+                            .TryRead(ref reader, out HostContracts.DuplicateHolder holder)
+                    );
+                    if (accepted)
+                    {
+                        Assert.AreEqual(1, holder.Child.A);
+                        Assert.AreEqual(2, holder.Child.B);
+                    }
+                    else
+                    {
+                        Assert.IsTrue(holder == null);
+                    }
+                    break;
+                case 1:
+                    Assert.AreEqual(
+                        accepted,
+                        WProtoFormatterProvider
+                            .Get<HostContracts.Box<HostContracts.DuplicateChild>>()
+                            .TryRead(
+                                ref reader,
+                                out HostContracts.Box<HostContracts.DuplicateChild> box
+                            )
+                    );
+                    if (accepted)
+                    {
+                        Assert.AreEqual(1, box.Value.A);
+                        Assert.AreEqual(2, box.Value.B);
+                    }
+                    else
+                    {
+                        Assert.IsTrue(box == null);
+                    }
+                    break;
+                case 2:
+                case 4:
+                    int before = HostContracts.HookedContract.AfterDeserializationRuns;
+                    Assert.AreEqual(
+                        accepted,
+                        WProtoFormatterProvider
+                            .Get<HostContracts.HookedMapContract>()
+                            .TryRead(ref reader, out HostContracts.HookedMapContract map)
+                    );
+                    Assert.AreEqual(
+                        route == 4 ? (accepted ? 2 : 1) : (accepted ? 1 : 0),
+                        HostContracts.HookedContract.AfterDeserializationRuns - before
+                    );
+                    if (accepted)
+                    {
+                        Assert.AreEqual(route == 4 ? 2 : 1, map.ById.Count);
+                        Assert.IsTrue(
+                            map.ById.TryGetValue(1, out HostContracts.HookedContract child)
+                        );
+                        Assert.AreEqual(9, child.Value);
+                        if (route == 4)
+                        {
+                            Assert.IsTrue(
+                                map.ById.TryGetValue(2, out HostContracts.HookedContract second)
+                            );
+                            Assert.AreEqual(13, second.Value);
+                        }
+                    }
+                    else
+                    {
+                        Assert.IsTrue(map == null);
+                    }
+                    break;
+                default:
+                    Assert.AreEqual(
+                        accepted,
+                        WProtoFormatterProvider
+                            .Get<HostContracts.DuplicateGrandparent>()
+                            .TryRead(ref reader, out HostContracts.DuplicateGrandparent grandparent)
+                    );
+                    if (accepted)
+                    {
+                        Assert.AreEqual(1, grandparent.Holder.Child.A);
+                        Assert.AreEqual(2, grandparent.Holder.Child.B);
+                    }
+                    else
+                    {
+                        Assert.IsTrue(grandparent == null);
+                    }
+                    break;
+            }
+            Assert.AreEqual(!accepted, reader.Malformed);
+            if (accepted)
+            {
+                Assert.IsTrue(reader.End);
+            }
+            else
+            {
+                WProtoFormatterFailureTests.AssertCannotContinue(ref reader);
+            }
+        }
+
+        [TestCase(0, 4L, false)]
+        [TestCase(0, 8L, true)]
+        [TestCase(1, 4L, false)]
+        [TestCase(1, 8L, true)]
+        [TestCase(2, 4L, false)]
+        [TestCase(2, 8L, true)]
+        public void FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(
+            int route,
+            long limit,
+            bool accepted
+        )
+        {
+            byte[] payload = ParseMergePayload("1202080112021002");
+            WProtoReader reader = new WProtoReader(
+                ParseMergePayload("081202080112021002"),
+                new WProtoReadLimits().WithMessageMergeCopyBytes(limit)
+            );
+            Assert.IsTrue(TryMergeCopyPair(ref reader, new byte[] { 0x08, 1 }));
+            IWProtoFormatter<HostContracts.DuplicateHolder> formatter =
+                WProtoFormatterProvider.Get<HostContracts.DuplicateHolder>();
+            bool result;
+            HostContracts.DuplicateHolder value;
+            switch (route)
+            {
+                case 0:
+                    result = reader.TryReadMessage(formatter, out value);
+                    break;
+                case 1:
+                    result = reader.TryReadMessage(payload, formatter, out value);
+                    break;
+                default:
+                    HostContracts.DuplicateHolder seed = new HostContracts.DuplicateHolder
+                    {
+                        Number = 99,
+                    };
+                    result = reader.TryReadMessage(payload, formatter, in seed, out value);
+                    break;
+            }
+            Assert.AreEqual(accepted, result);
+            Assert.AreEqual(!accepted, reader.Malformed);
+            if (accepted)
+            {
+                Assert.AreEqual(route == 2 ? 99 : 0, value.Number);
+                Assert.AreEqual(1, value.Child.A);
+                Assert.AreEqual(2, value.Child.B);
+            }
+            else
+            {
+                Assert.IsTrue(value == null);
+                WProtoFormatterFailureTests.AssertCannotContinue(ref reader);
+            }
+        }
+#endif
+
+        private readonly struct RestartingCopyBudgetFormatter : IWProtoFormatter<LimitMarker>
+        {
+            private readonly WProtoReadLimits _limits;
+
+            internal RestartingCopyBudgetFormatter(WProtoReadLimits limits)
+            {
+                _limits = limits;
+            }
+
+            public int Measure(in LimitMarker value)
+            {
+                return 0;
+            }
+
+            public bool Write(ref WProtoWriter writer, in LimitMarker value)
+            {
+                return true;
+            }
+
+            public bool TryRead(ref WProtoReader reader, out LimitMarker value)
+            {
+                reader = new WProtoReader(ReadOnlySpan<byte>.Empty, _limits);
+                value = default;
+                return true;
+            }
         }
 
         private sealed class PackedFormatter : IWProtoFormatter<int>

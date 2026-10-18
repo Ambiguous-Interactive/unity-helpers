@@ -61,6 +61,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </summary>
         public bool Malformed => _malformed;
 
+        internal WProtoMessageMergeCopyBudget MessageMergeCopyBudget => _messageMergeCopyBudget;
+
         private WProtoReadLimits Limits => _limits ?? WProtoReadLimits.Default;
 
         private readonly ReadOnlySpan<byte> _buffer;
@@ -68,6 +70,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private readonly WProtoReadLimits _limits;
         private readonly ReadBudget _packedBudget;
         private readonly ReadBudget _totalFieldBudget;
+        private readonly WProtoMessageMergeCopyBudget _messageMergeCopyBudget;
         private bool _countPackedElements;
         private int _fieldCount;
         private int _position;
@@ -90,7 +93,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 0,
                 limits ?? WProtoReadLimits.Default,
                 CreatePackedBudget(limits),
-                CreateTotalFieldBudget(limits)
+                CreateTotalFieldBudget(limits),
+                CreateMessageMergeCopyBudget(limits)
             ) { }
 
         /// <summary>
@@ -118,6 +122,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _limits = parent._limits ?? WProtoReadLimits.Default;
             _packedBudget = parent._packedBudget;
             _totalFieldBudget = parent._totalFieldBudget;
+            _messageMergeCopyBudget = parent._messageMergeCopyBudget;
             _countPackedElements = false;
             bool exhausted = parent._malformed || _limits.MaximumNestingDepth <= parent._depth;
             _buffer = exhausted ? default : buffer;
@@ -132,7 +137,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             int depth,
             WProtoReadLimits limits,
             ReadBudget packedBudget = null,
-            ReadBudget totalFieldBudget = null
+            ReadBudget totalFieldBudget = null,
+            WProtoMessageMergeCopyBudget messageMergeCopyBudget = null
         )
         {
             _buffer = buffer;
@@ -140,6 +146,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _limits = limits;
             _packedBudget = packedBudget;
             _totalFieldBudget = totalFieldBudget;
+            _messageMergeCopyBudget = messageMergeCopyBudget;
             _countPackedElements = false;
             _position = 0;
             _fieldCount = 0;
@@ -157,6 +164,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 && ReferenceEquals(reader.Limits, expected.Limits)
                 && ReferenceEquals(reader._packedBudget, expected._packedBudget)
                 && ReferenceEquals(reader._totalFieldBudget, expected._totalFieldBudget)
+                && ReferenceEquals(reader._messageMergeCopyBudget, expected._messageMergeCopyBudget)
                 && !reader.Malformed
                 && reader.End
                 && reader.Depth == expected.Depth
@@ -179,6 +187,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             return limits != null && limits.MaximumTotalFieldCount < int.MaxValue
                 ? new ReadBudget(limits.MaximumTotalFieldCount)
+                : null;
+        }
+
+        private static WProtoMessageMergeCopyBudget CreateMessageMergeCopyBudget(
+            WProtoReadLimits limits
+        )
+        {
+            return limits != null && limits.MaximumMessageMergeCopyBytes < long.MaxValue
+                ? new WProtoMessageMergeCopyBudget(limits.MaximumMessageMergeCopyBytes)
                 : null;
         }
 
@@ -589,7 +606,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             if (Limits.MaximumNestingDepth <= _depth)
             {
                 _malformed = true;
-                nested = new WProtoReader(default, _depth, Limits, _packedBudget, _totalFieldBudget)
+                nested = new WProtoReader(
+                    default,
+                    _depth,
+                    Limits,
+                    _packedBudget,
+                    _totalFieldBudget,
+                    _messageMergeCopyBudget
+                )
                 {
                     _malformed = true,
                 };
@@ -603,7 +627,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     _depth + 1,
                     Limits,
                     _packedBudget,
-                    _totalFieldBudget
+                    _totalFieldBudget,
+                    _messageMergeCopyBudget
                 )
                 {
                     _malformed = true,
@@ -616,7 +641,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _depth + 1,
                 Limits,
                 _packedBudget,
-                _totalFieldBudget
+                _totalFieldBudget,
+                _messageMergeCopyBudget
             );
             return true;
         }
@@ -646,14 +672,28 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
             {
-                packed = new WProtoReader(default, _depth, Limits, _packedBudget, _totalFieldBudget)
+                packed = new WProtoReader(
+                    default,
+                    _depth,
+                    Limits,
+                    _packedBudget,
+                    _totalFieldBudget,
+                    _messageMergeCopyBudget
+                )
                 {
                     _malformed = true,
                 };
                 return false;
             }
 
-            packed = new WProtoReader(payload, _depth, Limits, _packedBudget, _totalFieldBudget)
+            packed = new WProtoReader(
+                payload,
+                _depth,
+                Limits,
+                _packedBudget,
+                _totalFieldBudget,
+                _messageMergeCopyBudget
+            )
             {
                 _countPackedElements = _packedBudget != null,
             };
@@ -812,7 +852,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _depth + 1,
                 Limits,
                 _packedBudget,
-                _totalFieldBudget
+                _totalFieldBudget,
+                _messageMergeCopyBudget
             );
             if (nested.Malformed)
             {
@@ -870,7 +911,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _depth + 1,
                 Limits,
                 _packedBudget,
-                _totalFieldBudget
+                _totalFieldBudget,
+                _messageMergeCopyBudget
             );
             if (nested.Malformed)
             {

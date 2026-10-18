@@ -105,7 +105,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <remarks>
         /// The first occurrence is borrowed and validated by its formatter. Duplicate boundary scans
         /// consume the parent's shared tag budget and remaining nesting depth before allocating a
-        /// merge buffer. Final decoding consumes tags again. Failure latches the supplied parent.
+        /// merge buffer. A finite message-merge copy allowance is reserved before consolidation,
+        /// growth, or append copying. Final decoding consumes tags again. Failure latches the supplied parent.
         /// </remarks>
         public bool TryAdd(ReadOnlySpan<byte> occurrence, ref WProtoReader parent)
         {
@@ -125,7 +126,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            if (TryAppend(occurrence))
+            if (TryAppend(occurrence, parent.MessageMergeCopyBudget))
             {
                 return true;
             }
@@ -134,7 +135,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return false;
         }
 
-        private bool TryAppend(ReadOnlySpan<byte> occurrence)
+        private bool TryAppend(
+            ReadOnlySpan<byte> occurrence,
+            WProtoMessageMergeCopyBudget copyBudget = null
+        )
         {
             if (!_seen)
             {
@@ -143,31 +147,37 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return true;
             }
 
-            long required = (long)(_buffer == null ? _payload.Length : _length) + occurrence.Length;
+            int previousLength = _buffer == null ? _payload.Length : _length;
+            long required = (long)previousLength + occurrence.Length;
             if (int.MaxValue < required)
             {
                 return false;
             }
 
-            if (_buffer == null)
+            int previousCapacity = _buffer == null ? 0 : _buffer.Length;
+            bool resize = _buffer == null || previousCapacity < required;
+            long copiedBytes = (long)occurrence.Length + (resize ? previousLength : 0);
+            if (copyBudget != null && !copyBudget.TryCharge(copiedBytes))
             {
-                _buffer = new byte[Capacity(0, (int)required)];
-                _payload.CopyTo(_buffer);
-                _length = _payload.Length;
-            }
-            else
-            {
-                int bufferLength = _buffer.Length;
-                if (bufferLength < required)
-                {
-                    byte[] grown = new byte[Capacity(bufferLength, (int)required)];
-                    Array.Copy(_buffer, grown, _length);
-                    _buffer = grown;
-                }
+                return false;
             }
 
-            occurrence.CopyTo(new Span<byte>(_buffer, _length, occurrence.Length));
-            _length += occurrence.Length;
+            if (resize)
+            {
+                byte[] grown = new byte[Capacity(previousCapacity, (int)required)];
+                if (_buffer == null)
+                {
+                    _payload.CopyTo(grown);
+                }
+                else
+                {
+                    Array.Copy(_buffer, grown, _length);
+                }
+                _buffer = grown;
+            }
+
+            occurrence.CopyTo(new Span<byte>(_buffer, previousLength, occurrence.Length));
+            _length = (int)required;
             _payload = new ReadOnlySpan<byte>(_buffer, 0, _length);
             return true;
         }

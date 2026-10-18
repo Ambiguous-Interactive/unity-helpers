@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "2a5a2058561cd744575cbd8c3518649f5eae1e8289b43d1abaa1a90ca00f7926",
+  "guideSha256": "43613e1d055b14bc9dac2122f4922110b080bee9e18446f82d8dd68c3cd5b465",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -6952,7 +6952,7 @@
             "WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead",
             "WProtoReadLimitsTests.FacadeRejectsAnOversizedRootBeforeCallingTheFormatter"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Declared host selectors apply; complete ordinary v2 fixture discovery exists but a matching execution receipt is still required."
         },
         {
           "lane": "host-v3",
@@ -6974,7 +6974,7 @@
             "WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead",
             "WProtoReadLimitsTests.FacadeRejectsAnOversizedRootBeforeCallingTheFormatter"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Shared declared selectors apply; complete ordinary native fixture discovery exists but matching execution qualification remains separate."
         },
         {
           "lane": "unity-editor-editmode",
@@ -7018,7 +7018,7 @@
             "WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits",
             "WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Declared host selectors apply; complete ordinary v2 fixture discovery exists but a matching execution receipt is still required."
         },
         {
           "lane": "host-v3",
@@ -7042,7 +7042,7 @@
             "WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits",
             "WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Shared declared selectors apply; complete ordinary native fixture discovery exists but matching execution qualification remains separate."
         },
         {
           "lane": "unity-editor-editmode",
@@ -7086,7 +7086,7 @@
             "WProtoReadLimitsTests.TotalFieldBudgetChargesReplayedCopiesAndResetsForIndependentRoots",
             "WProtoReadLimitsTests.TotalFieldLimitPreservesExistingConstructorSettings"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Declared host selectors apply; complete ordinary v2 fixture discovery exists but a matching execution receipt is still required."
         },
         {
           "lane": "host-v3",
@@ -7110,7 +7110,7 @@
             "WProtoReadLimitsTests.TotalFieldBudgetChargesReplayedCopiesAndResetsForIndependentRoots",
             "WProtoReadLimitsTests.TotalFieldLimitPreservesExistingConstructorSettings"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Shared declared selectors apply; complete ordinary native fixture discovery exists but matching execution qualification remains separate."
         },
         {
           "lane": "unity-editor-editmode",
@@ -7152,7 +7152,7 @@
             "WProtoReadLimitsTests.EveryNestedReadRouteRetainsTheCumulativePackedBudget",
             "WProtoReadLimitsTests.TotalAndPackedBudgetsChargeIndependentWork"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Declared host selectors apply; complete ordinary v2 fixture discovery exists but a matching execution receipt is still required."
         },
         {
           "lane": "host-v3",
@@ -7174,7 +7174,7 @@
             "WProtoReadLimitsTests.EveryNestedReadRouteRetainsTheCumulativePackedBudget",
             "WProtoReadLimitsTests.TotalAndPackedBudgetsChargeIndependentWork"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Shared declared selectors apply; complete ordinary native fixture discovery exists but matching execution qualification remains separate."
         },
         {
           "lane": "unity-editor-editmode",
@@ -7216,7 +7216,7 @@
             "WProtoReadLimitsTests.VarintBoundariesPreserveValuesAndRejectEveryTruncatedPrefix",
             "WProtoReadLimitsTests.VarintWidthsChargeExactlyOnePackedElement"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Declared host selectors apply; complete ordinary v2 fixture discovery exists but a matching execution receipt is still required."
         },
         {
           "lane": "host-v3",
@@ -7238,7 +7238,7 @@
             "WProtoReadLimitsTests.VarintBoundariesPreserveValuesAndRejectEveryTruncatedPrefix",
             "WProtoReadLimitsTests.VarintWidthsChargeExactlyOnePackedElement"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Shared declared selectors apply; complete ordinary native fixture discovery exists but matching execution qualification remains separate."
         },
         {
           "lane": "unity-editor-editmode",
@@ -7282,7 +7282,7 @@
             "WProtoReadLimitsTests.ParentAwareAccumulatorPreservesPayloadOnMalformedDuplicates",
             "MapDifferentialTests.MapDuplicateValidationSharesEntryBudgetAndRunsHooksOnce"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Declared host selectors apply; complete ordinary v2 fixture discovery exists but a matching execution receipt is still required."
         },
         {
           "lane": "host-v3",
@@ -7305,7 +7305,7 @@
             "WProtoReadLimitsTests.DuplicateBoundaryValidationUsesRemainingGroupDepth",
             "WProtoReadLimitsTests.ParentAwareAccumulatorPreservesPayloadOnMalformedDuplicates"
           ],
-          "reason": "Only part of the declared witness set applies; this lane cannot establish the whole claim."
+          "reason": "Shared declared selectors apply; complete ordinary native fixture discovery exists but matching execution qualification remains separate."
         },
         {
           "lane": "unity-editor-editmode",
@@ -7347,7 +7347,7 @@
             "WProtoReadLimitsTests.ParentAwareAccumulatorBorrowsFirstOccurrenceWithoutAllocation",
             "DuplicateFieldDifferentialTests.SingleAccumulatorOccurrenceRetainsItsOriginalSpan"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Declared host selectors apply; complete ordinary v2 fixture discovery exists but a matching execution receipt is still required."
         },
         {
           "lane": "host-v3",
@@ -7368,7 +7368,7 @@
             "WProtoReadLimitsTests.LegacyAccumulatorOverloadPreservesIndependentValidation",
             "WProtoReadLimitsTests.ParentAwareAccumulatorBorrowsFirstOccurrenceWithoutAllocation"
           ],
-          "reason": "Only part of the declared witness set applies; this lane cannot establish the whole claim."
+          "reason": "Shared declared selectors apply; complete ordinary native fixture discovery exists but matching execution qualification remains separate."
         },
         {
           "lane": "unity-editor-editmode",
@@ -7414,7 +7414,7 @@
             "CrossAssemblySubtypeTests.GeneratedReplacementForwardLatchesCustomFormatterFailure",
             "IncludeDifferentialTests.MissingRequestedSubtypeLatchesGeneratedRootReader"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Declared host selectors apply; complete ordinary v2 fixture discovery exists but a matching execution receipt is still required."
         },
         {
           "lane": "host-v3",
@@ -7436,7 +7436,7 @@
           "selectors": [
             "WProtoReadLimitsTests.FormatterFailureLatchesCurrentReaderWithoutPoisoningCopies"
           ],
-          "reason": "Only part of the declared witness set applies; this lane cannot establish the whole claim."
+          "reason": "Shared declared selectors apply; complete ordinary native fixture discovery exists but matching execution qualification remains separate."
         },
         {
           "lane": "unity-editor-editmode",
@@ -7539,7 +7539,7 @@
             "WProtoReadLimitsTests.AllocationCounterWithoutByteArraySensitivityProvidesNoEvidence",
             "WProtoReadLimitsTests.ResponsiveAllocationCounterEnablesMeasurement"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Declared host selectors apply; complete ordinary v2 fixture discovery exists but a matching execution receipt is still required."
         },
         {
           "lane": "host-v3",
@@ -7559,7 +7559,7 @@
             "WProtoReadLimitsTests.AllocationCounterWithoutByteArraySensitivityProvidesNoEvidence",
             "WProtoReadLimitsTests.ResponsiveAllocationCounterEnablesMeasurement"
           ],
-          "reason": "All declared selectors apply; exact fixture evidence is still required."
+          "reason": "Shared declared selectors apply; complete ordinary native fixture discovery exists but matching execution qualification remains separate."
         },
         {
           "lane": "unity-editor-editmode",
@@ -10007,6 +10007,124 @@
           "scope": "none",
           "selectors": [],
           "reason": "The shared runtime fixture is not part of this lane; no behavior is qualified here."
+        }
+      ]
+    },
+    {
+      "id": "limits.message-merge-copy-bytes",
+      "guideAnchor": "docs/features/serialization/serialization.md#hostile-payloads",
+      "claim": "An opt-in long allowance bounds bytes copied by parent-aware duplicate-message accumulation across root-derived readers and accumulators",
+      "classification": "behavior",
+      "readerDirections": ["literal-input/current-read", "api-only"],
+      "selectors": [
+        "WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends",
+        "WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes",
+        "WProtoReadLimitsTests.ZeroMergeCopyBudgetPreservesBorrowingAndEmptyOccurrences",
+        "WProtoReadLimitsTests.MergeCopyBudgetIsSharedAcrossAccumulatorsAndReaderRoutes",
+        "WProtoReadLimitsTests.IndependentRootsDoNotShareMergeCopyAllowances",
+        "WProtoReadLimitsTests.RefusedMergeCopyReservationPreservesTheRemainingAllowance",
+        "WProtoReadLimitsTests.MalformedDuplicateDoesNotSpendMergeCopyBytes",
+        "WProtoReadLimitsTests.RefusedMergeCopyStillSpendsBoundaryValidationTagWork",
+        "WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing",
+        "WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition",
+        "WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads",
+        "WProtoReadLimitsTests.MergeCopyLimitLeavesLegacyAccumulatorAndOrdinaryReadsUnchanged",
+        "WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources",
+        "WProtoReadLimitsTests.DisablingMergeCopyLimitDoesNotAllocateReaderState",
+        "WProtoReadLimitsTests.FormatterCannotReplaceTheReaderToResetOnlyTheMergeCopyBudget",
+        "WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics",
+        "WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes"
+      ],
+      "limitations": "First occurrences borrow bytes without a copy charge; consolidation, growth and appends charge actual copied lengths before merge-buffer allocation. Refused reservations preserve accepted payload and remaining allowance; boundary validation tag work remains spent. This is not a cap on ordinary byte/string materialization, retained capacity, object graphs or all allocations. The legacy no-parent overload and independent/custom roots do not share the allowance; allocation exceptions after a successful reservation do not promise a refund. Host-only generated-route tests do not establish native generated-route coverage; allocation checks require a responsive calibrated counter. No performance acceptance follows.",
+      "gapIds": [],
+      "status": "supported-with-witness",
+      "laneRequirements": [
+        {
+          "lane": "host-v2",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends",
+            "WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes",
+            "WProtoReadLimitsTests.ZeroMergeCopyBudgetPreservesBorrowingAndEmptyOccurrences",
+            "WProtoReadLimitsTests.MergeCopyBudgetIsSharedAcrossAccumulatorsAndReaderRoutes",
+            "WProtoReadLimitsTests.IndependentRootsDoNotShareMergeCopyAllowances",
+            "WProtoReadLimitsTests.RefusedMergeCopyReservationPreservesTheRemainingAllowance",
+            "WProtoReadLimitsTests.MalformedDuplicateDoesNotSpendMergeCopyBytes",
+            "WProtoReadLimitsTests.RefusedMergeCopyStillSpendsBoundaryValidationTagWork",
+            "WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing",
+            "WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition",
+            "WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads",
+            "WProtoReadLimitsTests.MergeCopyLimitLeavesLegacyAccumulatorAndOrdinaryReadsUnchanged",
+            "WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources",
+            "WProtoReadLimitsTests.DisablingMergeCopyLimitDoesNotAllocateReaderState",
+            "WProtoReadLimitsTests.FormatterCannotReplaceTheReaderToResetOnlyTheMergeCopyBudget",
+            "WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics",
+            "WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes"
+          ],
+          "reason": "Declared host selectors apply; complete ordinary v2 fixture discovery exists but a matching execution receipt is still required."
+        },
+        {
+          "lane": "host-v3",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends",
+            "WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes",
+            "WProtoReadLimitsTests.ZeroMergeCopyBudgetPreservesBorrowingAndEmptyOccurrences",
+            "WProtoReadLimitsTests.MergeCopyBudgetIsSharedAcrossAccumulatorsAndReaderRoutes",
+            "WProtoReadLimitsTests.IndependentRootsDoNotShareMergeCopyAllowances",
+            "WProtoReadLimitsTests.RefusedMergeCopyReservationPreservesTheRemainingAllowance",
+            "WProtoReadLimitsTests.MalformedDuplicateDoesNotSpendMergeCopyBytes",
+            "WProtoReadLimitsTests.RefusedMergeCopyStillSpendsBoundaryValidationTagWork",
+            "WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing",
+            "WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition",
+            "WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads",
+            "WProtoReadLimitsTests.MergeCopyLimitLeavesLegacyAccumulatorAndOrdinaryReadsUnchanged",
+            "WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources",
+            "WProtoReadLimitsTests.DisablingMergeCopyLimitDoesNotAllocateReaderState",
+            "WProtoReadLimitsTests.FormatterCannotReplaceTheReaderToResetOnlyTheMergeCopyBudget",
+            "WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics",
+            "WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes"
+          ],
+          "reason": "All declared host selectors apply; complete ordinary v3 fixture discovery exists but a matching execution receipt is still required."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "witnesses",
+          "scope": "partial",
+          "selectors": [
+            "WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends",
+            "WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes",
+            "WProtoReadLimitsTests.ZeroMergeCopyBudgetPreservesBorrowingAndEmptyOccurrences",
+            "WProtoReadLimitsTests.MergeCopyBudgetIsSharedAcrossAccumulatorsAndReaderRoutes",
+            "WProtoReadLimitsTests.IndependentRootsDoNotShareMergeCopyAllowances",
+            "WProtoReadLimitsTests.RefusedMergeCopyReservationPreservesTheRemainingAllowance",
+            "WProtoReadLimitsTests.MalformedDuplicateDoesNotSpendMergeCopyBytes",
+            "WProtoReadLimitsTests.RefusedMergeCopyStillSpendsBoundaryValidationTagWork",
+            "WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing",
+            "WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition",
+            "WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads",
+            "WProtoReadLimitsTests.MergeCopyLimitLeavesLegacyAccumulatorAndOrdinaryReadsUnchanged",
+            "WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources",
+            "WProtoReadLimitsTests.DisablingMergeCopyLimitDoesNotAllocateReaderState",
+            "WProtoReadLimitsTests.FormatterCannotReplaceTheReaderToResetOnlyTheMergeCopyBudget"
+          ],
+          "reason": "Fifteen shared methods apply and complete native fixture discovery exists. Two host-only generated-contract/formatter-route methods, comprising sixteen host cases, remain outside this native lane; no player qualification is claimed."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "scope": "none",
+          "selectors": [],
+          "reason": "This shared runtime fixture is not bound to this lane; no behavior is qualified here."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "scope": "none",
+          "selectors": [],
+          "reason": "This shared runtime fixture is not bound to this lane; no behavior is qualified here."
         }
       ]
     }

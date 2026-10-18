@@ -2928,23 +2928,26 @@ WProtoReadLimits limits = new WProtoReadLimits(
     maximumPackedElementCount: 4096
 );
 limits = limits.WithTotalFieldCount(4096);
+limits = limits.WithMessageMergeCopyBytes(128 * 1024);
 WProtoReader reader = new WProtoReader(bytes, limits);
 ```
 
-The total-field factory returns new limits with the same per-region settings and a replaced
-total-field allowance. The original limits remain unchanged.
+Both factories return new limits with the other settings preserved and the requested allowance
+replaced. The original limits remain unchanged; either factory order gives the same settings.
 
-| Limit                  | Scope                                                                                                  |
-| ---------------------- | ------------------------------------------------------------------------------------------------------ |
-| Message bytes          | Each reader region                                                                                     |
-| Length-delimited bytes | Each field, checked before copying or decoding                                                         |
-| Field count            | Tags per region, including duplicate, unknown, and skipped-group tags                                  |
-| Total field count      | Tags across the root, nested readers, groups, and reader copies; checked before consuming the next tag |
-| Nesting depth          | Combined sub-message and group depth; maximum 64                                                       |
-| Packed elements        | All packed runs and nested messages in one root read, checked before reserving packed capacity         |
+| Limit                    | Scope                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Message bytes            | Each reader region                                                                                     |
+| Length-delimited bytes   | Each field, checked before copying or decoding                                                         |
+| Field count              | Tags per region, including duplicate, unknown, and skipped-group tags                                  |
+| Total field count        | Tags across the root, nested readers, groups, and reader copies; checked before consuming the next tag |
+| Nesting depth            | Combined sub-message and group depth; maximum 64                                                       |
+| Packed elements          | All packed runs and nested messages in one root read, checked before reserving packed capacity         |
+| Message-merge copy bytes | Actual bytes copied by parent-aware duplicate-message accumulators across a root read                  |
 
 Defaults leave byte and count limits unrestricted, with depth capped at 64. Negative limits become
-zero. These limits do not bound total decoded memory or merge-buffer copying. Independent root
+zero. The message-merge copy allowance defaults to `long.MaxValue`, which disables that cap.
+These limits do not bound total decoded memory. Independent root
 readers created by custom formatters do not share an existing root's allowances. The limits do not
 configure protobuf-net fallback or [JSON reads](#reading-untrusted-json).
 
@@ -2954,6 +2957,20 @@ growing a merge buffer. Final decoding spends tag allowance again. The first occ
 borrowed; a refused duplicate preserves previously accepted bytes. Existing `TryAdd(payload)` keeps
 its independent validation behavior. Precompiled codecs using that overload need regeneration for
 cumulative boundary-scan accounting. Regenerate with the generator and runtime from the same package version.
+
+`WithMessageMergeCopyBytes(long)` limits cumulative copying by these parent-aware accumulators.
+The first borrowed occurrence costs zero. Consolidation and buffer growth charge the existing
+accepted bytes plus the incoming bytes; an append within existing capacity charges only the
+incoming bytes. For five two-byte occurrences, cumulative charges are 0, 4, 10, 12, and 22 bytes.
+The allowance is checked before allocation or copying. A refused reservation leaves the accepted
+payload and remaining copy allowance intact and marks the supplied reader malformed; boundary
+scans may already have spent tag allowance. Successful reservations are not refunded if allocation
+later throws. Descendants, reader copies, and sibling accumulators share the allowance.
+
+A finite copy allowance adds one accounting object per root reader. Default readers allocate no
+copy-accounting state. This cap excludes buffer capacity, ordinary string and byte-array reads,
+decoded object graphs, and the legacy accumulator overload without a parent. It is not a total
+allocation or retained-memory limit.
 
 `WProtoFacade.TryDeserialize(bytes, limits, out T value)` and `TryDeserializeAs` also accept limits.
 They throw `InvalidOperationException` for malformed or over-budget handled payloads; `false` means

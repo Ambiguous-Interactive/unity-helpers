@@ -57,6 +57,27 @@
       "sha256": "f92b6ab418d89d2e66df6920d0da7b97158a4b4eb6679686288aa01ab5034d21",
       "purpose": "case-discovery-only",
       "qualification": "none"
+    },
+    {
+      "id": "merge-copy-focused-v3",
+      "label": "merge-copy-green-v3.trx",
+      "sha256": "5686321090980a16e09a14f39fee48f5be02ae8ec33a9a6d35c4178aaf6a6e3a",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "merge-copy-focused-v2",
+      "label": "merge-copy-green-v2.trx",
+      "sha256": "4eba92a55792a503f67b968a590011b209fca7fd3ee5c3d771aae170cbfb5565",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "merge-copy-native-serialization",
+      "label": "wproto-merge-copy-native-serialization.json",
+      "sha256": "7eb1e1e77328cabbbba295cebf9544bc19296600684af571df521fb5ce47bf33",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
     }
   ],
   "selectors": [
@@ -321,6 +342,11 @@
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
     },
     {
+      "id": "DiagnosticTests.AMutableClassWithNoParameterlessConstructorIsStillAnError",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
+    },
+    {
       "id": "DiagnosticTests.ANonPartialContractIsAnError",
       "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
@@ -421,6 +447,11 @@
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
     },
     {
+      "id": "DiagnosticTests.AnExplicitOrdinalCollidingWithACommittedOneIsRefused",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
+    },
+    {
       "id": "DiagnosticTests.AnImmutableContractDeclaringSkipConstructorStillWarns",
       "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
@@ -457,6 +488,11 @@
     },
     {
       "id": "DiagnosticTests.AnOpenSurrogateShippedByAReferenceRegistersTheConsumerClosure",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
+    },
+    {
+      "id": "DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused",
       "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
     },
@@ -1716,6 +1752,16 @@
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests"
     },
     {
+      "id": "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SubtypeTagManifestTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests"
+    },
+    {
+      "id": "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SubtypeTagManifestTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests"
+    },
+    {
       "id": "SubtypeTagManifestTests.AnExistingNumberIsNeverRecomputedEvenWhenASmallerOneIsFree",
       "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SubtypeTagManifestTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests"
@@ -2056,6 +2102,16 @@
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests"
     },
     {
+      "id": "WProtoFormatterFailureTests.MessageFormatterExceptionLatchesWriterAndPreservesCommittedBytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoFormatterFailureTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests"
+    },
+    {
+      "id": "WProtoFormatterFailureTests.NonthrowingMessageFormatterCompletesAndAllowsFurtherWrites",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoFormatterFailureTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests"
+    },
+    {
       "id": "WProtoFormatterFailureTests.TemporalSemanticFailureLatchesReader",
       "sourcePath": "Tests/Runtime/Serialization/WProtoFormatterFailureTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests"
@@ -2201,7 +2257,17 @@
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
     },
     {
+      "id": "WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
       "id": "WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.DisablingMergeCopyLimitDoesNotAllocateReaderState",
       "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
     },
@@ -2217,6 +2283,11 @@
     },
     {
       "id": "WProtoReadLimitsTests.DuplicateBoundaryValidationUsesRemainingGroupDepth",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes",
       "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
     },
@@ -2241,7 +2312,27 @@
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
     },
     {
+      "id": "WProtoReadLimitsTests.FormatterCannotReplaceTheReaderToResetOnlyTheMergeCopyBudget",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
       "id": "WProtoReadLimitsTests.FormatterFailureLatchesCurrentReaderWithoutPoisoningCopies",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.IndependentRootsDoNotShareMergeCopyAllowances",
       "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
     },
@@ -2252,6 +2343,41 @@
     },
     {
       "id": "WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.MalformedDuplicateDoesNotSpendMergeCopyBytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.MergeCopyBudgetIsSharedAcrossAccumulatorsAndReaderRoutes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.MergeCopyLimitLeavesLegacyAccumulatorAndOrdinaryReadsUnchanged",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition",
       "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
     },
@@ -2267,6 +2393,16 @@
     },
     {
       "id": "WProtoReadLimitsTests.ParentAwareAccumulatorPreservesPayloadOnMalformedDuplicates",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.RefusedMergeCopyReservationPreservesTheRemainingAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.RefusedMergeCopyStillSpendsBoundaryValidationTagWork",
       "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
     },
@@ -2312,6 +2448,11 @@
     },
     {
       "id": "WProtoReadLimitsTests.VarintWidthsChargeExactlyOnePackedElement",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
+    },
+    {
+      "id": "WProtoReadLimitsTests.ZeroMergeCopyBudgetPreservesBorrowingAndEmptyOccurrences",
       "sourcePath": "Tests/Runtime/Serialization/WProtoReadLimitsTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests"
     },
@@ -2614,41 +2755,6 @@
       "id": "ZigZagDifferentialTests.TheShippedCellShapeEncodesAsProtobufNetDoes",
       "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/ZigZagDifferentialTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ZigZagDifferentialTests"
-    },
-    {
-      "id": "DiagnosticTests.AMutableClassWithNoParameterlessConstructorIsStillAnError",
-      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
-      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
-    },
-    {
-      "id": "DiagnosticTests.AnExplicitOrdinalCollidingWithACommittedOneIsRefused",
-      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
-      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
-    },
-    {
-      "id": "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer",
-      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SubtypeTagManifestTests.cs",
-      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests"
-    },
-    {
-      "id": "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor",
-      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SubtypeTagManifestTests.cs",
-      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests"
-    },
-    {
-      "id": "DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused",
-      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
-      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
-    },
-    {
-      "id": "WProtoFormatterFailureTests.MessageFormatterExceptionLatchesWriterAndPreservesCommittedBytes",
-      "sourcePath": "Tests/Runtime/Serialization/WProtoFormatterFailureTests.cs",
-      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests"
-    },
-    {
-      "id": "WProtoFormatterFailureTests.NonthrowingMessageFormatterCompletesAndAllowsFurtherWrites",
-      "sourcePath": "Tests/Runtime/Serialization/WProtoFormatterFailureTests.cs",
-      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests"
     }
   ],
   "fixtures": [
@@ -10286,10 +10392,13 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling(0,0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling(64,64)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling(int.MaxValue,64)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources(True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits(0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits(1)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits(4)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedOversizedPayloadNeverReachesTheFormatter",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DisablingMergeCopyLimitDoesNotAllocateReaderState",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateAndUnknownTagsSpendTheSameFieldBudget(-1)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateAndUnknownTagsSpendTheSameFieldBudget(0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateAndUnknownTagsSpendTheSameFieldBudget(1)",
@@ -10313,6 +10422,9 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateStormStopsAtTheConfiguredWorkBound(1)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateStormStopsAtTheConfiguredWorkBound(1024)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateStormStopsAtTheConfiguredWorkBound(64)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes(0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes(1L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes(2L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateBoundaryScansDoNotSpendTagBudget",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EveryNestedReadRouteRetainsTheCumulativePackedBudget",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EveryTwoBytePrefixPreservesValueConsumptionAndFailureLatching",
@@ -10322,10 +10434,28 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FacadePropagatesFieldLimitsAndKeepsItsRoutingContract(1,True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FacadeRejectsAnOversizedRootBeforeCallingTheFormatter",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FieldBudgetAtExactEndIsNotMalformed",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterCannotReplaceTheReaderToResetOnlyTheMergeCopyBudget",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterCannotReplaceTheRootReaderToDiscardLimits",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterFailureLatchesCurrentReaderWithoutPoisoningCopies",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(0,4L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(0,8L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(1,4L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(1,8L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(2,4L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(2,8L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(0,3L,False,\"1202080112021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(0,4L,True,\"1202080112021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(1,3L,False,\"0A0208010A021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(1,4L,True,\"0A0208010A021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(2,3L,False,\"0A0A08011202080712020809\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(2,4L,True,\"0A0A08011202080712020809\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(3,11L,False,\"0A04120208010A0412021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(3,12L,True,\"0A04120208010A0412021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(4,7L,False,\"0A0A080112020807120208090A0A08021202080B1202080D\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(4,8L,True,\"0A0A080112020807120208090A0A08021202080B1202080D\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GroupDepthUsesTheConfiguredLimit(0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GroupDepthUsesTheConfiguredLimit(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.IndependentRootsDoNotShareMergeCopyAllowances",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LegacyAccumulatorOverloadPreservesIndependentValidation",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TryReadBytes\",1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TryReadBytes\",2,True)",
@@ -10337,6 +10467,35 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TryReadString\",2,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TrySkipField\",1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TrySkipField\",2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MalformedDuplicateDoesNotSpendMergeCopyBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.MessageReader",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.ParentConstructor",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.ReaderCopy",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.SiblingAccumulator",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.TypedPackedReader",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.UntypedPackedReader",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(0L,1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(10L,3,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(11L,4,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(12L,4,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(21L,5,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(22L,5,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(3L,2,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(4L,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(9L,3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(-1L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(2147483648L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(9223372036854775806L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(long.MaxValue,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing(1,3L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing(2,9L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitLeavesLegacyAccumulatorAndOrdinaryReadsUnchanged",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(-1L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(0L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(2147483648L,2147483648L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(4L,4L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(long.MaxValue,long.MaxValue)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MessageSizeLimitIsInclusiveAndRefusesBeforeConsumption(-1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MessageSizeLimitIsInclusiveAndRefusesBeforeConsumption(0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MessageSizeLimitIsInclusiveAndRefusesBeforeConsumption(1,False)",
@@ -10356,6 +10515,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ParentAwareAccumulatorPreservesPayloadOnMalformedDuplicates([8])",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ParentAwareAccumulatorPreservesPayloadOnMalformedDuplicates([byte.MinValue])",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ParentAwareAccumulatorRefusesMalformedParentBeforeBorrowing",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.RefusedMergeCopyReservationPreservesTheRemainingAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.RefusedMergeCopyStillSpendsBoundaryValidationTagWork",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ResponsiveAllocationCounterEnablesMeasurement(32)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ResponsiveAllocationCounterEnablesMeasurement(64)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.SkippedGroupsIncludeTheirTagsAndTerminators(2,False)",
@@ -10406,10 +10567,11 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.VarintWidthsChargeExactlyOnePackedElement(8)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.VarintWidthsChargeExactlyOnePackedElement(9)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroLengthFieldsAreAcceptedAtTheZeroLengthLimit",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroLimitsPermitAnEmptyRoot"
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroLimitsPermitAnEmptyRoot",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroMergeCopyBudgetPreservesBorrowingAndEmptyOccurrences"
           ],
-          "discoveryArtifact": "formatter-full-v2",
-          "reason": "Complete fixture names observed in an ordinary full oracle run; discovery is not qualification."
+          "discoveryArtifact": "merge-copy-focused-v2",
+          "reason": "Complete 185-case fixture set observed in ordinary Release v2 TRX; the source-guard and API snapshot cases belong to other fixtures. Discovery only, not current qualification."
         },
         {
           "lane": "host-v3",
@@ -10423,10 +10585,13 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling(0,0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling(64,64)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling(int.MaxValue,64)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources(True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits(0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits(1)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits(4)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedOversizedPayloadNeverReachesTheFormatter",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DisablingMergeCopyLimitDoesNotAllocateReaderState",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateAndUnknownTagsSpendTheSameFieldBudget(-1)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateAndUnknownTagsSpendTheSameFieldBudget(0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateAndUnknownTagsSpendTheSameFieldBudget(1)",
@@ -10450,6 +10615,9 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateStormStopsAtTheConfiguredWorkBound(1)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateStormStopsAtTheConfiguredWorkBound(1024)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateStormStopsAtTheConfiguredWorkBound(64)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes(0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes(1L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes(2L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateBoundaryScansDoNotSpendTagBudget",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EveryNestedReadRouteRetainsTheCumulativePackedBudget",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EveryTwoBytePrefixPreservesValueConsumptionAndFailureLatching",
@@ -10459,10 +10627,28 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FacadePropagatesFieldLimitsAndKeepsItsRoutingContract(1,True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FacadeRejectsAnOversizedRootBeforeCallingTheFormatter",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FieldBudgetAtExactEndIsNotMalformed",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterCannotReplaceTheReaderToResetOnlyTheMergeCopyBudget",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterCannotReplaceTheRootReaderToDiscardLimits",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterFailureLatchesCurrentReaderWithoutPoisoningCopies",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(0,4L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(0,8L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(1,4L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(1,8L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(2,4L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterReaderRoutesSharePreviouslySpentMergeCopyBytes(2,8L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(0,3L,False,\"1202080112021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(0,4L,True,\"1202080112021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(1,3L,False,\"0A0208010A021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(1,4L,True,\"0A0208010A021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(2,3L,False,\"0A0A08011202080712020809\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(2,4L,True,\"0A0A08011202080712020809\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(3,11L,False,\"0A04120208010A0412021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(3,12L,True,\"0A04120208010A0412021002\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(4,7L,False,\"0A0A080112020807120208090A0A08021202080B1202080D\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GeneratedMessageMergesShareCopyBudgetAndPreserveSemantics(4,8L,True,\"0A0A080112020807120208090A0A08021202080B1202080D\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GroupDepthUsesTheConfiguredLimit(0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GroupDepthUsesTheConfiguredLimit(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.IndependentRootsDoNotShareMergeCopyAllowances",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LegacyAccumulatorOverloadPreservesIndependentValidation",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TryReadBytes\",1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TryReadBytes\",2,True)",
@@ -10474,6 +10660,35 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TryReadString\",2,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TrySkipField\",1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TrySkipField\",2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MalformedDuplicateDoesNotSpendMergeCopyBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.MessageReader",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.ParentConstructor",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.ReaderCopy",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.SiblingAccumulator",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.TypedPackedReader",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.UntypedPackedReader",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(0L,1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(10L,3,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(11L,4,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(12L,4,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(21L,5,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(22L,5,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(3L,2,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(4L,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(9L,3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(-1L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(2147483648L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(9223372036854775806L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(long.MaxValue,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing(1,3L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing(2,9L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitLeavesLegacyAccumulatorAndOrdinaryReadsUnchanged",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(-1L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(0L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(2147483648L,2147483648L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(4L,4L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(long.MaxValue,long.MaxValue)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MessageSizeLimitIsInclusiveAndRefusesBeforeConsumption(-1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MessageSizeLimitIsInclusiveAndRefusesBeforeConsumption(0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MessageSizeLimitIsInclusiveAndRefusesBeforeConsumption(1,False)",
@@ -10493,6 +10708,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ParentAwareAccumulatorPreservesPayloadOnMalformedDuplicates([8])",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ParentAwareAccumulatorPreservesPayloadOnMalformedDuplicates([byte.MinValue])",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ParentAwareAccumulatorRefusesMalformedParentBeforeBorrowing",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.RefusedMergeCopyReservationPreservesTheRemainingAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.RefusedMergeCopyStillSpendsBoundaryValidationTagWork",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ResponsiveAllocationCounterEnablesMeasurement(32)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ResponsiveAllocationCounterEnablesMeasurement(64)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.SkippedGroupsIncludeTheirTagsAndTerminators(2,False)",
@@ -10543,10 +10760,11 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.VarintWidthsChargeExactlyOnePackedElement(8)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.VarintWidthsChargeExactlyOnePackedElement(9)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroLengthFieldsAreAcceptedAtTheZeroLengthLimit",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroLimitsPermitAnEmptyRoot"
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroLimitsPermitAnEmptyRoot",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroMergeCopyBudgetPreservesBorrowingAndEmptyOccurrences"
           ],
-          "discoveryArtifact": "formatter-full-v3",
-          "reason": "Complete fixture names observed in an ordinary full oracle run; discovery is not qualification."
+          "discoveryArtifact": "merge-copy-focused-v3",
+          "reason": "Complete 185-case fixture set observed in ordinary Release v3 TRX; the additional source-guard case belongs to another fixture. Discovery only, not current qualification."
         },
         {
           "lane": "unity-editor-playmode",
@@ -10560,10 +10778,13 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling(0,0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling(64,64)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CallerCannotRaiseTheStackSafetyCeiling(int.MaxValue,64)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.CopyAndPackedLimitsChargeIndependentResources(True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits(0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits(1)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedAndNestedReadersPreserveDepthLimits(4)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DetachedOversizedPayloadNeverReachesTheFormatter",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DisablingMergeCopyLimitDoesNotAllocateReaderState",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateAndUnknownTagsSpendTheSameFieldBudget(-1)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateAndUnknownTagsSpendTheSameFieldBudget(0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateAndUnknownTagsSpendTheSameFieldBudget(1)",
@@ -10587,6 +10808,9 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateStormStopsAtTheConfiguredWorkBound(1)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateStormStopsAtTheConfiguredWorkBound(1024)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.DuplicateStormStopsAtTheConfiguredWorkBound(64)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes(0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes(1L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateAfterBorrowingChargesTheBorrowedBytes(2L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EmptyDuplicateBoundaryScansDoNotSpendTagBudget",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EveryNestedReadRouteRetainsTheCumulativePackedBudget",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.EveryTwoBytePrefixPreservesValueConsumptionAndFailureLatching",
@@ -10596,10 +10820,12 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FacadePropagatesFieldLimitsAndKeepsItsRoutingContract(1,True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FacadeRejectsAnOversizedRootBeforeCallingTheFormatter",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FieldBudgetAtExactEndIsNotMalformed",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterCannotReplaceTheReaderToResetOnlyTheMergeCopyBudget",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterCannotReplaceTheRootReaderToDiscardLimits",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.FormatterFailureLatchesCurrentReaderWithoutPoisoningCopies",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GroupDepthUsesTheConfiguredLimit(0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.GroupDepthUsesTheConfiguredLimit(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.IndependentRootsDoNotShareMergeCopyAllowances",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LegacyAccumulatorOverloadPreservesIndependentValidation",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TryReadBytes\",1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TryReadBytes\",2,True)",
@@ -10611,6 +10837,35 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TryReadString\",2,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TrySkipField\",1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.LengthLimitCoversEveryDelimitedRead(\"TrySkipField\",2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MalformedDuplicateDoesNotSpendMergeCopyBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.MessageReader",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.ParentConstructor",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.ReaderCopy",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.SiblingAccumulator",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.TypedPackedReader",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudget.UntypedPackedReader",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(0L,1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(10L,3,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(11L,4,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(12L,4,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(21L,5,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(22L,5,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(3L,2,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(4L,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetCountsConsolidationGrowthAndInCapacityAppends(9L,3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(-1L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(2147483648L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(9223372036854775806L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetNormalizationAndDisablingAffectActualReads(long.MaxValue,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing(1,3L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyBudgetRefusesBeforeAllocatingOrGrowing(2,9L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitLeavesLegacyAccumulatorAndOrdinaryReadsUnchanged",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(-1L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(0L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(2147483648L,2147483648L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(4L,4L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MergeCopyLimitPreservesConstructorSettingsAndFactoryComposition(long.MaxValue,long.MaxValue)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MessageSizeLimitIsInclusiveAndRefusesBeforeConsumption(-1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MessageSizeLimitIsInclusiveAndRefusesBeforeConsumption(0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.MessageSizeLimitIsInclusiveAndRefusesBeforeConsumption(1,False)",
@@ -10630,6 +10885,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ParentAwareAccumulatorPreservesPayloadOnMalformedDuplicates(System.Byte[] GeneratedTestCase5)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ParentAwareAccumulatorPreservesPayloadOnMalformedDuplicates(System.Byte[])",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ParentAwareAccumulatorRefusesMalformedParentBeforeBorrowing",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.RefusedMergeCopyReservationPreservesTheRemainingAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.RefusedMergeCopyStillSpendsBoundaryValidationTagWork",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ResponsiveAllocationCounterEnablesMeasurement(32)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ResponsiveAllocationCounterEnablesMeasurement(64)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.SkippedGroupsIncludeTheirTagsAndTerminators(2,False)",
@@ -10680,10 +10937,11 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.VarintWidthsChargeExactlyOnePackedElement(8)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.VarintWidthsChargeExactlyOnePackedElement(9)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroLengthFieldsAreAcceptedAtTheZeroLengthLimit",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroLimitsPermitAnEmptyRoot"
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroLimitsPermitAnEmptyRoot",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoReadLimitsTests.ZeroMergeCopyBudgetPreservesBorrowingAndEmptyOccurrences"
           ],
-          "discoveryArtifact": "formatter-native-serialization",
-          "reason": "Complete fixture names observed in the full Serialization namespace playmode result; no source/backend qualification is transferred."
+          "discoveryArtifact": "merge-copy-native-serialization",
+          "reason": "Complete 169-case fixture set observed in the ordinary Unity Editor playmode Serialization run; all selected fixture cases passed. Four unrelated inconclusive cases in the broad artifact remain inconclusive. Discovery only, not player or current receipt qualification."
         },
         {
           "lane": "unity-editor-editmode",
