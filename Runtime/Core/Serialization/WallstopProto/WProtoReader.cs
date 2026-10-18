@@ -286,7 +286,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             int index = _position;
-            if ((uint)index < (uint)_buffer.Length)
+            int bufferLength = _buffer.Length;
+            if ((uint)index < (uint)bufferLength)
             {
                 byte first = _buffer[index];
                 if (first < 0x80)
@@ -296,7 +297,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return true;
                 }
 
-                if (index + 1 < _buffer.Length)
+                if (index + 1 < bufferLength)
                 {
                     byte second = _buffer[index + 1];
                     if (second < 0x80)
@@ -306,7 +307,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         return true;
                     }
 
-                    if (index + 2 < _buffer.Length)
+                    if (index + 2 < bufferLength)
                     {
                         byte third = _buffer[index + 2];
                         uint prefix = (uint)(first & 0x7F) | ((uint)(second & 0x7F) << 7);
@@ -320,6 +321,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         return TryReadLongVarint(
                             prefix | ((uint)(third & 0x7F) << 14),
                             index + 3,
+                            bufferLength,
                             out value
                         );
                     }
@@ -1025,11 +1027,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return true;
         }
 
-        private bool TryReadLongVarint(ulong result, int index, out ulong value)
+        private bool TryReadLongVarint(ulong result, int index, int bufferLength, out ulong value)
         {
             for (int shift = 3; shift < WProtoSizes.MaxVarintBytes; ++shift)
             {
-                if (_buffer.Length <= index)
+                if (bufferLength <= index)
                 {
                     _malformed = true;
                     value = 0;
