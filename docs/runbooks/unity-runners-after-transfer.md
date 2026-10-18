@@ -245,8 +245,13 @@ A nonzero editor exit and an accepted result artifact are separate observations.
 
 A missing configure marker also attempts to save `configure.process-diagnostics.json` beside the configure log. It records the child process identity, UTC launch and observation boundaries, raw and returned exits, and watchdog termination provenance. On Windows, it queries Application Error and Windows Error Reporting events once, from two seconds before launch through the earlier of capture time or fifteen seconds after the process observation ended. It examines at most 64 candidates and retains at most eight matches, with explicit truncation flags. Events require the child's executable path and process ID, or a report ID joined to an event with that identity. Unrelated events and full event messages are excluded. The report distinguishes unavailable evidence and no observed matches; a missing or delayed event does not rule out a crash. The existing Package Manager cancellation retry also attempts to preserve its first attempt in `configure.first-attempt.process-diagnostics.json`.
 
-Configure and in-editor test invocations also attempt to save `unity.execution-diagnostics.json`
-beside its log, including an invocation that exits zero or later supplies passing NUnit XML.
+Configure, in-editor test and Standalone Editor-build invocations also attempt to save
+a `*.execution-diagnostics.json` receipt beside the invocation log (`unity.execution-diagnostics.json`
+for tests and Standalone builds), including an invocation that exits zero,
+later supplies passing NUnit XML, or produces a fresh player accepted by the existing build policy.
+Standalone builds retain their wall-clock timeout without a completion sentinel or silence guard;
+IL2CPP compilation can legitimately produce no output for minutes. The caller receives
+the full watchdog result, including timeout and stall state.
 The receipt uses the same bounded Windows event matcher and records process identity, raw and
 returned exits, watchdog provenance, and UTC capture time. Its native-log summary counts
 `Native Crash Reporting` headers and `Got a UNKNOWN while executing native code` lines separately,

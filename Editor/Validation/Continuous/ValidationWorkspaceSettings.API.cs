@@ -33,14 +33,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return (string[])Categories.Clone();
         }
 
-        private static bool IsSeverity(ValidationSeverity severity)
-        {
-            return severity == ValidationSeverity.Info
-                || severity == ValidationSeverity.Warning
-                || severity == ValidationSeverity.Error;
-        }
-
-        private static RuleDefinition Clone(RuleDefinition source)
+        internal static RuleDefinition Clone(RuleDefinition source)
         {
             if (source == null)
             {
@@ -81,6 +74,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 );
             }
             return copy;
+        }
+
+        private static bool IsSeverity(ValidationSeverity severity)
+        {
+            return severity == ValidationSeverity.Info
+                || severity == ValidationSeverity.Warning
+                || severity == ValidationSeverity.Error;
         }
 
         private static Profile Clone(Profile source)

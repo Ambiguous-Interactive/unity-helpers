@@ -367,6 +367,10 @@ values are On change (`0`), On save (`1`), and Manual (`2`). Build failure thres
 Warning or Error; rule severity preferences also accept Info. The frame budget accepts 1–100 ms.
 Profiles must already exist, and names match exactly.
 
+Validation runs capture a detached copy of each authored rule and its conditions without a JSON
+round trip. Later builder edits cannot change an active run. Optional null text keeps the legacy
+empty-string behavior; capturing a rule leaves the caller's definition unchanged.
+
 <!-- doc-sample: compiles-editor -->
 
 ```csharp

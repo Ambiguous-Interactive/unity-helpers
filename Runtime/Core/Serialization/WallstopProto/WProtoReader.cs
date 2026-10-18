@@ -175,6 +175,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// A clean end of input returns <c>false</c> without latching <see cref="Malformed"/>, so
         /// <c>while (reader.TryReadTag(...))</c> terminates normally on a well-formed message.
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReadTag(out int fieldNumber, out int wireType)
         {
             if (_malformed || End)
@@ -225,6 +226,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// A negative <c>int32</c> is written sign-extended across ten bytes, so a 32-bit field can
         /// legitimately carry a ten-byte varint. The upper bits are discarded rather than rejected.
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReadVarint32(out uint value)
         {
             if (!TryReadVarint64(out ulong wide))
@@ -248,6 +250,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// Field <i>values</i> use <see cref="TryReadVarint32"/>, which truncates, because a
         /// negative <c>int32</c> is legitimately written sign-extended across ten bytes.
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReadVarint32Strict(out uint value)
         {
             if (!TryReadVarint64(out ulong wide))
@@ -272,6 +275,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </summary>
         /// <param name="value">Receives the value, or 0 on failure.</param>
         /// <returns><c>true</c> when a value was read.</returns>
+        /// <remarks>Packed reads charge one element before consuming bytes, regardless of encoded width.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReadVarint64(out ulong value)
         {
             if (_malformed || !TryChargePackedElement())
@@ -280,33 +285,46 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            ulong result = 0;
             int index = _position;
-            for (int shift = 0; shift < WProtoSizes.MaxVarintBytes; ++shift)
+            int bufferLength = _buffer.Length;
+            if ((uint)index < (uint)bufferLength)
             {
-                if (_buffer.Length <= index)
+                byte first = _buffer[index];
+                if (first < 0x80)
                 {
-                    _malformed = true;
-                    value = 0;
-                    return false;
-                }
-
-                byte current = _buffer[index++];
-
-                // Only the highest bit of a 64-bit value fits in the tenth varint byte.
-                if (shift == WProtoSizes.MaxVarintBytes - 1 && 0x01 < current)
-                {
-                    _malformed = true;
-                    value = 0;
-                    return false;
-                }
-
-                result |= (ulong)(current & 0x7F) << (shift * 7);
-                if ((current & 0x80) == 0)
-                {
-                    _position = index;
-                    value = result;
+                    _position = index + 1;
+                    value = first;
                     return true;
+                }
+
+                if (index + 1 < bufferLength)
+                {
+                    byte second = _buffer[index + 1];
+                    if (second < 0x80)
+                    {
+                        _position = index + 2;
+                        value = (uint)(first & 0x7F) | ((uint)second << 7);
+                        return true;
+                    }
+
+                    if (index + 2 < bufferLength)
+                    {
+                        byte third = _buffer[index + 2];
+                        uint prefix = (uint)(first & 0x7F) | ((uint)(second & 0x7F) << 7);
+                        if (third < 0x80)
+                        {
+                            _position = index + 3;
+                            value = prefix | ((uint)third << 14);
+                            return true;
+                        }
+
+                        return TryReadLongVarint(
+                            prefix | ((uint)(third & 0x7F) << 14),
+                            index + 3,
+                            bufferLength,
+                            out value
+                        );
+                    }
                 }
             }
 
@@ -908,10 +926,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             int bufferLength = _buffer.Length;
             for (int index = _position; index < bufferLength; ++index)
             {
-                if ((_buffer[index] & 0x80) == 0)
-                {
-                    ++count;
-                }
+                count += 1 - (_buffer[index] >> 7);
             }
 
             return count;
@@ -1012,6 +1027,42 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return true;
         }
 
+        private bool TryReadLongVarint(ulong result, int index, int bufferLength, out ulong value)
+        {
+            for (int shift = 3; shift < WProtoSizes.MaxVarintBytes; ++shift)
+            {
+                if (bufferLength <= index)
+                {
+                    _malformed = true;
+                    value = 0;
+                    return false;
+                }
+
+                byte current = _buffer[index++];
+
+                // Only the highest bit of a 64-bit value fits in the tenth varint byte.
+                if (shift == WProtoSizes.MaxVarintBytes - 1 && 0x01 < current)
+                {
+                    _malformed = true;
+                    value = 0;
+                    return false;
+                }
+
+                result |= (ulong)(current & 0x7F) << (shift * 7);
+                if ((current & 0x80) == 0)
+                {
+                    _position = index;
+                    value = result;
+                    return true;
+                }
+            }
+
+            _malformed = true;
+            value = 0;
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryChargePackedElement()
         {
             if (!_countPackedElements)
