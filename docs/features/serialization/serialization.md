@@ -2575,6 +2575,21 @@ base's, which is the byte layout (the schema lists them in field-number order). 
 nothing can express is skipped and reported in the export window rather than silently missing. From code, `WProtoSchemaText.TryWriteSchema(contracts, packageName, surrogates,
 out string schema, out IReadOnlyList<string> diagnostics)` renders the same text.
 
+Native maps render as `map<key, value>` without a `repeated` label. Keys that need message
+encodings retain explicit repeated entry messages. URI members, repeated URI elements and URI
+map values use `string`, matching the original UTF-8 text with no inner message tag. Explicit
+surrogate mappings take precedence over native scalar, nullable, binary, BCL and array shapes.
+
+The separate Linux x64 host conformance suite compiles actual exports with pinned protoc 27.2
+and cross-reads independent text-format values through its C++ codec and WProto. It covers a
+finite set of scalar, collection, map, URI and BCL shapes, including absent and present nullable
+defaults, with malformed-schema and changed-tag controls. It does not qualify every schema,
+consumer deployment or Unity backend.
+
+```bash
+dotnet test Generator~/WallstopStudios.UnityHelpers.SchemaConformance.Tests/WallstopStudios.UnityHelpers.SchemaConformance.Tests.csproj -c Release -p:ProtobufNetOracle=v3
+```
+
 Editor scripts can also write schemas without opening the window. `ProtoSchemaExporter.Export`
 accepts the exact contract types, destination, layout, optional package name, and optional surrogate
 map. `ExportProject` discovers concrete, directly attributed project contracts and loaded assembly

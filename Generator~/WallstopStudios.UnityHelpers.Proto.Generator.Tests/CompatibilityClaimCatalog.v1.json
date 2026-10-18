@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "43613e1d055b14bc9dac2122f4922110b080bee9e18446f82d8dd68c3cd5b465",
+  "guideSha256": "d8597f0b2bfa628fe33b09d5a21d75ed491a33cc69af9f92d5e4873816e05268",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -7589,9 +7589,10 @@
         "WProtoSchemaTextTests.BclValueMembersRenderAsTheirMessageShapes",
         "WProtoSchemaTextTests.CollectionShapesMatchTheGeneratorWrappers",
         "WProtoSchemaTextTests.IncludeChainsCarryTheDeeperTagInsideTheShallowerMessage",
-        "WProtoSchemaTextTests.ExplicitUnpackedRepeatedMembersRenderTheirWritePolicy"
+        "WProtoSchemaTextTests.ExplicitUnpackedRepeatedMembersRenderTheirWritePolicy",
+        "WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes"
       ],
-      "limitations": "Host oracle project excludes schema renderer; text equality is not actual protoc/cross-language qualification.",
+      "limitations": "The main host oracle project excludes the renderer. A separate pinned protoc 27.2 suite cross-reads finite scalar, nullable, collection, map, URI and BCL inputs; it has separate ordinary TRX evidence, outside these strict host lanes. Full schema qualification remains open.",
       "gapIds": ["G006"],
       "status": "supported-with-witness",
       "laneRequirements": [
@@ -7619,7 +7620,8 @@
             "WProtoSchemaTextTests.BclValueMembersRenderAsTheirMessageShapes",
             "WProtoSchemaTextTests.CollectionShapesMatchTheGeneratorWrappers",
             "WProtoSchemaTextTests.IncludeChainsCarryTheDeeperTagInsideTheShallowerMessage",
-            "WProtoSchemaTextTests.ExplicitUnpackedRepeatedMembersRenderTheirWritePolicy"
+            "WProtoSchemaTextTests.ExplicitUnpackedRepeatedMembersRenderTheirWritePolicy",
+            "WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
@@ -10164,7 +10166,7 @@
       "id": "G006",
       "claimIds": ["schema.rendering"],
       "status": "open",
-      "description": "Text golden output does not prove actual protoc compilation/cross-language decoding."
+      "description": "A separate Linux x64 protoc 27.2 panel compiles exports and cross-reads finite scalar, nullable, collection, map, URI and BCL values. Compiler/cross-language coverage for includes, enums, surrogate conversion and identifier edge cases remains open; ordinary source assertions do not qualify these cases."
     },
     {
       "id": "G007",

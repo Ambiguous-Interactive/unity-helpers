@@ -26,8 +26,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <see cref="WProtoIncludeAttribute"/> subtype is emitted as a message holding the subtype's
     /// members followed by the base's, exactly as the wire lays the bytes out. The BCL value types
     /// the formatters serve (<see cref="DateTime"/>, <see cref="TimeSpan"/>, <see cref="Guid"/>,
-    /// <see cref="decimal"/>, <see cref="Uri"/>) are emitted as the message shapes those formatters
-    /// actually write, which replicate protobuf-net's <c>.bcl.*</c> conventions.
+    /// <see cref="decimal"/>) are emitted as the message shapes those formatters
+    /// actually write, which replicate protobuf-net's <c>.bcl.*</c> conventions. URI members
+    /// use <c>string</c>, matching their raw UTF-8 payload without an inner message tag.
     /// </para>
     /// <para>
     /// Explicit <see cref="WProtoMemberAttribute.IsPacked"/> opt-outs render as
@@ -114,19 +115,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         + "  uint64 low = 1;\n"
                         + "  uint32 high = 2;\n"
                         + "  uint32 sign_scale = 3;\n"
-                        + "}"
-                )
-            },
-            {
-                typeof(Uri),
-                (
-                    "BclUri",
-                    name =>
-                        "// Replicates protobuf-net's .bcl.Uri layout: the UTF-8 original string.\n"
-                        + "message "
-                        + name
-                        + " {\n"
-                        + "  string original_string = 1;\n"
                         + "}"
                 )
             },
@@ -772,6 +760,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             {
                 Type memberType = member.MemberType;
 
+                if (TryResolveSurrogate(memberType, out Type surrogateType))
+                {
+                    string surrogateName = TryAddContract(surrogateType);
+                    return surrogateName == null
+                        ? null
+                        : $"{surrogateName} {member.SchemaName} = {member.Tag};";
+                }
+
                 if (RefusedTypes.TryGetValue(memberType, out string refusal))
                 {
                     _diagnostics.Add(
@@ -835,15 +831,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return $"{rectName} {member.SchemaName} = {member.Tag};";
                 }
 
-                if (TryResolveSurrogate(memberType, out Type surrogateType))
-                {
-                    string surrogateName = TryAddContract(surrogateType);
-                    if (surrogateName != null)
-                    {
-                        return $"{surrogateName} {member.SchemaName} = {member.Tag};";
-                    }
-                }
-
                 object[] contractMarkers = memberType.GetCustomAttributes(
                     typeof(WProtoContractAttribute),
                     false
@@ -856,13 +843,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 if (TryShapeRepeated(memberType, member, ownerName, out string repeatedType))
                 {
+                    string repetition = repeatedType.StartsWith("map<", StringComparison.Ordinal)
+                        ? string.Empty
+                        : "repeated ";
                     string packingOption =
                         !member.IsPacked
                         && CanPackSchemaElement(GetElementType(memberType))
                         && !TryResolveSurrogate(GetElementType(memberType), out _)
                             ? " [packed = false]"
                             : string.Empty;
-                    return $"repeated {repeatedType} {member.SchemaName} = {member.Tag}{packingOption};";
+                    return $"{repetition}{repeatedType} {member.SchemaName} = {member.Tag}{packingOption};";
                 }
 
                 _diagnostics.Add(
@@ -1553,7 +1543,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return "fixed64";
                 }
 
-                if (type == typeof(string))
+                if (type == typeof(string) || type == typeof(Uri))
                 {
                     return "string";
                 }

@@ -287,7 +287,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             StringAssert.Contains("BclDateTime Moment = 2;", schema);
             StringAssert.Contains("BclTimeSpan Duration = 3;", schema);
             StringAssert.Contains("BclDecimal Amount = 4;", schema);
-            StringAssert.Contains("BclUri Source = 5;", schema);
+            StringAssert.Contains("string Source = 5;", schema);
+            StringAssert.DoesNotContain("BclUri", schema);
             StringAssert.Contains(
                 "message BclGuid {\n  fixed64 low = 1;\n  fixed64 high = 2;\n}",
                 schema
@@ -328,6 +329,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
             StringAssert.Contains("GridRect Grid = 3;", schema);
             StringAssert.Contains("map<string, int32> Counts = 4;", schema);
+            StringAssert.DoesNotContain("repeated map<", schema);
             StringAssert.Contains("repeated SchemaPoint Points = 5;", schema);
         }
 
@@ -380,6 +382,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "The surrogate's message is the field's type, as the wire has it."
             );
             Assert.IsEmpty(diagnostics);
+        }
+
+        [TestCase(typeof(SchemaBcl), typeof(Uri), nameof(SchemaBcl.Source), 5)]
+        [TestCase(typeof(SchemaBcl), typeof(Guid), nameof(SchemaBcl.Id), 1)]
+        [TestCase(typeof(SchemaBcl), typeof(DateTime), nameof(SchemaBcl.Moment), 2)]
+        [TestCase(typeof(SchemaScalars), typeof(int), nameof(SchemaScalars.Signed), 2)]
+        [TestCase(typeof(SchemaScalars), typeof(int?), nameof(SchemaScalars.Maybe), 10)]
+        [TestCase(typeof(SchemaScalars), typeof(byte[]), nameof(SchemaScalars.Payload), 7)]
+        [TestCase(typeof(SchemaCollections), typeof(int[,]), nameof(SchemaCollections.Grid), 3)]
+        public void ExplicitSurrogatesOverrideNativeMemberShapes(
+            Type contract,
+            Type replaced,
+            string member,
+            int tag
+        )
+        {
+            Assert.IsTrue(
+                WProtoSchemaText.TryWriteSchema(
+                    new[] { contract },
+                    null,
+                    new Dictionary<Type, Type> { { replaced, typeof(SchemaPoint) } },
+                    out string schema,
+                    out IReadOnlyList<string> diagnostics
+                )
+            );
+            Assert.IsEmpty(diagnostics);
+            StringAssert.Contains($"SchemaPoint {member} = {tag};", schema);
         }
 
         [Test]

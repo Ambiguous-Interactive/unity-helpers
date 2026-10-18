@@ -93,6 +93,16 @@ jobs:
           --logger "trx;LogFileName=dox-retained-v3.trx"
           --results-directory "${{ runner.temp }}/wproto-evidence/dox-retained"
 
+      - name: Compile exported schemas and cross-read with protoc
+        env:
+          WPROTO_SCHEMA_EVIDENCE_ROOT: ${{ runner.temp }}/wproto-evidence/schema-conformance/processes
+        run: >-
+          dotnet test
+          Generator~/WallstopStudios.UnityHelpers.SchemaConformance.Tests/WallstopStudios.UnityHelpers.SchemaConformance.Tests.csproj
+          -c Release -p:ProtobufNetOracle=v3 --nologo
+          --logger "trx;LogFileName=schema-conformance.trx"
+          --results-directory "${{ runner.temp }}/wproto-evidence/schema-conformance"
+
       - name: Test the generator against protobuf-net 2.4.9
         # The two oracle DLLs share an assembly name. A second process is the only reliable
         # isolation boundary; side-by-side aliases can silently bind both references to v3.

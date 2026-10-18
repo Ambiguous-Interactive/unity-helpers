@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix exported protobuf map fields, URI text, and explicit surrogate overrides so other protobuf tools can read the generated schemas ([#1027](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1027)).
 - Fix nested WProto writes remaining usable after a custom formatter throws; preserve the original exception and reject further writes ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix WProto readers allowing further reads or partial results after rejecting data, including generated readers, built-in values, collection restoration, and formatter forwarding ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix player pools retaining their peak indefinitely: enable conservative idle maintenance and automatic budget checks, while honoring explicit idle opt-outs, capacity limits, and retention floors ([#1008](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1008)).

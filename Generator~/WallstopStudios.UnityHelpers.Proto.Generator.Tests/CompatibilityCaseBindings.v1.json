@@ -99,6 +99,13 @@
       "sha256": "96bf63597c986b44694e9e3c94182d1f453a43caa8d4c53944f5626ac48eb340",
       "purpose": "case-discovery-only",
       "qualification": "none"
+    },
+    {
+      "id": "schema-native-focused",
+      "label": "native-schema-result.json",
+      "sha256": "6c2e612f5eca16523b595221f3454d9bd23662cddd8678ae50d09ec91aaa9eb9",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
     }
   ],
   "selectors": [
@@ -2544,6 +2551,11 @@
     },
     {
       "id": "WProtoSchemaTextTests.EnumOdditiesAreReportedRatherThanSilentlyRendered",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaTextTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests"
+    },
+    {
+      "id": "WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes",
       "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaTextTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests"
     },
@@ -11263,6 +11275,13 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.CollectionShapesMatchTheGeneratorWrappers",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.EnumMemberNamesThatCollideAtFileScopeAreRenamedWithADiagnostic",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.EnumOdditiesAreReportedRatherThanSilentlyRendered",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaBcl,System.DateTime,\"Moment\",2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaBcl,System.Guid,\"Id\",1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaBcl,System.Uri,\"Source\",5)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaCollections,System.Int32[,],\"Grid\",3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaScalars,System.Byte[],\"Payload\",7)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaScalars,System.Int32,\"Signed\",2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaScalars,System.Nullable`1[System.Int32],\"Maybe\",10)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.ExplicitUnpackedRepeatedMembersRenderTheirWritePolicy",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.IncludeChainsCarryTheDeeperTagInsideTheShallowerMessage",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.IncludesEmitTheSubtypeWithItsMembersAheadOfTheBase",
@@ -11279,8 +11298,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.UnpackedSurrogateElementsRenderMessagesWithoutPackingOptions",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.UnsignedEnumValuesAboveLongMaxRenderInsteadOfThrowing"
           ],
-          "discoveryArtifact": "formatter-native-serialization",
-          "reason": "Complete fixture names observed in the full Serialization namespace playmode result; no source/backend qualification is transferred."
+          "discoveryArtifact": "schema-native-focused",
+          "reason": "Complete 32-case fixture discovery from Unity 6000.4.6f1 PlayMode; artifact identity alone transfers no current-source or backend qualification."
         },
         {
           "lane": "unity-editor-editmode",
