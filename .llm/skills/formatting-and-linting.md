@@ -51,6 +51,12 @@ pwsh -NoProfile -File scripts/install-hooks.ps1
 6. Checks staged C# files for forbidden `#region` directives
 7. Checks for missing `.meta` files on staged files and auto-stages dirty existing `.meta` companions
 
+Final-newline checks and fixes respect explicit Git `text=unset` (`-text` or `binary`) attributes.
+Byte captures may intentionally lack a final newline. Read attributes from the index with
+`git check-attr --cached`, so an unstaged attribute change cannot alter the staged-file policy;
+an attribute lookup failure must fail the check instead of permitting a write. Query only files
+that actually lack a final newline.
+
 Pre-commit intentionally does not run Prettier, CSharpier, cspell,
 markdownlint, documentation link lint, EOL normalization, test lint,
 duplicate-using lint, or broad license audits. Those checks belong in

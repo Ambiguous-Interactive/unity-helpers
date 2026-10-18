@@ -590,6 +590,64 @@ $merge_output
     fi
 }
 
+test_precommit_preserves_staged_byte_attributes() {
+    local policy staged_policy working_policy
+    for policy in unset binary staged-text; do
+        local name="pre-commit honors staged byte policy ($policy)"
+        local sandbox="$TEMPDIR/precommit-byte-policy-$policy"
+        mkdir -p "$sandbox/.githooks" "$sandbox/scripts"
+        cp "$REPO_ROOT/.githooks/pre-commit.ps1" "$sandbox/.githooks/pre-commit.ps1"
+        cp "$REPO_ROOT/scripts/git-staging-helpers.ps1" "$sandbox/scripts/git-staging-helpers.ps1"
+        cp "$REPO_ROOT/scripts/normalize-eol.ps1" "$sandbox/scripts/normalize-eol.ps1"
+        git -C "$sandbox" init -q
+        git -C "$sandbox" config user.email test@example.com
+        git -C "$sandbox" config user.name "Test User"
+        staged_policy=-text
+        working_policy=text
+        if [[ "$policy" == binary ]]; then
+            staged_policy=binary
+        elif [[ "$policy" == staged-text ]]; then
+            staged_policy=text
+            working_policy=-text
+        fi
+        local capture='.githooks/captured sample.txt'
+        printf '"%s" %s\n' "$capture" "$staged_policy" > "$sandbox/.gitattributes"
+        printf 'frozen bytes' > "$sandbox/$capture"
+        printf 'ordinary text' > "$sandbox/README.md"
+        git -C "$sandbox" add -- .gitattributes "$capture" README.md
+        printf '"%s" %s\n' "$capture" "$working_policy" > "$sandbox/.gitattributes"
+        local before_blob
+        before_blob=$(git -C "$sandbox" rev-parse ":$capture")
+        local output exit_code=0
+        output=$(cd "$sandbox" && pwsh -NoProfile -File .githooks/pre-commit.ps1 2>&1) || exit_code=$?
+        if [[ "$exit_code" -ne 0 ]]; then
+            fail "$name" "hook failed: $output"
+            continue
+        fi
+        printf 'ordinary text\n' > "$sandbox/expected"
+        git -C "$sandbox" show :README.md > "$sandbox/index-readme"
+        if ! cmp -s "$sandbox/expected" "$sandbox/README.md" || ! cmp -s "$sandbox/expected" "$sandbox/index-readme"; then
+            fail "$name" 'ordinary text was not fixed in both worktree and index'
+            continue
+        fi
+        if [[ "$policy" == staged-text ]]; then
+            printf 'frozen bytes\n' > "$sandbox/expected"
+        else
+            printf 'frozen bytes' > "$sandbox/expected"
+            if [[ "$(git -C "$sandbox" rev-parse ":$capture")" != "$before_blob" ]]; then
+                fail "$name" 'byte-preserved index blob changed'
+                continue
+            fi
+        fi
+        git -C "$sandbox" show ":$capture" > "$sandbox/index-capture"
+        if cmp -s "$sandbox/expected" "$sandbox/$capture" && cmp -s "$sandbox/expected" "$sandbox/index-capture"; then
+            pass "$name"
+        else
+            fail "$name" 'capture bytes do not follow the staged attribute policy'
+        fi
+    done
+}
+
 test_precommit_refuses_partial_final_newline_before_write() {
     local name="pre-commit refuses partial final-newline fix before write"
     local sandbox="$TEMPDIR/precommit-partial-final-newline"
@@ -802,6 +860,7 @@ test_precommit_spellcheck_regression
 test_precommit_entrypoint_delegates_to_ps1
 test_precommit_fast_path_removes_ignored_artifacts
 test_premergecommit_delegates_to_precommit
+test_precommit_preserves_staged_byte_attributes
 test_precommit_refuses_partial_final_newline_before_write
 test_precommit_checks_staged_csharp_blob
 test_precommit_partial_commit
