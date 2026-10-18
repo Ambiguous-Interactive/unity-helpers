@@ -1374,6 +1374,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     string.Equals(diagnostic.Id, "WPROTO045", System.StringComparison.Ordinal)
                 );
 
+            Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
             Assert.IsTrue(match.GetMessage().Contains(named), match.GetMessage());
         }
 
@@ -2281,12 +2282,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     + " Value; } [WProtoContract] public partial class ValidDefault { [WProtoMember(1)] public int Value; }",
                 out Compilation generated
             );
-            Assert.AreEqual(
-                1,
-                diagnostics.Count(diagnostic =>
-                    string.Equals(diagnostic.Id, "WPROTO049", StringComparison.Ordinal)
-                )
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO049", StringComparison.Ordinal)
             );
+            Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
             Assert.IsFalse(
                 diagnostics.Any(diagnostic =>
                     string.Equals(diagnostic.Id, "CS8785", StringComparison.Ordinal)
@@ -2353,12 +2352,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     + " Value; }",
                 out Compilation generated
             );
-            Assert.AreEqual(
-                1,
-                diagnostics.Count(diagnostic =>
-                    string.Equals(diagnostic.Id, "WPROTO049", StringComparison.Ordinal)
-                )
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO049", StringComparison.Ordinal)
             );
+            Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
             Assert.IsFalse(
                 diagnostics.Any(diagnostic =>
                     string.Equals(diagnostic.Id, "CS8785", StringComparison.Ordinal)

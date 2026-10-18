@@ -162,6 +162,84 @@ function Assert-WProtoUniqueIds {
     }
 }
 
+function Assert-WProtoDiagnosticCatalog {
+    param([string]$Root, $Catalog, $Bindings)
+    $advertised = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($match in [regex]::Matches([IO.File]::ReadAllText((Resolve-WProtoSourcePath $Root $Catalog.guidePath)), '\bWPROTO[0-9]{3}\b')) { [void]$advertised.Add($match.Value) }
+    if ($advertised.Count -eq 0) { throw 'The guide has no advertised diagnostic subjects.' }
+    Assert-WProtoUniqueIds $Catalog.diagnostics 'code' 'diagnostics'
+    Assert-WProtoArray $Catalog.diagnosticAssertionSources 'diagnosticAssertionSources'
+    Assert-WProtoUniqueIds $Catalog.diagnosticAssertionSources 'path' 'diagnostic assertion sources'
+    $reviewedSources = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($source in $Catalog.diagnosticAssertionSources) {
+        Assert-WProtoString $source.sha256 'diagnostic source sha256'
+        if ((Get-WProtoFileHash (Resolve-WProtoSourcePath $Root $source.path)) -cne $source.sha256) { throw 'Diagnostic assertion source changed without semantic review.' }
+        [void]$reviewedSources.Add($source.path)
+    }
+    $usedSources = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $active = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $hostLanes = @($Catalog.lanes | Where-Object { $_.backend -ceq 'CoreCLR' } | ForEach-Object { $_.id })
+    if ($hostLanes.Count -eq 0) { throw 'Diagnostic assertions have no host execution lane.' }
+    $editorPolicy = @{
+        'SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer' = @('Error')
+        'SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor' = @('Warning')
+        'SubtypeTagManifestTests.TheUnassignedSeverityFollowsTheUnityEditorSymbolAndNothingElse' = @('Error', 'Warning')
+    }
+    $retired = 0
+    foreach ($diagnostic in $Catalog.diagnostics) {
+        Assert-WProtoString $diagnostic.status 'diagnostic status'
+        Assert-WProtoArray $diagnostic.assertions 'diagnostic assertions'
+        if ($diagnostic.code -ceq 'WPROTO007') {
+            if ($advertised.Contains($diagnostic.code) -or $diagnostic.status -cne 'resolved-stale-advertisement' -or $null -ne $diagnostic.claimId -or $diagnostic.assertions.Count -ne 0) { throw 'Retired WPROTO007 cannot assert active behavior.' }
+            ++$retired
+            continue
+        }
+        if (-not $advertised.Contains($diagnostic.code) -or $diagnostic.status -cne 'reviewed-assertions') { throw 'Diagnostic has no reviewed advertised assertion mapping.' }
+        [void]$active.Add($diagnostic.code)
+        Assert-WProtoString $diagnostic.claimId 'diagnostic claimId'
+        $claim = @($Catalog.claims | Where-Object { $_.id -ceq $diagnostic.claimId })
+        if ($claim.Count -ne 1) { throw 'Diagnostic has no catalog claim.' }
+        Assert-WProtoUniqueIds $diagnostic.assertions 'selector' 'diagnostic assertions'
+        $assertionIds = [Collections.Generic.HashSet[string]]::new([string[]]@($diagnostic.assertions.selector), [StringComparer]::Ordinal)
+        if ($diagnostic.code -ceq 'WPROTO041' -and -not $assertionIds.SetEquals([string[]]@($editorPolicy.Keys))) { throw 'WPROTO041 requires the reviewed player, editor and symbol-control assertions.' }
+        foreach ($assertion in $diagnostic.assertions) {
+            $selector = @($Bindings.selectors | Where-Object { $_.id -ceq $assertion.selector })
+            if ($selector.Count -ne 1 -or $assertion.selector -cnotin @($claim[0].selectors) -or -not $reviewedSources.Contains($selector[0].sourcePath)) { throw 'Diagnostic assertion has no reviewed claim/source selector.' }
+            [void]$usedSources.Add($selector[0].sourcePath)
+            Assert-WProtoArray $assertion.expectedSeverities 'diagnostic expectedSeverities'
+            $severities = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            foreach ($severity in $assertion.expectedSeverities) {
+                Assert-WProtoString $severity 'diagnostic severity'
+                if (-not $severities.Add($severity)) { throw 'Duplicate diagnostic severity.' }
+            }
+            $expected = if ($diagnostic.code -ceq 'WPROTO041') { $editorPolicy[$assertion.selector] }
+            elseif ($diagnostic.code -cin @('WPROTO028', 'WPROTO031', 'WPROTO033', 'WPROTO034', 'WPROTO047')) { @('Warning') }
+            elseif ($diagnostic.code -cin @('WPROTO030', 'WPROTO048')) { @('Info') }
+            else { @('Error') }
+            if (-not $severities.SetEquals([string[]]@($expected))) { throw 'Diagnostic severity differs from the reviewed policy.' }
+            Assert-WProtoArray $assertion.lanes 'diagnostic assertion lanes'
+            Assert-WProtoUniqueIds $assertion.lanes 'lane' 'diagnostic assertion lanes'
+            $lanes = [Collections.Generic.HashSet[string]]::new([string[]]@($assertion.lanes.lane), [StringComparer]::Ordinal)
+            if (-not $lanes.SetEquals([string[]]$hostLanes)) { throw 'Diagnostic assertions must bind every host lane.' }
+            $fixture = @($Bindings.fixtures | Where-Object { $_.fixture -ceq $selector[0].fixture -and $_.sourcePath -ceq $selector[0].sourcePath })
+            if ($fixture.Count -ne 1) { throw 'Diagnostic assertion fixture is missing.' }
+            foreach ($lane in $assertion.lanes) {
+                Assert-WProtoArray $lane.caseNames 'diagnostic assertion cases'
+                if ($lane.caseNames.Count -eq 0) { throw 'Diagnostic assertion has no exact cases.' }
+                $binding = @($fixture[0].lanes | Where-Object { $_.lane -ceq $lane.lane -and $_.status -ceq 'discovered' })
+                $requirement = @($claim[0].laneRequirements | Where-Object { $_.lane -ceq $lane.lane -and $_.status -ceq 'witnesses' })
+                if ($binding.Count -ne 1 -or $requirement.Count -ne 1 -or $assertion.selector -cnotin @($requirement[0].selectors)) { throw 'Diagnostic assertion has no discovered claim/fixture lane.' }
+                $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+                foreach ($name in $lane.caseNames) {
+                    Assert-WProtoString $name 'diagnostic case name'
+                    if (-not $names.Add($name) -or $name -cnotin @($binding[0].caseNames)) { throw 'Diagnostic case is duplicated or outside its discovered fixture.' }
+                }
+            }
+        }
+    }
+    if ($retired -ne 1 -or -not $active.SetEquals($advertised) -or -not $usedSources.SetEquals($reviewedSources)) { throw 'Advertised diagnostics or reviewed assertion sources are incomplete.' }
+}
+
 function Read-WProtoCatalog {
     param([string]$Root)
     $directory = Join-Path $Root 'Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests'
@@ -242,6 +320,7 @@ function Read-WProtoCatalog {
             if ($requirement.status -ceq 'witnesses' -and @($requirement.selectors).Count -eq 0) { throw 'Witness lane cannot be empty.' }
         }
     }
+    Assert-WProtoDiagnosticCatalog $Root $catalog $bindings
     return @{ catalog = $catalog; bindings = $bindings; catalogPath = $catalogPath; bindingsPath = $bindingsPath }
 }
 

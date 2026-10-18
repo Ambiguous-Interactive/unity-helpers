@@ -2593,6 +2593,31 @@
       "id": "ZigZagDifferentialTests.TheShippedCellShapeEncodesAsProtobufNetDoes",
       "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/ZigZagDifferentialTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ZigZagDifferentialTests"
+    },
+    {
+      "id": "DiagnosticTests.AMutableClassWithNoParameterlessConstructorIsStillAnError",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
+    },
+    {
+      "id": "DiagnosticTests.AnExplicitOrdinalCollidingWithACommittedOneIsRefused",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
+    },
+    {
+      "id": "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SubtypeTagManifestTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests"
+    },
+    {
+      "id": "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SubtypeTagManifestTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests"
+    },
+    {
+      "id": "DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
     }
   ],
   "fixtures": [

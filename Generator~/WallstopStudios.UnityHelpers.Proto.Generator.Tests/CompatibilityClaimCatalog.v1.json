@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "6c8e90e6895d5d2a72c88a98f27c720ffd46fe7611cc3285f8c569cd1fcdb151",
+  "guideSha256": "a89f02aedd4ef4a94e22babd3df6be27fc8a9a79e14fa3f73ad703e348703d6e",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -3058,7 +3058,8 @@
         "DiagnosticTests.BothDeclarationFormsEmitTheSameFormatterSource",
         "WProtoIncludeContractTests.ASelfDeclaredHierarchyWritesExactlyWhatTheBaseDeclaredOneDoes",
         "WProtoIncludeContractTests.OneBaseServesBothDeclarationFormsAtOnce",
-        "DiagnosticTests.OneFieldNumberCannotIdentifyTwoSubtypes"
+        "DiagnosticTests.OneFieldNumberCannotIdentifyTwoSubtypes",
+        "DiagnosticTests.AnExplicitOrdinalCollidingWithACommittedOneIsRefused"
       ],
       "limitations": "Host and Unity tests pin explicit/base-side declaration equivalence.",
       "gapIds": ["G019"],
@@ -3071,7 +3072,8 @@
           "selectors": [
             "SubtypeDeclarationTests.TheTwoDeclarationFormsProduceIdenticalBytes",
             "DiagnosticTests.BothDeclarationFormsEmitTheSameFormatterSource",
-            "DiagnosticTests.OneFieldNumberCannotIdentifyTwoSubtypes"
+            "DiagnosticTests.OneFieldNumberCannotIdentifyTwoSubtypes",
+            "DiagnosticTests.AnExplicitOrdinalCollidingWithACommittedOneIsRefused"
           ],
           "reason": "Only part of the declared witness set applies; this lane cannot establish the whole claim."
         },
@@ -3082,7 +3084,8 @@
           "selectors": [
             "SubtypeDeclarationTests.TheTwoDeclarationFormsProduceIdenticalBytes",
             "DiagnosticTests.BothDeclarationFormsEmitTheSameFormatterSource",
-            "DiagnosticTests.OneFieldNumberCannotIdentifyTwoSubtypes"
+            "DiagnosticTests.OneFieldNumberCannotIdentifyTwoSubtypes",
+            "DiagnosticTests.AnExplicitOrdinalCollidingWithACommittedOneIsRefused"
           ],
           "reason": "Only part of the declared witness set applies; this lane cannot establish the whole claim."
         },
@@ -3370,7 +3373,9 @@
       "selectors": [
         "SubtypeTagManifestTests.TheUnassignedSeverityFollowsTheUnityEditorSymbolAndNothingElse",
         "SubtypeTagManifestTests.TheBuildGateRefusesOnlyForAssembliesThePlayerActuallyContains",
-        "SubtypeTagManifestTests.WritingASubtypeTheChainDoesNotDeclareThrowsRatherThanWritingItAsItsBase"
+        "SubtypeTagManifestTests.WritingASubtypeTheChainDoesNotDeclareThrowsRatherThanWritingItAsItsBase",
+        "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer",
+        "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor"
       ],
       "limitations": "Compiler symbol simulation is not actual stripped player acceptance.",
       "gapIds": ["G019"],
@@ -3383,7 +3388,9 @@
           "selectors": [
             "SubtypeTagManifestTests.TheUnassignedSeverityFollowsTheUnityEditorSymbolAndNothingElse",
             "SubtypeTagManifestTests.TheBuildGateRefusesOnlyForAssembliesThePlayerActuallyContains",
-            "SubtypeTagManifestTests.WritingASubtypeTheChainDoesNotDeclareThrowsRatherThanWritingItAsItsBase"
+            "SubtypeTagManifestTests.WritingASubtypeTheChainDoesNotDeclareThrowsRatherThanWritingItAsItsBase",
+            "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer",
+            "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
@@ -3394,7 +3401,9 @@
           "selectors": [
             "SubtypeTagManifestTests.TheUnassignedSeverityFollowsTheUnityEditorSymbolAndNothingElse",
             "SubtypeTagManifestTests.TheBuildGateRefusesOnlyForAssembliesThePlayerActuallyContains",
-            "SubtypeTagManifestTests.WritingASubtypeTheChainDoesNotDeclareThrowsRatherThanWritingItAsItsBase"
+            "SubtypeTagManifestTests.WritingASubtypeTheChainDoesNotDeclareThrowsRatherThanWritingItAsItsBase",
+            "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer",
+            "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
@@ -3613,7 +3622,8 @@
         "CrossAssemblySubtypeTests.AnInaccessibleUpstreamSubtypeRefusesAnIncompleteReplacement",
         "DiagnosticTests.ASubtypeCannotExtendAnAssemblyWithoutAGeneratedExtensionBody",
         "DiagnosticTests.TheMissingExtensionBodyRefusalExplainsHowToRebuildOrCompose",
-        "DiagnosticTests.AnUnusableSubtypeDeclarationIsAnError"
+        "DiagnosticTests.AnUnusableSubtypeDeclarationIsAnError",
+        "DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused"
       ],
       "limitations": "Full immutable inheritance remains unsupported.",
       "gapIds": ["G019"],
@@ -3627,7 +3637,8 @@
             "CrossAssemblySubtypeTests.AnInaccessibleUpstreamSubtypeRefusesAnIncompleteReplacement",
             "DiagnosticTests.ASubtypeCannotExtendAnAssemblyWithoutAGeneratedExtensionBody",
             "DiagnosticTests.TheMissingExtensionBodyRefusalExplainsHowToRebuildOrCompose",
-            "DiagnosticTests.AnUnusableSubtypeDeclarationIsAnError"
+            "DiagnosticTests.AnUnusableSubtypeDeclarationIsAnError",
+            "DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
@@ -3639,7 +3650,8 @@
             "CrossAssemblySubtypeTests.AnInaccessibleUpstreamSubtypeRefusesAnIncompleteReplacement",
             "DiagnosticTests.ASubtypeCannotExtendAnAssemblyWithoutAGeneratedExtensionBody",
             "DiagnosticTests.TheMissingExtensionBodyRefusalExplainsHowToRebuildOrCompose",
-            "DiagnosticTests.AnUnusableSubtypeDeclarationIsAnError"
+            "DiagnosticTests.AnUnusableSubtypeDeclarationIsAnError",
+            "DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
@@ -6860,7 +6872,8 @@
         "DeclaredRootTests.AClaimBeatsADeclarationWhicheverRunsFirst",
         "DeclaredRootTests.ReleasingAClaimRestoresTheDeclaration",
         "DeclaredRootTests.AnImplementationOutsideTheRootsChainIsNotServed",
-        "DiagnosticTests.ConflictingDeclaredRootsInTwoReferencedAssembliesAreAWarning"
+        "DiagnosticTests.ConflictingDeclaredRootsInTwoReferencedAssembliesAreAWarning",
+        "DiagnosticTests.ADeclaredRootConflictingWithAReferencedAssemblyIsAWarning"
       ],
       "limitations": "Out-of-chain writes may fallback; reads with declared concrete root can plausibly read wrong schema unless explicit type supplied.",
       "gapIds": ["G019"],
@@ -6874,7 +6887,8 @@
             "DeclaredRootTests.AClaimBeatsADeclarationWhicheverRunsFirst",
             "DeclaredRootTests.ReleasingAClaimRestoresTheDeclaration",
             "DeclaredRootTests.AnImplementationOutsideTheRootsChainIsNotServed",
-            "DiagnosticTests.ConflictingDeclaredRootsInTwoReferencedAssembliesAreAWarning"
+            "DiagnosticTests.ConflictingDeclaredRootsInTwoReferencedAssembliesAreAWarning",
+            "DiagnosticTests.ADeclaredRootConflictingWithAReferencedAssemblyIsAWarning"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
@@ -6886,7 +6900,8 @@
             "DeclaredRootTests.AClaimBeatsADeclarationWhicheverRunsFirst",
             "DeclaredRootTests.ReleasingAClaimRestoresTheDeclaration",
             "DeclaredRootTests.AnImplementationOutsideTheRootsChainIsNotServed",
-            "DiagnosticTests.ConflictingDeclaredRootsInTwoReferencedAssembliesAreAWarning"
+            "DiagnosticTests.ConflictingDeclaredRootsInTwoReferencedAssembliesAreAWarning",
+            "DiagnosticTests.ADeclaredRootConflictingWithAReferencedAssemblyIsAWarning"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
@@ -8384,7 +8399,8 @@
         "DiagnosticTests.AHookThatTakesArgumentsIsAnError",
         "DiagnosticTests.AHookOnAStructIsAnError",
         "DiagnosticTests.AClassWithNoParameterlessConstructorIsAnError",
-        "DiagnosticTests.ARefusedContractNeverLeavesGeneratedCodeThatFailsToCompile"
+        "DiagnosticTests.ARefusedContractNeverLeavesGeneratedCodeThatFailsToCompile",
+        "DiagnosticTests.AMutableClassWithNoParameterlessConstructorIsStillAnError"
       ],
       "limitations": "Diagnostic-specific rows below must expand exact advertised WPROTO codes before catalog acceptance.",
       "gapIds": ["G003", "G019"],
@@ -8403,7 +8419,8 @@
             "DiagnosticTests.AHookThatTakesArgumentsIsAnError",
             "DiagnosticTests.AHookOnAStructIsAnError",
             "DiagnosticTests.AClassWithNoParameterlessConstructorIsAnError",
-            "DiagnosticTests.ARefusedContractNeverLeavesGeneratedCodeThatFailsToCompile"
+            "DiagnosticTests.ARefusedContractNeverLeavesGeneratedCodeThatFailsToCompile",
+            "DiagnosticTests.AMutableClassWithNoParameterlessConstructorIsStillAnError"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
@@ -8420,7 +8437,8 @@
             "DiagnosticTests.AHookThatTakesArgumentsIsAnError",
             "DiagnosticTests.AHookOnAStructIsAnError",
             "DiagnosticTests.AClassWithNoParameterlessConstructorIsAnError",
-            "DiagnosticTests.ARefusedContractNeverLeavesGeneratedCodeThatFailsToCompile"
+            "DiagnosticTests.ARefusedContractNeverLeavesGeneratedCodeThatFailsToCompile",
+            "DiagnosticTests.AMutableClassWithNoParameterlessConstructorIsStillAnError"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
@@ -10067,201 +10085,1082 @@
         "unsupported.immutable-polymorphism",
         "zigzag.refused"
       ],
-      "status": "open",
-      "description": "The 37 active diagnostic codes remain mapped-requires-case-and-source-verification. Whole-fixture passes and source test declarations do not yet prove each advertised diagnostic has a reviewed exact code, severity and ordinary-runner case assertion. Complete the per-code semantic mapping before claiming diagnostic catalog completeness; retired WPROTO007 is excluded and retains its resolved documentation status."
+      "status": "resolved-by-witness",
+      "description": "The main guide's 37 advertised active codes have reviewed exact identifier/severity assertions and 78 ordinary cases per host lane. WPROTO041 pins explicit subtype player/editor/symbol-control branches; other trigger paths are not implied. Two reviewed source hashes require renewed semantic review after assertion/provider/helper edits. Complete fixture execution and backend qualification remain separate; retired WPROTO007 stays excluded."
     }
   ],
   "diagnostics": [
     {
       "code": "WPROTO001",
       "claimId": "compiler.unsupported-declarations",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.ANonPartialContractIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ANonPartialContractIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ANonPartialContractIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO002",
       "claimId": "compiler.unsupported-declarations",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.TwoMembersClaimingOneFieldNumberIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.TwoMembersClaimingOneFieldNumberIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.TwoMembersClaimingOneFieldNumberIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO003",
       "claimId": "compiler.collection-refusals",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnUnsupportedMemberTypeIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"Consumer.IOwnList<int>\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"Consumer.IOwnList<int>[,]\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"System.Collections.Generic.List<Consumer.IOwnList<int>>\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"System.Collections.Generic.List<System.DateTimeOffset[]>\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"System.DateTimeOffset\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"System.DateTimeOffset[,]\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"int?[,]\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"int?[]\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"int?[][]\")"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"Consumer.IOwnList<int>\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"Consumer.IOwnList<int>[,]\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"System.Collections.Generic.List<Consumer.IOwnList<int>>\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"System.Collections.Generic.List<System.DateTimeOffset[]>\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"System.DateTimeOffset\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"System.DateTimeOffset[,]\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"int?[,]\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"int?[]\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUnsupportedMemberTypeIsAnError(\"int?[][]\")"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO004",
       "claimId": "compiler.unsupported-declarations",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AFieldNumberOutsideTheLegalRangeIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AFieldNumberOutsideTheLegalRangeIsAnError(-3)",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AFieldNumberOutsideTheLegalRangeIsAnError(0)",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AFieldNumberOutsideTheLegalRangeIsAnError(19500)"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AFieldNumberOutsideTheLegalRangeIsAnError(-3)",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AFieldNumberOutsideTheLegalRangeIsAnError(0)",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AFieldNumberOutsideTheLegalRangeIsAnError(19500)"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO005",
       "claimId": "compiler.unsupported-declarations",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.ALifecycleHookOnATypeWithNoContractIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ALifecycleHookOnATypeWithNoContractIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ALifecycleHookOnATypeWithNoContractIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO006",
       "claimId": "compiler.unsupported-declarations",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.TwoHooksOfTheSameKindIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.TwoHooksOfTheSameKindIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.TwoHooksOfTheSameKindIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO007",
       "claimId": null,
-      "status": "resolved-stale-advertisement"
+      "status": "resolved-stale-advertisement",
+      "assertions": []
     },
     {
       "code": "WPROTO008",
       "claimId": "compiler.unsupported-declarations",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AHookThatTakesArgumentsIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AHookThatTakesArgumentsIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AHookThatTakesArgumentsIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO009",
       "claimId": "generic.refusals",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AContractNestedInsideAGenericTypeIsARefusalToo",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AContractNestedInsideAGenericTypeIsARefusalToo"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AContractNestedInsideAGenericTypeIsARefusalToo"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO010",
       "claimId": "compiler.unsupported-declarations",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AHookOnAStructIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AHookOnAStructIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AHookOnAStructIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO011",
       "claimId": "compiler.unsupported-declarations",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AMutableClassWithNoParameterlessConstructorIsStillAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AMutableClassWithNoParameterlessConstructorIsStillAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AMutableClassWithNoParameterlessConstructorIsStillAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO015",
       "claimId": "unsupported.immutable-polymorphism",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.ImmutableMembersWithAnIncludeAreRefused",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableMembersWithAnIncludeAreRefused(\"public int Value { get; }\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableMembersWithAnIncludeAreRefused(\"public readonly int Value;\")"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableMembersWithAnIncludeAreRefused(\"public int Value { get; }\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableMembersWithAnIncludeAreRefused(\"public readonly int Value;\")"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO023",
       "claimId": "compiler.root-diagnostics",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnUnusableDeclaredRootIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ARootThatIsNotAssignableToItsDeclaredTypeIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ARootThatIsNotAssignableToItsDeclaredTypeIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO024",
       "claimId": "compiler.root-diagnostics",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnUnusableDeclaredRootIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ARootThatIsItsOwnDeclaredTypeIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ARootThatIsItsOwnDeclaredTypeIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO025",
       "claimId": "compiler.root-diagnostics",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnUnusableDeclaredRootIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ADeclaredTypeThatIsItselfAContractIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ADeclaredTypeThatIsItselfAContractIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO026",
       "claimId": "compiler.root-diagnostics",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnUnusableDeclaredRootIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AGenericDeclaredRootIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AGenericDeclaredRootIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO027",
       "claimId": "compiler.root-diagnostics",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnUnusableDeclaredRootIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.TwoRootsForOneDeclaredTypeIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.TwoRootsForOneDeclaredTypeIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO028",
       "claimId": "generic.refusals",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AClosureTheRegistrarCannotNameIsAnnounced",
+          "expectedSeverities": ["Warning"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AClosureTheRegistrarCannotNameIsAnnounced"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AClosureTheRegistrarCannotNameIsAnnounced"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO029",
       "claimId": "compiler.root-diagnostics",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnUnusableDeclaredRootIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AValueTypeAsTheDeclaredTypeIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AValueTypeAsTheDeclaredTypeIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO030",
       "claimId": "migration.metadata-not-consumed",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AProtobufContractWithoutAWallstopProtoContractReportsMigrationInfo",
+          "expectedSeverities": ["Info"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AProtobufContractWithoutAWallstopProtoContractReportsMigrationInfo"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AProtobufContractWithoutAWallstopProtoContractReportsMigrationInfo"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO031",
       "claimId": "root.claim-overrides",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.ADeclaredRootConflictingWithAReferencedAssemblyIsAWarning",
+          "expectedSeverities": ["Warning"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ADeclaredRootConflictingWithAReferencedAssemblyIsAWarning"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ADeclaredRootConflictingWithAReferencedAssemblyIsAWarning"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO032",
       "claimId": "compiler.collection-refusals",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.ACollectionNestedPastTheReadersDepthIsItsOwnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ACollectionNestedPastTheReadersDepthIsItsOwnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ACollectionNestedPastTheReadersDepthIsItsOwnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO033",
       "claimId": "construction.skip-warning",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AFieldInitializerSkipConstructorDiscardsIsAWarning",
+          "expectedSeverities": ["Warning"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AFieldInitializerSkipConstructorDiscardsIsAWarning"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AFieldInitializerSkipConstructorDiscardsIsAWarning"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO034",
       "claimId": "construction.hook-policy",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.ALifecycleHookOnASubtypeIsAWarning",
+          "expectedSeverities": ["Warning"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ALifecycleHookOnASubtypeIsAWarning"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ALifecycleHookOnASubtypeIsAWarning"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO037",
       "claimId": "zigzag.refused",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AZigZagOnATypeWithNoSuchEncodingIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AZigZagBoolIsAnError",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AZigZagFloatIsAnError",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AZigZagRepeatedMemberIsAnError",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AZigZagStringIsAnError",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AZigZagUnsignedIntegerIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AZigZagBoolIsAnError",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AZigZagFloatIsAnError",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AZigZagRepeatedMemberIsAnError",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AZigZagStringIsAnError",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AZigZagUnsignedIntegerIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO038",
       "claimId": "surrogate.invalid",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnOpenGenericSurrogateRequiresMatchingOpennessAndArity",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ClosedReal.OpenSurrogate.Refused",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.OpenReal.ClosedSurrogate.Refused",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.OpenPair.DifferentArity.Refused"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ClosedReal.OpenSurrogate.Refused",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.OpenReal.ClosedSurrogate.Refused",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.OpenPair.DifferentArity.Refused"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO039",
       "claimId": "polymorphism.subtype-declaration",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnExplicitOrdinalCollidingWithACommittedOneIsRefused",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnExplicitOrdinalCollidingWithACommittedOneIsRefused"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnExplicitOrdinalCollidingWithACommittedOneIsRefused"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO040",
       "claimId": "polymorphism.upstream-refusal",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.ASubtypeCannotExtendAnAssemblyWithoutAGeneratedExtensionBody",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ASubtypeCannotExtendAnAssemblyWithoutAGeneratedExtensionBody"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ASubtypeCannotExtendAnAssemblyWithoutAGeneratedExtensionBody"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO041",
       "claimId": "polymorphism.manifest-gates",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer"
+              ]
+            }
+          ]
+        },
+        {
+          "selector": "SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor",
+          "expectedSeverities": ["Warning"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor"
+              ]
+            }
+          ]
+        },
+        {
+          "selector": "SubtypeTagManifestTests.TheUnassignedSeverityFollowsTheUnityEditorSymbolAndNothingElse",
+          "expectedSeverities": ["Error", "Warning"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.TheUnassignedSeverityFollowsTheUnityEditorSymbolAndNothingElse"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.TheUnassignedSeverityFollowsTheUnityEditorSymbolAndNothingElse"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO042",
       "claimId": "polymorphism.manifest-durability",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError - a number outside the protobuf range",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError - a retired entry naming no type",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError - a retired number handed out again",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError - one number for two subtypes",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError - two numbers for one pair"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError - a number outside the protobuf range",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError - a retired entry naming no type",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError - a retired number handed out again",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError - one number for two subtypes",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests.AManifestEntryThatCannotBeHonouredIsAnError - two numbers for one pair"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO043",
       "claimId": "evolution.reserved-members",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AMemberCannotTakeAReservedFieldNumber",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AMemberCannotTakeAReservedFieldNumber"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AMemberCannotTakeAReservedFieldNumber"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO044",
       "claimId": "polymorphism.upstream-refusal",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO045",
       "claimId": "polymorphism.optout",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.TheOptOutBesideAContradictoryDeclarationIsRefused",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.TheOptOutBesideAContractIsRefused",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.TheOptOutBesideASubtypeDeclarationIsRefused"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.TheOptOutBesideAContractIsRefused",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.TheOptOutBesideASubtypeDeclarationIsRefused"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO046",
       "claimId": "evolution.reserved-enums",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnEnumMemberTakingAReservedValueIsAnError",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnEnumMemberTakingAReservedValueIsAnError"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnEnumMemberTakingAReservedValueIsAnError"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO047",
       "claimId": "polymorphism.optout",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.AnInheritedContractWithMembersOfItsOwnIsAdvisedToSaySo",
+          "expectedSeverities": ["Warning"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnInheritedContractWithMembersOfItsOwnIsAdvisedToSaySo"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AnInheritedContractWithMembersOfItsOwnIsAdvisedToSaySo"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO048",
       "claimId": "migration.runtime-model",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.RuntimeModelMigrationNamesTheApiAndCompileTimeReplacement",
+          "expectedSeverities": ["Info"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.RuntimeModelMigration.Add.TypeLiteral"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.RuntimeModelMigration.Add.TypeLiteral"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO049",
       "claimId": "contract.default-refusals",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"System.Collections.Generic.List<int>\",\"5\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"System.DayOfWeek\",\"1.5D\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"System.DayOfWeek\",\"typeof(System.DayOfWeek), \\\"-1, 2147483648\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"System.DayOfWeek\",\"typeof(System.DayOfWeek), \\\"4294967301\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"System.IO.FileAttributes\",\"\\\"1, 2\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"byte[]\",\"5\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"double\",\"typeof(double), \\\"NaN\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"float\",\"float.NaN\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"int\",\"new int[] { 1 }\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"int\",\"typeof(int)\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"int\",\"typeof(int), \\\"invalid\\\"\")"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"System.Collections.Generic.List<int>\",\"5\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"System.DayOfWeek\",\"1.5D\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"System.DayOfWeek\",\"typeof(System.DayOfWeek), \\\"-1, 2147483648\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"System.DayOfWeek\",\"typeof(System.DayOfWeek), \\\"4294967301\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"System.IO.FileAttributes\",\"\\\"1, 2\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"byte[]\",\"5\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"double\",\"typeof(double), \\\"NaN\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"float\",\"float.NaN\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"int\",\"new int[] { 1 }\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"int\",\"typeof(int)\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ExplicitDefaultsRefuseUnsupportedOmissionPolicies(\"int\",\"typeof(int), \\\"invalid\\\"\")"
+              ]
+            }
+          ]
+        },
+        {
+          "selector": "DiagnosticTests.AmbiguousEnumDefaultsRequireAnExplicitFormatter",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AmbiguousEnumDefaultsRequireAnExplicitFormatter(\"[System.ComponentModel.TypeConverter(typeof(System.ComponentModel.BooleanConverter))] public enum Alias { First = 1 }\",\"Alias\",\"typeof(Alias), \\\"true\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AmbiguousEnumDefaultsRequireAnExplicitFormatter(\"public enum Alias : ulong { First = 1 }\",\"Alias\",\"typeof(Alias), \\\"-1\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AmbiguousEnumDefaultsRequireAnExplicitFormatter(\"public enum Alias { Alpha = 1, ALPHA = 2 }\",\"Alias\",\"typeof(Alias), \\\"Alpha\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AmbiguousEnumDefaultsRequireAnExplicitFormatter(\"public enum Alias { First = 1, Second = 1 }\",\"string\",\"Alias.First\")"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AmbiguousEnumDefaultsRequireAnExplicitFormatter(\"[System.ComponentModel.TypeConverter(typeof(System.ComponentModel.BooleanConverter))] public enum Alias { First = 1 }\",\"Alias\",\"typeof(Alias), \\\"true\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AmbiguousEnumDefaultsRequireAnExplicitFormatter(\"public enum Alias : ulong { First = 1 }\",\"Alias\",\"typeof(Alias), \\\"-1\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AmbiguousEnumDefaultsRequireAnExplicitFormatter(\"public enum Alias { Alpha = 1, ALPHA = 2 }\",\"Alias\",\"typeof(Alias), \\\"Alpha\\\"\")",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.AmbiguousEnumDefaultsRequireAnExplicitFormatter(\"public enum Alias { First = 1, Second = 1 }\",\"string\",\"Alias.First\")"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "WPROTO050",
       "claimId": "immutable.base-constructors",
-      "status": "mapped-requires-case-and-source-verification"
+      "status": "reviewed-assertions",
+      "assertions": [
+        {
+          "selector": "DiagnosticTests.ImmutableConstructionWithoutAnAccessibleBaseConstructorIsRefused",
+          "expectedSeverities": ["Error"],
+          "lanes": [
+            {
+              "lane": "host-v2",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableConstructionWithoutAnAccessibleBaseConstructorIsRefused(\"private Base() { } protected Base(int seed) { }\",False)",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableConstructionWithoutAnAccessibleBaseConstructorIsRefused(\"private Base() { } protected Base(int seed) { }\",True)",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableConstructionWithoutAnAccessibleBaseConstructorIsRefused(\"public Base(int seed) { }\",False)",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableConstructionWithoutAnAccessibleBaseConstructorIsRefused(\"public Base(int seed) { }\",True)"
+              ]
+            },
+            {
+              "lane": "host-v3",
+              "caseNames": [
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableConstructionWithoutAnAccessibleBaseConstructorIsRefused(\"private Base() { } protected Base(int seed) { }\",False)",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableConstructionWithoutAnAccessibleBaseConstructorIsRefused(\"private Base() { } protected Base(int seed) { }\",True)",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableConstructionWithoutAnAccessibleBaseConstructorIsRefused(\"public Base(int seed) { }\",False)",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests.ImmutableConstructionWithoutAnAccessibleBaseConstructorIsRefused(\"public Base(int seed) { }\",True)"
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
-  "guidePath": "docs/features/serialization/serialization.md"
+  "guidePath": "docs/features/serialization/serialization.md",
+  "diagnosticAssertionSources": [
+    {
+      "path": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
+      "sha256": "b65458c6ee3150a71d668f20647a92e8737b5194b0cf0a66bcb22816f20cba7d"
+    },
+    {
+      "path": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SubtypeTagManifestTests.cs",
+      "sha256": "c8cf3f429b9bb13f7a274b40b8a836bc69a0d1db0243cae52bf53f7c3f195017"
+    }
+  ]
 }

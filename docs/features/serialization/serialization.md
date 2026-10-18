@@ -3026,6 +3026,14 @@ compatibility classes, reader directions, lane requirements, and named evidence 
 fixture and lane. Missing discovery and partial coverage remain explicit. The source guard parses
 test declarations without invoking them; ordinary NUnit owns case expansion and lifecycle.
 
+The main guide's diagnostic codes have reviewed identifier/severity assertions bound to exact
+ordinary cases in each host lane. Review hashes cover the assertion sources, including their local
+case providers and helpers; edits require renewed review. `WPROTO041` separately pins the player,
+Editor, and preprocessor-symbol controls for explicit subtype declarations. These bindings check
+reviewed metadata and execution identity. Human review establishes what each assertion means;
+the verifier does not prove arbitrary C# semantics or every diagnostic trigger path. Unadvertised
+generator descriptors remain outside this diagnostic inventory.
+
 From the repository root, validate the catalog with
 `pwsh -NoProfile -File scripts/verify-wproto-evidence.ps1 -Mode catalog`.
 Run either isolated host lane with
