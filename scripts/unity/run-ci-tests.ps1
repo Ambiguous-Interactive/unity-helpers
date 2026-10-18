@@ -3236,6 +3236,12 @@ public sealed partial class UhCiStandaloneBuildModifier
 {
     static partial void WriteFrozenBuildPreparation(BuildPlayerOptions playerOptions)
     {
+#if UNITY_6000_6_OR_NEWER
+        if (PlayerSettings.GetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Standalone) == ScriptingImplementation.Mono2x)
+        {
+            PlayerSettings.SetManagedCodeVariant(UnityEditor.Build.NamedBuildTarget.Standalone, ManagedCodeVariant.Release);
+        }
+#endif
         WallstopStudios.UnityHelpers.Editor.Settings.UnityHelpersSettings.instance.SaveSettings();
         AssetDatabase.SaveAssets();
         string project = Directory.GetParent(Application.dataPath).FullName;
@@ -3267,13 +3273,20 @@ public sealed partial class UhCiStandaloneBuildModifier
             }
         }
         entries.Sort(StringComparer.Ordinal);
+        string playerSettingsPath = Path.Combine(project, "ProjectSettings", "ProjectSettings.asset");
+        FileInfo playerSettings = new FileInfo(playerSettingsPath);
+        if ((playerSettings.Attributes & FileAttributes.ReparsePoint) != 0 || playerSettings.Length < 1 || 1048576 < playerSettings.Length)
+        {
+            throw new InvalidOperationException("Invalid WProto prepared player settings.");
+        }
+        File.Copy(playerSettingsPath, Path.Combine(Path.GetDirectoryName(@"$receiptPath"), "build-player-settings.asset"), false);
         using (FileStream output = new FileStream(@"$receiptPath", FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
             Utf8JsonWriter writer = new Utf8JsonWriter(output);
             try
             {
                 writer.WriteStartObject();
-                writer.WriteNumber("SchemaVersion", 1);
+                writer.WriteNumber("SchemaVersion", 2);
                 writer.WriteString("RunId", "$runId");
                 writer.WriteString("DeclarationSha256", "$declarationHash");
                 writer.WriteString("SourceCommit", "$commit");
@@ -3596,7 +3609,9 @@ function Add-FrozenPlayerProvenanceSnapshot {
                 $configured = @($Context.Snapshots | Where-Object { $_.Stage -ceq 'after-configure' })
                 if ($configured.Count -ne 1) { throw 'WProto build preparation requires exactly one configured snapshot.' }
                 Assert-WProtoBuildPreparation -Preparation $Context.BuildPreparation -ConfiguredInputs $configured[0].ProjectInputs `
-                    -BuiltInputs $projectInputs -Declaration $Context.Declaration.Value -DeclarationSha256 $Context.Declaration.Sha256
+                    -BuiltInputs $projectInputs -Declaration $Context.Declaration.Value -DeclarationSha256 $Context.Declaration.Sha256 `
+                    -RestoredPlayerSettingsPath (Join-Path $Context.GeneratedRoot 'ProjectSettings/ProjectSettings.asset') `
+                    -PreparedPlayerSettingsPath (Join-Path $Context.Declaration.ReportDirectory 'build-player-settings.asset')
                 $Context.ProjectSettingsBaseline = $projectIdentity
             }
             elseif ($Stage -cne 'before-configure' -and ($null -eq $Context.ProjectSettingsBaseline -or $Context.ProjectSettingsBaseline -cne $projectIdentity)) {
@@ -3745,9 +3760,23 @@ function Complete-FrozenPlayerProvenance {
             Assert-WProtoRecordedInventory -Root $generatedRoot -Entries $built[0].GeneratedAnchorFiles
             Copy-Item -LiteralPath (Join-Path $Context.Declaration.ReportDirectory 'build-preparation.json') `
                 -Destination (Join-Path $Context.Declaration.ReportDirectory $report.BuildPreparationPath) -ErrorAction Stop
+            if ((Get-FileHash -LiteralPath (Join-Path $retained 'build-preparation.json') -Algorithm SHA256).Hash.ToLowerInvariant() -cne $Context.BuildPreparationSha256) {
+                throw 'WProto build preparation changed before retention.'
+            }
+            if ($Context.BuildPreparation.SchemaVersion -eq 2) {
+                Copy-Item -LiteralPath (Join-Path $Context.Declaration.ReportDirectory 'build-player-settings.asset') `
+                    -Destination (Join-Path $retained 'build-player-settings.asset') -ErrorAction Stop
+                $preparedSettings = @($Context.BuildPreparation.ProjectInputs | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' })
+                if ($preparedSettings.Count -ne 1) { throw 'WProto prepared player settings identity is missing.' }
+                Assert-WProtoRecordedInventory -Root $retained -Entries @([pscustomobject]@{
+                        Path = 'build-player-settings.asset'; Kind = 'file'; Length = $preparedSettings[0].Length; Sha256 = $preparedSettings[0].Sha256
+                    })
+            }
             Copy-Item -LiteralPath $ResultsPath -Destination (Join-Path $retained 'results.xml') -ErrorAction Stop
             Copy-WProtoCorpusRecords -Source $PlayerLogPath -Destination (Join-Path $retained 'corpus-records.txt')
-            $report.RetainedFiles = @(foreach ($relative in @($report.PlayerLogPath, $report.ResultsPath, $report.BuildPreparationPath)) {
+            $retainedPaths = @($report.PlayerLogPath, $report.ResultsPath, $report.BuildPreparationPath)
+            if ($Context.BuildPreparation.SchemaVersion -eq 2) { $retainedPaths += 'retained/build-player-settings.asset' }
+            $report.RetainedFiles = @(foreach ($relative in $retainedPaths) {
                     $path = Join-Path $Context.Declaration.ReportDirectory $relative
                     $item = Get-Item -LiteralPath $path -ErrorAction Stop
                     [pscustomobject]@{ Path = $relative; Kind = 'file'; Length = $item.Length; Sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }

@@ -57,14 +57,15 @@ function Read-ControlDeclaration {
     Read-FrozenPlayerDeclaration -Path $Fixture.Path -Mode standalone -UnityVersion '6000.6.0f1' -Backend Mono2x -ArtifactsPath $Fixture.Root -RepoRoot $Fixture.Root
 }
 function Start-ControlContext {
-    param($Fixture)
+    param($Fixture, [switch]$TransientSettings)
     $declaration = Read-ControlDeclaration $Fixture
     $context = Start-FrozenPlayerProvenance -Declaration $declaration -RepoRoot $Fixture.Root -PayloadRoot $Fixture.Payload
     if ($null -ne $declaration.CanonicalCorpus) { New-FrozenPlayerAnchor -Context $context -ProjectPath (Join-Path $Fixture.Root 'generated project') }
+    if ($TransientSettings) { [IO.File]::WriteAllText((Join-Path $context.GeneratedRoot 'ProjectSettings/ProjectSettings.asset'), $script:stablePlayerSettings) }
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'before-configure'
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'after-configure'
     if ($declaration.CampaignKind -ceq 'wproto-seven-families-v1') {
-        $preparation = New-ControlBuildPreparation $context
+        $preparation = New-ControlBuildPreparation $context -TransientSettings:$TransientSettings
         [IO.File]::WriteAllText((Join-Path $declaration.ReportDirectory 'build-preparation.json'), (ConvertTo-Json -InputObject $preparation -Depth 12))
     }
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'after-build' -IncludePayload
@@ -142,19 +143,54 @@ function New-WProtoFixture {
     [IO.File]::WriteAllText($fixture.Path, (ConvertTo-Json -InputObject $fixture.Manifest -Depth 8))
     return $fixture
 }
+$stablePlayerSettings = @'
+%YAML 1.1
+PlayerSettings:
+  companyName: preserved
+  runInBackground: 0
+  fullscreenMode: 1
+  resizableWindow: 0
+  m_ShowUnitySplashScreen: 1
+  m_ShowUnitySplashLogo: 1
+  aotOptions:
+  managedCodeVariant:
+    Standalone: 3
+'@
+$preparedPlayerSettings = @'
+%YAML 1.1
+PlayerSettings:
+  companyName: preserved
+  runInBackground: 1
+  fullscreenMode: 3
+  resizableWindow: 1
+  m_ShowUnitySplashScreen: 0
+  m_ShowUnitySplashLogo: 0
+  aotOptions:
+  managedCodeVariant:
+    Standalone: 3
+'@
+$stablePlayerSettings = $stablePlayerSettings.Replace('  aotOptions:', '  aotOptions: ')
+$preparedPlayerSettings = $preparedPlayerSettings.Replace('  aotOptions:', '  aotOptions: ')
 function New-ControlBuildPreparation {
-    param($Context)
+    param($Context, [switch]$TransientSettings)
     $scene = 'Assets/InitTestScene01234567-89ab-cdef-0123-456789abcdef.unity'
     foreach ($relative in @($scene, ($scene + '.meta'), 'ProjectSettings/SceneTemplateSettings.json', 'ProjectSettings/UnityHelpersSettings.asset')) {
         $path = Join-Path $Context.GeneratedRoot $relative
         if (-not (Test-Path -LiteralPath $path)) { [IO.File]::WriteAllText($path, 'generated ' + $relative) }
     }
-    return [pscustomobject][ordered]@{
-        SchemaVersion = 1; RunId = $Context.Declaration.Value.RunId; DeclarationSha256 = $Context.Declaration.Sha256
+    $settingsPath = Join-Path $Context.GeneratedRoot 'ProjectSettings/ProjectSettings.asset'
+    if ($TransientSettings) {
+        [IO.File]::WriteAllText($settingsPath, $script:preparedPlayerSettings)
+        [IO.File]::Copy($settingsPath, (Join-Path $Context.Declaration.ReportDirectory 'build-player-settings.asset'))
+    }
+    $preparation = [pscustomobject][ordered]@{
+        SchemaVersion = $(if ($TransientSettings) { 2 } else { 1 }); RunId = $Context.Declaration.Value.RunId; DeclarationSha256 = $Context.Declaration.Sha256
         SourceCommit = $Context.Declaration.Value.SourceCommit
         Scenes = @($scene, 'Packages/com.wallstop-studios.unity-helpers/Tests/Runtime/Scenes/Test1.unity')
         ProjectInputs = @(Get-WProtoProjectInputs -ProjectPath $Context.GeneratedRoot)
     }
+    if ($TransientSettings) { [IO.File]::WriteAllText($settingsPath, $script:stablePlayerSettings) }
+    return $preparation
 }
 function Write-WProtoResults {
     param([string]$Path, [switch]$OmitLast, [switch]$Duplicate, [string]$Result = 'Passed')
@@ -518,6 +554,72 @@ try {
             -Declaration $preparationContext.Declaration.Value -DeclarationSha256 $preparationContext.Declaration.Sha256
         Assert-Control $true "already materialized $preexisting settings remain frozen"
     }
+    $transientFixture = New-WProtoFixture 'transient-settings-transition'
+    $transientContext = Start-ControlContext $transientFixture -TransientSettings
+    Assert-Control ($transientContext.Snapshots[2].State -ceq 'passed') 'version2 admits actual prepared settings followed by exact restoration'
+
+    $stableSettingsPath = Join-Path $transientContext.GeneratedRoot 'ProjectSettings/ProjectSettings.asset'
+    $preparedSettingsPath = Join-Path $transientContext.Declaration.ReportDirectory 'build-player-settings.asset'
+    foreach ($settingCase in @('lf', 'crlf', 'bom', 'floor', 'checked', 'configured-checked', 'unrelated', 'restored-change',
+            'duplicate-key', 'missing-key', 'malformed-key', 'changed-line-endings', 'oversized', 'empty', 'invalid-utf8',
+            'prepared-hash', 'prepared-length', 'restored-hash', 'prepared-kind', 'missing-prepared', 'missing-restored',
+            'late-source', 'late-scene', 'wrong-run', 'wrong-version')) {
+        $recipeV2 = $transientContext.BuildPreparation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $configuredV2 = $transientContext.Snapshots[1].ProjectInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $builtV2 = $transientContext.Snapshots[2].ProjectInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $declarationV2 = $transientContext.Declaration.Value | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $stableText = $stablePlayerSettings.Replace("`r`n", "`n")
+        $preparedText = $preparedPlayerSettings.Replace("`r`n", "`n")
+        switch ($settingCase) {
+            'crlf' { $stableText = $stableText.Replace("`n", "`r`n"); $preparedText = $preparedText.Replace("`n", "`r`n") }
+            'bom' { $stableText = [char]0xfeff + $stableText; $preparedText = [char]0xfeff + $preparedText }
+            'floor' { $declarationV2.UnityVersion = '2021.3.45f1'; $preparedText = $preparedText.Replace('  aotOptions: ', '  aotOptions: nimt-trampolines=1024') }
+            'checked' { $preparedText = $preparedText.Replace('    Standalone: 3', '    Standalone: 1') }
+            'configured-checked' { $stableText = $stableText.Replace('    Standalone: 3', '    Standalone: 1'); $preparedText = $preparedText.Replace('    Standalone: 3', '    Standalone: 1') }
+            'unrelated' { $preparedText = $preparedText.Replace('companyName: preserved', 'companyName: changed') }
+            'restored-change' { $stableText = $stableText.Replace('companyName: preserved', 'companyName: changed') }
+            'duplicate-key' { $stableText += "`n  runInBackground: 0"; $preparedText += "`n  runInBackground: 1" }
+            'missing-key' { $stableText = $stableText.Replace("  resizableWindow: 0`n", ''); $preparedText = $preparedText.Replace("  resizableWindow: 1`n", '') }
+            'malformed-key' { $stableText = $stableText.Replace('runInBackground: 0', 'runInBackground: false') }
+            'changed-line-endings' { $preparedText = $preparedText.Replace("`n", "`r`n") }
+            'oversized' { $preparedText = 'x' * 1048577 }
+            'empty' { $preparedText = '' }
+            'wrong-run' { $recipeV2.RunId = 'other' }
+            'wrong-version' { $declarationV2.UnityVersion = 'invalid' }
+        }
+        [IO.File]::WriteAllText($stableSettingsPath, $stableText)
+        [IO.File]::WriteAllText($preparedSettingsPath, $preparedText)
+        if ($settingCase -eq 'invalid-utf8') { [IO.File]::WriteAllBytes($stableSettingsPath, [byte[]]@(0xff, 0xfe, 0xff)) }
+        foreach ($entry in @($configuredV2 + $builtV2 | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' })) {
+            $entry.Length = (Get-Item -LiteralPath $stableSettingsPath).Length
+            $entry.Sha256 = (Get-FileHash -LiteralPath $stableSettingsPath).Hash.ToLowerInvariant()
+        }
+        $preparedEntry = $recipeV2.ProjectInputs | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' }
+        $preparedEntry.Length = (Get-Item -LiteralPath $preparedSettingsPath).Length
+        $preparedEntry.Sha256 = (Get-FileHash -LiteralPath $preparedSettingsPath).Hash.ToLowerInvariant()
+        switch ($settingCase) {
+            'prepared-hash' { $preparedEntry.Sha256 = '0' * 64 }
+            'prepared-length' { $preparedEntry.Length++ }
+            'restored-hash' { ($configuredV2 | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' }).Sha256 = '0' * 64 }
+            'prepared-kind' { $preparedEntry.Kind = 'directory'; $preparedEntry.Length = $null; $preparedEntry.Sha256 = $null }
+            'missing-prepared' { Remove-Item -LiteralPath $preparedSettingsPath }
+            'missing-restored' { Remove-Item -LiteralPath $stableSettingsPath }
+            'late-source' { $builtV2 += [pscustomobject]@{ Path = 'Assets/late.cs'; Kind = 'file'; Length = 1; Sha256 = 'a' * 64 } }
+            'late-scene' { ($builtV2 | Where-Object { $_.Path -ceq $recipeV2.Scenes[0] }).Sha256 = '0' * 64 }
+        }
+        $verifySettings = {
+            Assert-WProtoBuildPreparation -Preparation $recipeV2 -ConfiguredInputs $configuredV2 -BuiltInputs $builtV2 `
+                -Declaration $declarationV2 -DeclarationSha256 $transientContext.Declaration.Sha256 `
+                -RestoredPlayerSettingsPath $stableSettingsPath -PreparedPlayerSettingsPath $preparedSettingsPath
+        }
+        if ($settingCase -in @('lf', 'crlf', 'bom', 'floor')) {
+            & $verifySettings
+            Assert-Control $true "version2 admits exact $settingCase framework transition"
+        } else {
+            Assert-Rejected $verifySettings "version2 rejects $settingCase prepared settings"
+        }
+    }
+
     foreach ($mutation in @('missing', 'schema', 'schema-string', 'run', 'declaration', 'commit', 'scene-scalar', 'scene-duplicate',
             'scene-unreferenced', 'scene-path', 'scene-missing', 'scene-second', 'scene-guid', 'meta-missing', 'old-changed', 'old-removed',
             'unknown-source', 'unknown-asmdef', 'unknown-response', 'unknown-meta', 'new-directory', 'duplicate', 'case-collision', 'path-traversal',
@@ -528,7 +630,7 @@ try {
         $scenePath = $changed.Scenes[0]
         switch ($mutation) {
             'missing' { $changed = $null }
-            'schema' { $changed.SchemaVersion = 2 }
+            'schema' { $changed.SchemaVersion = 3 }
             'schema-string' { $changed.SchemaVersion = '1' }
             'run' { $changed.RunId = 'other' }
             'declaration' { $changed.DeclarationSha256 = '0' * 64 }
@@ -569,12 +671,12 @@ try {
     $realCorpusInvoker = ${function:Invoke-WProtoCorpusVerifier}
     function Invoke-WProtoCorpusVerifier { param($Repository, $PlayerLogPath, $Commit, $UnityVersion) return $script:wprotoSummary }
     try {
-        foreach ($mutation in @('none', 'unstable', 'upm-support', 'unavailable-capture', 'truncated-capture', 'upm-fault', 'timeout', 'nonzero', 'build-exit', 'configure-exit', 'configure-retry',
+        foreach ($mutation in @('none', 'transient-settings', 'unstable', 'upm-support', 'unavailable-capture', 'truncated-capture', 'upm-fault', 'timeout', 'nonzero', 'build-exit', 'configure-exit', 'configure-retry',
                 'execution-error', 'missing-stage', 'reordered-stage', 'missing-case', 'duplicate-case', 'skip-case',
-                'wrong-run', 'wrong-declaration', 'wrong-corpus', 'wrong-commit', 'host-runtime', 'editor', 'development',
+                'late-preparation', 'late-prepared-settings', 'wrong-run', 'wrong-declaration', 'wrong-corpus', 'wrong-commit', 'host-runtime', 'editor', 'development',
                 'missing-define', 'fault-header', 'fault-pattern', 'configure-dump', 'build-dump', 'string-launch', 'array-invocation', 'wrong-oracle', 'missing-oracle', 'wrong-oracle-payload', 'missing-operation', 'bad-records')) {
             $fixture = New-WProtoFixture ('wproto-' + $mutation)
-            $context = Start-ControlContext $fixture
+            $context = Start-ControlContext $fixture -TransientSettings:($mutation -in @('transient-settings', 'late-prepared-settings'))
             Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'before-launch' -IncludePayload
             $context.LaunchAttempted = $true
             $context.InvocationObserved = $true
@@ -618,6 +720,8 @@ try {
                 'missing-case' { Write-WProtoResults $results -OmitLast }
                 'duplicate-case' { Write-WProtoResults $results -Duplicate }
                 'skip-case' { Write-WProtoResults $results -Result 'Skipped' }
+                'late-preparation' { [IO.File]::AppendAllText((Join-Path $context.Declaration.ReportDirectory 'build-preparation.json'), ' ') }
+                'late-prepared-settings' { [IO.File]::AppendAllText((Join-Path $context.Declaration.ReportDirectory 'build-player-settings.asset'), ' ') }
                 'wrong-run' { $first.FrozenRunId = 'another-run' }
                 'wrong-declaration' { $first.FrozenDeclarationSha256 = '0' * 64 }
                 'wrong-corpus' { $first.FrozenCorpusSha256 = '0' * 64 }
@@ -638,7 +742,7 @@ try {
                 'missing-operation' { $script:wprotoSummary.runtimeRecords.PSObject.Properties.Remove('write-public') }
                 'bad-records' { $script:wprotoSummary.strictRecordValidity = $false }
             }
-            if ($mutation -in @('none', 'unstable', 'upm-support')) {
+            if ($mutation -in @('none', 'transient-settings', 'unstable', 'upm-support')) {
                 Complete-FrozenPlayerProvenance -Context $context -ResultsPath $results -EvidencePaths @($results, $log, $configureLog, $buildLog) -PlayerLogPath $log
                 $report = Get-Content -LiteralPath $context.ReportPath -Raw | ConvertFrom-Json
                 Assert-Control ($report.CapturedEvidenceValid -and -not $report.AdoptionEligible -and -not $report.FullQualification) "valid $mutation WProto capture remains scoped"
@@ -651,14 +755,16 @@ try {
                 $null = Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1'
                 $retainedRecords = [IO.File]::ReadAllText((Join-Path $context.Declaration.ReportDirectory 'retained/corpus-records.txt'))
                 Assert-Control ($retainedRecords -ceq "WPROTO_CORPUS_UNKNOWN retain malformed records too`r`nWPROTO_CORPUS_RUNTIME synthetic parser boundary") 'retention preserves every marker line and original line endings, including unknown records'
-                foreach ($relative in @('corpus-records.txt', 'results.xml', 'build-preparation.json', 'player/Player_Data/Managed/protobuf-net.dll', 'project-inputs/ProjectSettings/ProjectSettings.asset', 'project-inputs/Assets/FrozenPlayerAnchor/ProtoSerializationPerformanceTests.Anchor.cs')) {
+                $tamperPaths = @('corpus-records.txt', 'results.xml', 'build-preparation.json', 'player/Player_Data/Managed/protobuf-net.dll', 'project-inputs/ProjectSettings/ProjectSettings.asset', 'project-inputs/Assets/FrozenPlayerAnchor/ProtoSerializationPerformanceTests.Anchor.cs')
+                if ($mutation -ceq 'transient-settings') { $tamperPaths += 'build-player-settings.asset' }
+                foreach ($relative in $tamperPaths) {
                     $retainedPath = Join-Path (Join-Path $context.Declaration.ReportDirectory 'retained') $relative
                     $original = [IO.File]::ReadAllBytes($retainedPath)
                     [IO.File]::WriteAllText($retainedPath, 'changed retained bytes')
                     Assert-Rejected { Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1' } "reject changed retained $relative"
                     [IO.File]::WriteAllBytes($retainedPath, $original)
                 }
-                if ($mutation -eq 'none') {
+                if ($mutation -in @('none', 'transient-settings')) {
                     $reportBytes = [IO.File]::ReadAllBytes($context.ReportPath)
                     try {
                         foreach ($change in @('declaration', 'source-hash', 'source-missing', 'source-duplicate', 'corpus-hash', 'anchor-hash', 'project-inputs', 'payload', 'early-payload')) {

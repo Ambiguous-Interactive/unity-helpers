@@ -326,12 +326,70 @@ function Assert-WProtoSnapshotInventory {
     }
 }
 
+function Assert-WProtoPreparedPlayerSettings {
+    param($Configured, $Prepared, $Built, [string]$RestoredPath, [string]$PreparedPath, [string]$UnityVersion)
+    Assert-WProtoSnapshotInventory -Observed @($Built) -Expected @($Configured)
+    $bytes = @{}
+    $hash = [Security.Cryptography.SHA256]::Create()
+    try {
+        foreach ($name in @('restored', 'prepared')) {
+            $path = if ($name -ceq 'restored') { $RestoredPath } else { $PreparedPath }
+            $entry = if ($name -ceq 'restored') { $Configured } else { $Prepared }
+            Assert-FrozenPlayerRegularPath -Path $path
+            $item = Get-Item -LiteralPath $path -Force -ErrorAction Stop
+            if ($entry.Kind -cne 'file' -or $item.Length -lt 1 -or $item.Length -gt 1048576) {
+                throw 'WProto player settings must be nonempty files within 1 MiB.'
+            }
+            $content = [IO.File]::ReadAllBytes($path)
+            $digest = [BitConverter]::ToString($hash.ComputeHash($content)).Replace('-', '').ToLowerInvariant()
+            if ($content.Length -ne $entry.Length -or $digest -cne $entry.Sha256) {
+                throw 'WProto player settings bytes differ from their recorded inventory.'
+            }
+            $bytes[$name] = $content
+        }
+        $encoding = New-Object Text.UTF8Encoding($false, $true)
+        $expected = $encoding.GetString($bytes.restored)
+        if ($UnityVersion -cnotmatch '^(?<major>[0-9]{4})\.(?<minor>[0-9]+)\.') {
+            throw 'WProto player settings require an explicit Unity version.'
+        }
+        $major = [int]$Matches.major
+        $minor = [int]$Matches.minor
+        if ($major -gt 6000 -or ($major -eq 6000 -and $minor -ge 6)) {
+            $variants = [regex]::Matches($expected, '(?m)^  managedCodeVariant:\r?\n(?<entries>(?:    [^\r\n]*(?:\r?\n|$))+)')
+            if ($variants.Count -ne 1) { throw 'WProto requires one explicit managed-code variant map.' }
+            $standalone = [regex]::Matches($variants[0].Groups['entries'].Value, '(?m)^    Standalone: (?<value>[0-3])\r?$')
+            if ($standalone.Count -ne 1 -or $standalone[0].Groups['value'].Value -cne '3') {
+                throw 'WProto requires the Release managed-code variant.'
+            }
+        }
+        $changes = @(
+            @{ Key = 'runInBackground'; Value = '1'; Pattern = '[01]' },
+            @{ Key = 'fullscreenMode'; Value = '3'; Pattern = '[0-3]' },
+            @{ Key = 'resizableWindow'; Value = '1'; Pattern = '[01]' },
+            @{ Key = 'm_ShowUnitySplashScreen'; Value = '0'; Pattern = '[01]' },
+            @{ Key = 'm_ShowUnitySplashLogo'; Value = '0'; Pattern = '[01]' }
+        )
+        if ($major -lt 6000) { $changes += @{ Key = 'aotOptions'; Value = 'nimt-trampolines=1024'; Pattern = '[^\r\n]*' } }
+        foreach ($change in $changes) {
+            $pattern = '(?m)^  ' + [regex]::Escape($change.Key) + ': ' + $change.Pattern + '(?<ending>\r?)$'
+            $lines = [regex]::Matches($expected, $pattern)
+            $keys = [regex]::Matches($expected, ('(?m)^  ' + [regex]::Escape($change.Key) + ':'))
+            if ($lines.Count -ne 1 -or $keys.Count -ne 1) { throw 'WProto transient player setting is missing, duplicated or malformed.' }
+            $replacement = '  ' + $change.Key + ': ' + $change.Value + $lines[0].Groups['ending'].Value
+            $expected = $expected.Remove($lines[0].Index, $lines[0].Length).Insert($lines[0].Index, $replacement)
+        }
+        $digest = [BitConverter]::ToString($hash.ComputeHash($encoding.GetBytes($expected))).Replace('-', '').ToLowerInvariant()
+        if ($digest -cne $Prepared.Sha256) { throw 'WProto prepared settings contain changes outside the framework transition.' }
+    } finally { $hash.Dispose() }
+}
+
 function Assert-WProtoBuildPreparation {
-    param($Preparation, $ConfiguredInputs, $BuiltInputs, $Declaration, [string]$DeclarationSha256)
+    param($Preparation, $ConfiguredInputs, $BuiltInputs, $Declaration, [string]$DeclarationSha256,
+        [string]$RestoredPlayerSettingsPath, [string]$PreparedPlayerSettingsPath)
     if ($null -eq $Preparation -or $Preparation.SchemaVersion -isnot [long] -and $Preparation.SchemaVersion -isnot [int]) {
         throw 'WProto build preparation receipt is missing or has an invalid schema.'
     }
-    if ($Preparation.SchemaVersion -ne 1 -or $Preparation.RunId -isnot [string] -or
+    if ($Preparation.SchemaVersion -notin @(1, 2) -or $Preparation.RunId -isnot [string] -or
         $Preparation.RunId -cne $Declaration.RunId -or $Preparation.DeclarationSha256 -isnot [string] -or
         $Preparation.DeclarationSha256 -cne $DeclarationSha256 -or $Preparation.SourceCommit -isnot [string] -or
         $Preparation.SourceCommit -cne $Declaration.SourceCommit) { throw 'WProto build preparation identity differs.' }
@@ -365,8 +423,10 @@ function Assert-WProtoBuildPreparation {
     }
     $configured = $inventories.configured
     $prepared = $inventories.prepared
+    $settingsPath = 'ProjectSettings/ProjectSettings.asset'
     foreach ($entry in $configured.Values) {
         if (-not $prepared.ContainsKey($entry.Path)) { throw 'WProto build preparation removed a configured input.' }
+        if ($Preparation.SchemaVersion -eq 2 -and $entry.Path -ceq $settingsPath) { continue }
         Assert-WProtoSnapshotInventory -Observed @($prepared[$entry.Path]) -Expected @($entry)
     }
     $newScenes = @($prepared.Values | Where-Object {
@@ -383,8 +443,19 @@ function Assert-WProtoBuildPreparation {
             throw 'WProto build preparation contains an unexpected added input.'
         }
     }
-    # The receipt is observed before BuildPipeline. Later stages may not silently adopt changes.
-    Assert-WProtoSnapshotInventory -Observed $BuiltInputs -Expected $Preparation.ProjectInputs
+    if ($Preparation.SchemaVersion -eq 2) {
+        if (-not $configured.ContainsKey($settingsPath) -or -not $prepared.ContainsKey($settingsPath) -or
+            -not $inventories.built.ContainsKey($settingsPath)) { throw 'WProto player settings inventory is missing.' }
+        Assert-WProtoPreparedPlayerSettings -Configured $configured[$settingsPath] -Prepared $prepared[$settingsPath] `
+            -Built $inventories.built[$settingsPath] -RestoredPath $RestoredPlayerSettingsPath `
+            -PreparedPath $PreparedPlayerSettingsPath -UnityVersion $Declaration.UnityVersion
+        $expectedBuilt = @($Preparation.ProjectInputs | ForEach-Object {
+                if ($_.Path -ceq $settingsPath) { $configured[$settingsPath] } else { $_ }
+            })
+        Assert-WProtoSnapshotInventory -Observed $BuiltInputs -Expected $expectedBuilt
+    } else {
+        Assert-WProtoSnapshotInventory -Observed $BuiltInputs -Expected $Preparation.ProjectInputs
+    }
 }
 
 function Assert-WProtoPlayerProvenance {
@@ -445,8 +516,12 @@ function Assert-WProtoPlayerProvenance {
     # EvidenceFiles are historical observations of support logs before redaction.
     # These sealed artifacts bind preparation, XML, and raw records independently of redacted logs.
     $retainedPaths = @($report.RetainedFiles | ForEach-Object { $_.Path })
-    if ($retainedPaths.Count -ne 3 -or @($retainedPaths | Where-Object { $_ -ceq 'retained/build-preparation.json' }).Count -ne 1 -or @($retainedPaths | Where-Object { $_ -ceq 'retained/corpus-records.txt' }).Count -ne 1 -or
-        @($retainedPaths | Where-Object { $_ -ceq 'retained/results.xml' }).Count -ne 1) { throw 'WProto retained metric/XML membership is invalid.' }
+    $expectedRetained = @('retained/build-preparation.json', 'retained/corpus-records.txt', 'retained/results.xml')
+    if ($report.BuildPreparation.SchemaVersion -eq 2) { $expectedRetained += 'retained/build-player-settings.asset' }
+    if ($retainedPaths.Count -ne $expectedRetained.Count) { throw 'WProto retained metric/XML membership is invalid.' }
+    foreach ($relative in $expectedRetained) {
+        if (@($retainedPaths | Where-Object { $_ -ceq $relative }).Count -ne 1) { throw 'WProto retained metric/XML membership is invalid.' }
+    }
     Assert-WProtoRecordedInventory -Root $reportDirectory -Entries $report.RetainedFiles
     $preparationPath = Join-Path $reportDirectory 'retained/build-preparation.json'
     $preparationHash = (Get-FileHash -LiteralPath $preparationPath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -456,7 +531,9 @@ function Assert-WProtoPlayerProvenance {
         throw 'WProto retained build preparation differs from its reported receipt.'
     }
     Assert-WProtoBuildPreparation -Preparation $preparation -ConfiguredInputs $report.Snapshots[1].ProjectInputs -BuiltInputs $built.ProjectInputs `
-        -Declaration $declaration -DeclarationSha256 $hash
+        -Declaration $declaration -DeclarationSha256 $hash `
+        -RestoredPlayerSettingsPath (Join-Path $generatedRoot 'ProjectSettings/ProjectSettings.asset') `
+        -PreparedPlayerSettingsPath (Join-Path $reportDirectory 'retained/build-player-settings.asset')
     $evidence = Read-TestResultEvidence -Path $resultsPath -Format NUnit
     $expected = @(Get-WProtoFrozenOperationNames | ForEach-Object {
             'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus("' + $_ + '")'

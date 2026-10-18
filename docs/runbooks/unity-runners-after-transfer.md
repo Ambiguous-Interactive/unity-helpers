@@ -518,16 +518,29 @@ succeeds. Before deleting the owned temporary project, the runner retains the ac
 and generated `Assets`, `Packages` and `ProjectSettings` inputs under the frozen report directory. It also retains
 exact result XML and every original line containing `WPROTO_CORPUS_`, including malformed records.
 The WProto build modifier writes a declaration-bound `build-preparation.json` receipt after the test
-framework prepares its scene and the modifier saves settings and assets. Every configured input
-must remain unchanged. Only the generated test scene and its metadata, plus
-`ProjectSettings/SceneTemplateSettings.json` and `ProjectSettings/UnityHelpersSettings.asset`, may
-be added during preparation. The complete prepared inventory must match the
-post-build and subsequent snapshots. The receipt is retained and checked again during replay;
-unrecorded changes still reject the capture. Seven generated anchor files are required for WProto;
-the separate borrowed-buffer route retains its five-file anchor.
-On Unity 6000.6 and newer, the shared configurator explicitly selects the Release managed-code
-variant for Mono before saving settings. This prevents build-time materialization of an implicit
-variant from changing the frozen settings file. IL2CPP and older Editors omit this API call.
+framework prepares its scene and the modifier saves settings and assets. Version 2 also copies the
+actual `ProjectSettings.asset` to `build-player-settings.asset` before the framework restores it.
+The copy must match the preparation inventory and is retained separately for replay.
+
+The framework may temporarily change only the background, fullscreen, resizable-window, splash-screen
+and splash-logo scalars. Before Unity 6000 it also sets the documented AOT trampoline option.
+The verifier reconstructs those exact byte changes from the configured settings. It rejects every
+other change, missing or duplicate scalar keys, invalid text, and files larger than 1 MiB.
+Post-build settings must match the configured bytes. Every other configured input stays frozen;
+only the generated test scene and its metadata, `ProjectSettings/SceneTemplateSettings.json` and
+`ProjectSettings/UnityHelpersSettings.asset` may be added. All other prepared inputs must match the
+build inventory, and every later snapshot must match the restored build inventory.
+
+On Unity 6000.6 and newer, the WProto callback explicitly selects the Release managed-code variant
+for Mono after the launcher temporarily selects Checked. The configurator also selects Release
+before the build. IL2CPP and older Editors omit these API calls. Replay rejects a configured Checked
+variant or a prepared variant that differs from Release. Version 1 receipts keep the original
+strict equality rule; existing rejected captures are not reclassified.
+
+Seven generated anchor files and four sealed evidence files are required for new WProto captures,
+including the separately retained prepared settings. Late changes to the preparation receipt or
+settings reject before retention completes. The separate borrowed-buffer route keeps its five-file
+anchor, and legacy WProto receipts retain their three-file evidence set.
 Full support logs may be redacted; their original hashes describe the observed invocation, not the
 uploaded redacted bytes. The same verifier runs again after redaction and checks the retained
 measurement records, XML and build inputs. After successful redaction, rejected diagnostics are also

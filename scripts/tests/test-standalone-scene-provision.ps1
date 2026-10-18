@@ -39,6 +39,11 @@ namespace UnityEditor {
             System.IO.File.WriteAllText(System.IO.Path.Combine(settings, "SavedAssets.txt"), "assets saved");
             VariantSetCountAtSave = PlayerSettings.VariantSetCount;
             VariantAtSave = PlayerSettings.Variant;
+            string playerSettings = System.IO.Path.Combine(settings, "ProjectSettings.asset");
+            if (System.IO.File.Exists(playerSettings) && PlayerSettings.Variant == ManagedCodeVariant.Release)
+            {
+                System.IO.File.WriteAllText(playerSettings, System.IO.File.ReadAllText(playerSettings).Replace("Standalone: 1", "Standalone: 3"));
+            }
             SaveCount++;
         }
     }
@@ -51,7 +56,7 @@ namespace UnityEditor {
     public enum ApiCompatibilityLevel { NET_Standard }
     public enum ManagedStrippingLevel { Disabled, Low, Medium, High }
     public enum Il2CppCompilerConfiguration { Release, Debug }
-    public enum ManagedCodeVariant { Default = 0, Release = 3 }
+    public enum ManagedCodeVariant { Default = 0, Checked = 1, Release = 3 }
     public static class EditorUserBuildSettings { public static bool SwitchActiveBuildTarget(BuildTargetGroup group, BuildTarget target) { return true; } }
     public static class PlayerSettings {
         public static int VariantSetCount;
@@ -91,7 +96,10 @@ public sealed partial class WProtoPreparationControl {
     public static void Invoke(UnityEditor.BuildPlayerOptions options) { WriteFrozenBuildPreparation(options); }
 }
 '@
-$temporary = Join-Path ([IO.Path]::GetTempPath()) ('wproto-preparation-control-' + [guid]::NewGuid().ToString('N'))
+$evidenceRoot = $env:WPROTO_PRODUCER_EVIDENCE_ROOT
+$keepEvidence = -not [string]::IsNullOrWhiteSpace($evidenceRoot)
+$parent = if ($keepEvidence) { $evidenceRoot } else { [IO.Path]::GetTempPath() }
+$temporary = Join-Path $parent ('wproto-preparation-control-' + [guid]::NewGuid().ToString('N'))
 $project = Join-Path $temporary 'project'
 $compileDirectory = Join-Path $temporary 'sources'
 $receiptDirectory = Join-Path $temporary 'receipts'
@@ -107,6 +115,8 @@ try {
     [IO.File]::WriteAllBytes((Join-Path $project 'Assets/Nested/Input.bytes'), [byte[]]@(0, 1, 127, 128, 255))
     [IO.File]::WriteAllText((Join-Path $project 'Packages/manifest.json'), '{"dependencies":{}}')
     [IO.File]::WriteAllText((Join-Path $project 'ProjectSettings/Existing.asset'), 'existing settings')
+    $playerSettingsPath = Join-Path $project 'ProjectSettings/ProjectSettings.asset'
+    [IO.File]::WriteAllText($playerSettingsPath, "actual prepared bytes`nStandalone: 3")
     $context = [pscustomobject]@{
         Declaration = [pscustomobject]@{
             Value = [pscustomobject]@{ RunId = 'preparation-control'; SourceCommit = ('a' * 40) }
@@ -124,6 +134,30 @@ try {
         @{ Name = 'LatestIl2Cpp.cs'; Text = "#define UNITY_6000_6_OR_NEWER`n" + (New-ConfiguratorSource -Backend IL2CPP).Replace('UhCiTestConfigurator', 'LatestIl2CppConfiguratorControl') },
         @{ Name = 'OlderMono.cs'; Text = (New-ConfiguratorSource -Backend Mono2x).Replace('UhCiTestConfigurator', 'OlderMonoConfiguratorControl') }
     )
+    $producerCases = @(
+        @{ Name = 'Latest'; Invoke = { [LatestWProtoPreparationControl]::Invoke($preparationOptions) }; Reject = $false },
+        @{ Name = 'MissingCopy'; Invoke = { [MissingCopyWProtoPreparationControl]::Invoke($preparationOptions) }; Reject = $true },
+        @{ Name = 'MissingRelease'; Invoke = { [MissingReleaseWProtoPreparationControl]::Invoke($preparationOptions) }; Reject = $true },
+        @{ Name = 'MissingLimit'; Invoke = { [MissingLimitWProtoPreparationControl]::Invoke($preparationOptions) }; Reject = $true },
+        @{ Name = 'Overwrite'; Invoke = { [OverwriteWProtoPreparationControl]::Invoke($preparationOptions) }; Reject = $true }
+    )
+    foreach ($case in $producerCases) {
+        $class = $case.Name + 'WProtoPreparationControl'
+        $directory = Join-Path $receiptDirectory $case.Name
+        $null = [IO.Directory]::CreateDirectory($directory)
+        $caseContext = @{ Declaration = @{ Value = $context.Declaration.Value; Sha256 = $context.Declaration.Sha256; ReportDirectory = $directory } }
+        $text = (New-WProtoBuildPreparationSource -Context $caseContext).Replace('UhCiStandaloneBuildModifier', $class)
+        $before = $text
+        switch ($case.Name) {
+            'MissingCopy' { $text = [regex]::Replace($text, '(?m)^        File.Copy\(playerSettingsPath,[^\r\n]+\r?\n', '') }
+            'MissingRelease' { $text = $text.Replace('PlayerSettings.SetManagedCodeVariant(UnityEditor.Build.NamedBuildTarget.Standalone, ManagedCodeVariant.Release);', '') }
+            'MissingLimit' { $text = $text.Replace('1048576 < playerSettings.Length', 'long.MaxValue < playerSettings.Length') }
+            'Overwrite' { $text = $text.Replace(', "build-player-settings.asset"), false);', ', "build-player-settings.asset"), true);') }
+        }
+        if ($case.Reject -and $before -ceq $text) { throw 'A producer mutation did not change its actual source.' }
+        $wrapper = "public sealed partial class $class { static partial void WriteFrozenBuildPreparation(UnityEditor.BuildPlayerOptions options); public static void Invoke(UnityEditor.BuildPlayerOptions options) { WriteFrozenBuildPreparation(options); } }"
+        $compileSources += @{ Name = ($class + '.cs'); Text = "#define UNITY_6000_6_OR_NEWER`n" + $text + "`n" + $wrapper }
+    }
     $compilePaths = foreach ($item in $compileSources) {
         $path = Join-Path $compileDirectory $item.Name
         [IO.File]::WriteAllText($path, $item.Text)
@@ -166,7 +200,7 @@ try {
     [WProtoPreparationControl]::Invoke($preparationOptions)
     $receiptPath = Join-Path $receiptDirectory 'build-preparation.json'
     $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
-    if ($receipt.SchemaVersion -ne 1 -or $receipt.RunId -cne $context.Declaration.Value.RunId -or $receipt.DeclarationSha256 -cne $context.Declaration.Sha256 -or $receipt.SourceCommit -cne $context.Declaration.Value.SourceCommit) {
+    if ($receipt.SchemaVersion -ne 2 -or $receipt.RunId -cne $context.Declaration.Value.RunId -or $receipt.DeclarationSha256 -cne $context.Declaration.Sha256 -or $receipt.SourceCommit -cne $context.Declaration.Value.SourceCommit) {
         throw 'The emitted preparation receipt lost its declaration-bound identity.'
     }
     if (($receipt.Scenes -join '|') -cne (@('Assets/Runner.unity', $scene) -join '|')) { throw 'Observed scene order or path normalization changed.' }
@@ -191,10 +225,18 @@ try {
         }
     }
     if ([UnityEditor.AssetDatabase]::SaveCount -ne 1 -or [WallstopStudios.UnityHelpers.Editor.Settings.UnityHelpersSettings]::SaveCount -ne 1) { throw 'Both settings and assets must be saved before capture.' }
+    if ([UnityEditor.PlayerSettings]::VariantSetCount -ne 0) { throw 'The older callback must not call the newer managed-variant API.' }
     foreach ($savedPath in @('ProjectSettings/UnityHelpersSettings.asset', 'ProjectSettings/SavedAssets.txt')) {
         if (@($receipt.ProjectInputs | Where-Object { $_.Path -ceq $savedPath }).Count -ne 1) { throw "Capture occurred before saving: $savedPath" }
     }
 
+    $preparedPath = Join-Path $receiptDirectory 'build-player-settings.asset'
+    $preparedBytes = [IO.File]::ReadAllBytes($preparedPath)
+    $preparedRow = @($receipt.ProjectInputs | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' })
+    if ($preparedRow.Count -ne 1 -or $preparedBytes.Length -ne $preparedRow[0].Length -or
+        (Get-FileHash -LiteralPath $preparedPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $preparedRow[0].Sha256) { throw 'Actual prepared settings are not bound to the producer inventory.' }
+    [IO.File]::WriteAllText($playerSettingsPath, 'restored settings')
+    if ([Convert]::ToBase64String([IO.File]::ReadAllBytes($preparedPath)) -cne [Convert]::ToBase64String($preparedBytes)) { throw 'Restoration changed retained prepared bytes.' }
     $originalReceiptHash = (Get-FileHash -LiteralPath $receiptPath -Algorithm SHA256).Hash
     $rejected = $false
     try { [WProtoPreparationControl]::Invoke($preparationOptions) }
@@ -206,6 +248,40 @@ try {
     if (-not $rejected -or (Get-FileHash -LiteralPath $receiptPath -Algorithm SHA256).Hash -cne $originalReceiptHash) { throw 'A second capture must refuse to overwrite the existing receipt.' }
     Write-Host 'WProto preparation: 4 shipping-generated C# controls passed (identity/scenes, complete census, save ordering, exclusive creation; Unity APIs stubbed; no player proof).'
 
+    Remove-Item -LiteralPath $preparedPath, $receiptPath
+    [IO.File]::WriteAllText($playerSettingsPath, ('x' * 1048577))
+    $rejected = $false
+    try { [WProtoPreparationControl]::Invoke($preparationOptions) }
+    catch { $rejected = $_.Exception.ToString().Contains('Invalid WProto prepared player settings.') }
+    if (-not $rejected -or (Test-Path -LiteralPath $preparedPath)) { throw 'Oversized settings must reject before copying.' }
+    foreach ($case in $producerCases) {
+        $directory = Join-Path $receiptDirectory $case.Name
+        $snapshot = Join-Path $directory 'build-player-settings.asset'
+        [UnityEditor.PlayerSettings]::SetScriptingBackend([UnityEditor.Build.NamedBuildTarget]::Standalone, [UnityEditor.ScriptingImplementation]::Mono2x)
+        [UnityEditor.PlayerSettings]::Variant = [UnityEditor.ManagedCodeVariant]::Checked
+        [UnityEditor.PlayerSettings]::VariantSetCount = 0
+        [IO.File]::WriteAllText($playerSettingsPath, $(if ($case.Name -ceq 'MissingLimit') { 'x' * 1048577 } else { "actual prepared bytes`nStandalone: 1" }))
+        & $case.Invoke
+        $valid = (Test-Path -LiteralPath $snapshot) -and (Get-Item -LiteralPath $snapshot).Length -le 1048576 -and
+            [UnityEditor.PlayerSettings]::VariantSetCount -eq 1 -and [UnityEditor.AssetDatabase]::VariantAtSave -eq [UnityEditor.ManagedCodeVariant]::Release
+        if ($valid) { $valid = ([IO.File]::ReadAllText($snapshot) -ceq "actual prepared bytes`nStandalone: 3") }
+        if ($case.Name -ceq 'Overwrite') {
+            if (-not $valid) { throw 'Overwrite control must first capture valid prepared bytes.' }
+            $original = (Get-FileHash -LiteralPath $snapshot).Hash
+            [IO.File]::WriteAllText($playerSettingsPath, 'later restored bytes')
+            $collision = $false
+            try { & $case.Invoke } catch {
+                $exception = $_.Exception
+                while ($null -ne $exception.InnerException) { $exception = $exception.InnerException }
+                $collision = $exception -is [IO.IOException]
+            }
+            if (-not $collision) { throw 'Overwrite control did not reach exclusive receipt creation.' }
+            $valid = (Get-FileHash -LiteralPath $snapshot).Hash -ceq $original
+        }
+        if ($valid -eq $case.Reject) { throw "Producer control $($case.Name) did not distinguish the shipping callback from its mutation." }
+        Write-Host "Producer control $($case.Name): expected acceptance $(-not $case.Reject) observed."
+    }
+    [IO.File]::WriteAllText($playerSettingsPath, "actual prepared bytes`nStandalone: 3")
     $env:UH_ADDITIONAL_SCRIPTING_DEFINES = ''
     $env:UH_CONFIGURE_MARKER_PATH = ''
     $configuratorCases = @(
@@ -235,5 +311,5 @@ finally {
     $env:UH_PLAYER_BUILD_PATH = $savedOutput
     $env:UH_ADDITIONAL_SCRIPTING_DEFINES = $savedDefines
     $env:UH_CONFIGURE_MARKER_PATH = $savedMarker
-    if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
+    if (-not $keepEvidence -and (Test-Path -LiteralPath $temporary)) { Remove-Item -LiteralPath $temporary -Recurse -Force }
 }
