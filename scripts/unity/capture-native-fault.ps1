@@ -11,7 +11,10 @@ param(
     [Parameter(ParameterSetName = 'Capture')][switch]$CompareLoaderSnaps,
     [Parameter(ParameterSetName = 'Capture')][ValidateRange(1, 1800)][int]$TimeoutSeconds = 600,
     [Parameter(Mandatory = $true, ParameterSetName = 'Readback')][string]$ExecutionDiagnosticsPath,
-    [Parameter(Mandatory = $true, ParameterSetName = 'Readback')][string]$ExpectedMachine
+    [Parameter(Mandatory = $true, ParameterSetName = 'Readback')][string]$ExpectedMachine,
+    [Parameter(ParameterSetName = 'Readback')][string]$TestFrameworkLogPath,
+    [Parameter(Mandatory = $true, ParameterSetName = 'SelectReadback')][string]$SourceRunId,
+    [Parameter(Mandatory = $true, ParameterSetName = 'SelectReadback')][string]$Repository
 )
 
 Set-StrictMode -Version Latest
@@ -184,7 +187,8 @@ function Invoke-NativeEvidenceReadback {
     param(
         [Parameter(Mandatory = $true)][string]$ExecutionDiagnosticsPath,
         [Parameter(Mandatory = $true)][string]$ExpectedMachine,
-        [Parameter(Mandatory = $true)][string]$ArtifactsPath
+        [Parameter(Mandatory = $true)][string]$ArtifactsPath,
+        [string]$TestFrameworkLogPath
     )
 
     $inputPath = [IO.Path]::GetFullPath($ExecutionDiagnosticsPath)
@@ -283,21 +287,32 @@ function Invoke-NativeEvidenceReadback {
         OriginalPath = $inputPath; OriginalSha256 = $inputHash; OriginalBytes = $bytes.Length
         Machine = $actualMachine; ExpectedMachine = $ExpectedMachine; OriginalProcess = $observation
         OriginalNativeCaptureState = $nativeState; StartedUtc = [DateTime]::UtcNow.ToString('o')
-        WindowsEvents = $null; NativeEvidence = $null; EndedUtc = $null
+        WindowsEvents = $null; NativeEvidence = $null; TestFrameworkSources = $null; EndedUtc = $null
         Qualification = 'Historical process evidence only. Missing events or files do not resolve the original failure; no new Unity invocation or acceptance evidence.'
     }
+    [IO.File]::WriteAllText((Join-Path $artifactRoot 'receipt.json'), (ConvertTo-UnitySafeLogText -Text ($record | ConvertTo-Json -Depth 12)))
     $record.WindowsEvents = Get-UnityProcessFailureEvents -ProcessObservation $observation
+    [IO.File]::WriteAllText((Join-Path $artifactRoot 'receipt.json'), (ConvertTo-UnitySafeLogText -Text ($record | ConvertTo-Json -Depth 12)))
     $record.NativeEvidence = if ($null -eq $capture) {
         @{ State = 'capture-unavailable'; Reason = 'original-capture-identity-unavailable'; Files = @() }
     } else { Get-UnityNativeEvidence -Capture $capture -LogPath (Join-Path $artifactRoot 'readback.log') }
+    if (-not [string]::IsNullOrWhiteSpace($TestFrameworkLogPath)) {
+        try { $record.TestFrameworkSources = Get-NativeTestFrameworkSources -LogPath $TestFrameworkLogPath -ProcessObservation $observation -ArtifactsPath $artifactRoot }
+        catch { $record.TestFrameworkSources = @{ State = 'rejected'; ErrorType = $_.Exception.GetType().Name; Error = $_.Exception.Message; Scope = 'current-persistent-package-sources'; OriginalOwnedProjectBytesProven = $false } }
+    }
     $record.EndedUtc = [DateTime]::UtcNow.ToString('o')
     $record.State = 'completed'
     [IO.File]::WriteAllText((Join-Path $artifactRoot 'receipt.json'), (ConvertTo-UnitySafeLogText -Text ($record | ConvertTo-Json -Depth 12)))
     return [pscustomobject]$record
 }
 
+if ($PSCmdlet.ParameterSetName -ceq 'SelectReadback') {
+    Get-NativeReadbackArtifactSelection -Repository $Repository -SourceRunId $SourceRunId -ArtifactsPath $ArtifactsPath -Token $env:GITHUB_TOKEN
+    return
+}
+
 if ($PSCmdlet.ParameterSetName -ceq 'Readback') {
-    Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $ExecutionDiagnosticsPath -ExpectedMachine $ExpectedMachine -ArtifactsPath $ArtifactsPath
+    Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $ExecutionDiagnosticsPath -ExpectedMachine $ExpectedMachine -ArtifactsPath $ArtifactsPath -TestFrameworkLogPath $TestFrameworkLogPath
     return
 }
 

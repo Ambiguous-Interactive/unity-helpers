@@ -1821,8 +1821,82 @@ if (-not $runnerBootstrapPinsRequestedMachine) {
     Write-Info "Checked runner bootstrap pins the requested machine with a machine-name label."
 }
 
+function Test-UnityRunnerPreflightLabels {
+    param([string]$JobText, [switch]$AllowHistoricalReadback)
+
+    $labels = [regex]::Matches($JobText, '(?m)^          required-label-sets: (?<value>[^\r\n]+)\r?$')
+    if ($labels.Count -ne 1) { return $false }
+    $value = $labels[0].Groups['value'].Value
+    return $value -ceq '''[["self-hosted","Windows","RAM-64GB"]]''' -or ($AllowHistoricalReadback -and
+        $value -ceq '${{ format(''[["self-hosted","Windows","RAM-64GB"{0}]]'', github.event_name == ''workflow_dispatch'' && inputs.native-readback-run-id != '''' && '',"ELI-MACHINE"'' || '''') }}')
+}
+
+function Test-UnityAggregateAlwaysGuard {
+    param([string]$JobText, [switch]$AllowHistoricalReadback)
+
+    $guards = [regex]::Matches($JobText, '(?m)^    if: (?<value>[^\r\n]+)\r?$')
+    if ($guards.Count -ne 1) { return $false }
+    $value = $guards[0].Groups['value'].Value
+    return $value -ceq '${{ always() }}' -or ($AllowHistoricalReadback -and
+        $value -ceq '${{ !(github.event_name == ''workflow_dispatch'' && inputs.native-readback-run-id != '''') && (always()) }}')
+}
+
 $unityTestsRunnerPreflightJob = if ($jobTexts.ContainsKey('runner-preflight')) { $jobTexts['runner-preflight'] } else { '' }
 $benchmarksRunnerPreflightJob = if ($benchmarksJobTexts.ContainsKey('runner-preflight')) { $benchmarksJobTexts['runner-preflight'] } else { '' }
+$readbackLabelLine = [regex]::Match($unityTestsRunnerPreflightJob, '(?m)^          required-label-sets: [^\r\n]+').Value
+$readbackAggregateLine = [regex]::Match([string]$jobTexts['unity-ci-success'], '(?m)^    if: [^\r\n]+').Value
+$ordinaryLabelLine = '          required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]'''
+$ordinaryAggregateLine = '    if: ${{ always() }}'
+foreach ($allowReadback in @($false, $true)) {
+    if (-not (Test-UnityRunnerPreflightLabels -JobText $ordinaryLabelLine -AllowHistoricalReadback:$allowReadback) -or
+        -not (Test-UnityAggregateAlwaysGuard -JobText $ordinaryAggregateLine -AllowHistoricalReadback:$allowReadback)) {
+        Write-Host '::error::Historical readback recognizers must preserve the ordinary preflight and aggregate forms.'
+        $failed = $true
+    }
+}
+if ([string]::IsNullOrWhiteSpace($readbackLabelLine) -or [string]::IsNullOrWhiteSpace($readbackAggregateLine) -or
+    (Test-UnityRunnerPreflightLabels -JobText $readbackLabelLine) -or (Test-UnityAggregateAlwaysGuard -JobText $readbackAggregateLine)) {
+    Write-Host '::error::Historical readback exceptions require an explicit caller opt-in and actual workflow subjects.'
+    $failed = $true
+}
+foreach ($control in @(
+        @{ Kind = 'Labels'; Name = 'wrong target machine'; From = 'ELI-MACHINE'; To = 'DAD-MACHINE' },
+        @{ Kind = 'Labels'; Name = 'wrong default labels'; From = '"self-hosted","Windows","RAM-64GB"{0}'; To = '"self-hosted","Linux","RAM-64GB"{0}' },
+        @{ Kind = 'Labels'; Name = 'wrong target labels'; From = ',"ELI-MACHINE"'; To = ',"Linux","ELI-MACHINE"' },
+        @{ Kind = 'Labels'; Name = 'wrong dispatch selector'; From = "'workflow_dispatch'"; To = "'push'" },
+        @{ Kind = 'Labels'; Name = 'wrong readback selector'; From = 'inputs.native-readback-run-id'; To = 'inputs.acceptance' },
+        @{ Kind = 'Labels'; Name = 'inverted readback selector'; From = "!= ''"; To = "== ''" },
+        @{ Kind = 'Labels'; Name = 'broadened readback selector'; From = ' && '; To = ' || ' },
+        @{ Kind = 'Aggregate'; Name = 'skip every manual dispatch'; From = " && inputs.native-readback-run-id != ''"; To = '' },
+        @{ Kind = 'Aggregate'; Name = 'skip nonempty input on all events'; From = "github.event_name == 'workflow_dispatch' && "; To = '' },
+        @{ Kind = 'Aggregate'; Name = 'wrong dispatch selector'; From = "'workflow_dispatch'"; To = "'push'" },
+        @{ Kind = 'Aggregate'; Name = 'wrong readback selector'; From = 'inputs.native-readback-run-id'; To = 'inputs.acceptance' },
+        @{ Kind = 'Aggregate'; Name = 'inverted readback selector'; From = "!= ''"; To = "== ''" },
+        @{ Kind = 'Aggregate'; Name = 'weakened outcome reporting'; From = 'always()'; To = 'success()' }
+    )) {
+    $original = if ($control.Kind -ceq 'Labels') { $readbackLabelLine } else { $readbackAggregateLine }
+    if (-not $original.Contains($control.From)) {
+        Write-Host "::error::Historical readback mutation lacks its subject: $($control.Name)."
+        $failed = $true
+        continue
+    }
+    $mutated = $original.Replace($control.From, $control.To)
+    $accepted = if ($control.Kind -ceq 'Labels') { Test-UnityRunnerPreflightLabels -JobText $mutated -AllowHistoricalReadback }
+    else { Test-UnityAggregateAlwaysGuard -JobText $mutated -AllowHistoricalReadback }
+    if ($accepted) {
+        Write-Host "::error::Historical readback recognizer accepted $($control.Kind): $($control.Name)."
+        $failed = $true
+    }
+}
+foreach ($duplicate in @($readbackLabelLine, $readbackAggregateLine)) {
+    $duplicated = $duplicate + "`n" + $duplicate
+    if ((Test-UnityRunnerPreflightLabels -JobText $duplicated -AllowHistoricalReadback) -or
+        (Test-UnityAggregateAlwaysGuard -JobText $duplicated -AllowHistoricalReadback)) {
+        Write-Host '::error::Historical readback recognizers accepted duplicate workflow keys.'
+        $failed = $true
+    }
+}
+
 $unityWorkflowRunnerPreflightsFailClosed = (
     $jobTexts.ContainsKey('runner-preflight') -and
     $benchmarksJobTexts.ContainsKey('runner-preflight') -and
@@ -1830,8 +1904,8 @@ $unityWorkflowRunnerPreflightsFailClosed = (
     $benchmarksRunnerPreflightJob.Contains("uses: $runnerPreflightAction # $runnerAvailabilityActionVersion") -and
     $unityTestsRunnerPreflightJob -match $readerAppCredentialsPattern -and
     $benchmarksRunnerPreflightJob -match $readerAppCredentialsPattern -and
-    $unityTestsRunnerPreflightJob.Contains('required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]''') -and
-    $benchmarksRunnerPreflightJob.Contains('required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]''') -and
+    (Test-UnityRunnerPreflightLabels -JobText $unityTestsRunnerPreflightJob -AllowHistoricalReadback) -and
+    (Test-UnityRunnerPreflightLabels -JobText $benchmarksRunnerPreflightJob) -and
     -not $workflowContent.Contains('RUNNER_AUDIT_PAT') -and
     -not $benchmarksWorkflowContent.Contains('RUNNER_AUDIT_PAT') -and
     -not $runnerBootstrapContent.Contains('RUNNER_AUDIT_PAT') -and
@@ -1850,7 +1924,7 @@ $unityCiSuccessJob = if ($jobTexts.ContainsKey('unity-ci-success')) { $jobTexts[
 $unityCiSuccessContract = (
     $jobTexts.ContainsKey('unity-ci-success') -and
     $unityCiSuccessJob -match '(?m)^\s+name:\s*Unity CI Success\s*$' -and
-    $unityCiSuccessJob -match '(?m)^\s+if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$' -and
+    (Test-UnityAggregateAlwaysGuard -JobText $unityCiSuccessJob -AllowHistoricalReadback) -and
     $unityCiSuccessJob.Contains('needs.runner-preflight.result') -and
     $unityCiSuccessJob.Contains('needs.unity-tests.result') -and
     $unityCiSuccessJob.Contains('needs.unity-tests-single-threaded.result') -and
@@ -3785,10 +3859,12 @@ if (-not $failed) {
 
 # Pull request revisions cancel older legs; pushed commits retain their own validation runs
 # so prepared releases can publish the exact validated merge even when main advances.
-$cancelsSupersededLicensedRuns = (
-    $workflowContent.Contains('group: unity-tests-${{ github.event_name == ''push'' && github.sha || github.event.pull_request.number || github.ref }}') -and
-    $workflowContent.Contains('cancel-in-progress: true')
-)
+$foldedWorkflowGroups = [regex]::Matches($workflowContent,
+    '(?m)^concurrency:\r?\n  group: >-\r?\n(?<body>(?:    \S[^\r\n]*\r?\n)+)  cancel-in-progress: true\r?$')
+$foldedWorkflowGroup = if ($foldedWorkflowGroups.Count -eq 1) {
+    ($foldedWorkflowGroups[0].Groups['body'].Value -replace '(?:^|\r?\n)    ', ' ').Trim()
+} else { '' }
+$cancelsSupersededLicensedRuns = $foldedWorkflowGroup -ceq 'unity-tests-${{ github.event_name == ''push'' && github.sha || github.event.pull_request.number || github.ref }}${{ github.event_name == ''workflow_dispatch'' && inputs.native-readback-run-id != '''' && format(''-native-readback-{0}'', github.run_id) || '''' }}'
 if (-not $cancelsSupersededLicensedRuns) {
     Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must retain pushed-commit validation while canceling superseded pull request revisions."
     $failed = $true
@@ -4072,11 +4148,12 @@ $benchmarksAggregateJobText = if ($benchmarksJobTexts.ContainsKey('benchmarks-ag
 function Test-TrustedSkipAggregateJobText {
     param(
         [Parameter(Mandatory = $true)][string]$JobText,
-        [Parameter(Mandatory = $true)][string]$LicensedJobResult
+        [Parameter(Mandatory = $true)][string]$LicensedJobResult,
+        [switch]$AllowHistoricalReadback
     )
 
     return (
-        $JobText -match '(?m)^\s+if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$' -and
+        (Test-UnityAggregateAlwaysGuard -JobText $JobText -AllowHistoricalReadback:$AllowHistoricalReadback) -and
         $JobText.Contains('runs-on: ubuntu-latest') -and
         $JobText.Contains('needs:') -and
         $JobText.Contains('shell: bash') -and
@@ -4177,9 +4254,9 @@ $supersededGateContracts = @(
         # cancellation, or unexpected skip of a licensed tier turns red.
         Name = 'each licensed job has a hosted trusted-skip aggregate'
         Ok = (
-            (Test-TrustedSkipAggregateJobText -JobText $jobTexts['unity-tests-aggregate'] -LicensedJobResult "needs.unity-tests.result") -and
-            (Test-TrustedSkipAggregateJobText -JobText $jobTexts['unity-tests-single-threaded-aggregate'] -LicensedJobResult "needs.unity-tests-single-threaded.result") -and
-            (Test-TrustedSkipAggregateJobText -JobText $jobTexts['unitypackage-smoke-aggregate'] -LicensedJobResult "needs.unitypackage-smoke.result") -and
+            (Test-TrustedSkipAggregateJobText -JobText $jobTexts['unity-tests-aggregate'] -LicensedJobResult "needs.unity-tests.result" -AllowHistoricalReadback) -and
+            (Test-TrustedSkipAggregateJobText -JobText $jobTexts['unity-tests-single-threaded-aggregate'] -LicensedJobResult "needs.unity-tests-single-threaded.result" -AllowHistoricalReadback) -and
+            (Test-TrustedSkipAggregateJobText -JobText $jobTexts['unitypackage-smoke-aggregate'] -LicensedJobResult "needs.unitypackage-smoke.result" -AllowHistoricalReadback) -and
             (Test-TrustedSkipAggregateJobText -JobText $benchmarksAggregateJobText -LicensedJobResult "needs.benchmarks.result")
         )
         Message = 'unity-tests, unity-tests-single-threaded, unitypackage-smoke, and benchmarks must each be covered by a single-step always-reporting aggregate that binds RUNNER_PREFLIGHT_RESULT and UNITY_TESTS_RESULT to the exact needs results and green-reports only an exact untrusted skip (FORK_PR/DEPENDABOT_PR) or full success. Any other script shape hides a skipped or cancelled licensed tier.'
@@ -4578,7 +4655,7 @@ function Test-NativeExportFleet {
     return (
         $Job.Contains('runs-on: [self-hosted, Windows, RAM-64GB]') -and
         $Job.Contains('      - runner-preflight') -and
-        $Preflight.Contains('required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]''') -and
+        (Test-UnityRunnerPreflightLabels -JobText $Preflight -AllowHistoricalReadback) -and
         $Preflight.Contains("uses: $runnerPreflightAction # $runnerAvailabilityActionVersion") -and
         $stageIndex -ge 0 -and $acquireIndex -gt $stageIndex -and $exportIndex -gt $acquireIndex -and
         $Job.Contains('UH_CENTRAL_LICENSE_RETURN: "true"') -and
@@ -4615,10 +4692,10 @@ foreach ($exportContract in @(
             @{ From = "uses: $centralReturnUses"; To = 'uses: ./.github/actions/return-unity-license'; Target = 'Job' },
             @{ From = "- name: Require confirmed Unity cleanup`n        if: always()"; To = "- name: Require confirmed Unity cleanup`n        if: success()"; Target = 'Job' },
             @{ From = '- name: Require confirmed Unity cleanup'; To = "- name: Require confirmed Unity cleanup`n        continue-on-error: true"; Target = 'Job' },
-            @{ From = 'required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]'''; To = 'required-label-sets: ''[["self-hosted","Linux"]]'''; Target = 'Preflight' }
+            @{ From = [regex]::Match($exportContract.Preflight, '(?m)^          required-label-sets: [^\r\n]+').Value.Trim(); To = 'required-label-sets: ''[["self-hosted","Linux"]]'''; Target = 'Preflight' }
         )) {
         $candidate = @{ Job = $exportContract.Job; Preflight = $exportContract.Preflight }
-        if (-not $candidate[$mutation.Target].Contains($mutation.From)) {
+        if ([string]::IsNullOrWhiteSpace($mutation.From) -or -not $candidate[$mutation.Target].Contains($mutation.From)) {
             Write-Host "::error::Native export mutation has no subject: $($exportContract.Name), $($mutation.From)"
             $failed = $true
             continue

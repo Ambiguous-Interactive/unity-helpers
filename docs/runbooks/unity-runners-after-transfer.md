@@ -315,6 +315,31 @@ the observed process exit; later event timestamps remain outside that query. Una
 queries or files and no matching observations remain distinct. Missing evidence does not
 explain the original failure or establish test or performance acceptance.
 
+For an existing **Unity Tests** run, dispatch that same workflow with
+`native-readback-run-id` set to its exact numeric run ID, `acceptance: none`,
+`native-diagnostics: false`, and `native-loader-snaps-comparison: false`. Wait for
+all timing campaigns on the selected host to finish before dispatch. The job
+checks for active Unity Editors; that check does not detect a standalone player
+that continues after its Editor exits. Separate diagnostic concurrency prevents
+cancelling qualification work, but does not serialize execution with it.
+
+This route requires runner-access preflight for ELI-MACHINE. It selects a completed
+run from the current repository with exactly one attempt, verifies unique latest
+acceptance and standalone artifact identities against that run and its source
+revision, and downloads by artifact ID. Repeated attempts and missing, expired,
+duplicate or truncated selections fail explicitly. Normal Unity jobs and success
+aggregates skip in this diagnostic mode. Failure diagnostics remain available in
+a separate artifact; they do not qualify the original run.
+
+The standalone readback also passes `-TestFrameworkLogPath` with its saved
+`unity.log`. For the observed test-framework 1.8.0 cache, it can copy the manifest
+and two launcher source files from the persistent project named in that log.
+Copies retain byte counts and hashes and are explicitly current cache observations;
+they do not prove the removed measurement project's original build-source bytes.
+Unavailable or rejected sources remain distinct. Readback writes an unfinished
+receipt before querying events so an interrupted collection preserves its original
+process identity. This route performs no new Unity, debugger or timing invocation.
+
 ### Opt-in native debugger capture
 
 <!-- cspell:ignore gflag -->

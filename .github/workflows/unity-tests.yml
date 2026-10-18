@@ -56,6 +56,11 @@ on:
         required: false
         default: false
         type: boolean
+      native-readback-run-id:
+        description: "Historical ELI evidence only: source run ID; skips all Unity jobs."
+        required: false
+        default: ""
+        type: string
       native-diagnostics:
         description: "Capture a direct/debugger exit pair on Unity 6000.6; evidence only."
         required: false
@@ -77,18 +82,134 @@ permissions:
 # central cancellation-safe cleanup path: `always()` returns the Unity license, classifies the
 # evidence, releases the organization lock, and requires confirmed cleanup before the job ends.
 concurrency:
-  group: unity-tests-${{ github.event_name == 'push' && github.sha || github.event.pull_request.number || github.ref }}
+  group: >-
+    unity-tests-${{ github.event_name == 'push' && github.sha || github.event.pull_request.number ||
+    github.ref }}${{ github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' &&
+    format('-native-readback-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:
+  native-historical-readback:
+    name: Historical ELI native evidence (diagnostic only)
+    needs: runner-preflight
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' && needs.runner-preflight.result == 'success' }}
+    runs-on: [self-hosted, Windows, RAM-64GB, ELI-MACHINE]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Validate historical readback selection
+        shell: pwsh
+        env:
+          UH_READBACK_RUN_ID: ${{ inputs.native-readback-run-id }}
+          UH_READBACK_ACCEPTANCE: ${{ inputs.acceptance }}
+          UH_READBACK_CAPTURE: ${{ inputs.native-diagnostics }}
+          UH_READBACK_LOADER: ${{ inputs.native-loader-snaps-comparison }}
+        run: |
+          if ($env:UH_READBACK_RUN_ID -cnotmatch '^[1-9][0-9]{0,19}$') { throw 'Readback requires a positive decimal source run ID.' }
+          if ($env:UH_READBACK_ACCEPTANCE -ne 'none' -or $env:UH_READBACK_CAPTURE -eq 'true' -or $env:UH_READBACK_LOADER -eq 'true') {
+            throw 'Historical readback cannot request acceptance or a new capture.'
+          }
+          if ([Environment]::MachineName -ine 'ELI-MACHINE') { throw 'Historical readback must run on ELI-MACHINE.' }
+
+      - name: Resolve exact historical artifact identities
+        id: readback_selection
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          UH_READBACK_RUN_ID: ${{ inputs.native-readback-run-id }}
+          UH_READBACK_REPOSITORY: ${{ github.repository }}
+        run: |
+          $selection = ./scripts/unity/capture-native-fault.ps1 `
+            -SourceRunId $env:UH_READBACK_RUN_ID -Repository $env:UH_READBACK_REPOSITORY `
+            -ArtifactsPath '.artifacts/native-readback/output/selection'
+          "acceptance-id=$($selection.AcceptanceArtifactId)" >> $env:GITHUB_OUTPUT
+          "standalone-id=$($selection.StandaloneArtifactId)" >> $env:GITHUB_OUTPUT
+
+      - name: Download original latest acceptance evidence
+        id: readback_acceptance_input
+        if: ${{ !cancelled() && steps.readback_selection.outcome == 'success' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.native-readback-run-id }}
+          merge-multiple: true
+          artifact-ids: ${{ steps.readback_selection.outputs.acceptance-id }}
+          path: .artifacts/native-readback/input/acceptance
+
+      - name: Download original latest standalone evidence
+        id: readback_standalone_input
+        if: ${{ !cancelled() && steps.readback_selection.outcome == 'success' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.native-readback-run-id }}
+          merge-multiple: true
+          artifact-ids: ${{ steps.readback_selection.outputs.standalone-id }}
+          path: .artifacts/native-readback/input/standalone
+
+      - name: Require no active Unity Editor for historical collection
+        id: readback_host_idle
+        if: ${{ !cancelled() && steps.readback_selection.outcome == 'success' }}
+        shell: pwsh
+        run: ./scripts/unity/assert-no-active-unity-editor.ps1
+
+      - name: Read historical acceptance process evidence
+        if: ${{ !cancelled() && steps.readback_acceptance_input.outcome == 'success' && steps.readback_host_idle.outcome == 'success' }}
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          ./scripts/unity/capture-native-fault.ps1 `
+            -ExecutionDiagnosticsPath '.artifacts/native-readback/input/acceptance/wproto/unity.execution-diagnostics.json' `
+            -ExpectedMachine 'ELI-MACHINE' -ArtifactsPath '.artifacts/native-readback/output/acceptance'
+
+      - name: Read historical standalone process and package sources
+        if: ${{ !cancelled() && steps.readback_standalone_input.outcome == 'success' && steps.readback_host_idle.outcome == 'success' }}
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          ./scripts/unity/capture-native-fault.ps1 `
+            -ExecutionDiagnosticsPath '.artifacts/native-readback/input/standalone/unity.execution-diagnostics.json' `
+            -TestFrameworkLogPath '.artifacts/native-readback/input/standalone/unity.log' `
+            -ExpectedMachine 'ELI-MACHINE' -ArtifactsPath '.artifacts/native-readback/output/standalone'
+
+      - name: Setup Node.js for historical evidence redaction
+        if: ${{ always() }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "22.18.0"
+
+      - name: Redact historical readback output
+        id: redact_native_readback
+        if: ${{ steps.checkout.outcome == 'success' && always() }}
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/native-readback/output
+
+      - name: Upload historical readback diagnostics
+        if: ${{ always() && steps.redact_native_readback.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-readback-ELI-MACHINE-${{ inputs.native-readback-run-id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .artifacts/native-readback/output
+          if-no-files-found: warn
+          retention-days: 30
+
   matrix-config:
     name: Resolve Unity test matrix
     if: >-
-      ${{
-        (github.event_name != 'pull_request' ||
+      ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && ((github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
-        (github.event_name != 'push' || github.ref_protected)
-      }}
+        (github.event_name != 'push' || github.ref_protected)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
@@ -293,7 +414,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     concurrency:
-      group: ${{ github.workflow }}-runner-preflight-${{ github.event_name == 'push' && github.sha || github.ref }}
+      group: >-
+        ${{ github.workflow }}-runner-preflight-${{ github.event_name == 'push' && github.sha ||
+        github.ref }}${{ github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' &&
+        format('-native-readback-{0}', github.run_id) || '' }}
       cancel-in-progress: true
     steps:
       # Verifies only that every required label set has a registered runner
@@ -304,7 +428,7 @@ jobs:
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
-          required-label-sets: '[["self-hosted","Windows","RAM-64GB"]]'
+          required-label-sets: ${{ format('[["self-hosted","Windows","RAM-64GB"{0}]]', github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' && ',"ELI-MACHINE"' || '') }}
 
   # Group all selected modes by Unity version. Each version pays checkout,
   # provisioning, organization-lock acquisition, and central cleanup once while
@@ -315,8 +439,8 @@ jobs:
       - matrix-config
       - runner-preflight
     if: >-
-      ${{
-        !cancelled() &&
+      ${{ !cancelled() &&
+        !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
@@ -1130,8 +1254,8 @@ jobs:
       - matrix-config
       - runner-preflight
     if: >-
-      ${{
-        !cancelled() &&
+      ${{ !cancelled() &&
+        !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
@@ -1614,8 +1738,8 @@ jobs:
       - matrix-config
       - runner-preflight
     if: >-
-      ${{
-        !cancelled() &&
+      ${{ !cancelled() &&
+        !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
@@ -1841,7 +1965,7 @@ jobs:
   # per gate.
   unity-tests-aggregate:
     name: Unity CI aggregate gate (tests)
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - runner-preflight
       - unity-tests
@@ -1867,7 +1991,7 @@ jobs:
 
   unity-tests-single-threaded-aggregate:
     name: Unity CI aggregate gate (single-threaded)
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - runner-preflight
       - unity-tests-single-threaded
@@ -1893,7 +2017,7 @@ jobs:
 
   unitypackage-smoke-aggregate:
     name: Unity CI aggregate gate (package smoke)
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - runner-preflight
       - unitypackage-smoke
@@ -1919,7 +2043,7 @@ jobs:
 
   unity-ci-success:
     name: Unity CI Success
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - matrix-config
       - runner-preflight

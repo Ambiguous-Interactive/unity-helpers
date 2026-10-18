@@ -77,6 +77,17 @@ try {
         Assert-Capture ([DateTimeOffset]::Parse($result.StartedUtc) -le [DateTimeOffset]::Parse($result.NativeEvidence.CapturedUtc) -and
             [DateTimeOffset]::Parse($result.NativeEvidence.CapturedUtc) -le [DateTimeOffset]::Parse($result.EndedUtc) -and
             (Test-Path -LiteralPath (Join-Path $output 'receipt.json'))) 'Readback receipt records enclosing collection times'
+        $controlledEventCollector = ${function:Get-UnityProcessFailureEvents}
+        function Get-UnityProcessFailureEvents { param($ProcessObservation) throw 'controlled collection interruption' }
+        $interruptedOutput = Join-Path $root 'readback-interrupted'
+        $interrupted = $false
+        try { $null = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath $interruptedOutput }
+        catch { $interrupted = $_.Exception.Message -ceq 'controlled collection interruption' }
+        finally { ${function:Get-UnityProcessFailureEvents} = $controlledEventCollector }
+        $partial = [IO.File]::ReadAllText((Join-Path $interruptedOutput 'receipt.json')) | ConvertFrom-Json -AsHashtable
+        Assert-Capture ($interrupted -and $partial.EvidenceOnly -and $partial.State -ceq 'collecting' -and $null -eq $partial.EndedUtc -and
+            $partial.OriginalProcess.ProcessId -eq 123 -and $partial.OriginalSha256 -ceq $originalHash -and
+            (Get-FileHash -LiteralPath (Join-Path $interruptedOutput 'execution-diagnostics.original.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $originalHash) 'Interrupted event collection retains the original process receipt and unfinished collection state'
         $eventsBefore = $script:readbackEventCalls
         $filesBefore = $script:readbackFileCalls
         $rejected = $false
@@ -163,6 +174,139 @@ try {
     $captureSet = @($parameterSets | Where-Object { $_.Name -ceq 'Capture' })
     Assert-Capture ($captureSet.Count -eq 1 -and $captureSet[0].IsDefault -and
         @($captureSet[0].Parameters | Where-Object { $_.IsMandatory -and $_.Name -in @('EditorPath', 'ProjectPath', 'ArtifactsPath', 'AssemblyNames') }).Count -eq 4) 'Capture remains the default parameter set with its original required inputs'
+
+    $selectionRun = @{ id = 39132725629L; repository = @{ full_name = 'wallstop/unity-helpers' }; status = 'completed'; run_attempt = 1; head_sha = 'a' * 40 }
+    $selectionArtifacts = @{ total_count = 2; artifacts = @(
+            @{ id = 12139481462L; name = 'unity-6000.6.0f1-acceptance'; expired = $false; size_in_bytes = 100; workflow_run = @{ id = 39132725629L; head_sha = 'a' * 40 } },
+            @{ id = 12138863641L; name = 'unity-6000.6.0f1-standalone'; expired = $false; size_in_bytes = 200; workflow_run = @{ id = 39132725629L; head_sha = 'a' * 40 } }
+        ) }
+    $oldRestFunction = Get-Item Function:Invoke-RestMethod -ErrorAction SilentlyContinue
+    $script:selectionCalls = [Collections.Generic.List[object]]::new()
+    function Invoke-RestMethod {
+        param($Method, $Uri, $Headers, $TimeoutSec)
+        $script:selectionCalls.Add(@{ Method = $Method; Uri = $Uri; Timeout = $TimeoutSec; Token = $Headers.Authorization })
+        if ($script:selectionNetworkFailure) { throw 'controlled metadata unavailable' }
+        if ($Uri.EndsWith('/artifacts?per_page=100')) { return $script:selectionArtifactsResponse }
+        return $script:selectionRunResponse
+    }
+    try {
+        foreach ($mutation in @('valid', 'wrong-run', 'string-run', 'wrong-repository', 'active-run', 'repeated-attempt', 'string-attempt', 'invalid-head',
+                'missing-artifact', 'duplicate-artifact', 'expired-artifact', 'untyped-expired', 'artifact-run', 'artifact-head', 'artifact-id-string', 'artifact-size',
+                'truncated-inventory', 'over-bound-inventory', 'string-count', 'network-failure', 'invalid-request')) {
+            $script:selectionRunResponse = $selectionRun | ConvertTo-Json -Depth 8 | ConvertFrom-Json -AsHashtable
+            $script:selectionArtifactsResponse = $selectionArtifacts | ConvertTo-Json -Depth 8 | ConvertFrom-Json -AsHashtable
+            $script:selectionNetworkFailure = $false
+            $script:selectionCalls.Clear()
+            $request = '39132725629'
+            switch ($mutation) {
+                'wrong-run' { $script:selectionRunResponse.id++ }
+                'string-run' { $script:selectionRunResponse.id = '39132725629' }
+                'wrong-repository' { $script:selectionRunResponse.repository.full_name = 'other/repository' }
+                'active-run' { $script:selectionRunResponse.status = 'in_progress' }
+                'repeated-attempt' { $script:selectionRunResponse.run_attempt = 2 }
+                'string-attempt' { $script:selectionRunResponse.run_attempt = '1' }
+                'invalid-head' { $script:selectionRunResponse.head_sha = 'a' * 39 }
+                'missing-artifact' { $script:selectionArtifactsResponse.artifacts[0].name = 'different' }
+                'duplicate-artifact' { $script:selectionArtifactsResponse.artifacts += $script:selectionArtifactsResponse.artifacts[0]; $script:selectionArtifactsResponse.total_count = 3 }
+                'expired-artifact' { $script:selectionArtifactsResponse.artifacts[0].expired = $true }
+                'untyped-expired' { $script:selectionArtifactsResponse.artifacts[0].expired = 'false' }
+                'artifact-run' { $script:selectionArtifactsResponse.artifacts[0].workflow_run.id++ }
+                'artifact-head' { $script:selectionArtifactsResponse.artifacts[0].workflow_run.head_sha = 'b' * 40 }
+                'artifact-id-string' { $script:selectionArtifactsResponse.artifacts[0].id = '12139481462' }
+                'artifact-size' { $script:selectionArtifactsResponse.artifacts[0].size_in_bytes = -1 }
+                'truncated-inventory' { $script:selectionArtifactsResponse.total_count = 3 }
+                'over-bound-inventory' { $script:selectionArtifactsResponse.total_count = 101 }
+                'string-count' { $script:selectionArtifactsResponse.total_count = '2' }
+                'network-failure' { $script:selectionNetworkFailure = $true }
+                'invalid-request' { $request = '../latest' }
+            }
+            $selectionOutput = Join-Path $root ('selection-' + $mutation)
+            $rejected = $false
+            try { $selected = Get-NativeReadbackArtifactSelection -Repository 'wallstop/unity-helpers' -SourceRunId $request -ArtifactsPath $selectionOutput -Token 'controlled-actions-token' }
+            catch { $rejected = $true }
+            $selectionText = [IO.File]::ReadAllText((Join-Path $selectionOutput 'selection.json'))
+            $selectionReceipt = $selectionText | ConvertFrom-Json -AsHashtable
+            Assert-Capture ($selectionReceipt.EvidenceOnly -and -not $selectionText.Contains('controlled-actions-token') -and
+                [DateTimeOffset]::Parse($selectionReceipt.StartedUtc) -le [DateTimeOffset]::Parse($selectionReceipt.EndedUtc)) "Selection retains diagnostic identity and times without credentials: $mutation"
+            if ($mutation -ceq 'valid') {
+                Assert-Capture (-not $rejected -and $selected.State -ceq 'selected' -and $selected.RunId -eq 39132725629L -and $selected.RunAttempt -eq 1 -and
+                    $selected.HeadSha -ceq ('a' * 40) -and $selected.AcceptanceArtifactId -eq 12139481462L -and $selected.StandaloneArtifactId -eq 12138863641L -and
+                    $selected.Artifacts.Count -eq 2) 'Selection binds both exact artifact IDs to the requested completed run and head'
+                Assert-Capture ($script:selectionCalls.Count -eq 2 -and $script:selectionCalls[0].Uri -ceq 'https://api.github.com/repos/wallstop/unity-helpers/actions/runs/39132725629' -and
+                    $script:selectionCalls[1].Uri -ceq 'https://api.github.com/repos/wallstop/unity-helpers/actions/runs/39132725629/artifacts?per_page=100' -and
+                    @($script:selectionCalls | Where-Object { $_.Method -cne 'Get' -or $_.Timeout -ne 30 -or $_.Token -cne 'Bearer controlled-actions-token' }).Count -eq 0) 'Selection performs only two bounded current-repository metadata GETs'
+                $selectionHash = (Get-FileHash -LiteralPath (Join-Path $selectionOutput 'selection.json')).Hash
+                $beforeCalls = $script:selectionCalls.Count
+                $refusedExisting = $false
+                try { $null = Get-NativeReadbackArtifactSelection -Repository 'wallstop/unity-helpers' -SourceRunId $request -ArtifactsPath $selectionOutput -Token 'controlled-actions-token' }
+                catch { $refusedExisting = $_.Exception.Message -like '*must be fresh*' }
+                Assert-Capture ($refusedExisting -and $script:selectionCalls.Count -eq $beforeCalls -and
+                    (Get-FileHash -LiteralPath (Join-Path $selectionOutput 'selection.json')).Hash -ceq $selectionHash) 'Selection preserves an existing attempt without network access'
+            } else {
+                Assert-Capture ($rejected -and $selectionReceipt.State -ceq 'failed' -and -not [string]::IsNullOrWhiteSpace($selectionReceipt.Error)) "Selection refuses and retains $mutation"
+                if ($mutation -ceq 'invalid-request') { Assert-Capture ($script:selectionCalls.Count -eq 0) 'Invalid requested run never invokes the API' }
+            }
+        }
+    } finally {
+        if ($null -eq $oldRestFunction) { Remove-Item Function:Invoke-RestMethod }
+        else { Set-Item Function:Invoke-RestMethod -Value $oldRestFunction.ScriptBlock }
+    }
+
+    $sourceProject = Join-Path $root '6000.6.0f1-standalone'
+    $sourcePackage = Join-Path $sourceProject 'Library/PackageCache/com.unity.test-framework@7a3849e09bd0'
+    $sourceLaunchers = Join-Path $sourcePackage 'UnityEditor.TestRunner/TestLaunchers'
+    $null = [IO.Directory]::CreateDirectory($sourceLaunchers)
+    $sourceLog = Join-Path $root 'ordinary-unity.log'
+    $sourceManifest = Join-Path $sourcePackage 'package.json'
+    $sourceContext = Join-Path $sourceLaunchers 'PlayerLauncherContextSettings.cs'
+    $sourceLauncher = Join-Path $sourceLaunchers 'PlayerLauncher.cs'
+    $sourceLogText = "COMMAND LINE: $($savedProcess.ExecutablePath)`n{`"processId`":123,`"label`":`"controlled`"}`nSuccessfully changed project path to: $sourceProject`n  com.unity.test-framework@1.8.0 (location: $sourcePackage)`n"
+    foreach ($mutation in @('valid', 'missing-source', 'oversize-source', 'wrong-manifest-version', 'wrong-manifest-name', 'malformed-manifest',
+            'wrong-cache', 'wrong-log-version', 'duplicate-package', 'wrong-pid', 'wrong-editor', 'relative-project', 'output-in-project', 'existing-output')) {
+        [IO.File]::WriteAllText($sourceManifest, '{"name":"com.unity.test-framework","version":"1.8.0"}')
+        [IO.File]::WriteAllText($sourceContext, 'controlled context source')
+        [IO.File]::WriteAllText($sourceLauncher, 'controlled launcher source')
+        $logText = $sourceLogText
+        $sourceOutput = Join-Path $root ('source-' + $mutation)
+        switch ($mutation) {
+            'missing-source' { Remove-Item -LiteralPath $sourceLauncher }
+            'oversize-source' { [IO.File]::WriteAllText($sourceLauncher, ('x' * 262145)) }
+            'wrong-manifest-version' { [IO.File]::WriteAllText($sourceManifest, '{"name":"com.unity.test-framework","version":"1.8.1"}') }
+            'wrong-manifest-name' { [IO.File]::WriteAllText($sourceManifest, '{"name":"another-package","version":"1.8.0"}') }
+            'malformed-manifest' { [IO.File]::WriteAllText($sourceManifest, '{') }
+            'wrong-cache' { $logText = $logText.Replace('7a3849e09bd0', '000000000000') }
+            'wrong-log-version' { $logText = $logText.Replace('@1.8.0 ', '@1.8.1 ') }
+            'duplicate-package' { $logText += "  com.unity.test-framework@1.8.0 (location: $sourcePackage)`n" }
+            'wrong-pid' { $logText = $logText.Replace('123,', '124,') }
+            'wrong-editor' { $logText = $logText.Replace($savedProcess.ExecutablePath, 'another-editor') }
+            'relative-project' { $logText = $logText.Replace("path to: $sourceProject", 'path to: 6000.6.0f1-standalone') }
+            'output-in-project' { $sourceOutput = Join-Path $sourceProject 'output' }
+            'existing-output' { $null = [IO.Directory]::CreateDirectory((Join-Path $sourceOutput 'test-framework-sources')) }
+        }
+        [IO.File]::WriteAllText($sourceLog, $logText)
+        $beforeSourceFiles = @(Get-ChildItem -LiteralPath $sourcePackage -File -Recurse | Sort-Object FullName | ForEach-Object { $_.FullName + ':' + (Get-FileHash -LiteralPath $_.FullName).Hash })
+        $sourceResult = $null
+        $rejected = $false
+        try { $sourceResult = Get-NativeTestFrameworkSources -LogPath $sourceLog -ProcessObservation ([hashtable]$savedProcess) -ArtifactsPath $sourceOutput }
+        catch { $rejected = $true }
+        $afterSourceFiles = @(Get-ChildItem -LiteralPath $sourcePackage -File -Recurse | Sort-Object FullName | ForEach-Object { $_.FullName + ':' + (Get-FileHash -LiteralPath $_.FullName).Hash })
+        Assert-Capture (($beforeSourceFiles -join '|') -ceq ($afterSourceFiles -join '|')) "Package source collection preserves the original package: $mutation"
+        if ($mutation -ceq 'valid') {
+            Assert-Capture (-not $rejected -and $sourceResult.State -ceq 'observed' -and $sourceResult.Files.Count -eq 3 -and
+                $sourceResult.Scope -ceq 'current-persistent-package-sources' -and -not $sourceResult.OriginalOwnedProjectBytesProven -and
+                $sourceResult.PackageVersion -ceq '1.8.0' -and $sourceResult.CacheIdentity -ceq '7a3849e09bd0' -and
+                $sourceResult.ObservedLogSha256 -ceq (Get-FileHash -LiteralPath $sourceLog -Algorithm SHA256).Hash.ToLowerInvariant()) 'Package copies bind the observed log and current persistent cache without claiming original owned bytes'
+            foreach ($file in $sourceResult.Files) {
+                $retainedSource = Join-Path $sourceOutput $file.SavedPath
+                Assert-Capture ((Get-FileHash -LiteralPath $retainedSource -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $file.Sha256 -and
+                    (Get-FileHash -LiteralPath $file.Path -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $file.Sha256 -and
+                    (Get-Item -LiteralPath $retainedSource).Length -eq $file.Length) 'Each of the three bounded source copies preserves and hashes exact bytes'
+            }
+        } else {
+            Assert-Capture ($rejected -or ($null -ne $sourceResult -and $sourceResult.State -ceq 'unavailable' -and $sourceResult.Files.Count -eq 0)) "Package source collection distinguishes unavailable or rejected $mutation"
+            if ($mutation -cne 'existing-output') { Assert-Capture (-not (Test-Path -LiteralPath (Join-Path $sourceOutput 'test-framework-sources'))) "Invalid package creates no source output: $mutation" }
+        }
+    }
 
     $editorInput = Join-Path $root 'editor-input.txt'
     $lockInput = Join-Path $root 'package-lock-input.json'

@@ -45,6 +45,7 @@ function expression(text) {
     "failure",
     "contains",
     "fromJSON",
+    "format",
     `return (${body.replace(/\.([A-Za-z_][A-Za-z0-9_]*-[A-Za-z0-9_-]+)/g, '["$1"]')});`
   );
   return (context) =>
@@ -59,7 +60,8 @@ function expression(text) {
       () => context.success,
       () => context.failure,
       (values, value) => values.includes(value),
-      JSON.parse
+      JSON.parse,
+      (template, ...values) => template.replace(/\{(\d+)\}/g, (_, index) => values[Number(index)])
     );
 }
 function predicate(step) {
@@ -515,3 +517,272 @@ for (const stage of ["RUN", "VERIFY", "REDACT", "UPLOAD"]) {
   );
 }
 console.log(`${onlyControls} WProto-only player workflow controls passed.`);
+
+const readbackOriginalJobPredicates = {
+  "matrix-config":
+    "(github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected)",
+  "runner-preflight":
+    "github.event.pull_request.user.login != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)",
+  "unity-tests":
+    "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.test-modes != '[]' &&\n        needs.matrix-config.outputs.superseded != 'true'",
+  "unity-tests-single-threaded":
+    "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
+  "unitypackage-smoke":
+    "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
+  "unity-tests-aggregate": "always()",
+  "unity-tests-single-threaded-aggregate": "always()",
+  "unitypackage-smoke-aggregate": "always()",
+  "unity-ci-success": "always()"
+};
+
+const historicalJob = workflow.match(
+  /^  native-historical-readback:\n([\s\S]*?)(?=^  [\w-]+:\n)/m
+)?.[1];
+assert.ok(historicalJob);
+assert.match(historicalJob, /^    needs: runner-preflight$/m);
+assert.match(historicalJob, /^    runs-on: \[self-hosted, Windows, RAM-64GB, ELI-MACHINE\]$/m);
+assert.match(historicalJob, /^      actions: read$/m);
+assert.match(historicalJob, /^      contents: read$/m);
+assert.doesNotMatch(
+  historicalJob,
+  /UNITY_SERIAL|UNITY_EMAIL|UNITY_PASSWORD|ensure-unity-editor|run-ci-tests\.ps1|run-acceptance\.ps1|-EditorPath|-ProjectPath|CompareLoaderSnaps/
+);
+const readbackOption = workflow.match(
+  /^      native-readback-run-id:\n((?:        [^\n]*\n|\n)+)/m
+)?.[1];
+assert.match(readbackOption, /^        default: ""$/m);
+assert.match(readbackOption, /^        type: string$/m);
+assert.ok(
+  [...workflow.slice(0, workflow.indexOf("\npermissions:")).matchAll(/^      [\w-]+:\n/gm)]
+    .length <= 10
+);
+function jobGate(block) {
+  return expression(block.match(/^    if: (?:>-\n\s*)?\$\{\{([\s\S]*?)\}\}/m)?.[1]);
+}
+let readbackJobControls = 0;
+for (const event of ["push", "pull_request", "workflow_dispatch"]) {
+  for (const request of ["", "39132725629"]) {
+    for (const cancelled of [false, true]) {
+      for (const fork of [false, true]) {
+        for (const protectedRef of [false, true]) {
+          for (const result of ["success", "failure", "skipped"]) {
+            const context = {
+              github: {
+                event_name: event,
+                repository: "Org/Repo",
+                ref_protected: protectedRef,
+                ref: "refs/heads/feature",
+                sha: "abc",
+                run_id: "100",
+                workflow: "Unity Tests",
+                event: {
+                  pull_request: {
+                    number: 42,
+                    head: { repo: { full_name: fork ? "Other/Repo" : "Org/Repo" } },
+                    user: { login: "developer" }
+                  }
+                }
+              },
+              inputs: { "native-readback-run-id": request },
+              cancelled,
+              steps: {},
+              needs: {
+                "matrix-config": {
+                  result,
+                  outputs: { "test-modes": '["standalone"]', superseded: "false" }
+                },
+                "runner-preflight": { result }
+              }
+            };
+            const requested = event === "workflow_dispatch" && request !== "";
+            for (const [name, previous] of Object.entries(readbackOriginalJobPredicates)) {
+              const block = workflow.match(
+                new RegExp(`^  ${name}:\\n([\\s\\S]*?)(?=^  [\\w-]+:\\n|(?![\\s\\S]))`, "m")
+              )?.[1];
+              assert.ok(block, name);
+              const expected =
+                Boolean(expression(previous)(context)) &&
+                (name === "runner-preflight" || !requested);
+              assert.equal(
+                Boolean(jobGate(block)(context)),
+                expected,
+                `${name} preserves its prior predicate outside explicit readback`
+              );
+            }
+            assert.equal(
+              Boolean(jobGate(historicalJob)(context)),
+              requested && !cancelled && result === "success"
+            );
+            readbackJobControls++;
+          }
+        }
+      }
+    }
+  }
+}
+function foldedGroup(block, indentation) {
+  const header = " ".repeat(indentation) + "group: >-\n";
+  const start = block.indexOf(header);
+  assert.ok(start >= 0, "Concurrency group uses a folded scalar");
+  const prefix = " ".repeat(indentation + 2);
+  const lines = block.slice(start + header.length).split("\n");
+  const content = [];
+  for (const line of lines) {
+    if (!line.startsWith(prefix)) break;
+    assert.ok(
+      line.length > prefix.length && line[prefix.length] !== " ",
+      "Folded group has no blank or extra-indented lines"
+    );
+    content.push(line.slice(prefix.length));
+  }
+  assert.ok(content.length > 1);
+  return content.join(" ");
+}
+const concurrencyGroup = foldedGroup(workflow, 2);
+function renderGroup(template, context) {
+  return template.replace(/\$\{\{([\s\S]*?)\}\}/g, (_, value) => expression(value)(context));
+}
+const groupContext = {
+  github: {
+    event_name: "workflow_dispatch",
+    sha: "abc",
+    ref: "refs/heads/feature",
+    run_id: "100",
+    event: { pull_request: {} }
+  },
+  inputs: { "native-readback-run-id": "" }
+};
+const ordinaryGroup = renderGroup(concurrencyGroup, groupContext);
+assert.equal(ordinaryGroup, "unity-tests-refs/heads/feature");
+groupContext.inputs["native-readback-run-id"] = "39132725629";
+const firstReadbackGroup = renderGroup(concurrencyGroup, groupContext);
+groupContext.github.run_id = "101";
+assert.notEqual(firstReadbackGroup, ordinaryGroup);
+assert.notEqual(renderGroup(concurrencyGroup, groupContext), firstReadbackGroup);
+const historicalSteps = historicalJob.split(/(?=^      - name:)/m);
+function historicalStep(name) {
+  const matches = historicalSteps.filter((step) => step.startsWith(`      - name: ${name}\n`));
+  assert.equal(matches.length, 1);
+  return matches[0];
+}
+for (const [name, id] of [
+  ["Download original latest acceptance evidence", "acceptance-id"],
+  ["Download original latest standalone evidence", "standalone-id"]
+]) {
+  const step = historicalStep(name);
+  assert.match(step, /actions\/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333/);
+  assert.match(step, /repository: \$\{\{ github.repository \}\}/);
+  assert.match(step, /run-id: \$\{\{ inputs.native-readback-run-id \}\}/);
+  assert.ok(step.includes("artifact-ids: ${{ steps.readback_selection.outputs." + id + " }}"));
+  assert.doesNotMatch(step, /^          (?:name|pattern):/m);
+  assert.equal(
+    predicate(step)({ cancelled: false, steps: { readback_selection: { outcome: "success" } } }),
+    true
+  );
+  assert.equal(
+    predicate(step)({ cancelled: false, steps: { readback_selection: { outcome: "failure" } } }),
+    false
+  );
+}
+const uploadHistorical = historicalStep("Upload historical readback diagnostics");
+for (const outcome of ["success", "failure", "skipped", "cancelled"]) {
+  for (const redaction of ["success", "failure", "skipped"]) {
+    assert.equal(
+      predicate(uploadHistorical)({
+        steps: {
+          redact_native_readback: { outcome: redaction },
+          readback_standalone_input: { outcome }
+        }
+      }),
+      redaction === "success"
+    );
+  }
+}
+assert.match(uploadHistorical, /path: .artifacts\/native-readback\/output/);
+assert.match(
+  historicalStep("Read historical standalone process and package sources"),
+  /-TestFrameworkLogPath '.artifacts\/native-readback\/input\/standalone\/unity.log'/
+);
+assert.match(
+  historicalStep("Resolve exact historical artifact identities"),
+  /-SourceRunId \$env:UH_READBACK_RUN_ID -Repository \$env:UH_READBACK_REPOSITORY/
+);
+const preflightBlock = workflow.match(/^  runner-preflight:\n([\s\S]*?)(?=^  [\w-]+:\n)/m)?.[1];
+const requiredLabels = expression(
+  preflightBlock.match(/^          required-label-sets: (.+)$/m)?.[1]
+);
+for (const event of ["push", "pull_request", "workflow_dispatch"]) {
+  for (const request of ["", "39132725629"]) {
+    const labels = JSON.parse(
+      requiredLabels({
+        github: { event_name: event },
+        inputs: { "native-readback-run-id": request }
+      })
+    );
+    assert.deepEqual(labels, [
+      [
+        "self-hosted",
+        "Windows",
+        "RAM-64GB",
+        ...(event === "workflow_dispatch" && request !== "" ? ["ELI-MACHINE"] : [])
+      ]
+    ]);
+  }
+}
+const preflightGroup = foldedGroup(preflightBlock, 6);
+groupContext.github.workflow = "Unity Tests";
+groupContext.inputs["native-readback-run-id"] = "";
+const normalPreflightGroup = renderGroup(preflightGroup, groupContext);
+groupContext.inputs["native-readback-run-id"] = "39132725629";
+assert.notEqual(renderGroup(preflightGroup, groupContext), normalPreflightGroup);
+assert.equal(normalPreflightGroup, "Unity Tests-runner-preflight-refs/heads/feature");
+for (const event of ["push", "pull_request", "workflow_dispatch"]) {
+  for (const request of ["", "39132725629"]) {
+    const context = {
+      github: {
+        event_name: event,
+        workflow: "Unity Tests",
+        sha: "source-sha",
+        ref: "refs/heads/feature",
+        run_id: "456",
+        event: { pull_request: event === "pull_request" ? { number: 42 } : {} }
+      },
+      inputs: { "native-readback-run-id": request }
+    };
+    const suffix = event === "workflow_dispatch" && request !== "" ? "-native-readback-456" : "";
+    assert.equal(
+      renderGroup(concurrencyGroup, context),
+      "unity-tests-" +
+        (event === "push" ? "source-sha" : event === "pull_request" ? "42" : "refs/heads/feature") +
+        suffix
+    );
+    assert.equal(
+      renderGroup(preflightGroup, context),
+      "Unity Tests-runner-preflight-" +
+        (event === "push" ? "source-sha" : "refs/heads/feature") +
+        suffix
+    );
+  }
+}
+assert.doesNotMatch(historicalJob, /continue-on-error:/);
+for (const [name, input] of [
+  ["Read historical acceptance process evidence", "readback_acceptance_input"],
+  ["Read historical standalone process and package sources", "readback_standalone_input"]
+]) {
+  const step = historicalStep(name);
+  assert.match(step, /-ExpectedMachine 'ELI-MACHINE'/);
+  for (const cancelled of [false, true]) {
+    for (const download of ["success", "failure", "skipped", "cancelled"]) {
+      for (const idle of ["success", "failure", "skipped"]) {
+        assert.equal(
+          predicate(step)({
+            cancelled,
+            steps: { [input]: { outcome: download }, readback_host_idle: { outcome: idle } }
+          }),
+          !cancelled && download === "success" && idle === "success"
+        );
+      }
+    }
+  }
+}
+console.log(`${readbackJobControls} historical readback job predicate controls passed.`);
