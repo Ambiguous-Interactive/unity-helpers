@@ -3083,6 +3083,11 @@ Changed, missing, duplicated, skipped, or inconclusive required cases cannot qua
 Review case-binding changes against complete runner results; do not regenerate them to conceal
 lost coverage.
 
+Catalog and initial source-census failures retain their primary error without launching the SDK,
+build or tests. Their rejected receipts have no completed before/after source comparison.
+Source drift is checked only after the initial census completes, including when a later build
+or test fails. Missing or incomplete source observations never qualify an invocation.
+
 This verifier accepts CoreCLR host fixture evidence only. Its process observation covers the
 `dotnet` parent exit and captured output; it does not establish Unity native-process stability.
 Passing host receipts do not complete partial or missing lane requirements, player qualification,

@@ -111,6 +111,7 @@ function Invoke-WProtoEvidenceRun {
         log = $null; buildLog = $null; sdkLog = $null; exception = $null
     }
     $receiptPath = Join-Path $directory 'receipt.json'
+    $sourceInventoryCaptured = $false
     try {
         $model = Read-WProtoCatalog $Root
         $lane = @($model.catalog.lanes | Where-Object { $_.id -ceq $receipt.lane })
@@ -120,6 +121,7 @@ function Invoke-WProtoEvidenceRun {
         $receipt.sourceRevision = (& git -C $Root rev-parse HEAD) -join ''
         if ($LASTEXITCODE -ne 0) { throw 'Cannot identify source revision.' }
         $receipt.sourceFiles = @(Get-WProtoSourceInventory $Root)
+        $sourceInventoryCaptured = $true
         $dotnet = (Get-Command dotnet -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
         $receipt.sdkProcess = Invoke-WProtoObservedProcess $dotnet @('--version') $Root (Join-Path $directory 'sdk') 60
         $receipt.sdkLog = $receipt.sdkProcess.stdout
@@ -152,8 +154,10 @@ function Invoke-WProtoEvidenceRun {
     } catch { $receipt.exception = $_.Exception.ToString() }
     finally {
         try {
-            $receipt.sourceFilesAfterRun = @(Get-WProtoSourceInventory $Root)
-            if ((ConvertTo-Json -InputObject $receipt.sourceFiles -Depth 5 -Compress) -cne (ConvertTo-Json -InputObject $receipt.sourceFilesAfterRun -Depth 5 -Compress)) { throw 'Source inventory changed during invocation.' }
+            if ($sourceInventoryCaptured) {
+                $receipt.sourceFilesAfterRun = @(Get-WProtoSourceInventory $Root)
+                if ((ConvertTo-Json -InputObject $receipt.sourceFiles -Depth 5 -Compress) -cne (ConvertTo-Json -InputObject $receipt.sourceFilesAfterRun -Depth 5 -Compress)) { throw 'Source inventory changed during invocation.' }
+            }
         } catch { $receipt.exception = [string]$receipt.exception + "`n" + $_.Exception.ToString() }
         Write-WProtoNewFile $receiptPath (ConvertTo-Json -InputObject $receipt -Depth 20)
     }

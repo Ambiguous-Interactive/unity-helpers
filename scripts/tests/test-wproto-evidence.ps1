@@ -1,13 +1,17 @@
 #!/usr/bin/env pwsh
 [CmdletBinding()]
-param()
+param([string]$ArtifactRoot)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot '../verify-wproto-evidence.ps1')
+$gitEnvironment = @(& git rev-parse --local-env-vars)
+if ($LASTEXITCODE -ne 0) { throw 'Cannot identify Git environment for isolated controls.' }
+foreach ($name in $gitEnvironment) { Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue }
+. (Join-Path $PSScriptRoot '../run-wproto-evidence.ps1') -Oracle v3
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('wproto evidence controls ' + [Guid]::NewGuid().ToString('N'))
 $checks = 0
 $failures = [Collections.Generic.List[string]]::new()
+if (-not [string]::IsNullOrWhiteSpace($ArtifactRoot) -and (Test-Path -LiteralPath $ArtifactRoot)) { throw 'Control artifact destination already exists.' }
 $manifestFixture = 'WallstopStudios.UnityHelpers.Proto.Generator.Tests.SubtypeTagManifestTests'
 $manifestAssertions = [ordered]@{
     ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer = @('Error')
@@ -24,6 +28,12 @@ function Write-ControlFile {
 function Write-ControlJson {
     param([string]$Path, $Value)
     Write-ControlFile $Path (ConvertTo-Json -InputObject $Value -Depth 30)
+}
+
+function Assert-InvocationControl {
+    param([bool]$Passed, [string]$Name)
+    if (-not $Passed) { $script:failures.Add($Name) }
+    ++$script:checks
 }
 
 function New-ControlProcess {
@@ -215,6 +225,9 @@ function New-ControlFixture {
 
 try {
     $fixture = New-ControlFixture
+    $actualRoot = (& git -C $fixture.Root rev-parse --show-toplevel) -join ''
+    if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($actualRoot) -cne [IO.Path]::GetFullPath($fixture.Root)) { throw 'Control Git repository escaped its temporary root.' }
+    ++$checks
     $baseline = [Collections.Generic.Dictionary[string,byte[]]]::new([StringComparer]::Ordinal)
     foreach ($file in Get-ChildItem -LiteralPath $fixture.Root -File -Recurse -Force) {
         if ($file.FullName.StartsWith((Join-Path $fixture.Root '.git') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)) { continue }
@@ -408,8 +421,82 @@ try {
     try { Assert-WProtoEvidence $fixture.Root $fixture.Receipt 'synthetic-receipt-control' | Out-Null } catch { $rejected = $true }
     if (-not $rejected) { $failures.Add('Duplicate JSON member was accepted.') }
     ++$checks
+    foreach ($stage in @('catalog', 'initial-census', 'after-census')) {
+        Restore-ControlFixture
+        $index = Join-Path $fixture.Root '.git/index'
+        $hadIndex = Test-Path -LiteralPath $index -PathType Leaf
+        $indexBytes = if ($hadIndex) { [IO.File]::ReadAllBytes($index) } else { $null }
+        if ($stage -eq 'catalog') {
+            Write-ControlFile $fixture.Guide '# Unreviewed guide change'
+            $primary = 'Guide changed without catalog review.'
+        } elseif ($stage -eq 'initial-census') {
+            [IO.File]::WriteAllText($index, 'invalid isolated control index')
+            $primary = 'Cannot enumerate WProto build inputs.'
+        } else {
+            $project = Join-Path $fixture.Root 'Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj'
+            Write-ControlFile $project @'
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <Target Name="ChangeSourceAfterCapture" BeforeTargets="PrepareForBuild">
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)/../../Runtime/PreservedInput.cs" Lines="// controlled source change" Overwrite="false" />
+    <Error Text="Controlled build refusal after changing source." />
+  </Target>
+</Project>
+'@
+            $primary = 'Release build did not complete cleanly.'
+        }
+        $identity = [guid]::NewGuid()
+        $destination = Join-Path $temporary ('invocation-' + $stage)
+        $directory = Join-Path $destination $identity.ToString('D')
+        $rejected = $false
+        try {
+            Invoke-WProtoEvidenceRun $fixture.Root $destination v3 $identity 60 60 | Out-Null
+        } catch {
+            $rejected = $true
+        } finally {
+            if ($stage -eq 'initial-census') {
+                if ($hadIndex) { [IO.File]::WriteAllBytes($index, $indexBytes) }
+                else { [IO.File]::Delete($index) }
+            }
+        }
+        Assert-InvocationControl $rejected "$stage invocation rejects"
+        $record = Read-WProtoJson (Join-Path $directory 'receipt.json')
+        Assert-InvocationControl ($record.exception.Contains($primary)) "$stage keeps the primary failure"
+        Assert-InvocationControl ([regex]::Matches($record.exception, [regex]::Escape($primary)).Count -eq 1) "$stage does not repeat the primary failure"
+        Assert-InvocationControl (-not (Test-Path -LiteralPath (Join-Path $directory 'verification.json'))) "$stage produces no qualifying verification"
+        Assert-InvocationControl ($null -eq $record.process -and $null -eq $record.results) "$stage starts no test process"
+        if ($stage -eq 'after-census') {
+            Assert-InvocationControl ($record.sourceFiles.Count -gt 0 -and $record.sourceFilesAfterRun.Count -gt 0) 'real drift has both source observations'
+            Assert-InvocationControl ($null -ne $record.sdkProcess -and $null -ne $record.build) 'real drift follows actual SDK and build processes'
+            Assert-InvocationControl ($record.exception.Contains('Source inventory changed during invocation.')) 'real source drift is still reported'
+            $before = @($record.sourceFiles | Where-Object { $_.path -ceq 'Runtime/PreservedInput.cs' })
+            $after = @($record.sourceFilesAfterRun | Where-Object { $_.path -ceq 'Runtime/PreservedInput.cs' })
+            Assert-InvocationControl ($before.Count -eq 1 -and $after.Count -eq 1 -and $before[0].sha256 -cne $after[0].sha256 -and $after[0].sha256 -ceq (Get-WProtoFileHash (Join-Path $fixture.Root 'Runtime/PreservedInput.cs'))) 'real drift identifies the actual changed bytes'
+        } else {
+            Assert-InvocationControl ($record.sourceFiles.Count -eq 0 -and $record.sourceFilesAfterRun.Count -eq 0) "$stage does not invent a source observation"
+            Assert-InvocationControl ($null -eq $record.sdkProcess -and $null -eq $record.build) "$stage starts no SDK or build process"
+            Assert-InvocationControl (-not $record.exception.Contains('Source inventory changed during invocation.')) "$stage does not invent source drift"
+        }
+    }
     if ($failures.Count -gt 0) { throw ($failures -join "`n") }
     Write-Host "WProto evidence receipt-graph controls passed: $checks; synthetic artifacts do not qualify a build or serializer."
 } finally {
-    if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
+    try {
+        if (-not [string]::IsNullOrWhiteSpace($ArtifactRoot)) {
+            $destination = [IO.Path]::GetFullPath($ArtifactRoot)
+            [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destination))
+            foreach ($file in Get-ChildItem -LiteralPath $temporary -File -Recurse -Force) {
+                $relative = [IO.Path]::GetRelativePath($temporary, $file.FullName).Replace('\', '/')
+                if ($relative.Split('/') -ccontains '.git') { continue }
+                $target = Join-Path $destination $relative
+                [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))
+                [IO.File]::Copy($file.FullName, $target, $false)
+            }
+        }
+    } finally {
+        if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
+    }
 }
