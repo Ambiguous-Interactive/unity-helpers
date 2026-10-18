@@ -839,6 +839,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + Tag
                         + ".TryAdd("
                         + decoded
+                        + ", ref "
+                        + entry
                         + "))"
                         + Writer.Open
                 );

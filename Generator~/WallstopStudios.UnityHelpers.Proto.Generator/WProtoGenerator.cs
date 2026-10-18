@@ -19,11 +19,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Implemented as an <see cref="ISourceGenerator"/> rather than an
-    /// <c>IIncrementalGenerator</c>. Unity 2021.3 -- which this package supports and CI builds --
-    /// ships Roslyn 3.9, where the incremental interface does not exist and an analyzer compiled
-    /// against Microsoft.CodeAnalysis 4.x does not load at all. The v2 interface runs on every host
-    /// from 3.8 upward, which is every Unity version in the matrix.
+    /// Unity 2021.3's documented source-generator requirements target Microsoft.CodeAnalysis 3.8.
+    /// Implementing <see cref="ISourceGenerator"/> preserves that API floor without depending on
+    /// the newer <c>IIncrementalGenerator</c> interface.
     /// </para>
     /// <para>
     /// The formatter is emitted as a type nested inside the contract, which is how generated code
@@ -1477,7 +1475,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// hook -- the pooled-scratch leak the hook contract exists to prevent.
         /// </para>
         /// </remarks>
-        private static void EmitReplacementForward(Writer writer, string qualified, string call)
+        private static void EmitReplacementForward(
+            Writer writer,
+            string qualified,
+            string call,
+            bool isRead = false
+        )
         {
             writer.Line(
                 "if ("
@@ -1492,7 +1495,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + Writer.Open
             );
             writer.Indent();
-            writer.Line("return " + call + ";");
+            if (isRead)
+            {
+                writer.Line("bool succeeded = " + call + ";");
+                writer.Line(
+                    "if (!succeeded) { reader.MarkMalformed(); value = default("
+                        + qualified
+                        + "); }"
+                );
+                writer.Line("return succeeded;");
+            }
+            else
+            {
+                writer.Line("return " + call + ";");
+            }
             writer.Outdent();
             writer.Line("}");
         }
@@ -2081,12 +2097,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + Writer.Open
             );
             writer.Indent();
+            writer.Line("reader.MarkMalformed();");
             writer.Line("value = default(" + qualified + ");");
             writer.Line("return false;");
             writer.Outdent();
             writer.Line("}");
             writer.Blank();
             writer.Line("value = read as " + qualified + ";");
+            writer.Line("if (value == null) reader.MarkMalformed();");
             writer.Line("return value != null;");
             writer.Outdent();
             writer.Line("}");
@@ -2463,7 +2481,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             + ".IWProtoMergeFormatter<"
                             + qualified
                             + "> merging ? merging.TryReadInto(ref reader, seed, out value) : replacement.TryRead(ref reader, out value)"
-                        : "replacement.TryRead(ref reader, out value)"
+                        : "replacement.TryRead(ref reader, out value)",
+                    isRead: true
                 );
             }
 
@@ -2553,7 +2572,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line(
                     "if (!dispatch.TryReadSubtype(ref reader, fieldNumber, wireType, out "
                         + qualified
-                        + " subtype, out bool handled)) { value = default; return false; }"
+                        + " subtype, out bool handled)) { reader.MarkMalformed(); value = default; return false; }"
                 );
                 writer.Line("if (handled)" + Writer.Open);
                 writer.Indent();
@@ -2652,6 +2671,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 writer.Line("if (read == null)" + Writer.Open);
                 writer.Indent();
+                writer.Line("reader.MarkMalformed();");
                 writer.Line("value = default(" + qualified + ");");
                 writer.Line("return false;");
                 writer.Outdent();

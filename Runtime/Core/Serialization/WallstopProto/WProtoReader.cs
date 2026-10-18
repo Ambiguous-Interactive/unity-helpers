@@ -939,6 +939,34 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return TrySkipField(fieldNumber, wireType, _depth);
         }
 
+        /// <summary>Latches a formatter failure so later reads on this reader are refused.</summary>
+        /// <remarks>Call when nested decoding or semantic validation fails. Existing reader copies retain their own failure state.</remarks>
+        public void MarkMalformed()
+        {
+            _malformed = true;
+        }
+
+        internal bool TryValidateMessage(ReadOnlySpan<byte> payload)
+        {
+            WProtoReader nested = new WProtoReader(payload, in this);
+            while (nested.TryReadTag(out int fieldNumber, out int wireType))
+            {
+                if (!nested.TrySkipField(fieldNumber, wireType))
+                {
+                    _malformed = true;
+                    return false;
+                }
+            }
+
+            if (nested.Malformed || !nested.End)
+            {
+                _malformed = true;
+                return false;
+            }
+
+            return true;
+        }
+
         private int CountPackedElementsCore(int wireType)
         {
             if (_malformed)

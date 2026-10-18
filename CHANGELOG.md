@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add an opt-in total-field read limit for WProto, shared across nested messages, unknown fields, groups, and reader copies while preserving existing per-message limits ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
+- Add an opt-in total-field read limit for WProto, shared across nested messages, duplicate-message validation, unknown fields, groups, and reader copies while preserving existing per-message limits ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Add typed equality and hashing to public value types, including configurations, scopes, enumerators, and protobuf surrogates, plus the opt-in `WUH023` analyzer ([#1001](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1001)).
 - Add `TryGetInstance(out T)` to both singleton families for reading an existing instance without creating, searching, or loading one ([#1009](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1009)).
 - Add generated protobuf roots for supported arrays, lists, and dictionaries, including object/interface writes, explicit-type reads, and readonly generic consumer values. Generated maps retain nullable keys and values, including present defaults ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix generated WProto readers allowing further reads after rejecting nested or semantic data, including map entries and replacement formatters ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix player pools retaining their peak indefinitely: enable conservative idle maintenance and automatic budget checks, while honoring explicit idle opt-outs, capacity limits, and retention floors ([#1008](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1008)).
 - Fix variable coroutine wait durations when quantization overflows or the wait cache is full; document support for computed and random values ([#1007](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1007)).
 - Require exact-source native Unity export and confirmed cleanup before release tag changes or publication ([#323](https://github.com/Ambiguous-Interactive/unity-helpers/issues/323)).

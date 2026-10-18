@@ -2940,9 +2940,16 @@ total-field allowance. The original limits remain unchanged.
 | Packed elements        | All packed runs and nested messages in one root read, checked before reserving packed capacity         |
 
 Defaults leave byte and count limits unrestricted, with depth capped at 64. Negative limits become
-zero. These limits do not bound total decoded memory, duplicate-message validation/copying, or
-custom formatters that create independent root readers. They do not configure protobuf-net fallback or
-[JSON reads](#reading-untrusted-json).
+zero. These limits do not bound total decoded memory or merge-buffer copying. Independent root
+readers created by custom formatters do not share an existing root's allowances. The limits do not
+configure protobuf-net fallback or [JSON reads](#reading-untrusted-json).
+
+Regenerated codecs use `WProtoMessageAccumulator.TryAdd(payload, ref parent)` to validate duplicate
+message boundaries with the parent's shared tag allowance and remaining depth before allocating or
+growing a merge buffer. Final decoding spends tag allowance again. The first occurrence remains
+borrowed; a refused duplicate preserves previously accepted bytes. Existing `TryAdd(payload)` keeps
+its independent validation behavior. Precompiled codecs using that overload need regeneration for
+cumulative boundary-scan accounting. Regenerate with the generator and runtime from the same package version.
 
 `WProtoFacade.TryDeserialize(bytes, limits, out T value)` and `TryDeserializeAs` also accept limits.
 They throw `InvalidOperationException` for malformed or over-budget handled payloads; `false` means
@@ -2971,6 +2978,10 @@ Custom formatters must consume the complete payload. Use `TryReadMessage` or
 Reader copies share the packed and total-field allowances. Reading tags again through a copy spends
 additional total-field allowance because it repeats parsing work; ending exactly at the limit is
 valid. Copies of an accepted typed packed run replay its prepaid bytes.
+Call `reader.MarkMalformed()` when nested decoding or semantic validation fails before returning
+`false`. Regenerated readers latch these failures, including failures from map entries, packed
+readers, subtype dispatch, and replacement formatters. Failure state belongs to the reader instance;
+existing reader copies retain their own state while sharing the work allowances.
 Custom allocations remain the formatter's responsibility.
 
 ### Wire compatibility

@@ -84,16 +84,63 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </returns>
         public bool TryAdd(ReadOnlySpan<byte> occurrence)
         {
+            if (
+                _seen
+                && (
+                    (_buffer == null && !IsCompleteMessage(_payload))
+                    || !IsCompleteMessage(occurrence)
+                )
+            )
+            {
+                return false;
+            }
+
+            return TryAppend(occurrence);
+        }
+
+        /// <summary>Adds an occurrence while sharing its parent's validation limits.</summary>
+        /// <param name="occurrence">The delivered sub-message payload, without its key or length.</param>
+        /// <param name="parent">The reader that delivered the occurrence.</param>
+        /// <returns>Whether the occurrence was accepted without changing previously accepted bytes on failure.</returns>
+        /// <remarks>
+        /// The first occurrence is borrowed and validated by its formatter. Duplicate boundary scans
+        /// consume the parent's shared tag budget and remaining nesting depth before allocating a
+        /// merge buffer. Final decoding consumes tags again. Failure latches the supplied parent.
+        /// </remarks>
+        public bool TryAdd(ReadOnlySpan<byte> occurrence, ref WProtoReader parent)
+        {
+            if (parent.Malformed)
+            {
+                return false;
+            }
+
+            if (
+                _seen
+                && (
+                    (_buffer == null && !parent.TryValidateMessage(_payload))
+                    || !parent.TryValidateMessage(occurrence)
+                )
+            )
+            {
+                return false;
+            }
+
+            if (TryAppend(occurrence))
+            {
+                return true;
+            }
+
+            parent.MarkMalformed();
+            return false;
+        }
+
+        private bool TryAppend(ReadOnlySpan<byte> occurrence)
+        {
             if (!_seen)
             {
                 _seen = true;
                 _payload = occurrence;
                 return true;
-            }
-
-            if ((_buffer == null && !IsCompleteMessage(_payload)) || !IsCompleteMessage(occurrence))
-            {
-                return false;
             }
 
             long required = (long)(_buffer == null ? _payload.Length : _length) + occurrence.Length;

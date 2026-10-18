@@ -150,6 +150,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </summary>
         protected static void EmitReadFailure(Writer writer, string qualifiedContract)
         {
+            writer.Line("reader.MarkMalformed();");
             writer.Line("value = default(" + qualifiedContract + ");");
             writer.Line("return false;");
         }

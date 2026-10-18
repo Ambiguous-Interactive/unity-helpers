@@ -50,6 +50,328 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             return new T();
         }
 
+        private static long? BeginAllocationMeasurement()
+        {
+#if ENABLE_IL2CPP && !UNITY_6000_0_OR_NEWER
+            return null;
+#else
+            return BeginAllocationMeasurement(GC.GetAllocatedBytesForCurrentThread);
+#endif
+        }
+
+        private static long? BeginAllocationMeasurement(Func<long> readCounter)
+        {
+            const int controlBytes = 32;
+            long before = readCounter();
+            byte[] control = new byte[controlBytes];
+            long after = readCounter();
+            GC.KeepAlive(control);
+            if (after - before < controlBytes)
+            {
+                return null;
+            }
+
+            return readCounter();
+        }
+
+        private static long? EndAllocationMeasurement(long? before)
+        {
+            return before.HasValue
+                ? GC.GetAllocatedBytesForCurrentThread() - before.Value
+                : (long?)null;
+        }
+
+        private static void AssertNoAllocationWhenMeasured(long? allocated)
+        {
+            if (!allocated.HasValue)
+            {
+                TestContext.Out.WriteLine(
+                    "Allocation evidence unavailable: this platform cannot safely measure allocations or its counter did not detect the retained control allocation. Serialization assertions still execute."
+                );
+                return;
+            }
+
+            Assert.AreEqual(0, allocated.Value);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(31)]
+        [TestCase(-1)]
+        public void AllocationCounterWithoutByteArraySensitivityProvidesNoEvidence(long increment)
+        {
+            int reads = 0;
+            long? measurement = BeginAllocationMeasurement(() => ++reads * increment);
+            Assert.IsFalse(measurement.HasValue);
+            AssertNoAllocationWhenMeasured(measurement);
+        }
+
+        [TestCase(32)]
+        [TestCase(64)]
+        public void ResponsiveAllocationCounterEnablesMeasurement(long increment)
+        {
+            int reads = 0;
+            Assert.IsTrue(BeginAllocationMeasurement(() => ++reads * increment).HasValue);
+        }
+
+        [Test]
+        public void FormatterFailureLatchesCurrentReaderWithoutPoisoningCopies()
+        {
+            WProtoReader reader = new WProtoReader(new byte[] { 0x08, 1 });
+            WProtoReader copy = reader;
+            reader.MarkMalformed();
+            reader.MarkMalformed();
+            Assert.IsTrue(reader.Malformed);
+            Assert.IsFalse(reader.TryReadTag(out _, out _));
+            Assert.IsFalse(reader.TryReadVarint64(out _));
+            Assert.AreEqual(0, reader.Position);
+            Assert.IsFalse(copy.Malformed);
+            Assert.IsTrue(copy.TryReadTag(out int field, out int wire));
+            Assert.AreEqual(1, field);
+            Assert.AreEqual(WProtoWireType.Varint, wire);
+            Assert.IsTrue(copy.TryReadInt32(out int value));
+            Assert.AreEqual(1, value);
+        }
+
+        [TestCase(1, false)]
+        [TestCase(2, true)]
+        public void DuplicateBoundaryValidationSharesParentTagBudget(int maximumTags, bool accepted)
+        {
+            byte[] first = { 0x08, 1 };
+            byte[] second = { 0x10, 2 };
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithTotalFieldCount(maximumTags)
+            );
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(first, ref parent));
+            Assert.AreEqual(accepted, accumulator.TryAdd(second, ref parent));
+            Assert.AreEqual(!accepted, parent.Malformed);
+            CollectionAssert.AreEqual(
+                accepted ? new byte[] { 0x08, 1, 0x10, 2 } : first,
+                accumulator.Payload.ToArray()
+            );
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        public void DuplicateBoundaryBudgetRefusesBeforeAllocating(int maximumTags)
+        {
+            byte[] first = { 0x08, 1 };
+            byte[] second = { 0x10, 2 };
+            WProtoReadLimits limits = new WProtoReadLimits().WithTotalFieldCount(maximumTags);
+            WProtoReader warmParent = new WProtoReader(default, limits);
+            WProtoMessageAccumulator warm = default;
+            Assert.IsTrue(warm.TryAdd(first, ref warmParent));
+            Assert.IsFalse(warm.TryAdd(second, ref warmParent));
+            WProtoReader parent = new WProtoReader(default, limits);
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(first, ref parent));
+            long? before = BeginAllocationMeasurement();
+            bool accepted = accumulator.TryAdd(second, ref parent);
+            long? allocated = EndAllocationMeasurement(before);
+            Assert.IsFalse(accepted);
+            AssertNoAllocationWhenMeasured(allocated);
+            Assert.IsTrue(parent.Malformed);
+            CollectionAssert.AreEqual(first, accumulator.Payload.ToArray());
+            Assert.IsFalse(accumulator.TryAdd(Array.Empty<byte>(), ref parent));
+        }
+
+        [TestCase(0, false)]
+        [TestCase(1, false)]
+        [TestCase(2, true)]
+        public void DuplicateBoundaryValidationUsesRemainingGroupDepth(
+            int maximumDepth,
+            bool accepted
+        )
+        {
+            byte[] first = { 0x13, 0x18, 1, 0x14 };
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits(maximumNestingDepth: maximumDepth)
+            );
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(first, ref parent));
+            Assert.AreEqual(accepted, accumulator.TryAdd(Array.Empty<byte>(), ref parent));
+            Assert.AreEqual(!accepted, parent.Malformed);
+            CollectionAssert.AreEqual(first, accumulator.Payload.ToArray());
+        }
+
+        [TestCase(2, false)]
+        [TestCase(3, true)]
+        public void DuplicateBoundaryValidationChargesUnknownGroupTerminators(
+            int maximumTags,
+            bool accepted
+        )
+        {
+            byte[] first = { 0x13, 0x18, 1, 0x14 };
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithTotalFieldCount(maximumTags)
+            );
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(first, ref parent));
+            Assert.AreEqual(accepted, accumulator.TryAdd(Array.Empty<byte>(), ref parent));
+            Assert.AreEqual(!accepted, parent.Malformed);
+        }
+
+        [TestCase(new byte[] { 0x08 })]
+        [TestCase(new byte[] { 0x08, 0x80 })]
+        [TestCase(new byte[] { 0x0A, 2, 1 })]
+        [TestCase(new byte[] { 0x13, 0x1C })]
+        [TestCase(new byte[] { 0 })]
+        public void ParentAwareAccumulatorPreservesPayloadOnMalformedDuplicates(byte[] malformed)
+        {
+            byte[] valid = { 0x08, 1 };
+            WProtoReader firstParent = new WProtoReader(default);
+            WProtoMessageAccumulator first = default;
+            Assert.IsTrue(first.TryAdd(malformed, ref firstParent));
+            Assert.IsFalse(first.TryAdd(valid, ref firstParent));
+            Assert.IsTrue(firstParent.Malformed);
+            CollectionAssert.AreEqual(malformed, first.Payload.ToArray());
+
+            WProtoReader secondParent = new WProtoReader(default);
+            WProtoMessageAccumulator second = default;
+            Assert.IsTrue(second.TryAdd(valid, ref secondParent));
+            Assert.IsFalse(second.TryAdd(malformed, ref secondParent));
+            Assert.IsTrue(secondParent.Malformed);
+            CollectionAssert.AreEqual(valid, second.Payload.ToArray());
+        }
+
+        [Test]
+        public void ParentAwareAccumulatorBorrowsFirstOccurrenceWithoutAllocation()
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReader parent = new WProtoReader(default);
+            WProtoMessageAccumulator warm = default;
+            Assert.IsTrue(warm.TryAdd(occurrence, ref parent));
+            WProtoMessageAccumulator accumulator = default;
+            long? before = BeginAllocationMeasurement();
+            bool accepted = accumulator.TryAdd(occurrence, ref parent);
+            long? allocated = EndAllocationMeasurement(before);
+            Assert.IsTrue(accepted);
+            AssertNoAllocationWhenMeasured(allocated);
+            occurrence[1] = 7;
+            Assert.AreEqual(7, accumulator.Payload[1]);
+        }
+
+        [Test]
+        public void ParentAwareAccumulatorRefusesMalformedParentBeforeBorrowing()
+        {
+            WProtoReader parent = new WProtoReader(new byte[] { 0 });
+            Assert.IsFalse(parent.TryReadTag(out _, out _));
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsFalse(accumulator.TryAdd(new byte[] { 0x08, 1 }, ref parent));
+            Assert.IsFalse(accumulator.HasValue);
+            Assert.AreEqual(0, accumulator.Payload.Length);
+        }
+
+        [Test]
+        public void DuplicateBoundaryValidationSharesBudgetWithParentCopies()
+        {
+            WProtoReader parent = new WProtoReader(
+                new byte[] { 0x08, 1 },
+                new WProtoReadLimits().WithTotalFieldCount(1)
+            );
+            WProtoReader copy = parent;
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(new byte[] { 0x08, 2 }, ref parent));
+            Assert.IsTrue(accumulator.TryAdd(Array.Empty<byte>(), ref parent));
+            Assert.IsFalse(copy.TryReadTag(out _, out _));
+            Assert.IsTrue(copy.Malformed);
+            Assert.AreEqual(0, copy.Position);
+            Assert.IsFalse(parent.Malformed);
+        }
+
+        [TestCase(2, false)]
+        [TestCase(3, true)]
+        public void DuplicateBoundaryValidationHonorsNestedParentDepth(
+            int maximumDepth,
+            bool accepted
+        )
+        {
+            WProtoReader root = new WProtoReader(
+                new byte[] { 0 },
+                new WProtoReadLimits(maximumNestingDepth: maximumDepth)
+            );
+            Assert.IsTrue(root.TryReadMessage(out WProtoReader parent));
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(new byte[] { 0x13, 0x14 }, ref parent));
+            Assert.AreEqual(accepted, accumulator.TryAdd(Array.Empty<byte>(), ref parent));
+            Assert.AreEqual(!accepted, parent.Malformed);
+            Assert.IsFalse(root.Malformed);
+        }
+
+        [TestCase(1, int.MaxValue, int.MaxValue, new byte[] { 0x08, 1 })]
+        [TestCase(int.MaxValue, 1, int.MaxValue, new byte[] { 0x0A, 2, 1, 2 })]
+        [TestCase(int.MaxValue, int.MaxValue, 1, new byte[] { 0x08, 1, 0x10, 2 })]
+        public void DuplicateBoundaryValidationPreservesParentRegionLimits(
+            int maximumBytes,
+            int maximumDelimitedBytes,
+            int maximumFields,
+            byte[] occurrence
+        )
+        {
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits(maximumBytes, maximumDelimitedBytes, maximumFields, 64)
+            );
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(occurrence, ref parent));
+            Assert.IsFalse(accumulator.TryAdd(Array.Empty<byte>(), ref parent));
+            Assert.IsTrue(parent.Malformed);
+            CollectionAssert.AreEqual(occurrence, accumulator.Payload.ToArray());
+        }
+
+        [Test]
+        public void DuplicateBoundaryBudgetRefusesGrowthWithoutChangingAcceptedPayload()
+        {
+            byte[] occurrence = { 0x08, 1 };
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithTotalFieldCount(2)
+            );
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(occurrence, ref parent));
+            Assert.IsTrue(accumulator.TryAdd(occurrence, ref parent));
+            long? before = BeginAllocationMeasurement();
+            bool accepted = accumulator.TryAdd(occurrence, ref parent);
+            long? allocated = EndAllocationMeasurement(before);
+            Assert.IsFalse(accepted);
+            AssertNoAllocationWhenMeasured(allocated);
+            Assert.IsTrue(parent.Malformed);
+            CollectionAssert.AreEqual(
+                new byte[] { 0x08, 1, 0x08, 1 },
+                accumulator.Payload.ToArray()
+            );
+        }
+
+        [Test]
+        public void EmptyDuplicateBoundaryScansDoNotSpendTagBudget()
+        {
+            WProtoReader parent = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithTotalFieldCount(0)
+            );
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(Array.Empty<byte>(), ref parent));
+            Assert.IsTrue(accumulator.TryAdd(Array.Empty<byte>(), ref parent));
+            Assert.IsFalse(parent.Malformed);
+            Assert.IsTrue(parent.End);
+            Assert.IsTrue(accumulator.HasValue);
+            Assert.AreEqual(0, accumulator.Payload.Length);
+        }
+
+        [Test]
+        public void LegacyAccumulatorOverloadPreservesIndependentValidation()
+        {
+            byte[] group = { 0x13, 0x14 };
+            WProtoMessageAccumulator accumulator = default;
+            Assert.IsTrue(accumulator.TryAdd(group));
+            Assert.IsTrue(accumulator.TryAdd(Array.Empty<byte>()));
+            CollectionAssert.AreEqual(group, accumulator.Payload.ToArray());
+        }
+
         [Test]
         public void ParameterlessConstructionSupportsGenericFactories()
         {

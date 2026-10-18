@@ -616,6 +616,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private void EmitFailure(Writer writer)
         {
+            writer.Line("reader.MarkMalformed();");
             writer.Line("value = default(" + Qualified + ");");
             writer.Line("return false;");
         }

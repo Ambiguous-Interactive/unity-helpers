@@ -416,6 +416,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 formatter.TryRead(ref reader, out RectangularArrayContract _),
                 "a payload was accepted that should not have been: " + why
             );
+            Assert.IsTrue(reader.Malformed);
         }
 
         [Test]
