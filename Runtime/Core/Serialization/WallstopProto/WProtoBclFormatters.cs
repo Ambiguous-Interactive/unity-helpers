@@ -393,7 +393,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     {
                         if (!reader.TryReadZigZag64(out value))
                         {
-                            return RefuseScaled(out fields);
+                            return RefuseScaled(ref reader, out fields);
                         }
 
                         break;
@@ -402,7 +402,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     {
                         if (!reader.TryReadVarint32(out uint encoded))
                         {
-                            return RefuseScaled(out fields);
+                            return RefuseScaled(ref reader, out fields);
                         }
 
                         scale = (int)encoded;
@@ -413,7 +413,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         // Accept the oracle kind marker, but refuse unknown values in both temporal readers.
                         if (!reader.TryReadVarint32(out kind) || 2U < kind)
                         {
-                            return RefuseScaled(out fields);
+                            return RefuseScaled(ref reader, out fields);
                         }
 
                         break;
@@ -422,7 +422,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     {
                         if (!reader.TrySkipField(fieldNumber, wireType))
                         {
-                            return RefuseScaled(out fields);
+                            return RefuseScaled(ref reader, out fields);
                         }
 
                         break;
@@ -432,15 +432,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             if (reader.Malformed)
             {
-                return RefuseScaled(out fields);
+                return RefuseScaled(ref reader, out fields);
             }
 
             fields = new WProtoBcl.ScaledFields(value, scale, kind);
             return true;
         }
 
-        private static bool RefuseScaled(out WProtoBcl.ScaledFields fields)
+        private static bool RefuseScaled(ref WProtoReader reader, out WProtoBcl.ScaledFields fields)
         {
+            reader.MarkMalformed();
             fields = default(WProtoBcl.ScaledFields);
             return false;
         }
@@ -490,6 +491,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             if (2U < fields.Kind)
             {
+                reader.MarkMalformed();
                 value = default(DateTime);
                 return false;
             }
@@ -498,15 +500,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             if (fields.Scale == WProtoBcl.ScaleMinMax)
             {
-                value =
-                    fields.Value == 1L ? DateTime.MaxValue
-                    : fields.Value == -1L ? DateTime.MinValue
-                    : default(DateTime);
-                return fields.Value == 1L || fields.Value == -1L;
+                if (fields.Value != 1L && fields.Value != -1L)
+                {
+                    reader.MarkMalformed();
+                    value = default(DateTime);
+                    return false;
+                }
+                value = fields.Value == 1L ? DateTime.MaxValue : DateTime.MinValue;
+                return true;
             }
 
             if (!WProtoBcl.TryJoinTicks(fields.Value, fields.Scale, out long delta))
             {
+                reader.MarkMalformed();
                 value = default(DateTime);
                 return false;
             }
@@ -518,6 +524,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
             catch (ArgumentOutOfRangeException)
             {
+                reader.MarkMalformed();
                 value = default(DateTime);
                 return false;
             }
@@ -583,9 +590,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            bool joined = WProtoBcl.TryJoinTicks(fields.Value, fields.Scale, out long ticks);
-            value = joined ? new TimeSpan(ticks) : default(TimeSpan);
-            return joined;
+            if (!WProtoBcl.TryJoinTicks(fields.Value, fields.Scale, out long ticks))
+            {
+                reader.MarkMalformed();
+                value = default(TimeSpan);
+                return false;
+            }
+            value = new TimeSpan(ticks);
+            return true;
         }
     }
 
@@ -877,6 +889,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             uint scale = (signScale & 0x1FEU) >> 1;
             if (28U < scale)
             {
+                reader.MarkMalformed();
                 value = default(decimal);
                 return false;
             }
@@ -1053,6 +1066,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (!reader.TryReadRemaining(out ReadOnlySpan<byte> payload))
             {
+                reader.MarkMalformed();
                 value = null;
                 return false;
             }
@@ -1064,6 +1078,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
             catch (ArgumentException)
             {
+                reader.MarkMalformed();
                 value = null;
                 return false;
             }
@@ -1075,11 +1090,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
             catch (InvalidOperationException)
             {
+                reader.MarkMalformed();
                 value = null;
                 return false;
             }
             catch (FormatException)
             {
+                reader.MarkMalformed();
                 value = null;
                 return false;
             }

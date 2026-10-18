@@ -57,6 +57,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             )
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
@@ -119,6 +120,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             )
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
@@ -190,12 +192,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             )
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
 
             if (!((INullableCollectionWrapper)wrapper).TryRestoreNullableItems())
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
@@ -280,12 +284,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             )
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
 
             if (!((INullableCollectionWrapper)wrapper).TryRestoreNullableItems())
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
@@ -348,6 +354,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             )
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
@@ -428,6 +435,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             )
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
@@ -485,11 +493,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             )
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
 
-            return wrapper.TryRestore(out value);
+            if (!wrapper.TryRestore(out value))
+            {
+                reader.MarkMalformed();
+                value = default;
+                return false;
+            }
+            return true;
         }
     }
 }

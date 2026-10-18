@@ -147,17 +147,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="reader">A reader scoped to this message's payload.</param>
         /// <param name="value">Receives the decoded value, or <c>default</c> on failure.</param>
         /// <returns><c>true</c> when a complete value was read.</returns>
+        /// <remarks>A rejected read latches the supplied reader and clears the result.</remarks>
         public bool TryRead(ref WProtoReader reader, out TDeclared value)
         {
             IWProtoFormatter<TRoot> root = Root();
             if (root == null)
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
 
             if (!root.TryRead(ref reader, out TRoot read))
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }

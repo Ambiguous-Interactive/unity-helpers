@@ -335,13 +335,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="reader">The source.</param>
         /// <param name="value">Receives the value, or <c>default</c> on failure.</param>
         /// <returns><c>true</c> when a value was read.</returns>
+        /// <remarks>A rejected read latches the supplied reader and clears the result.</remarks>
         public static bool TryReadValue(ref WProtoReader reader, out T value)
         {
             Resolve();
 
             if (_scalar != null)
             {
-                return _scalar.TryReadValue(ref reader, out value);
+                if (_scalar.TryReadValue(ref reader, out value))
+                {
+                    return true;
+                }
+                reader.MarkMalformed();
+                value = default;
+                return false;
             }
 
             return reader.TryReadMessage(Message(), out value);

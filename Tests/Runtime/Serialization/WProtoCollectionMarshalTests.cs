@@ -208,6 +208,117 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void NullablePresenceRestorationFailureLatchesReader(bool sorted)
+        {
+            WProtoReader reader = new WProtoReader(new byte[] { 0x08, 1, 0x1A, 1, 2 });
+            if (sorted)
+            {
+                SerializableSortedDictionaryMarshalFormatter<int, int?> formatter =
+                    new SerializableSortedDictionaryMarshalFormatter<int, int?>();
+                Assert.IsFalse(
+                    formatter.TryRead(ref reader, out SerializableSortedDictionary<int, int?> value)
+                );
+                Assert.IsTrue(value == null);
+            }
+            else
+            {
+                SerializableDictionaryMarshalFormatter<int, int?> formatter =
+                    new SerializableDictionaryMarshalFormatter<int, int?>();
+                Assert.IsFalse(
+                    formatter.TryRead(ref reader, out SerializableDictionary<int, int?> value)
+                );
+                Assert.IsTrue(value == null);
+            }
+            WProtoFormatterFailureTests.AssertCannotContinue(ref reader);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void SupportedDictionaryRestorationValidatesPresenceMetadata(
+            bool sorted,
+            bool presence
+        )
+        {
+            byte[] payload = presence
+                ? new byte[] { 0x08, 1, 0x10, 42, 0x1A, 1, 1 }
+                : new byte[] { 0x08, 1, 0x10, 42 };
+            WProtoReader reader = new WProtoReader(payload);
+            if (sorted)
+            {
+                SerializableSortedDictionaryMarshalFormatter<int, int> formatter =
+                    new SerializableSortedDictionaryMarshalFormatter<int, int>();
+                Assert.IsTrue(formatter.CanServe());
+                if (presence)
+                {
+                    Assert.IsFalse(
+                        formatter.TryRead(
+                            ref reader,
+                            out SerializableSortedDictionary<int, int> refused
+                        )
+                    );
+                    Assert.IsTrue(refused == null);
+                    WProtoFormatterFailureTests.AssertCannotContinue(ref reader);
+                    return;
+                }
+                Assert.IsTrue(
+                    formatter.TryRead(ref reader, out SerializableSortedDictionary<int, int> value)
+                );
+                Assert.AreEqual(1, value.Count);
+                Assert.IsTrue(value.TryGetValue(1, out int item));
+                Assert.AreEqual(42, item);
+            }
+            else
+            {
+                SerializableDictionaryMarshalFormatter<int, int> formatter =
+                    new SerializableDictionaryMarshalFormatter<int, int>();
+                Assert.IsTrue(formatter.CanServe());
+                if (presence)
+                {
+                    Assert.IsFalse(
+                        formatter.TryRead(ref reader, out SerializableDictionary<int, int> refused)
+                    );
+                    Assert.IsTrue(refused == null);
+                    WProtoFormatterFailureTests.AssertCannotContinue(ref reader);
+                    return;
+                }
+                Assert.IsTrue(
+                    formatter.TryRead(ref reader, out SerializableDictionary<int, int> value)
+                );
+                Assert.AreEqual(1, value.Count);
+                Assert.IsTrue(value.TryGetValue(1, out int item));
+                Assert.AreEqual(42, item);
+            }
+            Assert.IsFalse(reader.Malformed);
+            Assert.IsTrue(reader.End);
+        }
+
+        [Test]
+        public void SparseSetRestorationFailureLatchesReader()
+        {
+            WProtoReader reader = new WProtoReader(new byte[] { 0x08, 1, 0x10, 1 });
+            SparseSetMarshalFormatter formatter = new SparseSetMarshalFormatter();
+            Assert.IsFalse(formatter.TryRead(ref reader, out SparseSet value));
+            Assert.IsTrue(value == null);
+            WProtoFormatterFailureTests.AssertCannotContinue(ref reader);
+        }
+
+        [Test]
+        public void SurrogateForwardingFailureLatchesReaderAndClearsOutput()
+        {
+            WProtoRefusingSurrogateFormatter formatter = new WProtoRefusingSurrogateFormatter(
+                WProtoFormatterFailureTests.CreateRefusingFormatter()
+            );
+            WProtoReader reader = new WProtoReader(new byte[] { 7, 9 });
+            Assert.IsFalse(formatter.TryRead(ref reader, out int value));
+            Assert.AreEqual(0, value);
+            Assert.AreEqual(1, reader.Position);
+            WProtoFormatterFailureTests.AssertCannotContinue(ref reader);
+        }
+
         [Test]
         public void EveryMarshalledCollectionIsServedAtTheRoot()
         {

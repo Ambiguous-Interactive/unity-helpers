@@ -2979,8 +2979,10 @@ Reader copies share the packed and total-field allowances. Reading tags again th
 additional total-field allowance because it repeats parsing work; ending exactly at the limit is
 valid. Copies of an accepted typed packed run replay its prepaid bytes.
 Call `reader.MarkMalformed()` when nested decoding or semantic validation fails before returning
-`false`. Regenerated readers latch these failures, including failures from map entries, packed
-readers, subtype dispatch, and replacement formatters. Failure state belongs to the reader instance;
+`false`, and set the output to `default`. Regenerated readers and built-in formatters latch read
+failures, including invalid temporal or decimal values, invalid URI text, collection restoration,
+map entries, packed readers, subtype dispatch, and formatter forwarding. An unavailable formatter
+still makes the facade decline the request before decoding. Failure state belongs to the reader instance;
 existing reader copies retain their own state while sharing the work allowances.
 Custom allocations remain the formatter's responsibility.
 
