@@ -2923,19 +2923,25 @@ WProtoReadLimits limits = new WProtoReadLimits(
     maximumNestingDepth: 16,
     maximumPackedElementCount: 4096
 );
+limits = limits.WithTotalFieldCount(4096);
 WProtoReader reader = new WProtoReader(bytes, limits);
 ```
 
-| Limit                  | Scope                                                                                          |
-| ---------------------- | ---------------------------------------------------------------------------------------------- |
-| Message bytes          | Each reader region                                                                             |
-| Length-delimited bytes | Each field, checked before copying or decoding                                                 |
-| Field count            | Tags per region, including duplicate, unknown, and skipped-group tags                          |
-| Nesting depth          | Combined sub-message and group depth; maximum 64                                               |
-| Packed elements        | All packed runs and nested messages in one root read, checked before reserving packed capacity |
+The total-field factory returns new limits with the same per-region settings and a replaced
+total-field allowance. The original limits remain unchanged.
+
+| Limit                  | Scope                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| Message bytes          | Each reader region                                                                                     |
+| Length-delimited bytes | Each field, checked before copying or decoding                                                         |
+| Field count            | Tags per region, including duplicate, unknown, and skipped-group tags                                  |
+| Total field count      | Tags across the root, nested readers, groups, and reader copies; checked before consuming the next tag |
+| Nesting depth          | Combined sub-message and group depth; maximum 64                                                       |
+| Packed elements        | All packed runs and nested messages in one root read, checked before reserving packed capacity         |
 
 Defaults leave byte and count limits unrestricted, with depth capped at 64. Negative limits become
-zero. These limits do not bound total decoded memory or configure protobuf-net fallback or
+zero. These limits do not bound total decoded memory, duplicate-message validation/copying, or
+custom formatters that create independent root readers. They do not configure protobuf-net fallback or
 [JSON reads](#reading-untrusted-json).
 
 `WProtoFacade.TryDeserialize(bytes, limits, out T value)` and `TryDeserializeAs` also accept limits.
@@ -2962,10 +2968,38 @@ serializer, and use the value-returning methods when a missing formatter must fa
 Custom formatters must consume the complete payload. Use `TryReadMessage` or
 `new WProtoReader(payload, in reader)` to preserve parent limits. For packed fields, use
 `TryReadPackedRun(wireType, out reader)` before allocating and decode with that wire type.
-Reader copies share the packed allowance; copies of an accepted typed run replay its prepaid bytes.
+Reader copies share the packed and total-field allowances. Reading tags again through a copy spends
+additional total-field allowance because it repeats parsing work; ending exactly at the limit is
+valid. Copies of an accepted typed packed run replay its prepaid bytes.
 Custom allocations remain the formatter's responsibility.
 
 ### Wire compatibility
+
+Compatibility belongs to a versioned contract: protobuf has
+[no canonical byte representation](https://protobuf.dev/programming-guides/serialization-not-canonical/).
+Freeze tags, defaults, packing, subtype numbers, and root/surrogate encodings before changing a writer.
+WProto writes packed repeated scalars by default; use explicit `IsPacked = false` when preserving a
+legacy unpacked writer. Accepting both forms on read does not make their serialized hashes equal.
+The existing v3 map-write policy and named v2 exceptions below remain part of the contract.
+
+The host oracle suite's `CompatibilityInventoryTests` compares package and retained consumer
+metadata against `CompatibilityInventory.v1.json`. The inventory also pins protobuf facade and
+formatter extension signatures. It resolves attribute constants and records effective WProto
+packing/default policies; coordinated edits to both legacy and WProto tags still change the frozen
+record. Mutation controls cover tags, defaults, packing, member types, and deletion. Review a
+candidate inventory diff as a wire/API change; never overwrite the baseline merely to pass a check.
+`CompatibilityEvidence.v1.json` classifies a curated set of executable witnesses as identical
+bytes, readable alternate encodings, known oracle defects, behavior, or unsupported declarations.
+It records the source revision, pinned writers, reader directions, and unqualified backends.
+`CompatibilityEvidenceTests` executes those witnesses in both isolated host oracle lanes.
+This metadata gate and initial evidence ledger complement golden bytes and semantic assertions.
+They do not prove every advertised capability, custom formatter bodies, all consumer deployments,
+or platform performance.
+
+The generator remains `ISourceGenerator` with the Unity 2021.3 compiler floor. Unity documents
+[Roslyn 3.8 for that editor](https://docs.unity3d.com/2021.3/Documentation/Manual/roslyn-analyzers.html).
+The hybrid facade and bundled runtime remain supported during migration; dependency retirement
+requires separate release qualification.
 
 The differential suite runs in two isolated processes: one loads protobuf-net 2.4.9 and the other
 loads 3.2.56. Isolation matters because both assemblies have the same name; each run asserts the

@@ -466,9 +466,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
         }
 
-        [TestCase(0, false)]
-        [TestCase(1, true)]
-        public void FacadePropagatesFieldLimitsAndKeepsItsRoutingContract(int limit, bool accepted)
+        [TestCase(0, false, false)]
+        [TestCase(1, true, false)]
+        [TestCase(0, false, true)]
+        [TestCase(1, true, true)]
+        public void FacadePropagatesFieldLimitsAndKeepsItsRoutingContract(
+            int limit,
+            bool accepted,
+            bool total
+        )
         {
             IWProtoFormatter<LimitMarker> original = WProtoFormatterProvider.TryGet(
                 out IWProtoFormatter<LimitMarker> registered
@@ -479,7 +485,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 WProtoFormatterProvider.Register<LimitMarker>(new MarkerFormatter());
                 byte[] payload = { 8, 1 };
-                WProtoReadLimits limits = new WProtoReadLimits(maximumFieldCount: limit);
+                WProtoReadLimits limits = total
+                    ? new WProtoReadLimits().WithTotalFieldCount(limit)
+                    : new WProtoReadLimits(maximumFieldCount: limit);
                 if (accepted)
                 {
                     Assert.IsTrue(WProtoFacade.TryDeserialize(payload, limits, out LimitMarker _));
@@ -656,6 +664,226 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsFalse(packedCopy.TryReadInt32(out _));
             Assert.IsTrue(packedCopy.Malformed);
             Assert.AreEqual(0, packedCopy.Position);
+        }
+
+        [TestCase(-1, 0)]
+        [TestCase(0, 0)]
+        [TestCase(3, 3)]
+        [TestCase(int.MaxValue, int.MaxValue)]
+        public void TotalFieldLimitPreservesExistingConstructorSettings(int requested, int expected)
+        {
+            WProtoReadLimits[] existing =
+            {
+                new WProtoReadLimits(),
+                new WProtoReadLimits(10, 9, 8, 7),
+                new WProtoReadLimits(1, default),
+                new WProtoReadLimits(default, 1),
+                new WProtoReadLimits(10, 9, 8, 7, 6),
+                new WProtoReadLimits(maximumFieldCount: 2),
+                new WProtoReadLimits(maximumPackedElementCount: 4),
+                new WProtoReadLimits().WithTotalFieldCount(1),
+            };
+            foreach (WProtoReadLimits original in existing)
+            {
+                WProtoReadLimits limits = original.WithTotalFieldCount(requested);
+                Assert.AreEqual(expected, limits.MaximumTotalFieldCount);
+                Assert.AreEqual(original.MaximumMessageBytes, limits.MaximumMessageBytes);
+                Assert.AreEqual(
+                    original.MaximumLengthDelimitedBytes,
+                    limits.MaximumLengthDelimitedBytes
+                );
+                Assert.AreEqual(original.MaximumFieldCount, limits.MaximumFieldCount);
+                Assert.AreEqual(
+                    original.MaximumPackedElementCount,
+                    limits.MaximumPackedElementCount
+                );
+                Assert.AreEqual(original.MaximumNestingDepth, limits.MaximumNestingDepth);
+            }
+            Assert.AreEqual(int.MaxValue, new WProtoReadLimits().MaximumTotalFieldCount);
+            WProtoReadLimits defaults = new WProtoReadLimits().WithTotalFieldCount(requested);
+            Assert.AreEqual(int.MaxValue, defaults.MaximumFieldCount);
+            Assert.AreEqual(expected, defaults.MaximumTotalFieldCount);
+        }
+
+        [Test]
+        public void TotalFieldBudgetStopsAcrossSiblingRegionsBeforeTheNextTag()
+        {
+            byte[] payload = { 10, 2, 8, 1, 18, 2, 8, 2 };
+            WProtoReadLimits limits = new WProtoReadLimits(
+                maximumFieldCount: 2
+            ).WithTotalFieldCount(3);
+            WProtoReader reader = new WProtoReader(payload, limits);
+            Assert.IsTrue(reader.TryReadTag(out _, out _));
+            Assert.IsTrue(reader.TryReadMessage(out WProtoReader first));
+            Assert.IsTrue(first.TryReadTag(out _, out _));
+            Assert.IsTrue(first.TryReadInt32(out _));
+            Assert.IsFalse(first.TryReadTag(out _, out _));
+            Assert.IsFalse(first.Malformed);
+            Assert.IsTrue(reader.TryReadTag(out _, out _));
+            Assert.IsTrue(reader.TryReadMessage(out WProtoReader second));
+            Assert.IsFalse(second.TryReadTag(out int tag, out int wire));
+            Assert.AreEqual(0, tag);
+            Assert.AreEqual(-1, wire);
+            Assert.AreEqual(0, second.Position);
+            Assert.IsTrue(second.Malformed);
+            Assert.IsFalse(second.TryReadInt32(out _));
+            Assert.IsFalse(reader.Malformed);
+        }
+
+        [TestCase(0, TestName = "TotalFieldBudget.DetachedConstructor")]
+        [TestCase(1, TestName = "TotalFieldBudget.NestedReader")]
+        [TestCase(2, TestName = "TotalFieldBudget.NestedFormatter")]
+        [TestCase(3, TestName = "TotalFieldBudget.DetachedFormatter")]
+        [TestCase(4, TestName = "TotalFieldBudget.SeededFormatter")]
+        [TestCase(5, TestName = "TotalFieldBudget.UntypedPackedReader")]
+        [TestCase(6, TestName = "TotalFieldBudget.TypedPackedReader")]
+        public void EveryNestedRouteSharesTheTotalFieldBudget(int route)
+        {
+            byte[] payload = { 8, 1 };
+            WProtoReader root = new WProtoReader(
+                new byte[] { 2, 8, 1 },
+                new WProtoReadLimits().WithTotalFieldCount(1)
+            );
+            WProtoReader first = new WProtoReader(payload, in root);
+            Assert.IsTrue(first.TryReadTag(out int tag, out int wire));
+            Assert.IsTrue(first.TrySkipField(tag, wire));
+            MarkerFormatter formatter = new MarkerFormatter();
+            switch (route)
+            {
+                case 0:
+                    WProtoReader detached = new WProtoReader(payload, in root);
+                    Assert.IsFalse(detached.TryReadTag(out _, out _));
+                    Assert.AreEqual(0, detached.Position);
+                    Assert.IsTrue(detached.Malformed);
+                    break;
+                case 1:
+                    Assert.IsTrue(root.TryReadMessage(out WProtoReader nested));
+                    Assert.IsFalse(nested.TryReadTag(out _, out _));
+                    Assert.AreEqual(0, nested.Position);
+                    Assert.IsTrue(nested.Malformed);
+                    break;
+                case 2:
+                    Assert.IsFalse(root.TryReadMessage(formatter, out _));
+                    Assert.IsTrue(root.Malformed);
+                    break;
+                case 3:
+                    Assert.IsFalse(root.TryReadMessage(payload, formatter, out _));
+                    Assert.IsTrue(root.Malformed);
+                    break;
+                case 4:
+                    LimitMarker seed = default;
+                    Assert.IsFalse(root.TryReadMessage(payload, formatter, in seed, out _));
+                    Assert.IsTrue(root.Malformed);
+                    break;
+                case 5:
+                    Assert.IsTrue(root.TryReadPackedRun(out WProtoReader packed));
+                    Assert.IsFalse(packed.TryReadTag(out _, out _));
+                    Assert.IsTrue(packed.Malformed);
+                    break;
+                case 6:
+                    Assert.IsTrue(
+                        root.TryReadPackedRun(WProtoWireType.Varint, out WProtoReader typed)
+                    );
+                    Assert.IsFalse(typed.TryReadTag(out _, out _));
+                    Assert.IsTrue(typed.Malformed);
+                    break;
+            }
+        }
+
+        [TestCase(-1, 0)]
+        [TestCase(0, 0)]
+        [TestCase(1, 1)]
+        [TestCase(2, 2)]
+        [TestCase(3, 3)]
+        [TestCase(int.MaxValue, 3)]
+        public void TotalFieldBudgetCountsDuplicateAndUnknownTags(int limit, int expected)
+        {
+            byte[] payload = { 8, 1, 8, 2, 248, 1, 3 };
+            WProtoReader reader = new WProtoReader(
+                payload,
+                new WProtoReadLimits().WithTotalFieldCount(limit)
+            );
+            int count = 0;
+            while (reader.TryReadTag(out int tag, out int wire))
+            {
+                Assert.IsTrue(reader.TrySkipField(tag, wire));
+                ++count;
+            }
+            Assert.AreEqual(expected, count);
+            Assert.AreEqual(expected < 3, reader.Malformed);
+            Assert.AreEqual(expected < 3 ? expected * 2 : payload.Length, reader.Position);
+        }
+
+        [TestCase(2, false)]
+        [TestCase(3, true)]
+        public void TotalFieldBudgetCountsGroupTerminators(int limit, bool accepted)
+        {
+            WProtoReader reader = new WProtoReader(
+                new byte[] { 11, 16, 1, 12 },
+                new WProtoReadLimits().WithTotalFieldCount(limit)
+            );
+            Assert.IsTrue(reader.TryReadTag(out int tag, out int wire));
+            Assert.AreEqual(accepted, reader.TrySkipField(tag, wire));
+            Assert.AreEqual(!accepted, reader.Malformed);
+            Assert.AreEqual(accepted ? 4 : 3, reader.Position);
+        }
+
+        [Test]
+        public void TotalFieldBudgetChargesReplayedCopiesAndResetsForIndependentRoots()
+        {
+            byte[] payload = { 8, 1 };
+            WProtoReadLimits limits = new WProtoReadLimits().WithTotalFieldCount(1);
+            WProtoReader original = new WProtoReader(payload, limits);
+            WProtoReader copy = original;
+            Assert.IsTrue(original.TryReadTag(out _, out _));
+            Assert.IsFalse(copy.TryReadTag(out _, out _));
+            Assert.AreEqual(0, copy.Position);
+            Assert.IsTrue(copy.Malformed);
+            Assert.IsTrue(original.TryReadInt32(out _));
+            Assert.IsFalse(original.TryReadTag(out _, out _));
+            Assert.IsFalse(original.Malformed);
+            WProtoReader independent = new WProtoReader(payload, limits);
+            Assert.IsTrue(independent.TryReadTag(out _, out _));
+        }
+
+        [Test]
+        public void TotalFieldBudgetDoesNotChargeUntaggedPackedElements()
+        {
+            WProtoReader reader = new WProtoReader(
+                new byte[] { 10, 2, 1, 2 },
+                new WProtoReadLimits().WithTotalFieldCount(1)
+            );
+            Assert.IsTrue(reader.TryReadTag(out _, out _));
+            Assert.IsTrue(reader.TryReadPackedRun(WProtoWireType.Varint, out WProtoReader packed));
+            Assert.IsTrue(packed.TryReadInt32(out _));
+            Assert.IsTrue(packed.TryReadInt32(out _));
+            Assert.IsTrue(packed.End);
+            Assert.IsFalse(reader.TryReadTag(out _, out _));
+            Assert.IsFalse(reader.Malformed);
+            WProtoReader empty = new WProtoReader(
+                default,
+                new WProtoReadLimits().WithTotalFieldCount(0)
+            );
+            Assert.IsFalse(empty.TryReadTag(out _, out _));
+            Assert.IsFalse(empty.Malformed);
+        }
+
+        [Test]
+        public void TotalAndPackedBudgetsChargeIndependentWork()
+        {
+            WProtoReadLimits limits = new WProtoReadLimits(
+                maximumPackedElementCount: 1
+            ).WithTotalFieldCount(2);
+            WProtoReader reader = new WProtoReader(new byte[] { 10, 1, 7, 16, 3 }, limits);
+            Assert.IsTrue(reader.TryReadTag(out _, out _));
+            Assert.IsTrue(reader.TryReadPackedRun(WProtoWireType.Varint, out WProtoReader packed));
+            Assert.IsTrue(packed.TryReadInt32(out int packedValue));
+            Assert.AreEqual(7, packedValue);
+            Assert.IsTrue(reader.TryReadTag(out _, out _));
+            Assert.IsTrue(reader.TryReadInt32(out int scalarValue));
+            Assert.AreEqual(3, scalarValue);
+            Assert.IsFalse(reader.TryReadTag(out _, out _));
+            Assert.IsFalse(reader.Malformed);
         }
 
         private sealed class PackedFormatter : IWProtoFormatter<int>

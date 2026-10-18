@@ -5,7 +5,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     /// <summary>Configures immutable wire-size, field-count, packed-element, and recursion limits for a read.</summary>
     /// <remarks>
-    /// Wire and tag limits apply to each reader region; packed elements share one root budget.
+    /// Wire and per-region tag limits apply to each reader region; packed elements and total tags
+    /// have separate shared root budgets.
     /// Field counts include
     /// unknown and duplicate tags and group terminators, but not untagged packed elements.
     /// These limits bound encoded input, not the size of objects a custom formatter constructs.
@@ -22,6 +23,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         /// <summary>Maximum tags in one reader region, including duplicate and unknown tags.</summary>
         public int MaximumFieldCount { get; }
+
+        /// <summary>Maximum tag reads across all regions and reader copies in one read.</summary>
+        /// <remarks>
+        /// The default int.MaxValue disables this cumulative cap. Replayed tags spend the
+        /// finite work budget again; untagged packed elements do not.
+        /// Only readers derived from this root share the budget; independent validation readers
+        /// and work performed by formatters are not included.
+        /// </remarks>
+        public int MaximumTotalFieldCount { get; }
 
         /// <summary>Maximum packed scalar elements across all runs and nested regions in one read.</summary>
         public int MaximumPackedElementCount { get; }
@@ -72,10 +82,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             MaximumPackedElementCount =
                 maximumPackedElementCount < 0 ? 0 : maximumPackedElementCount;
             MaximumFieldCount = maximumFieldCount < 0 ? 0 : maximumFieldCount;
+            MaximumTotalFieldCount = int.MaxValue;
             MaximumNestingDepth =
                 maximumNestingDepth < 0 ? 0
                 : WProtoReader.MaxNestingDepth < maximumNestingDepth ? WProtoReader.MaxNestingDepth
                 : maximumNestingDepth;
+        }
+
+        private WProtoReadLimits(int maximumTotalFieldCount, WProtoReadLimits limits)
+            : this(
+                limits.MaximumMessageBytes,
+                limits.MaximumLengthDelimitedBytes,
+                limits.MaximumFieldCount,
+                limits.MaximumNestingDepth,
+                limits.MaximumPackedElementCount
+            )
+        {
+            MaximumTotalFieldCount = maximumTotalFieldCount < 0 ? 0 : maximumTotalFieldCount;
+        }
+
+        /// <summary>Copies these limits with a replacement cumulative tag work limit.</summary>
+        /// <param name="maximumTotalFieldCount">Maximum total tag reads; negative values become zero.</param>
+        /// <returns>New immutable limits with every other setting preserved.</returns>
+        /// <remarks>The new budget is independent for each root reader and shared by its descendants and copies.</remarks>
+        public WProtoReadLimits WithTotalFieldCount(int maximumTotalFieldCount)
+        {
+            return new WProtoReadLimits(maximumTotalFieldCount, this);
         }
     }
 }

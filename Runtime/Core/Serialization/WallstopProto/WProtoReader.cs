@@ -66,7 +66,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private readonly ReadOnlySpan<byte> _buffer;
         private readonly int _depth;
         private readonly WProtoReadLimits _limits;
-        private readonly PackedReadBudget _packedBudget;
+        private readonly ReadBudget _packedBudget;
+        private readonly ReadBudget _totalFieldBudget;
         private bool _countPackedElements;
         private int _fieldCount;
         private int _position;
@@ -84,7 +85,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="limits">Immutable limits; null uses the default limits.</param>
         /// <remarks>A region exceeding the byte limit starts malformed, with no bytes consumed.</remarks>
         public WProtoReader(ReadOnlySpan<byte> buffer, WProtoReadLimits limits)
-            : this(buffer, 0, limits ?? WProtoReadLimits.Default, CreatePackedBudget(limits)) { }
+            : this(
+                buffer,
+                0,
+                limits ?? WProtoReadLimits.Default,
+                CreatePackedBudget(limits),
+                CreateTotalFieldBudget(limits)
+            ) { }
 
         /// <summary>
         /// Initializes a reader over a sub-message payload already carved out of <paramref name="parent"/>.
@@ -110,6 +117,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             _limits = parent._limits ?? WProtoReadLimits.Default;
             _packedBudget = parent._packedBudget;
+            _totalFieldBudget = parent._totalFieldBudget;
             _countPackedElements = false;
             bool exhausted = parent._malformed || _limits.MaximumNestingDepth <= parent._depth;
             _buffer = exhausted ? default : buffer;
@@ -123,13 +131,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             ReadOnlySpan<byte> buffer,
             int depth,
             WProtoReadLimits limits,
-            PackedReadBudget packedBudget = null
+            ReadBudget packedBudget = null,
+            ReadBudget totalFieldBudget = null
         )
         {
             _buffer = buffer;
             _depth = depth;
             _limits = limits;
             _packedBudget = packedBudget;
+            _totalFieldBudget = totalFieldBudget;
             _countPackedElements = false;
             _position = 0;
             _fieldCount = 0;
@@ -146,6 +156,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 && !expected.Malformed
                 && ReferenceEquals(reader.Limits, expected.Limits)
                 && ReferenceEquals(reader._packedBudget, expected._packedBudget)
+                && ReferenceEquals(reader._totalFieldBudget, expected._totalFieldBudget)
                 && !reader.Malformed
                 && reader.End
                 && reader.Depth == expected.Depth
@@ -157,10 +168,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 );
         }
 
-        private static PackedReadBudget CreatePackedBudget(WProtoReadLimits limits)
+        private static ReadBudget CreatePackedBudget(WProtoReadLimits limits)
         {
             return limits != null && limits.MaximumPackedElementCount < int.MaxValue
-                ? new PackedReadBudget(limits.MaximumPackedElementCount)
+                ? new ReadBudget(limits.MaximumPackedElementCount)
+                : null;
+        }
+
+        private static ReadBudget CreateTotalFieldBudget(WProtoReadLimits limits)
+        {
+            return limits != null && limits.MaximumTotalFieldCount < int.MaxValue
+                ? new ReadBudget(limits.MaximumTotalFieldCount)
                 : null;
         }
 
@@ -171,7 +189,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="wireType">Receives the wire type, or -1 on failure.</param>
         /// <returns><c>true</c> when a valid key was read; <c>false</c> at end of input or on a malformed key.</returns>
         /// <remarks>
-        /// Reaching the configured field count refuses the next tag before consuming it.
+        /// Reaching either field count refuses the next tag before consuming it. Total counts
+        /// include tags replayed through reader copies because they bound parsing work.
         /// A clean end of input returns <c>false</c> without latching <see cref="Malformed"/>, so
         /// <c>while (reader.TryReadTag(...))</c> terminates normally on a well-formed message.
         /// </remarks>
@@ -185,7 +204,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            if (Limits.MaximumFieldCount <= _fieldCount)
+            if (
+                Limits.MaximumFieldCount <= _fieldCount
+                || (_totalFieldBudget != null && !_totalFieldBudget.TryCharge(1))
+            )
             {
                 _malformed = true;
                 fieldNumber = 0;
@@ -567,7 +589,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             if (Limits.MaximumNestingDepth <= _depth)
             {
                 _malformed = true;
-                nested = new WProtoReader(default, _depth, Limits, _packedBudget)
+                nested = new WProtoReader(default, _depth, Limits, _packedBudget, _totalFieldBudget)
                 {
                     _malformed = true,
                 };
@@ -576,14 +598,26 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
             {
-                nested = new WProtoReader(default, _depth + 1, Limits, _packedBudget)
+                nested = new WProtoReader(
+                    default,
+                    _depth + 1,
+                    Limits,
+                    _packedBudget,
+                    _totalFieldBudget
+                )
                 {
                     _malformed = true,
                 };
                 return false;
             }
 
-            nested = new WProtoReader(payload, _depth + 1, Limits, _packedBudget);
+            nested = new WProtoReader(
+                payload,
+                _depth + 1,
+                Limits,
+                _packedBudget,
+                _totalFieldBudget
+            );
             return true;
         }
 
@@ -612,14 +646,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
             {
-                packed = new WProtoReader(default, _depth, Limits, _packedBudget)
+                packed = new WProtoReader(default, _depth, Limits, _packedBudget, _totalFieldBudget)
                 {
                     _malformed = true,
                 };
                 return false;
             }
 
-            packed = new WProtoReader(payload, _depth, Limits, _packedBudget)
+            packed = new WProtoReader(payload, _depth, Limits, _packedBudget, _totalFieldBudget)
             {
                 _countPackedElements = _packedBudget != null,
             };
@@ -773,7 +807,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            WProtoReader nested = new WProtoReader(payload, _depth + 1, Limits, _packedBudget);
+            WProtoReader nested = new WProtoReader(
+                payload,
+                _depth + 1,
+                Limits,
+                _packedBudget,
+                _totalFieldBudget
+            );
             if (nested.Malformed)
             {
                 _malformed = true;
@@ -825,7 +865,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            WProtoReader nested = new WProtoReader(payload, _depth + 1, Limits, _packedBudget);
+            WProtoReader nested = new WProtoReader(
+                payload,
+                _depth + 1,
+                Limits,
+                _packedBudget,
+                _totalFieldBudget
+            );
             if (nested.Malformed)
             {
                 _malformed = true;
@@ -1079,11 +1125,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return true;
         }
 
-        private sealed class PackedReadBudget
+        private sealed class ReadBudget
         {
             internal int Remaining;
 
-            internal PackedReadBudget(int remaining)
+            internal ReadBudget(int remaining)
             {
                 Remaining = remaining;
             }
