@@ -6,6 +6,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . (Join-Path $repo 'scripts/unity/lib/native-global-flags.ps1')
+. (Join-Path $repo 'scripts/unity/lib/native-evidence.ps1')
 . (Join-Path $repo 'scripts/unity/lib/native-loader-flag-lease.ps1')
 if ($RequireWindowsRegistry -and -not $IsWindows) { throw 'Windows registry controls were required' }
 $source = Join-Path $repo 'scripts/unity/capture-native-fault.ps1'
@@ -13,7 +14,7 @@ $tokens = $null
 $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw ($errors | Out-String) }
-foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureLayout', 'Get-NativeCaptureExitEvent', 'Get-NativeCaptureXmlOutcome', 'Read-NativeCaptureTail', 'Test-NativeCaptureInputsUnchanged')) {
+foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureLayout', 'Get-NativeCaptureExitEvent', 'Get-NativeCaptureXmlOutcome', 'Read-NativeCaptureTail', 'Test-NativeCaptureInputsUnchanged', 'Invoke-NativeEvidenceReadback')) {
     $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
     if ($null -eq $function) { throw "Missing shipping function $name" }
     . ([scriptblock]::Create($function.Extent.Text))
@@ -26,6 +27,143 @@ function Assert-Capture([bool]$Condition, [string]$Message) {
     ++$script:passed
 }
 try {
+    $readbackInput = Join-Path $root 'execution-diagnostics.json'
+    $captureId = '0123456789abcdef0123456789abcdef'
+    $captureDirectory = Join-Path $root $captureId
+    $null = [IO.Directory]::CreateDirectory($captureDirectory)
+    [IO.File]::WriteAllText((Join-Path $captureDirectory 'upm.log'), 'retained package log')
+    $savedProcess = [ordered]@{
+        State = 'observed'; MachineName = [Environment]::MachineName; ProcessId = 123
+        ExecutablePath = (Join-Path $root 'missing-editor/Unity.exe')
+        LaunchUtc = '2020-01-01T00:00:00.0000000Z'; EndObservedUtc = '2020-01-01T00:00:01.0000000Z'
+        RawExitCode = -1073741819; ReturnedExitCode = -1073741819; ExitOrigin = 'process-exit'; KillReason = $null
+        NativeEvidence = [ordered]@{ State = 'files-observed'; CaptureId = $captureId; CrashDirectory = $captureDirectory; UpmLogPath = (Join-Path $captureDirectory 'upm.log') }
+    }
+    $readbackJson = @{ Process = $savedProcess; CapturedUtc = '2020-01-01T00:00:01.0100000Z' } | ConvertTo-Json -Depth 8
+    [IO.File]::WriteAllText($readbackInput, $readbackJson)
+    $originalHash = (Get-FileHash -LiteralPath $readbackInput -Algorithm SHA256).Hash.ToLowerInvariant()
+    $originalEventCollector = ${function:Get-UnityProcessFailureEvents}
+    $originalFileCollector = ${function:Get-UnityNativeEvidence}
+    $originalCaptureProcess = ${function:Invoke-NativeCaptureProcess}
+    $originalGlobalFlags = ${function:Get-NativeGlobalFlagSnapshot}
+    $script:readbackEventCalls = 0
+    $script:readbackFileCalls = 0
+    $script:readbackEventIdentity = $null
+    function Get-UnityProcessFailureEvents {
+        param($ProcessObservation)
+        $script:readbackEventCalls++
+        $script:readbackEventIdentity = $ProcessObservation
+        return @{ State = 'no-matching-events'; Events = @(); Qualification = 'No events observed by this controlled collector.' }
+    }
+    function Get-UnityNativeEvidence {
+        param($Capture, $LogPath)
+        $script:readbackFileCalls++
+        return & $originalFileCollector -Capture $Capture -LogPath $LogPath
+    }
+    function Invoke-NativeCaptureProcess { throw 'Readback must not launch a capture process.' }
+    function Get-NativeGlobalFlagSnapshot { throw 'Readback must not inspect registry settings.' }
+    try {
+        $output = Join-Path $root 'readback-success'
+        $result = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath $output
+        Assert-Capture ($script:readbackEventCalls -eq 1 -and $script:readbackFileCalls -eq 1 -and $script:readbackEventIdentity.ProcessId -eq 123 -and
+            $script:readbackEventIdentity.ExecutablePath -ceq $savedProcess.ExecutablePath -and $script:readbackEventIdentity.LaunchUtc -ceq $savedProcess.LaunchUtc -and
+            $script:readbackEventIdentity.EndObservedUtc -ceq $savedProcess.EndObservedUtc) 'Readback collectors receive the saved process and capture identity'
+        Assert-Capture ($result.EvidenceOnly -and $result.Mode -ceq 'historical-readback' -and $result.State -ceq 'completed' -and
+            $result.WindowsEvents.State -ceq 'no-matching-events' -and $result.NativeEvidence.State -ceq 'files-observed' -and
+            $result.NativeEvidence.CaptureId -ceq $captureId -and $result.NativeEvidence.Files.Count -eq 1) 'Matching-host readback retains observation states without acceptance claims'
+        Assert-Capture ($result.OriginalSha256 -ceq $originalHash -and
+            (Get-FileHash -LiteralPath $readbackInput -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $originalHash -and
+            (Get-FileHash -LiteralPath (Join-Path $output 'execution-diagnostics.original.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $originalHash) 'Readback preserves original bytes and binds its retained copy by hash'
+        Assert-Capture ([DateTimeOffset]::Parse($result.StartedUtc) -le [DateTimeOffset]::Parse($result.NativeEvidence.CapturedUtc) -and
+            [DateTimeOffset]::Parse($result.NativeEvidence.CapturedUtc) -le [DateTimeOffset]::Parse($result.EndedUtc) -and
+            (Test-Path -LiteralPath (Join-Path $output 'receipt.json'))) 'Readback receipt records enclosing collection times'
+        $eventsBefore = $script:readbackEventCalls
+        $filesBefore = $script:readbackFileCalls
+        $rejected = $false
+        try { $null = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath $output }
+        catch { $rejected = $_.Exception.Message -like '*must be fresh*' }
+        Assert-Capture ($rejected -and $script:readbackEventCalls -eq $eventsBefore -and $script:readbackFileCalls -eq $filesBefore -and
+            (Get-FileHash -LiteralPath (Join-Path $output 'execution-diagnostics.original.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $originalHash) 'Existing readback output is refused before collection and preserved'
+
+        $nestedOutput = Join-Path $captureDirectory 'readback-output'
+        $captureFilesBefore = @(Get-ChildItem -LiteralPath $captureDirectory -File -Recurse | ForEach-Object {
+                $_.FullName + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+            })
+        $rejected = $false
+        try { $null = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath $nestedOutput }
+        catch { $rejected = $_.Exception.Message -like '*outside the original native capture directory*' }
+        $captureFilesAfter = @(Get-ChildItem -LiteralPath $captureDirectory -File -Recurse | ForEach-Object {
+                $_.FullName + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+            })
+        Assert-Capture ($rejected -and $script:readbackEventCalls -eq $eventsBefore -and $script:readbackFileCalls -eq $filesBefore -and
+            -not (Test-Path -LiteralPath $nestedOutput) -and $captureFilesBefore.Count -eq 1 -and
+            ($captureFilesBefore -join '|') -ceq ($captureFilesAfter -join '|')) 'Readback output inside original capture is refused before collection without contaminating original evidence'
+
+        foreach ($mutation in @('expected-host', 'saved-host', 'both-foreign-hosts', 'process-state', 'pid-zero', 'pid-string', 'pid-array', 'executable-relative',
+                'invalid-time', 'reversed-time', 'future-time', 'numeric-time', 'exit-string', 'native-partial', 'native-id', 'native-path', 'native-upm', 'missing-native-paths', 'empty', 'malformed', 'oversize')) {
+            $changed = $readbackJson | ConvertFrom-Json -AsHashtable
+            $changed.Process.LaunchUtc = $savedProcess.LaunchUtc
+            $changed.Process.EndObservedUtc = $savedProcess.EndObservedUtc
+            $expectedMachine = [Environment]::MachineName
+            switch ($mutation) {
+                'expected-host' { $expectedMachine = 'different-readback-machine' }
+                'saved-host' { $changed.Process.MachineName = 'different-readback-machine' }
+                'both-foreign-hosts' { $expectedMachine = 'different-readback-machine'; $changed.Process.MachineName = $expectedMachine }
+                'process-state' { $changed.Process.State = 'unavailable' }
+                'pid-zero' { $changed.Process.ProcessId = 0 }
+                'pid-string' { $changed.Process.ProcessId = '123' }
+                'pid-array' { $changed.Process.ProcessId = @(123) }
+                'executable-relative' { $changed.Process.ExecutablePath = 'Unity.exe' }
+                'invalid-time' { $changed.Process.LaunchUtc = 'yesterday' }
+                'reversed-time' { $changed.Process.LaunchUtc = '2020-01-02T00:00:00Z' }
+                'future-time' { $changed.Process.EndObservedUtc = '9999-01-01T00:00:00Z' }
+                'numeric-time' { $changed.Process.LaunchUtc = 1 }
+                'exit-string' { $changed.Process.RawExitCode = '-1073741819' }
+                'native-partial' { [void]$changed.Process.NativeEvidence.Remove('UpmLogPath') }
+                'native-id' { $changed.Process.NativeEvidence.CaptureId = 'wrong' }
+                'native-path' { $changed.Process.NativeEvidence.CrashDirectory = Join-Path $root 'another-directory' }
+                'native-upm' { $changed.Process.NativeEvidence.UpmLogPath = Join-Path $root 'another.log' }
+                'missing-native-paths' { $changed.Process.NativeEvidence = @{ State = 'files-observed' } }
+            }
+            $changedJson = $changed | ConvertTo-Json -Depth 8
+            if ($mutation -eq 'empty') { $changedJson = '' }
+            if ($mutation -eq 'malformed') { $changedJson = '{' }
+            if ($mutation -eq 'oversize') { $changedJson = ' ' * 4194305 }
+            [IO.File]::WriteAllText($readbackInput, $changedJson)
+            $inputHash = (Get-FileHash -LiteralPath $readbackInput -Algorithm SHA256).Hash
+            $eventsBefore = $script:readbackEventCalls
+            $filesBefore = $script:readbackFileCalls
+            $rejected = $false
+            $negativeOutput = Join-Path $root ('readback-' + $mutation)
+            try { $null = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine $expectedMachine -ArtifactsPath $negativeOutput }
+            catch { $rejected = $true }
+            Assert-Capture ($rejected -and $script:readbackEventCalls -eq $eventsBefore -and $script:readbackFileCalls -eq $filesBefore -and
+                -not (Test-Path -LiteralPath $negativeOutput) -and (Get-FileHash -LiteralPath $readbackInput -Algorithm SHA256).Hash -ceq $inputHash) "Readback rejects $mutation before collection without changing input or creating output"
+        }
+        foreach ($unavailable in @('original-unavailable', 'missing-directory')) {
+            $changed = $readbackJson | ConvertFrom-Json -AsHashtable
+            $changed.Process.LaunchUtc = $savedProcess.LaunchUtc
+            $changed.Process.EndObservedUtc = $savedProcess.EndObservedUtc
+            if ($unavailable -eq 'original-unavailable') { $changed.Process.NativeEvidence = @{ State = 'capture-unavailable' } }
+            else { Remove-Item -LiteralPath $captureDirectory -Recurse -Force }
+            [IO.File]::WriteAllText($readbackInput, ($changed | ConvertTo-Json -Depth 8))
+            $result = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath (Join-Path $root $unavailable)
+            Assert-Capture ($result.NativeEvidence.State -ceq 'capture-unavailable' -and $result.WindowsEvents.State -ceq 'no-matching-events' -and $result.EvidenceOnly) "Readback retains $unavailable without claiming the original process was healthy"
+        }
+    } finally {
+        ${function:Get-UnityProcessFailureEvents} = $originalEventCollector
+        ${function:Get-UnityNativeEvidence} = $originalFileCollector
+        ${function:Invoke-NativeCaptureProcess} = $originalCaptureProcess
+        ${function:Get-NativeGlobalFlagSnapshot} = $originalGlobalFlags
+    }
+    $cliOutput = Join-Path $root 'readback-cli'
+    $cliRecord = & $source -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath $cliOutput
+    Assert-Capture ($cliRecord.Mode -ceq 'historical-readback' -and $cliRecord.EvidenceOnly -and $cliRecord.State -ceq 'completed') 'Readback command completes without editor, project, assemblies, debugger download or process launch'
+    $parameterSets = (Get-Command $source).ParameterSets
+    $captureSet = @($parameterSets | Where-Object { $_.Name -ceq 'Capture' })
+    Assert-Capture ($captureSet.Count -eq 1 -and $captureSet[0].IsDefault -and
+        @($captureSet[0].Parameters | Where-Object { $_.IsMandatory -and $_.Name -in @('EditorPath', 'ProjectPath', 'ArtifactsPath', 'AssemblyNames') }).Count -eq 4) 'Capture remains the default parameter set with its original required inputs'
+
     $editorInput = Join-Path $root 'editor-input.txt'
     $lockInput = Join-Path $root 'package-lock-input.json'
     [IO.File]::WriteAllText($editorInput, 'editor')

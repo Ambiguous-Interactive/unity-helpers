@@ -290,6 +290,31 @@ result gates. A receipt write failure warns without replacing the original proce
 
 Use those observations to investigate the original process on the named runner before selecting a repair. A successful later launch does not explain an earlier failure, and the diagnostic report does not replace the fresh configure marker or required player results.
 
+### Historical native evidence readback
+
+After timing collection finishes, recover delayed records on the machine named in the
+original execution receipt:
+
+```powershell
+pwsh -NoProfile -File scripts/unity/capture-native-fault.ps1 `
+  -ExecutionDiagnosticsPath 'D:\diagnostics\original\unity.execution-diagnostics.json' `
+  -ExpectedMachine 'ELI-MACHINE' `
+  -ArtifactsPath 'D:\diagnostics\readback-22536'
+```
+
+The expected, saved and actual machine names must agree before collection starts. The
+output directory must be fresh. Readback preserves the original receipt bytes and hash,
+queries the original process identity and event window, and inventories the original
+private capture folder using the existing file, depth, hash and text limits. The old
+Editor and generated project need not exist. It launches no Unity or debugger process
+and changes no host settings.
+
+The separate receipt records collection times and remains `EvidenceOnly`. Newly available
+events can be recovered only within the original window, ending fifteen seconds after
+the observed process exit; later event timestamps remain outside that query. Unavailable
+queries or files and no matching observations remain distinct. Missing evidence does not
+explain the original failure or establish test or performance acceptance.
+
 ### Opt-in native debugger capture
 
 <!-- cspell:ignore gflag -->

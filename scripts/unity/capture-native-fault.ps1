@@ -1,20 +1,23 @@
 #!/usr/bin/env pwsh
 # cspell:ignore sxd sxe epr
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'Capture')]
 param(
-    [Parameter(Mandatory = $true)][string]$EditorPath,
-    [Parameter(Mandatory = $true)][string]$ProjectPath,
+    [Parameter(Mandatory = $true, ParameterSetName = 'Capture')][string]$EditorPath,
+    [Parameter(Mandatory = $true, ParameterSetName = 'Capture')][string]$ProjectPath,
     [Parameter(Mandatory = $true)][string]$ArtifactsPath,
-    [Parameter(Mandatory = $true)][string]$AssemblyNames,
-    [string]$TestFilter = 'WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationApiTests.SourceAnalysisExposesReadOnlyChangesAndFindings',
-    [string]$DebuggerDirectory,
-    [switch]$CompareLoaderSnaps,
-    [ValidateRange(1, 1800)][int]$TimeoutSeconds = 600
+    [Parameter(Mandatory = $true, ParameterSetName = 'Capture')][string]$AssemblyNames,
+    [Parameter(ParameterSetName = 'Capture')][string]$TestFilter = 'WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationApiTests.SourceAnalysisExposesReadOnlyChangesAndFindings',
+    [Parameter(ParameterSetName = 'Capture')][string]$DebuggerDirectory,
+    [Parameter(ParameterSetName = 'Capture')][switch]$CompareLoaderSnaps,
+    [Parameter(ParameterSetName = 'Capture')][ValidateRange(1, 1800)][int]$TimeoutSeconds = 600,
+    [Parameter(Mandatory = $true, ParameterSetName = 'Readback')][string]$ExecutionDiagnosticsPath,
+    [Parameter(Mandatory = $true, ParameterSetName = 'Readback')][string]$ExpectedMachine
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/credential-redaction.ps1')
+. (Join-Path $PSScriptRoot 'lib/native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'lib/accelerator.ps1')
 . (Join-Path $PSScriptRoot 'lib/native-global-flags.ps1')
 . (Join-Path $PSScriptRoot 'lib/native-loader-flag-lease.ps1')
@@ -175,6 +178,127 @@ function Test-NativeCaptureInputsUnchanged {
     param([string]$EditorPath, [string]$PackageLockPath, [System.Collections.IDictionary]$Record)
 
     return (Test-Path -LiteralPath $EditorPath -PathType Leaf) -and (Test-Path -LiteralPath $PackageLockPath -PathType Leaf) -and $Record.Contains('PackagesLockSha256') -and (Get-FileHash -LiteralPath $EditorPath -Algorithm SHA256).Hash -ceq $Record.EditorSha256 -and (Get-FileHash -LiteralPath $PackageLockPath -Algorithm SHA256).Hash -ceq $Record.PackagesLockSha256
+}
+
+function Invoke-NativeEvidenceReadback {
+    param(
+        [Parameter(Mandatory = $true)][string]$ExecutionDiagnosticsPath,
+        [Parameter(Mandatory = $true)][string]$ExpectedMachine,
+        [Parameter(Mandatory = $true)][string]$ArtifactsPath
+    )
+
+    $inputPath = [IO.Path]::GetFullPath($ExecutionDiagnosticsPath)
+    $inputItem = Get-Item -LiteralPath $inputPath -Force -ErrorAction Stop
+    if ($inputItem.PSIsContainer -or ($inputItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'Execution diagnostics must be a regular file.'
+    }
+    $stream = [IO.File]::Open($inputPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        if ($stream.Length -lt 1 -or $stream.Length -gt 4194304) { throw 'Execution diagnostics must contain at most 4 MiB.' }
+        $bytes = [byte[]]::new([int]$stream.Length)
+        $offset = 0
+        while ($offset -lt $bytes.Length) {
+            $count = $stream.Read($bytes, $offset, $bytes.Length - $offset)
+            if ($count -eq 0) { throw 'Execution diagnostics changed while reading.' }
+            $offset += $count
+        }
+        if ($stream.ReadByte() -ne -1) { throw 'Execution diagnostics changed while reading.' }
+    } finally { $stream.Dispose() }
+    $text = [Text.UTF8Encoding]::new($false, $true).GetString($bytes).TrimStart([char]0xfeff)
+    $document = [Text.Json.JsonDocument]::Parse($text)
+    try {
+        $process = $document.RootElement.GetProperty('Process')
+        $observation = @{}
+        foreach ($name in @('MachineName', 'ExecutablePath', 'LaunchUtc', 'EndObservedUtc', 'State')) {
+            $value = $process.GetProperty($name).GetString()
+            if ([string]::IsNullOrWhiteSpace($value) -or $value.Length -gt 4096 -or $value -match '[\x00-\x1f]') {
+                throw "Execution diagnostics has an invalid $name."
+            }
+            $observation[$name] = $value
+        }
+        $observation.ProcessId = $process.GetProperty('ProcessId').GetInt32()
+        $observation.RawExitCode = $process.GetProperty('RawExitCode').GetInt32()
+        if ($observation.ProcessId -le 0 -or $observation.State -cne 'observed') { throw 'Execution diagnostics has no observed process identity.' }
+        $times = @{}
+        foreach ($name in @('LaunchUtc', 'EndObservedUtc')) {
+            $parsed = [DateTimeOffset]::MinValue
+            if ($observation[$name] -cnotmatch '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?Z$' -or
+                -not [DateTimeOffset]::TryParse($observation[$name], [Globalization.CultureInfo]::InvariantCulture,
+                    [Globalization.DateTimeStyles]::None, [ref]$parsed)) { throw "Execution diagnostics has an invalid $name." }
+            $times[$name] = $parsed
+        }
+        if ($times.EndObservedUtc -lt $times.LaunchUtc -or $times.EndObservedUtc -gt [DateTimeOffset]::UtcNow) {
+            throw 'Execution diagnostics process times are reversed or in the future.'
+        }
+        $actualMachine = [Environment]::MachineName
+        if ([string]::IsNullOrWhiteSpace($ExpectedMachine) -or
+            -not [string]::Equals($ExpectedMachine, $observation.MachineName, [StringComparison]::OrdinalIgnoreCase) -or
+            -not [string]::Equals($actualMachine, $observation.MachineName, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Historical readback requires expected, saved, and actual machine identities to match.'
+        }
+        if (-not [IO.Path]::IsPathRooted($observation.ExecutablePath)) { throw 'Execution diagnostics executable path must be absolute.' }
+        $native = $process.GetProperty('NativeEvidence')
+        $nativeState = $native.GetProperty('State').GetString()
+        if ([string]::IsNullOrWhiteSpace($nativeState)) { throw 'Execution diagnostics native capture state is missing.' }
+        $nativeFields = @{}
+        foreach ($name in @('CaptureId', 'CrashDirectory', 'UpmLogPath')) {
+            $element = [Text.Json.JsonElement]::new()
+            if ($native.TryGetProperty($name, [ref]$element)) { $nativeFields[$name] = $element.GetString() }
+        }
+        $capture = $null
+        if ($nativeFields.Count -ne 0) {
+            if ($nativeFields.Count -ne 3 -or $nativeFields.CaptureId -cnotmatch '^[a-f0-9]{32}$' -or
+                [string]::IsNullOrWhiteSpace($nativeFields.CrashDirectory) -or [string]::IsNullOrWhiteSpace($nativeFields.UpmLogPath) -or
+                $nativeFields.CrashDirectory -match '[\x00-\x1f]' -or $nativeFields.UpmLogPath -match '[\x00-\x1f]' -or
+                -not [IO.Path]::IsPathRooted($nativeFields.CrashDirectory) -or -not [IO.Path]::IsPathRooted($nativeFields.UpmLogPath)) {
+                throw 'Execution diagnostics native capture identity is invalid.'
+            }
+            $crashDirectory = [IO.Path]::GetFullPath($nativeFields.CrashDirectory)
+            if ([IO.Path]::GetFileName($crashDirectory) -cne $nativeFields.CaptureId -or
+                -not [string]::Equals([IO.Path]::GetFullPath($nativeFields.UpmLogPath), (Join-Path $crashDirectory 'upm.log'), [StringComparison]::OrdinalIgnoreCase)) {
+                throw 'Execution diagnostics native capture paths disagree.'
+            }
+            $capture = @{ State = 'configured'; CaptureId = $nativeFields.CaptureId; CrashDirectory = $crashDirectory; UpmLogPath = $nativeFields.UpmLogPath }
+        } elseif ($nativeState -notin @('capture-unavailable', 'capture-setup-failed', 'unsupported-platform')) {
+            throw 'Execution diagnostics native capture paths are missing.'
+        }
+    } finally { $document.Dispose() }
+
+    $artifactRoot = [IO.Path]::GetFullPath($ArtifactsPath)
+    if ($null -ne $capture) {
+        $capturePrefix = $capture.CrashDirectory.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+        if ($artifactRoot.StartsWith($capturePrefix, [StringComparison]::OrdinalIgnoreCase) -or
+            [string]::Equals($artifactRoot, $capture.CrashDirectory, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Historical readback output must be outside the original native capture directory.'
+        }
+    }
+    if (Test-Path -LiteralPath $artifactRoot) { throw 'Diagnostic artifact path must be fresh.' }
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try { $inputHash = [BitConverter]::ToString($algorithm.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant() }
+    finally { $algorithm.Dispose() }
+    $null = New-Item -ItemType Directory -Path $artifactRoot -ErrorAction Stop
+    [IO.File]::WriteAllBytes((Join-Path $artifactRoot 'execution-diagnostics.original.json'), $bytes)
+    $record = [ordered]@{
+        SchemaVersion = 1; EvidenceOnly = $true; Mode = 'historical-readback'; State = 'collecting'
+        OriginalPath = $inputPath; OriginalSha256 = $inputHash; OriginalBytes = $bytes.Length
+        Machine = $actualMachine; ExpectedMachine = $ExpectedMachine; OriginalProcess = $observation
+        OriginalNativeCaptureState = $nativeState; StartedUtc = [DateTime]::UtcNow.ToString('o')
+        WindowsEvents = $null; NativeEvidence = $null; EndedUtc = $null
+        Qualification = 'Historical process evidence only. Missing events or files do not resolve the original failure; no new Unity invocation or acceptance evidence.'
+    }
+    $record.WindowsEvents = Get-UnityProcessFailureEvents -ProcessObservation $observation
+    $record.NativeEvidence = if ($null -eq $capture) {
+        @{ State = 'capture-unavailable'; Reason = 'original-capture-identity-unavailable'; Files = @() }
+    } else { Get-UnityNativeEvidence -Capture $capture -LogPath (Join-Path $artifactRoot 'readback.log') }
+    $record.EndedUtc = [DateTime]::UtcNow.ToString('o')
+    $record.State = 'completed'
+    [IO.File]::WriteAllText((Join-Path $artifactRoot 'receipt.json'), (ConvertTo-UnitySafeLogText -Text ($record | ConvertTo-Json -Depth 12)))
+    return [pscustomobject]$record
+}
+
+if ($PSCmdlet.ParameterSetName -ceq 'Readback') {
+    Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $ExecutionDiagnosticsPath -ExpectedMachine $ExpectedMachine -ArtifactsPath $ArtifactsPath
+    return
 }
 
 if (-not $IsWindows) { throw 'Native capture requires Windows x64' }
