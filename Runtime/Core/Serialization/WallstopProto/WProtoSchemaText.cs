@@ -29,6 +29,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <see cref="decimal"/>) are emitted as the message shapes those formatters
     /// actually write, which replicate protobuf-net's <c>.bcl.*</c> conventions. URI members
     /// use <c>string</c>, matching their raw UTF-8 payload without an inner message tag.
+    /// Enums backed by <see cref="uint"/>, <see cref="long"/>, or <see cref="ulong"/> use
+    /// the corresponding integer schema type to preserve values beyond proto3's int32 enum range.
     /// </para>
     /// <para>
     /// Explicit <see cref="WProtoMemberAttribute.IsPacked"/> opt-outs render as
@@ -1092,6 +1094,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             private string TryAddEnum(Type enumType)
             {
+                Type underlying = Enum.GetUnderlyingType(enumType);
+                if (underlying == typeof(uint))
+                {
+                    return "uint32";
+                }
+                if (underlying == typeof(long))
+                {
+                    return "int64";
+                }
+                if (underlying == typeof(ulong))
+                {
+                    return "uint64";
+                }
+
                 if (_enumNames.TryGetValue(enumType, out string known))
                 {
                     return known;

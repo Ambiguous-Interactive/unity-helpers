@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.SchemaConformance.Tests
     using System.Threading.Tasks;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using WallstopStudios.UnityHelpers.Tests.Serialization;
 
     [TestFixture]
     public sealed class SchemaConformanceTests
@@ -295,6 +296,223 @@ namespace WallstopStudios.UnityHelpers.SchemaConformance.Tests
                     Assert.AreEqual("URN:example:Thing", source.OriginalString);
                 }
             );
+        }
+
+        [Test]
+        public async Task NarrowEnumMapKeysKeepTheirNamedDeclarations()
+        {
+            await Verify(
+                new SchemaEnumMap
+                {
+                    ByColor = new Dictionary<SchemaColor, int>
+                    {
+                        { (SchemaColor)0, 0 },
+                        { SchemaColor.Blue, 17 },
+                    },
+                },
+                nameof(SchemaEnumMap),
+                "ByColor { key: None value: 0 } ByColor { key: Blue value: 17 }",
+                actual =>
+                {
+                    Assert.IsTrue(actual != null);
+                    Assert.AreEqual(2, actual.ByColor.Count);
+                    Assert.IsTrue(actual.ByColor.TryGetValue((SchemaColor)0, out int zero));
+                    Assert.AreEqual(0, zero);
+                    Assert.IsTrue(actual.ByColor.TryGetValue(SchemaColor.Blue, out int blue));
+                    Assert.AreEqual(17, blue);
+                }
+            );
+        }
+
+        [Test]
+        public async Task Unsigned64EnumExportCompilesAndCrossReadsItsMaximumValue()
+        {
+            await Verify(
+                new SchemaUnsignedEnumHost { Value = SchemaUnsignedColor.Huge },
+                nameof(SchemaUnsignedEnumHost),
+                "Value: 18446744073709551615",
+                actual =>
+                {
+                    Assert.IsTrue(actual != null);
+                    Assert.AreEqual(ulong.MaxValue, (ulong)actual.Value);
+                }
+            );
+        }
+
+        [Test]
+        public async Task WideEnumsKeepTheirFullNumericRangeInEveryContainer()
+        {
+            await Verify(
+                new WProtoSchemaWideEnumContract
+                {
+                    Unsigned = WProtoSchemaUnsigned32.Maximum,
+                    Signed = WProtoSchemaSigned64.Minimum,
+                    WideUnsigned = WProtoSchemaUnsigned64.Maximum,
+                    Optional = (WProtoSchemaUnsigned32)0,
+                    Packed = new[]
+                    {
+                        WProtoSchemaSigned64.Minimum,
+                        (WProtoSchemaSigned64)0,
+                        WProtoSchemaSigned64.Maximum,
+                    },
+                    Unpacked = new[]
+                    {
+                        WProtoSchemaUnsigned32.Maximum,
+                        (WProtoSchemaUnsigned32)0,
+                        (WProtoSchemaUnsigned32)42,
+                    },
+                    ByNumber = new Dictionary<WProtoSchemaUnsigned64, WProtoSchemaSigned64>
+                    {
+                        { WProtoSchemaUnsigned64.Maximum, WProtoSchemaSigned64.Maximum },
+                    },
+                    Rows = new[]
+                    {
+                        new[] { WProtoSchemaUnsigned64.Maximum },
+                        Array.Empty<WProtoSchemaUnsigned64>(),
+                    },
+                    Grid = new[,]
+                    {
+                        { (WProtoSchemaUnsigned32)0, WProtoSchemaUnsigned32.Maximum },
+                    },
+                    ByName = new Dictionary<string, WProtoSchemaUnsigned64>
+                    {
+                        { "wide", WProtoSchemaUnsigned64.Maximum },
+                    },
+                },
+                nameof(WProtoSchemaWideEnumContract),
+                "Unsigned: 4294967295 Signed: -9223372036854775808 WideUnsigned: 18446744073709551615 Optional: 0 "
+                    + "Packed: [-9223372036854775808, 0, 9223372036854775807] Unpacked: [4294967295, 0, 42] "
+                    + "ByNumber { key: 18446744073709551615 value: 9223372036854775807 } "
+                    + "Rows { values: 18446744073709551615 } Rows {} Grid { dims: [1, 2] values: [0, 4294967295] } "
+                    + "ByName { key: \"wide\" value: 18446744073709551615 }",
+                actual =>
+                {
+                    Assert.IsTrue(actual != null);
+                    Assert.AreEqual(uint.MaxValue, (uint)actual.Unsigned);
+                    Assert.AreEqual(long.MinValue, (long)actual.Signed);
+                    Assert.AreEqual(ulong.MaxValue, (ulong)actual.WideUnsigned);
+                    Assert.IsTrue(actual.Optional.HasValue);
+                    Assert.AreEqual(0u, (uint)actual.Optional.Value);
+                    CollectionAssert.AreEqual(
+                        new[]
+                        {
+                            WProtoSchemaSigned64.Minimum,
+                            (WProtoSchemaSigned64)0,
+                            WProtoSchemaSigned64.Maximum,
+                        },
+                        actual.Packed
+                    );
+                    CollectionAssert.AreEqual(
+                        new[]
+                        {
+                            WProtoSchemaUnsigned32.Maximum,
+                            (WProtoSchemaUnsigned32)0,
+                            (WProtoSchemaUnsigned32)42,
+                        },
+                        actual.Unpacked
+                    );
+                    Assert.AreEqual(1, actual.ByNumber.Count);
+                    Assert.IsTrue(
+                        actual.ByNumber.TryGetValue(
+                            WProtoSchemaUnsigned64.Maximum,
+                            out WProtoSchemaSigned64 number
+                        )
+                    );
+                    Assert.AreEqual(long.MaxValue, (long)number);
+                    Assert.AreEqual(2, actual.Rows.Length);
+                    CollectionAssert.AreEqual(
+                        new[] { WProtoSchemaUnsigned64.Maximum },
+                        actual.Rows[0]
+                    );
+                    Assert.IsEmpty(actual.Rows[1]);
+                    Assert.AreEqual(1, actual.Grid.GetLength(0));
+                    Assert.AreEqual(2, actual.Grid.GetLength(1));
+                    CollectionAssert.AreEqual(
+                        new[] { (WProtoSchemaUnsigned32)0, WProtoSchemaUnsigned32.Maximum },
+                        actual.Grid
+                    );
+                    Assert.AreEqual(1, actual.ByName.Count);
+                    Assert.IsTrue(
+                        actual.ByName.TryGetValue("wide", out WProtoSchemaUnsigned64 named)
+                    );
+                    Assert.AreEqual(ulong.MaxValue, (ulong)named);
+                }
+            );
+        }
+
+        [Test]
+        public async Task WideEnumsKeepUndeclaredValuesAndAbsentNullablePresence()
+        {
+            await Verify(
+                new WProtoSchemaWideEnumContract
+                {
+                    Unsigned = (WProtoSchemaUnsigned32)2147483648u,
+                    Signed = (WProtoSchemaSigned64)(-2147483649L),
+                    WideUnsigned = (WProtoSchemaUnsigned64)9223372036854775808UL,
+                },
+                nameof(WProtoSchemaWideEnumContract),
+                "Unsigned: 2147483648 Signed: -2147483649 WideUnsigned: 9223372036854775808",
+                actual =>
+                {
+                    Assert.IsTrue(actual != null);
+                    Assert.AreEqual(2147483648u, (uint)actual.Unsigned);
+                    Assert.AreEqual(-2147483649L, (long)actual.Signed);
+                    Assert.AreEqual(9223372036854775808UL, (ulong)actual.WideUnsigned);
+                    Assert.IsFalse(actual.Optional.HasValue);
+                }
+            );
+        }
+
+        [TestCase(
+            nameof(WProtoSchemaWideEnumContract.Unsigned),
+            "uint32",
+            "int32",
+            "Unsigned: 4294967295"
+        )]
+        [TestCase(
+            nameof(WProtoSchemaWideEnumContract.Signed),
+            "int64",
+            "int32",
+            "Signed: -9223372036854775808"
+        )]
+        [TestCase(
+            nameof(WProtoSchemaWideEnumContract.WideUnsigned),
+            "uint64",
+            "uint32",
+            "WideUnsigned: 18446744073709551615"
+        )]
+        public async Task NarrowedEnumSchemaRejectsAnOtherwiseValidValue(
+            string member,
+            string correctType,
+            string wrongType,
+            string input
+        )
+        {
+            string original = ExportSchema<WProtoSchemaWideEnumContract>();
+            string schema = original.Replace(
+                correctType + " " + member + " =",
+                wrongType + " " + member + " =",
+                StringComparison.Ordinal
+            );
+            Assert.AreNotEqual(original, schema);
+            File.WriteAllText(Path.Combine(_directory, "schema.proto"), schema);
+            await ProtocOracle.RequireSuccess(
+                _directory,
+                "wrong-width-compile",
+                Array.Empty<byte>(),
+                "--descriptor_set_out=schema.pb",
+                "schema.proto"
+            );
+            (int exitCode, byte[] output, string error) = await ProtocOracle.Run(
+                _directory,
+                "wrong-width-encode",
+                Encoding.UTF8.GetBytes(input),
+                "--encode=interop." + nameof(WProtoSchemaWideEnumContract),
+                "schema.proto"
+            );
+            Assert.AreNotEqual(0, exitCode);
+            Assert.IsEmpty(output);
+            StringAssert.Contains("out of range", error);
         }
 
         [Test]

@@ -29,6 +29,14 @@
       Include="../../Tests/Runtime/Serialization/WProtoRepeatedContracts.cs"
       Link="WProtoRepeatedContracts.cs"
     />
+    <Compile
+      Include="../../Tests/Runtime/Serialization/WProtoSchemaEnumWidths.cs"
+      Link="WProtoSchemaEnumWidths.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/Serialization/WProtoSchemaWideEnumContract.cs"
+      Link="WProtoSchemaWideEnumContract.cs"
+    />
     <None
       Include="$(PkgGrpc_Tools)/tools/linux_x64/protoc"
       Link="protoc"

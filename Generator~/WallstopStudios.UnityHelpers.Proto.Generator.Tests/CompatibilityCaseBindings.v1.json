@@ -3,6 +3,13 @@
   "policy": "Selectors bind source declarations to fixtures only. A qualifying lane must execute every exact case of each selected fixture once, using ordinary NUnit discovery/lifecycle and a matching source/build receipt. Display-case names never infer method or argument identity.",
   "discoveryArtifacts": [
     {
+      "id": "schema-wide-enum-native-focused",
+      "label": "native-schema-result.json",
+      "sha256": "3418a1442458bfa7743e6932936d4bffc599f12763aea15fb4764b30e857794f",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
       "id": "unknown-rewrite-focused-v2",
       "label": "focused-v2.trx",
       "sha256": "ce8d79e6eb8ddf661741104dddddb4b86e4911dfa25939a981808554d91bb46d",
@@ -130,6 +137,16 @@
     }
   ],
   "selectors": [
+    {
+      "id": "WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaTextTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests"
+    },
+    {
+      "id": "WProtoSchemaTextTests.WideEnumsUseNumericSchemaTypesAcrossContainers",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaTextTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests"
+    },
     {
       "id": "WProtoConsumerMigrationTests.ReadRewriteDropsUnknownFieldsAndPreservesKnownValues",
       "sourcePath": "Tests/Runtime/Serialization/WProtoConsumerMigrationTests.cs",
@@ -11352,10 +11369,15 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.SimpleContractRendersTheFullSchemaText",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.SurrogatesSubstituteBeforeAnyOtherMapping",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.UnpackedSurrogateElementsRenderMessagesWithoutPackingOptions",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.UnsignedEnumValuesAboveLongMaxRenderInsteadOfThrowing"
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.UnsignedEnumValuesAboveLongMaxRenderInsteadOfThrowing",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames(2147483648,-2147483649L,9223372036854775808UL,\"0880808080F8FFFFFFFF0110FFFFFFFFF7FFFFFFFF0118808080808080808080012000\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames(42,long.MaxValue,42UL,\"082A10FFFFFFFFFFFFFFFF7F182A2000\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames(uint.MaxValue,long.MinValue,ulong.MaxValue,\"08FFFFFFFFFFFFFFFFFF01108080808080808080800118FFFFFFFFFFFFFFFFFF012000\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames(uint.MinValue,0L,ulong.MinValue,\"2000\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaTextTests.WideEnumsUseNumericSchemaTypesAcrossContainers"
           ],
-          "discoveryArtifact": "schema-native-focused",
-          "reason": "Complete 32-case fixture discovery from Unity 6000.4.6f1 PlayMode; artifact identity alone transfers no current-source or backend qualification."
+          "discoveryArtifact": "schema-wide-enum-native-focused",
+          "reason": "Complete 37-case fixture discovery from Unity 6000.4.6f1 PlayMode; artifact identity alone transfers no current-source or backend qualification."
         },
         {
           "lane": "unity-editor-editmode",

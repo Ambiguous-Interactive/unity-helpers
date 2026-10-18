@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "94b7307d3e384565855eadf27a01057db108ff46749f958a8c8169e79d41c2df",
+  "guideSha256": "fe0f4e786e5e2cf4133609cd46da930fee2a5550e482be7c734d02a9e1944118",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -7590,9 +7590,11 @@
         "WProtoSchemaTextTests.CollectionShapesMatchTheGeneratorWrappers",
         "WProtoSchemaTextTests.IncludeChainsCarryTheDeeperTagInsideTheShallowerMessage",
         "WProtoSchemaTextTests.ExplicitUnpackedRepeatedMembersRenderTheirWritePolicy",
-        "WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes"
+        "WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes",
+        "WProtoSchemaTextTests.WideEnumsUseNumericSchemaTypesAcrossContainers",
+        "WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames"
       ],
-      "limitations": "The main host oracle project excludes the renderer. A separate pinned protoc 27.2 suite cross-reads finite scalar, nullable, collection, map, URI and BCL inputs; it has separate ordinary TRX evidence, outside these strict host lanes. Full schema qualification remains open.",
+      "limitations": "The main host oracle project excludes the renderer. A separate pinned protoc 27.2 suite cross-reads finite scalar, nullable, collection, map, URI, BCL and wide-enum inputs; it has separate ordinary TRX evidence, outside these strict host lanes. Full schema qualification remains open.",
       "gapIds": ["G006"],
       "status": "supported-with-witness",
       "laneRequirements": [
@@ -7621,7 +7623,9 @@
             "WProtoSchemaTextTests.CollectionShapesMatchTheGeneratorWrappers",
             "WProtoSchemaTextTests.IncludeChainsCarryTheDeeperTagInsideTheShallowerMessage",
             "WProtoSchemaTextTests.ExplicitUnpackedRepeatedMembersRenderTheirWritePolicy",
-            "WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes"
+            "WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes",
+            "WProtoSchemaTextTests.WideEnumsUseNumericSchemaTypesAcrossContainers",
+            "WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
@@ -10177,7 +10181,7 @@
       "id": "G006",
       "claimIds": ["schema.rendering"],
       "status": "open",
-      "description": "A separate Linux x64 protoc 27.2 panel compiles exports and cross-reads finite scalar, nullable, collection, map, URI and BCL values. Compiler/cross-language coverage for includes, enums, surrogate conversion and identifier edge cases remains open; ordinary source assertions do not qualify these cases."
+      "description": "A separate Linux x64 protoc 27.2 panel compiles exports and cross-reads finite scalar, nullable, collection, map, URI, BCL and wide-enum values. Narrow enum, include, surrogate conversion and identifier edge cases remain open; ordinary source assertions do not qualify these cases."
     },
     {
       "id": "G007",

@@ -2280,7 +2280,7 @@ A member taking a reserved value or a reserved name is `WPROTO046`. Two differen
 - **The value range is any `int32`**, not a field number's 1-536,870,911. Reserving `0` is legal and
   is often the one worth pinning; a negative value is legal too.
 
-The exported `.proto` carries the reservation inside the `enum` block, so a consumer's own toolchain
+For enums with an exported `enum` declaration, the `.proto` carries the reservation inside that block, so a consumer's own toolchain
 refuses the reuse as well rather than permitting one build system over exactly what this refuses
 here.
 
@@ -2580,10 +2580,17 @@ encodings retain explicit repeated entry messages. URI members, repeated URI ele
 map values use `string`, matching the original UTF-8 text with no inner message tag. Explicit
 surrogate mappings take precedence over native scalar, nullable, binary, BCL and array shapes.
 
+Enums backed by `uint`, `long`, or `ulong` use `uint32`, `int64`, or `uint64` fields. Proto3
+enum declarations only accept signed 32-bit values, so numeric fields preserve the full CLR range
+and unnamed values. This also applies inside nullable values, collections, wrappers and maps.
+These numeric schema fields have no enum member names or enum reservations; keep the original
+C# enum reservations to prevent reuse in your game. Other enum widths keep their enum declarations.
+Serializer bytes are unchanged, including the accepted alternate varints for unsigned enum values.
+
 The separate Linux x64 host conformance suite compiles actual exports with pinned protoc 27.2
 and cross-reads independent text-format values through its C++ codec and WProto. It covers a
-finite set of scalar, collection, map, URI and BCL shapes, including absent and present nullable
-defaults, with malformed-schema and changed-tag controls. It does not qualify every schema,
+finite set of scalar, collection, map, URI, BCL and wide-enum shapes, including absent and present
+nullable defaults, with malformed-schema, changed-tag and narrowed-enum controls. It does not qualify every schema,
 consumer deployment or Unity backend.
 
 ```bash

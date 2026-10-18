@@ -28,6 +28,11 @@ native string maps with default keys/values, GUID entry-message maps, BCL tempor
 layouts and singular/repeated/map URI text. The exporter uses fixed-width integer schema fields
 for floating-point bits. The independent text inputs spell those bits explicitly.
 
+Wide enum cases cover the full `uint`, `long` and `ulong` ranges, unnamed values, nullable presence,
+packed/unpacked runs, jagged/rectangular wrappers and dictionary keys/values. Numeric schema fields
+preserve those domains. Independent wrong-width schemas compile but refuse the valid boundary
+values. Shared literal wire goldens retain the existing signed-varint enum encoding.
+
 Malformed-schema and changed-tag controls require native rejection or changed values in both reader
 directions. The ordinary shared fixture also checks explicit surrogate precedence over native shapes.
 These cases qualify their declared inputs; they do not establish all schema features, complete

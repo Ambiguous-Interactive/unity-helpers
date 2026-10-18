@@ -455,8 +455,84 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
 
             Assert.IsTrue(rendered);
-            StringAssert.Contains("Huge = 18446744073709551615;", schema);
+            StringAssert.Contains("uint64 Value = 1;", schema);
+            StringAssert.DoesNotContain("enum SchemaUnsignedColor", schema);
             Assert.IsEmpty(diagnostics, "A legal ulong enum member is not an error.");
+        }
+
+        [Test]
+        public void WideEnumsUseNumericSchemaTypesAcrossContainers()
+        {
+            Assert.IsTrue(
+                WProtoSchemaText.TryWriteSchema(
+                    new[] { typeof(WProtoSchemaWideEnumContract) },
+                    null,
+                    null,
+                    out string schema,
+                    out IReadOnlyList<string> diagnostics
+                )
+            );
+            Assert.IsEmpty(diagnostics);
+            StringAssert.DoesNotContain("enum ", schema);
+            StringAssert.Contains("uint32 Unsigned = 1;", schema);
+            StringAssert.Contains("int64 Signed = 2;", schema);
+            StringAssert.Contains("uint64 WideUnsigned = 3;", schema);
+            StringAssert.Contains("optional uint32 Optional = 4;", schema);
+            StringAssert.Contains("repeated int64 Packed = 5;", schema);
+            StringAssert.Contains("repeated uint32 Unpacked = 6 [packed = false];", schema);
+            StringAssert.Contains("map<uint64, int64> ByNumber = 7;", schema);
+            StringAssert.Contains("repeated uint64 values = 1;", schema);
+            StringAssert.Contains("repeated uint32 values = 2;", schema);
+            StringAssert.Contains("map<string, uint64> ByName = 10;", schema);
+        }
+
+        [TestCase(
+            uint.MaxValue,
+            long.MinValue,
+            ulong.MaxValue,
+            "08FFFFFFFFFFFFFFFFFF01108080808080808080800118FFFFFFFFFFFFFFFFFF012000"
+        )]
+        [TestCase(
+            2147483648u,
+            -2147483649L,
+            9223372036854775808UL,
+            "0880808080F8FFFFFFFF0110FFFFFFFFF7FFFFFFFF0118808080808080808080012000"
+        )]
+        [TestCase(42u, long.MaxValue, 42UL, "082A10FFFFFFFFFFFFFFFF7F182A2000")]
+        [TestCase(0u, 0L, 0UL, "2000")]
+        public void WideEnumWireBytesRemainIndependentOfSchemaNames(
+            uint unsigned,
+            long signed,
+            ulong wideUnsigned,
+            string golden
+        )
+        {
+            WProtoSchemaWideEnumContract original = new WProtoSchemaWideEnumContract
+            {
+                Unsigned = (WProtoSchemaUnsigned32)unsigned,
+                Signed = (WProtoSchemaSigned64)signed,
+                WideUnsigned = (WProtoSchemaUnsigned64)wideUnsigned,
+                Optional = (WProtoSchemaUnsigned32)0,
+            };
+            IWProtoFormatter<WProtoSchemaWideEnumContract> formatter =
+                WProtoFormatterProvider.Get<WProtoSchemaWideEnumContract>();
+            Assert.IsTrue(formatter != null);
+            byte[] bytes = new byte[formatter.Measure(original)];
+            WProtoWriter writer = new WProtoWriter(bytes);
+            Assert.IsTrue(formatter.Write(ref writer, original));
+            Assert.AreEqual(bytes.Length, writer.Position);
+            Assert.AreEqual(golden, BitConverter.ToString(bytes).Replace("-", string.Empty));
+            CollectionAssert.AreEqual(bytes, WProtoFacade.Serialize(original));
+            WProtoReader reader = new WProtoReader(bytes);
+            Assert.IsTrue(formatter.TryRead(ref reader, out WProtoSchemaWideEnumContract actual));
+            Assert.IsTrue(reader.End);
+            Assert.IsFalse(reader.Malformed);
+            Assert.IsTrue(actual != null);
+            Assert.AreEqual(unsigned, (uint)actual.Unsigned);
+            Assert.AreEqual(signed, (long)actual.Signed);
+            Assert.AreEqual(wideUnsigned, (ulong)actual.WideUnsigned);
+            Assert.IsTrue(actual.Optional.HasValue);
+            Assert.AreEqual(0u, (uint)actual.Optional.Value);
         }
 
         [Test]
