@@ -1,17 +1,19 @@
 # WallstopProto vs. Public Unity protobuf-net Projects
 
-> The figures below preserve the original survey snapshot. The package now ships
-> `Vector4`, `Matrix4x4`, `Keyframe` and `BoneWeight` surrogates on both protobuf routes,
-> closing three surveyed member gaps. Coverage becomes **2,154 / 2,166 (99.45%)**;
-> 12 members still require the changes recorded below. See the
-> [Unity surrogate layouts](./serialization.md#unity-surrogate-layouts).
+> This is the **2026-08-29 survey snapshot**, not current release acceptance.
+> Its counts and historical findings below have not been recomputed against the external projects.
+> The package now ships `Vector4`, `Matrix4x4`, `Keyframe` and `BoneWeight` surrogates,
+> and supports nullable map keys and values. Nullable repeated elements remain unsupported.
+> See [Unity surrogate layouts](./serialization.md#unity-surrogate-layouts) and
+> [nullable maps](./serialization.md#nullable-map-presence).
 >
-> Runtime registration now has migration guidance too: `WPROTO048` reports source calls to
-> `RuntimeTypeModel.Add`, `MetaType.Add`, `AddSubType` and `SetSurrogate`. It identifies the
-> registration API, not the complete set of runtime-discovered targets. See
+> `WPROTO030` now detects the surveyed legacy annotation forms. `WPROTO048` reports source calls to
+> `RuntimeTypeModel.Add`, `MetaType.Add`, `AddSubType` and `SetSurrogate`; it does not recover all
+> runtime-discovered targets. Export effective tags and defaults from the actual legacy model
+> before migration. **Do not infer implicit tags from source order.** See
 > [Migrating runtime model registrations](./serialization.md#migrating-runtime-model-registrations).
 
-## TL;DR
+## Original survey summary
 
 - **2,166 serialized member declarations** were catalogued across four public Unity codebases that
   annotate protobuf-net contracts. **2,151 of them (99.31%) are shapes WallstopProto already
@@ -72,7 +74,7 @@ RTSL is redistributed verbatim: the same generated `Persistent*` files appear in
 [llhswwha/RuntimeEditor_HDRP](https://github.com/llhswwha/RuntimeEditor_HDRP), so one copy was
 catalogued and it stands for all three.
 
-## Step 1: what WallstopProto supports, derived from this repository
+## Step 1: support at the survey revision
 
 The authoritative sources are the `WPROTO###` descriptors (40 on the day of the survey) in
 `Generator~/WallstopStudios.UnityHelpers.Proto.Generator/WProtoDiagnostics.cs`, the runtime under
@@ -206,8 +208,9 @@ the base.
 | public members carried implicitly                            |                           666 |
 | `Nullable<T>` members                                        |                            61 |
 
-OpenHellion assigns **no field numbers at all**: the entire wire contract is protobuf-net's implicit
-declaration-order numbering. It is also the only corpus that puts `[ProtoContract]` **on an
+OpenHellion assigns **no explicit field numbers**: its wire contract depends on the effective
+implicit numbering in its legacy runtime model. A migration must extract those numbers from that
+model and pin them; declaration order alone is not evidence of the assigned tags. It is also the only corpus that puts `[ProtoContract]` **on an
 interface**: `IAuxDetails` is an empty interface carrying eight `[ProtoInclude]`s, and four members
 are typed as it.
 
@@ -286,8 +289,8 @@ OpenHellion's interface members and its single `Nullable<T>` map value.
 
 Two contract-level features are also refused rather than supported, though neither costs a member:
 `ImplicitFields` (the 666 members OpenHellion's 162 contracts carry implicitly would each need a
-`[WProtoMember]` number written by hand, reproducing protobuf-net's declaration-order numbering
-exactly or every existing save is misread), and
+`[WProtoMember]` number frozen from the actual legacy model; a guessed number can misread
+existing saves), and
 `[ProtoContract]` on an interface (`IAuxDetails`), which has to become
 `[assembly: WProtoDeclaredRoot(typeof(IAuxDetails), typeof(AuxDetailsBase))]` over an abstract base.
 
@@ -377,7 +380,7 @@ tracking separately, because neither is a shape question:
    `[DataMember(Order = n)]` and a protobuf-net reference, and a renamed `ProtoContractAttribute`
    counts only when its namespace also declares `ProtoMemberAttribute`.
 2. **Decide explicitly whether `ImplicitFields` is in scope**, or document that it is not and that a
-   port must number the members by hand in declaration order.
+   port must freeze member numbers obtained from the actual legacy runtime model.
 3. **Ship the missing Unity struct surrogates — done.** `Vector4`, `Matrix4x4`,
    `Keyframe` and `BoneWeight` now have shared protobuf-net / WallstopProto shapes and
    AOT-safe root formatters. Both protobuf-net majors pass byte and cross-read checks;
