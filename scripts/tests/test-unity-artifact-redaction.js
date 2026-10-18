@@ -33,6 +33,7 @@ const uploadAction = "actions/upload-artifact";
  * Directory prefixes that can hold Unity editor output.
  *
  * `.artifacts/unity` is where every Unity invocation in this repository writes, logs included.
+ * `.artifacts/native-readback` holds recovered Unity process and package-manager text.
  * `perf-staging` is the benchmark job's copy of a results file taken out of that tree, so it is
  * derived Unity output and is covered for the same reason.
  *
@@ -41,7 +42,7 @@ const uploadAction = "actions/upload-artifact";
  * binary release asset that carries no credential material. `perf-results` holds files the commit
  * job DOWNLOADS from the benchmark job, which scrubbed them before it uploaded them.
  */
-const unityOutputPrefixes = [".artifacts/unity", "perf-staging"];
+const unityOutputPrefixes = [".artifacts/unity", ".artifacts/native-readback", "perf-staging"];
 
 let passed = 0;
 let failed = 0;
@@ -313,7 +314,12 @@ runTest("the workflow scanner still finds the Unity jobs, steps and uploads", ()
   const jobIds = new Set(
     steps.filter((step) => step.workflow === "unity-tests.yml").map((step) => step.jobId)
   );
-  for (const expected of ["unity-tests", "unity-tests-single-threaded", "unitypackage-smoke"]) {
+  for (const expected of [
+    "unity-tests",
+    "unity-tests-single-threaded",
+    "unitypackage-smoke",
+    "native-historical-readback"
+  ]) {
     assert.ok(jobIds.has(expected), `scanner: unity-tests.yml job ${expected} was not found`);
   }
   const groupedUploads = unityUploads().filter((upload) => upload.workflow === "unity-tests.yml");
@@ -353,6 +359,18 @@ runTest("the workflow scanner still finds the Unity jobs, steps and uploads", ()
     unityUploads().length >= 12,
     `scanner: expected the Unity uploads to be found, saw ${unityUploads().length}`
   );
+});
+
+runTest("historical readback upload is a nonempty protected scanner subject", () => {
+  const historical = unityUploads().filter(
+    (upload) =>
+      upload.workflow === "unity-tests.yml" && upload.jobId === "native-historical-readback"
+  );
+  assert.equal(historical.length, 1);
+  assert.equal(historical[0].uploadedPath, ".artifacts/native-readback/output");
+  assert.ok(covers(historical[0].redactedSoFar, historical[0].uploadedPath));
+  assert.equal(covers([], historical[0].uploadedPath), false);
+  assert.equal(isUnityOutput(".artifacts/native-readback-other/output"), false);
 });
 
 runTest("every Unity artifact upload is preceded by redaction in the same job", () => {
