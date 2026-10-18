@@ -68,3 +68,8 @@ _includes/*.html       text eol=lf
 
 # Preserve upstream source line endings inside the dependency patch hunks.
 Runtime/Protobuf-Net/il2cpp-aot.patch -text whitespace=-blank-at-eol,cr-at-eol
+
+# Frozen consumer captures retain their original source, JSON and wire bytes.
+Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/Captured/*.cs.txt -text
+Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/Data/*.json.txt -text
+Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/Data/*.bin binary

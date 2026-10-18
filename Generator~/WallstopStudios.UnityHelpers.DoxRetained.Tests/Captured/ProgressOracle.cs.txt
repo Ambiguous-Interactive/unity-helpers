@@ -1,0 +1,22 @@
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+namespace Tests.Configuration.Persistence
+{
+#if !WALLSTOP_PROTO_ONLY
+    using ProtoBuf;
+
+    [ProtoContract]
+    public sealed class ProgressOracle
+    {
+        [ProtoMember(1)]
+        public string Id { get; set; }
+
+        [ProtoMember(2)]
+        public bool Solved { get; set; }
+
+        [ProtoMember(3)]
+        public string ProgressJson { get; set; }
+    }
+#endif
+}

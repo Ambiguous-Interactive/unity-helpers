@@ -1,0 +1,2 @@
+
+001æ{"Id":"001","Moves":[{"MoveIndex":902,"source":{"configuration":{"type":"Solid","direction":"None"},"disableCount":0,"preventedByNext":false,"preventedByFollow":false,"mustUseByFollow":false,"mustUseByNext":false},"sourceLocation":{"x":2,"y":4},"interactionLocation":null}],"LevelAvailability":"Solved","TotalMovesTried":1,"MoveHashes":[7499666778938972168]}

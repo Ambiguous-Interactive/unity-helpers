@@ -589,7 +589,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 CalibrationTargetMilliseconds,
                 (count, referenceMilliseconds, subjectMilliseconds) =>
                 {
-                    if (observed >= CalibrationAttemptCount)
+                    if (CalibrationAttemptCount <= observed)
                     {
                         Assert.Fail("The calibration attempt plan changed.");
                         return;

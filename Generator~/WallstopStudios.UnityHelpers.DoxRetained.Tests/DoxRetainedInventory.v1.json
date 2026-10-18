@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "panel": "dox-retained-v1",
+  "scope": "Host same-type v3 admission of captured oracle reconstructions from retained SQLite/JSON saves. Original wire encoder identity unavailable; not historical production-writer, Unity, SQLite, deployment, or timing qualification.",
+  "modelSourceCensus": "targeted-20261016/consumer-DoxReloaded-source-census.json",
+  "captureSource": "session488-issue-debt/consumer-capture",
+  "priorAdmissionRevision": "bc6511cc86a75dc5a7c44929284a0f8f8438313d",
+  "sources": [
+    {
+      "file": "Captured/LevelProgressModel.cs.txt",
+      "bytes": 1372,
+      "sha256": "2bfccbe4c2b6c59ac593738bfa77e4402ddaac2bfce2c60e3973daf23f7853d3",
+      "role": "consumer-model",
+      "matchesOctober16ModelCensus": true
+    },
+    {
+      "file": "Captured/SettingsModel.cs.txt",
+      "bytes": 2582,
+      "sha256": "806e3f1ab0ee152745c71be75777f78830057161b92aed05c9fd0c762e418316",
+      "role": "consumer-model",
+      "matchesOctober16ModelCensus": true
+    },
+    {
+      "file": "Captured/ProgressOracle.cs.txt",
+      "bytes": 504,
+      "sha256": "5c32065b06b134cc12ebdfd96357432c8b00ce5d025b001c0589c9b7f1f4d9c8",
+      "role": "captured-test-oracle",
+      "matchesOctober16ModelCensus": false
+    },
+    {
+      "file": "Captured/SettingsOracle.cs.txt",
+      "bytes": 462,
+      "sha256": "e427575b661de7a58ccc33e8808f86ff5485ff73fce67192e254a33bfc126bdb",
+      "role": "captured-test-oracle",
+      "matchesOctober16ModelCensus": false
+    }
+  ],
+  "values": [
+    {
+      "file": "Data/level-progress-oracle.json.txt",
+      "bytes": 2026,
+      "sha256": "a2ec392da07fe677c3f69719d8fe2d3fa88510bc42695e7d04f9e5561efa5949"
+    },
+    {
+      "file": "Data/settings.json.txt",
+      "bytes": 61,
+      "sha256": "45fdbad03b84dbb14ec97d046e518b2320b94bfdcdc62b45895f48c792afec80"
+    }
+  ],
+  "inputs": [
+    {
+      "file": "Data/progress-wire-0.bin",
+      "bytes": 368,
+      "sha256": "c467d2efdee8876f44ecd035cb93ab0b1eadb57b2726287517a97dd0caef78c9",
+      "id": "dox-progress-row-0"
+    },
+    {
+      "file": "Data/progress-wire-1.bin",
+      "bytes": 98,
+      "sha256": "ef67ce89f290108affba538ba9653d6e250a876fa06b707e5b4515f4e1ccd8be",
+      "id": "dox-progress-row-1"
+    },
+    {
+      "file": "Data/progress-wire-2.bin",
+      "bytes": 98,
+      "sha256": "0a2f012bb3a45d36089d675d093ccdcc66817a9c5980ac2a5f1b5b3b2aca826f",
+      "id": "dox-progress-row-2"
+    },
+    {
+      "file": "Data/progress-wire-3.bin",
+      "bytes": 98,
+      "sha256": "f2798c090b611d0c5f6975c20060eb19ce7aa1d71054057a37e34b9383d13b82",
+      "id": "dox-progress-row-3"
+    },
+    {
+      "file": "Data/progress-wire-4.bin",
+      "bytes": 98,
+      "sha256": "aa9096684900339c44cd85670ed968dcf7ddb1a0964a3c24f8235530f93857d8",
+      "id": "dox-progress-row-4"
+    },
+    {
+      "file": "Data/progress-wire-5.bin",
+      "bytes": 101,
+      "sha256": "a68c54d677e0b0591f98980b5e6b8bcdd5801eba1c82d217c5f2ca2c6bb334fa",
+      "id": "dox-progress-row-5"
+    },
+    {
+      "file": "Data/progress-wire-6.bin",
+      "bytes": 101,
+      "sha256": "337e0f83c4840f5ea94d5183f61f6a7e7bd967ac194d272f9fd0a0d343b55287",
+      "id": "dox-progress-row-6"
+    },
+    {
+      "file": "Data/progress-wire-7.bin",
+      "bytes": 101,
+      "sha256": "48c278300c0e402e5c8399dc10e581528dc4365e13fb67a03ff5a87cfba04c4f",
+      "id": "dox-progress-row-7"
+    },
+    {
+      "file": "Data/progress-wire-8.bin",
+      "bytes": 101,
+      "sha256": "da23f775d2a71b7e05c4a042ce491543774d008e4256400406cc2c6b223840c6",
+      "id": "dox-progress-row-8"
+    },
+    {
+      "file": "Data/progress-wire-9.bin",
+      "bytes": 101,
+      "sha256": "76cffdf4a17858ef9259c943cd6e8ff65b6396638ede4b58040d79164a604c8a",
+      "id": "dox-progress-row-9"
+    },
+    {
+      "file": "Data/settings-wire-oracle.bin",
+      "bytes": 47,
+      "sha256": "c2af63d3e4caee659cec653b9b186d3a4c0f764156e47b2551f730afcbaa27a0",
+      "id": "dox-settings-retained"
+    }
+  ],
+  "oracleAssemblies": [
+    {
+      "file": "protobuf-net.dll",
+      "bytes": 315904,
+      "sha256": "01c0eb2062c70f3eb27b1c662288247514741391f82b549c63c68ffa7d672630"
+    },
+    {
+      "file": "protobuf-net.Core.dll",
+      "bytes": 297472,
+      "sha256": "be800dd4484bddada630bde8e7a7ea753022bba2856e8d8cf378a6a768424f04"
+    }
+  ]
+}

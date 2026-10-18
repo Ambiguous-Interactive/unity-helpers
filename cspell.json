@@ -1259,6 +1259,8 @@
     {
       "filename": [
         "cspell.json",
+        "Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/DoxRetainedInventory.v1.json",
+        "Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/README.md",
         "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/CompatibilityCaseBindings.v1.json",
         "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/CompatibilityClaimCatalog.v1.json"
       ],

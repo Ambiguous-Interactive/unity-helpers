@@ -17,6 +17,7 @@ namespace UnityEngine.Scripting
         AttributeTargets.Assembly
             | AttributeTargets.Class
             | AttributeTargets.Struct
+            | AttributeTargets.Constructor
             | AttributeTargets.Method
             | AttributeTargets.Property
             | AttributeTargets.Field

@@ -1,0 +1,89 @@
+namespace Data.Persistence.Models
+{
+    using System;
+    using System.Collections.Generic;
+    using System.Text.Json.Serialization;
+    using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using PreserveAttribute = UnityEngine.Scripting.PreserveAttribute;
+
+    [Serializable]
+    [WProtoContract]
+    [Preserve]
+    public sealed partial class SettingsModel : IEquatable<SettingsModel>
+    {
+        [JsonIgnore]
+        [Preserve]
+        public bool VibrationsEnabled
+        {
+            get =>
+                !settings.TryGetValue(nameof(VibrationsEnabled), out string value)
+                || !bool.TryParse(value, out bool parsed)
+                || parsed;
+            set => settings[nameof(VibrationsEnabled)] = value.ToString();
+        }
+
+        [JsonIgnore]
+        [Preserve]
+        public bool SfxEnabled
+        {
+            get =>
+                !settings.TryGetValue(nameof(SfxEnabled), out string value)
+                || !bool.TryParse(value, out bool parsed)
+                || parsed;
+            set => settings[nameof(SfxEnabled)] = value.ToString();
+        }
+
+        [JsonInclude]
+        [WProtoMember(1)]
+        [Preserve]
+        public readonly Dictionary<string, string> settings;
+
+        [Preserve]
+        public SettingsModel()
+        {
+            settings = new Dictionary<string, string>();
+        }
+
+        [JsonConstructor]
+        [Preserve]
+        public SettingsModel(Dictionary<string, string> settings)
+        {
+            this.settings =
+                settings == null
+                    ? new Dictionary<string, string>()
+                    : new Dictionary<string, string>(settings);
+        }
+
+        public SettingsModel Copy()
+        {
+            return new SettingsModel(settings);
+        }
+
+        public bool Equals(SettingsModel other)
+        {
+            if (ReferenceEquals(other, this))
+            {
+                return true;
+            }
+
+            if (ReferenceEquals(other, null))
+            {
+                return false;
+            }
+
+            return settings.ContentEquals(other.settings);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return Equals(obj as SettingsModel);
+        }
+
+        public override int GetHashCode()
+        {
+            return Objects.EnumerableHashCode(settings.Keys.Ordered());
+        }
+    }
+}

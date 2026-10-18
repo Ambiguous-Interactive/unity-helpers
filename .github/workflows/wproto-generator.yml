@@ -19,6 +19,7 @@ on:
       - "scripts/verify-wproto-evidence.ps1"
       - "scripts/unity/lib/test-result-evidence.ps1"
       - "scripts/unity/lib/catastrophic-patterns.ps1"
+      - ".gitattributes"
       - ".github/workflows/wproto-generator.yml"
   pull_request:
     paths:
@@ -31,6 +32,7 @@ on:
       - "scripts/verify-wproto-evidence.ps1"
       - "scripts/unity/lib/test-result-evidence.ps1"
       - "scripts/unity/lib/catastrophic-patterns.ps1"
+      - ".gitattributes"
       - ".github/workflows/wproto-generator.yml"
 
 permissions:
@@ -82,6 +84,14 @@ jobs:
         # produces them, rather than a transcription of what it ought to emit.
         shell: pwsh
         run: ./scripts/run-wproto-evidence.ps1 -Oracle v3 -OutputRoot "$env:RUNNER_TEMP/wproto-evidence"
+
+      - name: Admit retained Dox consumer contracts against protobuf-net v3
+        run: >-
+          dotnet test
+          Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/WallstopStudios.UnityHelpers.DoxRetained.Tests.csproj
+          -c Release -p:ProtobufNetOracle=v3 --nologo
+          --logger "trx;LogFileName=dox-retained-v3.trx"
+          --results-directory "${{ runner.temp }}/wproto-evidence/dox-retained"
 
       - name: Test the generator against protobuf-net 2.4.9
         # The two oracle DLLs share an assembly name. A second process is the only reliable
