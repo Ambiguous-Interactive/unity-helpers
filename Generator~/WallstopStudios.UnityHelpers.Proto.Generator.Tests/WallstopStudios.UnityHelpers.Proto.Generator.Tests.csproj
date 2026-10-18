@@ -49,6 +49,16 @@
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoEnumFormatterTests.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoReadLimitsTests.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoFormatterFailureTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Core/PairedMeasurementTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkCpuSetRecord.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkCpuSetTopology.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkProtocol.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkRuntimeIdentity.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkSlotDiagnostics.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkSlotObservation.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkThreadSnapshot.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/CalibratedBenchmarkMeasurement.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/PairedMeasurement.cs" />
     <!-- SerializableValueTuple implements it explicitly, so the file is not optional here. This
          project names its Runtime sources one by one rather than globbing, which is why a new
          dependency of one of them fails HERE and nowhere else. -->

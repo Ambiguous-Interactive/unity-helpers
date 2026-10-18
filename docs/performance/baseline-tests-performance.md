@@ -201,6 +201,14 @@ option is rejected.
   generation and optimization settings remain `unknown`. Seed, iteration count, and measured
   warmup durations/executions accompany the samples.
 
+Backend labels identify `IL2CPP` from its compilation symbol, `Mono` from the executing core
+library, and `.NET` otherwise. The `.NET` label does not distinguish CoreCLR from NativeAOT or
+other .NET implementations. Reports also preserve the raw runtime framework description; it
+does not prove the compilation mode. Standalone host reports mark Unity fields as unavailable
+and CPU identity as `unknown`, using the host OS and build configuration. The borrowed-buffer
+preflight uses the same backend detector. A host build with the IL2CPP symbol exercises branch
+selection only; player qualification requires actual player execution.
+
 `IntMapPerformanceTests` allows 30 minutes per test case so its grouped dictionary workloads can
 use the maximum calibration target. Its default target remains 20 ms; the timeout does not relax
 any timing or stability gate.

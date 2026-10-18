@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Core
 {
     using System;
+    using System.Runtime.InteropServices;
     using System.Text;
     using System.Text.Json;
     using NUnit.Framework;
@@ -873,6 +874,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     .GetProperty("allocationMetric")
                     .GetString()
             );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void CapturedBackendDescribesTheExecutingRuntime(bool serialized)
+        {
+            double[] samples = new double[32];
+            for (int index = 0; index < samples.Length; ++index)
+            {
+                samples[index] = 100;
+            }
+            CalibratedBenchmarkMeasurement measurement = CreateSamples(samples, samples);
+            string expectedFramework = RuntimeInformation.FrameworkDescription;
+#if ENABLE_IL2CPP
+            const string expectedBackend = "IL2CPP";
+#else
+            string expectedBackend = expectedFramework.StartsWith("Mono ", StringComparison.Ordinal)
+                ? "Mono"
+                : ".NET";
+#endif
+            if (serialized)
+            {
+                using JsonDocument document = JsonDocument.Parse(measurement.ToJson());
+                JsonElement metadata = document.RootElement.GetProperty(
+                    nameof(measurement.EnvironmentMetadata)
+                );
+                Assert.AreEqual(expectedBackend, metadata.GetProperty("backend").GetString());
+                Assert.AreEqual(
+                    expectedFramework,
+                    metadata.GetProperty("frameworkDescription").GetString()
+                );
+            }
+            else
+            {
+                Assert.IsTrue(
+                    measurement.EnvironmentMetadata.TryGetValue("backend", out string backend)
+                );
+                Assert.AreEqual(expectedBackend, backend);
+                Assert.IsTrue(
+                    measurement.EnvironmentMetadata.TryGetValue(
+                        "frameworkDescription",
+                        out string framework
+                    )
+                );
+                Assert.AreEqual(expectedFramework, framework);
+            }
         }
 
         [Test]

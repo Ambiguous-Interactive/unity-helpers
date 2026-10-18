@@ -6,6 +6,10 @@
 )]
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo(
+    "WallstopStudios.UnityHelpers.Tests.Runtime.Performance"
+)]
+
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(
     "WallstopStudios.UnityHelpers.Tests.Editor"
 )]
 
