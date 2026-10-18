@@ -1178,9 +1178,11 @@ protobuf-net's model builder cannot. `Serializer` routes through it **per annota
 wire layer is public and usable today either way. It is public **for your code, not just this
 package's**: a game annotates its own types and gets the same treatment.
 
-The reader and writer are `ref struct`s over spans that allocate nothing and never throw. Every
-operation reports success, and a failure latches so a truncated write cannot look complete and a corrupt
-payload cannot decode as data:
+The reader and writer are `ref struct`s over spans. Caller-owned output can avoid allocations after
+registration and buffer setup; deserialization still allocates returned strings and object graphs.
+Finite shared read limits also allocate accounting state. Checked wire operations report success;
+malformed input and insufficient output latch the reader or writer so later operations refuse to
+continue. A clean end of input from `TryReadTag` is not malformed:
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -1299,20 +1301,22 @@ maps, surrogates, and a generic contract's closed type parameters. An unsupporte
 error naming the type, the member and the remedy**, never a silent skip: a contract that quietly got
 no formatter would surface as an exception from the first save in a shipped player:
 
-| Code        | Meaning                                                                              |
-| ----------- | ------------------------------------------------------------------------------------ |
-| `WPROTO001` | The contract, or a type enclosing it, is not `partial`                               |
-| `WPROTO002` | Two members claim the same field number                                              |
-| `WPROTO003` | A member's type is not supported yet                                                 |
-| `WPROTO004` | A field number is outside 1-536,870,911, or inside the reserved 19000-19999          |
-| `WPROTO005` | A lifecycle hook sits on a type with no `[WProtoContract]`, so nothing calls it      |
-| `WPROTO006` | Two methods carry the same lifecycle attribute                                       |
-| `WPROTO007` | A member is read-only, so a decoded value cannot be assigned to it                   |
-| `WPROTO008` | A lifecycle hook is static, or takes parameters                                      |
-| `WPROTO009` | A contract is nested inside a generic type and cannot be registered                  |
-| `WPROTO010` | A hook sits on a struct contract, where `in` copies the value and discards mutations |
-| `WPROTO011` | A class contract has no parameterless constructor to read into                       |
-| `WPROTO050` | A generated constructor cannot call an accessible base constructor without arguments |
+| Code        | Meaning                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------- |
+| `WPROTO001` | The contract, or a type enclosing it, is not `partial`                                  |
+| `WPROTO002` | Two members claim the same field number                                                 |
+| `WPROTO003` | A member's type is not supported yet                                                    |
+| `WPROTO004` | A field number is outside 1-536,870,911, or inside the reserved 19000-19999             |
+| `WPROTO005` | A lifecycle hook sits on a type with no `[WProtoContract]`, so nothing calls it         |
+| `WPROTO006` | Two methods carry the same lifecycle attribute                                          |
+| `WPROTO008` | A lifecycle hook is static, or takes parameters                                         |
+| `WPROTO009` | A contract is nested inside a generic type and cannot be registered                     |
+| `WPROTO010` | A hook sits on a struct contract, where `in` copies the value and discards mutations    |
+| `WPROTO011` | A mutable class without `SkipConstructor` lacks an accessible parameterless constructor |
+| `WPROTO050` | A generated constructor cannot call an accessible base constructor without arguments    |
+
+Readonly fields and get-only properties use [immutable construction](#immutable-contracts), with
+its construction and inheritance limits.
 
 `WPROTO028` is a **warning** that reports a skip rather than a refusal. It fires when a
 closed construction found in your source cannot be named by the generated registrar, most often a
@@ -3016,6 +3020,29 @@ This metadata gate and initial evidence ledger complement golden bytes and seman
 They do not prove every advertised capability, custom formatter bodies, all consumer deployments,
 or platform performance.
 
+`CompatibilityClaimCatalog.v1.json` maps the documented capabilities to source witnesses,
+compatibility classes, reader directions, lane requirements, and named evidence gaps.
+`CompatibilityCaseBindings.v1.json` freezes the complete discovered case set for each selected
+fixture and lane. Missing discovery and partial coverage remain explicit. The source guard parses
+test declarations without invoking them; ordinary NUnit owns case expansion and lifecycle.
+
+From the repository root, validate the catalog with
+`pwsh -NoProfile -File scripts/verify-wproto-evidence.ps1 -Mode catalog`.
+Run either isolated host lane with
+`pwsh -NoProfile -File scripts/run-wproto-evidence.ps1 -Oracle v3` or `-Oracle v2`.
+Each invocation retains a new directory under `progress/.artifacts/wproto-evidence` by default.
+It records a fresh Release build, source and binary inventories, raw process streams, exit status,
+and ordinary TRX results, then verifies their identities and exact fixture case sets.
+Changed, missing, duplicated, skipped, or inconclusive required cases cannot qualify.
+Review case-binding changes against complete runner results; do not regenerate them to conceal
+lost coverage.
+
+This verifier accepts CoreCLR host fixture evidence only. Its process observation covers the
+`dotnet` parent exit and captured output; it does not establish Unity native-process stability.
+Passing host receipts do not complete partial or missing lane requirements, player qualification,
+consumer deployment, allocation, or throughput acceptance. Historical results without a matching
+invocation receipt remain historical evidence.
+
 The generator remains `ISourceGenerator` with the Unity 2021.3 compiler floor. Unity documents
 [Roslyn 3.8 for that editor](https://docs.unity3d.com/2021.3/Documentation/Manual/roslyn-analyzers.html).
 The hybrid facade and bundled runtime remain supported during migration; dependency retirement
@@ -3046,5 +3073,5 @@ Three protobuf-net behaviors are worth knowing because they are easy to trip ove
   omitted.
 - **Negative zero is not preserved.** Default-value omission tests `value == 0`, and `-0.0 == 0.0`, so a
   `-0f` member is omitted and reads back as `+0f`.
-- **Members go out in ascending field number, not declaration order.** `FastVector3Int` declares
-  x, y, z, hash but tags them 1, 2, 4, 3, so its cached hash is written before z.
+- **Members go out in ascending field number.** Declarations with tags 3, 1, 2 are emitted as
+  1, 2, 3.

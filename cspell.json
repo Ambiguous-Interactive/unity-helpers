@@ -1254,5 +1254,26 @@
   "flagWords": [],
   "minWordLength": 3,
   "allowCompoundWords": true,
-  "caseSensitive": false
+  "caseSensitive": false,
+  "overrides": [
+    {
+      "filename": [
+        "cspell.json",
+        "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/CompatibilityCaseBindings.v1.json",
+        "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/CompatibilityClaimCatalog.v1.json"
+      ],
+      "words": [
+        "Assemblys",
+        "Entrys",
+        "FFFE",
+        "llo",
+        "wallstopproto",
+        "Dox",
+        "Isho",
+        "moduleinitializer",
+        "hostv",
+        "unemitted"
+      ]
+    }
+  ]
 }

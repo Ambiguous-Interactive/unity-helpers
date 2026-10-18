@@ -6,11 +6,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     using System;
 
     /// <summary>
-    /// Marks a method to run immediately before the annotated type is read into.
+    /// Marks a method to run during deserialization before the after-deserialization hook.
     /// </summary>
     /// <remarks>
-    /// This runs after the instance exists and before any member is assigned, which is the only
-    /// point at which state left over from a previous life can be cleared.
+    /// On mutable contracts this runs after the instance exists and before decoded members are
+    /// assigned. On immutable contracts it runs after construction has assigned the decoded members.
     /// <para>
     /// The method must take no parameters and return <see langword="void"/>. It may be private:
     /// generated formatters are emitted as a nested type of the contract, so they reach private

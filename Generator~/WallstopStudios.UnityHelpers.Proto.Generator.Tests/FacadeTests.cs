@@ -5,6 +5,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 {
     using System;
     using System.IO;
+    using System.Linq;
+    using Microsoft.CodeAnalysis;
+    using Microsoft.CodeAnalysis.CSharp;
+    using Microsoft.CodeAnalysis.CSharp.Syntax;
     using NUnit.Framework;
     using UnityHelpers.Core.Serialization;
     using UnityHelpers.Core.Serialization.WallstopProto;
@@ -38,6 +42,74 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             return limits
                 ? WProtoFacade.Deserialize<T>(bytes, null)
                 : WProtoFacade.Deserialize<T>(bytes);
+        }
+
+        [TestCase("None", 0)]
+        [TestCase("SystemBinary", 1)]
+        [TestCase("Protobuf", 2)]
+        [TestCase("Json", 3)]
+        public void SerializationTypeRetainsItsPublishedNumericValues(
+            string memberName,
+            int expected
+        )
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    ContractMirrorTests.RepositoryRoot(),
+                    "Runtime",
+                    "Core",
+                    "Serialization",
+                    "Serializer.cs"
+                )
+            );
+            EnumDeclarationSyntax declaration = CSharpSyntaxTree
+                .ParseText(source)
+                .GetRoot()
+                .DescendantNodes()
+                .OfType<EnumDeclarationSyntax>()
+                .Single(item =>
+                    string.Equals(
+                        item.Identifier.ValueText,
+                        "SerializationType",
+                        StringComparison.Ordinal
+                    )
+                );
+            NamespaceDeclarationSyntax owner = declaration
+                .Ancestors()
+                .OfType<NamespaceDeclarationSyntax>()
+                .Single();
+            Assert.AreEqual(
+                "WallstopStudios.UnityHelpers.Core.Serialization",
+                owner.Name.ToString()
+            );
+            CSharpCompilation compilation = CompatibilityInventory.Compile(
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        "using System; namespace "
+                            + owner.Name
+                            + " { "
+                            + declaration.ToFullString()
+                            + " }"
+                    ),
+                }
+            );
+            Assert.IsEmpty(
+                compilation
+                    .GetDiagnostics()
+                    .Where(item => item.Severity == DiagnosticSeverity.Error)
+            );
+            INamedTypeSymbol enumeration = compilation.GetTypeByMetadataName(
+                "WallstopStudios.UnityHelpers.Core.Serialization.SerializationType"
+            );
+            Assert.IsTrue(enumeration != null);
+            Assert.AreEqual(SpecialType.System_Int32, enumeration.EnumUnderlyingType.SpecialType);
+            IFieldSymbol member = enumeration
+                .GetMembers(memberName)
+                .OfType<IFieldSymbol>()
+                .Single();
+            Assert.IsTrue(member.HasConstantValue);
+            Assert.AreEqual(expected, member.ConstantValue);
         }
 
         [TestCase(false, false)]

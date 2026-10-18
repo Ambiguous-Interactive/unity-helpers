@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.Text.Json;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
+    using Microsoft.CodeAnalysis.CSharp.Syntax;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Tests.Serialization;
 
@@ -340,6 +341,505 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     ),
                 witness + " is not an executable NUnit test."
             );
+        }
+
+        private static IEnumerable<TestCaseData> BoundFixtureSources()
+        {
+            string path = Path.Combine(
+                ContractMirrorTests.RepositoryRoot(),
+                "Generator~",
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests",
+                "CompatibilityCaseBindings.v1.json"
+            );
+            using JsonDocument bindings = JsonDocument.Parse(File.ReadAllText(path));
+            Dictionary<string, List<string>> selectors = new Dictionary<string, List<string>>(
+                StringComparer.Ordinal
+            );
+            foreach (
+                JsonElement selector in bindings
+                    .RootElement.GetProperty("selectors")
+                    .EnumerateArray()
+            )
+            {
+                string fixture = selector.GetProperty("fixture").GetString();
+                if (!selectors.TryGetValue(fixture, out List<string> methods))
+                {
+                    methods = new List<string>();
+                    selectors.Add(fixture, methods);
+                }
+                string id = selector.GetProperty("id").GetString();
+                int separator = id.LastIndexOf('.');
+                Assert.Less(0, separator, id);
+                methods.Add(id.Substring(separator + 1));
+            }
+            int fixtureCount = 0;
+            foreach (
+                JsonElement fixture in bindings.RootElement.GetProperty("fixtures").EnumerateArray()
+            )
+            {
+                string name = fixture.GetProperty("fixture").GetString();
+                Assert.IsTrue(selectors.TryGetValue(name, out List<string> methods), name);
+                yield return new TestCaseData(
+                    fixture.GetProperty("sourcePath").GetString(),
+                    name,
+                    methods.ToArray()
+                ).SetName("CompatibilitySource." + name);
+                ++fixtureCount;
+            }
+            Assert.Less(0, fixtureCount);
+            Assert.AreEqual(selectors.Count, fixtureCount);
+        }
+
+        private static string SourceDeclarationName(SyntaxNode declaration)
+        {
+            List<string> parts = new List<string>();
+            foreach (SyntaxNode node in declaration.AncestorsAndSelf())
+            {
+                if (node is TypeDeclarationSyntax parentType)
+                {
+                    int arity =
+                        parentType.TypeParameterList == null
+                            ? 0
+                            : parentType.TypeParameterList.Parameters.Count;
+                    parts.Insert(
+                        0,
+                        parentType.Identifier.ValueText
+                            + (
+                                arity == 0
+                                    ? string.Empty
+                                    : "`" + arity.ToString(CultureInfo.InvariantCulture)
+                            )
+                    );
+                }
+                else if (node is NamespaceDeclarationSyntax containingNamespace)
+                {
+                    parts.Insert(0, containingNamespace.Name.ToString());
+                }
+            }
+            return string.Join(".", parts);
+        }
+
+        private static HashSet<string> LocalSourceDeclarations(SyntaxNode root)
+        {
+            HashSet<string> declarations = new HashSet<string>(StringComparer.Ordinal);
+            foreach (SyntaxNode node in root.DescendantNodes())
+            {
+                if (!(node is TypeDeclarationSyntax) && !(node is NamespaceDeclarationSyntax))
+                {
+                    continue;
+                }
+                string name = SourceDeclarationName(node);
+                declarations.Add(name);
+                int separator = name.LastIndexOf('.');
+                while (0 < separator)
+                {
+                    name = name.Substring(0, separator);
+                    declarations.Add(name);
+                    separator = name.LastIndexOf('.');
+                }
+            }
+            return declarations;
+        }
+
+        private static bool SourceNameIsShadowed(
+            SyntaxNode context,
+            string name,
+            HashSet<string> declarations
+        )
+        {
+            bool absolute = name.StartsWith("global::", StringComparison.Ordinal);
+            string normalized = absolute ? name.Substring("global::".Length) : name;
+            int separator = normalized.IndexOf('.');
+            string first = separator < 0 ? normalized : normalized.Substring(0, separator);
+            List<string> scopes = new List<string> { string.Empty };
+            if (!absolute)
+            {
+                foreach (SyntaxNode ancestor in context.Ancestors())
+                {
+                    if (ancestor is TypeDeclarationSyntax || ancestor is NamespaceDeclarationSyntax)
+                    {
+                        string scope = SourceDeclarationName(ancestor);
+                        scopes.Add(scope + ".");
+                        if (ancestor is NamespaceDeclarationSyntax)
+                        {
+                            int scopeSeparator = scope.LastIndexOf('.');
+                            while (0 < scopeSeparator)
+                            {
+                                scope = scope.Substring(0, scopeSeparator);
+                                scopes.Add(scope + ".");
+                                scopeSeparator = scope.LastIndexOf('.');
+                            }
+                        }
+                    }
+                }
+            }
+            foreach (string scope in scopes)
+            {
+                if (
+                    declarations.Contains(scope + first)
+                    || (separator < 0 && declarations.Contains(scope + first + "Attribute"))
+                )
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool IsTestAttributeName(string name)
+        {
+            string normalized = name.Replace("global::", string.Empty);
+            if (!normalized.EndsWith("Attribute", StringComparison.Ordinal))
+            {
+                normalized += "Attribute";
+            }
+            return string.Equals(
+                    normalized,
+                    typeof(TestAttribute).FullName,
+                    StringComparison.Ordinal
+                )
+                || string.Equals(
+                    normalized,
+                    typeof(TestCaseAttribute).FullName,
+                    StringComparison.Ordinal
+                )
+                || string.Equals(
+                    normalized,
+                    typeof(TestCaseSourceAttribute).FullName,
+                    StringComparison.Ordinal
+                )
+                || string.Equals(
+                    normalized,
+                    "UnityEngine.TestTools.UnityTestAttribute",
+                    StringComparison.Ordinal
+                );
+        }
+
+        private static bool HasSourceTestAttribute(
+            MethodDeclarationSyntax method,
+            HashSet<string> declarations
+        )
+        {
+            List<UsingDirectiveSyntax> imports = new List<UsingDirectiveSyntax>();
+            foreach (SyntaxNode ancestor in method.Ancestors())
+            {
+                if (ancestor is NamespaceDeclarationSyntax containingNamespace)
+                {
+                    imports.AddRange(containingNamespace.Usings);
+                }
+                else if (ancestor is CompilationUnitSyntax unit)
+                {
+                    imports.AddRange(unit.Usings);
+                }
+            }
+            foreach (AttributeListSyntax list in method.AttributeLists)
+            {
+                foreach (AttributeSyntax attribute in list.Attributes)
+                {
+                    string name = attribute.Name.ToString();
+                    bool aliasMatched = false;
+                    foreach (UsingDirectiveSyntax import in imports)
+                    {
+                        if (import.Alias == null)
+                        {
+                            continue;
+                        }
+                        string alias = import.Alias.Name.Identifier.ValueText;
+                        bool suffixedAlias =
+                            name.IndexOf('.') < 0
+                            && string.Equals(alias, name + "Attribute", StringComparison.Ordinal);
+                        if (
+                            string.Equals(name, alias, StringComparison.Ordinal)
+                            || name.StartsWith(alias + ".", StringComparison.Ordinal)
+                            || suffixedAlias
+                        )
+                        {
+                            string suffix = suffixedAlias
+                                ? string.Empty
+                                : name.Substring(alias.Length);
+                            if (
+                                IsTestAttributeName(import.Name + suffix)
+                                && !SourceNameIsShadowed(attribute, name, declarations)
+                                && !SourceNameIsShadowed(
+                                    import,
+                                    import.Name.ToString(),
+                                    declarations
+                                )
+                            )
+                            {
+                                return true;
+                            }
+                            aliasMatched = true;
+                            break;
+                        }
+                    }
+                    if (aliasMatched)
+                    {
+                        continue;
+                    }
+                    if (
+                        IsTestAttributeName(name)
+                        && !SourceNameIsShadowed(attribute, name, declarations)
+                    )
+                    {
+                        return true;
+                    }
+                    foreach (UsingDirectiveSyntax import in imports)
+                    {
+                        if (
+                            import.Alias == null
+                            && IsTestAttributeName(import.Name + "." + name)
+                            && !SourceNameIsShadowed(attribute, name, declarations)
+                            && !SourceNameIsShadowed(import, import.Name.ToString(), declarations)
+                        )
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static void AssertSourceFixture(
+            string source,
+            string fixture,
+            string[] methods,
+            string[][] profiles
+        )
+        {
+            Assert.Less(0, methods.Length, fixture);
+            Assert.Less(0, profiles.Length, fixture);
+            Assert.AreEqual(
+                methods.Length,
+                new HashSet<string>(methods, StringComparer.Ordinal).Count
+            );
+            HashSet<string> found = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string[] profile in profiles)
+            {
+                SyntaxTree tree = CSharpSyntaxTree.ParseText(
+                    source,
+                    new CSharpParseOptions(LanguageVersion.Latest, preprocessorSymbols: profile)
+                );
+                Assert.IsFalse(
+                    tree.GetDiagnostics()
+                        .Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+                    fixture
+                );
+                TypeDeclarationSyntax[] types = tree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<TypeDeclarationSyntax>()
+                    .Where(type =>
+                        string.Equals(
+                            SourceDeclarationName(type),
+                            fixture,
+                            StringComparison.Ordinal
+                        )
+                    )
+                    .ToArray();
+                Assert.LessOrEqual(types.Length, 1, "Ambiguous source fixture " + fixture);
+                if (types.Length == 0)
+                {
+                    continue;
+                }
+                HashSet<string> declarations = LocalSourceDeclarations(tree.GetRoot());
+                foreach (string method in methods)
+                {
+                    MethodDeclarationSyntax[] candidates = types[0]
+                        .Members.OfType<MethodDeclarationSyntax>()
+                        .Where(member =>
+                            string.Equals(
+                                member.Identifier.ValueText,
+                                method,
+                                StringComparison.Ordinal
+                            )
+                        )
+                        .ToArray();
+                    Assert.LessOrEqual(candidates.Length, 1, fixture + "." + method);
+                    if (candidates.Length == 0)
+                    {
+                        continue;
+                    }
+                    Assert.IsTrue(
+                        candidates[0].Modifiers.Any(SyntaxKind.PublicKeyword),
+                        fixture + "." + method
+                    );
+                    Assert.IsTrue(
+                        HasSourceTestAttribute(candidates[0], declarations),
+                        fixture + "." + method + " is not a declared NUnit or Unity test."
+                    );
+                    found.Add(method);
+                }
+            }
+            CollectionAssert.AreEquivalent(
+                methods,
+                found,
+                "Source declarations only; no case execution or backend qualification: " + fixture
+            );
+        }
+
+        [TestCaseSource(nameof(BoundFixtureSources))]
+        public void BoundFixtureSelectorsNameDeclaredSourceTests(
+            string sourcePath,
+            string fixture,
+            string[] methods
+        )
+        {
+            string[][] profiles =
+            {
+                Array.Empty<string>(),
+                new[] { "PROTOBUF_NET_ORACLE_V2" },
+                new[]
+                {
+                    "UNITY_5_3_OR_NEWER",
+                    "UNITY_EDITOR",
+                    "UNITY_INCLUDE_TESTS",
+                    "WALLSTOP_PROTO",
+                },
+                new[]
+                {
+                    "UNITY_5_3_OR_NEWER",
+                    "UNITY_EDITOR",
+                    "UNITY_INCLUDE_TESTS",
+                    "WALLSTOP_PROTO",
+                    "WALLSTOP_PROTO_ONLY",
+                },
+            };
+            AssertSourceFixture(
+                File.ReadAllText(Path.Combine(ContractMirrorTests.RepositoryRoot(), sourcePath)),
+                fixture,
+                methods,
+                profiles
+            );
+        }
+
+        [TestCase(
+            "namespace Claims { public class Other { [NUnit.Framework.Test] public void Witness() {} } }"
+        )]
+        [TestCase(
+            "namespace Other { public class Evidence { [NUnit.Framework.Test] public void Witness() {} } }"
+        )]
+        [TestCase(
+            "namespace Claims { public class Evidence { [NUnit.Framework.Test] public void Other() {} } }"
+        )]
+        [TestCase("namespace Claims { public class Evidence { public void Witness() {} } }")]
+        [TestCase(
+            "namespace Claims { public class Evidence { [Other.Test] public void Witness() {} } }"
+        )]
+        [TestCase(
+            "namespace Claims { public class Evidence { [NUnit.Framework.Test] private void Witness() {} } }"
+        )]
+        [TestCase(
+            "namespace Claims { public class Evidence { [NUnit.Framework.Test] public void Witness() {} [NUnit.Framework.TestCase(1)] public void Witness(int value) {} } }"
+        )]
+        [TestCase(
+            "using NUnit.Framework; using Test = Other.TestAttribute; namespace Claims { public class Evidence { [Test] public void Witness() {} } }"
+        )]
+        [TestCase(
+            "using NUnit.Framework; namespace Claims { public sealed class TestAttribute : System.Attribute {} public class Evidence { [Test] public void Witness() {} } }"
+        )]
+        [TestCase(
+            "namespace Claims { namespace NUnit.Framework { public sealed class TestAttribute : System.Attribute {} } public class Evidence { [NUnit.Framework.Test] public void Witness() {} } }"
+        )]
+        [TestCase(
+            "namespace Claims { public class NUnit { public class Framework { public sealed class TestAttribute : System.Attribute {} } } public class Evidence { [NUnit.Framework.Test] public void Witness() {} } }"
+        )]
+        [TestCase(
+            "namespace Claims { public class Evidence<T> { [NUnit.Framework.Test] public void Witness() {} } }"
+        )]
+        [TestCase(
+            "using Tests = NUnit.Framework; namespace Claims { public class Tests { public sealed class TestAttribute : System.Attribute {} } public class Evidence { [Tests.Test] public void Witness() {} } }"
+        )]
+        [TestCase(
+            "using NUnit.Framework; using TestAttribute = Other.TestAttribute; namespace Claims { public class Evidence { [Test] public void Witness() {} } }"
+        )]
+        public void SourceSelectorsRejectMissingAmbiguousAndNonTestDeclarations(string source)
+        {
+            Assert.Throws<AssertionException>(() =>
+                AssertSourceFixture(
+                    source,
+                    "Claims.Evidence",
+                    new[] { "Witness" },
+                    new[] { Array.Empty<string>() }
+                )
+            );
+        }
+
+        [Test]
+        public void SourceSelectorsRejectAnEnclosingNamespaceAttributeShadow()
+        {
+            const string Source =
+                "namespace Claims.NUnit.Framework { public sealed class TestAttribute : System.Attribute {} } namespace Claims.Nested { public class Evidence { [NUnit.Framework.Test] public void Witness() {} } }";
+            Assert.Throws<AssertionException>(() =>
+                AssertSourceFixture(
+                    Source,
+                    "Claims.Nested.Evidence",
+                    new[] { "Witness" },
+                    new[] { Array.Empty<string>() }
+                )
+            );
+        }
+
+        [TestCase("using NUnit.Framework;", "Test")]
+        [TestCase("using NUnit.Framework;", "TestCase(1)")]
+        [TestCase("using NUnit.Framework;", "TestCaseSource(\"Cases\")")]
+        [TestCase("using Case = NUnit.Framework.TestAttribute;", "Case")]
+        [TestCase("using Tests = NUnit.Framework;", "Tests.Test")]
+        [TestCase("using TestAttribute = NUnit.Framework.TestAttribute;", "Test")]
+        [TestCase("using UnityEngine.TestTools;", "UnityTest")]
+        [TestCase(
+            "using NUnit.Framework; namespace Other { public sealed class TestAttribute : System.Attribute {} }",
+            "Test"
+        )]
+        [TestCase(
+            "namespace Claims.NUnit.Framework { public sealed class TestAttribute : System.Attribute {} }",
+            "global::NUnit.Framework.Test"
+        )]
+        public void SourceSelectorsRecognizeTestAttributesWithoutExecutingMethods(
+            string imports,
+            string attribute
+        )
+        {
+            string source =
+                imports
+                + " namespace Claims { public class Evidence { [NUnit.Framework.SetUp] public void Prepare() { throw new System.Exception(); } ["
+                + attribute
+                + "] public void Witness() { throw new System.Exception(); } } }";
+            AssertSourceFixture(
+                source,
+                "Claims.Evidence",
+                new[] { "Witness" },
+                new[] { Array.Empty<string>() }
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SourceSelectorsRespectConditionalProfiles(bool enabled)
+        {
+            const string Source =
+                "namespace Claims { public class Evidence {\n#if WALLSTOP_PROTO_ONLY\n[NUnit.Framework.Test] public void Witness() {}\n#endif\n} }";
+            string[] profile = enabled ? new[] { "WALLSTOP_PROTO_ONLY" } : Array.Empty<string>();
+            if (enabled)
+            {
+                AssertSourceFixture(
+                    Source,
+                    "Claims.Evidence",
+                    new[] { "Witness" },
+                    new[] { profile }
+                );
+            }
+            else
+            {
+                Assert.Throws<AssertionException>(() =>
+                    AssertSourceFixture(
+                        Source,
+                        "Claims.Evidence",
+                        new[] { "Witness" },
+                        new[] { profile }
+                    )
+                );
+            }
         }
 
         [Test]

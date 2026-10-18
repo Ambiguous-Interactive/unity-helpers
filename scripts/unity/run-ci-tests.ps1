@@ -219,6 +219,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/compilation-fixture-results.ps1')
+. (Join-Path $PSScriptRoot 'lib/test-result-evidence.ps1')
 if ($IsolateCompilationFixtures -and $TestMode -ne 'editmode') {
     throw 'Compilation fixture isolation requires EditMode.'
 }
@@ -3463,26 +3464,9 @@ function Get-FrozenPlayerJointCorrectness {
     $leaves = @()
     $reason = $null
     try {
-        $resultFile = Get-Item -LiteralPath $ResultsPath -Force -ErrorAction Stop
-        if ($resultFile.PSIsContainer -or $resultFile.Length -lt 1 -or $resultFile.Length -gt 33554432) {
-            throw 'Joint correctness XML must be a nonempty file of at most 32 MiB.'
-        }
-        $settings = New-Object Xml.XmlReaderSettings
-        $settings.MaxCharactersInDocument = 33554432
-        $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
-        $settings.XmlResolver = $null
-        $reader = [Xml.XmlReader]::Create($ResultsPath, $settings)
-        try { $xml = New-Object Xml.XmlDocument; $xml.Load($reader) } finally { $reader.Dispose() }
-        $run = $xml.SelectSingleNode('/test-run')
-        if ($null -eq $run -or $run.GetAttribute('result') -cne 'Passed' -or
-            $run.GetAttribute('testcasecount') -cne '3' -or $run.GetAttribute('total') -cne '3' -or $run.GetAttribute('passed') -cne '3' -or
-            $run.GetAttribute('failed') -cne '0' -or $run.GetAttribute('skipped') -cne '0' -or
-            $run.GetAttribute('inconclusive') -cne '0' -or
-            $xml.SelectNodes("//test-suite[not(@result='Passed')]|//failure").Count -ne 0) {
-            throw 'Joint correctness root counts or lifecycle results contradict three passed cases.'
-        }
-        $leaves = @($xml.SelectNodes('//test-case') | ForEach-Object {
-                [pscustomobject]@{ FullName = $_.GetAttribute('fullname'); Result = $_.GetAttribute('result') }
+        $evidence = Read-TestResultEvidence -Path $ResultsPath -Format NUnit
+        $leaves = @($evidence.Cases | ForEach-Object {
+                [pscustomobject]@{ FullName = $_.FullName; Result = $_.Result }
             })
         if ($leaves.Count -ne $expected.Count) { throw 'Joint correctness requires exactly the three declared native cases.' }
         foreach ($name in $expected) {
@@ -4650,36 +4634,7 @@ function Read-UnityProcessFailureEvents {
 
 function Get-UnityNativeReportSummary {
     param([string]$LogPath)
-
-    $summary = [ordered]@{
-        State = 'missing-log'
-        NativeReportHeaderCount = 0
-        UnknownNativeConditionCount = 0
-        NativeReportHeaderLines = @()
-        UnknownNativeConditionLines = @()
-        LocationsTruncated = $false
-    }
-    if ([string]::IsNullOrWhiteSpace($LogPath) -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return $summary }
-    try {
-        $lineNumber = 0
-        foreach ($line in [IO.File]::ReadLines($LogPath)) {
-            ++$lineNumber
-            if (0 -le $line.IndexOf('Native Crash Reporting', [StringComparison]::OrdinalIgnoreCase)) {
-                ++$summary.NativeReportHeaderCount
-                if ($summary.NativeReportHeaderLines.Count -lt 8) { $summary.NativeReportHeaderLines += $lineNumber }
-                else { $summary.LocationsTruncated = $true }
-            }
-            if (0 -le $line.IndexOf('Got a UNKNOWN while executing native code', [StringComparison]::OrdinalIgnoreCase)) {
-                ++$summary.UnknownNativeConditionCount
-                if ($summary.UnknownNativeConditionLines.Count -lt 8) { $summary.UnknownNativeConditionLines += $lineNumber }
-                else { $summary.LocationsTruncated = $true }
-            }
-        }
-        $summary.State = 'observed'
-    } catch {
-        $summary.State = 'unreadable-log'
-    }
-    return $summary
+    return Get-NativeReportSummary -LogPath $LogPath
 }
 
 function Write-UnityExecutionObservation {

@@ -2840,6 +2840,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ADirectInterfaceMemberIsRefusedEvenWithADeclaredRoot(bool declaredRoot)
+        {
+            string registration = declaredRoot
+                ? "[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.Thing))]\n"
+                : string.Empty;
+            AssertDiagnostic(
+                "WPROTO003",
+                "Value",
+                registration
+                    + @"public interface IThing { }
+                      [WProtoContract] public sealed partial class Thing : IThing
+                      {
+                          [WProtoMember(1)] public int Number;
+                      }
+                      [WProtoContract] public sealed partial class Holder
+                      {
+                          [WProtoMember(1)] public IThing Value;
+                      }"
+            );
+        }
+
         [Test]
         public void EveryConstructibleCollectionIsAccepted()
         {
@@ -3300,6 +3323,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                       [WProtoMember(2)] public string Name { get; }
                       [WProtoMember(3)] public readonly int[] Marks;
                       public Frozen() { }
+                  }"
+            );
+        }
+
+        [TestCase("public readonly int Value;")]
+        [TestCase("public int Value { get; }")]
+        public void ImmutableMembersWithAnIncludeAreRefused(string member)
+        {
+            AssertDiagnostic(
+                "WPROTO015",
+                "Frozen",
+                @"[WProtoContract] [WProtoInclude(100, typeof(Leaf))]
+                  public partial class Frozen
+                  {
+                      [WProtoMember(1)] "
+                    + member
+                    + @"
+                  }
+                  [WProtoContract] public sealed partial class Leaf : Frozen
+                  {
+                      [WProtoMember(1)] public int Other;
                   }"
             );
         }

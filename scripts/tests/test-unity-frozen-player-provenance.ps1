@@ -3,6 +3,7 @@
 param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '../unity/lib/test-result-evidence.ps1')
 $runner = Join-Path $PSScriptRoot '../unity/run-ci-tests.ps1'
 $source = Get-Content -LiteralPath $runner -Raw
 $tokens = $null

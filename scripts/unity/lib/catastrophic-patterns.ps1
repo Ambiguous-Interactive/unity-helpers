@@ -42,6 +42,34 @@ function Get-CatastrophicPatterns {
     )
 }
 
+function Get-NativeReportSummary {
+    param([string]$LogPath)
+    $summary = [ordered]@{
+        State = 'missing-log'; NativeReportHeaderCount = 0; UnknownNativeConditionCount = 0
+        NativeReportHeaderLines = @(); UnknownNativeConditionLines = @(); LocationsTruncated = $false
+    }
+    if ([string]::IsNullOrWhiteSpace($LogPath) -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return $summary }
+    try {
+        $lineNumber = 0
+        foreach ($line in [IO.File]::ReadLines($LogPath)) {
+            ++$lineNumber
+            if (0 -le $line.IndexOf('Native Crash Reporting', [StringComparison]::OrdinalIgnoreCase)) {
+                ++$summary.NativeReportHeaderCount
+                if ($summary.NativeReportHeaderLines.Count -lt 8) { $summary.NativeReportHeaderLines += $lineNumber }
+                else { $summary.LocationsTruncated = $true }
+            }
+            if (0 -le $line.IndexOf('Got a UNKNOWN while executing native code', [StringComparison]::OrdinalIgnoreCase)) {
+                ++$summary.UnknownNativeConditionCount
+                if ($summary.UnknownNativeConditionLines.Count -lt 8) { $summary.UnknownNativeConditionLines += $lineNumber }
+                else { $summary.LocationsTruncated = $true }
+            }
+        }
+        $summary.State = 'observed'
+    } catch { $summary.State = 'unreadable-log' }
+    return $summary
+}
+
+
 # ENVIRONMENT WARNING PATTERNS: a Unity leg can pass every test and still be sick.
 #
 # Measured on run 33365150391 (issue #657): the runner's copy of
@@ -56,6 +84,7 @@ function Get-CatastrophicPatterns {
 # a green suite on a host-level fault would be a worse trade than a slow diagnosis.
 # The point is that the next occurrence is named in the job summary instead of costing
 # an hour of log archaeology.
+
 function Get-EnvironmentWarningPatterns {
     [CmdletBinding()]
     param()

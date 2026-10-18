@@ -11,14 +11,26 @@ on:
       - main
     paths:
       - "Generator~/**"
-      - "Runtime/Analyzers/**"
-      - "Runtime/Core/Serialization/WallstopProto/**"
+      - "Runtime/**"
+      - "Editor/**"
+      - "Tests/**"
+      - "docs/features/serialization/serialization.md"
+      - "scripts/run-wproto-evidence.ps1"
+      - "scripts/verify-wproto-evidence.ps1"
+      - "scripts/unity/lib/test-result-evidence.ps1"
+      - "scripts/unity/lib/catastrophic-patterns.ps1"
       - ".github/workflows/wproto-generator.yml"
   pull_request:
     paths:
       - "Generator~/**"
-      - "Runtime/Analyzers/**"
-      - "Runtime/Core/Serialization/WallstopProto/**"
+      - "Runtime/**"
+      - "Editor/**"
+      - "Tests/**"
+      - "docs/features/serialization/serialization.md"
+      - "scripts/run-wproto-evidence.ps1"
+      - "scripts/verify-wproto-evidence.ps1"
+      - "scripts/unity/lib/test-result-evidence.ps1"
+      - "scripts/unity/lib/catastrophic-patterns.ps1"
       - ".github/workflows/wproto-generator.yml"
 
 permissions:
@@ -68,9 +80,19 @@ jobs:
       - name: Test the generator against protobuf-net 3.2.56
         # The formatters under test are the shipped analyzer's own output, produced the way Unity
         # produces them, rather than a transcription of what it ought to emit.
-        run: dotnet test "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj" -c Release --nologo -p:ProtobufNetOracle=v3
+        shell: pwsh
+        run: ./scripts/run-wproto-evidence.ps1 -Oracle v3 -OutputRoot "$env:RUNNER_TEMP/wproto-evidence"
 
       - name: Test the generator against protobuf-net 2.4.9
         # The two oracle DLLs share an assembly name. A second process is the only reliable
         # isolation boundary; side-by-side aliases can silently bind both references to v3.
-        run: dotnet test "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj" -c Release --nologo -p:ProtobufNetOracle=v2
+        shell: pwsh
+        run: ./scripts/run-wproto-evidence.ps1 -Oracle v2 -OutputRoot "$env:RUNNER_TEMP/wproto-evidence"
+
+      - name: Retain oracle invocation evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: wproto-oracle-evidence
+          path: ${{ runner.temp }}/wproto-evidence
+          if-no-files-found: warn
