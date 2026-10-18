@@ -1274,6 +1274,10 @@
         "hostv",
         "unemitted"
       ]
+    },
+    {
+      "filename": ["scripts/unity/wproto-corpus.v1.json"],
+      "ignoreRegExpList": ["/\"sha256\":\\s*\"[A-Za-z0-9+/]{43}=\"/g"]
     }
   ]
 }

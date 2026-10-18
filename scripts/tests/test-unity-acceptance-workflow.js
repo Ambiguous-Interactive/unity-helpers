@@ -15,7 +15,7 @@ assert.match(option, /^        default: "none"$/m);
 assert.match(option, /^        type: choice$/m);
 assert.deepEqual(
   [...option.matchAll(/^          - (\w+)$/gm)].map((match) => match[1]),
-  ["none", "sentinel", "intmap", "serialization", "nullableconsumer", "borrowed", "all"]
+  ["none", "sentinel", "intmap", "serialization", "nullableconsumer", "borrowed", "wproto", "all"]
 );
 const job = workflow.match(/^  unity-tests:\n([\s\S]*?)(?=^  [\w-]+:\n)/m)?.[1];
 assert.ok(job, "Default licensed job must exist");
@@ -79,6 +79,7 @@ function predicate(step) {
 }
 
 const run = identified("run_acceptance");
+assert.match(run, /timeout-minutes: \$\{\{ inputs\.acceptance == 'wproto' && 150 \|\| 120 \}\}/);
 const diagnostics = workflow.match(/^      intmap-diagnostics:\n((?:        [^\n]*\n|\n)+)/m)?.[1];
 assert.ok(diagnostics, "Manual diagnostic input must exist");
 assert.match(diagnostics, /^        default: false$/m);
@@ -96,6 +97,7 @@ for (const event of ["pull_request", "push", "workflow_dispatch"]) {
     "serialization",
     "nullableconsumer",
     "borrowed",
+    "wproto",
     "all"
   ]) {
     for (const requested of [undefined, false, true]) {
@@ -112,9 +114,23 @@ for (const event of ["pull_request", "push", "workflow_dispatch"]) {
 }
 const verify = identified("verify_acceptance");
 const redact = identified("redact_acceptance");
+const reverify = identified("reverify_wproto_acceptance");
 const upload = identified("upload_acceptance");
+const uploadPaths = upload
+  .match(/^          path: \|\n((?:            [^\n]*\n)+)/m)?.[1]
+  ?.trim()
+  .split("\n")
+  .map((line) => line.trim());
+assert.equal(
+  uploadPaths?.length,
+  2,
+  "Acceptance upload requires its directory and conditional summary exclusion"
+);
+assert.equal(uploadPaths[0], ".artifacts/unity/${{ matrix.unity-version }}-acceptance");
+assert.match(upload, /^          name: unity-\$\{\{ matrix\.unity-version \}\}-acceptance$/m);
+const summaryExclusion = expression(uploadPaths[1]);
 const gate = named("Require requested native acceptance");
-const selectedSteps = [run, verify, redact, upload, gate];
+const selectedSteps = [run, verify, redact, reverify, upload, gate];
 const predicates = selectedSteps.map(predicate);
 let controls = diagnosticControls;
 for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
@@ -126,12 +142,19 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
     "serialization",
     "nullableconsumer",
     "borrowed",
+    "wproto",
     "all"
   ]) {
-    for (const unityVersion of ["2021.3.45f1", "2022.3.45f1", "6000.6.0f1"]) {
+    for (const unityVersion of ["2021.3.45f1", "2022.3.45f1", "6000.5.2f1", "6000.6.0f1"]) {
       for (const cancelled of [false, true]) {
         for (const acquired of ["true", "false", ""]) {
-          for (const redaction of ["success", "failure", "skipped"]) {
+          for (const { redaction, reverification } of ["success", "failure", "skipped"].flatMap(
+            (redaction) =>
+              ["success", "failure", "skipped", "cancelled", ""].map((reverification) => ({
+                redaction,
+                reverification
+              }))
+          )) {
             const context = {
               github: { event_name: event },
               inputs: { acceptance },
@@ -143,7 +166,8 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
               steps: {
                 checkout: { outcome: "success" },
                 unity_lock: { outputs: { acquired } },
-                redact_acceptance: { outcome: redaction }
+                redact_acceptance: { outcome: redaction },
+                reverify_wproto_acceptance: { outcome: reverification }
               }
             };
             const requested =
@@ -154,14 +178,16 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
                 "serialization",
                 "nullableconsumer",
                 "borrowed",
+                "wproto",
                 "all"
               ].includes(acceptance) &&
-              (acceptance !== "nullableconsumer" ||
+              (!["nullableconsumer", "wproto"].includes(acceptance) ||
                 ["2021.3.45f1", "6000.6.0f1"].includes(unityVersion));
             const expected = [
               requested && !cancelled && acquired === "true",
               requested && !cancelled,
               requested,
+              requested && acceptance === "wproto" && !cancelled && redaction === "success",
               requested && redaction === "success",
               requested && !cancelled
             ];
@@ -169,10 +195,17 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
               assert.equal(
                 Boolean(test(context)),
                 expected[index],
-                `Wrong predicate for ${["run", "verify", "redact", "upload", "gate"][index]}: ${JSON.stringify(context)}`
+                `Wrong predicate for ${["run", "verify", "redact", "reverify", "upload", "gate"][index]}: ${JSON.stringify(context)}`
               )
             );
-            controls += predicates.length;
+            assert.equal(
+              summaryExclusion(context),
+              acceptance === "wproto" && reverification !== "success"
+                ? "!**/corpus-summary.json"
+                : "",
+              `Wrong rejected-capture summary exclusion: ${JSON.stringify(context)}`
+            );
+            controls += predicates.length + 1;
           }
         }
       }
@@ -238,6 +271,11 @@ for (const step of [run, verify, redact, upload]) {
 }
 assert.doesNotMatch(gate, /continue-on-error:/);
 assert.match(upload, /if-no-files-found: error/);
+assert.ok(job.indexOf(redact) < job.indexOf(reverify));
+assert.ok(job.indexOf(reverify) < job.indexOf(upload));
+assert.ok(reverify.includes("./scripts/unity/verify-acceptance.ps1"));
+assert.ok(reverify.includes("-Acceptance 'wproto'"));
+assert.match(reverify, /timeout-minutes: 5/);
 const nodeSetup = named("Setup Node.js for credential redaction");
 assert.ok(
   job.indexOf(nodeSetup) < job.indexOf(verify),
@@ -249,6 +287,7 @@ for (const [phase, id] of [
   ["RUN", "run_acceptance"],
   ["VERIFY", "verify_acceptance"],
   ["REDACT", "redact_acceptance"],
+  ["REVERIFY", "reverify_wproto_acceptance"],
   ["UPLOAD", "upload_acceptance"]
 ]) {
   assert.ok(
@@ -260,12 +299,27 @@ const body = gate
   .match(/^        run: \|\n((?:          [^\n]*\n|\n)+)/m)?.[1]
   ?.replace(/^ {10}/gm, "");
 assert.ok(body, "Executable outcome gate required");
-const gateCases = [{ outcomes: ["success", "success", "success", "success"], reject: false }];
+const gateCases = [
+  {
+    acceptance: "intmap",
+    reverification: "skipped",
+    outcomes: ["success", "success", "success", "success"],
+    reject: false
+  }
+];
+for (const reverification of ["success", "failure", "cancelled", "skipped", "", "unknown"]) {
+  gateCases.push({
+    acceptance: "wproto",
+    reverification,
+    outcomes: ["success", "success", "success", "success"],
+    reject: reverification !== "success"
+  });
+}
 for (let stage = 0; stage < 4; stage++) {
   for (const failure of ["failure", "cancelled", "skipped", "", "unknown"]) {
     const outcomes = ["success", "success", "success", "success"];
     outcomes[stage] = failure;
-    gateCases.push({ outcomes, reject: true });
+    gateCases.push({ acceptance: "intmap", reverification: "skipped", outcomes, reject: true });
   }
 }
 const result = spawnSync(
@@ -278,6 +332,8 @@ const result = spawnSync(
 $ErrorActionPreference = 'Stop'
 $gate = [scriptblock]::Create([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:ACCEPTANCE_GATE_BODY)))
 foreach ($case in ($env:ACCEPTANCE_GATE_CASES | ConvertFrom-Json)) {
+    [Environment]::SetEnvironmentVariable('UH_ACCEPTANCE', $case.acceptance, 'Process')
+    [Environment]::SetEnvironmentVariable('ACCEPTANCE_REVERIFY', $case.reverification, 'Process')
     $stages = @('RUN', 'VERIFY', 'REDACT', 'UPLOAD')
     for ($index = 0; $index -lt $stages.Count; $index++) {
         [Environment]::SetEnvironmentVariable('ACCEPTANCE_' + $stages[$index], $case.outcomes[$index], 'Process')

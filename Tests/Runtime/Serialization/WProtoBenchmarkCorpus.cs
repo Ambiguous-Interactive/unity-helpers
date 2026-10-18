@@ -8,6 +8,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.Globalization;
     using System.IO;
     using System.Security.Cryptography;
+    using System.Text;
+    using System.Text.Json;
     using NUnit.Framework;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -51,6 +53,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public const string WritePublic = "write-public";
         private const int BenchmarkSeed = 343;
         private const double CalibrationTargetMilliseconds = 50;
+        private const int CalibrationAttemptCount = 21;
         private const string VerifyOnly = "verify";
 
         private static readonly int[] CorpusSizes = { 0, 1, 32, 1024 };
@@ -99,6 +102,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 );
             }
 #endif
+            int expectedWorkloads = operation.StartsWith("read-", StringComparison.Ordinal)
+                ? 32
+                : 28;
+            UnityEngine.Debug.Log(
+                FormattableString.Invariant(
+                    $"WPROTO_CORPUS_PLAN {CorpusVersion} {operation} {{\"SchemaVersion\":1,\"Seed\":{BenchmarkSeed},\"CalibrationTargetMilliseconds\":{CalibrationTargetMilliseconds:R},\"Batches\":{BenchmarkProtocol.CalibratedBatches},\"CyclesPerBatch\":{BenchmarkProtocol.CyclesPerBatch},\"BatchOrder\":\"ABBABAAB\",\"ExpectedWorkloads\":{expectedWorkloads}}}"
+                )
+            );
             IReadOnlyList<IReadOnlyList<CalibratedBenchmarkMeasurement>> families = RunFrozenCorpus(
                 operation
             );
@@ -344,7 +355,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             using SHA256 fingerprint = SHA256.Create();
             string inputHash = Convert.ToBase64String(fingerprint.ComputeHash(input));
             UnityEngine.Debug.Log(
-                $"WPROTO_CORPUS_INPUT {CorpusVersion} {family}/{workload} bytes={input.Length} sha256={inputHash}"
+                $"WPROTO_CORPUS_INPUT {CorpusVersion} {operation} {family}/{workload} bytes={input.Length} sha256={inputHash}"
             );
             Assert.IsTrue(
                 ProtoBenchmarkCorpusIdentity.TryAccept(
@@ -521,15 +532,99 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
                 return checksum;
             };
+            if (identities.Count == 1)
+            {
+                MeasureSameCodeControl(operation, "reference-same-code", referenceWork, verify);
+                MeasureSameCodeControl(operation, "subject-same-code", subjectWork, verify);
+            }
+            CalibratedBenchmarkMeasurement samples = MeasureWithCalibration(
+                operation,
+                family + "/" + workload,
+                referenceWork,
+                subjectWork,
+                verify
+            );
+            UnityEngine.Debug.Log(
+                $"WPROTO_CORPUS_SAMPLES {CorpusVersion} {operation} {family} {workload} bytes={input.Length} sha256={inputHash} {(samples == null ? "inconclusive: calibration failed" : samples.ToJson())}"
+            );
+            return samples;
+        }
+
+        private static void MeasureSameCodeControl(
+            string operation,
+            string control,
+            Func<int, long> work,
+            Action verify
+        )
+        {
+            CalibratedBenchmarkMeasurement samples = MeasureWithCalibration(
+                operation,
+                control,
+                work,
+                work,
+                verify
+            );
+            UnityEngine.Debug.Log(
+                $"WPROTO_CORPUS_CONTROL {CorpusVersion} {operation} {control} {(samples == null ? "inconclusive: calibration failed" : samples.ToJson())}"
+            );
+        }
+
+        private static CalibratedBenchmarkMeasurement MeasureWithCalibration(
+            string operation,
+            string identity,
+            Func<int, long> referenceWork,
+            Func<int, long> subjectWork,
+            Action verify
+        )
+        {
+            int[] iterations = new int[CalibrationAttemptCount];
+            double[] reference = new double[CalibrationAttemptCount];
+            double[] subject = new double[CalibrationAttemptCount];
+            int observed = 0;
             CalibratedBenchmarkMeasurement samples = BenchmarkProtocol.MeasureCalibrated(
                 referenceWork,
                 subjectWork,
                 verify,
                 BenchmarkSeed,
-                CalibrationTargetMilliseconds
+                CalibrationTargetMilliseconds,
+                (count, referenceMilliseconds, subjectMilliseconds) =>
+                {
+                    if (observed >= CalibrationAttemptCount)
+                    {
+                        Assert.Fail("The calibration attempt plan changed.");
+                        return;
+                    }
+                    iterations[observed] = count;
+                    reference[observed] = referenceMilliseconds;
+                    subject[observed] = subjectMilliseconds;
+                    ++observed;
+                }
             );
+            using MemoryStream stream = new MemoryStream();
+            Utf8JsonWriter writer = new Utf8JsonWriter(stream);
+            try
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("SchemaVersion", 1);
+                writer.WriteStartArray("Pairs");
+                for (int index = 0; index < observed; ++index)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteNumber("Iterations", iterations[index]);
+                    writer.WriteNumber("ReferenceMilliseconds", reference[index]);
+                    writer.WriteNumber("SubjectMilliseconds", subject[index]);
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+                writer.WriteEndObject();
+            }
+            finally
+            {
+                writer.Dispose();
+            }
+            string record = Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length);
             UnityEngine.Debug.Log(
-                $"WPROTO_CORPUS_SAMPLES {CorpusVersion} {operation} {family} {workload} bytes={input.Length} sha256={inputHash} {(samples == null ? "inconclusive: calibration failed" : samples.ToJson())}"
+                $"WPROTO_CORPUS_CALIBRATION {CorpusVersion} {operation} {identity} {record}"
             );
             return samples;
         }

@@ -32,5 +32,27 @@ for (const acceptance of ["none", "serialization", "all"]) {
     controls++;
   }
 }
-assert.equal(controls, 18);
-console.log(`Nullable consumer matrix controls passed: ${controls}`);
+for (const version of versions) {
+  for (const mode of ["all", "editmode", "playmode", "standalone"]) {
+    if (["2021.3.45f1", "6000.6.0f1"].includes(version)) {
+      const resolved = resolveTestMatrix(versions, version, mode, "wproto");
+      assert.deepEqual(resolved["unity-versions"], [version]);
+      assert.ok(resolved["test-modes"].includes("standalone"));
+    } else {
+      assert.throws(
+        () => resolveTestMatrix(versions, version, mode, "wproto"),
+        /WProto corpus acceptance requires its pinned floor or latest Unity version/
+      );
+    }
+    controls++;
+  }
+}
+for (const version of ["", "   "]) {
+  assert.deepEqual(resolveTestMatrix(versions, version, "standalone", "wproto"), {
+    "unity-versions": versions,
+    "test-modes": ["standalone"]
+  });
+  controls++;
+}
+assert.equal(controls, 36);
+console.log(`Pinned acceptance matrix controls passed: ${controls}`);

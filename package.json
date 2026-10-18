@@ -267,6 +267,7 @@
     "test:wproto-annotations": "node scripts/tests/test-wproto-annotations.js",
     "test:test-result-evidence": "pwsh -NoProfile -File scripts/tests/test-test-result-evidence.ps1",
     "test:wproto-evidence": "pwsh -NoProfile -File scripts/tests/test-wproto-evidence.ps1",
+    "test:wproto-corpus": "node scripts/tests/test-wproto-corpus.js",
     "test:run-wproto-evidence": "pwsh -NoProfile -File scripts/tests/test-run-wproto-evidence.ps1",
     "lint:comment-block-form": "pwsh -NoProfile -File scripts/lint-comment-block-form.ps1",
     "test:lint-comment-block-form": "node scripts/tests/test-lint-comment-block-form.js",

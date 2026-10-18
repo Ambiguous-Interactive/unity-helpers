@@ -44,6 +44,7 @@ on:
           - serialization
           - nullableconsumer
           - borrowed
+          - wproto
           - all
       fresh-conversion:
         description: "Clear Standalone compilation outputs before IL2CPP acceptance builds."
@@ -646,9 +647,11 @@ jobs:
         if: >-
           ${{ !cancelled() && github.event_name == 'workflow_dispatch'
           && inputs.acceptance != '' && inputs.acceptance != 'none'
-          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') && steps.unity_lock.outputs.acquired == 'true' }}
+          && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto')
+          || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')
+          && steps.unity_lock.outputs.acquired == 'true' }}
         continue-on-error: true
-        timeout-minutes: 120
+        timeout-minutes: ${{ inputs.acceptance == 'wproto' && 150 || 120 }}
         shell: pwsh
         env:
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
@@ -973,7 +976,7 @@ jobs:
         id: verify_acceptance
         if: >-
           ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none'
-          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') }}
+          && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto') || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') }}
         continue-on-error: true
         shell: pwsh
         env:
@@ -993,38 +996,65 @@ jobs:
           ${{ steps.checkout.outcome == 'success' && (always()
           && github.event_name == 'workflow_dispatch'
           && inputs.acceptance != '' && inputs.acceptance != 'none'
-          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')) }}
+          && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto') || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')) }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:
           paths: .artifacts/unity/${{ matrix.unity-version }}-acceptance
 
+      - name: Reverify retained WProto evidence after redaction
+        id: reverify_wproto_acceptance
+        if: >-
+          ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance == 'wproto'
+          && (matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') && steps.redact_acceptance.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: pwsh
+        env:
+          UH_UNITY_VERSION: ${{ matrix.unity-version }}
+          UH_COMMIT: ${{ github.sha }}
+        run: |
+          ./scripts/unity/verify-acceptance.ps1 `
+            -Acceptance 'wproto' `
+            -ArtifactsPath ".artifacts/unity/$env:UH_UNITY_VERSION-acceptance" `
+            -Commit $env:UH_COMMIT `
+            -UnityVersion $env:UH_UNITY_VERSION
+
       - name: Upload acceptance artifacts
         id: upload_acceptance
         if: >-
           ${{ always() && github.event_name == 'workflow_dispatch'
           && inputs.acceptance != '' && inputs.acceptance != 'none'
-          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') && steps.redact_acceptance.outcome == 'success' }}
+          && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto')
+          || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')
+          && steps.redact_acceptance.outcome == 'success' }}
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-${{ matrix.unity-version }}-acceptance
-          path: .artifacts/unity/${{ matrix.unity-version }}-acceptance
+          path: |
+            .artifacts/unity/${{ matrix.unity-version }}-acceptance
+            ${{ inputs.acceptance == 'wproto' && steps.reverify_wproto_acceptance.outcome != 'success' && '!**/corpus-summary.json' || '' }}
           if-no-files-found: error
           retention-days: 30
 
       - name: Require requested native acceptance
         if: >-
           ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none'
-          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') }}
+          && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto') || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') }}
         shell: pwsh
         env:
+          UH_ACCEPTANCE: ${{ inputs.acceptance }}
+          ACCEPTANCE_REVERIFY: ${{ steps.reverify_wproto_acceptance.outcome }}
           ACCEPTANCE_RUN: ${{ steps.run_acceptance.outcome }}
           ACCEPTANCE_VERIFY: ${{ steps.verify_acceptance.outcome }}
           ACCEPTANCE_REDACT: ${{ steps.redact_acceptance.outcome }}
           ACCEPTANCE_UPLOAD: ${{ steps.upload_acceptance.outcome }}
         run: |
+          if ($env:UH_ACCEPTANCE -eq 'wproto' -and $env:ACCEPTANCE_REVERIFY -ne 'success') {
+            throw "WProto post-redaction verification was $env:ACCEPTANCE_REVERIFY."
+          }
           foreach ($stage in @('RUN', 'VERIFY', 'REDACT', 'UPLOAD')) {
             $outcome = [Environment]::GetEnvironmentVariable("ACCEPTANCE_$stage")
             if ($outcome -ne 'success') { throw "Native acceptance $stage was $outcome." }

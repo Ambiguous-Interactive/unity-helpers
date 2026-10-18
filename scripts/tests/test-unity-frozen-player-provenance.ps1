@@ -4,6 +4,7 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../unity/lib/test-result-evidence.ps1')
+. (Join-Path $PSScriptRoot '../unity/lib/wproto-player-provenance.ps1')
 $runner = Join-Path $PSScriptRoot '../unity/run-ci-tests.ps1'
 $source = Get-Content -LiteralPath $runner -Raw
 $tokens = $null
@@ -109,6 +110,66 @@ function Write-RuntimeRecords {
     $lines = if ($CorrectnessFirst) { @($correctness, $preflight) } else { @($preflight, $correctness) }
     [IO.File]::WriteAllText($Path, ($lines -join "`n") + "`n")
 }
+function New-WProtoFixture {
+    param([string]$RunId)
+    $fixture = New-CanonicalFixture $RunId
+    foreach ($directory in @('Runtime/Protobuf-Net', 'Editor', 'Tests', 'Generator~', 'scripts/unity/lib', '.github/workflows', 'generated project/Packages', 'generated project/ProjectSettings')) {
+        $null = New-Item -ItemType Directory -Path (Join-Path $fixture.Root $directory) -Force
+    }
+    foreach ($relative in @('package.json', '.github/unity-versions.json', '.github/workflows/unity-tests.yml',
+            'scripts/unity/run-ci-tests.ps1', 'scripts/unity/run-acceptance.ps1', 'scripts/unity/verify-acceptance.ps1',
+            'scripts/unity/verify-wproto-corpus.js', 'scripts/unity/wproto-corpus.v1.json',
+            'scripts/unity/lib/wproto-player-provenance.ps1', 'scripts/unity/lib/wproto-player-provenance.ps1.meta',
+            'generated project/Packages/manifest.json', 'generated project/ProjectSettings/ProjectSettings.asset')) {
+        [IO.File]::WriteAllText((Join-Path $fixture.Root $relative), 'controlled ' + $relative)
+    }
+    $managed = Join-Path $fixture.Payload 'Player_Data/Managed'
+    $null = New-Item -ItemType Directory -Path $managed -Force
+    foreach ($name in @('protobuf-net', 'protobuf-net.Core')) {
+        $bytes = [Text.Encoding]::UTF8.GetBytes('controlled oracle ' + $name)
+        [IO.File]::WriteAllBytes((Join-Path $fixture.Root "Runtime/Protobuf-Net/$name.dll"), $bytes)
+        [IO.File]::WriteAllBytes((Join-Path $managed "$name.dll"), $bytes)
+    }
+    $fixture.Manifest.CampaignKind = 'wproto-seven-families-v1'
+    $fixture.Manifest.SourceCommit = '1' * 40
+    $fixture.Manifest.SourceFiles = @(Get-WProtoPlayerSourceFiles -Repository $fixture.Root)
+    $fixture.Manifest.CanonicalCorpusPath = 'scripts/unity/wproto-corpus.v1.json'
+    $fixture.Manifest.CorpusFiles = @(@{ Path = $fixture.Manifest.CanonicalCorpusPath; Sha256 = (Get-FileHash -LiteralPath (Join-Path $fixture.Root $fixture.Manifest.CanonicalCorpusPath)).Hash.ToLowerInvariant() })
+    [IO.File]::WriteAllText($fixture.Path, (ConvertTo-Json -InputObject $fixture.Manifest -Depth 8))
+    return $fixture
+}
+function Write-WProtoResults {
+    param([string]$Path, [switch]$OmitLast, [switch]$Duplicate, [string]$Result = 'Passed')
+    $names = @(Get-WProtoFrozenOperationNames)
+    if ($OmitLast) { $names = $names[0..8] }
+    if ($Duplicate) { $names[9] = $names[0] }
+    $leaves = ($names | ForEach-Object {
+            $name = [Security.SecurityElement]::Escape('WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus("' + $_ + '")')
+            "<test-case fullname=`"$name`" result=`"$Result`"/>"
+        }) -join ''
+    $count = $names.Count
+    $passed = if ($Result -eq 'Passed') { $count } else { 0 }
+    $skipped = $count - $passed
+    [IO.File]::WriteAllText($Path, "<test-run result=`"Passed`" testcasecount=`"$count`" total=`"$count`" passed=`"$passed`" failed=`"0`" skipped=`"$skipped`" inconclusive=`"0`">$leaves</test-run>")
+}
+function New-WProtoSummary {
+    param($Context)
+    $records = [ordered]@{}
+    foreach ($operation in @(Get-WProtoFrozenOperationNames)) {
+        $oracles = @(foreach ($name in @('protobuf-net', 'protobuf-net.Core')) {
+                $file = @($Context.Declaration.Value.SourceFiles | Where-Object { $_.Path -ceq "Runtime/Protobuf-Net/$name.dll" })
+                [pscustomobject]@{ Name = $name; Version = '3.2.56.0'; Sha256 = $file[0].Sha256 }
+            })
+        $records[$operation] = [pscustomobject]@{
+            SchemaVersion = 1; FrozenRunId = $Context.Declaration.Value.RunId; FrozenDeclarationSha256 = $Context.Declaration.Sha256
+            FrozenCorpusSha256 = $Context.Declaration.CanonicalCorpus.Sha256; SourceCommit = $Context.Declaration.Value.SourceCommit
+            RuntimeIdentity = [pscustomobject]@{ UnityVersion = '6000.6.0f1'; Backend = 'Mono'; Platform = 'WindowsPlayer'; ProcessBits = 64; IsEditor = $false; DevelopmentBuild = $false; WallstopProto = $true }
+            OracleAssemblies = $oracles
+        }
+    }
+    return [pscustomobject]@{ schemaVersion = 1; corpusVersion = 'wproto-seven-families-v1'; scope = 'synthetic-timing-only'; strictRecordValidity = $true; timingQualified = $true; timingTwofoldTarget = $true; runtimeRecords = [pscustomobject]$records }
+}
+
 try {
     $originalAllocatorDiagnostics = $env:UH_NATIVE_ALLOCATOR_DIAGNOSTICS
     function Invoke-ProcessWithTreeKillTimeout {
@@ -419,6 +480,145 @@ try {
     $report = Get-Content -LiteralPath $frozenPlayerProvenance.ReportPath -Raw | ConvertFrom-Json
     Assert-Control ($report.ExecutionError.Contains('original synthetic startup failure') -and -not $report.InvocationObserved -and
         $report.JointCorrectness.State -eq 'rejected' -and $report.EvidenceFiles.Count -eq 4) 'real lifecycle retains failure evidence without claiming native invocation'
+    # The parser's numerical/JSON controls run in its own ordinary Node suite. These
+    # controls replace only that external process boundary, retaining real provenance joins.
+    $realCorpusInvoker = ${function:Invoke-WProtoCorpusVerifier}
+    function Invoke-WProtoCorpusVerifier { param($Repository, $PlayerLogPath, $Commit, $UnityVersion) return $script:wprotoSummary }
+    try {
+        foreach ($mutation in @('none', 'unstable', 'upm-support', 'unavailable-capture', 'truncated-capture', 'upm-fault', 'timeout', 'nonzero', 'build-exit', 'configure-exit', 'configure-retry',
+                'execution-error', 'missing-stage', 'reordered-stage', 'missing-case', 'duplicate-case', 'skip-case',
+                'wrong-run', 'wrong-declaration', 'wrong-corpus', 'wrong-commit', 'host-runtime', 'editor', 'development',
+                'missing-define', 'fault-header', 'fault-pattern', 'configure-dump', 'build-dump', 'string-launch', 'array-invocation', 'wrong-oracle', 'missing-oracle', 'wrong-oracle-payload', 'missing-operation', 'bad-records')) {
+            $fixture = New-WProtoFixture ('wproto-' + $mutation)
+            $context = Start-ControlContext $fixture
+            Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'before-launch' -IncludePayload
+            $context.LaunchAttempted = $true
+            $context.InvocationObserved = $true
+            $context.ResultsValidated = $true
+            $context.PlayerOutcome = @{ ExitCode = 0; TimedOut = $false }
+            $context.BuildOutcome = @{ ExitCode = 0; TimedOut = $false }
+            $context.ConfigureOutcomes.Add([pscustomobject]@{ State = 'observed'; ReturnedExitCode = 0; RawExitCode = 0; ExitOrigin = 'process-exit'; KillReason = ''; ExceptionType = ''; NativeEvidence = @{ State = 'no-files-at-capture'; FileLimitReached = $false; Files = @() } })
+            $context.BuildObservation = [pscustomobject]@{ State = 'observed'; ReturnedExitCode = 0; RawExitCode = 0; ExitOrigin = 'process-exit'; KillReason = ''; ExceptionType = ''; NativeEvidence = @{ State = 'no-files-at-capture'; FileLimitReached = $false; Files = @() } }
+            $configureLog = Join-Path $fixture.Root 'configure.log'
+            $buildLog = Join-Path $fixture.Root 'build.log'
+            [IO.File]::WriteAllText($configureLog, 'Clean synthetic configure')
+            [IO.File]::WriteAllText($buildLog, 'Clean synthetic build')
+            $results = Join-Path $fixture.Root 'wproto-results.xml'
+            Write-WProtoResults $results
+            $log = Join-Path $fixture.Root 'wproto-player.log'
+            [IO.File]::WriteAllText($log, "Support path /private/source`r`nWPROTO_CORPUS_UNKNOWN retain malformed records too`r`nWPROTO_CORPUS_RUNTIME synthetic parser boundary")
+            $script:wprotoSummary = New-WProtoSummary $context
+            if ($mutation -in @('upm-support', 'upm-fault', 'truncated-capture')) {
+                $upm = Join-Path $fixture.Root 'upm.log'
+                $upmText = if ($mutation -eq 'upm-fault') { 'Native Crash Reporting' } else { 'Healthy synthetic UPM support log' }
+                [IO.File]::WriteAllText($upm, $upmText)
+                $artifact = 'native-' + ('a' * 32) + '-1.txt'
+                $context.BuildObservation.NativeEvidence = @{
+                    State = 'files-observed'; FileLimitReached = $false; UpmLogPath = $upm; UpmTextArtifact = $artifact
+                    Files = @(@{ RelativePath = 'upm.log'; HashState = 'observed'; Sha256 = (Get-FileHash -LiteralPath $upm -Algorithm SHA256).Hash.ToLowerInvariant()
+                            Length = (Get-Item -LiteralPath $upm).Length; TextTruncated = ($mutation -eq 'truncated-capture'); TextArtifact = $artifact })
+                }
+            }
+            $first = $script:wprotoSummary.runtimeRecords.'read-memory'
+            switch ($mutation) {
+                'unstable' { $script:wprotoSummary.timingQualified = $false; $script:wprotoSummary.timingTwofoldTarget = $false }
+                'unavailable-capture' { $context.BuildObservation.NativeEvidence.State = 'capture-unavailable' }
+                'timeout' { $context.PlayerOutcome = @{ ExitCode = 124; TimedOut = $true } }
+                'nonzero' { $context.PlayerOutcome.ExitCode = -1073741819 }
+                'build-exit' { $context.BuildOutcome.ExitCode = 255 }
+                'configure-exit' { $context.ConfigureOutcomes[0].RawExitCode = 255 }
+                'configure-retry' { $context.ConfigureOutcomes.Add($context.ConfigureOutcomes[0]) }
+                'execution-error' { $context.ExecutionError = 'synthetic earlier failure' }
+                'missing-stage' { $context.Snapshots.RemoveAt(0) }
+                'reordered-stage' { $context.Snapshots[0].Stage = 'after-configure'; $context.Snapshots[1].Stage = 'before-configure' }
+                'missing-case' { Write-WProtoResults $results -OmitLast }
+                'duplicate-case' { Write-WProtoResults $results -Duplicate }
+                'skip-case' { Write-WProtoResults $results -Result 'Skipped' }
+                'wrong-run' { $first.FrozenRunId = 'another-run' }
+                'wrong-declaration' { $first.FrozenDeclarationSha256 = '0' * 64 }
+                'wrong-corpus' { $first.FrozenCorpusSha256 = '0' * 64 }
+                'wrong-commit' { $first.SourceCommit = '0' * 40 }
+                'host-runtime' { $first.RuntimeIdentity.Backend = '.NET' }
+                'editor' { $first.RuntimeIdentity.IsEditor = $true }
+                'development' { $first.RuntimeIdentity.DevelopmentBuild = $true }
+                'missing-define' { $first.RuntimeIdentity.WallstopProto = $false }
+                'fault-header' { [IO.File]::AppendAllText($log, "`nNative Crash Reporting`n") }
+                'fault-pattern' { [IO.File]::AppendAllText($buildLog, "`nfatal error in the mono runtime`n") }
+                'configure-dump' { $context.ConfigureOutcomes[0].NativeEvidence.Files = @(@{ RelativePath = 'crash.dmp' }) }
+                'build-dump' { $context.BuildObservation.NativeEvidence.Files = @(@{ RelativePath = 'crash.dmp' }) }
+                'string-launch' { $context.LaunchAttempted = 'false' }
+                'array-invocation' { $context.InvocationObserved = @($true) }
+                'wrong-oracle' { $first.OracleAssemblies[0].Sha256 = '0' * 64 }
+                'missing-oracle' { $first.OracleAssemblies = @($first.OracleAssemblies[0]) }
+                'wrong-oracle-payload' { [IO.File]::WriteAllText((Join-Path $fixture.Payload 'Player_Data/Managed/protobuf-net.dll'), 'changed') }
+                'missing-operation' { $script:wprotoSummary.runtimeRecords.PSObject.Properties.Remove('write-public') }
+                'bad-records' { $script:wprotoSummary.strictRecordValidity = $false }
+            }
+            if ($mutation -in @('none', 'unstable', 'upm-support')) {
+                Complete-FrozenPlayerProvenance -Context $context -ResultsPath $results -EvidencePaths @($results, $log, $configureLog, $buildLog) -PlayerLogPath $log
+                $report = Get-Content -LiteralPath $context.ReportPath -Raw | ConvertFrom-Json
+                Assert-Control ($report.CapturedEvidenceValid -and -not $report.AdoptionEligible -and -not $report.FullQualification) "valid $mutation WProto capture remains scoped"
+                Assert-Control ($report.SyntheticTimingQualified -eq ($mutation -ne 'unstable')) "WProto $mutation timing state is independent of capture validity"
+                Remove-Item -LiteralPath $context.GeneratedRoot -Recurse -Force
+                Remove-Item -LiteralPath $context.PayloadRoot -Recurse -Force
+                $readback = Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1'
+                Assert-Control ($readback.strictRecordValidity -and $readback.timingQualified -eq ($mutation -ne 'unstable')) 'retained source/build bytes support readback after original project cleanup'
+                [IO.File]::WriteAllText($log, 'Redacted support log')
+                $null = Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1'
+                $retainedRecords = [IO.File]::ReadAllText((Join-Path $context.Declaration.ReportDirectory 'retained/corpus-records.txt'))
+                Assert-Control ($retainedRecords -ceq "WPROTO_CORPUS_UNKNOWN retain malformed records too`r`nWPROTO_CORPUS_RUNTIME synthetic parser boundary") 'retention preserves every marker line and original line endings, including unknown records'
+                foreach ($relative in @('corpus-records.txt', 'results.xml', 'player/Player_Data/Managed/protobuf-net.dll', 'project-inputs/ProjectSettings/ProjectSettings.asset', 'project-inputs/Assets/FrozenPlayerAnchor/ProtoSerializationPerformanceTests.Anchor.cs')) {
+                    $retainedPath = Join-Path (Join-Path $context.Declaration.ReportDirectory 'retained') $relative
+                    $original = [IO.File]::ReadAllBytes($retainedPath)
+                    [IO.File]::WriteAllText($retainedPath, 'changed retained bytes')
+                    Assert-Rejected { Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1' } "reject changed retained $relative"
+                    [IO.File]::WriteAllBytes($retainedPath, $original)
+                }
+                if ($mutation -eq 'none') {
+                    $reportBytes = [IO.File]::ReadAllBytes($context.ReportPath)
+                    try {
+                        foreach ($change in @('declaration', 'source-hash', 'source-missing', 'source-duplicate', 'corpus-hash', 'anchor-hash', 'project-inputs', 'payload', 'early-payload')) {
+                            $changed = [Text.Encoding]::UTF8.GetString($reportBytes) | ConvertFrom-Json
+                            switch ($change) {
+                                'declaration' { $changed.Snapshots[1].DeclarationSha256 = '0' * 64 }
+                                'source-hash' { $changed.Snapshots[1].SourceFiles[0].Sha256 = '0' * 64 }
+                                'source-missing' { $changed.Snapshots[1].SourceFiles = @($changed.Snapshots[1].SourceFiles | Select-Object -Skip 1) }
+                                'source-duplicate' { $changed.Snapshots[1].SourceFiles[1] = $changed.Snapshots[1].SourceFiles[0] }
+                                'corpus-hash' { $changed.Snapshots[4].CorpusFiles[0].Sha256 = '0' * 64 }
+                                'anchor-hash' { $changed.Snapshots[0].GeneratedAnchorFiles[0].Sha256 = '0' * 64 }
+                                'project-inputs' { $changed.Snapshots[3].ProjectInputs = @() }
+                                'payload' { $changed.Snapshots[4].PayloadFiles = @() }
+                                'early-payload' { $changed.Snapshots[0].PayloadFiles = $changed.Snapshots[2].PayloadFiles }
+                            }
+                            [IO.File]::WriteAllText($context.ReportPath, (ConvertTo-Json -InputObject $changed -Depth 32))
+                            Assert-Rejected { Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1' } "reject altered snapshot $change" 'WProto snapshot'
+                        }
+                    } finally { [IO.File]::WriteAllBytes($context.ReportPath, $reportBytes) }
+                }
+                $relocated = Join-Path $fixture.Root 'relocated-report'
+                Move-Item -LiteralPath $context.Declaration.ReportDirectory -Destination $relocated
+                $null = Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $relocated -Commit ('1' * 40) -UnityVersion '6000.6.0f1'
+                Assert-Control $true 'relative retained evidence survives report-directory relocation'
+            } else {
+                Assert-Rejected { Complete-FrozenPlayerProvenance -Context $context -ResultsPath $results -EvidencePaths @($results, $log, $configureLog, $buildLog) -PlayerLogPath $log } "WProto provenance rejects $mutation"
+                $report = Get-Content -LiteralPath $context.ReportPath -Raw | ConvertFrom-Json
+                Assert-Control (-not $report.CapturedEvidenceValid -and -not $report.SyntheticTimingQualified) "rejected $mutation retains nonqualifying report"
+            }
+        }
+        foreach ($mutation in @('unknown-kind', 'array-kind', 'non-mono', 'missing-source', 'new-source', 'wrong-canonical')) {
+            $fixture = New-WProtoFixture ('declaration-' + $mutation)
+            switch ($mutation) {
+                'unknown-kind' { $fixture.Manifest.CampaignKind = 'unknown' }
+                'array-kind' { $fixture.Manifest.CampaignKind = @('wproto-seven-families-v1') }
+                'non-mono' { $fixture.Manifest.Backend = 'IL2CPP' }
+                'missing-source' { $fixture.Manifest.SourceFiles = @($fixture.Manifest.SourceFiles | Select-Object -Skip 1) }
+                'new-source' { [IO.File]::WriteAllText((Join-Path $fixture.Root 'Runtime/new.cs'), 'new authored input') }
+                'wrong-canonical' { $fixture.Manifest.CanonicalCorpusPath = 'corpus.json' }
+            }
+            [IO.File]::WriteAllText($fixture.Path, (ConvertTo-Json -InputObject $fixture.Manifest -Depth 8))
+            Assert-Rejected { Read-ControlDeclaration $fixture } "WProto declaration rejects $mutation"
+        }
+    } finally { ${function:Invoke-WProtoCorpusVerifier} = $realCorpusInvoker }
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force
 }

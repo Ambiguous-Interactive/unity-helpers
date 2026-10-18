@@ -11,7 +11,8 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../unity/run-acceptance.ps1') -
 $environmentKeys = @('ACCEPTANCE_CONTROL_LOG', 'ACCEPTANCE_CONTROL_ACTIVE', 'ACCEPTANCE_CONTROL_FAIL', 'ACCEPTANCE_CONTROL_START_ACTIVE',
     'WALLSTOP_SENTINEL_INTERACTION_TOKEN', 'WALLSTOP_SENTINEL_INTERACTION_PROJECT',
     'WALLSTOP_SENTINEL_CAPTURE_TOKEN', 'WALLSTOP_SENTINEL_CAPTURE_PROJECT', 'WALLSTOP_SENTINEL_CAPTURE_OUTPUT',
-    'WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN', 'WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT', 'UH_NATIVE_PROBE_SOURCE_SHA256')
+    'WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN', 'WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT', 'UH_NATIVE_PROBE_SOURCE_SHA256',
+    'UH_EDITOR_TEST_TIMEOUT_SECONDS', 'UH_STANDALONE_BUILD_TIMEOUT_SECONDS', 'UH_STANDALONE_PLAYER_TIMEOUT_SECONDS', 'UH_PERF_COMMIT')
 $originalEnvironment = @{}
 foreach ($key in $environmentKeys) {
     $originalEnvironment[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
@@ -114,6 +115,35 @@ if ($TestFilter -match 'BorrowedBufferPreflightTests') {
     if ($nativeSource.Count -ne 1 -or $nativeSource[0].Sha256 -cne $env:UH_NATIVE_PROBE_SOURCE_SHA256 -or
         ($AdditionalScriptingDefines -join ';') -cne 'UNITY_HELPERS_NATIVE_ALLOCATION_PROBE') {
         throw 'Borrowed qualification lost the native probe source or global define.'
+    }
+}
+if ($null -ne $FrozenPlayerDeclarationPath -and $TestFilter -match 'CompareFrozenSevenFamilyCorpus$') {
+    $declaration = Get-Content -LiteralPath $FrozenPlayerDeclarationPath -Raw | ConvertFrom-Json
+    if ($declaration.CampaignKind -cne 'wproto-seven-families-v1' -or
+        $declaration.RunId -cnotmatch '^wproto-[0-9a-f]{32}$' -or
+        $declaration.Backend -cne 'Mono2x' -or $declaration.UnityVersion -cne $UnityVersion -or
+        $declaration.SourceCommit -cnotmatch '^[0-9a-f]{40}$' -or
+        $env:UH_PERF_COMMIT -cne $declaration.SourceCommit -or
+        $declaration.CanonicalCorpusPath -cne 'scripts/unity/wproto-corpus.v1.json' -or
+        $declaration.CorpusFiles.Count -ne 1 -or
+        $declaration.CorpusFiles[0].Path -cne $declaration.CanonicalCorpusPath) {
+        throw 'WProto declaration identity differs from the requested campaign.'
+    }
+    $actualCorpusHash = (Get-FileHash -LiteralPath (Join-Path $RepoRoot $declaration.CanonicalCorpusPath) -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($declaration.CorpusFiles[0].Sha256 -cne $actualCorpusHash) { throw 'WProto declaration lost the actual corpus bytes.' }
+    foreach ($relative in @('Tests/Runtime/Performance/ProtoSerializationCorpusPerformanceTests.cs',
+        'Tests/Runtime/Serialization/WProtoBenchmarkCorpus.cs', 'scripts/unity/wproto-corpus.v1.json',
+        'Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll')) {
+        $entries = @($declaration.SourceFiles | Where-Object { $_.Path -ceq $relative })
+        if ($entries.Count -ne 1 -or $entries[0].Sha256 -cne
+            (Get-FileHash -LiteralPath (Join-Path $RepoRoot $relative) -Algorithm SHA256).Hash.ToLowerInvariant()) {
+            throw "WProto source census lost current input $relative."
+        }
+    }
+    if ($env:UH_EDITOR_TEST_TIMEOUT_SECONDS -cne '900' -or
+        $env:UH_STANDALONE_BUILD_TIMEOUT_SECONDS -cne '1800' -or
+        $env:UH_STANDALONE_PLAYER_TIMEOUT_SECONDS -cne '3600') {
+        throw 'WProto timeout envelope was not applied to the player invocation.'
     }
 }
 $PSBoundParameters | ConvertTo-Json -Compress | Add-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
@@ -310,6 +340,111 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             $env:WALLSTOP_SENTINEL_CAPTURE_OUTPUT -ne 'original-capture-output' -or
             $env:WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN -ne 'original-owner-token' -or
             $env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT -ne 'original-owner-project') { throw 'Sentinel marker environment leaked.' }
+        $checks++
+    }
+    $timeoutKeys = @('UH_EDITOR_TEST_TIMEOUT_SECONDS', 'UH_STANDALONE_BUILD_TIMEOUT_SECONDS', 'UH_STANDALONE_PLAYER_TIMEOUT_SECONDS')
+    $expectedTimeouts = @('71', $null, '')
+    for ($index = 0; $index -lt $timeoutKeys.Count; $index++) {
+        if ($null -eq $expectedTimeouts[$index]) {
+            Remove-Item -LiteralPath "Env:$($timeoutKeys[$index])" -ErrorAction SilentlyContinue
+        } else {
+            [Environment]::SetEnvironmentVariable($timeoutKeys[$index], $expectedTimeouts[$index], 'Process')
+        }
+    }
+    if ($null -ne [Environment]::GetEnvironmentVariable($timeoutKeys[1], 'Process')) {
+        throw 'The absent timeout restoration control must start with an absent environment variable.'
+    }
+    $emptyTimeout = [Environment]::GetEnvironmentVariable($timeoutKeys[2], 'Process')
+    if ($null -ne $emptyTimeout -and $emptyTimeout -cne '') { throw 'The empty timeout control did not establish an empty or absent value.' }
+    $expectedTimeouts[2] = $emptyTimeout
+    $sourceCommit = (& git -C (Join-Path $PSScriptRoot '../..') rev-parse HEAD | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $sourceCommit -cnotmatch '^[0-9a-f]{40}$') { throw 'Cannot establish the control source revision.' }
+    foreach ($control in @(
+        @{ Version = '2021.3.45f1'; Commit = $null },
+        @{ Version = '6000.6.0f1'; Commit = '' },
+        @{ Version = '2021.3.45f1'; Commit = $sourceCommit }
+    )) {
+        $version = $control.Version
+        if ($null -eq $control.Commit) {
+            Remove-Item -LiteralPath 'Env:UH_PERF_COMMIT' -ErrorAction SilentlyContinue
+        } else {
+            [Environment]::SetEnvironmentVariable('UH_PERF_COMMIT', $control.Commit, 'Process')
+        }
+        $expectedCommit = [Environment]::GetEnvironmentVariable('UH_PERF_COMMIT', 'Process')
+        if ($null -eq $control.Commit -and $null -ne $expectedCommit) { throw 'The absent commit control must start absent.' }
+        if ($null -ne $control.Commit -and $control.Commit.Length -gt 0 -and $expectedCommit -cne $control.Commit) { throw 'The populated commit control was not established.' }
+        if ($null -ne $control.Commit -and $control.Commit.Length -eq 0 -and $null -ne $expectedCommit -and $expectedCommit -cne '') { throw 'The empty commit control was not established.' }
+        foreach ($injectFailure in @($false, $true)) {
+            $directory = Join-Path $temporary ('wproto-control-' + [Guid]::NewGuid().ToString('N'))
+            Clear-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
+            $env:ACCEPTANCE_CONTROL_FAIL = if ($injectFailure) { 'standalone' } else { '' }
+            $failure = $null
+            try { & $subject -Acceptance wproto -UnityVersion $version -ArtifactsPath $directory -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') }
+            catch { $failure = $_.ToString() }
+            if (($null -ne $failure) -ne $injectFailure -or
+                ($injectFailure -and $failure -notmatch 'Injected native failure')) {
+                throw "Unexpected WProto route result: $version / $injectFailure / $failure"
+            }
+            $calls = @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG | ForEach-Object { $_ | ConvertFrom-Json })
+            if ($calls.Count -ne 1) { throw 'WProto acceptance must invoke one observed player without automatic timing retries.' }
+            $call = $calls[0]
+            if ($call.TestMode -cne 'standalone' -or $call.StandaloneScriptingBackend -cne 'Mono2x' -or
+                -not $call.ReleaseCodeOptimization -or -not $call.ReleasePlayerBuild -or
+                $call.ManagedStrippingLevel -cne 'Disabled' -or
+                ($call.AdditionalScriptingDefines -join ';') -cne 'WALLSTOP_PROTO' -or
+                $call.AssemblyNames -cne 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance' -or
+                $call.TestFilter -cne 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus' -or
+                $call.TestCategory -cne '' -or (Test-Path -LiteralPath $call.ProjectPath)) {
+                throw 'WProto acceptance changed its exact release Mono corpus selection or leaked its owned project.'
+            }
+            for ($index = 0; $index -lt $timeoutKeys.Count; $index++) {
+                $actualTimeout = [Environment]::GetEnvironmentVariable($timeoutKeys[$index], 'Process')
+                if ($actualTimeout -cne $expectedTimeouts[$index]) {
+                    $expectedDisplay = if ($null -eq $expectedTimeouts[$index]) { '<absent>' } else { "'$($expectedTimeouts[$index])'" }
+                    $actualDisplay = if ($null -eq $actualTimeout) { '<absent>' } else { "'$actualTimeout'" }
+                    throw "WProto acceptance did not restore $($timeoutKeys[$index]): expected $expectedDisplay, observed $actualDisplay."
+                }
+            }
+            if ([Environment]::GetEnvironmentVariable('UH_PERF_COMMIT', 'Process') -cne $expectedCommit) {
+                throw 'WProto acceptance did not restore the original commit environment value.'
+            }
+            $declarationHash = (Get-FileHash -LiteralPath $call.FrozenPlayerDeclarationPath -Algorithm SHA256).Hash
+            Clear-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
+            $env:ACCEPTANCE_CONTROL_FAIL = ''
+            $refused = $false
+            try { & $subject -Acceptance wproto -UnityVersion $version -ArtifactsPath $directory -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') }
+            catch { $refused = $true }
+            if (-not $refused -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 0 -or
+                (Get-FileHash -LiteralPath $call.FrozenPlayerDeclarationPath -Algorithm SHA256).Hash -cne $declarationHash) {
+                throw 'WProto acceptance must retain an existing attempt and refuse its replacement before player invocation.'
+            }
+            if ([Environment]::GetEnvironmentVariable('UH_PERF_COMMIT', 'Process') -cne $expectedCommit) {
+                throw 'Refusing an existing WProto attempt changed the commit environment value.'
+            }
+            $checks += 2
+        }
+    }
+    $conflictingCommit = if ($sourceCommit -ceq ('0' * 40)) { '1' * 40 } else { '0' * 40 }
+    $env:UH_PERF_COMMIT = $conflictingCommit
+    $directory = Join-Path $temporary 'wproto-conflicting-commit'
+    Clear-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
+    $refused = $false
+    try { & $subject -Acceptance wproto -UnityVersion '6000.6.0f1' -ArtifactsPath $directory -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') }
+    catch { $refused = $_.ToString() -match 'UH_PERF_COMMIT conflicts' }
+    if (-not $refused -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 0 -or
+        (Test-Path -LiteralPath (Join-Path $directory 'wproto/declaration.json')) -or
+        [Environment]::GetEnvironmentVariable('UH_PERF_COMMIT', 'Process') -cne $conflictingCommit) {
+        throw 'A conflicting WProto commit must be preserved and refused before declaration or player invocation.'
+    }
+    $checks++
+    foreach ($version in @('2022.3.45f1', '6000.5.2f1', '6000.6.0f2')) {
+        Clear-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
+        $refused = $false
+        try { & $subject -Acceptance wproto -UnityVersion $version -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') }
+        catch { $refused = $_.ToString() -match 'pinned floor or latest' }
+        if (-not $refused -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 0) {
+            throw "Unsupported WProto player version was not refused before invocation: $version"
+        }
         $checks++
     }
     $env:ACCEPTANCE_CONTROL_FAIL = 'editmode'
@@ -674,10 +809,89 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         }
         $checks++
     }
+    $verifierRepository = Join-Path $temporary 'wproto-verifier-controls'
+    $verifierLibrary = Join-Path $verifierRepository 'scripts/unity/lib'
+    $null = New-Item -ItemType Directory -Path $verifierLibrary -Force
+    Set-Content -LiteralPath (Join-Path $verifierLibrary 'wproto-player-provenance.ps1') -Value @'
+function Assert-WProtoPlayerProvenance {
+    param($Repository, $Directory, $Commit, $UnityVersion)
+    if ($Commit -cne ('a' * 40) -or $UnityVersion -cne '2021.3.45f1' -or
+        [IO.Path]::GetFileName($Directory) -cne 'wproto') { throw 'Verifier delegation changed its identity arguments.' }
+    if ((Get-Content -LiteralPath (Join-Path $Directory 'mode.txt') -Raw).Trim() -ceq 'invalid-provenance') {
+        throw 'Injected provenance refusal.'
+    }
+    Set-Content -LiteralPath (Join-Path $Directory 'provenance-called') -Value 'observed'
+    $validatedSummary = Join-Path $Directory 'validated-summary.json'
+    & node (Join-Path $Repository 'scripts/unity/verify-wproto-corpus.js') `
+        --log (Join-Path $Directory 'player.log') --commit $Commit --unity-version $UnityVersion --output $validatedSummary
+    if ($LASTEXITCODE -ne 0) { throw 'Injected corpus record refusal.' }
+    return Get-Content -LiteralPath $validatedSummary -Raw | ConvertFrom-Json
+}
+'@
+    Set-Content -LiteralPath (Join-Path $verifierRepository 'scripts/unity/verify-wproto-corpus.js') -Value @'
+const fs = require("node:fs");
+const path = require("node:path");
+const args = process.argv.slice(2);
+const keys = ["--log", "--commit", "--unity-version", "--output"];
+if (args.length !== keys.length * 2 || keys.some((key, index) => args[index * 2] !== key)) {
+  throw new Error("Unexpected corpus verifier arguments");
+}
+const directory = path.dirname(args[1]);
+if (args[3] !== "a".repeat(40) || args[5] !== "2021.3.45f1" ||
+    args[7] !== path.join(directory, "validated-summary.json") ||
+    !fs.existsSync(path.join(directory, "provenance-called"))) {
+  throw new Error("Corpus verification lost identity or ran before provenance");
+}
+fs.appendFileSync(path.join(directory, "node-called"), "observed\n");
+const mode = fs.readFileSync(path.join(directory, "mode.txt"), "utf8").trim();
+if (mode === "invalid-records") {
+  process.exitCode = 3;
+} else {
+  fs.writeFileSync(args[7], JSON.stringify({ strictRecordValidity: true,
+    timingQualified: mode === "below-target", timingTwofoldTarget: false }));
+}
+'@
+    foreach ($mode in @('unstable', 'below-target', 'invalid-provenance', 'invalid-records')) {
+        $directory = Join-Path $verifierRepository "$mode/wproto"
+        $null = New-Item -ItemType Directory -Path $directory -Force
+        Set-Content -LiteralPath (Join-Path $directory 'mode.txt') -Value $mode
+        Set-Content -LiteralPath (Join-Path $directory 'player.log') -Value 'fixture log'
+        $summaryPath = Join-Path $directory 'corpus-summary.json'
+        Set-Content -LiteralPath $summaryPath -Value '{"stale":true}'
+        $failed = $false
+        try {
+            & (Join-Path $PSScriptRoot '../unity/verify-acceptance.ps1') -Acceptance wproto `
+                -ArtifactsPath (Split-Path -Parent $directory) -Commit ('a' * 40) `
+                -UnityVersion '2021.3.45f1' -Repository $verifierRepository
+        } catch { $failed = $true }
+        $expectedFailure = $mode -in @('invalid-provenance', 'invalid-records')
+        if ($failed -ne $expectedFailure -or
+            (Test-Path -LiteralPath (Join-Path $directory 'node-called')) -ne ($mode -ne 'invalid-provenance')) {
+            throw "WProto verifier failed its provenance/record delegation policy: $mode"
+        }
+        if ($mode -ne 'invalid-provenance' -and
+            @(Get-Content -LiteralPath (Join-Path $directory 'node-called')).Count -ne 1) {
+            throw 'WProto verification must persist its single validated result without a second record pass.'
+        }
+        if ($expectedFailure) {
+            if (Test-Path -LiteralPath $summaryPath) { throw 'Rejected WProto evidence retained a stale successful summary.' }
+        } else {
+            $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+            if (-not $summary.strictRecordValidity -or $summary.timingTwofoldTarget -or
+                $summary.timingQualified -ne ($mode -eq 'below-target')) {
+                throw 'WProto baseline verification changed the raw timing decision.'
+            }
+        }
+        $checks++
+    }
     Write-Host "$checks orchestration, exact XML and raw evidence integration controls passed."
 } finally {
     foreach ($key in $environmentKeys) {
-        [Environment]::SetEnvironmentVariable($key, $originalEnvironment[$key], 'Process')
+        if ($null -eq $originalEnvironment[$key]) {
+            Remove-Item -LiteralPath "Env:$key" -ErrorAction SilentlyContinue
+        } else {
+            [Environment]::SetEnvironmentVariable($key, $originalEnvironment[$key], 'Process')
+        }
     }
     Remove-Item -LiteralPath $temporary -Recurse -Force
 }

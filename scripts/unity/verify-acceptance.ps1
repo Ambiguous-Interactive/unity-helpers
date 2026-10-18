@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'borrowed', 'all')]
+    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'borrowed', 'wproto', 'all')]
     [string]$Acceptance,
     [Parameter(Mandatory = $true)]
     [string]$ArtifactsPath,
@@ -92,6 +92,23 @@ function Assert-NativeAllocationQualification {
             }
         }
     }
+}
+if ($Acceptance -eq 'wproto') {
+    if ($UnityVersion -cnotin @('2021.3.45f1', '6000.6.0f1')) {
+        throw 'WProto corpus acceptance requires the pinned floor or latest Unity version.'
+    }
+    . (Join-Path $PSScriptRoot 'lib/test-result-evidence.ps1')
+    . (Join-Path $Repository 'scripts/unity/lib/wproto-player-provenance.ps1')
+    $directory = Join-Path $ArtifactsPath 'wproto'
+    $summaryPath = Join-Path $directory 'corpus-summary.json'
+    if (Test-Path -LiteralPath $summaryPath) { Remove-Item -LiteralPath $summaryPath -Force }
+    $summary = Assert-WProtoPlayerProvenance -Repository $Repository -Directory $directory -Commit $Commit -UnityVersion $UnityVersion
+    $stream = [IO.File]::Open($summaryPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try {
+        $bytes = [Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject $summary -Depth 100))
+        $stream.Write($bytes, 0, $bytes.Length)
+    } finally { $stream.Dispose() }
+    return
 }
 if ($Acceptance -eq 'nullableconsumer') {
     & (Join-Path $PSScriptRoot 'verify-nullable-consumer.ps1') -ArtifactsPath $ArtifactsPath -Commit $Commit -UnityVersion $UnityVersion -Repository $Repository

@@ -111,6 +111,11 @@ const CHECKS = [
     name: "WProto evidence process collector controls",
     run: "npm run test:run-wproto-evidence"
   },
+  {
+    id: "wproto-corpus",
+    name: "WProto frozen corpus measurement controls",
+    run: "npm run test:wproto-corpus"
+  },
 
   // Linter self-tests.
   {

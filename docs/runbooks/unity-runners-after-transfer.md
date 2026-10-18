@@ -437,10 +437,43 @@ Provision the required Unity and build-lock credentials as organization secrets 
 
 Manually dispatch **Unity Tests** with `acceptance` set to `sentinel`, `intmap`, or `all`.
 The default is `none`. The selected normal test modes still run; acceptance adds work under the
-same organization license lease. `unity-version` can select a supported editor to bound the run.
+same organization license lease. The licensed workflow retains its static four-version matrix;
+`unity-version` validates the requested version but does not reduce those jobs.
 Artifacts named `unity-<version>-acceptance` contain separate result directories and a summary.
 Each requested test, verification, credential redaction and upload must succeed. These optional
 runs are separate from the benchmark dispatch and release export workflows.
+
+For the frozen seven-family WProto synthetic baseline, dispatch **Unity Tests** on the feature
+branch with `acceptance: wproto` and `test-mode: standalone`. No pull request is required. This
+opt-in selection is excluded from `all`; its additional player runs execute only on
+2021.3.45f1 and 6000.6.0f1. Both use Mono, Release code optimization, a non-development player,
+and the generated-first `WALLSTOP_PROTO` facade. The exact corpus method selects ten read/write
+API cases; a missing, skipped, duplicated or unexpected case cannot establish baseline evidence.
+Normal selected correctness jobs, runner access checks, the organization lock and license cleanup
+remain in place.
+
+The additional WProto step allows 150 minutes. Its scoped configure timeout is 900 seconds per
+attempt (at most one existing package-resolution retry), build timeout is 1800 seconds, and player
+timeout is 3600 seconds. Previous timeout environment values are restored after success or failure.
+A terminated or unsuccessful process cannot qualify the capture even if it wrote passing XML.
+The player is not automatically rerun to obtain a more favorable timing result.
+
+The `wproto` directory inside each `unity-<version>-acceptance` artifact retains the declaration,
+source and player provenance, result XML and player log, plus `corpus-summary.json` when verification
+succeeds. Before deleting the owned temporary project, the runner retains the actual player payload
+and generated `Assets`, `Packages` and `ProjectSettings` inputs under the frozen report directory. It also retains
+exact result XML and every original line containing `WPROTO_CORPUS_`, including malformed records.
+Full support logs may be redacted; their original hashes describe the observed invocation, not the
+uploaded redacted bytes. The same verifier runs again after redaction and checks the retained
+measurement records, XML and build inputs. After successful redaction, rejected diagnostics are also
+uploaded; unsuccessful or skipped readback excludes `corpus-summary.json` so an earlier successful
+summary cannot be published as current evidence. Readback failure still fails the acceptance gate.
+The declaration binds the `wproto-seven-families-v1` campaign to
+`scripts/unity/wproto-corpus.v1.json`, the source revision, and the compiler inputs. Artifacts retain
+the existing 30-day lifetime; preserve accepted and rejected campaign evidence before expiry. Verification distinguishes complete raw capture from
+stable timing and the twofold target. Unstable or below-target results remain visible; a successful
+baseline capture does not claim representative consumer coverage, allocation or retained-memory
+qualification, code-size qualification, or release acceptance.
 
 For fresh IL2CPP conversion evidence, set `fresh-conversion=true` on a manual **Unity Tests**
 dispatch. The default is `false`, preserving normal warm CI. This clears only `Bee`,

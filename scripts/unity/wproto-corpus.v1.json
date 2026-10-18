@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "corpusVersion": "wproto-seven-families-v1",
+  "families": [
+    "scalar-heavy",
+    "text-heavy",
+    "repeated-numeric",
+    "maps",
+    "nested-polymorphic",
+    "generic-enum",
+    "large-binary"
+  ],
+  "sizes": ["0", "1", "32", "1024"],
+  "cases": [
+    {
+      "id": "scalar-heavy/0",
+      "length": 3,
+      "sha256": "3mOdw7kyqqS2gGqzogi0tJtnpAPO+Db9R4Xl5mHsmqw="
+    },
+    {
+      "id": "text-heavy/0",
+      "length": 5,
+      "sha256": "gAxlCjp9y9Pbq1sVkM0eH3AxFdyT4rdGN2PtUqoVgSw="
+    },
+    {
+      "id": "repeated-numeric/0",
+      "length": 3,
+      "sha256": "3mOdw7kyqqS2gGqzogi0tJtnpAPO+Db9R4Xl5mHsmqw="
+    },
+    {
+      "id": "repeated-numeric/0-unpacked",
+      "length": 3,
+      "sha256": "3mOdw7kyqqS2gGqzogi0tJtnpAPO+Db9R4Xl5mHsmqw="
+    },
+    {
+      "id": "maps/0",
+      "length": 3,
+      "sha256": "3mOdw7kyqqS2gGqzogi0tJtnpAPO+Db9R4Xl5mHsmqw="
+    },
+    {
+      "id": "nested-polymorphic/0",
+      "length": 3,
+      "sha256": "3mOdw7kyqqS2gGqzogi0tJtnpAPO+Db9R4Xl5mHsmqw="
+    },
+    {
+      "id": "generic-enum/0",
+      "length": 3,
+      "sha256": "3mOdw7kyqqS2gGqzogi0tJtnpAPO+Db9R4Xl5mHsmqw="
+    },
+    {
+      "id": "large-binary/0",
+      "length": 5,
+      "sha256": "gAxlCjp9y9Pbq1sVkM0eH3AxFdyT4rdGN2PtUqoVgSw="
+    },
+    {
+      "id": "scalar-heavy/1",
+      "length": 5,
+      "sha256": "0Z9Uac0g0gpi2VZKgIFMgrDOSuABvhB5ihikstIg168="
+    },
+    {
+      "id": "text-heavy/1",
+      "length": 53,
+      "sha256": "kxf6mcTj41fRMhR9HzPI3pS3w8Mo4Ctf1UqF9A8Drto="
+    },
+    {
+      "id": "repeated-numeric/1",
+      "length": 6,
+      "sha256": "vwkMdJD7q1orchRgRy3rmHxLMughe9DPYLvJa1L6uDw="
+    },
+    {
+      "id": "repeated-numeric/1-unpacked",
+      "length": 5,
+      "sha256": "pW/nfwZy+rP6vZ1q1JeQ6pcxvdhpyZoqPxucVIw0Zds="
+    },
+    {
+      "id": "maps/1",
+      "length": 12,
+      "sha256": "E80tiGXk3yI/Cp5N4QpnZrmAeREYYhohEt6BVB5WgA4="
+    },
+    {
+      "id": "nested-polymorphic/1",
+      "length": 15,
+      "sha256": "J4om/Nv5CBvyQWa7cnSBjtSbUaG95A95sGU/nmgDtHE="
+    },
+    {
+      "id": "generic-enum/1",
+      "length": 6,
+      "sha256": "vwkMdJD7q1orchRgRy3rmHxLMughe9DPYLvJa1L6uDw="
+    },
+    {
+      "id": "large-binary/1",
+      "length": 1030,
+      "sha256": "JT1PmkupXxvW//cHVPZ6O8on5zxQuE66hT0eqClbiKY="
+    },
+    {
+      "id": "scalar-heavy/32",
+      "length": 23,
+      "sha256": "BE5YRFwCmpZ0dxqVnixT/atGjFCKI6KXXz+QMGcs8/Q="
+    },
+    {
+      "id": "text-heavy/32",
+      "length": 1542,
+      "sha256": "o70Iaofj00JOIISJdjYAWH5J8HFfpFLbKzslremKW3c="
+    },
+    {
+      "id": "repeated-numeric/32",
+      "length": 164,
+      "sha256": "Ic8Esl4Ev85nqoElDZvkv0Zfbi+gKMItj+V+bDLEMIk="
+    },
+    {
+      "id": "repeated-numeric/32-unpacked",
+      "length": 193,
+      "sha256": "Eq684kcGivfzGhWdj5nqqMFCYTIKTvOFFK1RL1OS0fU="
+    },
+    {
+      "id": "maps/32",
+      "length": 399,
+      "sha256": "HWvg8I1/+lOBu5NKqTam6ycopE4pLE9u8LyP3usljdk="
+    },
+    {
+      "id": "nested-polymorphic/32",
+      "length": 471,
+      "sha256": "T9kDPieycb+8xjmYXWW8p9kYETaWAcOlJ48qp/pS3jg="
+    },
+    {
+      "id": "generic-enum/32",
+      "length": 37,
+      "sha256": "AipqZ/JVsQOYLmtKk+xYD29eejXpVbpil38tuk5JAjo="
+    },
+    {
+      "id": "large-binary/32",
+      "length": 32775,
+      "sha256": "OvwIAeVQ/I/WqKvk18JuaRuSUITOGFE/jvKQ5rEpUwc="
+    },
+    {
+      "id": "scalar-heavy/1024",
+      "length": 68,
+      "sha256": "/vm147VHtmb8HxHbsrvG4vYDOneADHB7efZCFWDTtVM="
+    },
+    {
+      "id": "text-heavy/1024",
+      "length": 49159,
+      "sha256": "+NzGalGiHBlkxMEFdYRxrYiHoJ2UtN1EGyr23CvEk/c="
+    },
+    {
+      "id": "repeated-numeric/1024",
+      "length": 5215,
+      "sha256": "TR+pyGjEnMYzjqWAgVNniWFbGXFTScIoGX2glxZdRTw="
+    },
+    {
+      "id": "repeated-numeric/1024-unpacked",
+      "length": 6236,
+      "sha256": "/Y6mIS6IdYXxoL5f4FhVDdgELAN4L2XGf6cDmrb1tGk="
+    },
+    {
+      "id": "maps/1024",
+      "length": 14303,
+      "sha256": "xlgKI3gOmY/jz/qqgZCahaabRvUM0E7XyNOT96RtWD4="
+    },
+    {
+      "id": "nested-polymorphic/1024",
+      "length": 17195,
+      "sha256": "Ev/I6rCEQxF1HppVEEPwlQZxW1S3kfrYT8ROVsAF/Go="
+    },
+    {
+      "id": "generic-enum/1024",
+      "length": 1030,
+      "sha256": "WMg9n9ZUFPk3zyEGLW9exRLS4bKfaXwYo9K80eLzgC8="
+    },
+    {
+      "id": "large-binary/1024",
+      "length": 1048583,
+      "sha256": "BdeT0I+79itTTfahxMMx6WS/cSf5b9nLvexOqmwdH64="
+    }
+  ],
+  "operations": {
+    "read-memory": {
+      "direction": "read",
+      "referenceApi": "protobuf-net v3 Serializer.Deserialize(ReadOnlyMemory<byte>)",
+      "subjectApi": "WProtoFacade.Deserialize(ReadOnlySpan<byte>), default limits"
+    },
+    "read-stream": {
+      "direction": "read",
+      "referenceApi": "protobuf-net v3 Serializer.Deserialize(MemoryStream), stream position reset",
+      "subjectApi": "WProtoFacade.Deserialize(ReadOnlySpan<byte>), default limits"
+    },
+    "read-finite": {
+      "direction": "read",
+      "referenceApi": "protobuf-net v3 Serializer.Deserialize(ReadOnlyMemory<byte>)",
+      "subjectApi": "WProtoFacade.Deserialize(ReadOnlySpan<byte>, finite wire/packed/tag limits)"
+    },
+    "read-direct": {
+      "direction": "read",
+      "referenceApi": "protobuf-net v3 Serializer.Deserialize(ReadOnlyMemory<byte>)",
+      "subjectApi": "generated IWProtoFormatter.TryRead plus malformed/consumption checks"
+    },
+    "read-public": {
+      "direction": "read",
+      "referenceApi": "protobuf-net v3 Serializer.Deserialize(ReadOnlyMemory<byte>)",
+      "subjectApi": "public Serializer.ProtoDeserialize under WALLSTOP_PROTO"
+    },
+    "write-buffer": {
+      "direction": "write",
+      "referenceApi": "protobuf-net v3 Serializer.Serialize(IBufferWriter<byte>), count-only rewind",
+      "subjectApi": "WProtoFacade.Serialize with reusable byte[]"
+    },
+    "write-stream": {
+      "direction": "write",
+      "referenceApi": "protobuf-net v3 Serializer.Serialize(MemoryStream), position/length reset",
+      "subjectApi": "WProtoFacade.Serialize with reusable byte[]"
+    },
+    "write-array": {
+      "direction": "write",
+      "referenceApi": "protobuf-net v3 Serializer.Serialize(IBufferWriter<byte>) then WrittenSpan.ToArray",
+      "subjectApi": "WProtoFacade.Serialize returning byte[]"
+    },
+    "write-direct": {
+      "direction": "write",
+      "referenceApi": "protobuf-net v3 Serializer.Serialize(IBufferWriter<byte>), count-only rewind",
+      "subjectApi": "generated IWProtoFormatter.Measure and Write into reusable byte[]"
+    },
+    "write-public": {
+      "direction": "write",
+      "referenceApi": "protobuf-net v3 Serializer.Serialize(IBufferWriter<byte>) then WrittenSpan.ToArray",
+      "subjectApi": "public Serializer.ProtoSerialize returning byte[] under WALLSTOP_PROTO"
+    }
+  }
+}
