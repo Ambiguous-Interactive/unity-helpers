@@ -385,6 +385,8 @@
     {
       "name": "package-terms",
       "words": [
+        "inext",
+        "inextp",
         "ApplyEffect",
         "Approximately",
         "AssignRelationalComponents",
