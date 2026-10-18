@@ -1273,8 +1273,10 @@ failure instead of handing back an object whose derived state was rebuilt from h
 ### The generator
 
 For a plain `netstandard2.1` consumer, the generator supplies `ModuleInitializerAttribute` if the
-target framework does not define it. The generated registrar therefore compiles without a consumer
-polyfill. A test double derived from a `[WProtoContract]` base can carry
+target framework does not expose an accessible definition. An internal polyfill in another library
+does not prevent generation of a local one. Existing source, public, and friend-assembly definitions
+are reused. The generated registrar therefore compiles without a consumer polyfill.
+A test double derived from a `[WProtoContract]` base can carry
 `[WProtoNotSerialized]` when it never reaches the serializer. `WPROTO001` and `WPROTO011` now
 point inherited-only subclasses to this opt-out; see
 [A subclass that is not serialized](#a-subclass-that-is-not-serialized).
@@ -3108,6 +3110,12 @@ invocation receipt remain historical evidence.
 
 The generator remains `ISourceGenerator` with the Unity 2021.3 compiler floor. Unity documents
 [Roslyn 3.8 for that editor](https://docs.unity3d.com/2021.3/Documentation/Manual/roslyn-analyzers.html).
+The separate compiler-floor host suite loads the shipped generator through Roslyn 3.8, compiles
+C# 9 consumers against .NET Standard 2.1 metadata, and checks the emitted module constructor.
+It covers absent, source, public, inaccessible internal and friend-assembly attribute definitions,
+with controls for removed polyfills and initializer uses. Its retained inputs and ordinary NUnit
+results are separate from strict oracle receipts. It does not compile the complete platform-neutral
+source closure or establish Unity compiler-process or player startup acceptance.
 The hybrid facade and bundled runtime remain supported during migration; dependency retirement
 requires separate release qualification.
 

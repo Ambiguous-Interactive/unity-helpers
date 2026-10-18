@@ -103,6 +103,17 @@ jobs:
           --logger "trx;LogFileName=schema-conformance.trx"
           --results-directory "${{ runner.temp }}/wproto-evidence/schema-conformance"
 
+      - name: Compile consumers with the Roslyn 3.8 API floor
+        env:
+          WPROTO_COMPILER_EVIDENCE_ROOT: ${{ runner.temp }}/wproto-evidence/compiler-floor/processes
+        run: >-
+          dotnet test
+          Generator~/WallstopStudios.UnityHelpers.Proto.CompilerFloor.Tests/WallstopStudios.UnityHelpers.Proto.CompilerFloor.Tests.csproj
+          -c Release --nologo
+          --logger "trx;LogFileName=compiler-floor.trx"
+          --results-directory "${{ runner.temp }}/wproto-evidence/compiler-floor"
+          -- RunConfiguration.TreatNoTestsAsError=true
+
       - name: Test the generator against protobuf-net 2.4.9
         # The two oracle DLLs share an assembly name. A second process is the only reliable
         # isolation boundary; side-by-side aliases can silently bind both references to v3.

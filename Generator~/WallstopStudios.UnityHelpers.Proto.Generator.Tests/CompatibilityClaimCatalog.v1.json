@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "fe0f4e786e5e2cf4133609cd46da930fee2a5550e482be7c734d02a9e1944118",
+  "guideSha256": "95ccf75767aec85171f0231bb7d9e7d7bbe65885795c153f763872bcb6f4a7de",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -8601,7 +8601,7 @@
       "classification": "behavior",
       "readerDirections": ["compile-only"],
       "selectors": [],
-      "limitations": "No exact existing NUnit floor/polyfill witness found in this source audit. Require existing compile-matrix/plain-netstandard2.1 smoke artifacts plus shipped DLL byte verification; this is an explicit catalog gap, not a passing claim.",
+      "limitations": "A separate pinned Roslyn 3.8/C# 9 host suite emits real generated consumers against .NET Standard 2.1 metadata and checks module initializer IL and attribute accessibility. These ordinary results are outside the strict catalog lanes; project/source-closure and Unity compiler-process receipts remain open.",
       "gapIds": ["G001"],
       "status": "evidence-gap",
       "laneRequirements": [
@@ -9250,7 +9250,7 @@
       "classification": "behavior",
       "readerDirections": ["compile-only"],
       "selectors": [],
-      "limitations": "Existing native/host unit methods do not prove this project-level compilation. Locate and register existing smoke-project command/artifact separately; do not add a fake NUnit witness.",
+      "limitations": "No current catalog-bound source-closure project receipt is registered. The separate compiler-floor suite emits synthetic consumers against existing runtime metadata; it does not source-link the complete platform-neutral runtime.",
       "gapIds": ["G001"],
       "status": "evidence-gap",
       "laneRequirements": [
@@ -10151,7 +10151,7 @@
       "id": "G001",
       "claimIds": ["compiler.floor-platform", "platform.netstandard-smoke"],
       "status": "open",
-      "description": "No exact existing NUnit compiler-floor/moduleinitializer-polyfill witness selected; use existing smoke/build pipeline artifacts or add regression."
+      "description": "A separate Roslyn 3.8/C# 9 suite covers generated consumer emission, module initializer IL and polyfill accessibility. Complete plain netstandard2.1 source-closure/project receipts and catalog lane binding remain open."
     },
     {
       "id": "G002",

@@ -24,6 +24,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// the newer <c>IIncrementalGenerator</c> interface.
     /// </para>
     /// <para>
+    /// Outside Unity, a registrar receives a module-initializer attribute polyfill when no
+    /// definition is accessible from the consumer assembly.
+    /// </para>
+    /// <para>
     /// The formatter is emitted as a type nested inside the contract, which is how generated code
     /// reaches private fields and private lifecycle hooks with no reflection at all -- the property
     /// the whole serializer exists for. That is also why a non-partial contract is an error rather
@@ -4621,9 +4625,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     context.ParseOptions == null
                     || !context.ParseOptions.PreprocessorSymbolNames.Contains("UNITY_5_3_OR_NEWER")
                 )
-                && context.Compilation.GetTypeByMetadataName(
-                    "System.Runtime.CompilerServices.ModuleInitializerAttribute"
-                ) == null
+                && !(
+                    context.Compilation.GetTypeByMetadataName(
+                        "System.Runtime.CompilerServices.ModuleInitializerAttribute"
+                    )
+                        is INamedTypeSymbol initializerAttribute
+                    && context.Compilation.IsSymbolAccessibleWithin(
+                        initializerAttribute,
+                        context.Compilation.Assembly
+                    )
+                )
             )
             {
                 context.AddSource(
