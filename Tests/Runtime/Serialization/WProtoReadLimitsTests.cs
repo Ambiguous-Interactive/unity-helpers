@@ -976,6 +976,142 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void TypedPackedCopiesReplayPrepaidValuesWithoutResettingTheRootBudget()
+        {
+            byte[] payload = { 1, 7, 1, 8 };
+            WProtoReader root = new WProtoReader(
+                payload,
+                new WProtoReadLimits(maximumPackedElementCount: 1)
+                    .WithTotalFieldCount(0)
+                    .WithMessageMergeCopyBytes(0)
+            );
+            Assert.IsTrue(root.TryReadPackedRun(WProtoWireType.Varint, out WProtoReader packed));
+            WProtoReader replay = packed;
+            Assert.IsTrue(packed.TryReadInt32(out int first));
+            Assert.AreEqual(7, first);
+            Assert.IsTrue(replay.TryReadInt32(out int repeated));
+            Assert.AreEqual(7, repeated);
+            Assert.IsTrue(packed.End);
+            Assert.IsTrue(replay.End);
+            Assert.IsFalse(packed.Malformed);
+            Assert.IsFalse(replay.Malformed);
+            Assert.IsFalse(root.TryReadPackedRun(WProtoWireType.Varint, out WProtoReader refused));
+            WProtoFormatterFailureTests.AssertCannotContinue(ref root);
+            WProtoFormatterFailureTests.AssertCannotContinue(ref refused);
+            Assert.IsFalse(packed.Malformed);
+            Assert.IsFalse(replay.Malformed);
+        }
+
+        [TestCase(false, false, false)]
+        [TestCase(false, false, true)]
+        [TestCase(false, true, false)]
+        [TestCase(false, true, true)]
+        [TestCase(true, false, false)]
+        [TestCase(true, false, true)]
+        [TestCase(true, true, false)]
+        [TestCase(true, true, true)]
+        public void CumulativeLimitsRemainIndependentAcrossFiniteCombinations(
+            bool finiteTags,
+            bool finitePacked,
+            bool finiteCopies
+        )
+        {
+            byte[] payload = { 8, 9, 8, 10, 8, 11 };
+            byte[] occurrence = { 8, 1 };
+            byte[] packedPayload = { 1, 7, 1, 8 };
+            WProtoReadLimits limits = new WProtoReadLimits(
+                maximumPackedElementCount: finitePacked ? 1 : int.MaxValue
+            )
+                .WithTotalFieldCount(finiteTags ? 6 : int.MaxValue)
+                .WithMessageMergeCopyBytes(finiteCopies ? 4 : long.MaxValue);
+            foreach (bool typed in new[] { false, true })
+            {
+                WProtoReader root = new WProtoReader(payload, limits);
+                Assert.IsTrue(TryMergeCopyPair(ref root, occurrence));
+                WProtoReader continuing = root;
+                Assert.AreEqual(!finiteCopies, TryMergeCopyPair(ref root, occurrence));
+                Assert.AreEqual(finiteCopies, root.Malformed);
+                Assert.IsFalse(continuing.Malformed);
+
+                WProtoReader packedParent = new WProtoReader(packedPayload, in continuing);
+                if (typed)
+                {
+                    Assert.IsTrue(
+                        packedParent.TryReadPackedRun(WProtoWireType.Varint, out WProtoReader first)
+                    );
+                    Assert.IsTrue(first.TryReadInt32(out int firstValue));
+                    Assert.AreEqual(7, firstValue);
+                    Assert.IsTrue(first.End);
+                    Assert.AreEqual(
+                        !finitePacked,
+                        packedParent.TryReadPackedRun(
+                            WProtoWireType.Varint,
+                            out WProtoReader second
+                        )
+                    );
+                    Assert.AreEqual(finitePacked, packedParent.Malformed);
+                    Assert.AreEqual(finitePacked, second.Malformed);
+                    if (!finitePacked)
+                    {
+                        Assert.IsTrue(second.TryReadInt32(out int secondValue));
+                        Assert.AreEqual(8, secondValue);
+                        Assert.IsTrue(second.End);
+                    }
+                    else
+                    {
+                        WProtoFormatterFailureTests.AssertCannotContinue(ref packedParent);
+                        WProtoFormatterFailureTests.AssertCannotContinue(ref second);
+                    }
+                }
+                else
+                {
+                    Assert.IsTrue(packedParent.TryReadPackedRun(out WProtoReader first));
+                    Assert.IsTrue(first.TryReadInt32(out int firstValue));
+                    Assert.AreEqual(7, firstValue);
+                    Assert.IsTrue(first.End);
+                    Assert.IsTrue(packedParent.TryReadPackedRun(out WProtoReader second));
+                    Assert.AreEqual(!finitePacked, second.TryReadInt32(out int secondValue));
+                    Assert.AreEqual(finitePacked ? 0 : 8, secondValue);
+                    Assert.AreEqual(finitePacked, second.Malformed);
+                    Assert.IsFalse(packedParent.Malformed);
+                    if (finitePacked)
+                    {
+                        Assert.AreEqual(0, second.Position);
+                        WProtoFormatterFailureTests.AssertCannotContinue(ref second);
+                    }
+                    else
+                    {
+                        Assert.IsTrue(second.End);
+                    }
+                }
+
+                Assert.IsFalse(continuing.Malformed);
+                for (int index = 0; index < 3; ++index)
+                {
+                    bool accepted = index < 2 || !finiteTags;
+                    Assert.AreEqual(accepted, continuing.TryReadTag(out int tag, out int wire));
+                    if (!accepted)
+                    {
+                        Assert.AreEqual(0, tag);
+                        Assert.AreEqual(-1, wire);
+                        Assert.AreEqual(4, continuing.Position);
+                        WProtoFormatterFailureTests.AssertCannotContinue(ref continuing);
+                        break;
+                    }
+                    Assert.AreEqual(1, tag);
+                    Assert.AreEqual(WProtoWireType.Varint, wire);
+                    Assert.IsTrue(continuing.TryReadInt32(out int value));
+                    Assert.AreEqual(9 + index, value);
+                }
+                Assert.AreEqual(finiteTags, continuing.Malformed);
+                if (!finiteTags)
+                {
+                    Assert.IsTrue(continuing.End);
+                }
+            }
+        }
+
+        [Test]
         public void EveryNestedReadRouteRetainsTheCumulativePackedBudget()
         {
             PackedFormatter formatter = new PackedFormatter();
@@ -1649,6 +1785,66 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(1, value);
             Assert.IsTrue(reader.End);
             Assert.IsFalse(reader.Malformed);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void UnlimitedReaderConstructionDoesNotAllocateSharedAccounting(int construction)
+        {
+            byte[] payload = { 8, 7 };
+            WProtoReadLimits limits = construction == 1 ? null : WProtoReadLimits.Default;
+            if (construction == 3)
+            {
+                limits = new WProtoReadLimits(maximumPackedElementCount: int.MaxValue)
+                    .WithTotalFieldCount(0)
+                    .WithMessageMergeCopyBytes(0)
+                    .WithTotalFieldCount(int.MaxValue)
+                    .WithMessageMergeCopyBytes(long.MaxValue);
+            }
+            WProtoReader warm =
+                construction == 0 ? new WProtoReader(payload) : new WProtoReader(payload, limits);
+            Assert.IsTrue(warm.TryReadTag(out _, out _));
+            long? before = BeginAllocationMeasurement();
+            WProtoReader reader =
+                construction == 0 ? new WProtoReader(payload) : new WProtoReader(payload, limits);
+            long? allocated = EndAllocationMeasurement(before);
+            AssertNoAllocationWhenMeasured(allocated);
+            Assert.IsTrue(reader.TryReadTag(out int tag, out int wire));
+            Assert.AreEqual(1, tag);
+            Assert.AreEqual(WProtoWireType.Varint, wire);
+            Assert.IsTrue(reader.TryReadInt32(out int value));
+            Assert.AreEqual(7, value);
+            Assert.IsTrue(reader.End);
+            Assert.IsFalse(reader.Malformed);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void FormatterCannotReplaceTheReaderToResetOnlyTagOrPackedAccounting(bool packed)
+        {
+            WProtoReadLimits limits = packed
+                ? new WProtoReadLimits(maximumPackedElementCount: 1)
+                : new WProtoReadLimits().WithTotalFieldCount(1);
+            IWProtoFormatter<LimitMarker> previous = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<LimitMarker> registered
+            )
+                ? registered
+                : null;
+            try
+            {
+                WProtoFormatterProvider.Register<LimitMarker>(
+                    new RestartingCopyBudgetFormatter(limits)
+                );
+                Assert.Throws<InvalidOperationException>(() =>
+                    WProtoFacade.TryDeserialize(ReadOnlySpan<byte>.Empty, limits, out LimitMarker _)
+                );
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(previous);
+            }
         }
 
         [Test]
