@@ -17,7 +17,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
     internal static class CompatibilityInventory
     {
-        internal static CSharpCompilation Compile(IEnumerable<SyntaxTree> trees)
+        internal static CSharpCompilation Compile(
+            IEnumerable<SyntaxTree> trees,
+            bool includeCompiledRuntime = true
+        )
         {
             HashSet<string> paths = new HashSet<string>(StringComparer.Ordinal);
             string trustedAssemblies = (string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
@@ -26,7 +29,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 paths.Add(path);
             }
-            paths.Add(typeof(WProtoContractAttribute).Assembly.Location);
+            string compiledRuntime = typeof(WProtoContractAttribute).Assembly.Location;
+            if (includeCompiledRuntime)
+            {
+                paths.Add(compiledRuntime);
+            }
+            else
+            {
+                paths.Remove(compiledRuntime);
+            }
             paths.Add(typeof(ProtoBuf.ProtoContractAttribute).Assembly.Location);
             return CSharpCompilation.Create(
                 nameof(CompatibilityInventory),
@@ -44,14 +55,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 SemanticModel model = compilation.GetSemanticModel(tree);
                 foreach (
-                    TypeDeclarationSyntax declaration in tree.GetRoot()
+                    MemberDeclarationSyntax declaration in tree.GetRoot()
                         .DescendantNodes()
-                        .OfType<TypeDeclarationSyntax>()
+                        .OfType<MemberDeclarationSyntax>()
+                        .Where(node =>
+                            node is BaseTypeDeclarationSyntax || node is DelegateDeclarationSyntax
+                        )
                 )
                 {
-                    INamedTypeSymbol type = model.GetDeclaredSymbol(declaration);
+                    INamedTypeSymbol type =
+                        model.GetDeclaredSymbol(declaration) as INamedTypeSymbol;
                     Assert.IsTrue(type != null, declaration.ToString());
-                    CapturePublicSurface(type, entries);
+                    CapturePublicSurface(type, compilation, entries);
                     if (!seen.Add(type) || !type.GetAttributes().Any(IsContract))
                     {
                         continue;
@@ -103,10 +118,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             else if (type is INamedTypeSymbol named)
             {
-                foreach (ITypeSymbol argument in named.TypeArguments)
+                if (named.ContainingType != null)
                 {
-                    AssertBoundType(argument, identity);
+                    AssertBoundType(named.ContainingType, identity);
                 }
+                if (!named.IsUnboundGenericType)
+                {
+                    foreach (ITypeSymbol argument in named.TypeArguments)
+                    {
+                        AssertBoundType(argument, identity);
+                    }
+                }
+            }
+            else if (type is IPointerTypeSymbol pointer)
+            {
+                AssertBoundType(pointer.PointedAtType, identity);
+            }
+            else if (type is IFunctionPointerTypeSymbol function)
+            {
+                AssertBoundMethod(function.Signature, identity);
             }
         }
 
@@ -138,23 +168,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
-        private static void CapturePublicSurface(INamedTypeSymbol type, SortedSet<string> entries)
+        private static void CapturePublicSurface(
+            INamedTypeSymbol type,
+            CSharpCompilation compilation,
+            SortedSet<string> entries
+        )
         {
-            if (type.DeclaredAccessibility != Accessibility.Public)
+            if (!IsExternallyAccessible(type))
             {
                 return;
             }
             string space = type.ContainingNamespace.ToDisplayString();
-            bool facade =
-                string.Equals(type.Name, nameof(WProtoFacade), StringComparison.Ordinal)
-                || string.Equals(
-                    type.Name,
-                    nameof(WProtoFormatterProvider),
-                    StringComparison.Ordinal
-                );
-            bool extension =
-                type.TypeKind == TypeKind.Interface
-                && type.Name.StartsWith("IWProto", StringComparison.Ordinal);
             bool publicSerializer =
                 string.Equals(
                     space,
@@ -163,10 +187,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 ) && string.Equals(type.Name, "Serializer", StringComparison.Ordinal);
             if (
                 !publicSerializer
-                && !(
-                    string.Equals(space, typeof(WProtoFacade).Namespace, StringComparison.Ordinal)
-                    && (facade || extension)
-                )
+                && !string.Equals(space, typeof(WProtoFacade).Namespace, StringComparison.Ordinal)
             )
             {
                 return;
@@ -187,6 +208,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         )
                     )
             );
+            string identity = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            CaptureApiAttributes(type.GetAttributes(), identity, compilation, entries);
+            CaptureAttributeUsage(type, identity, compilation, entries);
+            if (type.BaseType != null)
+            {
+                AssertBoundType(type.BaseType, identity);
+            }
+            foreach (INamedTypeSymbol implemented in type.Interfaces)
+            {
+                AssertBoundType(implemented, identity);
+            }
+            AssertBoundConstraints(type.TypeParameters, identity);
+            entries.Add(
+                $"api-shape {identity} kind={type.TypeKind} accessibility={type.DeclaredAccessibility} static={type.IsStatic} abstract={type.IsAbstract} sealed={type.IsSealed} readonly={type.IsReadOnly} ref-like={type.IsRefLikeType} base={type.BaseType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)} enum={type.EnumUnderlyingType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}"
+            );
+            CaptureTypeParameters(type.TypeParameters, identity, compilation, entries);
             SymbolDisplayFormat format = SymbolDisplayFormat
                 .FullyQualifiedFormat.WithMemberOptions(
                     SymbolDisplayMemberOptions.IncludeAccessibility
@@ -209,8 +246,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             foreach (ISymbol member in type.GetMembers())
             {
                 if (
-                    member.DeclaredAccessibility == Accessibility.Public
-                    && !member.IsImplicitlyDeclared
+                    IsExternallyAccessible(member)
                     && (
                         !publicSerializer
                         || member.Name.Contains("Proto", StringComparison.Ordinal)
@@ -220,8 +256,358 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     )
                 )
                 {
-                    entries.Add("api " + member.ToDisplayString(format));
+                    string signature = member.ToDisplayString(format);
+                    entries.Add("api " + signature);
+                    CaptureApiMember(member, signature, compilation, entries);
                 }
+            }
+        }
+
+        private static bool IsExternallyAccessible(ISymbol symbol)
+        {
+            for (
+                ISymbol current = symbol;
+                current is not INamespaceSymbol && current != null;
+                current = current.ContainingSymbol
+            )
+            {
+                if (
+                    current.DeclaredAccessibility != Accessibility.Public
+                    && current.DeclaredAccessibility != Accessibility.Protected
+                    && current.DeclaredAccessibility != Accessibility.ProtectedOrInternal
+                )
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static void AssertBoundConstraints(
+            IEnumerable<ITypeParameterSymbol> parameters,
+            string identity
+        )
+        {
+            foreach (ITypeParameterSymbol parameter in parameters)
+            {
+                foreach (ITypeSymbol constraint in parameter.ConstraintTypes)
+                {
+                    AssertBoundType(constraint, identity);
+                }
+            }
+        }
+
+        private static void AssertBoundParameters(
+            IEnumerable<IParameterSymbol> parameters,
+            string identity
+        )
+        {
+            foreach (IParameterSymbol parameter in parameters)
+            {
+                AssertBoundType(parameter.Type, identity);
+            }
+        }
+
+        private static void AssertValidDefaults(
+            IEnumerable<IParameterSymbol> parameters,
+            CSharpCompilation compilation,
+            string identity
+        )
+        {
+            foreach (IParameterSymbol parameter in parameters)
+            {
+                foreach (SyntaxReference reference in parameter.DeclaringSyntaxReferences)
+                {
+                    if (
+                        reference.GetSyntax() is ParameterSyntax declaration
+                        && declaration.Default != null
+                    )
+                    {
+                        Assert.IsTrue(
+                            parameter.HasExplicitDefaultValue,
+                            identity + ": unresolved parameter default"
+                        );
+                        Assert.IsEmpty(
+                            compilation
+                                .GetSemanticModel(reference.SyntaxTree)
+                                .GetDiagnostics(declaration.Default.Span)
+                                .Where(item => item.Severity == DiagnosticSeverity.Error),
+                            identity + ": invalid parameter default"
+                        );
+                    }
+                }
+            }
+        }
+
+        private static void AssertBoundMethod(IMethodSymbol method, string identity)
+        {
+            AssertBoundType(method.ReturnType, identity);
+            AssertBoundParameters(method.Parameters, identity);
+            AssertBoundConstraints(method.TypeParameters, identity);
+        }
+
+        private static void CaptureApiMember(
+            ISymbol member,
+            string signature,
+            CSharpCompilation compilation,
+            SortedSet<string> entries
+        )
+        {
+            CaptureApiAttributes(member.GetAttributes(), signature, compilation, entries);
+            if (member is IMethodSymbol method)
+            {
+                AssertBoundMethod(method, signature);
+                AssertValidDefaults(method.Parameters, compilation, signature);
+                CaptureApiAttributes(
+                    method.GetReturnTypeAttributes(),
+                    signature + " return",
+                    compilation,
+                    entries
+                );
+                CaptureParameters(method.Parameters, signature, compilation, entries);
+                CaptureTypeParameters(method.TypeParameters, signature, compilation, entries);
+                entries.Add(
+                    $"api-method {signature} kind={method.MethodKind} return-ref={method.RefKind} readonly={method.IsReadOnly} extension={method.IsExtensionMethod} nullable={method.ReturnNullableAnnotation} return-type={SourceType(method.ReturnType)}"
+                );
+            }
+            else if (member is IPropertySymbol property)
+            {
+                AssertBoundType(property.Type, signature);
+                AssertBoundParameters(property.Parameters, signature);
+                AssertValidDefaults(property.Parameters, compilation, signature);
+                CaptureParameters(property.Parameters, signature, compilation, entries);
+                entries.Add(
+                    $"api-accessor {signature} return-ref={property.RefKind} get={property.GetMethod?.DeclaredAccessibility.ToString() ?? "absent"} set={property.SetMethod?.DeclaredAccessibility.ToString() ?? "absent"} init={property.SetMethod?.IsInitOnly ?? false} nullable={property.NullableAnnotation} type={SourceType(property.Type)}"
+                );
+            }
+            else if (member is IFieldSymbol field)
+            {
+                AssertBoundType(field.Type, signature);
+                entries.Add(
+                    $"api-field {signature} nullable={field.NullableAnnotation} type={SourceType(field.Type)}"
+                );
+                if (field.IsConst)
+                {
+                    Assert.IsTrue(field.HasConstantValue, signature + ": unresolved API constant");
+                }
+                if (field.HasConstantValue)
+                {
+                    entries.Add(
+                        "api-constant "
+                            + signature
+                            + "="
+                            + JsonSerializer.Serialize(field.ConstantValue)
+                    );
+                }
+            }
+            else if (member is IEventSymbol eventSymbol)
+            {
+                AssertBoundType(eventSymbol.Type, signature);
+                entries.Add(
+                    $"api-event {signature} add={eventSymbol.AddMethod?.DeclaredAccessibility.ToString() ?? "absent"} remove={eventSymbol.RemoveMethod?.DeclaredAccessibility.ToString() ?? "absent"} nullable={eventSymbol.NullableAnnotation} type={SourceType(eventSymbol.Type)}"
+                );
+            }
+        }
+
+        private static string SourceType(ITypeSymbol type)
+        {
+            return type.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat.AddMiscellaneousOptions(
+                    SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
+                )
+            );
+        }
+
+        private static void CaptureParameters(
+            IEnumerable<IParameterSymbol> parameters,
+            string identity,
+            CSharpCompilation compilation,
+            SortedSet<string> entries
+        )
+        {
+            foreach (IParameterSymbol parameter in parameters)
+            {
+                string parameterIdentity = identity + " parameter=" + parameter.Name;
+                entries.Add(
+                    $"api-parameter {parameterIdentity} optional={parameter.IsOptional} nullable={parameter.NullableAnnotation} type={SourceType(parameter.Type)}"
+                );
+                CaptureApiAttributes(
+                    parameter.GetAttributes(),
+                    parameterIdentity,
+                    compilation,
+                    entries
+                );
+            }
+        }
+
+        private static void CaptureTypeParameters(
+            IEnumerable<ITypeParameterSymbol> parameters,
+            string identity,
+            CSharpCompilation compilation,
+            SortedSet<string> entries
+        )
+        {
+            foreach (ITypeParameterSymbol parameter in parameters)
+            {
+                string parameterIdentity = identity + " type-parameter=" + parameter.Name;
+                entries.Add(
+                    $"api-type-parameter {parameterIdentity} variance={parameter.Variance} reference={parameter.HasReferenceTypeConstraint} reference-nullable={parameter.ReferenceTypeConstraintNullableAnnotation} value={parameter.HasValueTypeConstraint} unmanaged={parameter.HasUnmanagedTypeConstraint} notnull={parameter.HasNotNullConstraint} constructor={parameter.HasConstructorConstraint} constraints={string.Join(",", parameter.ConstraintTypes.Select(SourceType))}"
+                );
+                CaptureApiAttributes(
+                    parameter.GetAttributes(),
+                    parameterIdentity,
+                    compilation,
+                    entries
+                );
+            }
+        }
+
+        private static void CaptureApiAttributes(
+            IEnumerable<AttributeData> attributes,
+            string identity,
+            CSharpCompilation compilation,
+            SortedSet<string> entries
+        )
+        {
+            List<string> records = new List<string>();
+            foreach (AttributeData attribute in attributes)
+            {
+                string name = attribute.AttributeClass?.ToDisplayString();
+                if (
+                    string.Equals(
+                        name,
+                        typeof(System.Runtime.CompilerServices.MethodImplAttribute).FullName,
+                        StringComparison.Ordinal
+                    )
+                    || string.Equals(
+                        name,
+                        typeof(AttributeUsageAttribute).FullName,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    continue;
+                }
+                records.Add(ApiAttribute(attribute, identity, compilation));
+            }
+            foreach (
+                IGrouping<string, string> group in records.GroupBy(
+                    record => record,
+                    StringComparer.Ordinal
+                )
+            )
+            {
+                entries.Add($"api-attribute {identity} {group.Key} count={group.Count()}");
+            }
+        }
+
+        private static string ApiAttribute(
+            AttributeData attribute,
+            string identity,
+            CSharpCompilation compilation
+        )
+        {
+            SyntaxReference reference = attribute.ApplicationSyntaxReference;
+            if (reference != null)
+            {
+                Assert.IsEmpty(
+                    compilation
+                        .GetSemanticModel(reference.SyntaxTree)
+                        .GetDiagnostics(reference.Span)
+                        .Where(item => item.Severity == DiagnosticSeverity.Error),
+                    identity + ": invalid API attribute"
+                );
+            }
+            Assert.IsTrue(
+                attribute.AttributeClass != null,
+                identity + ": unresolved API attribute"
+            );
+            AssertBoundType(attribute.AttributeClass, identity);
+            Assert.IsTrue(
+                attribute.AttributeConstructor != null,
+                identity + ": unresolved API attribute constructor"
+            );
+            AssertBoundMethod(attribute.AttributeConstructor, identity);
+            string name = attribute.AttributeClass.ToDisplayString();
+            SortedDictionary<string, string> options = new SortedDictionary<string, string>(
+                StringComparer.Ordinal
+            );
+            if (
+                string.Equals(
+                    name,
+                    typeof(AttributeUsageAttribute).FullName,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                options[nameof(AttributeUsageAttribute.AllowMultiple)] = "bool:false";
+                options[nameof(AttributeUsageAttribute.Inherited)] = "bool:true";
+            }
+            foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
+            {
+                options[argument.Key] = ApiConstant(argument.Value, identity);
+            }
+            string constructorParameters = string.Join(
+                ",",
+                attribute.AttributeConstructor.Parameters.Select(parameter =>
+                    SourceType(parameter.Type)
+                )
+            );
+            return $"{name} constructor=({constructorParameters}) ({string.Join(",", attribute.ConstructorArguments.Select(argument => ApiConstant(argument, identity)))}) {string.Join(",", options.Select(option => option.Key + "=" + option.Value))}".TrimEnd();
+        }
+
+        private static string ApiConstant(TypedConstant constant, string identity)
+        {
+            Assert.IsTrue(constant.Type != null, identity + ": unresolved API argument type");
+            AssertBoundType(constant.Type, identity);
+            string value =
+                constant.Kind == TypedConstantKind.Array && !constant.IsNull
+                    ? "["
+                        + string.Join(
+                            ",",
+                            constant.Values.Select(item => ApiConstant(item, identity))
+                        )
+                        + "]"
+                    : Constant(constant, identity);
+            return SourceType(constant.Type) + ":" + value;
+        }
+
+        private static void CaptureAttributeUsage(
+            INamedTypeSymbol type,
+            string identity,
+            CSharpCompilation compilation,
+            SortedSet<string> entries
+        )
+        {
+            AttributeData usage = null;
+            bool isAttribute = false;
+            for (INamedTypeSymbol current = type; current != null; current = current.BaseType)
+            {
+                if (usage == null)
+                {
+                    usage = current
+                        .GetAttributes()
+                        .FirstOrDefault(attribute =>
+                            string.Equals(
+                                attribute.AttributeClass?.ToDisplayString(),
+                                typeof(AttributeUsageAttribute).FullName,
+                                StringComparison.Ordinal
+                            )
+                        );
+                }
+                isAttribute |= string.Equals(
+                    current.ToDisplayString(),
+                    typeof(Attribute).FullName,
+                    StringComparison.Ordinal
+                );
+            }
+            if (isAttribute)
+            {
+                string record =
+                    usage == null
+                        ? $"{typeof(AttributeUsageAttribute).FullName} constructor=(global::System.AttributeTargets) (global::System.AttributeTargets:{(int)AttributeTargets.All}) AllowMultiple=bool:false,Inherited=bool:true"
+                        : ApiAttribute(usage, identity, compilation);
+                entries.Add($"api-attribute {identity} {record} count=1");
             }
         }
 
@@ -338,11 +724,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             if (constant.Value is ITypeSymbol type)
             {
-                Assert.AreNotEqual(
-                    TypeKind.Error,
-                    type.TypeKind,
-                    identity + ": unresolved wire type"
-                );
+                AssertBoundType(type, identity);
                 return type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             }
             if (constant.Value is string text)

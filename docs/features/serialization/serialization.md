@@ -2994,11 +2994,18 @@ legacy unpacked writer. Accepting both forms on read does not make their seriali
 The existing v3 map-write policy and named v2 exceptions below remain part of the contract.
 
 The host oracle suite's `CompatibilityInventoryTests` compares package and retained consumer
-metadata against `CompatibilityInventory.v1.json`. The inventory also pins protobuf facade and
-formatter extension signatures. It resolves attribute constants and records effective WProto
-packing/default policies; coordinated edits to both legacy and WProto tags still change the frozen
-record. Mutation controls cover tags, defaults, packing, member types, and deletion. Review a
-candidate inventory diff as a wire/API change; never overwrite the baseline merely to pass a check.
+metadata against `CompatibilityInventory.v1.json`. Under its frozen `WALLSTOP_PROTO` and
+`UNITY_5_3_OR_NEWER` declarations, it also pins externally visible types and members in the
+WallstopProto namespace, plus selected protobuf/shared `Serializer` operations. This includes
+reader/writer and formatter extension signatures, type and parameter constraints, construction,
+constants, accessors, optional parameters, and source annotation rules. This is a source contract
+snapshot for those declarations, not an ABI or all-configuration guarantee.
+
+The inventory resolves attribute constants and records effective WProto packing/default policies;
+coordinated edits to both legacy and WProto tags still change the frozen record. Mutation controls
+cover wire metadata and public declaration changes; unresolved API types/defaults cannot pass.
+Review a candidate inventory diff as a wire/API change, preserving historical entries when extending
+coverage; never overwrite the baseline merely to pass a check.
 `CompatibilityEvidence.v1.json` classifies a curated set of executable witnesses as identical
 bytes, readable alternate encodings, known oracle defects, behavior, or unsupported declarations.
 It records the source revision, pinned writers, reader directions, and unqualified backends.
