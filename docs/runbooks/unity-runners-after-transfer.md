@@ -323,7 +323,11 @@ checks for active Unity Editors; that check does not detect a standalone player
 that continues after its Editor exits. Separate diagnostic concurrency prevents
 cancelling qualification work, but does not serialize execution with it.
 
-This route requires runner-access preflight for ELI-MACHINE. It selects a completed
+This route requests `[self-hosted, Windows, RAM-64GB, fast]` in both runner-access
+preflight and job scheduling. The registered ELI-MACHINE runner carries `fast`;
+its runner name is not itself a scheduling label. The job separately requires
+`[Environment]::MachineName` to equal `ELI-MACHINE` before reading evidence.
+It selects a completed
 run from the current repository with exactly one attempt, verifies unique latest
 acceptance and standalone artifact identities against that run and its source
 revision, and downloads by artifact ID. Repeated attempts and missing, expired,

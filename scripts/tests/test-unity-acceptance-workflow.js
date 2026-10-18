@@ -1,5 +1,7 @@
 "use strict";
 
+// cspell:ignore ine
+
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -540,7 +542,7 @@ const historicalJob = workflow.match(
 )?.[1];
 assert.ok(historicalJob);
 assert.match(historicalJob, /^    needs: runner-preflight$/m);
-assert.match(historicalJob, /^    runs-on: \[self-hosted, Windows, RAM-64GB, ELI-MACHINE\]$/m);
+assert.match(historicalJob, /^    runs-on: \[self-hosted, Windows, RAM-64GB, fast\]$/m);
 assert.match(historicalJob, /^      actions: read$/m);
 assert.match(historicalJob, /^      contents: read$/m);
 assert.doesNotMatch(
@@ -724,11 +726,31 @@ for (const event of ["push", "pull_request", "workflow_dispatch"]) {
         "self-hosted",
         "Windows",
         "RAM-64GB",
-        ...(event === "workflow_dispatch" && request !== "" ? ["ELI-MACHINE"] : [])
+        ...(event === "workflow_dispatch" && request !== "" ? ["fast"] : [])
       ]
     ]);
   }
 }
+const registeredWindowsRunners = [
+  { name: "DAD-MACHINE", labels: ["self-hosted", "X64", "Windows", "RAM-64GB"] },
+  { name: "ELI-MACHINE", labels: ["self-hosted", "X64", "Windows", "RAM-64GB", "fast"] }
+];
+const historicalLabels = JSON.parse(
+  requiredLabels({
+    github: { event_name: "workflow_dispatch" },
+    inputs: { "native-readback-run-id": "39132725629" }
+  })
+)[0];
+assert.deepEqual(
+  registeredWindowsRunners
+    .filter((runner) => historicalLabels.every((label) => runner.labels.includes(label)))
+    .map((runner) => runner.name),
+  ["ELI-MACHINE"]
+);
+assert.match(
+  historicalStep("Validate historical readback selection"),
+  /if \(\[Environment\]::MachineName -ine 'ELI-MACHINE'\) \{ throw 'Historical readback must run on ELI-MACHINE\.' \}/
+);
 const preflightGroup = foldedGroup(preflightBlock, 6);
 groupContext.github.workflow = "Unity Tests";
 groupContext.inputs["native-readback-run-id"] = "";
