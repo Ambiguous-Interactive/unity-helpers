@@ -3,6 +3,27 @@
   "policy": "Selectors bind source declarations to fixtures only. A qualifying lane must execute every exact case of each selected fixture once, using ordinary NUnit discovery/lifecycle and a matching source/build receipt. Display-case names never infer method or argument identity.",
   "discoveryArtifacts": [
     {
+      "id": "unknown-rewrite-focused-v2",
+      "label": "focused-v2.trx",
+      "sha256": "ce8d79e6eb8ddf661741104dddddb4b86e4911dfa25939a981808554d91bb46d",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "unknown-rewrite-focused-v3",
+      "label": "focused-v3.trx",
+      "sha256": "13bae7eae3ea01d6de7fc2ac12feb33dca210a380c5981a18036a29480759917",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "unknown-rewrite-native-focused",
+      "label": "native-rewrite-result.json",
+      "sha256": "87e3a871449e8d76f2f3f4ba415ba9ea353e9dfdda809c69a9a078d154f8cd2c",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
       "id": "formatter-full-v2",
       "label": "formatter-full-v2.trx",
       "sha256": "3b1402da55a1a24a186104d219b4c2d86dfab6e951496d71fe4888a834e04b06",
@@ -109,6 +130,11 @@
     }
   ],
   "selectors": [
+    {
+      "id": "WProtoConsumerMigrationTests.ReadRewriteDropsUnknownFieldsAndPreservesKnownValues",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoConsumerMigrationTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests"
+    },
     {
       "id": "BclDifferentialTests.ARepeatedBclMemberTakesTheLastOccurrence",
       "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/BclDifferentialTests.cs",
@@ -9249,10 +9275,20 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.ClosedTargets.String.Zero",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.CombinedMigrationReadsRetainedGoldenBytes",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.NullAndEmptyReferenceValuesKeepTheirWireDistinction",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.RuntimeDefaultsHaveGoldenBytesAndAChangedDefaultIsDetectable"
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.RuntimeDefaultsHaveGoldenBytesAndAChangedDefaultIsDetectable",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Bytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Fixed32",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Fixed64",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Group",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Varint",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Bytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Fixed32",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Fixed64",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Group",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Varint"
           ],
-          "discoveryArtifact": "formatter-full-v2",
-          "reason": "Complete fixture names observed in an ordinary full oracle run; discovery is not qualification."
+          "discoveryArtifact": "unknown-rewrite-focused-v2",
+          "reason": "Complete fixture names observed in the focused rewrite result; discovery is separate from matching receipt and backend qualification."
         },
         {
           "lane": "host-v3",
@@ -9270,10 +9306,20 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.ClosedTargets.String.Zero",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.CombinedMigrationReadsRetainedGoldenBytes",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.NullAndEmptyReferenceValuesKeepTheirWireDistinction",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.RuntimeDefaultsHaveGoldenBytesAndAChangedDefaultIsDetectable"
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.RuntimeDefaultsHaveGoldenBytesAndAChangedDefaultIsDetectable",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Bytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Fixed32",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Fixed64",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Group",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Varint",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Bytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Fixed32",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Fixed64",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Group",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Varint"
           ],
-          "discoveryArtifact": "formatter-full-v3",
-          "reason": "Complete fixture names observed in an ordinary full oracle run; discovery is not qualification."
+          "discoveryArtifact": "unknown-rewrite-focused-v3",
+          "reason": "Complete fixture names observed in the focused rewrite result; discovery is separate from matching receipt and backend qualification."
         },
         {
           "lane": "unity-editor-playmode",
@@ -9291,10 +9337,20 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.ClosedTargets.String.Zero",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.CombinedMigrationReadsRetainedGoldenBytes",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.NullAndEmptyReferenceValuesKeepTheirWireDistinction",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.RuntimeDefaultsHaveGoldenBytesAndAChangedDefaultIsDetectable"
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.RuntimeDefaultsHaveGoldenBytesAndAChangedDefaultIsDetectable",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Bytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Fixed32",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Fixed64",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Group",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Nested.Varint",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Bytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Fixed32",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Fixed64",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Group",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests.UnknownRewrite.Root.Varint"
           ],
-          "discoveryArtifact": "formatter-native-serialization",
-          "reason": "Complete fixture names observed in the full Serialization namespace playmode result; no source/backend qualification is transferred."
+          "discoveryArtifact": "unknown-rewrite-native-focused",
+          "reason": "Complete fixture names observed in the focused rewrite result; discovery is separate from matching receipt and backend qualification."
         },
         {
           "lane": "unity-editor-editmode",

@@ -2987,6 +2987,11 @@ copy-accounting state. This cap excludes buffer capacity, ordinary string and by
 decoded object graphs, and the legacy accumulator overload without a parent. It is not a total
 allocation or retained-memory limit.
 
+Unknown fields are skipped and are not retained for rewriting, including fields inside known
+nested messages. An older model can read a newer save successfully, then drop those fields when
+it writes the save again. Keep the original payload for rollback; successful decoding alone does
+not prove a lossless rewrite.
+
 `WProtoFacade.TryDeserialize(bytes, limits, out T value)` and `TryDeserializeAs` also accept limits.
 They throw `InvalidOperationException` for malformed or over-budget handled payloads; `false` means
 an unhandled type. Reader methods return `false` and latch `Malformed`. Invalid UTF-8 is refused.

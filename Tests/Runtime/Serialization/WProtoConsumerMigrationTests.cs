@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
+    using System;
     using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
@@ -259,6 +260,84 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             CollectionAssert.AreEqual(retained, rewritten);
 #if !ENABLE_IL2CPP
             CollectionAssert.AreEqual(OracleBytes(Model<int>(), expected), retained);
+#endif
+        }
+
+        [TestCase("B83E2A", false, TestName = "UnknownRewrite.Root.Varint")]
+        [TestCase("B93E000000000000F03F", false, TestName = "UnknownRewrite.Root.Fixed64")]
+        [TestCase("BA3E036E6577", false, TestName = "UnknownRewrite.Root.Bytes")]
+        [TestCase("BD3E0000803F", false, TestName = "UnknownRewrite.Root.Fixed32")]
+        [TestCase("BB3E0801BC3E", false, TestName = "UnknownRewrite.Root.Group")]
+        [TestCase("B83E2A", true, TestName = "UnknownRewrite.Nested.Varint")]
+        [TestCase("B93E000000000000F03F", true, TestName = "UnknownRewrite.Nested.Fixed64")]
+        [TestCase("BA3E036E6577", true, TestName = "UnknownRewrite.Nested.Bytes")]
+        [TestCase("BD3E0000803F", true, TestName = "UnknownRewrite.Nested.Fixed32")]
+        [TestCase("BB3E0801BC3E", true, TestName = "UnknownRewrite.Nested.Group")]
+        public void ReadRewriteDropsUnknownFieldsAndPreservesKnownValues(string hex, bool nested)
+        {
+            byte[] known = { 0x28, 17, 0x58, 7, 0x88, 1, 0, 0xBA, 1, 3, 0x3A, 1, 0x78, 0xEA, 1, 0 };
+            byte[] unknown = new byte[hex.Length / 2];
+            for (int index = 0; index < unknown.Length; ++index)
+            {
+                unknown[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            int insertion = nested ? 13 : 0;
+            byte[] future = new byte[known.Length + unknown.Length];
+            Array.Copy(known, 0, future, 0, insertion);
+            Array.Copy(unknown, 0, future, insertion, unknown.Length);
+            Array.Copy(
+                known,
+                insertion,
+                future,
+                insertion + unknown.Length,
+                known.Length - insertion
+            );
+            if (nested)
+            {
+                future[9] = (byte)(3 + unknown.Length);
+            }
+
+            RuntimeConfiguredSave<int> expected = new RuntimeConfiguredSave<int>
+            {
+                Identifier = 17,
+                Version = 7,
+                Checkpoint = 0,
+                Entries = new List<RuntimeConfiguredEntry>
+                {
+                    new RuntimeConfiguredEntry { Name = "x" },
+                },
+            };
+            Assert.IsTrue(
+                WProtoFacade.TryDeserialize(future, out RuntimeConfiguredSave<int> older)
+            );
+            AssertValue(expected, older);
+            Assert.IsTrue(WProtoFacade.TrySerialize(older, out byte[] rewritten));
+            CollectionAssert.AreEqual(known, rewritten);
+
+            IWProtoFormatter<RuntimeConfiguredSave<int>> formatter = WProtoFormatterProvider.Get<
+                RuntimeConfiguredSave<int>
+            >();
+            WProtoReader reader = new WProtoReader(future);
+            Assert.IsTrue(formatter.TryRead(ref reader, out RuntimeConfiguredSave<int> direct));
+            Assert.IsTrue(reader.End);
+            Assert.IsFalse(reader.Malformed);
+            AssertValue(expected, direct);
+            byte[] buffer = new byte[formatter.Measure(direct)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, direct));
+            Assert.AreEqual(known.Length, writer.Position);
+            CollectionAssert.AreEqual(known, writer.Written.ToArray());
+#if !ENABLE_IL2CPP
+            RuntimeTypeModel model = Model<int>();
+            using (MemoryStream stream = new MemoryStream(future))
+            {
+                RuntimeConfiguredSave<int> oracle =
+                    (RuntimeConfiguredSave<int>)
+                        model.Deserialize(stream, null, typeof(RuntimeConfiguredSave<int>));
+                AssertValue(expected, oracle);
+                CollectionAssert.AreEqual(known, OracleBytes(model, oracle));
+            }
 #endif
         }
 

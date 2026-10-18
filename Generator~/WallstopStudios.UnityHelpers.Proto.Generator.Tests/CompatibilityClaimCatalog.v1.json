@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "42e143661adb60557de5d5874141e7916988ee61bcfb6a00db36e3de0a62074c",
+  "guideSha256": "94b7307d3e384565855eadf27a01057db108ff46749f958a8c8169e79d41c2df",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -9090,8 +9090,11 @@
       "claim": "Unknown fields skipped, not retained for rewrite",
       "classification": "behavior",
       "readerDirections": ["newer-write/older-read"],
-      "selectors": ["GeneratedFormatterTests.AnUnknownFieldIsSkippedRatherThanRejected"],
-      "limitations": "No dedicated read-rewrite unknown-preservation-loss assertion found; keep explicit limitation, do not claim retention support.",
+      "selectors": [
+        "GeneratedFormatterTests.AnUnknownFieldIsSkippedRatherThanRejected",
+        "WProtoConsumerMigrationTests.ReadRewriteDropsUnknownFieldsAndPreservesKnownValues"
+      ],
+      "limitations": "Unknown fields are discarded during read/rewrite in the witnessed non-extensible root and nested consumer models. This does not add retention support or establish lossless mixed-version deployment.",
       "gapIds": ["G013"],
       "status": "unsupported-with-witness",
       "laneRequirements": [
@@ -9099,22 +9102,30 @@
           "lane": "host-v2",
           "status": "witnesses",
           "scope": "complete",
-          "selectors": ["GeneratedFormatterTests.AnUnknownFieldIsSkippedRatherThanRejected"],
+          "selectors": [
+            "GeneratedFormatterTests.AnUnknownFieldIsSkippedRatherThanRejected",
+            "WProtoConsumerMigrationTests.ReadRewriteDropsUnknownFieldsAndPreservesKnownValues"
+          ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
         {
           "lane": "host-v3",
           "status": "witnesses",
           "scope": "complete",
-          "selectors": ["GeneratedFormatterTests.AnUnknownFieldIsSkippedRatherThanRejected"],
+          "selectors": [
+            "GeneratedFormatterTests.AnUnknownFieldIsSkippedRatherThanRejected",
+            "WProtoConsumerMigrationTests.ReadRewriteDropsUnknownFieldsAndPreservesKnownValues"
+          ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },
         {
           "lane": "unity-editor-playmode",
-          "status": "not-applicable",
-          "scope": "none",
-          "selectors": [],
-          "reason": "No declared witness applies to this lane; this is not qualified absence of behavior."
+          "status": "witnesses",
+          "scope": "partial",
+          "selectors": [
+            "WProtoConsumerMigrationTests.ReadRewriteDropsUnknownFieldsAndPreservesKnownValues"
+          ],
+          "reason": "The shared rewrite-loss witness applies; the separate host-only skip selector is not part of this lane."
         },
         {
           "lane": "unity-editor-editmode",
@@ -10207,8 +10218,8 @@
     {
       "id": "G013",
       "claimIds": ["unsupported.unknown-retention"],
-      "status": "open",
-      "description": "Unknowns are skipped; no read-rewrite loss/preservation-specific named witness selected. Retention implementation is future scope."
+      "status": "resolved-by-witness",
+      "description": "Ten literal-input cases pin unknown-field loss on root and nested consumer read/rewrite across all five skippable wire forms, while preserving known values through direct, facade and pinned oracle operations. Retention implementation and real consumer rollout remain future scope; fixture discovery alone is not qualification."
     },
     {
       "id": "G014",
