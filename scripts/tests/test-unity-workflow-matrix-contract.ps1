@@ -1828,7 +1828,7 @@ function Test-UnityRunnerPreflightLabels {
     if ($labels.Count -ne 1) { return $false }
     $value = $labels[0].Groups['value'].Value
     return $value -ceq '''[["self-hosted","Windows","RAM-64GB"]]''' -or ($AllowHistoricalReadback -and
-        $value -ceq '${{ format(''[["self-hosted","Windows","RAM-64GB"{0}]]'', github.event_name == ''workflow_dispatch'' && inputs.native-readback-run-id != '''' && '',"ELI-MACHINE"'' || '''') }}')
+        $value -ceq '${{ format(''[["self-hosted","Windows","RAM-64GB"{0}]]'', github.event_name == ''workflow_dispatch'' && inputs.native-readback-run-id != '''' && '',"fast"'' || '''') }}')
 }
 
 function Test-UnityAggregateAlwaysGuard {
@@ -1860,9 +1860,9 @@ if ([string]::IsNullOrWhiteSpace($readbackLabelLine) -or [string]::IsNullOrWhite
     $failed = $true
 }
 foreach ($control in @(
-        @{ Kind = 'Labels'; Name = 'wrong target machine'; From = 'ELI-MACHINE'; To = 'DAD-MACHINE' },
+        @{ Kind = 'Labels'; Name = 'absent machine-name label'; From = ',"fast"'; To = ',"ELI-MACHINE"' },
         @{ Kind = 'Labels'; Name = 'wrong default labels'; From = '"self-hosted","Windows","RAM-64GB"{0}'; To = '"self-hosted","Linux","RAM-64GB"{0}' },
-        @{ Kind = 'Labels'; Name = 'wrong target labels'; From = ',"ELI-MACHINE"'; To = ',"Linux","ELI-MACHINE"' },
+        @{ Kind = 'Labels'; Name = 'wrong target labels'; From = ',"fast"'; To = ',"Linux","fast"' },
         @{ Kind = 'Labels'; Name = 'wrong dispatch selector'; From = "'workflow_dispatch'"; To = "'push'" },
         @{ Kind = 'Labels'; Name = 'wrong readback selector'; From = 'inputs.native-readback-run-id'; To = 'inputs.acceptance' },
         @{ Kind = 'Labels'; Name = 'inverted readback selector'; From = "!= ''"; To = "== ''" },

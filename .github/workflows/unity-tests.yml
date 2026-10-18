@@ -93,7 +93,7 @@ jobs:
     name: Historical ELI native evidence (diagnostic only)
     needs: runner-preflight
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' && needs.runner-preflight.result == 'success' }}
-    runs-on: [self-hosted, Windows, RAM-64GB, ELI-MACHINE]
+    runs-on: [self-hosted, Windows, RAM-64GB, fast]
     timeout-minutes: 10
     permissions:
       contents: read
@@ -428,7 +428,7 @@ jobs:
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
-          required-label-sets: ${{ format('[["self-hosted","Windows","RAM-64GB"{0}]]', github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' && ',"ELI-MACHINE"' || '') }}
+          required-label-sets: ${{ format('[["self-hosted","Windows","RAM-64GB"{0}]]', github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' && ',"fast"' || '') }}
 
   # Group all selected modes by Unity version. Each version pays checkout,
   # provisioning, organization-lock acquisition, and central cleanup once while
