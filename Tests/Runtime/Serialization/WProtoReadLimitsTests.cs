@@ -127,6 +127,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(width, packed.Position);
         }
 
+        [TestCase(0UL)]
+        [TestCase(127UL)]
+        [TestCase(128UL)]
+        [TestCase(16383UL)]
+        [TestCase(16384UL)]
+        [TestCase(2097151UL)]
+        [TestCase(2097152UL)]
+        [TestCase(0x123456789ABCDEF0UL)]
+        [TestCase(ulong.MaxValue)]
+        public void VarintBoundariesPreserveValuesAndRejectEveryTruncatedPrefix(ulong expected)
+        {
+            byte[] bytes = new byte[WProtoSizes.MaxVarintBytes];
+            WProtoWriter writer = new WProtoWriter(bytes);
+            Assert.IsTrue(writer.TryWriteVarint64(expected));
+            WProtoReader reader = new WProtoReader(writer.Written);
+            Assert.IsTrue(reader.TryReadVarint64(out ulong actual));
+            Assert.AreEqual(expected, actual);
+            Assert.IsTrue(reader.End);
+            Assert.IsFalse(reader.Malformed);
+            for (int length = 0; length < writer.Position; ++length)
+            {
+                WProtoReader truncated = new WProtoReader(writer.Written.Slice(0, length));
+                Assert.IsFalse(truncated.TryReadVarint64(out ulong refused));
+                Assert.AreEqual(0UL, refused);
+                Assert.IsTrue(truncated.Malformed);
+            }
+        }
+
         [TestCase(-1, false)]
         [TestCase(0, false)]
         [TestCase(1, false)]

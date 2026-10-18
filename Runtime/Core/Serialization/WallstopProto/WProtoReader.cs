@@ -305,10 +305,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         value = (uint)(first & 0x7F) | ((uint)second << 7);
                         return true;
                     }
+
+                    if (index + 2 < _buffer.Length)
+                    {
+                        byte third = _buffer[index + 2];
+                        uint prefix = (uint)(first & 0x7F) | ((uint)(second & 0x7F) << 7);
+                        if (third < 0x80)
+                        {
+                            _position = index + 3;
+                            value = prefix | ((uint)third << 14);
+                            return true;
+                        }
+
+                        return TryReadLongVarint(
+                            prefix | ((uint)(third & 0x7F) << 14),
+                            index + 3,
+                            out value
+                        );
+                    }
                 }
             }
 
-            return TryReadLongVarint(out value);
+            _malformed = true;
+            value = 0;
+            return false;
         }
 
         /// <summary>
@@ -1005,11 +1025,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return true;
         }
 
-        private bool TryReadLongVarint(out ulong value)
+        private bool TryReadLongVarint(ulong result, int index, out ulong value)
         {
-            ulong result = 0;
-            int index = _position;
-            for (int shift = 0; shift < WProtoSizes.MaxVarintBytes; ++shift)
+            for (int shift = 3; shift < WProtoSizes.MaxVarintBytes; ++shift)
             {
                 if (_buffer.Length <= index)
                 {
