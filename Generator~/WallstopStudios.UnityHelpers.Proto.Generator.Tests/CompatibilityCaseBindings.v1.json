@@ -36,6 +36,27 @@
       "sha256": "944680ba747b44bc928b555ee160116302c058d821bfc1d482511022436e7ae0",
       "purpose": "case-discovery-only",
       "qualification": "none"
+    },
+    {
+      "id": "writer-focused-v2",
+      "label": "writer-green-v2.trx",
+      "sha256": "a848a7626c69980fa10abbc207eea3ae1fb9d5074239473a9a7425dfa504fcaa",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "writer-focused-v3",
+      "label": "writer-green-v3.trx",
+      "sha256": "cfc09e4319753d5f6d84ebd67a54d2111e0a3d45984b2f2675ae3642ac54d96d",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "writer-native-focused",
+      "label": "native-focused.json",
+      "sha256": "f92b6ab418d89d2e66df6920d0da7b97158a4b4eb6679686288aa01ab5034d21",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
     }
   ],
   "selectors": [
@@ -2618,6 +2639,16 @@
       "id": "DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused",
       "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.DiagnosticTests"
+    },
+    {
+      "id": "WProtoFormatterFailureTests.MessageFormatterExceptionLatchesWriterAndPreservesCommittedBytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoFormatterFailureTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests"
+    },
+    {
+      "id": "WProtoFormatterFailureTests.NonthrowingMessageFormatterCompletesAndAllowsFurtherWrites",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoFormatterFailureTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests"
     }
   ],
   "fixtures": [
@@ -9614,10 +9645,18 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.UriEmptyAndRelativePolicyIsPreserved(\"relative/path\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(1)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(2)"
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Control.Direct",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Control.Nested",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Direct.AfterPayload",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Direct.BeforePayload",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Nested.Rethrown",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Nested.Swallowed",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Preopened.AfterPayload",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Preopened.BeforePayload"
           ],
-          "discoveryArtifact": "formatter-full-v2",
-          "reason": "Complete fixture names observed in an ordinary full oracle run; discovery is not qualification."
+          "discoveryArtifact": "writer-focused-v2",
+          "reason": "Complete fixture names observed in an ordinary focused oracle run; discovery is not qualification."
         },
         {
           "lane": "host-v3",
@@ -9647,10 +9686,18 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.UriEmptyAndRelativePolicyIsPreserved(\"relative/path\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(1)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(2)"
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Control.Direct",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Control.Nested",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Direct.AfterPayload",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Direct.BeforePayload",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Nested.Rethrown",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Nested.Swallowed",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Preopened.AfterPayload",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Preopened.BeforePayload"
           ],
-          "discoveryArtifact": "formatter-full-v3",
-          "reason": "Complete fixture names observed in an ordinary full oracle run; discovery is not qualification."
+          "discoveryArtifact": "writer-focused-v3",
+          "reason": "Complete fixture names observed in an ordinary focused oracle run; discovery is not qualification."
         },
         {
           "lane": "unity-editor-playmode",
@@ -9680,10 +9727,18 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.UriEmptyAndRelativePolicyIsPreserved(\"relative/path\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(0)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(1)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(2)"
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.ValidTemporalKindsRemainAccepted(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Control.Direct",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Control.Nested",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Direct.AfterPayload",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Direct.BeforePayload",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Nested.Rethrown",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Nested.Swallowed",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Preopened.AfterPayload",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoFormatterFailureTests.WriteMessageException.Preopened.BeforePayload"
           ],
-          "discoveryArtifact": "formatter-native-serialization",
-          "reason": "Complete fixture names observed in the full Serialization namespace playmode result; no source/backend qualification is transferred."
+          "discoveryArtifact": "writer-native-focused",
+          "reason": "Complete fixture names observed in ordinary Unity 6000.4.6f1 Editor Mono PlayMode execution; discovery alone does not qualify other sources or backends."
         },
         {
           "lane": "unity-editor-editmode",

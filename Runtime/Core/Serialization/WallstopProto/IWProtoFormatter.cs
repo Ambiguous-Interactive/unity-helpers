@@ -19,9 +19,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// Implementations must not throw. A malformed payload is reported by returning
     /// <see langword="false"/>, which is what lets a caller distinguish corrupt save data from a
     /// crash. <see cref="Measure"/> must return exactly the byte count <see cref="Write"/> produces
-    /// for the same value, because a parent message emits that number as a length prefix before the
-    /// payload exists; a formatter whose measurement disagrees with its output corrupts every
-    /// message that contains it.
+    /// for the same value. The facade uses that count to size its destination and plan nested prefix
+    /// widths. Back-patching actual nested lengths does not make an incorrect total measurement valid.
     /// </para>
     /// <para>
     /// <b>Hook ordering.</b> A formatter that handles a type carrying lifecycle hooks must invoke
@@ -31,19 +30,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <item><description>
     /// <see cref="WProtoBeforeSerializationAttribute"/> -- first statement of <see cref="Measure"/>,
     /// and <b>not</b> repeated in <see cref="Write"/>. A type that projects its live state into its
-    /// serialized members must have done so before it is measured, or the length prefix will not
-    /// match the payload. This makes <see cref="Measure"/> stateful rather than pure, and makes
-    /// "measure exactly once, immediately before each write" part of the contract -- which the
-    /// length-prefix protocol already requires, since a prefix cannot be emitted without it. A hook
-    /// that rents pooled scratch would leak if it also ran from <see cref="Write"/>.
+    /// serialized members must have done so before it is measured, so destination sizing includes
+    /// those changes. This makes <see cref="Measure"/> stateful rather than pure: measure exactly
+    /// once, immediately before each write. Repeated measurement can rent pooled scratch twice for
+    /// one write, while the after-serialization hook releases it only once.
     /// </description></item>
     /// <item><description>
     /// <see cref="WProtoAfterSerializationAttribute"/> -- last statement of <see cref="Write"/>, so
     /// whatever the before-serialization hook staged is released once the bytes are out.
     /// </description></item>
     /// <item><description>
-    /// <see cref="WProtoBeforeDeserializationAttribute"/> -- after the instance is created and
-    /// before any member is assigned.
+    /// <see cref="WProtoBeforeDeserializationAttribute"/> -- after the instance is created, before
+    /// decoded members are assigned on mutable contracts. On immutable contracts, construction has
+    /// already assigned the decoded members before this hook runs.
     /// </description></item>
     /// <item><description>
     /// <see cref="WProtoAfterDeserializationAttribute"/> -- after the last member is assigned, and

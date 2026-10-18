@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix nested WProto writes remaining usable after a custom formatter throws; preserve the original exception and reject further writes ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix WProto readers allowing further reads or partial results after rejecting data, including generated readers, built-in values, collection restoration, and formatter forwarding ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix player pools retaining their peak indefinitely: enable conservative idle maintenance and automatic budget checks, while honoring explicit idle opt-outs, capacity limits, and retention floors ([#1008](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1008)).
 - Fix variable coroutine wait durations when quantization overflows or the wait cache is full; document support for computed and random values ([#1007](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1007)).

@@ -2990,6 +2990,12 @@ still makes the facade decline the request before decoding. Failure state belong
 existing reader copies retain their own state while sharing the work allowances.
 Custom allocations remain the formatter's responsibility.
 
+`IWProtoFormatter` implementations must report failure with `false` rather than throw.
+If a formatter throws inside `TryWriteMessage`, the writer latches `Faulted`, unwinds its own
+nesting frame and propagates the original exception. An enclosing formatter cannot
+catch that exception and complete the write successfully. Compound writes may already have
+written a tag, reserved prefix or partial payload; discard that output after failure.
+
 ### Wire compatibility
 
 Compatibility belongs to a versioned contract: protobuf has

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "a89f02aedd4ef4a94e22babd3df6be27fc8a9a79e14fa3f73ad703e348703d6e",
+  "guideSha256": "2a5a2058561cd744575cbd8c3518649f5eae1e8289b43d1abaa1a90ca00f7926",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -9947,6 +9947,66 @@
           "scope": "none",
           "selectors": [],
           "reason": "No declared witness applies to this lane; this is not qualified absence of behavior."
+        }
+      ]
+    },
+    {
+      "id": "formatter.nested-write-exception",
+      "guideAnchor": "docs/features/serialization/serialization.md#hostile-payloads",
+      "claim": "TryWriteMessage latches a delegated formatter exception, unwinds its own frame, preserves the original exception and refuses continuation",
+      "classification": "behavior",
+      "readerDirections": ["current-write"],
+      "selectors": [
+        "WProtoFormatterFailureTests.MessageFormatterExceptionLatchesWriterAndPreservesCommittedBytes",
+        "WProtoFormatterFailureTests.NonthrowingMessageFormatterCompletesAndAllowsFurtherWrites"
+      ],
+      "limitations": "Formatters must not throw. This protects the existing nested-message boundary; partial bytes remain. Arbitrary direct formatter forwarding and unbalanced custom length tokens are outside this guarantee. No wire or successful-path behavior changes.",
+      "gapIds": [],
+      "status": "supported-with-witness",
+      "laneRequirements": [
+        {
+          "lane": "host-v2",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoFormatterFailureTests.MessageFormatterExceptionLatchesWriterAndPreservesCommittedBytes",
+            "WProtoFormatterFailureTests.NonthrowingMessageFormatterCompletesAndAllowsFurtherWrites"
+          ],
+          "reason": "Both declared selectors apply; exact complete-fixture execution evidence is required."
+        },
+        {
+          "lane": "host-v3",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoFormatterFailureTests.MessageFormatterExceptionLatchesWriterAndPreservesCommittedBytes",
+            "WProtoFormatterFailureTests.NonthrowingMessageFormatterCompletesAndAllowsFurtherWrites"
+          ],
+          "reason": "Both declared selectors apply; exact complete-fixture execution evidence is required."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoFormatterFailureTests.MessageFormatterExceptionLatchesWriterAndPreservesCommittedBytes",
+            "WProtoFormatterFailureTests.NonthrowingMessageFormatterCompletesAndAllowsFurtherWrites"
+          ],
+          "reason": "Both declared selectors apply; exact complete-fixture execution evidence is required."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "scope": "none",
+          "selectors": [],
+          "reason": "The shared runtime fixture is not part of this lane; no behavior is qualified here."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "scope": "none",
+          "selectors": [],
+          "reason": "The shared runtime fixture is not part of this lane; no behavior is qualified here."
         }
       ]
     }
