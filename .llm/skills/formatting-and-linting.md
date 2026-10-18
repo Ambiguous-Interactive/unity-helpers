@@ -71,18 +71,6 @@ must be `.ps1` scripts on every supported host. For debugging, run
 `.githooks/pre-commit.ps1` with PowerShell, or let Git execute
 `.githooks/pre-commit` directly.
 
-### If the Hook Wasn't Active
-
-If a commit bypassed the hook (e.g., `--no-verify`, hook not installed), fix locally:
-
-```bash
-# Fix formatting
-npm run format:fix
-
-# Run full validation
-npm run validate:local
-```
-
 ---
 
 ## Markdown File References

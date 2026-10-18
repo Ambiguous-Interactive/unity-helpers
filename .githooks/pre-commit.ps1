@@ -395,11 +395,8 @@ function Add-FinalNewlines {
             continue
         }
 
-        $attributeOutput = @(& git -C $repoRoot check-attr --cached -z text -- $path 2>&1)
-        if ($LASTEXITCODE -ne 0) {
-            throw "Cannot inspect staged text attribute for '$path': $($attributeOutput -join ' ')"
-        }
-        $attributeFields = ($attributeOutput -join "`n").Split([char]0)
+        $attributeResult = Invoke-Git -Arguments @('check-attr', '--cached', '-z', 'text', '--', $path)
+        $attributeFields = $attributeResult.Stdout.Split([char]0)
         if ($attributeFields.Count -ne 4 -or $attributeFields[0] -cne $path -or $attributeFields[1] -cne 'text' -or $attributeFields[3] -cne '') {
             throw "Unexpected staged text attribute response for '$path'."
         }

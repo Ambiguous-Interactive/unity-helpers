@@ -596,12 +596,15 @@ test_precommit_preserves_staged_byte_attributes() {
         local name="pre-commit honors staged byte policy ($policy)"
         local sandbox="$TEMPDIR/precommit-byte-policy-$policy"
         mkdir -p "$sandbox/.githooks" "$sandbox/scripts"
+        cp "$REPO_ROOT/.githooks/pre-commit" "$sandbox/.githooks/pre-commit"
+        chmod +x "$sandbox/.githooks/pre-commit"
         cp "$REPO_ROOT/.githooks/pre-commit.ps1" "$sandbox/.githooks/pre-commit.ps1"
         cp "$REPO_ROOT/scripts/git-staging-helpers.ps1" "$sandbox/scripts/git-staging-helpers.ps1"
         cp "$REPO_ROOT/scripts/normalize-eol.ps1" "$sandbox/scripts/normalize-eol.ps1"
         git -C "$sandbox" init -q
         git -C "$sandbox" config user.email test@example.com
         git -C "$sandbox" config user.name "Test User"
+        git -C "$sandbox" config core.hooksPath .githooks
         staged_policy=-text
         working_policy=text
         if [[ "$policy" == binary ]]; then
@@ -619,7 +622,7 @@ test_precommit_preserves_staged_byte_attributes() {
         local before_blob
         before_blob=$(git -C "$sandbox" rev-parse ":$capture")
         local output exit_code=0
-        output=$(cd "$sandbox" && pwsh -NoProfile -File .githooks/pre-commit.ps1 2>&1) || exit_code=$?
+        output=$(git -C "$sandbox" -c commit.gpgsign=false commit -qm 'Verify staged byte policy' 2>&1) || exit_code=$?
         if [[ "$exit_code" -ne 0 ]]; then
             fail "$name" "hook failed: $output"
             continue
@@ -639,11 +642,122 @@ test_precommit_preserves_staged_byte_attributes() {
                 continue
             fi
         fi
-        git -C "$sandbox" show ":$capture" > "$sandbox/index-capture"
+        git -C "$sandbox" show "HEAD:$capture" > "$sandbox/index-capture"
         if cmp -s "$sandbox/expected" "$sandbox/$capture" && cmp -s "$sandbox/expected" "$sandbox/index-capture"; then
             pass "$name"
         else
             fail "$name" 'capture bytes do not follow the staged attribute policy'
+        fi
+    done
+}
+
+test_bash_newline_staged_byte_attributes() {
+    local consumer policy mode
+    for consumer in scripts/tests/test-final-newline.sh scripts/validate-formatting.sh; do
+        for policy in unset binary staged-text unspecified; do
+            for mode in check fix; do
+                if [[ "$consumer" == scripts/tests/* && "$mode" == fix ]]; then
+                    continue
+                fi
+                local name="$consumer honors staged byte policy ($policy, $mode)"
+                local sandbox
+                sandbox="$TEMPDIR/bash-newline-$(basename "$consumer")-$policy-$mode"
+                mkdir -p "$sandbox/scripts/tests" "$sandbox/node_modules"
+                cp "$REPO_ROOT/$consumer" "$sandbox/$consumer"
+                # Isolate newline behavior from Prettier; its four calls are outside this contract.
+                printf 'process.exit(0);\n' > "$sandbox/scripts/run-prettier.js"
+                git -C "$sandbox" init -q
+                git -C "$sandbox" config core.autocrlf false
+                local capture='captured sample.txt'
+                local staged_policy=-text working_policy=text
+                if [[ "$policy" == binary ]]; then
+                    staged_policy=binary
+                elif [[ "$policy" == staged-text ]]; then
+                    staged_policy=text
+                    working_policy=-text
+                elif [[ "$policy" == unspecified ]]; then
+                    staged_policy='!text'
+                    working_policy=-text
+                fi
+                printf '"%s" %s\n' "$capture" "$staged_policy" > "$sandbox/.gitattributes"
+                printf 'frozen bytes' > "$sandbox/$capture"
+                git -C "$sandbox" add -- .gitattributes "$capture"
+                printf '"%s" %s\n' "$capture" "$working_policy" > "$sandbox/.gitattributes"
+                local before_blob
+                before_blob=$(git -C "$sandbox" rev-parse ":$capture")
+                local args=()
+                if [[ "$mode" == fix ]]; then
+                    args=(--fix)
+                fi
+                local output exit_code=0 expected_exit=0
+                output=$(cd "$sandbox" && bash "$consumer" "${args[@]}" 2>&1) || exit_code=$?
+                if [[ "$mode" == check && ( "$policy" == staged-text || "$policy" == unspecified ) ]]; then
+                    expected_exit=1
+                fi
+                if [[ "$exit_code" -ne "$expected_exit" ]]; then
+                    fail "$name" "expected $expected_exit, got $exit_code: $output"
+                    continue
+                fi
+                if [[ "$mode" == fix && ( "$policy" == staged-text || "$policy" == unspecified ) ]]; then
+                    printf 'frozen bytes\n' > "$sandbox/expected"
+                else
+                    printf 'frozen bytes' > "$sandbox/expected"
+                fi
+                if ! cmp -s "$sandbox/expected" "$sandbox/$capture"; then
+                    fail "$name" 'worktree bytes do not follow staged policy'
+                elif [[ "$(git -C "$sandbox" rev-parse ":$capture")" != "$before_blob" ]]; then
+                    fail "$name" 'validation changed the staged blob'
+                else
+                    pass "$name"
+                fi
+            done
+        done
+    done
+}
+
+test_newline_attribute_lookup_failure() {
+    local real_git
+    real_git=$(command -v git)
+    local consumer
+    for consumer in .githooks/pre-commit.ps1 scripts/tests/test-final-newline.sh scripts/validate-formatting.sh; do
+        local name="$consumer refuses writes when staged attributes are unavailable"
+        local sandbox
+        sandbox="$TEMPDIR/newline-attribute-failure-$(basename "$consumer")"
+        mkdir -p "$sandbox/.githooks" "$sandbox/scripts/tests" "$sandbox/node_modules" "$sandbox/bin"
+        cp "$REPO_ROOT/$consumer" "$sandbox/$consumer"
+        cp "$REPO_ROOT/scripts/git-staging-helpers.ps1" "$sandbox/scripts/git-staging-helpers.ps1"
+        printf 'process.exit(0);\n' > "$sandbox/scripts/run-prettier.js"
+        git -C "$sandbox" init -q
+        printf 'unchanged bytes' > "$sandbox/captured.txt"
+        git -C "$sandbox" add -- captured.txt
+        local before_blob
+        before_blob=$(git -C "$sandbox" rev-parse :captured.txt)
+        cat > "$sandbox/bin/git" <<'EOF'
+#!/usr/bin/env bash
+for argument in "$@"; do
+    if [[ "$argument" == check-attr ]]; then
+        echo 'controlled staged attribute failure' >&2
+        exit 42
+    fi
+done
+exec "$NEWLINE_REAL_GIT" "$@"
+EOF
+        chmod +x "$sandbox/bin/git"
+        local output exit_code=0
+        if [[ "$consumer" == *.ps1 ]]; then
+            output=$(cd "$sandbox" && PATH="$sandbox/bin:$PATH" NEWLINE_REAL_GIT="$real_git" pwsh -NoProfile -File "$consumer" 2>&1) || exit_code=$?
+        else
+            output=$(cd "$sandbox" && PATH="$sandbox/bin:$PATH" NEWLINE_REAL_GIT="$real_git" bash "$consumer" --fix 2>&1) || exit_code=$?
+        fi
+        printf 'unchanged bytes' > "$sandbox/expected"
+        if [[ "$exit_code" -eq 0 || "$output" != *'controlled staged attribute failure'* ]]; then
+            fail "$name" "lookup failure was not propagated: $output"
+        elif ! cmp -s "$sandbox/expected" "$sandbox/captured.txt"; then
+            fail "$name" 'worktree bytes changed after a failed lookup'
+        elif [[ "$(git -C "$sandbox" rev-parse :captured.txt)" != "$before_blob" ]]; then
+            fail "$name" 'staged blob changed after a failed lookup'
+        else
+            pass "$name"
         fi
     done
 }
@@ -861,6 +975,8 @@ test_precommit_entrypoint_delegates_to_ps1
 test_precommit_fast_path_removes_ignored_artifacts
 test_premergecommit_delegates_to_precommit
 test_precommit_preserves_staged_byte_attributes
+test_bash_newline_staged_byte_attributes
+test_newline_attribute_lookup_failure
 test_precommit_refuses_partial_final_newline_before_write
 test_precommit_checks_staged_csharp_blob
 test_precommit_partial_commit
