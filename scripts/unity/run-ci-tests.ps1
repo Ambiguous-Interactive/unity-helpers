@@ -1735,6 +1735,13 @@ public static class UhCiTestConfigurator
         // the Mono backend for the Mono perf leg via -Backend.
         NamedBuildTarget target = NamedBuildTarget.Standalone;
         PlayerSettings.SetScriptingBackend(target, ScriptingImplementation.$Backend);
+#if UNITY_6000_6_OR_NEWER
+        if (PlayerSettings.GetScriptingBackend(target) == ScriptingImplementation.Mono2x)
+        {
+            PlayerSettings.SetManagedCodeVariant(target, ManagedCodeVariant.Release);
+            Debug.Log("UH perf managed code variant: " + PlayerSettings.GetManagedCodeVariant(target));
+        }
+#endif
         // Use the non-deprecated ApiCompatibilityLevel.NET_Standard (targets .NET
         // Standard 2.1). The deprecated 2.0 form and the non-existent 2.1 enum
         // member are intentionally NOT used.
@@ -1880,10 +1887,12 @@ using UnityEngine.TestTools;
 // clears on the PlayerConnection runFinished message, which never arrives when
 // the player is not launched. PostBuildCleanup is the framework's hook (run after
 // the build) to exit the editor cleanly.
-public sealed class UhCiStandaloneBuildModifier : ITestPlayerBuildModifier, IPostBuildCleanup
+public sealed partial class UhCiStandaloneBuildModifier : ITestPlayerBuildModifier, IPostBuildCleanup
 {
     private static bool s_Armed;
     private static readonly EditorApplication.CallbackFunction s_Exit = () => EditorApplication.Exit(0);
+
+    static partial void WriteFrozenBuildPreparation(BuildPlayerOptions playerOptions);
 
     public BuildPlayerOptions ModifyOptions(BuildPlayerOptions playerOptions)
     {
@@ -1920,6 +1929,7 @@ $developmentOption
         Debug.Log("UH player build config: backend=" + UnityEditor.PlayerSettings.GetScriptingBackend(target)
             + ", stripping=" + UnityEditor.PlayerSettings.GetManagedStrippingLevel(target)
             + ", development=" + ((playerOptions.options & UnityEditor.BuildOptions.Development) != 0));
+        WriteFrozenBuildPreparation(playerOptions);
         return playerOptions;
     }
 
@@ -3211,8 +3221,116 @@ function Start-FrozenPlayerProvenance {
         GeneratedRoot = $null; GeneratedFiles = @()
         LaunchAttempted = $false; InvocationObserved = $false; ResultsValidated = $false; PlayerOutcome = $null; ExecutionError = $null
         ConfigureOutcomes = (New-Object 'System.Collections.Generic.List[object]'); BuildOutcome = $null
-        ProjectSettingsBaseline = $null; BuildObservation = $null; KnownFaultScan = $null; NativeSupportScans = @()
+        ProjectSettingsBaseline = $null; BuildPreparation = $null; BuildPreparationSha256 = $null
+        BuildObservation = $null; KnownFaultScan = $null; NativeSupportScans = @()
     }
+}
+
+function New-WProtoBuildPreparationSource {
+    param([Parameter(Mandatory = $true)]$Context)
+    $runId = $Context.Declaration.Value.RunId
+    $declarationHash = $Context.Declaration.Sha256
+    $commit = $Context.Declaration.Value.SourceCommit
+    $receiptPath = (Join-Path $Context.Declaration.ReportDirectory 'build-preparation.json').Replace('"', '""')
+    $year = (Get-Date).Year
+    @"
+// MIT License - Copyright (c) $year wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text.Json;
+using UnityEditor;
+using UnityEngine;
+
+public sealed partial class UhCiStandaloneBuildModifier
+{
+    static partial void WriteFrozenBuildPreparation(BuildPlayerOptions playerOptions)
+    {
+        WallstopStudios.UnityHelpers.Editor.Settings.UnityHelpersSettings.instance.SaveSettings();
+        AssetDatabase.SaveAssets();
+        string project = Directory.GetParent(Application.dataPath).FullName;
+        List<string> entries = new List<string>();
+        Stack<string> pending = new Stack<string>();
+        foreach (string directory in new[] { "Assets", "Packages", "ProjectSettings" })
+        {
+            string root = Path.Combine(project, directory);
+            if (!Directory.Exists(root) || (File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidOperationException("Invalid WProto preparation root: " + directory);
+            }
+            pending.Push(root);
+        }
+        while (pending.TryPop(out string current))
+        {
+            foreach (string path in Directory.EnumerateFileSystemEntries(current))
+            {
+                FileAttributes attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.ReparsePoint) != 0 || 16384 <= entries.Count)
+                {
+                    throw new InvalidOperationException("Invalid or excessive WProto preparation inputs.");
+                }
+                entries.Add(path);
+                if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    pending.Push(path);
+                }
+            }
+        }
+        entries.Sort(StringComparer.Ordinal);
+        using (FileStream output = new FileStream(@"$receiptPath", FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            Utf8JsonWriter writer = new Utf8JsonWriter(output);
+            try
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("SchemaVersion", 1);
+                writer.WriteString("RunId", "$runId");
+                writer.WriteString("DeclarationSha256", "$declarationHash");
+                writer.WriteString("SourceCommit", "$commit");
+                writer.WriteStartArray("Scenes");
+                foreach (string scene in playerOptions.scenes ?? Array.Empty<string>())
+                {
+                    writer.WriteStringValue(scene.Replace('\\', '/'));
+                }
+                writer.WriteEndArray();
+                writer.WriteStartArray("ProjectInputs");
+                foreach (string path in entries)
+                {
+                    string relative = path.Substring(project.Length + 1).Replace('\\', '/');
+                    writer.WriteStartObject();
+                    writer.WriteString("Path", relative);
+                    if (Directory.Exists(path))
+                    {
+                        writer.WriteString("Kind", "directory");
+                        writer.WriteNull("Length");
+                        writer.WriteNull("Sha256");
+                    }
+                    else
+                    {
+                        using (FileStream input = File.OpenRead(path))
+                        using (SHA256 hash = SHA256.Create())
+                        {
+                            writer.WriteString("Kind", "file");
+                            writer.WriteNumber("Length", input.Length);
+                            writer.WriteString("Sha256", BitConverter.ToString(hash.ComputeHash(input)).Replace("-", string.Empty).ToLowerInvariant());
+                        }
+                    }
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+                writer.WriteEndObject();
+            }
+            finally
+            {
+                writer.Dispose();
+            }
+        }
+    }
+}
+"@
 }
 
 function New-FrozenPlayerAnchor {
@@ -3296,6 +3414,11 @@ AssemblyDefinitionReferenceImporter:
   assetBundleName:
   assetBundleVariant:
 '@
+    }
+    if ($Context.Declaration.CampaignKind -ceq 'wproto-seven-families-v1') {
+        $generated['Assets/Editor/UhCiStandaloneBuildModifier.WProto.cs'] = New-WProtoBuildPreparationSource -Context $Context
+        $generated['Assets/Editor/UhCiStandaloneBuildModifier.WProto.cs.meta'] = $generated["Assets/FrozenPlayerAnchor/$anchorName.meta"].Replace(
+            'd60d7181d309022b7d213e8407fcccc6', '6d83710f21db498e9c7362a09eaaae01')
     }
     foreach ($relative in $generated.Keys) {
         $path = Join-Path $ProjectPath $relative
@@ -3463,7 +3586,8 @@ function Add-FrozenPlayerProvenanceSnapshot {
     if ($null -ne $Context.Declaration.CanonicalCorpus) {
         $observed = New-Object 'System.Collections.Generic.List[object]'
         try {
-            if ($Context.GeneratedFiles.Count -ne 5) { throw 'Frozen compiled anchor files are missing.' }
+            $expectedAnchors = if ($Context.Declaration.CampaignKind -ceq 'wproto-seven-families-v1') { 7 } else { 5 }
+            if ($Context.GeneratedFiles.Count -ne $expectedAnchors) { throw 'Frozen compiled anchor files are missing.' }
             Get-FrozenPlayerFileInventory -Root $Context.GeneratedRoot -DeclaredFiles $Context.GeneratedFiles |
                 ForEach-Object { $observed.Add($_) }
         } catch { $snapshot.Errors += $_.ToString() }
@@ -3476,6 +3600,18 @@ function Add-FrozenPlayerProvenanceSnapshot {
             $snapshot.ProjectInputs = $projectInputs
             $projectIdentity = ConvertTo-Json -InputObject $projectInputs -Depth 4 -Compress
             if ($Stage -ceq 'after-configure') { $Context.ProjectSettingsBaseline = $projectIdentity }
+            elseif ($Stage -ceq 'after-build') {
+                $preparationPath = Join-Path $Context.Declaration.ReportDirectory 'build-preparation.json'
+                Assert-FrozenPlayerRegularPath -Path $preparationPath
+                if ((Get-Item -LiteralPath $preparationPath).Length -gt 4194304) { throw 'WProto build preparation receipt exceeds 4 MiB.' }
+                $Context.BuildPreparationSha256 = (Get-FileHash -LiteralPath $preparationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                $Context.BuildPreparation = Get-Content -LiteralPath $preparationPath -Raw | ConvertFrom-Json -ErrorAction Stop
+                $configured = @($Context.Snapshots | Where-Object { $_.Stage -ceq 'after-configure' })
+                if ($configured.Count -ne 1) { throw 'WProto build preparation requires exactly one configured snapshot.' }
+                Assert-WProtoBuildPreparation -Preparation $Context.BuildPreparation -ConfiguredInputs $configured[0].ProjectInputs `
+                    -BuiltInputs $projectInputs -Declaration $Context.Declaration.Value -DeclarationSha256 $Context.Declaration.Sha256
+                $Context.ProjectSettingsBaseline = $projectIdentity
+            }
             elseif ($Stage -cne 'before-configure' -and ($null -eq $Context.ProjectSettingsBaseline -or $Context.ProjectSettingsBaseline -cne $projectIdentity)) {
                 throw 'WProto generated project settings or compilation inputs changed after configuration.'
             }
@@ -3593,6 +3729,8 @@ function Complete-FrozenPlayerProvenance {
         $report.ConfigureOutcomes = $Context.ConfigureOutcomes.ToArray()
         $report.BuildOutcome = $Context.BuildOutcome
         $report.BuildObservation = $Context.BuildObservation
+        $report.BuildPreparation = $Context.BuildPreparation
+        $report.BuildPreparationSha256 = $Context.BuildPreparationSha256
         $report.KnownFaultScan = $Context.KnownFaultScan
         $report.NativeSupportScans = $Context.NativeSupportScans
         $report.OriginalGeneratedRoot = $Context.GeneratedRoot
@@ -3602,6 +3740,7 @@ function Complete-FrozenPlayerProvenance {
         $report.PayloadRoot = 'retained/player'
         $report.PlayerLogPath = 'retained/corpus-records.txt'
         $report.ResultsPath = 'retained/results.xml'
+        $report.BuildPreparationPath = 'retained/build-preparation.json'
         $report.EvidenceFilesScope = 'Historical pre-redaction support-log observations; replay uses RetainedFiles only.'
         $generatedRoot = Join-Path $Context.Declaration.ReportDirectory $report.GeneratedRoot
         $payloadRoot = Join-Path $Context.Declaration.ReportDirectory $report.PayloadRoot
@@ -3617,9 +3756,11 @@ function Complete-FrozenPlayerProvenance {
             Assert-WProtoRecordedInventory -Root $payloadRoot -Entries $built[0].PayloadFiles -Complete
             Assert-WProtoRecordedInventory -Root $generatedRoot -Entries $built[0].ProjectInputs
             Assert-WProtoRecordedInventory -Root $generatedRoot -Entries $built[0].GeneratedAnchorFiles
+            Copy-Item -LiteralPath (Join-Path $Context.Declaration.ReportDirectory 'build-preparation.json') `
+                -Destination (Join-Path $Context.Declaration.ReportDirectory $report.BuildPreparationPath) -ErrorAction Stop
             Copy-Item -LiteralPath $ResultsPath -Destination (Join-Path $retained 'results.xml') -ErrorAction Stop
             Copy-WProtoCorpusRecords -Source $PlayerLogPath -Destination (Join-Path $retained 'corpus-records.txt')
-            $report.RetainedFiles = @(foreach ($relative in @($report.PlayerLogPath, $report.ResultsPath)) {
+            $report.RetainedFiles = @(foreach ($relative in @($report.PlayerLogPath, $report.ResultsPath, $report.BuildPreparationPath)) {
                     $path = Join-Path $Context.Declaration.ReportDirectory $relative
                     $item = Get-Item -LiteralPath $path -ErrorAction Stop
                     [pscustomobject]@{ Path = $relative; Kind = 'file'; Length = $item.Length; Sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }

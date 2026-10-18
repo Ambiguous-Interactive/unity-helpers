@@ -326,6 +326,67 @@ function Assert-WProtoSnapshotInventory {
     }
 }
 
+function Assert-WProtoBuildPreparation {
+    param($Preparation, $ConfiguredInputs, $BuiltInputs, $Declaration, [string]$DeclarationSha256)
+    if ($null -eq $Preparation -or $Preparation.SchemaVersion -isnot [long] -and $Preparation.SchemaVersion -isnot [int]) {
+        throw 'WProto build preparation receipt is missing or has an invalid schema.'
+    }
+    if ($Preparation.SchemaVersion -ne 1 -or $Preparation.RunId -isnot [string] -or
+        $Preparation.RunId -cne $Declaration.RunId -or $Preparation.DeclarationSha256 -isnot [string] -or
+        $Preparation.DeclarationSha256 -cne $DeclarationSha256 -or $Preparation.SourceCommit -isnot [string] -or
+        $Preparation.SourceCommit -cne $Declaration.SourceCommit) { throw 'WProto build preparation identity differs.' }
+    if ($Preparation.Scenes -isnot [array] -or $Preparation.Scenes.Count -lt 1 -or $Preparation.Scenes.Count -gt 256 -or
+        $Preparation.ProjectInputs -isnot [array] -or $Preparation.ProjectInputs.Count -lt 1 -or $Preparation.ProjectInputs.Count -gt 100000 -or
+        @($ConfiguredInputs).Count -lt 1 -or @($BuiltInputs).Count -lt 1) { throw 'WProto build preparation vectors must be nonempty bounded arrays.' }
+    $scenes = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($scene in $Preparation.Scenes) {
+        if ($scene -isnot [string] -or $scene -cnotmatch '^(Assets|Packages)/[^\\:<>"|?*\x00-\x1f]+\.unity$' -or
+            @($scene.Split('/') | Where-Object { $_ -eq '' -or $_ -eq '.' -or $_ -eq '..' -or $_ -match '[. ]$' }).Count -ne 0 -or
+            -not $scenes.Add($scene)) { throw 'WProto build preparation scene paths are invalid or repeated.' }
+    }
+    $inventories = @{}
+    foreach ($name in @('configured', 'prepared', 'built')) {
+        $values = switch ($name) { 'configured' { $ConfiguredInputs } 'prepared' { $Preparation.ProjectInputs } 'built' { $BuiltInputs } }
+        $entries = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::OrdinalIgnoreCase)
+        foreach ($entry in @($values)) {
+            if ($entry.Path -isnot [string] -or $entry.Path.Length -gt 1024 -or
+                $entry.Path -cnotmatch '^(Assets|Packages|ProjectSettings)/[^\\:<>"|?*\x00-\x1f]+$' -or
+                @($entry.Path.Split('/') | Where-Object { $_ -eq '' -or $_ -eq '.' -or $_ -eq '..' -or $_ -match '[. ]$' }).Count -ne 0 -or
+                $entries.ContainsKey($entry.Path)) { throw 'WProto build preparation input paths are invalid or repeated.' }
+            if ($entry.Kind -ceq 'file') {
+                if (($entry.Length -isnot [int] -and $entry.Length -isnot [long]) -or $entry.Length -lt 0 -or
+                    $entry.Sha256 -isnot [string] -or $entry.Sha256 -cnotmatch '^[a-f0-9]{64}$') { throw 'WProto build preparation file metadata is invalid.' }
+            } elseif ($entry.Kind -ceq 'directory') {
+                if ($null -ne $entry.Length -or $null -ne $entry.Sha256) { throw 'WProto build preparation directory metadata is invalid.' }
+            } else { throw 'WProto build preparation input kind is invalid.' }
+            $entries.Add($entry.Path, $entry)
+        }
+        $inventories[$name] = $entries
+    }
+    $configured = $inventories.configured
+    $prepared = $inventories.prepared
+    foreach ($entry in $configured.Values) {
+        if (-not $prepared.ContainsKey($entry.Path)) { throw 'WProto build preparation removed a configured input.' }
+        Assert-WProtoSnapshotInventory -Observed @($prepared[$entry.Path]) -Expected @($entry)
+    }
+    $newScenes = @($prepared.Values | Where-Object {
+            -not $configured.ContainsKey($_.Path) -and $_.Path -cmatch '^Assets/InitTestScene[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.unity$'
+        })
+    if ($newScenes.Count -ne 1) { throw 'WProto build preparation requires exactly one newly generated test scene.' }
+    $scenePath = $newScenes[0].Path
+    if (-not ($Preparation.Scenes -ccontains $scenePath) -or -not $prepared.ContainsKey($scenePath + '.meta') -or $configured.ContainsKey($scenePath + '.meta')) {
+        throw 'WProto build preparation test scene or matching metadata is missing from the observed build.'
+    }
+    $allowed = @($scenePath, ($scenePath + '.meta'), 'ProjectSettings/SceneTemplateSettings.json', 'ProjectSettings/UnityHelpersSettings.asset')
+    foreach ($entry in $prepared.Values) {
+        if (-not $configured.ContainsKey($entry.Path) -and ($entry.Kind -cne 'file' -or $allowed -cnotcontains $entry.Path)) {
+            throw 'WProto build preparation contains an unexpected added input.'
+        }
+    }
+    # The receipt is observed before BuildPipeline. Later stages may not silently adopt changes.
+    Assert-WProtoSnapshotInventory -Observed $BuiltInputs -Expected $Preparation.ProjectInputs
+}
+
 function Assert-WProtoPlayerProvenance {
     [CmdletBinding()]
     param([string]$Repository, [string]$Directory, [string]$Commit, [string]$UnityVersion)
@@ -354,13 +415,13 @@ function Assert-WProtoPlayerProvenance {
     $reportDirectory = $reportFiles[0].DirectoryName
     if ($report.GeneratedRoot -cne 'retained/project-inputs' -or $report.PayloadRoot -cne 'retained/player' -or
         $report.PlayerLogPath -cne 'retained/corpus-records.txt' -or $report.ResultsPath -cne 'retained/results.xml' -or
-        $report.RetainedEvidenceState -cne 'passed') { throw 'WProto retained evidence paths or state are invalid.' }
+        $report.BuildPreparationPath -cne 'retained/build-preparation.json' -or $report.RetainedEvidenceState -cne 'passed') { throw 'WProto retained evidence paths or state are invalid.' }
     $generatedRoot = Join-Path $reportDirectory $report.GeneratedRoot
     $payloadRoot = Join-Path $reportDirectory $report.PayloadRoot
     $playerLogPath = Join-Path $reportDirectory $report.PlayerLogPath
     $resultsPath = Join-Path $reportDirectory $report.ResultsPath
     $built = $report.Snapshots[2]
-    if ($report.SourceFilesCount -ne @($declaration.SourceFiles).Count -or @($built.GeneratedAnchorFiles).Count -ne 5) {
+    if ($report.SourceFilesCount -ne @($declaration.SourceFiles).Count -or @($built.GeneratedAnchorFiles).Count -ne 7) {
         throw 'WProto snapshot source or generated anchor count is invalid.'
     }
     for ($index = 0; $index -lt $report.Snapshots.Count; $index++) {
@@ -369,7 +430,7 @@ function Assert-WProtoPlayerProvenance {
         Assert-WProtoSnapshotInventory -Observed $snapshot.SourceFiles -Expected $declaration.SourceFiles -DeclaredHashes
         Assert-WProtoSnapshotInventory -Observed $snapshot.CorpusFiles -Expected $declaration.CorpusFiles -DeclaredHashes
         Assert-WProtoSnapshotInventory -Observed $snapshot.GeneratedAnchorFiles -Expected $built.GeneratedAnchorFiles
-        if ($index -ge 1) { Assert-WProtoSnapshotInventory -Observed $snapshot.ProjectInputs -Expected $built.ProjectInputs }
+        if ($index -ge 2) { Assert-WProtoSnapshotInventory -Observed $snapshot.ProjectInputs -Expected $built.ProjectInputs }
         $expectedPayload = @(if ($index -ge 2) { $built.PayloadFiles })
         Assert-WProtoSnapshotInventory -Observed $snapshot.PayloadFiles -Expected $expectedPayload
     }
@@ -382,11 +443,20 @@ function Assert-WProtoPlayerProvenance {
         Assert-WProtoRecordedInventory -Root (Join-Path $generatedRoot $directoryName) -Entries $entries -Complete
     }
     # EvidenceFiles are historical observations of support logs before redaction.
-    # These two sealed artifacts are the sole replay inputs for XML and raw records.
+    # These sealed artifacts bind preparation, XML, and raw records independently of redacted logs.
     $retainedPaths = @($report.RetainedFiles | ForEach-Object { $_.Path })
-    if ($retainedPaths.Count -ne 2 -or @($retainedPaths | Where-Object { $_ -ceq 'retained/corpus-records.txt' }).Count -ne 1 -or
+    if ($retainedPaths.Count -ne 3 -or @($retainedPaths | Where-Object { $_ -ceq 'retained/build-preparation.json' }).Count -ne 1 -or @($retainedPaths | Where-Object { $_ -ceq 'retained/corpus-records.txt' }).Count -ne 1 -or
         @($retainedPaths | Where-Object { $_ -ceq 'retained/results.xml' }).Count -ne 1) { throw 'WProto retained metric/XML membership is invalid.' }
     Assert-WProtoRecordedInventory -Root $reportDirectory -Entries $report.RetainedFiles
+    $preparationPath = Join-Path $reportDirectory 'retained/build-preparation.json'
+    $preparationHash = (Get-FileHash -LiteralPath $preparationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $preparation = Get-Content -LiteralPath $preparationPath -Raw | ConvertFrom-Json -ErrorAction Stop
+    if ($report.BuildPreparationSha256 -isnot [string] -or $report.BuildPreparationSha256 -cne $preparationHash -or
+        (ConvertTo-Json -InputObject $report.BuildPreparation -Depth 12 -Compress) -cne (ConvertTo-Json -InputObject $preparation -Depth 12 -Compress)) {
+        throw 'WProto retained build preparation differs from its reported receipt.'
+    }
+    Assert-WProtoBuildPreparation -Preparation $preparation -ConfiguredInputs $report.Snapshots[1].ProjectInputs -BuiltInputs $built.ProjectInputs `
+        -Declaration $declaration -DeclarationSha256 $hash
     $evidence = Read-TestResultEvidence -Path $resultsPath -Format NUnit
     $expected = @(Get-WProtoFrozenOperationNames | ForEach-Object {
             'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus("' + $_ + '")'

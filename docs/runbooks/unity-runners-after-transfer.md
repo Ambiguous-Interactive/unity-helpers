@@ -463,6 +463,17 @@ source and player provenance, result XML and player log, plus `corpus-summary.js
 succeeds. Before deleting the owned temporary project, the runner retains the actual player payload
 and generated `Assets`, `Packages` and `ProjectSettings` inputs under the frozen report directory. It also retains
 exact result XML and every original line containing `WPROTO_CORPUS_`, including malformed records.
+The WProto build modifier writes a declaration-bound `build-preparation.json` receipt after the test
+framework prepares its scene and the modifier saves settings and assets. Every configured input
+must remain unchanged. Only the generated test scene and its metadata, plus
+`ProjectSettings/SceneTemplateSettings.json` and `ProjectSettings/UnityHelpersSettings.asset`, may
+be added during preparation. The complete prepared inventory must match the
+post-build and subsequent snapshots. The receipt is retained and checked again during replay;
+unrecorded changes still reject the capture. Seven generated anchor files are required for WProto;
+the separate borrowed-buffer route retains its five-file anchor.
+On Unity 6000.6 and newer, the shared configurator explicitly selects the Release managed-code
+variant for Mono before saving settings. This prevents build-time materialization of an implicit
+variant from changing the frozen settings file. IL2CPP and older Editors omit this API call.
 Full support logs may be redacted; their original hashes describe the observed invocation, not the
 uploaded redacted bytes. The same verifier runs again after redaction and checks the retained
 measurement records, XML and build inputs. After successful redaction, rejected diagnostics are also

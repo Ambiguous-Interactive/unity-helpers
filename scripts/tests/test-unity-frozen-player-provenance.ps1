@@ -12,7 +12,7 @@ $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($source, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count -ne 0) { throw 'Unity runner must parse.' }
 foreach ($name in @('Assert-FrozenPlayerRegularPath', 'Get-FrozenPlayerFileInventory', 'Read-FrozenPlayerDeclaration', 'Start-FrozenPlayerProvenance',
-        'New-FrozenPlayerAnchor', 'Get-FrozenPlayerRuntimeJoin', 'Add-FrozenPlayerProvenanceSnapshot', 'Get-FrozenPlayerJointCorrectness', 'Complete-FrozenPlayerProvenance', 'Invoke-StandaloneTestPlayer')) {
+        'New-FrozenPlayerAnchor', 'New-WProtoBuildPreparationSource', 'Get-FrozenPlayerRuntimeJoin', 'Add-FrozenPlayerProvenanceSnapshot', 'Get-FrozenPlayerJointCorrectness', 'Complete-FrozenPlayerProvenance', 'Invoke-StandaloneTestPlayer')) {
     $function = $ast.Find({ param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
         }, $true)
@@ -63,6 +63,10 @@ function Start-ControlContext {
     if ($null -ne $declaration.CanonicalCorpus) { New-FrozenPlayerAnchor -Context $context -ProjectPath (Join-Path $Fixture.Root 'generated project') }
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'before-configure'
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'after-configure'
+    if ($declaration.CampaignKind -ceq 'wproto-seven-families-v1') {
+        $preparation = New-ControlBuildPreparation $context
+        [IO.File]::WriteAllText((Join-Path $declaration.ReportDirectory 'build-preparation.json'), (ConvertTo-Json -InputObject $preparation -Depth 12))
+    }
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'after-build' -IncludePayload
     return $context
 }
@@ -113,7 +117,7 @@ function Write-RuntimeRecords {
 function New-WProtoFixture {
     param([string]$RunId)
     $fixture = New-CanonicalFixture $RunId
-    foreach ($directory in @('Runtime/Protobuf-Net', 'Editor', 'Tests', 'Generator~', 'scripts/unity/lib', '.github/workflows', 'generated project/Packages', 'generated project/ProjectSettings')) {
+    foreach ($directory in @('Runtime/Protobuf-Net', 'Editor', 'Tests', 'Generator~', 'scripts/unity/lib', '.github/workflows', 'generated project/Assets/Editor', 'generated project/Packages', 'generated project/ProjectSettings')) {
         $null = New-Item -ItemType Directory -Path (Join-Path $fixture.Root $directory) -Force
     }
     foreach ($relative in @('package.json', '.github/unity-versions.json', '.github/workflows/unity-tests.yml',
@@ -137,6 +141,20 @@ function New-WProtoFixture {
     $fixture.Manifest.CorpusFiles = @(@{ Path = $fixture.Manifest.CanonicalCorpusPath; Sha256 = (Get-FileHash -LiteralPath (Join-Path $fixture.Root $fixture.Manifest.CanonicalCorpusPath)).Hash.ToLowerInvariant() })
     [IO.File]::WriteAllText($fixture.Path, (ConvertTo-Json -InputObject $fixture.Manifest -Depth 8))
     return $fixture
+}
+function New-ControlBuildPreparation {
+    param($Context)
+    $scene = 'Assets/InitTestScene01234567-89ab-cdef-0123-456789abcdef.unity'
+    foreach ($relative in @($scene, ($scene + '.meta'), 'ProjectSettings/SceneTemplateSettings.json', 'ProjectSettings/UnityHelpersSettings.asset')) {
+        $path = Join-Path $Context.GeneratedRoot $relative
+        if (-not (Test-Path -LiteralPath $path)) { [IO.File]::WriteAllText($path, 'generated ' + $relative) }
+    }
+    return [pscustomobject][ordered]@{
+        SchemaVersion = 1; RunId = $Context.Declaration.Value.RunId; DeclarationSha256 = $Context.Declaration.Sha256
+        SourceCommit = $Context.Declaration.Value.SourceCommit
+        Scenes = @($scene, 'Packages/com.wallstop-studios.unity-helpers/Tests/Runtime/Scenes/Test1.unity')
+        ProjectInputs = @(Get-WProtoProjectInputs -ProjectPath $Context.GeneratedRoot)
+    }
 }
 function Write-WProtoResults {
     param([string]$Path, [switch]$OmitLast, [switch]$Duplicate, [string]$Result = 'Passed')
@@ -482,6 +500,72 @@ try {
         $report.JointCorrectness.State -eq 'rejected' -and $report.EvidenceFiles.Count -eq 4) 'real lifecycle retains failure evidence without claiming native invocation'
     # The parser's numerical/JSON controls run in its own ordinary Node suite. These
     # controls replace only that external process boundary, retaining real provenance joins.
+    # Model the observed UTF scene/meta and deferred settings additions before the build.
+    $preparationFixture = New-WProtoFixture 'preparation-transition'
+    $preparationContext = Start-ControlContext $preparationFixture
+    $configuredInputs = $preparationContext.Snapshots[1].ProjectInputs
+    $builtInputs = $preparationContext.Snapshots[2].ProjectInputs
+    $preparationJson = Get-Content -LiteralPath (Join-Path $preparationContext.Declaration.ReportDirectory 'build-preparation.json') -Raw
+    $preparation = $preparationJson | ConvertFrom-Json
+    Assert-WProtoBuildPreparation -Preparation $preparation -ConfiguredInputs $configuredInputs -BuiltInputs $builtInputs `
+        -Declaration $preparationContext.Declaration.Value -DeclarationSha256 $preparationContext.Declaration.Sha256
+    Assert-Control ($builtInputs.Count -eq $configuredInputs.Count + 4) 'the observed four preparation additions are admitted before the build'
+    foreach ($preexisting in @('ProjectSettings/UnityHelpersSettings.asset', 'ProjectSettings/SceneTemplateSettings.json', 'both')) {
+        $settings = @($builtInputs | Where-Object {
+                $_.Path -ceq $preexisting -or ($preexisting -eq 'both' -and $_.Path -in @('ProjectSettings/UnityHelpersSettings.asset', 'ProjectSettings/SceneTemplateSettings.json'))
+            })
+        Assert-WProtoBuildPreparation -Preparation $preparation -ConfiguredInputs @($configuredInputs + $settings) -BuiltInputs $builtInputs `
+            -Declaration $preparationContext.Declaration.Value -DeclarationSha256 $preparationContext.Declaration.Sha256
+        Assert-Control $true "already materialized $preexisting settings remain frozen"
+    }
+    foreach ($mutation in @('missing', 'schema', 'schema-string', 'run', 'declaration', 'commit', 'scene-scalar', 'scene-duplicate',
+            'scene-unreferenced', 'scene-path', 'scene-missing', 'scene-second', 'scene-guid', 'meta-missing', 'old-changed', 'old-removed',
+            'unknown-source', 'unknown-asmdef', 'unknown-response', 'unknown-meta', 'new-directory', 'duplicate', 'case-collision', 'path-traversal',
+            'negative-length', 'string-length', 'bad-hash', 'directory-length', 'late-change', 'late-addition', 'late-removal')) {
+        $changed = $preparationJson | ConvertFrom-Json
+        $built = $builtInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $oldPath = 'ProjectSettings/ProjectSettings.asset'
+        $scenePath = $changed.Scenes[0]
+        switch ($mutation) {
+            'missing' { $changed = $null }
+            'schema' { $changed.SchemaVersion = 2 }
+            'schema-string' { $changed.SchemaVersion = '1' }
+            'run' { $changed.RunId = 'other' }
+            'declaration' { $changed.DeclarationSha256 = '0' * 64 }
+            'commit' { $changed.SourceCommit = '0' * 40 }
+            'scene-scalar' { $changed.Scenes = $scenePath }
+            'scene-duplicate' { $changed.Scenes += $scenePath }
+            'scene-unreferenced' { $changed.Scenes = @($changed.Scenes[1]) }
+            'scene-path' { $changed.Scenes[0] = '../Assets/scene.unity' }
+            'scene-missing' { $changed.ProjectInputs = @($changed.ProjectInputs | Where-Object { $_.Path -cne $scenePath }) }
+            'scene-second' { $entry = $changed.ProjectInputs | Where-Object { $_.Path -ceq $scenePath }; $extra = $entry | ConvertTo-Json | ConvertFrom-Json; $extra.Path = $scenePath.Replace('01234567-', '11234567-'); $changed.ProjectInputs += $extra }
+            'scene-guid' { ($changed.ProjectInputs | Where-Object { $_.Path -ceq $scenePath }).Path = 'Assets/InitTestScenenot-a-guid.unity' }
+            'meta-missing' { $changed.ProjectInputs = @($changed.ProjectInputs | Where-Object { $_.Path -cne ($scenePath + '.meta') }) }
+            'old-changed' { ($changed.ProjectInputs | Where-Object { $_.Path -ceq $oldPath }).Sha256 = '0' * 64 }
+            'old-removed' { $changed.ProjectInputs = @($changed.ProjectInputs | Where-Object { $_.Path -cne $oldPath }) }
+            { $_ -in @('unknown-source', 'unknown-asmdef', 'unknown-response', 'unknown-meta') } {
+                $extension = @{ 'unknown-source' = 'cs'; 'unknown-asmdef' = 'asmdef'; 'unknown-response' = 'rsp'; 'unknown-meta' = 'meta' }[$mutation]
+                $changed.ProjectInputs += [pscustomobject]@{ Path = "Assets/unexpected.$extension"; Kind = 'file'; Length = 1; Sha256 = 'a' * 64 }
+            }
+            'new-directory' { $changed.ProjectInputs += [pscustomobject]@{ Path = 'Assets/new'; Kind = 'directory'; Length = $null; Sha256 = $null } }
+            'duplicate' { $changed.ProjectInputs += $changed.ProjectInputs[0] }
+            'case-collision' { $extra = $changed.ProjectInputs[0] | ConvertTo-Json | ConvertFrom-Json; $extra.Path = $extra.Path.ToUpperInvariant(); $changed.ProjectInputs += $extra }
+            'path-traversal' { $changed.ProjectInputs[0].Path = 'Assets/../changed.cs' }
+            'negative-length' { ($changed.ProjectInputs | Where-Object { $_.Path -ceq $oldPath }).Length = -1 }
+            'string-length' { ($changed.ProjectInputs | Where-Object { $_.Path -ceq $oldPath }).Length = '1' }
+            'bad-hash' { ($changed.ProjectInputs | Where-Object { $_.Path -ceq $oldPath }).Sha256 = 'bad' }
+            'directory-length' { ($changed.ProjectInputs | Where-Object { $_.Kind -ceq 'directory' } | Select-Object -First 1).Length = 0 }
+            'late-change' { ($built | Where-Object { $_.Path -ceq $scenePath }).Sha256 = '0' * 64 }
+            'late-addition' { $built += [pscustomobject]@{ Path = 'Assets/late.cs'; Kind = 'file'; Length = 1; Sha256 = 'a' * 64 } }
+            'late-removal' { $built = @($built | Where-Object { $_.Path -cne $oldPath }) }
+        }
+        if ($null -ne $changed -and -not $mutation.StartsWith('late-')) {
+            $built = $changed.ProjectInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        }
+        Assert-Rejected { Assert-WProtoBuildPreparation -Preparation $changed -ConfiguredInputs $configuredInputs -BuiltInputs $built `
+                -Declaration $preparationContext.Declaration.Value -DeclarationSha256 $preparationContext.Declaration.Sha256 } "build preparation rejects $mutation"
+    }
+
     $realCorpusInvoker = ${function:Invoke-WProtoCorpusVerifier}
     function Invoke-WProtoCorpusVerifier { param($Repository, $PlayerLogPath, $Commit, $UnityVersion) return $script:wprotoSummary }
     try {
@@ -567,7 +651,7 @@ try {
                 $null = Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1'
                 $retainedRecords = [IO.File]::ReadAllText((Join-Path $context.Declaration.ReportDirectory 'retained/corpus-records.txt'))
                 Assert-Control ($retainedRecords -ceq "WPROTO_CORPUS_UNKNOWN retain malformed records too`r`nWPROTO_CORPUS_RUNTIME synthetic parser boundary") 'retention preserves every marker line and original line endings, including unknown records'
-                foreach ($relative in @('corpus-records.txt', 'results.xml', 'player/Player_Data/Managed/protobuf-net.dll', 'project-inputs/ProjectSettings/ProjectSettings.asset', 'project-inputs/Assets/FrozenPlayerAnchor/ProtoSerializationPerformanceTests.Anchor.cs')) {
+                foreach ($relative in @('corpus-records.txt', 'results.xml', 'build-preparation.json', 'player/Player_Data/Managed/protobuf-net.dll', 'project-inputs/ProjectSettings/ProjectSettings.asset', 'project-inputs/Assets/FrozenPlayerAnchor/ProtoSerializationPerformanceTests.Anchor.cs')) {
                     $retainedPath = Join-Path (Join-Path $context.Declaration.ReportDirectory 'retained') $relative
                     $original = [IO.File]::ReadAllBytes($retainedPath)
                     [IO.File]::WriteAllText($retainedPath, 'changed retained bytes')
