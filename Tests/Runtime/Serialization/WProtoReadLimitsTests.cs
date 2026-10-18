@@ -61,6 +61,72 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(WProtoReader.MaxNestingDepth, limits.MaximumNestingDepth);
         }
 
+        [Test]
+        public void EveryTwoBytePrefixPreservesValueConsumptionAndFailureLatching()
+        {
+            byte[] payload = new byte[3];
+            payload[0] = 42;
+            for (int first = 0; first <= byte.MaxValue; ++first)
+            {
+                payload[1] = (byte)first;
+                for (int second = 0; second <= byte.MaxValue; ++second)
+                {
+                    payload[2] = (byte)second;
+                    WProtoReader reader = new WProtoReader(payload);
+                    Assert.IsTrue(reader.TryReadVarint64(out ulong prefix));
+                    Assert.AreEqual(42UL, prefix);
+                    bool accepted = first < 128 || second < 128;
+                    Assert.AreEqual(accepted, reader.TryReadVarint64(out ulong value));
+                    Assert.AreEqual(!accepted, reader.Malformed);
+                    if (accepted)
+                    {
+                        ulong expected =
+                            first < 128 ? (ulong)first : (ulong)((first & 127) | (second << 7));
+                        Assert.AreEqual(expected, value);
+                        Assert.AreEqual(first < 128 ? 2 : 3, reader.Position);
+                    }
+                    else
+                    {
+                        Assert.AreEqual(0UL, value);
+                        Assert.IsFalse(reader.TryReadVarint64(out ulong refused));
+                        Assert.AreEqual(0UL, refused);
+                    }
+                }
+            }
+        }
+
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        [TestCase(6)]
+        [TestCase(7)]
+        [TestCase(8)]
+        [TestCase(9)]
+        [TestCase(10)]
+        public void VarintWidthsChargeExactlyOnePackedElement(int width)
+        {
+            byte[] payload = new byte[1 + 2 * width];
+            payload[0] = (byte)(2 * width);
+            for (int index = 0; index < 2 * width; ++index)
+            {
+                payload[index + 1] = (byte)((index + 1) % width == 0 ? 1 : 128);
+            }
+            WProtoReader reader = new WProtoReader(
+                payload,
+                new WProtoReadLimits(maximumPackedElementCount: 1)
+            );
+            Assert.IsTrue(reader.TryReadPackedRun(out WProtoReader packed));
+            Assert.IsTrue(packed.TryReadVarint64(out ulong value));
+            Assert.AreEqual(1UL << ((width - 1) * 7), value);
+            Assert.AreEqual(width, packed.Position);
+            Assert.IsFalse(packed.TryReadVarint64(out ulong refused));
+            Assert.AreEqual(0UL, refused);
+            Assert.IsTrue(packed.Malformed);
+            Assert.AreEqual(width, packed.Position);
+        }
+
         [TestCase(-1, false)]
         [TestCase(0, false)]
         [TestCase(1, false)]

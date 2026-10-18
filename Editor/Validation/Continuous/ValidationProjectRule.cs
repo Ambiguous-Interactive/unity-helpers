@@ -35,9 +35,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             if (!ValidateDefinition(definition, out string failure))
                 throw new ArgumentException(failure, nameof(definition));
-            _definition = JsonUtility.FromJson<ValidationWorkspaceSettings.RuleDefinition>(
-                JsonUtility.ToJson(definition)
-            );
+            _definition = ValidationWorkspaceSettings.Clone(definition);
+            _definition.id ??= string.Empty;
+            _definition.pathFilter ??= string.Empty;
+            _definition.fixValue ??= string.Empty;
+            foreach (ValidationWorkspaceSettings.RuleCondition condition in _definition.checks)
+            {
+                condition.value ??= string.Empty;
+            }
         }
 
         internal static bool ValidateDefinition(

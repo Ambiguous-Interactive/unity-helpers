@@ -486,6 +486,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce overhead for short protobuf integer reads and packed-element counts while preserving malformed-input and read-limit checks ([#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).
+- Reduce temporary JSON allocations when capturing authored validation rules while preserving detached conditions and legacy text behavior ([#870](https://github.com/Ambiguous-Interactive/unity-helpers/issues/870)).
 - Change Editor `MatchColliderToSprite.OnValidate` to preserve collider geometry; programmatic callers now use `RebuildCollider()`. Inspector edits and the match button still rebuild immediately with Undo support. See [Sprite Colliders](./docs/features/inspector/utility-components.md#matchcollidertosprite).
 - Reduce script compilation work for generic protobuf and JSON contracts ([#706](https://github.com/Ambiguous-Interactive/unity-helpers/issues/706)).
 - Change Unity Method Analyzer to read compiler diagnostics, with assembly coverage, explicit recompilation, and navigation to resolved source locations. See [Unity Method Analyzer](./docs/features/editor-tools/unity-method-analyzer.md) ([#654](https://github.com/Ambiguous-Interactive/unity-helpers/issues/654)).

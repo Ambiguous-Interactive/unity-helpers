@@ -86,13 +86,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             ValidationWorkspaceSettings.RuleDefinition definition = Definition();
             ValidationProjectRule rule = new ValidationProjectRule(definition);
+            definition.id = "changed.id";
+            definition.name = "changed name";
+            definition.target = "Scenes";
+            definition.pathFilter = "Assets/Other";
+            definition.severity = ValidationSeverity.Info;
             definition.message = "changed";
             definition.checks[0].value = "99";
+            definition.checks.Clear();
             GameObject subject = Track(new GameObject("Subject"));
             subject.transform.localScale = new Vector3(1, 2, 1);
             List<ValidationFinding> findings = Validate(rule, subject);
             Assert.AreEqual(1, findings.Count);
             Assert.AreEqual("Scale exceeds one", findings[0].Message);
+            Assert.AreEqual("project.test", rule.RuleId);
+            Assert.AreEqual("Mono audio for 3D sources", rule.DisplayName);
+            Assert.AreEqual(ValidationSeverity.Warning, findings[0].Severity);
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("   ")]
+        [TestCase("rule.\u65e5\u672c\u8a9e")]
+        public void RuleSnapshotsPreserveLegacyNullAndTextBehavior(string text)
+        {
+            ValidationWorkspaceSettings.RuleDefinition definition = Definition();
+            definition.id = text;
+            definition.pathFilter = null;
+            definition.fixValue = text;
+            definition.checks[0].property = "Renderer.sharedMaterial";
+            definition.checks[0].comparison = "is null";
+            definition.checks[0].value = null;
+            ValidationWorkspaceSettings.RuleDefinition legacy =
+                JsonUtility.FromJson<ValidationWorkspaceSettings.RuleDefinition>(
+                    JsonUtility.ToJson(definition)
+                );
+            ValidationProjectRule rule = new ValidationProjectRule(definition);
+            ValidationProjectRule legacyRule = new ValidationProjectRule(legacy);
+            Assert.AreEqual(legacy.id, rule.RuleId);
+            Assert.AreEqual(legacy.name, rule.DisplayName);
+            GameObject subject = Track(new GameObject("Snapshot subject"));
+            subject.AddComponent<MeshRenderer>();
+            List<ValidationFinding> actual = Validate(rule, subject);
+            List<ValidationFinding> expected = Validate(legacyRule, subject);
+            Assert.AreEqual(1, actual.Count);
+            Assert.AreEqual(1, expected.Count);
+            Assert.AreEqual(expected[0].Id, actual[0].Id);
+            Assert.AreEqual(expected[0].Message, actual[0].Message);
+            Assert.AreEqual(expected[0].Severity, actual[0].Severity);
+            Assert.IsTrue(definition.pathFilter == null);
+            Assert.IsTrue(definition.checks[0].value == null);
         }
 
         [Test]

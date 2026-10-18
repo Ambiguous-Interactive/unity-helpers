@@ -2909,6 +2909,10 @@ one declaration; a runtime claim alone cannot make the generated-adapter registr
 
 ### Hostile payloads
 
+Short varints use a checked one- or two-byte read path. Longer values, including sign-extended
+negative integers, retain the full overflow and truncation checks. Both paths enforce packed-element
+limits before consuming a value and keep a failed reader malformed.
+
 Use reusable `WProtoReadLimits` to bound untrusted input:
 
 ```csharp
