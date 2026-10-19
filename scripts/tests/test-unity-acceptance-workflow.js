@@ -83,6 +83,11 @@ function predicate(step) {
 }
 
 const run = identified("run_acceptance");
+const acceptanceNode = identified("acceptance_node");
+assert.ok(steps.indexOf(acceptanceNode) < steps.indexOf(run));
+assert.match(acceptanceNode, /uses: actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);
+assert.match(acceptanceNode, /node-version: "22\.18\.0"/);
+assert.doesNotMatch(acceptanceNode, /continue-on-error: true/);
 assert.match(run, /timeout-minutes: \$\{\{ inputs\.acceptance == 'wproto' && 150 \|\| 120 \}\}/);
 const diagnostics = workflow.match(/^      intmap-diagnostics:\n((?:        [^\n]*\n|\n)+)/m)?.[1];
 assert.ok(diagnostics, "Manual diagnostic input must exist");
@@ -169,6 +174,7 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
               success: false,
               steps: {
                 checkout: { outcome: "success" },
+                acceptance_node: { outcome: "success" },
                 unity_lock: { outputs: { acquired } },
                 redact_acceptance: { outcome: redaction },
                 reverify_wproto_acceptance: { outcome: reverification }
@@ -195,6 +201,20 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
               requested && redaction === "success",
               requested && !cancelled
             ];
+            assert.equal(
+              Boolean(predicate(acceptanceNode)(context)),
+              requested && acceptance === "wproto" && !cancelled && acquired === "true"
+            );
+            for (const outcome of ["failure", "skipped", "cancelled"]) {
+              const failedSetup = {
+                ...context,
+                steps: { ...context.steps, acceptance_node: { outcome } }
+              };
+              assert.equal(
+                Boolean(predicate(run)(failedSetup)),
+                expected[0] && acceptance !== "wproto"
+              );
+            }
             predicates.forEach((test, index) =>
               assert.equal(
                 Boolean(test(context)),
@@ -209,7 +229,7 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
                 : "",
               `Wrong rejected-capture summary exclusion: ${JSON.stringify(context)}`
             );
-            controls += predicates.length + 1;
+            controls += predicates.length + 5;
           }
         }
       }

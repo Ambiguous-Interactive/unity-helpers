@@ -764,6 +764,17 @@ jobs:
             -ManagedStrippingLevel 'High' `
             -Il2CppCompilerConfiguration 'Release'
 
+      - name: Setup Node.js for WProto native acceptance
+        id: acceptance_node
+        if: >-
+          ${{ !cancelled() && github.event_name == 'workflow_dispatch'
+          && inputs.acceptance == 'wproto'
+          && (matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')
+          && steps.unity_lock.outputs.acquired == 'true' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4
+        with:
+          node-version: "22.18.0"
+
       - name: Run additional native acceptance
         id: run_acceptance
         # Acceptance runs once per version after the selected test modes. The
@@ -773,6 +784,7 @@ jobs:
           && inputs.acceptance != '' && inputs.acceptance != 'none'
           && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto')
           || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')
+          && (inputs.acceptance != 'wproto' || steps.acceptance_node.outcome == 'success')
           && steps.unity_lock.outputs.acquired == 'true' }}
         continue-on-error: true
         timeout-minutes: ${{ inputs.acceptance == 'wproto' && 150 || 120 }}

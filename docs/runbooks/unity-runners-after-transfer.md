@@ -506,6 +506,10 @@ API cases; a missing, skipped, duplicated or unexpected case cannot establish ba
 Normal selected correctness jobs, runner access checks, the organization lock and license cleanup
 remain in place.
 
+The workflow installs the pinned Node.js runtime before WProto acceptance. Direct script runs
+also require a working `node` executable on `PATH`; the launcher checks it before creating a
+campaign or starting Unity. A failed Node setup prevents the workflow from starting that campaign.
+
 The additional WProto step allows 150 minutes. Its scoped configure timeout is 900 seconds per
 attempt (at most one existing package-resolution retry), build timeout is 1800 seconds, and player
 timeout is 3600 seconds. Previous timeout environment values are restored after success or failure.

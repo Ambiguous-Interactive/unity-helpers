@@ -314,6 +314,17 @@ function New-WProtoPlayerDeclaration {
 if ($Acceptance -eq 'wproto' -and $UnityVersion -cnotin @('2021.3.45f1', '6000.6.0f1')) {
     throw 'WProto corpus acceptance requires the pinned floor or latest Unity version.'
 }
+if ($Acceptance -eq 'wproto') {
+    try {
+        $node = @(Get-Command node -CommandType Application -ErrorAction Stop)[0]
+        $nodeVersion = (& $node.Source --version | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0 -or $nodeVersion -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+            throw 'Node.js did not return a successful version response.'
+        }
+    } catch {
+        throw "WProto acceptance requires a working Node.js executable before Unity launch: $($_.Exception.Message)"
+    }
+}
 if ($Acceptance -eq 'nullableconsumer') {
     & (Join-Path $PSScriptRoot 'run-nullable-consumer.ps1') -UnityVersion $UnityVersion -UnityEditorPath $env:UNITY_EDITOR_PATH -Repository $Repository -TemporaryRoot $TemporaryRoot -ArtifactsPath $ArtifactsPath
     return
