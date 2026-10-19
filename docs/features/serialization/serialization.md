@@ -2979,23 +2979,25 @@ limits = limits.WithTotalFieldCount(4096);
 limits = limits.WithMessageMergeCopyBytes(128 * 1024);
 limits = limits.WithDecodedPayloadBytes(64 * 1024);
 limits = limits.WithCollectionElementCount(4096);
+limits = limits.WithContractConstructionCount(2048);
 WProtoReader reader = new WProtoReader(bytes, limits);
 ```
 
 These factories return new limits with the other settings preserved and the requested allowance
 replaced. The original limits remain unchanged; their order gives the same settings.
 
-| Limit                    | Scope                                                                                                   |
-| ------------------------ | ------------------------------------------------------------------------------------------------------- |
-| Message bytes            | Each reader region                                                                                      |
-| Length-delimited bytes   | Each field, checked before copying or decoding                                                          |
-| Field count              | Tags per region, including duplicate, unknown, and skipped-group tags                                   |
-| Total field count        | Tags across the root, nested readers, groups, and reader copies; checked before consuming the next tag  |
-| Nesting depth            | Combined sub-message and group depth; maximum 64                                                        |
-| Packed elements          | All packed runs and nested messages in one root read, checked before reserving packed capacity          |
-| Message-merge copy bytes | Actual bytes copied by parent-aware duplicate-message accumulators across a root read                   |
-| Decoded payload bytes    | UTF-8 input bytes decoded as strings or URIs, plus bytes materialized as byte arrays across a root read |
-| Collection elements      | Repeated element and map-entry occurrences across the root, descendants and reader copies               |
+| Limit                    | Scope                                                                                                      |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Message bytes            | Each reader region                                                                                         |
+| Length-delimited bytes   | Each field, checked before copying or decoding                                                             |
+| Field count              | Tags per region, including duplicate, unknown, and skipped-group tags                                      |
+| Total field count        | Tags across the root, nested readers, groups, and reader copies; checked before consuming the next tag     |
+| Nesting depth            | Combined sub-message and group depth; maximum 64                                                           |
+| Packed elements          | All packed runs and nested messages in one root read, checked before reserving packed capacity             |
+| Message-merge copy bytes | Actual bytes copied by parent-aware duplicate-message accumulators across a root read                      |
+| Decoded payload bytes    | UTF-8 input bytes decoded as strings or URIs, plus bytes materialized as byte arrays across a root read    |
+| Collection elements      | Repeated element and map-entry occurrences across the root, descendants and reader copies                  |
+| Contract constructions   | Explicit generated reference-contract construction attempts across the root, descendants and reader copies |
 
 Defaults leave byte and count limits unrestricted, with depth capped at 64. Negative limits become
 zero. The message-merge copy and decoded payload allowances default to `long.MaxValue`, which disables their caps.
@@ -3080,6 +3082,41 @@ Constructor seeds, collection capacity, object headers and other custom work are
 fields cost no elements. This is not an object, total-memory or general work limit. Existing
 unsupported models, including nullable repeated elements, remain unsupported; limits do not change
 formatter availability or the facade's dispatch/data-error contracts.
+
+#### Limiting contract construction
+
+`WithContractConstructionCount(int)` limits how many reference-contract instances generated reads
+can construct. Use it with decoded-byte, collection-element and wire limits when reading untrusted
+saves or messages. The `int.MaxValue` default disables this allowance; negative values become zero.
+Finite allowances add one shared accounting object per root reader. Disabled allowances add none.
+Existing public constructors and wire encodings remain unchanged.
+
+Each explicit generated class construction costs one, checked before its constructor or field
+initializers run. This includes generated `SkipConstructor` constructors. Immutable reads that
+create a temporary instance to obtain constructor defaults and then a final instance cost two.
+An immutable read that needs only its final instance costs one. A concrete polymorphic base and
+its concrete subtype each cost one when both are constructed. An abstract base costs none;
+delegating root and formatter wrappers do not charge again. Struct values cost no constructions.
+
+Supplied merge seeds are reused without a construction charge. Instances created inside a user
+constructor or field initializer belong to that user code, even when a later generated read merges
+into them. Duplicate message occurrences that are accumulated and decoded once construct one
+child. Replaying a construction through a reader copy spends the shared allowance again.
+
+A refused charge faults the reader and clears the generated read's output before that constructor
+runs. Earlier accepted work and side effects are not reversed. Successful charges are not refunded
+when a later field, constructor or hook fails. Copies, descendants and parent-aware readers share
+one allowance; independent roots remain independent. Generated contract reads also refuse readers
+that are already malformed before invoking constructors, setters or hooks.
+
+Regenerate precompiled formatters with the generator and runtime from the same package version.
+Older generated constructors do not perform these charges. Custom formatters can call
+`TryChargeContractConstructions(count)` before constructing their own contract instances.
+
+This allowance counts explicit generated contract construction attempts, not every managed object.
+Collection, string, array and URI storage, constructor and hook allocations, custom formatter work,
+surrogate conversions and pool internals remain outside it. It does not bound total allocation,
+retained capacity or general parsing work, and it does not configure protobuf-net fallback or JSON.
 
 Unknown fields are skipped and are not retained for rewriting, including fields inside known
 nested messages. An older model can read a newer save successfully, then drop those fields when

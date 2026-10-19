@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add an opt-in WProto allowance that refuses generated class construction before constructors run. Regenerate codecs to enforce it; custom allocations remain separate ([#1042](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1042)).
 - Add an opt-in WProto element allowance shared by collection reads, nested values, maps and reader copies. Regenerate collection codecs to enforce it ([#1040](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1040)).
 - Add an opt-in WProto decoded payload allowance shared across strings, byte arrays, URIs, nested reads, and reader copies. Regenerate byte-array member codecs to enforce it ([#1038](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1038)).
 - Add an opt-in total-field read limit for WProto, shared across nested messages, duplicate-message validation, unknown fields, groups, and reader copies while preserving existing per-message limits ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).

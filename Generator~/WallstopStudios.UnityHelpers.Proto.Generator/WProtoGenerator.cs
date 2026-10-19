@@ -2396,6 +2396,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("}");
         }
 
+        private static void EmitContractConstructionCharge(Writer writer, string qualified)
+        {
+            writer.Line("if (!reader.TryChargeContractConstructions(1))" + Writer.Open);
+            writer.Indent();
+            writer.Line("value = default(" + qualified + ");");
+            writer.Line("return false;");
+            writer.Outdent();
+            writer.Line("}");
+        }
+
         private static void EmitRead(
             Writer writer,
             INamedTypeSymbol contract,
@@ -2469,6 +2479,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + Writer.Open
             );
             writer.Indent();
+            writer.Line("if (reader.Malformed)" + Writer.Open);
+            writer.Indent();
+            writer.Line("value = default(" + qualified + ");");
+            writer.Line("return false;");
+            writer.Outdent();
+            writer.Line("}");
+            writer.Blank();
             if (
                 !replacementBody
                 && !contract.IsValueType
@@ -2506,6 +2523,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 {
                     writer.Line("if (read == null)" + Writer.Open);
                     writer.Indent();
+                    EmitContractConstructionCharge(writer, qualified);
                     writer.Line(
                         skipConstructor
                             ? "read = new "
@@ -2525,6 +2543,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                  * The temporary instance supplies constructor defaults for immutable read locals; final
                  * construction uses the decoded values.
                  */
+                if (seedsFromInstance && !contract.IsValueType)
+                {
+                    EmitContractConstructionCharge(writer, qualified);
+                }
                 writer.Line(
                     seedsFromInstance
                         ? qualified + " read = new " + qualified + "();"
@@ -2542,6 +2564,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             else if (skipConstructor)
             {
+                EmitContractConstructionCharge(writer, qualified);
                 writer.Line(
                     qualified
                         + " read = new "
@@ -2553,6 +2576,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             else
             {
+                EmitContractConstructionCharge(writer, qualified);
                 writer.Line(qualified + " read = new " + qualified + "();");
             }
 
@@ -2710,6 +2734,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     arguments.Append(member.ReadLocal);
                 }
 
+                if (!contract.IsValueType)
+                {
+                    EmitContractConstructionCharge(writer, qualified);
+                }
                 writer.Line("read = new " + qualified + "(" + arguments + ");");
                 writer.Blank();
 

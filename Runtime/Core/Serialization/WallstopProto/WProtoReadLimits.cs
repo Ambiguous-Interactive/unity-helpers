@@ -43,6 +43,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public int MaximumCollectionElementCount { get; }
 
+        /// <summary>Maximum explicit generated reference-contract construction attempts in one read.</summary>
+        /// <remarks>
+        /// The default int.MaxValue disables this allowance. Temporary and final instances each cost one.
+        /// Value types, collection storage and allocations inside user code are excluded.
+        /// </remarks>
+        public int MaximumContractConstructionCount { get; }
+
         /// <summary>Maximum bytes copied while accumulating duplicate sub-message occurrences in one read.</summary>
         /// <remarks>
         /// The default long.MaxValue disables this cumulative cap. Borrowing a first occurrence
@@ -107,6 +114,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             MaximumFieldCount = maximumFieldCount < 0 ? 0 : maximumFieldCount;
             MaximumTotalFieldCount = int.MaxValue;
             MaximumCollectionElementCount = int.MaxValue;
+            MaximumContractConstructionCount = int.MaxValue;
             MaximumMessageMergeCopyBytes = long.MaxValue;
             MaximumDecodedPayloadBytes = long.MaxValue;
             MaximumNestingDepth =
@@ -120,7 +128,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             int maximumTotalFieldCount,
             long maximumMessageMergeCopyBytes,
             long maximumDecodedPayloadBytes,
-            int maximumCollectionElementCount
+            int maximumCollectionElementCount,
+            int maximumContractConstructionCount
         )
             : this(
                 limits.MaximumMessageBytes,
@@ -130,6 +139,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 limits.MaximumPackedElementCount
             )
         {
+            MaximumContractConstructionCount =
+                maximumContractConstructionCount < 0 ? 0 : maximumContractConstructionCount;
             MaximumTotalFieldCount = maximumTotalFieldCount < 0 ? 0 : maximumTotalFieldCount;
             MaximumCollectionElementCount =
                 maximumCollectionElementCount < 0 ? 0 : maximumCollectionElementCount;
@@ -150,7 +161,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 maximumTotalFieldCount,
                 MaximumMessageMergeCopyBytes,
                 MaximumDecodedPayloadBytes,
-                MaximumCollectionElementCount
+                MaximumCollectionElementCount,
+                MaximumContractConstructionCount
             );
         }
 
@@ -168,7 +180,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 MaximumTotalFieldCount,
                 maximumMessageMergeCopyBytes,
                 MaximumDecodedPayloadBytes,
-                MaximumCollectionElementCount
+                MaximumCollectionElementCount,
+                MaximumContractConstructionCount
             );
         }
 
@@ -188,7 +201,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 MaximumTotalFieldCount,
                 MaximumMessageMergeCopyBytes,
                 maximumDecodedPayloadBytes,
-                MaximumCollectionElementCount
+                MaximumCollectionElementCount,
+                MaximumContractConstructionCount
             );
         }
 
@@ -206,7 +220,29 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 MaximumTotalFieldCount,
                 MaximumMessageMergeCopyBytes,
                 MaximumDecodedPayloadBytes,
-                maximumCollectionElementCount
+                maximumCollectionElementCount,
+                MaximumContractConstructionCount
+            );
+        }
+
+        /// <summary>Copies these limits with a cumulative generated reference-contract construction allowance.</summary>
+        /// <param name="maximumContractConstructionCount">Maximum construction attempts; negatives become zero.</param>
+        /// <returns>New immutable limits with every other setting preserved.</returns>
+        /// <remarks>
+        /// Generated codecs charge before each reference-contract constructor, including temporary defaults.
+        /// Descendants and copies share the allowance; independent roots do not. Charges are not refunded.
+        /// Supplied merge seeds and struct values cost no constructions. Regenerate precompiled codecs.
+        /// This does not bound allocations inside constructors, hooks, custom formatters or surrogate conversions.
+        /// </remarks>
+        public WProtoReadLimits WithContractConstructionCount(int maximumContractConstructionCount)
+        {
+            return new WProtoReadLimits(
+                this,
+                MaximumTotalFieldCount,
+                MaximumMessageMergeCopyBytes,
+                MaximumDecodedPayloadBytes,
+                MaximumCollectionElementCount,
+                maximumContractConstructionCount
             );
         }
     }

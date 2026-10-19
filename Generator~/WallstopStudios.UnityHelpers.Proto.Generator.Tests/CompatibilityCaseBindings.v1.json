@@ -169,6 +169,13 @@
       "sha256": "da2a56a1df46218b8f1f66e4d2f2aefae5cd74e1dfe4eecc9e541008f0f0ad23",
       "purpose": "case-discovery-only",
       "qualification": "none"
+    },
+    {
+      "id": "contract-construction-host-focused",
+      "label": "construction-controls60-fixed.trx",
+      "sha256": "757ab70e82d03030a262d754fc630bd76083181f977f17dfdf0f8fe76106d4f6",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
     }
   ],
   "selectors": [
@@ -3106,6 +3113,146 @@
       "id": "WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization",
       "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.AbstractEnvelopeCostsOnlyTheConcreteConstruction",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.ConstructorOwnedSeedIsReusedWithoutAnotherGeneratedConstruction",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.DisabledAllowanceDoesNotAccumulateCharges",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.DuplicateMessageOccurrencesMergeIntoOneConstructedChild",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.EmptyNestedContractsSpendSharedAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.EveryFormatterReaderRouteSharesPreviouslySpentConstructionAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.ExactRootAllowanceConstructsOnceAndKeepsWireBytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.FormatterCannotReplaceTheAccountingIdentity",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.GenericAndRootCollectionReadersShareContractAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.ImmutableSeedAndFinalInstancesEachSpendAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.LargestFiniteAllowanceCannotOverflow",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.LiteralEmptyChildrenAreRefusedBeforeTheirConstructors",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.MalformedPayloadDoesNotRefundConstruction",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.MalformedSeededReadDoesNotInvokeHooksOrSetters",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.MapValueContractConstructionsShareTheRootAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.PolymorphicConstructionDoesNotChargeDelegatingWrappers",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.RefusalPrecedesConstructorInitializerSetterAndHooks",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.ReusingLimitsKeepsIndependentRoots",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.SkippedConstructorStillChargesGeneratedConstruction",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.StructAndCollectionStorageDoNotSpendContractConstructions",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.SuppliedMergeSeedCostsNoConstruction",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.ThrowingConstructorDoesNotRefundItsAttempt",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoContractConstructionBudgetTests.UnseededImmutableReadChargesOnlyItsFinalInstance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
     }
   ],
   "fixtures": [
@@ -12183,7 +12330,7 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.StringMatchesProtobufNetBytes(\"a\",\"0A0161\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.StringMatchesProtobufNetBytes(\"hello\",\"0A0568656C6C6F\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.StringMatchesProtobufNetBytes(\"h\u00e9llo\",\"0A0668C3A96C6C6F\")",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.StringMatchesProtobufNetBytes(\"😀\",\"0A04F09F9880\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.StringMatchesProtobufNetBytes(\"\ud83d\ude00\",\"0A04F09F9880\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.TryWriteMessageIsBoundedAtTheDocumentedDepth(63 accepted)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.TryWriteMessageIsBoundedAtTheDocumentedDepth(64 rejected)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.UnknownFieldsAreSkippedExactly",
@@ -12320,8 +12467,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"AB\",2L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\\ud83d\\ude42\",3L,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\\ud83d\\ude42\",4L,True)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",2L,False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\u754c\",2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\u754c\",3L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit"
           ],
@@ -12368,8 +12515,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"AB\",2L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\\ud83d\\ude42\",3L,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\\ud83d\\ude42\",4L,True)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",2L,False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\u754c\",2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\u754c\",3L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit"
           ],
@@ -12414,10 +12561,10 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",1L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"AB\",1L,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"AB\",2L,True)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",2L,False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",3L,True)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"🙂\",3L,False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"🙂\",4L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\u754c\",2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\u754c\",3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\ud83d\ude42\",3L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\ud83d\ude42\",4L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit"
           ],
@@ -12437,6 +12584,169 @@
           "caseNames": [],
           "discoveryArtifact": null,
           "reason": "This fixture is not bound to this lane."
+        }
+      ]
+    },
+    {
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
+      "lanes": [
+        {
+          "lane": "host-v2",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.AbstractEnvelopeCostsOnlyTheConcreteConstruction",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting(3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting(4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ConstructorOwnedSeedIsReusedWithoutAnotherGeneratedConstruction",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance(3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance(4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(-1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(int.MaxValue,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceDoesNotAccumulateCharges(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceDoesNotAccumulateCharges(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DuplicateMessageOccurrencesMergeIntoOneConstructedChild",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EmptyNestedContractsSpendSharedAllowance(0,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EmptyNestedContractsSpendSharedAllowance(1,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EmptyNestedContractsSpendSharedAllowance(2,4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EveryFormatterReaderRouteSharesPreviouslySpentConstructionAllowance(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EveryFormatterReaderRouteSharesPreviouslySpentConstructionAllowance(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EveryFormatterReaderRouteSharesPreviouslySpentConstructionAllowance(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ExactRootAllowanceConstructsOnceAndKeepsWireBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.FormatterCannotReplaceTheAccountingIdentity(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.FormatterCannotReplaceTheAccountingIdentity(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.GenericAndRootCollectionReadersShareContractAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives(-1,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives(0,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives(7,7)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives(int.MaxValue,int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives(int.MinValue,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableSeedAndFinalInstancesEachSpendAllowance(0,False,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableSeedAndFinalInstancesEachSpendAllowance(1,False,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableSeedAndFinalInstancesEachSpendAllowance(2,True,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.LargestFiniteAllowanceCannotOverflow",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.LiteralEmptyChildrenAreRefusedBeforeTheirConstructors(3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.LiteralEmptyChildrenAreRefusedBeforeTheirConstructors(4,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.MalformedPayloadDoesNotRefundConstruction",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.MalformedSeededReadDoesNotInvokeHooksOrSetters",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.MapValueContractConstructionsShareTheRootAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.PolymorphicConstructionDoesNotChargeDelegatingWrappers(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.PolymorphicConstructionDoesNotChargeDelegatingWrappers(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.RefusalPrecedesConstructorInitializerSetterAndHooks(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.RefusalPrecedesConstructorInitializerSetterAndHooks(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.RefusalPrecedesConstructorInitializerSetterAndHooks(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ReusingLimitsKeepsIndependentRoots",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.SkippedConstructorStillChargesGeneratedConstruction(0,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.SkippedConstructorStillChargesGeneratedConstruction(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.StructAndCollectionStorageDoNotSpendContractConstructions",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.SuppliedMergeSeedCostsNoConstruction",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ThrowingConstructorDoesNotRefundItsAttempt",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.UnseededImmutableReadChargesOnlyItsFinalInstance(0,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.UnseededImmutableReadChargesOnlyItsFinalInstance(1,True)"
+          ],
+          "discoveryArtifact": "contract-construction-host-focused",
+          "reason": "Complete 60-case source discovery from the shared fixture; discovery transfers no qualification."
+        },
+        {
+          "lane": "host-v3",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.AbstractEnvelopeCostsOnlyTheConcreteConstruction",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting(3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.BuilderOrderPreservesEverySetting(4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ConstructorOwnedSeedIsReusedWithoutAnotherGeneratedConstruction",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance(3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.CopiesAndDerivedReadersShareTheAllowance(4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(-1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(int.MaxValue,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceDoesNotAccumulateCharges(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceDoesNotAccumulateCharges(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DuplicateMessageOccurrencesMergeIntoOneConstructedChild",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EmptyNestedContractsSpendSharedAllowance(0,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EmptyNestedContractsSpendSharedAllowance(1,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EmptyNestedContractsSpendSharedAllowance(2,4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EveryFormatterReaderRouteSharesPreviouslySpentConstructionAllowance(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EveryFormatterReaderRouteSharesPreviouslySpentConstructionAllowance(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.EveryFormatterReaderRouteSharesPreviouslySpentConstructionAllowance(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ExactRootAllowanceConstructsOnceAndKeepsWireBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.FormatterCannotReplaceTheAccountingIdentity(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.FormatterCannotReplaceTheAccountingIdentity(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.GenericAndRootCollectionReadersShareContractAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives(-1,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives(0,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives(7,7)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives(int.MaxValue,int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableAllowanceNormalizesNegatives(int.MinValue,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableSeedAndFinalInstancesEachSpendAllowance(0,False,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableSeedAndFinalInstancesEachSpendAllowance(1,False,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ImmutableSeedAndFinalInstancesEachSpendAllowance(2,True,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.LargestFiniteAllowanceCannotOverflow",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.LiteralEmptyChildrenAreRefusedBeforeTheirConstructors(3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.LiteralEmptyChildrenAreRefusedBeforeTheirConstructors(4,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.MalformedPayloadDoesNotRefundConstruction",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.MalformedSeededReadDoesNotInvokeHooksOrSetters",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.MapValueContractConstructionsShareTheRootAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.PolymorphicConstructionDoesNotChargeDelegatingWrappers(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.PolymorphicConstructionDoesNotChargeDelegatingWrappers(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.RefusalPrecedesConstructorInitializerSetterAndHooks(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.RefusalPrecedesConstructorInitializerSetterAndHooks(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.RefusalPrecedesConstructorInitializerSetterAndHooks(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ReusingLimitsKeepsIndependentRoots",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.SkippedConstructorStillChargesGeneratedConstruction(0,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.SkippedConstructorStillChargesGeneratedConstruction(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.StructAndCollectionStorageDoNotSpendContractConstructions",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.SuppliedMergeSeedCostsNoConstruction",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.ThrowingConstructorDoesNotRefundItsAttempt",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.UnseededImmutableReadChargesOnlyItsFinalInstance(0,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.UnseededImmutableReadChargesOnlyItsFinalInstance(1,True)"
+          ],
+          "discoveryArtifact": "contract-construction-host-focused",
+          "reason": "Complete 60-case source discovery from the shared fixture; discovery transfers no qualification."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "missing-discovery",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "Ordinary native PlayMode execution and exact discovery are pending."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This runtime fixture is not part of this lane."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This runtime fixture is not part of this lane."
         }
       ]
     }

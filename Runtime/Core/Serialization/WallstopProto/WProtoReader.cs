@@ -71,6 +71,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private readonly ReadBudget _packedBudget;
         private readonly ReadBudget _totalFieldBudget;
         private readonly ReadBudget _collectionElementBudget;
+        private readonly ReadBudget _contractConstructionBudget;
         private readonly WProtoByteBudget _messageMergeCopyBudget;
         private readonly WProtoByteBudget _decodedPayloadBudget;
         private bool _countPackedElements;
@@ -98,7 +99,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 CreateTotalFieldBudget(limits),
                 CreateMessageMergeCopyBudget(limits),
                 CreateDecodedPayloadBudget(limits),
-                CreateCollectionElementBudget(limits)
+                CreateCollectionElementBudget(limits),
+                CreateContractConstructionBudget(limits)
             ) { }
 
         /// <summary>
@@ -129,6 +131,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _messageMergeCopyBudget = parent._messageMergeCopyBudget;
             _decodedPayloadBudget = parent._decodedPayloadBudget;
             _collectionElementBudget = parent._collectionElementBudget;
+            _contractConstructionBudget = parent._contractConstructionBudget;
             _countPackedElements = false;
             bool exhausted = parent._malformed || _limits.MaximumNestingDepth <= parent._depth;
             _buffer = exhausted ? default : buffer;
@@ -146,7 +149,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             ReadBudget totalFieldBudget = null,
             WProtoByteBudget messageMergeCopyBudget = null,
             WProtoByteBudget decodedPayloadBudget = null,
-            ReadBudget collectionElementBudget = null
+            ReadBudget collectionElementBudget = null,
+            ReadBudget contractConstructionBudget = null
         )
         {
             _buffer = buffer;
@@ -157,6 +161,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _messageMergeCopyBudget = messageMergeCopyBudget;
             _decodedPayloadBudget = decodedPayloadBudget;
             _collectionElementBudget = collectionElementBudget;
+            _contractConstructionBudget = contractConstructionBudget;
             _countPackedElements = false;
             _position = 0;
             _fieldCount = 0;
@@ -180,6 +185,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     reader._collectionElementBudget,
                     expected._collectionElementBudget
                 )
+                && ReferenceEquals(
+                    reader._contractConstructionBudget,
+                    expected._contractConstructionBudget
+                )
                 && !reader.Malformed
                 && reader.End
                 && reader.Depth == expected.Depth
@@ -195,6 +204,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             return limits != null && limits.MaximumCollectionElementCount < int.MaxValue
                 ? new ReadBudget(limits.MaximumCollectionElementCount)
+                : null;
+        }
+
+        private static ReadBudget CreateContractConstructionBudget(WProtoReadLimits limits)
+        {
+            return limits != null && limits.MaximumContractConstructionCount < int.MaxValue
+                ? new ReadBudget(limits.MaximumContractConstructionCount)
                 : null;
         }
 
@@ -665,7 +681,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     _totalFieldBudget,
                     _messageMergeCopyBudget,
                     _decodedPayloadBudget,
-                    _collectionElementBudget
+                    _collectionElementBudget,
+                    _contractConstructionBudget
                 )
                 {
                     _malformed = true,
@@ -683,7 +700,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     _totalFieldBudget,
                     _messageMergeCopyBudget,
                     _decodedPayloadBudget,
-                    _collectionElementBudget
+                    _collectionElementBudget,
+                    _contractConstructionBudget
                 )
                 {
                     _malformed = true,
@@ -699,7 +717,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _totalFieldBudget,
                 _messageMergeCopyBudget,
                 _decodedPayloadBudget,
-                _collectionElementBudget
+                _collectionElementBudget,
+                _contractConstructionBudget
             );
             return true;
         }
@@ -737,7 +756,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     _totalFieldBudget,
                     _messageMergeCopyBudget,
                     _decodedPayloadBudget,
-                    _collectionElementBudget
+                    _collectionElementBudget,
+                    _contractConstructionBudget
                 )
                 {
                     _malformed = true,
@@ -753,7 +773,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _totalFieldBudget,
                 _messageMergeCopyBudget,
                 _decodedPayloadBudget,
-                _collectionElementBudget
+                _collectionElementBudget,
+                _contractConstructionBudget
             )
             {
                 _countPackedElements = _packedBudget != null,
@@ -804,6 +825,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _malformed
                 || count < 0
                 || (_collectionElementBudget != null && !_collectionElementBudget.TryCharge(count))
+            )
+            {
+                _malformed = true;
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>Charges reference-contract construction attempts before invoking their constructors.</summary>
+        /// <param name="count">Number of explicit construction attempts.</param>
+        /// <returns>False and a malformed reader when the charge is negative or exceeds the allowance.</returns>
+        /// <remarks>Descendants and copies share successful charges, which are not refunded on later failure.</remarks>
+        public bool TryChargeContractConstructions(int count)
+        {
+            if (
+                _malformed
+                || count < 0
+                || (
+                    _contractConstructionBudget != null
+                    && !_contractConstructionBudget.TryCharge(count)
+                )
             )
             {
                 _malformed = true;
@@ -956,7 +998,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _totalFieldBudget,
                 _messageMergeCopyBudget,
                 _decodedPayloadBudget,
-                _collectionElementBudget
+                _collectionElementBudget,
+                _contractConstructionBudget
             );
             if (nested.Malformed)
             {
@@ -1017,7 +1060,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _totalFieldBudget,
                 _messageMergeCopyBudget,
                 _decodedPayloadBudget,
-                _collectionElementBudget
+                _collectionElementBudget,
+                _contractConstructionBudget
             );
             if (nested.Malformed)
             {
