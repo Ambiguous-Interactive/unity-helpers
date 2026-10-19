@@ -52,7 +52,7 @@ return $sourceHash
     Set-Content -LiteralPath (Join-Path $temporary 'run-ci-tests.ps1') -Value @'
 param($UnityVersion, $RepoRoot, $ArtifactsPath, $ReleaseCodeOptimization, $ReleasePlayerBuild,
     $Il2CppCompilerConfiguration, $ProjectPath, $TestMode, $AssemblyNames, $TestFilter,
-    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics, $TestCategory, $FrozenPlayerDeclarationPath, $AdditionalScriptingDefines)
+    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics, $TestCategory, $FrozenPlayerDeclarationPath, $AdditionalScriptingDefines, $StandaloneBuildCapture = 'None')
 if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
     if ($env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne $ProjectPath -or
         [IO.File]::ReadAllText((Join-Path $ProjectPath '.sentinel-interaction-disposable')) -ne
@@ -121,7 +121,9 @@ if ($null -ne $FrozenPlayerDeclarationPath -and $TestFilter -match 'CompareFroze
     $declaration = Get-Content -LiteralPath $FrozenPlayerDeclarationPath -Raw | ConvertFrom-Json
     if ($declaration.CampaignKind -cne 'wproto-seven-families-v1' -or
         $declaration.RunId -cnotmatch '^wproto-[0-9a-f]{32}$' -or
-        $declaration.Backend -cne 'Mono2x' -or $declaration.UnityVersion -cne $UnityVersion -or
+        $declaration.Backend -cne $StandaloneScriptingBackend -or
+        ($StandaloneBuildCapture -eq 'None' -and $StandaloneScriptingBackend -cne 'Mono2x') -or
+        $declaration.UnityVersion -cne $UnityVersion -or
         $declaration.SourceCommit -cnotmatch '^[0-9a-f]{40}$' -or
         $env:UH_PERF_COMMIT -cne $declaration.SourceCommit -or
         $declaration.CanonicalCorpusPath -cne 'scripts/unity/wproto-corpus.v1.json' -or
@@ -147,6 +149,7 @@ if ($null -ne $FrozenPlayerDeclarationPath -and $TestFilter -match 'CompareFroze
     }
 }
 $PSBoundParameters | ConvertTo-Json -Compress | Add-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
+if ($StandaloneBuildCapture -ne 'None') { throw 'Evidence-only Standalone build capture stops before player launch and cannot satisfy acceptance.' }
 if ($env:ACCEPTANCE_CONTROL_FAIL -eq $TestMode) { throw 'Injected native failure.' }
 if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_ACTIVE = 'true' }
 '@
@@ -437,6 +440,45 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         throw 'A conflicting WProto commit must be preserved and refused before declaration or player invocation.'
     }
     $checks++
+    $env:UH_PERF_COMMIT = $sourceCommit
+    $env:ACCEPTANCE_CONTROL_ACTIVE = 'false'
+    $env:ACCEPTANCE_CONTROL_FAIL = ''
+    foreach ($backend in @('Mono2x', 'IL2CPP', 'mono2x', 'il2cpp')) {
+        $canonicalBackend = if ($backend -eq 'IL2CPP') { 'IL2CPP' } else { 'Mono2x' }
+        $directory = Join-Path $temporary ('wproto-build-capture-' + [Guid]::NewGuid().ToString('N'))
+        Clear-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
+        $failure = $null
+        try {
+            & $subject -Acceptance wproto -UnityVersion '6000.6.0f1' -ArtifactsPath $directory -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') -StandaloneBuildCapture Direct -StandaloneBuildCaptureBackend $backend
+        } catch { $failure = $_.ToString() }
+        if ($null -eq $failure -or $failure -notmatch 'Evidence-only Standalone build capture stops before player launch') {
+            throw "Diagnostic backend did not retain the explicit no-player stop: $backend / $failure"
+        }
+        $calls = @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG | ForEach-Object { $_ | ConvertFrom-Json })
+        if ($calls.Count -ne 1 -or $calls[0].StandaloneBuildCapture -cne 'Direct' -or
+            $calls[0].StandaloneScriptingBackend -cne $canonicalBackend -or (Test-Path -LiteralPath $calls[0].ProjectPath)) {
+            throw "Diagnostic backend changed, repeated the build, or leaked its owned project: $backend"
+        }
+        $declaration = Get-Content -LiteralPath $calls[0].FrozenPlayerDeclarationPath -Raw | ConvertFrom-Json
+        if ($declaration.Backend -cne $canonicalBackend -or $calls[0].ManagedStrippingLevel -cne 'Disabled' -or
+            -not $calls[0].ReleaseCodeOptimization -or -not $calls[0].ReleasePlayerBuild -or
+            $calls[0].TestFilter -cne 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus') {
+            throw 'Diagnostic backend selection changed the declared source/settings/filter contract.'
+        }
+        $checks++
+    }
+    foreach ($selection in @('wproto', 'all', 'intmap')) {
+        Clear-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
+        $directory = Join-Path $temporary ('wproto-invalid-backend-' + [Guid]::NewGuid().ToString('N'))
+        $failure = $null
+        try { & $subject -Acceptance $selection -UnityVersion '6000.6.0f1' -ArtifactsPath $directory -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') -StandaloneBuildCaptureBackend IL2CPP }
+        catch { $failure = $_.ToString() }
+        if ($null -eq $failure -or $failure -notmatch 'requires explicit evidence-only capture mode' -or
+            @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 0 -or (Test-Path -LiteralPath $directory)) {
+            throw 'IL2CPP diagnostic selection must be refused before any ordinary acceptance or project creation.'
+        }
+        $checks++
+    }
     foreach ($version in @('2022.3.45f1', '6000.5.2f1', '6000.6.0f2')) {
         Clear-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
         $refused = $false

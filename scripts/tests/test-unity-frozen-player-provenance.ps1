@@ -228,6 +228,18 @@ function New-WProtoSummary {
 }
 
 try {
+    foreach ($backend in @('Mono2x', 'IL2CPP')) {
+        $fixture = New-WProtoFixture ('build-only-backend-' + $backend)
+        $fixture.Manifest.Backend = $backend
+        [IO.File]::WriteAllText($fixture.Path, (ConvertTo-Json -InputObject $fixture.Manifest -Depth 8))
+        $declaration = Read-FrozenPlayerDeclaration -Path $fixture.Path -Mode standalone -UnityVersion '6000.6.0f1' -Backend $backend -ArtifactsPath $fixture.Root -RepoRoot $fixture.Root -BuildCaptureOnly
+        Assert-Control ($declaration.Value.Backend -ceq $backend -and $declaration.CampaignKind -ceq 'wproto-seven-families-v1') "Explicit build-only capture retains backend $backend"
+        if ($backend -ceq 'IL2CPP') {
+            Assert-Rejected { Read-FrozenPlayerDeclaration -Path $fixture.Path -Mode standalone -UnityVersion '6000.6.0f1' -Backend $backend -ArtifactsPath $fixture.Root -RepoRoot $fixture.Root } 'Ordinary WProto admission still refuses IL2CPP' 'explicit IL2CPP build-only capture'
+            Assert-Rejected { Read-FrozenPlayerDeclaration -Path $fixture.Path -Mode standalone -UnityVersion '6000.6.0f1' -Backend $backend -ArtifactsPath $fixture.Root -RepoRoot $fixture.Root -BuildCaptureOnly:$false } 'False build-only flag cannot admit IL2CPP' 'explicit IL2CPP build-only capture'
+        }
+    }
+    Assert-Control ($source.Contains('-BuildCaptureOnly:($StandaloneBuildCapture -ne ''None'')')) 'The existing declaration read derives build-only authority from the actual diagnostic mode'
     $originalAllocatorDiagnostics = $env:UH_NATIVE_ALLOCATOR_DIAGNOSTICS
     function Invoke-ProcessWithTreeKillTimeout {
         param($FilePath, $Arguments, $TimeoutSeconds, $LogPath, $Label)
@@ -676,7 +688,7 @@ try {
     try {
         foreach ($mutation in @('none', 'transient-settings', 'unstable', 'upm-support', 'unavailable-capture', 'truncated-capture', 'upm-fault', 'timeout', 'nonzero', 'build-exit', 'configure-exit', 'configure-retry',
                 'execution-error', 'missing-stage', 'reordered-stage', 'missing-case', 'duplicate-case', 'skip-case',
-                'late-preparation', 'late-prepared-settings', 'wrong-run', 'wrong-declaration', 'wrong-corpus', 'wrong-commit', 'host-runtime', 'editor', 'development',
+                'late-preparation', 'late-prepared-settings', 'wrong-run', 'wrong-declaration', 'wrong-corpus', 'wrong-commit', 'host-runtime', 'il2cpp-runtime', 'editor', 'development',
                 'missing-define', 'fault-header', 'fault-pattern', 'configure-dump', 'build-dump', 'string-launch', 'array-invocation', 'wrong-oracle', 'missing-oracle', 'wrong-oracle-payload', 'missing-operation', 'bad-records')) {
             $fixture = New-WProtoFixture ('wproto-' + $mutation)
             $context = Start-ControlContext $fixture -TransientSettings:($mutation -in @('transient-settings', 'late-prepared-settings'))
@@ -730,6 +742,7 @@ try {
                 'wrong-corpus' { $first.FrozenCorpusSha256 = '0' * 64 }
                 'wrong-commit' { $first.SourceCommit = '0' * 40 }
                 'host-runtime' { $first.RuntimeIdentity.Backend = '.NET' }
+                'il2cpp-runtime' { $first.RuntimeIdentity.Backend = 'IL2CPP' }
                 'editor' { $first.RuntimeIdentity.IsEditor = $true }
                 'development' { $first.RuntimeIdentity.DevelopmentBuild = $true }
                 'missing-define' { $first.RuntimeIdentity.WallstopProto = $false }

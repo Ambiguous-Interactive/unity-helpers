@@ -12,11 +12,14 @@ param(
     [string]$TemporaryRoot,
     [string]$Repository = (Join-Path $PSScriptRoot '../..'),
     [ValidateSet('None', 'Direct', 'Debugger')]
-    [string]$StandaloneBuildCapture = 'None'
+    [string]$StandaloneBuildCapture = 'None',
+    [ValidateSet('Mono2x', 'IL2CPP')]
+    [string]$StandaloneBuildCaptureBackend = 'Mono2x'
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$StandaloneBuildCaptureBackend = if ($StandaloneBuildCaptureBackend -eq 'IL2CPP') { 'IL2CPP' } else { 'Mono2x' }
 function Initialize-SerializationAcceptanceProject {
     param([string]$Project, [string]$Repository, [switch]$ConflictingSibling)
 
@@ -282,7 +285,7 @@ function New-BorrowedPlayerDeclaration {
 }
 
 function New-WProtoPlayerDeclaration {
-    param([string]$Repository, [string]$ArtifactsPath, [string]$UnityVersion)
+    param([string]$Repository, [string]$ArtifactsPath, [string]$UnityVersion, [ValidateSet('Mono2x', 'IL2CPP')][string]$Backend = 'Mono2x')
 
     $path = Join-Path $ArtifactsPath 'declaration.json'
     if (Test-Path -LiteralPath $path) { throw 'An existing WProto declaration cannot be replaced.' }
@@ -299,7 +302,7 @@ function New-WProtoPlayerDeclaration {
     $declaration = [ordered]@{
         SchemaVersion = 1; CampaignKind = 'wproto-seven-families-v1'
         RunId = 'wproto-' + [Guid]::NewGuid().ToString('N')
-        UnityVersion = $UnityVersion; Backend = 'Mono2x'; SourceCommit = $commit
+        UnityVersion = $UnityVersion; Backend = $Backend; SourceCommit = $commit
         SourceFiles = $sourceFiles
         CorpusFiles = @(@{ Path = $corpusPath; Sha256 = $corpusHash })
         CanonicalCorpusPath = $corpusPath
@@ -313,6 +316,9 @@ function New-WProtoPlayerDeclaration {
     return $path
 }
 
+if ($StandaloneBuildCaptureBackend -ne 'Mono2x' -and ($StandaloneBuildCapture -eq 'None' -or $Acceptance -ne 'wproto')) {
+    throw 'An IL2CPP WProto build capture requires explicit evidence-only capture mode and Acceptance wproto.'
+}
 if ($StandaloneBuildCapture -ne 'None' -and $Acceptance -ne 'wproto') {
     throw 'Standalone build capture is an evidence-only WProto diagnostic.'
 }
@@ -441,13 +447,13 @@ foreach ($kind in $selected) {
                     $oldWProtoTimeouts[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
                     [Environment]::SetEnvironmentVariable($key, $timeouts[$key], 'Process')
                 }
-                $parameters.StandaloneScriptingBackend = 'Mono2x'
+                $parameters.StandaloneScriptingBackend = $StandaloneBuildCaptureBackend
                 $parameters.ManagedStrippingLevel = 'Disabled'
                 $parameters.AdditionalScriptingDefines = @('WALLSTOP_PROTO')
                 $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance'
                 $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus'
                 $parameters.TestCategory = ''
-                $parameters.FrozenPlayerDeclarationPath = New-WProtoPlayerDeclaration -Repository $Repository -ArtifactsPath $parameters.ArtifactsPath -UnityVersion $UnityVersion
+                $parameters.FrozenPlayerDeclarationPath = New-WProtoPlayerDeclaration -Repository $Repository -ArtifactsPath $parameters.ArtifactsPath -UnityVersion $UnityVersion -Backend $parameters.StandaloneScriptingBackend
                 $declaration = Get-Content -LiteralPath $parameters.FrozenPlayerDeclarationPath -Raw | ConvertFrom-Json
                 $env:UH_PERF_COMMIT = $declaration.SourceCommit
             } elseif ($kind -eq 'borrowed') {

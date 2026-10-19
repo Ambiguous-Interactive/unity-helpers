@@ -3045,7 +3045,8 @@ function Read-FrozenPlayerDeclaration {
         [Parameter(Mandatory = $true)][string]$Backend,
         [Parameter(Mandatory = $true)][string]$ArtifactsPath,
         [Parameter(Mandatory = $true)][string]$RepoRoot,
-        [switch]$GenerateOnly
+        [switch]$GenerateOnly,
+        [switch]$BuildCaptureOnly
     )
     if ($Mode -ne 'standalone' -or $GenerateOnly) {
         throw 'FrozenPlayerDeclarationPath requires an executed standalone player run.'
@@ -3078,10 +3079,10 @@ function Read-FrozenPlayerDeclaration {
     if ($kind -ceq 'borrowed-diagnostic' -and $bytes.Length -gt 1048576) { throw 'Borrowed declaration exceeds 1 MiB.' }
     if ($kind -ceq 'wproto-seven-families-v1') {
         if (($declaration.SchemaVersion -isnot [int] -and $declaration.SchemaVersion -isnot [long]) -or
-            $Backend -cne 'Mono2x' -or $declaration.SourceCommit -isnot [string] -or
+            ($Backend -cne 'Mono2x' -and -not ($BuildCaptureOnly -and $Backend -ceq 'IL2CPP')) -or $declaration.SourceCommit -isnot [string] -or
             $declaration.SourceCommit -cnotmatch '^[a-f0-9]{40}$' -or
             $declaration.CanonicalCorpusPath -cne 'scripts/unity/wproto-corpus.v1.json') {
-            throw 'WProto declaration requires Mono2x, an exact source commit, and the canonical synthetic corpus.'
+            throw 'WProto declaration requires Mono2x or an explicit IL2CPP build-only capture, an exact source commit, and the canonical synthetic corpus.'
         }
         Assert-WProtoSourceCensus -Repository $RepoRoot -DeclaredFiles $declaration.SourceFiles
     }
@@ -4916,7 +4917,7 @@ $frozenPlayerDeclaration = $null
 if (-not [string]::IsNullOrWhiteSpace($FrozenPlayerDeclarationPath)) {
     $frozenPlayerDeclaration = Read-FrozenPlayerDeclaration -Path $FrozenPlayerDeclarationPath `
         -Mode $TestMode -UnityVersion $UnityVersion -Backend $StandaloneScriptingBackend `
-        -ArtifactsPath $ArtifactsPath -RepoRoot $RepoRoot -GenerateOnly:$GenerateOnly
+        -ArtifactsPath $ArtifactsPath -RepoRoot $RepoRoot -GenerateOnly:$GenerateOnly -BuildCaptureOnly:($StandaloneBuildCapture -ne 'None')
 }
 $frozenPlayerProvenance = $null
 

@@ -835,6 +835,7 @@ assert.ok(steps.indexOf(acceptanceNode) < steps.indexOf(nativeBuildPython));
 assert.ok(steps.indexOf(nativeBuildPython) < steps.indexOf(nativeBuild));
 assert.ok(steps.indexOf(identified("run_standalone")) < steps.indexOf(nativeBuild));
 assert.match(nativeBuild, /-StandaloneBuildCapture 'Debugger'/);
+assert.match(nativeBuild, /-StandaloneBuildCaptureBackend 'IL2CPP'/);
 assert.match(nativeBuild, /-Acceptance 'wproto' -UnityVersion '6000\.6\.0f1'/);
 assert.match(
   nativeBuild,

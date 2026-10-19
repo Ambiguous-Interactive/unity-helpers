@@ -362,7 +362,9 @@ return, lock release, and cleanup checks still run.
 For the WProto Standalone build boundary, use `test-mode: standalone`,
 `acceptance: none`, and `native-diagnostics: true`. After ordinary latest-version
 Standalone succeeds, the existing acceptance driver creates a fresh owned WProto
-project and wraps its one existing Mono build in CDB. The exact build arguments,
+project and wraps its one existing IL2CPP build in CDB. This selects the backend
+of the ordinary build fault; a clean Mono capture does not characterize an IL2CPP
+failure. The exact build arguments,
 caller working directory, inherited symbol-path environment, safe build identity
 variables, debugger process outcome and unique target exit event are retained.
 The dump stays private even though the debugger retains the caller's working directory.
@@ -380,8 +382,12 @@ and their acceptance policy are unchanged; this route does not alter registry fl
 
 For a paired direct control from an existing licensed, lock-owning runner context,
 invoke the same `run-acceptance.ps1` with `-Acceptance wproto`, the selected pinned
-version, fresh artifact/temporary paths, and `-StandaloneBuildCapture Direct`.
-Use a separate fresh invocation with `Debugger` for the other arm. Both modes
+version, fresh artifact/temporary paths, `-StandaloneBuildCapture Direct`, and
+`-StandaloneBuildCaptureBackend IL2CPP`.
+Use a separate fresh invocation with `Debugger` and the same explicit backend for
+the other arm. The driver defaults to Mono when the backend option is omitted.
+An IL2CPP backend request without explicit build-only capture is refused; ordinary
+WProto timing acceptance remains Mono-only. Both capture modes
 stop with the explicit evidence-only error; neither returns player acceptance.
 Keep source, editor, backend, settings and caller environment matched. These
 controls characterize debugger effects and cannot by themselves resolve an older fault.

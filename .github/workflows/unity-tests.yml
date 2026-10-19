@@ -821,6 +821,7 @@ jobs:
           ./scripts/unity/run-acceptance.ps1 `
             -Acceptance 'wproto' -UnityVersion '6000.6.0f1' `
             -StandaloneBuildCapture 'Debugger' `
+            -StandaloneBuildCaptureBackend 'IL2CPP' `
             -ArtifactsPath '.artifacts/unity/6000.6.0f1-standalone/build-only-diagnostics' `
             -TemporaryRoot $env:RUNNER_TEMP
 
