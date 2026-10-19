@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix exported protobuf map fields, URI text, and explicit surrogate overrides so other protobuf tools can read the generated schemas ([#1027](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1027)).
 - Fix exported schemas for `uint`, `long`, and `ulong` enums so other protobuf tools preserve their full numeric range ([#1029](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1029)).
+- Fix exported protobuf schemas for concrete subtype roots and members, preserving their inheritance envelopes and field ownership ([#1035](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1035)).
 - Fix plain .NET Standard consumers failing to compile when another library contains an internal module-initializer polyfill ([#1030](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1030)).
 - Fix nested WProto writes remaining usable after a custom formatter throws; preserve the original exception and reject further writes ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix WProto readers allowing further reads or partial results after rejecting data, including generated readers, built-in values, collection restoration, and formatter forwarding ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).

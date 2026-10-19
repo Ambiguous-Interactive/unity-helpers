@@ -18,6 +18,22 @@
       Link="WProtoSchemaTextTests.cs"
     />
     <Compile
+      Include="../../Tests/Runtime/Serialization/WProtoSchemaSubtypeHolder.cs"
+      Link="WProtoSchemaSubtypeHolder.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs"
+      Link="WProtoSchemaPolymorphismTests.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/Serialization/WProtoNamedSchemaBase.cs"
+      Link="WProtoNamedSchemaBase.cs"
+    />
+    <Compile
+      Include="../../Tests/Runtime/Serialization/WProtoNamedSchemaDerived.cs"
+      Link="WProtoNamedSchemaDerived.cs"
+    />
+    <Compile
       Include="../../Tests/Runtime/Serialization/WProtoUnpackedRepeatedContract.cs"
       Link="WProtoUnpackedRepeatedContract.cs"
     />

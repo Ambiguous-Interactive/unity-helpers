@@ -597,7 +597,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 schema.Split("message SchemaDerived {").Length - 1,
                 "The derived message must appear exactly once."
             );
-            StringAssert.Contains("SchemaDerived schemaDerived = 7;", schema);
+            StringAssert.Contains("SchemaDerivedPayload schemaDerived = 7;", schema);
             Assert.IsEmpty(diagnostics);
         }
 
@@ -618,11 +618,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.IsTrue(rendered);
             int derivedIndex = schema.IndexOf(
-                "message SchemaChainDerived {",
+                "message SchemaChainDerivedPayload {",
                 StringComparison.Ordinal
             );
-            StringAssert.Contains("SchemaChainSubDerived schemaChainSubDerived = 8;", schema);
-            StringAssert.Contains("message SchemaChainSubDerived {", schema);
+            StringAssert.Contains(
+                "SchemaChainSubDerivedPayload schemaChainSubDerived = 8;",
+                schema
+            );
+            StringAssert.Contains("message SchemaChainSubDerivedPayload {", schema);
             Assert.Greater(derivedIndex, 0);
             Assert.IsEmpty(diagnostics);
         }
@@ -696,12 +699,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             StringAssert.Contains("int32 Extra = 10;", schema);
             StringAssert.Contains("int32 BaseId = 1;", schema);
             StringAssert.Contains("string BaseName = 2;", schema);
-            StringAssert.Contains("SchemaDerived schemaDerived = 7;", schema);
+            StringAssert.Contains("SchemaDerivedPayload schemaDerived = 7;", schema);
             StringAssert.Contains(
-                "// Subtype tag 7 carries the whole SchemaDerived message on the wire.",
+                "// Subtype tag 7 carries the whole SchemaDerivedPayload message on the wire.",
                 schema
             );
-            int derivedIndex = schema.IndexOf("message SchemaDerived {", StringComparison.Ordinal);
+            int derivedIndex = schema.IndexOf(
+                "message SchemaDerivedPayload {",
+                StringComparison.Ordinal
+            );
             Assert.Greater(derivedIndex, 0, "The include renders the subtype as its own message.");
             Assert.IsEmpty(diagnostics);
         }
@@ -776,14 +782,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.IsTrue(rendered);
             StringAssert.Contains(
-                "SchemaSelfDeclaredDerived schemaSelfDeclaredDerived = 7;",
+                "SchemaSelfDeclaredDerivedPayload schemaSelfDeclaredDerived = 7;",
                 schema
             );
-            StringAssert.Contains("message SchemaSelfDeclaredDerived {", schema);
+            StringAssert.Contains("message SchemaSelfDeclaredDerivedPayload {", schema);
             StringAssert.Contains("int32 Extra = 10;", schema);
             Assert.AreEqual(
                 1,
-                schema.Split("message SchemaSelfDeclaredDerived {").Length - 1,
+                schema.Split("message SchemaSelfDeclaredDerivedPayload {").Length - 1,
                 "The derived message must appear exactly once."
             );
             Assert.IsEmpty(diagnostics);

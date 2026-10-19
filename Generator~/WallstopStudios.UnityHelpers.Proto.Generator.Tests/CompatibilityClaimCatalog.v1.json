@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "95ccf75767aec85171f0231bb7d9e7d7bbe65885795c153f763872bcb6f4a7de",
+  "guideSha256": "85fa7aa71951efffbf21aa2cf2e9ca458fa6c7dce8312471db06f9ad80eee1c4",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -7592,9 +7592,17 @@
         "WProtoSchemaTextTests.ExplicitUnpackedRepeatedMembersRenderTheirWritePolicy",
         "WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes",
         "WProtoSchemaTextTests.WideEnumsUseNumericSchemaTypesAcrossContainers",
-        "WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames"
+        "WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames",
+        "WProtoSchemaPolymorphismTests.ConcreteRootsDescribeTheFullEnvelope",
+        "WProtoSchemaPolymorphismTests.ReorderingTheSameRootsKeepsTheSameSchema",
+        "WProtoSchemaPolymorphismTests.IncludeChainsKeepMembersAtTheirDeclaringLevel",
+        "WProtoSchemaPolymorphismTests.ReorderingEveryLevelKeepsTheSameChainSchema",
+        "WProtoSchemaPolymorphismTests.MembersAndCollectionsUseFullConcreteEnvelopes",
+        "WProtoSchemaPolymorphismTests.SelfDeclaredConcreteRootsUseTheSameEnvelope",
+        "WProtoSchemaPolymorphismTests.CustomContractNamesKeepIncludeFieldsDistinctFromMembers",
+        "WProtoSchemaPolymorphismTests.ConcreteAndBaseEntryPointsKeepTheSameWireGolden"
       ],
-      "limitations": "The main host oracle project excludes the renderer. A separate pinned protoc 27.2 suite cross-reads finite scalar, nullable, collection, map, URI, BCL and wide-enum inputs; it has separate ordinary TRX evidence, outside these strict host lanes. Full schema qualification remains open.",
+      "limitations": "The main host oracle project excludes the renderer. A separate pinned protoc 27.2 suite cross-reads finite scalar, nullable, collection, map, URI, BCL, wide-enum and included-subtype root/member/chain inputs, including custom names; its ordinary TRX evidence is outside these strict host lanes. Full schema qualification remains open.",
       "gapIds": ["G006"],
       "status": "supported-with-witness",
       "laneRequirements": [
@@ -7625,7 +7633,15 @@
             "WProtoSchemaTextTests.ExplicitUnpackedRepeatedMembersRenderTheirWritePolicy",
             "WProtoSchemaTextTests.ExplicitSurrogatesOverrideNativeMemberShapes",
             "WProtoSchemaTextTests.WideEnumsUseNumericSchemaTypesAcrossContainers",
-            "WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames"
+            "WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames",
+            "WProtoSchemaPolymorphismTests.ConcreteRootsDescribeTheFullEnvelope",
+            "WProtoSchemaPolymorphismTests.ReorderingTheSameRootsKeepsTheSameSchema",
+            "WProtoSchemaPolymorphismTests.IncludeChainsKeepMembersAtTheirDeclaringLevel",
+            "WProtoSchemaPolymorphismTests.ReorderingEveryLevelKeepsTheSameChainSchema",
+            "WProtoSchemaPolymorphismTests.MembersAndCollectionsUseFullConcreteEnvelopes",
+            "WProtoSchemaPolymorphismTests.SelfDeclaredConcreteRootsUseTheSameEnvelope",
+            "WProtoSchemaPolymorphismTests.CustomContractNamesKeepIncludeFieldsDistinctFromMembers",
+            "WProtoSchemaPolymorphismTests.ConcreteAndBaseEntryPointsKeepTheSameWireGolden"
           ],
           "reason": "All declared selectors apply; exact fixture evidence is still required."
         },

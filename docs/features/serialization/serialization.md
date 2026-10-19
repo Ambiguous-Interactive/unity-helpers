@@ -2572,10 +2572,34 @@ message PlayerState {
 
 The export mirrors the wire exactly: jagged collections become the wrapper messages the generator
 synthesizes, rectangular arrays become the `dims`/`values` wrapper, maps become proto3 `map` fields,
-and a subtype is emitted as one message holding the subtype's members plus the
-base's, which is the byte layout (the schema lists them in field-number order). A member type
+and included subtypes use separate payload messages containing their declared members. Inherited
+members stay at their own level of the include chain. A member type
 nothing can express is skipped and reported in the export window rather than silently missing. From code, `WProtoSchemaText.TryWriteSchema(contracts, packageName, surrogates,
 out string schema, out IReadOnlyList<string> diagnostics)` renders the same text.
+
+An included subtype's public root and member schema uses its declared contract name and the full
+outermost envelope. Its include payload uses the contract name followed by `Payload`. For example,
+a `Warrior` included by `Actor` at tag 7 has these two entry points:
+
+```protobuf
+message Actor {
+  int32 id = 1;
+  WarriorPayload warrior = 7;
+}
+message Warrior {
+  int32 id = 1;
+  WarriorPayload warrior = 7;
+}
+message WarriorPayload {
+  int32 armor = 10;
+}
+```
+
+Exporting either root, both roots, or a contract with a `Warrior` member describes the same wire
+envelope. Deeper includes nest their payloads at each level. Regenerate external bindings after
+exporting these corrected schemas: include payload message names gain the `Payload` suffix.
+Include field names stay the same unless they collide with a member name; the exporter reports
+each renamed field in its diagnostics. Serializer bytes and contract tags stay the same.
 
 Native maps render as `map<key, value>` without a `repeated` label. Keys that need message
 encodings retain explicit repeated entry messages. URI members, repeated URI elements and URI

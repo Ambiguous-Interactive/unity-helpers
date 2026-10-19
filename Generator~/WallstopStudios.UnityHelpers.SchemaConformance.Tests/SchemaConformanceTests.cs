@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.SchemaConformance.Tests
     using System.Text;
     using System.Threading.Tasks;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Tests.Serialization;
 
@@ -18,18 +19,18 @@ namespace WallstopStudios.UnityHelpers.SchemaConformance.Tests
     {
         private string _directory;
 
-        private static string ExportSchema<T>()
+        private static string ExportSchema<T>(Type[] roots = null, int expectedDiagnostics = 0)
         {
             Assert.IsTrue(
                 WProtoSchemaText.TryWriteSchema(
-                    new[] { typeof(T) },
+                    roots ?? new[] { typeof(T) },
                     "interop",
                     null,
                     out string schema,
                     out IReadOnlyList<string> diagnostics
                 )
             );
-            Assert.IsEmpty(diagnostics, string.Join("\n", diagnostics));
+            Assert.AreEqual(expectedDiagnostics, diagnostics.Count, string.Join("\n", diagnostics));
             return schema;
         }
 
@@ -49,6 +50,23 @@ namespace WallstopStudios.UnityHelpers.SchemaConformance.Tests
             CollectionAssert.AreEqual(new byte[] { 0, 255, 34 }, actual.Bytes);
             Assert.AreEqual(0, actual.Optional);
             Assert.IsTrue(actual.Optional.HasValue);
+        }
+
+        private static void AssertDerivedValues(SchemaDerived actual)
+        {
+            Assert.IsTrue(actual != null);
+            Assert.AreEqual(1, actual.BaseId);
+            Assert.AreEqual("base", actual.BaseName);
+            Assert.AreEqual(7, actual.Extra);
+        }
+
+        private static void AssertChainValues(SchemaChainBase actual)
+        {
+            Assert.IsInstanceOf<SchemaChainSubDerived>(actual);
+            SchemaChainSubDerived leaf = (SchemaChainSubDerived)actual;
+            Assert.AreEqual(1, leaf.RootId);
+            Assert.AreEqual(2, leaf.Middle);
+            Assert.AreEqual(3, leaf.Leaf);
         }
 
         [SetUp]
@@ -515,6 +533,196 @@ namespace WallstopStudios.UnityHelpers.SchemaConformance.Tests
             StringAssert.Contains("out of range", error);
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public async Task ConcreteSubtypeRootsDecodeTheirEnvelopeInBothDirections(int rootOrder)
+        {
+            Type[] roots =
+                rootOrder == 0 ? new[] { typeof(SchemaDerived) }
+                : rootOrder == 1 ? new[] { typeof(SchemaIncludeBase), typeof(SchemaDerived) }
+                : new[] { typeof(SchemaDerived), typeof(SchemaIncludeBase) };
+            await Verify(
+                new SchemaDerived
+                {
+                    BaseId = 1,
+                    BaseName = "base",
+                    Extra = 7,
+                },
+                nameof(SchemaDerived),
+                "BaseId: 1 BaseName: \"base\" schemaDerived { Extra: 7 }",
+                AssertDerivedValues,
+                roots
+            );
+        }
+
+        [Test]
+        public async Task BaseRootsDecodeTheirSubtypePayloadInBothDirections()
+        {
+            await Verify<SchemaIncludeBase>(
+                new SchemaDerived
+                {
+                    BaseId = 1,
+                    BaseName = "base",
+                    Extra = 7,
+                },
+                nameof(SchemaIncludeBase),
+                "BaseId: 1 BaseName: \"base\" schemaDerived { Extra: 7 }",
+                actual =>
+                {
+                    Assert.IsInstanceOf<SchemaDerived>(actual);
+                    AssertDerivedValues((SchemaDerived)actual);
+                }
+            );
+        }
+
+        [TestCase(typeof(SchemaChainBase))]
+        [TestCase(typeof(SchemaChainDerived))]
+        [TestCase(typeof(SchemaChainSubDerived))]
+        public async Task ChainRootsDecodeOnlyTheFieldsOwnedByEachPayload(Type root)
+        {
+            SchemaChainSubDerived value = new SchemaChainSubDerived
+            {
+                RootId = 1,
+                Middle = 2,
+                Leaf = 3,
+            };
+            const string text =
+                "RootId: 1 schemaChainDerived { Middle: 2 schemaChainSubDerived { Leaf: 3 } }";
+            CollectionAssert.AreEqual(
+                Convert.FromHexString("3A074203A0010350020801"),
+                WProtoFacade.Serialize(value)
+            );
+            if (root == typeof(SchemaChainBase))
+            {
+                await Verify<SchemaChainBase>(value, root.Name, text, AssertChainValues);
+            }
+            else if (root == typeof(SchemaChainDerived))
+            {
+                await Verify<SchemaChainDerived>(value, root.Name, text, AssertChainValues);
+            }
+            else
+            {
+                await Verify(value, root.Name, text, AssertChainValues);
+            }
+        }
+
+        [Test]
+        public async Task MemberAndCollectionReferencesDecodeConcreteEnvelopes()
+        {
+            SchemaDerived concrete = new SchemaDerived
+            {
+                BaseId = 1,
+                BaseName = "base",
+                Extra = 7,
+            };
+            SchemaChainSubDerived leaf = new SchemaChainSubDerived
+            {
+                RootId = 1,
+                Middle = 2,
+                Leaf = 3,
+            };
+            await Verify(
+                new WProtoSchemaSubtypeHolder
+                {
+                    Base = concrete,
+                    Concrete = concrete,
+                    Middle = leaf,
+                    Leaf = leaf,
+                    Repeated = new List<SchemaDerived> { concrete },
+                    ByName = new Dictionary<string, SchemaDerived> { { "a", concrete } },
+                },
+                nameof(WProtoSchemaSubtypeHolder),
+                "Base { BaseId: 1 BaseName: \"base\" schemaDerived { Extra: 7 } } "
+                    + "Concrete { BaseId: 1 BaseName: \"base\" schemaDerived { Extra: 7 } } "
+                    + "Middle { RootId: 1 schemaChainDerived { Middle: 2 schemaChainSubDerived { Leaf: 3 } } } "
+                    + "Leaf { RootId: 1 schemaChainDerived { Middle: 2 schemaChainSubDerived { Leaf: 3 } } } "
+                    + "Repeated { BaseId: 1 BaseName: \"base\" schemaDerived { Extra: 7 } } "
+                    + "ByName { key: \"a\" value { BaseId: 1 BaseName: \"base\" schemaDerived { Extra: 7 } } }",
+                actual =>
+                {
+                    Assert.IsTrue(actual != null);
+                    Assert.IsInstanceOf<SchemaDerived>(actual.Base);
+                    AssertDerivedValues((SchemaDerived)actual.Base);
+                    AssertDerivedValues(actual.Concrete);
+                    AssertChainValues(actual.Middle);
+                    AssertChainValues(actual.Leaf);
+                    Assert.IsTrue(actual.Repeated != null);
+                    Assert.AreEqual(1, actual.Repeated.Count);
+                    AssertDerivedValues(actual.Repeated[0]);
+                    Assert.IsTrue(actual.ByName != null);
+                    Assert.AreEqual(1, actual.ByName.Count);
+                    Assert.IsTrue(actual.ByName.TryGetValue("a", out SchemaDerived mapped));
+                    AssertDerivedValues(mapped);
+                }
+            );
+        }
+
+        [Test]
+        public async Task NamedSubtypeRootsDecodeDespiteAnIncludeFieldNameCollision()
+        {
+            WProtoNamedSchemaDerived value = new WProtoNamedSchemaDerived
+            {
+                RootId = 1,
+                PayloadNumber = 5,
+                Extra = 7,
+            };
+            CollectionAssert.AreEqual(
+                Convert.FromHexString("3A02100708011805"),
+                WProtoFacade.Serialize(value)
+            );
+            await Verify(
+                value,
+                "NamedNode",
+                "RootId: 1 namedNode: 5 namedNode3 { Extra: 7 }",
+                actual =>
+                {
+                    Assert.IsTrue(actual != null);
+                    Assert.AreEqual(1, actual.RootId);
+                    Assert.AreEqual(5, actual.PayloadNumber);
+                    Assert.AreEqual(7, actual.Extra);
+                },
+                expectedDiagnostics: 1
+            );
+        }
+
+        [Test]
+        public async Task AFlatConcreteSchemaFailsTheIndependentSemanticWitness()
+        {
+            File.WriteAllText(
+                Path.Combine(_directory, "schema.proto"),
+                "syntax = \"proto3\"; package interop; message Flat { int32 BaseId = 1; string BaseName = 2; int32 Extra = 10; }"
+            );
+            byte[] flat = await ProtocOracle.RequireSuccess(
+                _directory,
+                "encode-flat",
+                Encoding.UTF8.GetBytes("BaseId: 1 BaseName: \"base\" Extra: 7"),
+                "--encode=interop.Flat",
+                "schema.proto"
+            );
+            Assert.Throws<SerializationCorruptDataException>(() =>
+                WProtoFacade.Deserialize<SchemaDerived>(flat)
+            );
+            byte[] nested = WProtoFacade.Serialize(
+                new SchemaDerived
+                {
+                    BaseId = 1,
+                    BaseName = "base",
+                    Extra = 7,
+                }
+            );
+            CollectionAssert.AreEqual(Convert.FromHexString("3A0250070801120462617365"), nested);
+            byte[] decoded = await ProtocOracle.RequireSuccess(
+                _directory,
+                "decode-flat",
+                nested,
+                "--decode=interop.Flat",
+                "schema.proto"
+            );
+            StringAssert.DoesNotContain("Extra:", Encoding.UTF8.GetString(decoded));
+            StringAssert.Contains("7 {", Encoding.UTF8.GetString(decoded));
+        }
+
         [Test]
         public async Task ProtocRejectsAnInvalidSchema()
         {
@@ -539,10 +747,15 @@ namespace WallstopStudios.UnityHelpers.SchemaConformance.Tests
             T expected,
             string messageName,
             string independentText,
-            Action<T> assertValues
+            Action<T> assertValues,
+            Type[] roots = null,
+            int expectedDiagnostics = 0
         )
         {
-            File.WriteAllText(Path.Combine(_directory, "schema.proto"), ExportSchema<T>());
+            File.WriteAllText(
+                Path.Combine(_directory, "schema.proto"),
+                ExportSchema<T>(roots, expectedDiagnostics)
+            );
             await ProtocOracle.RequireSuccess(
                 _directory,
                 "compile",

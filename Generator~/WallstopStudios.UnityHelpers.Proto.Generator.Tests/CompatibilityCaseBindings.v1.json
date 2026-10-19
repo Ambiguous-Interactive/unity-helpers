@@ -134,6 +134,13 @@
       "sha256": "6c2e612f5eca16523b595221f3454d9bd23662cddd8678ae50d09ec91aaa9eb9",
       "purpose": "case-discovery-only",
       "qualification": "none"
+    },
+    {
+      "id": "schema-subtype-native-focused",
+      "label": "native-serialization-final.json",
+      "sha256": "0a891437ef768a976dd9159de384d1372edbf61815d793cd585f4ea9c580cfee",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
     }
   ],
   "selectors": [
@@ -2831,6 +2838,46 @@
       "id": "ZigZagDifferentialTests.TheShippedCellShapeEncodesAsProtobufNetDoes",
       "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/ZigZagDifferentialTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ZigZagDifferentialTests"
+    },
+    {
+      "id": "WProtoSchemaPolymorphismTests.ConcreteRootsDescribeTheFullEnvelope",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests"
+    },
+    {
+      "id": "WProtoSchemaPolymorphismTests.ReorderingTheSameRootsKeepsTheSameSchema",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests"
+    },
+    {
+      "id": "WProtoSchemaPolymorphismTests.IncludeChainsKeepMembersAtTheirDeclaringLevel",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests"
+    },
+    {
+      "id": "WProtoSchemaPolymorphismTests.ReorderingEveryLevelKeepsTheSameChainSchema",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests"
+    },
+    {
+      "id": "WProtoSchemaPolymorphismTests.MembersAndCollectionsUseFullConcreteEnvelopes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests"
+    },
+    {
+      "id": "WProtoSchemaPolymorphismTests.SelfDeclaredConcreteRootsUseTheSameEnvelope",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests"
+    },
+    {
+      "id": "WProtoSchemaPolymorphismTests.CustomContractNamesKeepIncludeFieldsDistinctFromMembers",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests"
+    },
+    {
+      "id": "WProtoSchemaPolymorphismTests.ConcreteAndBaseEntryPointsKeepTheSameWireGolden",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests"
     }
   ],
   "fixtures": [
@@ -11715,6 +11762,60 @@
           ],
           "discoveryArtifact": "formatter-native-serialization",
           "reason": "Complete fixture names observed in the full Serialization namespace playmode result; no source/backend qualification is transferred."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "The source is not part of this lane."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "The source is not part of this lane."
+        }
+      ]
+    },
+    {
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs",
+      "lanes": [
+        {
+          "lane": "host-v2",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "The source is not part of this lane."
+        },
+        {
+          "lane": "host-v3",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "The source is not part of this lane."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.ConcreteAndBaseEntryPointsKeepTheSameWireGolden",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.ConcreteRootsDescribeTheFullEnvelope(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.ConcreteRootsDescribeTheFullEnvelope(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.ConcreteRootsDescribeTheFullEnvelope(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.CustomContractNamesKeepIncludeFieldsDistinctFromMembers",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.IncludeChainsKeepMembersAtTheirDeclaringLevel(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaChainBase)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.IncludeChainsKeepMembersAtTheirDeclaringLevel(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaChainDerived)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.IncludeChainsKeepMembersAtTheirDeclaringLevel(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaChainSubDerived)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.MembersAndCollectionsUseFullConcreteEnvelopes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.ReorderingEveryLevelKeepsTheSameChainSchema",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.ReorderingTheSameRootsKeepsTheSameSchema",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests.SelfDeclaredConcreteRootsUseTheSameEnvelope"
+          ],
+          "discoveryArtifact": "schema-subtype-native-focused",
+          "reason": "Complete 12-case fixture discovery from Unity 6000.4.6f1 PlayMode; artifact identity alone transfers no current-source or backend qualification."
         },
         {
           "lane": "unity-editor-editmode",
