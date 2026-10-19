@@ -451,6 +451,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 bytes[index] = 65;
             }
             WProtoReadLimits limits = new WProtoReadLimits().WithDecodedPayloadBytes(0);
+            Assert.IsTrue(RefusesMaterialization(bytes, text, limits));
+#if ENABLE_IL2CPP && !UNITY_6000_0_OR_NEWER
+            Assert.Inconclusive(
+                "The legacy IL2CPP allocation counter is unsafe to call. Functional refusal was checked; the allocation bound is unqualified."
+            );
+#else
             long before = GC.GetAllocatedBytesForCurrentThread();
             byte[] positive = new byte[payloadLength];
             positive[0] = 1;
@@ -468,6 +474,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             Assert.IsTrue(refused);
             Assert.Less(allocated, payloadLength / 16);
+#endif
         }
     }
 }
