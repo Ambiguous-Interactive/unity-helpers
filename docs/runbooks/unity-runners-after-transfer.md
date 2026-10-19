@@ -362,8 +362,11 @@ return, lock release, and cleanup checks still run.
 For the WProto Standalone build boundary, use `test-mode: standalone`,
 `acceptance: none`, and `native-diagnostics: true`. After ordinary latest-version
 Standalone succeeds, the existing acceptance driver creates a fresh owned WProto
-project and wraps its one existing IL2CPP build in CDB. This selects the backend
-of the ordinary build fault; a clean Mono capture does not characterize an IL2CPP
+project and wraps its one existing IL2CPP build in CDB. IL2CPP diagnostics use
+`High` managed stripping, matching the ordinary Standalone lane. Mono diagnostics
+retain `Disabled`; Unity documents that setting as
+[Mono-only](https://docs.unity3d.com/6000.0/Documentation/Manual/managed-code-stripping-configure.html).
+This selects the backend of the ordinary build fault; a clean Mono capture does not characterize an IL2CPP
 failure. The exact build arguments,
 caller working directory, inherited symbol-path environment, safe build identity
 variables, debugger process outcome and unique target exit event are retained.

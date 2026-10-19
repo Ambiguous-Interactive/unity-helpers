@@ -448,7 +448,7 @@ foreach ($kind in $selected) {
                     [Environment]::SetEnvironmentVariable($key, $timeouts[$key], 'Process')
                 }
                 $parameters.StandaloneScriptingBackend = $StandaloneBuildCaptureBackend
-                $parameters.ManagedStrippingLevel = 'Disabled'
+                $parameters.ManagedStrippingLevel = if ($parameters.StandaloneScriptingBackend -eq 'IL2CPP') { 'High' } else { 'Disabled' }
                 $parameters.AdditionalScriptingDefines = @('WALLSTOP_PROTO')
                 $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance'
                 $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus'

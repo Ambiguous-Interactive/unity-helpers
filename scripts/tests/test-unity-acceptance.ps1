@@ -76,7 +76,7 @@ if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Tools') {
         throw 'The sibling must be independently compiled as an ordinary assembly.'
     }
 }
-if ($ManagedStrippingLevel -eq 'High') {
+if ($ManagedStrippingLevel -eq 'High' -and $StandaloneBuildCapture -eq 'None') {
     $root = Join-Path $ProjectPath 'Assets/SerializationAcceptance'
     $assemblies = @(Get-ChildItem -LiteralPath $root -Filter '*.asmdef' -Recurse)
     if ($assemblies.Count -ne 3) { throw 'High stripping needs three ordinary model assemblies.' }
@@ -445,6 +445,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
     $env:ACCEPTANCE_CONTROL_FAIL = ''
     foreach ($backend in @('Mono2x', 'IL2CPP', 'mono2x', 'il2cpp')) {
         $canonicalBackend = if ($backend -eq 'IL2CPP') { 'IL2CPP' } else { 'Mono2x' }
+        $expectedStripping = if ($canonicalBackend -ceq 'IL2CPP') { 'High' } else { 'Disabled' }
         $directory = Join-Path $temporary ('wproto-build-capture-' + [Guid]::NewGuid().ToString('N'))
         Clear-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
         $failure = $null
@@ -460,10 +461,10 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             throw "Diagnostic backend changed, repeated the build, or leaked its owned project: $backend"
         }
         $declaration = Get-Content -LiteralPath $calls[0].FrozenPlayerDeclarationPath -Raw | ConvertFrom-Json
-        if ($declaration.Backend -cne $canonicalBackend -or $calls[0].ManagedStrippingLevel -cne 'Disabled' -or
+        if ($declaration.Backend -cne $canonicalBackend -or $calls[0].ManagedStrippingLevel -cne $expectedStripping -or
             -not $calls[0].ReleaseCodeOptimization -or -not $calls[0].ReleasePlayerBuild -or
             $calls[0].TestFilter -cne 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus') {
-            throw 'Diagnostic backend selection changed the declared source/settings/filter contract.'
+            throw "Diagnostic backend selection changed the declared source/settings/filter contract: backend=$backend, stripping=$($calls[0].ManagedStrippingLevel), expected=$expectedStripping."
         }
         $checks++
     }
