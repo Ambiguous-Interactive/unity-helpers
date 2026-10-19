@@ -1,5 +1,6 @@
 # Shared source census for the WProto synthetic player declaration and verifier.
 . (Join-Path $PSScriptRoot 'catastrophic-patterns.ps1')
+. (Join-Path $PSScriptRoot 'frozen-player-files.ps1')
 function Get-WProtoPlayerSourceFiles {
     [CmdletBinding()]
     param([Parameter(Mandatory = $true)][string]$Repository)

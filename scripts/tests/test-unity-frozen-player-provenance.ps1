@@ -1,8 +1,11 @@
 #!/usr/bin/env pwsh
+# lint-pwsh-invocations: allow-subprocess-pwsh -- Verify library dependencies without inherited runner functions.
 [CmdletBinding()]
 param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+& ([Environment]::ProcessPath) -NoProfile -File (Join-Path $PSScriptRoot 'test-wproto-replay-dependencies.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'Fresh-process WProto replay dependency controls failed.' }
 . (Join-Path $PSScriptRoot '../unity/lib/test-result-evidence.ps1')
 . (Join-Path $PSScriptRoot '../unity/lib/wproto-player-provenance.ps1')
 $runner = Join-Path $PSScriptRoot '../unity/run-ci-tests.ps1'
@@ -11,7 +14,7 @@ $tokens = $null
 $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($source, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count -ne 0) { throw 'Unity runner must parse.' }
-foreach ($name in @('Assert-FrozenPlayerRegularPath', 'Get-FrozenPlayerFileInventory', 'Read-FrozenPlayerDeclaration', 'Start-FrozenPlayerProvenance',
+foreach ($name in @('Read-FrozenPlayerDeclaration', 'Start-FrozenPlayerProvenance',
         'New-FrozenPlayerAnchor', 'New-WProtoBuildPreparationSource', 'Get-FrozenPlayerRuntimeJoin', 'Add-FrozenPlayerProvenanceSnapshot', 'Get-FrozenPlayerJointCorrectness', 'Complete-FrozenPlayerProvenance', 'Invoke-StandaloneTestPlayer')) {
     $function = $ast.Find({ param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
