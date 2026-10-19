@@ -362,7 +362,7 @@ return, lock release, and cleanup checks still run.
 For the WProto Standalone build boundary, use `test-mode: standalone`,
 `acceptance: none`, and `native-diagnostics: true`. After ordinary latest-version
 Standalone succeeds, the existing acceptance driver creates a fresh owned WProto
-project and wraps its one existing IL2CPP build in CDB. IL2CPP diagnostics use
+project and wraps its one existing IL2CPP build in CDB by default. IL2CPP diagnostics use
 `High` managed stripping, matching the ordinary Standalone lane. Mono diagnostics
 retain `Disabled`; Unity documents that setting as
 [Mono-only](https://docs.unity3d.com/6000.0/Documentation/Manual/managed-code-stripping-configure.html).
@@ -382,6 +382,13 @@ of a zero debugger exit. A nonzero debugger return must numerically match the un
 observed target exit; both values remain distinct in the receipt. The ordinary player XML cannot qualify this separate build.
 No performance fixture or timing campaign runs in this route. Normal dispatches
 and their acceptance policy are unchanged; this route does not alter registry flags.
+
+For a matching Direct workflow arm, set `native-build-direct-control: true` with
+`native-diagnostics: true`, `test-mode: standalone`, and `acceptance: none`.
+The hosted matrix job rejects other combinations before licensed work starts.
+The default remains Debugger. Both arms retain the same IL2CPP/High/Release
+settings and stop before player launch; neither qualifies timing or adoption.
+Use separate source-bound runs and compare their recorded inputs and outcomes.
 
 For a paired direct control from an existing licensed, lock-owning runner context,
 invoke the same `run-acceptance.ps1` with `-Acceptance wproto`, the selected pinned

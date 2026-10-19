@@ -66,6 +66,11 @@ on:
         required: false
         default: false
         type: boolean
+      native-build-direct-control:
+        description: "Use a Direct build control instead of Debugger; requires native diagnostics, Standalone and acceptance=none."
+        required: false
+        default: false
+        type: boolean
       native-loader-snaps-comparison:
         description: "Temporarily clear Unity.exe loader snaps, capture, then restore; requires native diagnostics and EditMode."
         required: false
@@ -257,6 +262,14 @@ jobs:
           if ($env:UH_NATIVE_ACCEPTANCE -ne 'none') {
             throw 'Standalone native diagnostics require acceptance=none; no timing campaign may run.'
           }
+
+      - name: Validate Standalone Direct control selection
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-build-direct-control }}
+        env:
+          UH_NATIVE_DIAGNOSTICS: ${{ inputs.native-diagnostics }}
+          UH_NATIVE_MODE: ${{ inputs.test-mode }}
+          UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
+        run: node scripts/unity/validate-native-build-direct-selection.js
 
       # Assembly compatibility depends on target mode and integration opt-in,
       # never on Unity version. Compute each distinct list once on this hosted
@@ -817,10 +830,11 @@ jobs:
           UH_PERF_COMMIT: ${{ github.sha }}
           UH_PERF_BASE_COMMIT: ${{ github.sha }}
           UH_PERF_OPTIMIZATION: "Release"
+          UH_NATIVE_BUILD_CAPTURE_MODE: ${{ inputs.native-build-direct-control && 'Direct' || 'Debugger' }}
         run: |
           ./scripts/unity/run-acceptance.ps1 `
             -Acceptance 'wproto' -UnityVersion '6000.6.0f1' `
-            -StandaloneBuildCapture 'Debugger' `
+            -StandaloneBuildCapture $env:UH_NATIVE_BUILD_CAPTURE_MODE `
             -StandaloneBuildCaptureBackend 'IL2CPP' `
             -ArtifactsPath '.artifacts/unity/6000.6.0f1-standalone/build-only-diagnostics' `
             -TemporaryRoot $env:RUNNER_TEMP

@@ -10,6 +10,12 @@ const { spawnSync } = require("node:child_process");
 const workflow = fs
   .readFileSync(path.join(__dirname, "../../.github/workflows/unity-tests.yml"), "utf8")
   .replace(/\r\n/g, "\n");
+const directOption = workflow.match(
+  /^      native-build-direct-control:\n((?:        [^\n]*\n|\n)+)/m
+)?.[1];
+assert.ok(directOption, "Manual Direct build control input must exist");
+assert.match(directOption, /^        default: false$/m);
+assert.match(directOption, /^        type: boolean$/m);
 const option = workflow.match(/^      acceptance:\n((?:        [^\n]*\n|\n)+)/m)?.[1];
 assert.ok(option, "Manual acceptance input must exist");
 assert.match(option, /^        required: false$/m);
@@ -834,7 +840,7 @@ const nativeBuildPython = identified("native_build_python");
 assert.ok(steps.indexOf(acceptanceNode) < steps.indexOf(nativeBuildPython));
 assert.ok(steps.indexOf(nativeBuildPython) < steps.indexOf(nativeBuild));
 assert.ok(steps.indexOf(identified("run_standalone")) < steps.indexOf(nativeBuild));
-assert.match(nativeBuild, /-StandaloneBuildCapture 'Debugger'/);
+assert.match(nativeBuild, /-StandaloneBuildCapture \$env:UH_NATIVE_BUILD_CAPTURE_MODE/);
 assert.match(nativeBuild, /-StandaloneBuildCaptureBackend 'IL2CPP'/);
 assert.match(nativeBuild, /-Acceptance 'wproto' -UnityVersion '6000\.6\.0f1'/);
 assert.match(
@@ -894,4 +900,112 @@ for (const event of ["workflow_dispatch", "push", "pull_request"]) {
 }
 console.log(
   `${nativeBuildControls} build-only native diagnostic predicate and wiring controls passed.`
+);
+
+const { getDirectBuildSelectionError } = require("../unity/validate-native-build-direct-selection");
+const vm = require("node:vm");
+const directHelperPath = path.join(__dirname, "../unity/validate-native-build-direct-selection.js");
+const directHelperSource = fs.readFileSync(directHelperPath, "utf8");
+const matrixConfig = workflow.match(/^  matrix-config:\n([\s\S]*?)(?=^  [\w-]+:\n)/m)?.[1];
+assert.ok(matrixConfig);
+const directSelection = matrixConfig
+  .split(/(?=^      - name:)/m)
+  .find((step) => step.startsWith("      - name: Validate Standalone Direct control selection\n"));
+assert.ok(directSelection, "Hosted Direct selection must precede licensed jobs");
+assert.match(
+  directSelection,
+  /run: node scripts\/unity\/validate-native-build-direct-selection\.js/
+);
+assert.ok(
+  matrixConfig.indexOf("uses: actions/setup-node@") < matrixConfig.indexOf(directSelection)
+);
+assert.match(directSelection, /UH_NATIVE_DIAGNOSTICS: \$\{\{ inputs.native-diagnostics \}\}/);
+assert.match(directSelection, /UH_NATIVE_MODE: \$\{\{ inputs.test-mode \}\}/);
+assert.match(directSelection, /UH_NATIVE_ACCEPTANCE: \$\{\{ inputs.acceptance \}\}/);
+for (const event of ["workflow_dispatch", "pull_request", "push", "schedule"]) {
+  for (const direct of [false, true]) {
+    for (const cancelled of [false, true]) {
+      assert.equal(
+        predicate(directSelection)({
+          cancelled,
+          github: { event_name: event },
+          inputs: { "native-build-direct-control": direct }
+        }),
+        !cancelled && event === "workflow_dispatch" && direct
+      );
+    }
+  }
+}
+const captureModeExpression = nativeBuild.match(
+  /^          UH_NATIVE_BUILD_CAPTURE_MODE: (.+)$/m
+)?.[1];
+assert.ok(captureModeExpression);
+for (const direct of [undefined, false, true]) {
+  assert.equal(
+    expression(captureModeExpression)({ inputs: { "native-build-direct-control": direct } }),
+    direct === true ? "Direct" : "Debugger"
+  );
+}
+for (const absent of [null, undefined]) {
+  assert.notEqual(getDirectBuildSelectionError(absent), null);
+}
+const directSelections = [];
+for (const diagnostics of ["", "false", "true", "invalid"]) {
+  for (const mode of ["", "editmode", "standalone", "all"]) {
+    for (const acceptance of ["", "none", "wproto", "all"]) {
+      const environment = {
+        UH_NATIVE_DIAGNOSTICS: diagnostics,
+        UH_NATIVE_MODE: mode,
+        UH_NATIVE_ACCEPTANCE: acceptance
+      };
+      const permitted = diagnostics === "true" && mode === "standalone" && acceptance === "none";
+      assert.equal(getDirectBuildSelectionError(environment) === null, permitted);
+      directSelections.push({ environment, permitted });
+    }
+  }
+}
+for (const field of ["UH_NATIVE_DIAGNOSTICS", "UH_NATIVE_MODE", "UH_NATIVE_ACCEPTANCE"]) {
+  const patterns = {
+    UH_NATIVE_DIAGNOSTICS: /environment\.UH_NATIVE_DIAGNOSTICS !== "true"\s*\|\|\s*/,
+    UH_NATIVE_MODE: /environment\.UH_NATIVE_MODE !== "standalone"\s*\|\|\s*/,
+    UH_NATIVE_ACCEPTANCE: /\|\|\s*environment\.UH_NATIVE_ACCEPTANCE !== "none"/
+  };
+  const pattern = patterns[field];
+  const removed = directHelperSource.replace(pattern, "");
+  assert.notEqual(
+    removed,
+    directHelperSource,
+    `The ${field} control must change the actual helper`
+  );
+  const sandbox = { module: { exports: {} }, require, console, process };
+  vm.runInNewContext(removed, sandbox, { filename: directHelperPath });
+  const mismatches = directSelections.filter(
+    ({ environment, permitted }) =>
+      (sandbox.module.exports.getDirectBuildSelectionError(environment) === null) !== permitted
+  );
+  assert.equal(
+    mismatches.length,
+    3,
+    `Removing ${field} must fail its three exact selection controls`
+  );
+}
+for (const [diagnostics, mode, acceptance, exitCode] of [
+  ["true", "standalone", "none", 0],
+  ["false", "standalone", "none", 1],
+  ["true", "editmode", "none", 1],
+  ["true", "standalone", "wproto", 1]
+]) {
+  const environment = {
+    UH_NATIVE_DIAGNOSTICS: diagnostics,
+    UH_NATIVE_MODE: mode,
+    UH_NATIVE_ACCEPTANCE: acceptance
+  };
+  const result = spawnSync(process.execPath, [directHelperPath], {
+    env: { ...process.env, ...environment },
+    encoding: "utf8"
+  });
+  assert.equal(result.status, exitCode, result.stderr);
+}
+console.log(
+  `${directSelections.length} Direct build selection controls, three removed-guard controls, CLI and workflow wiring passed.`
 );
