@@ -36,6 +36,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <summary>Maximum packed scalar elements across all runs and nested regions in one read.</summary>
         public int MaximumPackedElementCount { get; }
 
+        /// <summary>Maximum delivered repeated elements and map entries across one root read.</summary>
+        /// <remarks>
+        /// The default int.MaxValue disables this allowance. Duplicate occurrences spend it again.
+        /// Constructor seeds, dimension metadata, byte-array payloads and custom work are excluded.
+        /// </remarks>
+        public int MaximumCollectionElementCount { get; }
+
         /// <summary>Maximum bytes copied while accumulating duplicate sub-message occurrences in one read.</summary>
         /// <remarks>
         /// The default long.MaxValue disables this cumulative cap. Borrowing a first occurrence
@@ -99,6 +106,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 maximumPackedElementCount < 0 ? 0 : maximumPackedElementCount;
             MaximumFieldCount = maximumFieldCount < 0 ? 0 : maximumFieldCount;
             MaximumTotalFieldCount = int.MaxValue;
+            MaximumCollectionElementCount = int.MaxValue;
             MaximumMessageMergeCopyBytes = long.MaxValue;
             MaximumDecodedPayloadBytes = long.MaxValue;
             MaximumNestingDepth =
@@ -111,7 +119,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             WProtoReadLimits limits,
             int maximumTotalFieldCount,
             long maximumMessageMergeCopyBytes,
-            long maximumDecodedPayloadBytes
+            long maximumDecodedPayloadBytes,
+            int maximumCollectionElementCount
         )
             : this(
                 limits.MaximumMessageBytes,
@@ -122,6 +131,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             )
         {
             MaximumTotalFieldCount = maximumTotalFieldCount < 0 ? 0 : maximumTotalFieldCount;
+            MaximumCollectionElementCount =
+                maximumCollectionElementCount < 0 ? 0 : maximumCollectionElementCount;
             MaximumMessageMergeCopyBytes =
                 maximumMessageMergeCopyBytes < 0 ? 0 : maximumMessageMergeCopyBytes;
             MaximumDecodedPayloadBytes =
@@ -138,7 +149,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 this,
                 maximumTotalFieldCount,
                 MaximumMessageMergeCopyBytes,
-                MaximumDecodedPayloadBytes
+                MaximumDecodedPayloadBytes,
+                MaximumCollectionElementCount
             );
         }
 
@@ -155,7 +167,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 this,
                 MaximumTotalFieldCount,
                 maximumMessageMergeCopyBytes,
-                MaximumDecodedPayloadBytes
+                MaximumDecodedPayloadBytes,
+                MaximumCollectionElementCount
             );
         }
 
@@ -174,7 +187,26 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 this,
                 MaximumTotalFieldCount,
                 MaximumMessageMergeCopyBytes,
-                maximumDecodedPayloadBytes
+                maximumDecodedPayloadBytes,
+                MaximumCollectionElementCount
+            );
+        }
+
+        /// <summary>Copies these limits with a cumulative delivered collection-element allowance.</summary>
+        /// <param name="maximumCollectionElementCount">Maximum delivered elements; negatives become zero.</param>
+        /// <returns>New immutable limits with every other setting preserved.</returns>
+        /// <remarks>
+        /// Descendants and copies share this allowance; independent roots do not. Regenerate older
+        /// collection codecs to enforce it. This does not bound constructor seeds or total memory.
+        /// </remarks>
+        public WProtoReadLimits WithCollectionElementCount(int maximumCollectionElementCount)
+        {
+            return new WProtoReadLimits(
+                this,
+                MaximumTotalFieldCount,
+                MaximumMessageMergeCopyBytes,
+                MaximumDecodedPayloadBytes,
+                maximumCollectionElementCount
             );
         }
     }

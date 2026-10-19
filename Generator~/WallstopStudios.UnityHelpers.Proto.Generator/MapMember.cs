@@ -496,6 +496,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string decodedValue = "decodedValue" + Tag;
 
             OpenCase(writer, Proto + ".WProtoWireType.LengthDelimited");
+            EmitCollectionElementCharge(writer, qualifiedContract);
             EmitSeed(writer);
 
             /*

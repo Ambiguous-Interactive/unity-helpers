@@ -2978,6 +2978,7 @@ WProtoReadLimits limits = new WProtoReadLimits(
 limits = limits.WithTotalFieldCount(4096);
 limits = limits.WithMessageMergeCopyBytes(128 * 1024);
 limits = limits.WithDecodedPayloadBytes(64 * 1024);
+limits = limits.WithCollectionElementCount(4096);
 WProtoReader reader = new WProtoReader(bytes, limits);
 ```
 
@@ -2994,6 +2995,7 @@ replaced. The original limits remain unchanged; their order gives the same setti
 | Packed elements          | All packed runs and nested messages in one root read, checked before reserving packed capacity          |
 | Message-merge copy bytes | Actual bytes copied by parent-aware duplicate-message accumulators across a root read                   |
 | Decoded payload bytes    | UTF-8 input bytes decoded as strings or URIs, plus bytes materialized as byte arrays across a root read |
+| Collection elements      | Repeated element and map-entry occurrences across the root, descendants and reader copies               |
 
 Defaults leave byte and count limits unrestricted, with depth capped at 64. Negative limits become
 zero. The message-merge copy and decoded payload allowances default to `long.MaxValue`, which disables their caps.
@@ -3044,6 +3046,40 @@ allowance for those members. A finite allowance creates one shared accounting ob
 default readers create none. The cap excludes collection capacity, object headers, URI object
 storage, custom allocations, and decoded object graphs. It is not a total memory limit. The
 message-merge copy allowance remains separate.
+
+#### Limiting collection elements
+
+`WithCollectionElementCount(int)` adds a shared allowance for generated collection reads. The
+`int.MaxValue` default disables it; negative values become zero. A finite allowance creates one
+accounting object per root. Disabled allowances create none. Existing constructors and wire encodings
+are unchanged.
+
+Each repeated element costs one, including empty strings and duplicate set entries. Each map entry
+costs one, including repeated keys and entries with omitted keys or values. A nested collection costs
+one for its outer occurrence plus its inner elements: `[[1, 2], [3]]` costs five. Rectangular array
+values count individually; their dimension metadata does not. Ordinary scalar strings and byte arrays
+cost no elements; a repeated byte-array value costs one element plus its separate decoded-byte charge.
+
+A recognized unpacked element or map entry reserves its allowance before decoding the value or
+seeding the collection. Packed runs reserve their element count from the delivered bytes before
+collection seeding or capacity reservation. This is separate from the packed-element allowance,
+which also covers packed metadata. Malformed values can still fail after a reservation; accepted
+charges are not refunded. Refusal faults the reader and generated reads clear their partial output.
+A refused charge itself does not spend remaining allowance. Reader copies replay already charged
+occurrences against the same allowance. Descendants and parent-aware custom readers share it;
+independent roots do not.
+
+Regenerate precompiled collection codecs with the generator and runtime from the same package
+version. Older generated repeated/map reads do not perform these charges. Custom formatters can use
+`TryChargeCollectionElements(count)` before their own decoding and reservation, or
+`TryReadPackedCollection(wireType, out packed)` to reserve an entire packed run. Do not charge that
+run again during scalar reads. Ordinary `TryReadPackedRun` remains available for packed metadata
+and custom formats; it does not apply collection accounting automatically.
+
+Constructor seeds, collection capacity, object headers and other custom work are excluded. Unknown
+fields cost no elements. This is not an object, total-memory or general work limit. Existing
+unsupported models, including nullable repeated elements, remain unsupported; limits do not change
+formatter availability or the facade's dispatch/data-error contracts.
 
 Unknown fields are skipped and are not retained for rewriting, including fields inside known
 nested messages. An older model can read a newer save successfully, then drop those fields when

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "448a55dafce9d7148e8e19f7c018396f2b186199a333d2ce4d6e530ebd66707f",
+  "guideSha256": "27cd05bf6948b688017301ba0e4a73d8e826c3701f8b82d09b8237741e1af02a",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -37,6 +37,142 @@
     }
   ],
   "claims": [
+    {
+      "id": "limits.collection-elements",
+      "guideAnchor": "docs/features/serialization/serialization.md#limiting-collection-elements",
+      "claim": "An opt-in shared allowance charges generated repeated elements and map-entry occurrences before decoding or collection reservation across root-derived readers",
+      "classification": "behavior",
+      "readerDirections": ["literal-input/current-read", "api-only"],
+      "selectors": [
+        "WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives",
+        "WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting",
+        "WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction",
+        "WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance",
+        "WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance",
+        "WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget",
+        "WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
+        "WProtoCollectionElementBudgetTests.GeneratedShapesUseOneCumulativeAllowance",
+        "WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
+        "WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure",
+        "WProtoCollectionElementBudgetTests.ConstructorSeedsAreExcludedFromDeliveredElementCharges",
+        "WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates",
+        "WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
+        "WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent",
+        "WProtoCollectionElementBudgetTests.BytePayloadsScalarTextUnknownFieldsAndEmptyCollectionsCostNoElements",
+        "WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
+        "WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion",
+        "WProtoCollectionElementBudgetTests.LargestFiniteAllowanceDoesNotOverflow",
+        "WProtoCollectionElementBudgetTests.ARefusedChargeDoesNotSpendTheRemainingAllowance",
+        "WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState",
+        "WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization"
+      ],
+      "limitations": "Regenerate precompiled repeated/map codecs. Constructor seeds, dimension metadata, scalar byte-array payloads, skipped unknowns, collection capacity, object headers and uncharged custom work are excluded. Nullable repeated models remain unsupported. Charges are not refunded after later failure. Native allocation evidence requires a calibrated responsive counter; no player or timing qualification is transferred.",
+      "gapIds": [],
+      "status": "supported-with-witness",
+      "laneRequirements": [
+        {
+          "lane": "host-v2",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives",
+            "WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting",
+            "WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction",
+            "WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance",
+            "WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance",
+            "WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget",
+            "WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
+            "WProtoCollectionElementBudgetTests.GeneratedShapesUseOneCumulativeAllowance",
+            "WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
+            "WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure",
+            "WProtoCollectionElementBudgetTests.ConstructorSeedsAreExcludedFromDeliveredElementCharges",
+            "WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates",
+            "WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
+            "WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent",
+            "WProtoCollectionElementBudgetTests.BytePayloadsScalarTextUnknownFieldsAndEmptyCollectionsCostNoElements",
+            "WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion",
+            "WProtoCollectionElementBudgetTests.LargestFiniteAllowanceDoesNotOverflow",
+            "WProtoCollectionElementBudgetTests.ARefusedChargeDoesNotSpendTheRemainingAllowance",
+            "WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState",
+            "WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization"
+          ],
+          "reason": "Every declared method applies; passing ordinary execution and matching source receipt are required. Discovery alone transfers no qualification."
+        },
+        {
+          "lane": "host-v3",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives",
+            "WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting",
+            "WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction",
+            "WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance",
+            "WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance",
+            "WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget",
+            "WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
+            "WProtoCollectionElementBudgetTests.GeneratedShapesUseOneCumulativeAllowance",
+            "WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
+            "WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure",
+            "WProtoCollectionElementBudgetTests.ConstructorSeedsAreExcludedFromDeliveredElementCharges",
+            "WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates",
+            "WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
+            "WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent",
+            "WProtoCollectionElementBudgetTests.BytePayloadsScalarTextUnknownFieldsAndEmptyCollectionsCostNoElements",
+            "WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion",
+            "WProtoCollectionElementBudgetTests.LargestFiniteAllowanceDoesNotOverflow",
+            "WProtoCollectionElementBudgetTests.ARefusedChargeDoesNotSpendTheRemainingAllowance",
+            "WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState",
+            "WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization"
+          ],
+          "reason": "Every declared method applies; passing ordinary execution and matching source receipt are required. Discovery alone transfers no qualification."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "witnesses",
+          "scope": "partial",
+          "selectors": [
+            "WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives",
+            "WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting",
+            "WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction",
+            "WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance",
+            "WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance",
+            "WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget",
+            "WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
+            "WProtoCollectionElementBudgetTests.GeneratedShapesUseOneCumulativeAllowance",
+            "WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
+            "WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure",
+            "WProtoCollectionElementBudgetTests.ConstructorSeedsAreExcludedFromDeliveredElementCharges",
+            "WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates",
+            "WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
+            "WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent",
+            "WProtoCollectionElementBudgetTests.BytePayloadsScalarTextUnknownFieldsAndEmptyCollectionsCostNoElements",
+            "WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion",
+            "WProtoCollectionElementBudgetTests.LargestFiniteAllowanceDoesNotOverflow",
+            "WProtoCollectionElementBudgetTests.ARefusedChargeDoesNotSpendTheRemainingAllowance",
+            "WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState",
+            "WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization"
+          ],
+          "reason": "Functional cases execute; four calibrated allocation measurements can be inconclusive. No allocation, player or timing qualification follows."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "scope": "none",
+          "selectors": [],
+          "reason": "This fixture is not bound to this lane."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "scope": "none",
+          "selectors": [],
+          "reason": "This fixture is not bound to this lane."
+        }
+      ]
+    },
     {
       "id": "wire.scalars",
       "guideAnchor": "docs/features/serialization/serialization.md#wallstopproto-the-reflection-free-wire-layer-preview",
@@ -10343,7 +10479,7 @@
       "id": "G009",
       "claimIds": ["limits.amplification"],
       "status": "open",
-      "description": "Aggregate decoded elements/copied bytes/retention limits and coverage-guided fuzzing are not existing guarantees."
+      "description": "Opt-in decoded payload, merge-copy and delivered collection-element allowances have scoped witnesses. Aggregate object/capacity/retention/general-work bounds and coverage-guided fuzzing remain open."
     },
     {
       "id": "G010",

@@ -3,6 +3,20 @@
   "policy": "Selectors bind source declarations to fixtures only. A qualifying lane must execute every exact case of each selected fixture once, using ordinary NUnit discovery/lifecycle and a matching source/build receipt. Display-case names never infer method or argument identity.",
   "discoveryArtifacts": [
     {
+      "id": "collection-elements-host-focused",
+      "label": "collection-final-focused.trx",
+      "sha256": "612f2cea9e911aa9094217c9e99cf92c06f419394df9c39046be854f26fdc5d3",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "collection-elements-native-focused",
+      "label": "native-focused.json",
+      "sha256": "c0d8f47cfffb20a940278c9c86528ff28dd9e95ea7c5061e08b4ed2a7bdd66b1",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
       "id": "schema-wide-enum-native-focused",
       "label": "native-schema-result.json",
       "sha256": "3418a1442458bfa7743e6932936d4bffc599f12763aea15fb4764b30e857794f",
@@ -158,6 +172,111 @@
     }
   ],
   "selectors": [
+    {
+      "id": "WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.GeneratedShapesUseOneCumulativeAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.ConstructorSeedsAreExcludedFromDeliveredElementCharges",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.BytePayloadsScalarTextUnknownFieldsAndEmptyCollectionsCostNoElements",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.LargestFiniteAllowanceDoesNotOverflow",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.ARefusedChargeDoesNotSpendTheRemainingAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
+    {
+      "id": "WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests"
+    },
     {
       "id": "WProtoSchemaTextTests.WideEnumWireBytesRemainIndependentOfSchemaNames",
       "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaTextTests.cs",
@@ -2990,6 +3109,221 @@
     }
   ],
   "fixtures": [
+    {
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
+      "lanes": [
+        {
+          "lane": "host-v2",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ARefusedChargeDoesNotSpendTheRemainingAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BytePayloadsScalarTextUnknownFieldsAndEmptyCollectionsCostNoElements",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.EmptyAndNonemptyStrings",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.FieldsAndDescendants",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.MapEntries",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.Messages",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.OuterAndInnerCollections",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.PackedIntegers",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.RectangularValues",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.SetElements",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ConstructorSeedsAreExcludedFromDeliveredElementCharges",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(-1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(int.MaxValue,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(-1,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(0,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(7,7)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(int.MaxValue,int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(int.MinValue,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.LargestFiniteAllowanceDoesNotOverflow",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent(1,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent(2,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(0,0,0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(0,2,1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(0,2,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(1,16,1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(1,16,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(2,0,0,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure"
+          ],
+          "discoveryArtifact": "collection-elements-host-focused",
+          "reason": "Discovery-only names; passing ordinary execution and matching source receipts are required. Native allocation counter controls may be inconclusive."
+        },
+        {
+          "lane": "host-v3",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ARefusedChargeDoesNotSpendTheRemainingAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BytePayloadsScalarTextUnknownFieldsAndEmptyCollectionsCostNoElements",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.EmptyAndNonemptyStrings",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.FieldsAndDescendants",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.MapEntries",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.Messages",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.OuterAndInnerCollections",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.PackedIntegers",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.RectangularValues",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.SetElements",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ConstructorSeedsAreExcludedFromDeliveredElementCharges",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(-1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(int.MaxValue,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(-1,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(0,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(7,7)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(int.MaxValue,int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(int.MinValue,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.LargestFiniteAllowanceDoesNotOverflow",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent(1,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent(2,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(0,0,0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(0,2,1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(0,2,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(1,16,1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(1,16,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(2,0,0,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure"
+          ],
+          "discoveryArtifact": "collection-elements-host-focused",
+          "reason": "Discovery-only names; passing ordinary execution and matching source receipts are required. Native allocation counter controls may be inconclusive."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ARefusedChargeDoesNotSpendTheRemainingAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BuilderOrderPreservesEverySetting(3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.BytePayloadsScalarTextUnknownFieldsAndEmptyCollectionsCostNoElements",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.EmptyAndNonemptyStrings",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.FieldsAndDescendants",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.MapEntries",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.Messages",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.OuterAndInnerCollections",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.PackedIntegers",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.RectangularValues",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CollectionBudget.SetElements",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CompletedReaderRequiresTheSameFiniteBudget(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ConstructorSeedsAreExcludedFromDeliveredElementCharges",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.CopiesAndDerivedReadersShareTheAllowance(4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DetachedFormatterReadsShareTheAllowance(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(-1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(int.MaxValue,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(-1,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(0,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(7,7)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(int.MaxValue,int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives(int.MinValue,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.LargestFiniteAllowanceDoesNotOverflow",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent(1,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedAndCollectionAllowancesAreIndependent(2,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(0,0,0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(0,2,1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(0,2,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(1,16,1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(1,16,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(2,0,0,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure"
+          ],
+          "discoveryArtifact": "collection-elements-native-focused",
+          "reason": "Discovery-only names; passing ordinary execution and matching source receipts are required. Native allocation counter controls may be inconclusive."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
+        }
+      ]
+    },
     {
       "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.BclDifferentialTests",
       "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/BclDifferentialTests.cs",
