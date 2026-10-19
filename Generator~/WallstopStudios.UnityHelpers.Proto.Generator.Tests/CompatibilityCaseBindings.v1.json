@@ -141,6 +141,20 @@
       "sha256": "0a891437ef768a976dd9159de384d1372edbf61815d793cd585f4ea9c580cfee",
       "purpose": "case-discovery-only",
       "qualification": "none"
+    },
+    {
+      "id": "decoded-payload-host-focused",
+      "label": "fresh-enforced.trx",
+      "sha256": "9eedd37e9d8d51aaeaefc6d52d7a84b901d1a7ac2b3a8ce32089075946c76a0e",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "decoded-payload-native-focused",
+      "label": "native-serialization.json",
+      "sha256": "da2a56a1df46218b8f1f66e4d2f2aefae5cd74e1dfe4eecc9e541008f0f0ad23",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
     }
   ],
   "selectors": [
@@ -2878,6 +2892,101 @@
       "id": "WProtoSchemaPolymorphismTests.ConcreteAndBaseEntryPointsKeepTheSameWireGolden",
       "sourcePath": "Tests/Runtime/Serialization/WProtoSchemaPolymorphismTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSchemaPolymorphismTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.ParentAwareReconstructionSharesTheAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.NestedRegionReadersShareTheAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.PackedRegionsRetainTheDecodedAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.BorrowedSpansAndUnknownFieldsDoNotSpendTheAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.AServedBudgetRefusalKeepsTheDispatchFailureContract",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.IndependentRootsHaveIndependentAllowances",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.DuplicateAndNestedFieldsSpendTheirDeliveredBytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.MapsRepeatedValuesAndUriMessagesShareOneRootAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.InvalidUtf8ConsumesItsAttemptAndLatchesFailure",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
+    },
+    {
+      "id": "WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests"
     }
   ],
   "fixtures": [
@@ -11740,7 +11849,7 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.StringMatchesProtobufNetBytes(\"a\",\"0A0161\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.StringMatchesProtobufNetBytes(\"hello\",\"0A0568656C6C6F\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.StringMatchesProtobufNetBytes(\"h\u00e9llo\",\"0A0668C3A96C6C6F\")",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.StringMatchesProtobufNetBytes(\"\ud83d\ude00\",\"0A04F09F9880\")",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.StringMatchesProtobufNetBytes(\"😀\",\"0A04F09F9880\")",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.TryWriteMessageIsBoundedAtTheDocumentedDepth(63 accepted)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.TryWriteMessageIsBoundedAtTheDocumentedDepth(64 rejected)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWireFormatTests.UnknownFieldsAreSkippedExactly",
@@ -11830,6 +11939,170 @@
           "caseNames": [],
           "discoveryArtifact": null,
           "reason": "The source is not part of this lane."
+        }
+      ]
+    },
+    {
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs",
+      "lanes": [
+        {
+          "lane": "host-v2",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.AServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.BorrowedSpansAndUnknownFieldsDoNotSpendTheAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(0,0L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(1,0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(1,1L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(3,2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(3,3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(-1L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(0L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(7L,7L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(long.MaxValue,long.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(long.MinValue,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.DuplicateAndNestedFieldsSpendTheirDeliveredBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.IndependentRootsHaveIndependentAllowances",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.InvalidUtf8ConsumesItsAttemptAndLatchesFailure",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.MapsRepeatedValuesAndUriMessagesShareOneRootAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.NestedRegionReadersShareTheAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.PackedRegionsRetainTheDecodedAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ParentAwareReconstructionSharesTheAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\",0L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",1L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"AB\",1L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"AB\",2L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\\ud83d\\ude42\",3L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\\ud83d\\ude42\",4L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit"
+          ],
+          "discoveryArtifact": "decoded-payload-host-focused",
+          "reason": "Complete 40-case ordinary source discovery; artifact identity transfers no lane qualification. Native allocation checks require a responsive counter."
+        },
+        {
+          "lane": "host-v3",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.AServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.BorrowedSpansAndUnknownFieldsDoNotSpendTheAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(0,0L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(1,0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(1,1L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(3,2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(3,3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(-1L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(0L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(7L,7L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(long.MaxValue,long.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(long.MinValue,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.DuplicateAndNestedFieldsSpendTheirDeliveredBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.IndependentRootsHaveIndependentAllowances",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.InvalidUtf8ConsumesItsAttemptAndLatchesFailure",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.MapsRepeatedValuesAndUriMessagesShareOneRootAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.NestedRegionReadersShareTheAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.PackedRegionsRetainTheDecodedAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ParentAwareReconstructionSharesTheAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\",0L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",1L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"AB\",1L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"AB\",2L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\\ud83d\\ude42\",3L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\\ud83d\\ude42\",4L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit"
+          ],
+          "discoveryArtifact": "decoded-payload-host-focused",
+          "reason": "Complete 40-case ordinary source discovery; artifact identity transfers no lane qualification. Native allocation checks require a responsive counter."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.AServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.BorrowedSpansAndUnknownFieldsDoNotSpendTheAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(0,0L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(1,0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(1,1L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(3,2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload(3,3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(-1L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(0L,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(7L,7L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(long.MaxValue,long.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults(long.MinValue,0L)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.DuplicateAndNestedFieldsSpendTheirDeliveredBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance(2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.IndependentRootsHaveIndependentAllowances",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.InvalidUtf8ConsumesItsAttemptAndLatchesFailure",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.MapsRepeatedValuesAndUriMessagesShareOneRootAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.NestedRegionReadersShareTheAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.PackedRegionsRetainTheDecodedAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ParentAwareReconstructionSharesTheAllowance",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\",0L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",0L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",1L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"AB\",1L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"AB\",2L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",2L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"界\",3L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"🙂\",3L,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"🙂\",4L,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit"
+          ],
+          "discoveryArtifact": "decoded-payload-native-focused",
+          "reason": "Complete 40-case ordinary source discovery; artifact identity transfers no lane qualification. Native allocation checks require a responsive counter."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
         }
       ]
     }

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "85fa7aa71951efffbf21aa2cf2e9ca458fa6c7dce8312471db06f9ad80eee1c4",
+  "guideSha256": "448a55dafce9d7148e8e19f7c018396f2b186199a333d2ce4d6e530ebd66707f",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -10158,6 +10158,134 @@
           "scope": "none",
           "selectors": [],
           "reason": "This shared runtime fixture is not bound to this lane; no behavior is qualified here."
+        }
+      ]
+    },
+    {
+      "id": "limits.decoded-payload-bytes",
+      "guideAnchor": "docs/features/serialization/serialization.md#limiting-decoded-payloads",
+      "claim": "An opt-in shared allowance charges delivered UTF-8 and owned byte-array payload lengths before built-in materialization across root-derived readers",
+      "classification": "behavior",
+      "readerDirections": ["literal-input/current-read", "api-only"],
+      "selectors": [
+        "WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes",
+        "WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload",
+        "WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance",
+        "WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
+        "WProtoDecodedPayloadBudgetTests.ParentAwareReconstructionSharesTheAllowance",
+        "WProtoDecodedPayloadBudgetTests.NestedRegionReadersShareTheAllowance",
+        "WProtoDecodedPayloadBudgetTests.PackedRegionsRetainTheDecodedAllowance",
+        "WProtoDecodedPayloadBudgetTests.BorrowedSpansAndUnknownFieldsDoNotSpendTheAllowance",
+        "WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
+        "WProtoDecodedPayloadBudgetTests.AServedBudgetRefusalKeepsTheDispatchFailureContract",
+        "WProtoDecodedPayloadBudgetTests.IndependentRootsHaveIndependentAllowances",
+        "WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance",
+        "WProtoDecodedPayloadBudgetTests.DuplicateAndNestedFieldsSpendTheirDeliveredBytes",
+        "WProtoDecodedPayloadBudgetTests.MapsRepeatedValuesAndUriMessagesShareOneRootAllowance",
+        "WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit",
+        "WProtoDecodedPayloadBudgetTests.InvalidUtf8ConsumesItsAttemptAndLatchesFailure",
+        "WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults",
+        "WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance",
+        "WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization"
+      ],
+      "limitations": "UTF-8 bytes are not UTF-16 memory: text storage can occupy up to twice the charge before overhead. Excludes borrowed spans, skipped unknowns, object and collection storage, custom allocations, independent roots and old precompiled byte-array member codecs until regeneration. Accepted charges are not refunded after failure. Allocation bounds require a calibrated responsive counter. No backend or timing qualification is transferred.",
+      "gapIds": [],
+      "status": "supported-with-witness",
+      "laneRequirements": [
+        {
+          "lane": "host-v2",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes",
+            "WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload",
+            "WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance",
+            "WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
+            "WProtoDecodedPayloadBudgetTests.ParentAwareReconstructionSharesTheAllowance",
+            "WProtoDecodedPayloadBudgetTests.NestedRegionReadersShareTheAllowance",
+            "WProtoDecodedPayloadBudgetTests.PackedRegionsRetainTheDecodedAllowance",
+            "WProtoDecodedPayloadBudgetTests.BorrowedSpansAndUnknownFieldsDoNotSpendTheAllowance",
+            "WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
+            "WProtoDecodedPayloadBudgetTests.AServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WProtoDecodedPayloadBudgetTests.IndependentRootsHaveIndependentAllowances",
+            "WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance",
+            "WProtoDecodedPayloadBudgetTests.DuplicateAndNestedFieldsSpendTheirDeliveredBytes",
+            "WProtoDecodedPayloadBudgetTests.MapsRepeatedValuesAndUriMessagesShareOneRootAllowance",
+            "WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit",
+            "WProtoDecodedPayloadBudgetTests.InvalidUtf8ConsumesItsAttemptAndLatchesFailure",
+            "WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults",
+            "WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance",
+            "WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization"
+          ],
+          "reason": "Every declared method applies; matching ordinary execution and source receipt required. Native allocation controls may be inconclusive. No player or timing qualification."
+        },
+        {
+          "lane": "host-v3",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes",
+            "WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload",
+            "WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance",
+            "WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
+            "WProtoDecodedPayloadBudgetTests.ParentAwareReconstructionSharesTheAllowance",
+            "WProtoDecodedPayloadBudgetTests.NestedRegionReadersShareTheAllowance",
+            "WProtoDecodedPayloadBudgetTests.PackedRegionsRetainTheDecodedAllowance",
+            "WProtoDecodedPayloadBudgetTests.BorrowedSpansAndUnknownFieldsDoNotSpendTheAllowance",
+            "WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
+            "WProtoDecodedPayloadBudgetTests.AServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WProtoDecodedPayloadBudgetTests.IndependentRootsHaveIndependentAllowances",
+            "WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance",
+            "WProtoDecodedPayloadBudgetTests.DuplicateAndNestedFieldsSpendTheirDeliveredBytes",
+            "WProtoDecodedPayloadBudgetTests.MapsRepeatedValuesAndUriMessagesShareOneRootAllowance",
+            "WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit",
+            "WProtoDecodedPayloadBudgetTests.InvalidUtf8ConsumesItsAttemptAndLatchesFailure",
+            "WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults",
+            "WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance",
+            "WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization"
+          ],
+          "reason": "Every declared method applies; matching ordinary execution and source receipt required. Native allocation controls may be inconclusive. No player or timing qualification."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes",
+            "WProtoDecodedPayloadBudgetTests.ByteArraysChargeTheirActualPayload",
+            "WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance",
+            "WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
+            "WProtoDecodedPayloadBudgetTests.ParentAwareReconstructionSharesTheAllowance",
+            "WProtoDecodedPayloadBudgetTests.NestedRegionReadersShareTheAllowance",
+            "WProtoDecodedPayloadBudgetTests.PackedRegionsRetainTheDecodedAllowance",
+            "WProtoDecodedPayloadBudgetTests.BorrowedSpansAndUnknownFieldsDoNotSpendTheAllowance",
+            "WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
+            "WProtoDecodedPayloadBudgetTests.AServedBudgetRefusalKeepsTheDispatchFailureContract",
+            "WProtoDecodedPayloadBudgetTests.IndependentRootsHaveIndependentAllowances",
+            "WProtoDecodedPayloadBudgetTests.CompletedReaderValidationRejectsAnIndependentFiniteAllowance",
+            "WProtoDecodedPayloadBudgetTests.DuplicateAndNestedFieldsSpendTheirDeliveredBytes",
+            "WProtoDecodedPayloadBudgetTests.MapsRepeatedValuesAndUriMessagesShareOneRootAllowance",
+            "WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit",
+            "WProtoDecodedPayloadBudgetTests.InvalidUtf8ConsumesItsAttemptAndLatchesFailure",
+            "WProtoDecodedPayloadBudgetTests.ConfigurationClampsNegativesAndPreservesUnlimitedDefaults",
+            "WProtoDecodedPayloadBudgetTests.FluentLimitsPreserveEveryOtherAllowance",
+            "WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization"
+          ],
+          "reason": "Every declared method applies; matching ordinary execution and source receipt required. Native allocation controls may be inconclusive. No player or timing qualification."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "scope": "none",
+          "selectors": [],
+          "reason": "This fixture is not bound to this lane."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "scope": "none",
+          "selectors": [],
+          "reason": "This fixture is not bound to this lane."
         }
       ]
     }

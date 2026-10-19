@@ -2977,24 +2977,26 @@ WProtoReadLimits limits = new WProtoReadLimits(
 );
 limits = limits.WithTotalFieldCount(4096);
 limits = limits.WithMessageMergeCopyBytes(128 * 1024);
+limits = limits.WithDecodedPayloadBytes(64 * 1024);
 WProtoReader reader = new WProtoReader(bytes, limits);
 ```
 
-Both factories return new limits with the other settings preserved and the requested allowance
-replaced. The original limits remain unchanged; either factory order gives the same settings.
+These factories return new limits with the other settings preserved and the requested allowance
+replaced. The original limits remain unchanged; their order gives the same settings.
 
-| Limit                    | Scope                                                                                                  |
-| ------------------------ | ------------------------------------------------------------------------------------------------------ |
-| Message bytes            | Each reader region                                                                                     |
-| Length-delimited bytes   | Each field, checked before copying or decoding                                                         |
-| Field count              | Tags per region, including duplicate, unknown, and skipped-group tags                                  |
-| Total field count        | Tags across the root, nested readers, groups, and reader copies; checked before consuming the next tag |
-| Nesting depth            | Combined sub-message and group depth; maximum 64                                                       |
-| Packed elements          | All packed runs and nested messages in one root read, checked before reserving packed capacity         |
-| Message-merge copy bytes | Actual bytes copied by parent-aware duplicate-message accumulators across a root read                  |
+| Limit                    | Scope                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Message bytes            | Each reader region                                                                                      |
+| Length-delimited bytes   | Each field, checked before copying or decoding                                                          |
+| Field count              | Tags per region, including duplicate, unknown, and skipped-group tags                                   |
+| Total field count        | Tags across the root, nested readers, groups, and reader copies; checked before consuming the next tag  |
+| Nesting depth            | Combined sub-message and group depth; maximum 64                                                        |
+| Packed elements          | All packed runs and nested messages in one root read, checked before reserving packed capacity          |
+| Message-merge copy bytes | Actual bytes copied by parent-aware duplicate-message accumulators across a root read                   |
+| Decoded payload bytes    | UTF-8 input bytes decoded as strings or URIs, plus bytes materialized as byte arrays across a root read |
 
 Defaults leave byte and count limits unrestricted, with depth capped at 64. Negative limits become
-zero. The message-merge copy allowance defaults to `long.MaxValue`, which disables that cap.
+zero. The message-merge copy and decoded payload allowances default to `long.MaxValue`, which disables their caps.
 These limits do not bound total decoded memory. Independent root
 readers created by custom formatters do not share an existing root's allowances. The limits do not
 configure protobuf-net fallback or [JSON reads](#reading-untrusted-json).
@@ -3019,6 +3021,29 @@ A finite copy allowance adds one accounting object per root reader. Default read
 copy-accounting state. This cap excludes buffer capacity, ordinary string and byte-array reads,
 decoded object graphs, and the legacy accumulator overload without a parent. It is not a total
 allocation or retained-memory limit.
+
+#### Limiting decoded payloads
+
+`WithDecodedPayloadBytes(long)` bounds cumulative delivered payload lengths before built-in string,
+byte-array, and URI materialization. String and URI charges count UTF-8 input bytes, not UTF-16
+storage: decoded characters can occupy up to twice that byte count before object overhead. Byte
+arrays charge their payload length. Empty strings and arrays cost zero. Repeated fields, map keys
+and values, nested messages, reader copies, and parent-aware custom readers share one allowance.
+Independent root readers have separate allowances.
+
+A refused charge marks the reader malformed and clears the result; the encoded field has already
+been consumed. Accepted charges are not refunded if UTF-8 validation, URI construction, or later
+work fails. Truncated payloads that were never delivered do not spend this allowance. Borrowed
+`TryReadBytes` spans and skipped unknown fields cost zero. Custom formatters can use
+`TryReadByteArray` to charge before copying, or remain responsible for allocations they perform
+from borrowed spans.
+
+Regenerate precompiled byte-array member codecs with the generator and runtime from the same
+package version. Older generated codecs copy borrowed spans directly and cannot enforce this
+allowance for those members. A finite allowance creates one shared accounting object per root;
+default readers create none. The cap excludes collection capacity, object headers, URI object
+storage, custom allocations, and decoded object graphs. It is not a total memory limit. The
+message-merge copy allowance remains separate.
 
 Unknown fields are skipped and are not retained for rewriting, including fields inside known
 nested messages. An older model can read a newer save successfully, then drop those fields when

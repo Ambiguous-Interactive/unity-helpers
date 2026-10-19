@@ -3,11 +3,11 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
-    internal sealed class WProtoMessageMergeCopyBudget
+    internal sealed class WProtoByteBudget
     {
         private long _remaining;
 
-        internal WProtoMessageMergeCopyBudget(long remaining)
+        internal WProtoByteBudget(long remaining)
         {
             _remaining = remaining < 0 ? 0 : remaining;
         }

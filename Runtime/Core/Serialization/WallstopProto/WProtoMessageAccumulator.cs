@@ -135,10 +135,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return false;
         }
 
-        private bool TryAppend(
-            ReadOnlySpan<byte> occurrence,
-            WProtoMessageMergeCopyBudget copyBudget = null
-        )
+        private bool TryAppend(ReadOnlySpan<byte> occurrence, WProtoByteBudget copyBudget = null)
         {
             if (!_seen)
             {

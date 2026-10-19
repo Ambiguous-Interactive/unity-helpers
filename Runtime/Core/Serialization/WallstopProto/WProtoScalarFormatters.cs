@@ -668,14 +668,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             public bool TryReadValue(ref WProtoReader reader, out byte[] value)
             {
-                if (!reader.TryReadBytes(out ReadOnlySpan<byte> decoded))
-                {
-                    value = null;
-                    return false;
-                }
-
-                value = decoded.ToArray();
-                return true;
+                return reader.TryReadByteArray(out value);
             }
         }
     }

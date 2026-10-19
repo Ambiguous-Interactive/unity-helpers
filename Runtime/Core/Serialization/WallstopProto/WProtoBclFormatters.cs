@@ -1072,6 +1072,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             string text;
+            if (!reader.TryChargeDecodedPayloadBytes(payload.Length))
+            {
+                value = null;
+                return false;
+            }
             try
             {
                 text = WProtoText.StrictUtf8.GetString(payload);

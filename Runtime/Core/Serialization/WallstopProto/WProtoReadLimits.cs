@@ -3,10 +3,10 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
-    /// <summary>Configures immutable wire, parsing-work, message-merge copy, and recursion limits for a read.</summary>
+    /// <summary>Configures immutable wire, parsing-work, resource, and recursion limits for a read.</summary>
     /// <remarks>
     /// Wire and per-region tag limits apply to each reader region; packed elements and total tags
-    /// have separate shared root budgets, as do duplicate-message merge copies.
+    /// have separate shared root budgets, as do duplicate-message merge copies and decoded payloads.
     /// Field counts include
     /// unknown and duplicate tags and group terminators, but not untagged packed elements.
     /// These limits do not bound the size of objects a custom formatter constructs.
@@ -43,6 +43,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// This does not bound ordinary string or byte-array reads, retained capacity, or object graphs.
         /// </remarks>
         public long MaximumMessageMergeCopyBytes { get; }
+
+        /// <summary>Maximum cumulative UTF-8 and byte-array payload bytes processed by owned decoders.</summary>
+        /// <remarks>
+        /// The default long.MaxValue disables this allowance. Text is charged by its delivered UTF-8
+        /// bytes, so its UTF-16 contents can occupy up to twice the charged length. Object headers,
+        /// collection capacity, custom formatter allocations, and borrowed raw spans are excluded.
+        /// </remarks>
+        public long MaximumDecodedPayloadBytes { get; }
 
         /// <summary>Maximum combined sub-message and group depth, never above 64.</summary>
         public int MaximumNestingDepth { get; }
@@ -92,6 +100,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             MaximumFieldCount = maximumFieldCount < 0 ? 0 : maximumFieldCount;
             MaximumTotalFieldCount = int.MaxValue;
             MaximumMessageMergeCopyBytes = long.MaxValue;
+            MaximumDecodedPayloadBytes = long.MaxValue;
             MaximumNestingDepth =
                 maximumNestingDepth < 0 ? 0
                 : WProtoReader.MaxNestingDepth < maximumNestingDepth ? WProtoReader.MaxNestingDepth
@@ -101,7 +110,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private WProtoReadLimits(
             WProtoReadLimits limits,
             int maximumTotalFieldCount,
-            long maximumMessageMergeCopyBytes
+            long maximumMessageMergeCopyBytes,
+            long maximumDecodedPayloadBytes
         )
             : this(
                 limits.MaximumMessageBytes,
@@ -114,6 +124,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             MaximumTotalFieldCount = maximumTotalFieldCount < 0 ? 0 : maximumTotalFieldCount;
             MaximumMessageMergeCopyBytes =
                 maximumMessageMergeCopyBytes < 0 ? 0 : maximumMessageMergeCopyBytes;
+            MaximumDecodedPayloadBytes =
+                maximumDecodedPayloadBytes < 0 ? 0 : maximumDecodedPayloadBytes;
         }
 
         /// <summary>Copies these limits with a replacement cumulative tag work limit.</summary>
@@ -122,7 +134,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <remarks>The new budget is independent for each root reader and shared by its descendants and copies.</remarks>
         public WProtoReadLimits WithTotalFieldCount(int maximumTotalFieldCount)
         {
-            return new WProtoReadLimits(this, maximumTotalFieldCount, MaximumMessageMergeCopyBytes);
+            return new WProtoReadLimits(
+                this,
+                maximumTotalFieldCount,
+                MaximumMessageMergeCopyBytes,
+                MaximumDecodedPayloadBytes
+            );
         }
 
         /// <summary>Copies these limits with a replacement cumulative message-merge copy allowance.</summary>
@@ -134,7 +151,31 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public WProtoReadLimits WithMessageMergeCopyBytes(long maximumMessageMergeCopyBytes)
         {
-            return new WProtoReadLimits(this, MaximumTotalFieldCount, maximumMessageMergeCopyBytes);
+            return new WProtoReadLimits(
+                this,
+                MaximumTotalFieldCount,
+                maximumMessageMergeCopyBytes,
+                MaximumDecodedPayloadBytes
+            );
+        }
+
+        /// <summary>Copies these limits with a cumulative decoded text and byte-array payload allowance.</summary>
+        /// <param name="maximumDecodedPayloadBytes">Maximum delivered UTF-8 or byte-array bytes; negatives become zero.</param>
+        /// <returns>New immutable limits with every other setting preserved.</returns>
+        /// <remarks>
+        /// Owned decoders charge before materialization, including overwritten values and replays.
+        /// Descendants and copies share this allowance; independent root readers do not.
+        /// A refused operation has consumed its encoded field and faults its reader. Charges are not refunded.
+        /// Regenerate older byte-array member codecs to enforce this allowance; direct borrowed-span copies bypass it.
+        /// </remarks>
+        public WProtoReadLimits WithDecodedPayloadBytes(long maximumDecodedPayloadBytes)
+        {
+            return new WProtoReadLimits(
+                this,
+                MaximumTotalFieldCount,
+                MaximumMessageMergeCopyBytes,
+                maximumDecodedPayloadBytes
+            );
         }
     }
 }

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add an opt-in WProto decoded payload allowance shared across strings, byte arrays, URIs, nested reads, and reader copies. Regenerate byte-array member codecs to enforce it ([#1038](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1038)).
 - Add an opt-in total-field read limit for WProto, shared across nested messages, duplicate-message validation, unknown fields, groups, and reader copies while preserving existing per-message limits ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Add typed equality and hashing to public value types, including configurations, scopes, enumerators, and protobuf surrogates, plus the opt-in `WUH023` analyzer ([#1001](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1001)).
 - Add `TryGetInstance(out T)` to both singleton families for reading an existing instance without creating, searching, or loading one ([#1009](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1009)).
