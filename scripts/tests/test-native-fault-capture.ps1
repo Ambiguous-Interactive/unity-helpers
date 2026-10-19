@@ -14,7 +14,7 @@ $tokens = $null
 $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw ($errors | Out-String) }
-foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureLayout', 'Get-NativeCaptureExitEvent', 'Get-NativeCaptureXmlOutcome', 'Read-NativeCaptureTail', 'Test-NativeCaptureInputsUnchanged', 'Invoke-NativeEvidenceReadback')) {
+foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureDebuggerCommand', 'Invoke-NativeStandaloneBuildCapture', 'Get-NativeCaptureLayout', 'Get-NativeCaptureExitEvent', 'Get-NativeCaptureXmlOutcome', 'Read-NativeCaptureTail', 'Test-NativeCaptureInputsUnchanged', 'Invoke-NativeEvidenceReadback')) {
     $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
     if ($null -eq $function) { throw "Missing shipping function $name" }
     . ([scriptblock]::Create($function.Extent.Text))
@@ -667,6 +667,104 @@ Start-Sleep -Seconds 300
     $rejected = $false
     try { Invoke-NativeCaptureProcess -FilePath (Join-Path $root 'absent.exe') -Arguments @() -Directory $root -Seconds 1 -Observation $failed | Out-Null } catch { $rejected = $true }
     Assert-Capture ($rejected -and -not $failed.Reaped -and $null -eq $failed.RawExitCode) 'Failed launch cannot fabricate an exit'
+
+    $originalSymbolPath = [Environment]::GetEnvironmentVariable('_NT_SYMBOL_PATH', 'Process')
+    try {
+        $env:_NT_SYMBOL_PATH = 'native-build-symbol-canary'
+        [IO.File]::WriteAllText($child, '[Console]::Write($env:_NT_SYMBOL_PATH + "|" + [Environment]::CurrentDirectory)')
+        $preserved = @{}
+        $output = Invoke-NativeCaptureProcess -FilePath (Get-Process -Id $PID).Path -Arguments @('-NoProfile', '-File', $child) -Directory $root -Seconds 20 -Observation $preserved -PreserveSymbolPath
+        Assert-Capture ($output -ceq ('native-build-symbol-canary|' + $root) -and $preserved.RawExitCode -eq 0) 'Build capture preserves inherited symbol environment and requested working directory'
+    } finally {
+        [Environment]::SetEnvironmentVariable('_NT_SYMBOL_PATH', $originalSymbolPath, 'Process')
+    }
+
+    Assert-Capture ((Get-NativeCaptureDebuggerCommand -DumpPath 'C:\capture with spaces\fault.dmp').Contains('\"C:\\capture with spaces\\fault.dmp\"')) 'CDB command-string parsing preserves quoted Windows dump paths and separators'
+    $originalBuildCaptureProcess = ${function:Invoke-NativeCaptureProcess}
+    $script:buildCaptureCalls = @()
+    $script:buildSavedRecords = @()
+    $script:buildControllerExit = 0
+    $script:buildKillReason = $null
+    $script:buildTargetText = 'Last event: 2a.1: Exit process 0:2a, code c0000005'
+    function Save-NativeCaptureRecord { $script:buildSavedRecords += ($Record | ConvertTo-Json -Depth 12 -Compress) }
+    function Invoke-NativeCaptureProcess {
+        param($FilePath, $Arguments, $Directory, $Seconds, $Observation, $ReceiptPath, [switch]$PreserveSymbolPath)
+        $script:buildCaptureCalls += @{ FilePath = $FilePath; Arguments = @($Arguments); Directory = $Directory; Seconds = $Seconds; PreserveSymbolPath = [bool]$PreserveSymbolPath }
+        $Observation.RawExitCode = $script:buildControllerExit
+        $Observation.Reaped = $true
+        $Observation.KillReason = $script:buildKillReason
+        $Observation.Pid = 888
+        return $script:buildTargetText
+    }
+    try {
+        $project = Join-Path $root 'project with spaces'
+        $buildArguments = @('-batchmode', '-nographics', '-projectPath', $project, '-runTests', '-testPlatform', 'StandaloneWindows64', '-assemblyNames', 'Exact.Assembly', '-testFilter', 'Exact.Case', '-logFile', '-')
+        $buildPrivate = Join-Path $root 'build capture private'
+        $buildRecord = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = 'old-editmode-case' }
+        Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory $buildPrivate -ArtifactsPath $root -LogPath (Join-Path $root 'build.log') -Seconds 123 -Record $buildRecord
+        Assert-Capture ($script:buildCaptureCalls.Count -eq 1 -and $buildRecord.Cases.Count -eq 1 -and $buildRecord.State -ceq 'completed') 'Build capture launches exactly one debugger build'
+        $call = $script:buildCaptureCalls[0]
+        $forwarded = @($call.Arguments | Select-Object -Skip 3)
+        Assert-Capture (($forwarded[0..($buildArguments.Count - 1)] -join [char]0) -ceq ($buildArguments -join [char]0) -and $forwarded.Count -eq $buildArguments.Count + 4) 'Every existing build argument is forwarded in order without replacement'
+        Assert-Capture ($call.Arguments[0] -ceq '-c' -and $call.Arguments[2] -ceq 'exact-editor.exe' -and $call.FilePath -ceq 'pinned-cdb.exe') 'Debugger wraps the selected editor once'
+        Assert-Capture ($call.Directory -ceq [Environment]::CurrentDirectory -and $call.PreserveSymbolPath -and $call.Seconds -eq 123) 'Build debugger retains caller working directory and symbol environment with the existing timeout'
+        Assert-Capture ($call.Arguments[1].Contains('\"' + (Join-Path $buildPrivate 'fault.dmp').Replace('\', '\\') + '\"')) 'Debugger dump stays in the private folder when the working directory is preserved'
+        Assert-Capture ($buildRecord.Cases[0].Process.Pid -eq 888 -and $buildRecord.Cases[0].Process.RawExitCode -eq 0 -and $buildRecord.Cases[0].TargetExitEvent.Pid -eq 42 -and $buildRecord.Cases[0].TargetExitEvent.ExitCodeHex -ceq 'C0000005') 'Debugger controller success cannot replace the target access violation'
+        Assert-Capture ($null -eq $buildRecord.TestFilter -and $buildRecord.Mode -ceq 'standalone-build' -and $buildRecord.ConsoleScope -ceq 'bounded-debugger-and-Unity-console-tail') 'Build record does not claim the unrelated default EditMode selection or a full console log'
+        Assert-Capture ($script:buildSavedRecords.Count -ge 3 -and (Test-Path -LiteralPath (Join-Path $root 'build.log'))) 'Build capture persists preparation and completed evidence'
+        $script:buildControllerExit = -1073741819
+        $matchingRecord = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = $null }
+        Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root 'matching-target-code') -ArtifactsPath $root -LogPath (Join-Path $root 'matching-target-code.log') -Seconds 123 -Record $matchingRecord
+        Assert-Capture ($matchingRecord.State -ceq 'completed' -and $matchingRecord.Cases[0].TargetExitCode -eq -1073741819 -and $matchingRecord.Cases[0].ControllerExitRelation -ceq 'matches-observed-target') 'A matching nonzero controller code preserves the observed target fault independently'
+        foreach ($scenario in @('controller-failed', 'target-missing', 'target-ambiguous', 'timeout')) {
+            $script:buildControllerExit = if ($scenario -eq 'controller-failed') { 1 } else { 0 }
+            $script:buildKillReason = if ($scenario -eq 'timeout') { 'wall-clock-timeout' } else { $null }
+            $script:buildTargetText = if ($scenario -eq 'target-missing') { 'no target event' } elseif ($scenario -eq 'target-ambiguous') { "Last event: 2a.1: Exit process 0:2a, code 0`nLast event: 2a.1: Exit process 0:2a, code 0" } else { 'Last event: 2a.1: Exit process 0:2a, code 0' }
+            $record = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = $null }
+            $rejected = $false
+            try { Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root $scenario) -ArtifactsPath $root -LogPath (Join-Path $root ($scenario + '.log')) -Seconds 123 -Record $record } catch { $rejected = $true }
+            Assert-Capture ($rejected -and $record.State -cne 'completed' -and $record.Cases.Count -eq 1) "Unqualified build controller outcome refuses completion: $scenario"
+            Assert-Capture (Test-Path -LiteralPath (Join-Path $root ($scenario + '.log'))) "Failed build retains console evidence: $scenario"
+        }
+        foreach ($scenario in @('wrong-platform', 'wrong-project', 'changed-log', 'early-quit', 'duplicate-run', 'unbounded')) {
+            $arguments = @($buildArguments)
+            if ($scenario -eq 'wrong-platform') { $arguments[6] = 'editmode' }
+            if ($scenario -eq 'wrong-project') { $arguments[3] = 'another-project' }
+            if ($scenario -eq 'changed-log') { $arguments[-1] = 'another.log' }
+            if ($scenario -eq 'early-quit') { $arguments += '-quit' }
+            if ($scenario -eq 'duplicate-run') { $arguments += '-runTests' }
+            $before = $script:buildCaptureCalls.Count
+            $record = [ordered]@{ State = 'preparing'; Cases = @() }
+            $rejected = $false
+            try { Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $arguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root ('invalid-' + $scenario)) -ArtifactsPath $root -LogPath (Join-Path $root 'invalid.log') -Seconds $(if ($scenario -eq 'unbounded') { 0 } else { 123 }) -Record $record } catch { $rejected = $true }
+            Assert-Capture ($rejected -and $script:buildCaptureCalls.Count -eq $before -and $record.Cases.Count -eq 0) "Invalid build selection starts no process: $scenario"
+        }
+    } finally { ${function:Invoke-NativeCaptureProcess} = $originalBuildCaptureProcess }
+
+    $runnerTokens = $null
+    $runnerErrors = $null
+    $runnerAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts/unity/run-ci-tests.ps1'), [ref]$runnerTokens, [ref]$runnerErrors)
+    Assert-Capture ($runnerErrors.Count -eq 0) 'Build integration parses'
+    $buildBranch = $runnerAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text -ceq '$StandaloneBuildCapture -ne ''None''' -and $node.Extent.Text.Contains('Invoke-UnityStandaloneBuildDiagnostic -Mode') }, $true)
+    Assert-Capture ($null -ne $buildBranch) 'Existing Standalone build has a diagnostic branch'
+    $script:diagnosticBuildCalls = 0
+    $script:diagnosticSnapshots = 0
+    $script:diagnosticPlayerCalls = 0
+    function Invoke-UnityStandaloneBuildDiagnostic { param($Mode, $EditorPath, $ProjectPath, $Arguments, $ArtifactsPath, $LogPath, $TimeoutSeconds) ++$script:diagnosticBuildCalls }
+    function Add-FrozenPlayerProvenanceSnapshot { param($Context, $Stage, [switch]$IncludePayload) Assert-Capture ($Stage -ceq 'after-build' -and $IncludePayload) 'Diagnostic records the actual post-build inventory'; ++$script:diagnosticSnapshots }
+    function Get-StandaloneBuildTimeoutSeconds { return 123 }
+    function Invoke-StandaloneTestPlayer { ++$script:diagnosticPlayerCalls }
+    foreach ($mode in @('Direct', 'Debugger')) {
+        $StandaloneBuildCapture = $mode
+        $UnityEditorPath = 'exact-editor.exe'; $ProjectPath = $project; $buildArgs = $buildArguments; $ArtifactsPath = $root; $logPath = Join-Path $root 'integration.log'; $frozenPlayerProvenance = @{}
+        $rejected = $false
+        try { & ([scriptblock]::Create($buildBranch.Extent.Text + '; Invoke-StandaloneTestPlayer')) } catch { $rejected = $_.Exception.Message -like 'Evidence-only Standalone build capture stops before player launch*' }
+        Assert-Capture ($rejected -and $script:diagnosticPlayerCalls -eq 0) "Build-only route never launches a player or returns acceptance: $mode"
+    }
+    Assert-Capture ($script:diagnosticBuildCalls -eq 2 -and $script:diagnosticSnapshots -eq 2) 'Each diagnostic arm performs one existing build and one post-build inventory'
+    $StandaloneBuildCapture = 'None'
+    & ([scriptblock]::Create($buildBranch.Extent.Text + '; Invoke-StandaloneTestPlayer'))
+    Assert-Capture ($script:diagnosticBuildCalls -eq 2 -and $script:diagnosticPlayerCalls -eq 1) 'Disabled diagnostic leaves the ordinary player path reachable'
 
     $workflow = [IO.File]::ReadAllText((Join-Path $repo '.github/workflows/unity-tests.yml'))
     Assert-Capture ($workflow -match '(?s)native-diagnostics:.*?default: false.*?type: boolean') 'Diagnostic input defaults off'

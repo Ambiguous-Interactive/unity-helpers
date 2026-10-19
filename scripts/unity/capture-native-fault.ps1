@@ -1,24 +1,32 @@
 #!/usr/bin/env pwsh
 # cspell:ignore sxd sxe epr
-[CmdletBinding(DefaultParameterSetName = 'Capture')]
+[CmdletBinding(DefaultParameterSetName = 'Capture', PositionalBinding = $false)]
 param(
-    [Parameter(Mandatory = $true, ParameterSetName = 'Capture')][string]$EditorPath,
-    [Parameter(Mandatory = $true, ParameterSetName = 'Capture')][string]$ProjectPath,
+    [Parameter(Mandatory = $true, ParameterSetName = 'Capture')]
+    [Parameter(Mandatory = $true, ParameterSetName = 'Build')][string]$EditorPath,
+    [Parameter(Mandatory = $true, ParameterSetName = 'Capture')]
+    [Parameter(Mandatory = $true, ParameterSetName = 'Build')][string]$ProjectPath,
     [Parameter(Mandatory = $true)][string]$ArtifactsPath,
     [Parameter(Mandatory = $true, ParameterSetName = 'Capture')][string]$AssemblyNames,
     [Parameter(ParameterSetName = 'Capture')][string]$TestFilter = 'WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationApiTests.SourceAnalysisExposesReadOnlyChangesAndFindings',
-    [Parameter(ParameterSetName = 'Capture')][string]$DebuggerDirectory,
+    [Parameter(ParameterSetName = 'Capture')]
+    [Parameter(ParameterSetName = 'Build')][string]$DebuggerDirectory,
+    [Parameter(Mandatory = $true, ParameterSetName = 'Build')][string[]]$BuildArguments,
+    [Parameter(Mandatory = $true, ParameterSetName = 'Build')][string]$BuildLogPath,
     [Parameter(ParameterSetName = 'Capture')][switch]$CompareLoaderSnaps,
-    [Parameter(ParameterSetName = 'Capture')][ValidateRange(1, 1800)][int]$TimeoutSeconds = 600,
+    [Parameter(ParameterSetName = 'Capture')]
+    [Parameter(ParameterSetName = 'Build')][ValidateRange(1, 1800)][int]$TimeoutSeconds = 600,
     [Parameter(Mandatory = $true, ParameterSetName = 'Readback')][string]$ExecutionDiagnosticsPath,
     [Parameter(Mandatory = $true, ParameterSetName = 'Readback')][string]$ExpectedMachine,
     [Parameter(ParameterSetName = 'Readback')][string]$TestFrameworkLogPath,
     [Parameter(Mandatory = $true, ParameterSetName = 'SelectReadback')][string]$SourceRunId,
-    [Parameter(Mandatory = $true, ParameterSetName = 'SelectReadback')][string]$Repository
+    [Parameter(Mandatory = $true, ParameterSetName = 'SelectReadback')][string]$Repository,
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$UnboundArguments
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($UnboundArguments -and $UnboundArguments.Count -gt 0) { throw 'Unbound arguments are not accepted; supply argument arrays from PowerShell.' }
 . (Join-Path $PSScriptRoot 'lib/credential-redaction.ps1')
 . (Join-Path $PSScriptRoot 'lib/native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'lib/accelerator.ps1')
@@ -32,7 +40,8 @@ function Invoke-NativeCaptureProcess {
         [string]$Directory,
         [int]$Seconds,
         [hashtable]$Observation,
-        [string]$ReceiptPath
+        [string]$ReceiptPath,
+        [switch]$PreserveSymbolPath
     )
 
     $info = [Diagnostics.ProcessStartInfo]::new($FilePath)
@@ -41,7 +50,7 @@ function Invoke-NativeCaptureProcess {
     $info.WorkingDirectory = $Directory
     $info.RedirectStandardOutput = $true
     $info.RedirectStandardError = $true
-    $info.Environment['_NT_SYMBOL_PATH'] = $Directory
+    if (-not $PreserveSymbolPath) { $info.Environment['_NT_SYMBOL_PATH'] = $Directory }
     foreach ($argument in $Arguments) { $info.ArgumentList.Add($argument) }
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $info
@@ -144,6 +153,81 @@ function Get-NativeCaptureExitEvent {
         Pid = [Convert]::ToInt32($events[0].Groups[1].Value, 16)
         ExitCodeHex = $events[0].Groups[2].Value.ToUpperInvariant().PadLeft(8, '0')
     }
+}
+
+function Get-NativeCaptureDebuggerCommand {
+    param([string]$DumpPath = 'fault.dmp')
+    if ($DumpPath.IndexOfAny([char[]]@([char]34, [char]10, [char]13)) -ge 0) { throw 'Invalid debugger dump path.' }
+    $command = 'sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av;sxe -c ".lastevent;q" epr;bu ntdll!RtlExitUserProcess ".echo WUH_EXIT_REQUEST;!gflag;r rcx;kv20;g";g'
+    if ($DumpPath -cne 'fault.dmp') { return $command.Replace('fault.dmp', '\"' + $DumpPath.Replace('\', '\\') + '\"') }
+    return $command
+}
+
+function Invoke-NativeStandaloneBuildCapture {
+    param(
+        [string]$EditorPath, [string]$ProjectPath, [string[]]$Arguments,
+        [string]$DebuggerPath, [string]$PrivateDirectory, [string]$ArtifactsPath,
+        [string]$LogPath, [int]$Seconds, [System.Collections.IDictionary]$Record
+    )
+
+    foreach ($pair in @(@('-projectPath', $ProjectPath), @('-testPlatform', 'StandaloneWindows64'), @('-logFile', '-'))) {
+        $positions = @(for ($index = 0; $index -lt $Arguments.Count; ++$index) { if ($Arguments[$index] -ceq $pair[0]) { $index } })
+        if ($positions.Count -ne 1 -or $positions[0] + 1 -ge $Arguments.Count -or $Arguments[$positions[0] + 1] -cne $pair[1]) {
+            throw 'Build capture requires the unchanged Standalone build argument array.'
+        }
+    }
+    if (@($Arguments | Where-Object { $_ -ceq '-runTests' }).Count -ne 1 -or $Arguments -ccontains '-quit') {
+        throw 'Build capture requires one test-player build without an early quit.'
+    }
+    if ($Seconds -lt 1 -or $Seconds -gt 1800) { throw 'Build capture requires a bounded timeout.' }
+    [void](New-Item -ItemType Directory -Path $PrivateDirectory -ErrorAction Stop)
+    $actual = @($Arguments) + @('-crash-report-folder', $PrivateDirectory, '-upmLogFile', (Join-Path $PrivateDirectory 'upm.log'))
+    $case = [ordered]@{ Mode = 'standalone-build'; Process = @{}; TargetExitEvent = $null; DumpPresent = $false }
+    $Record.Mode = 'standalone-build'
+    $Record.TestFilter = $null
+    $Record.WorkingDirectory = [Environment]::CurrentDirectory
+    $Record.ConsoleScope = 'bounded-debugger-and-Unity-console-tail'
+    $Record.InputArguments = @($Arguments)
+    $Record.ActualArguments = $actual
+    $Record.BuildEnvironment = [ordered]@{}
+    foreach ($name in @('UH_PLAYER_BUILD_PATH', 'UH_PERF_COMMIT', 'UH_PERF_BASE_COMMIT', 'UH_PERF_OPTIMIZATION')) {
+        $Record.BuildEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+    }
+    $Record.Qualification = 'One existing build under a debugger; controller and target exits are distinct. No player launch, timing or acceptance qualification. Symbol-path environment is inherited unchanged.'
+    $Record.Cases += $case
+    Save-NativeCaptureRecord
+    $output = Invoke-NativeCaptureProcess -FilePath $DebuggerPath `
+        -Arguments (@('-c', (Get-NativeCaptureDebuggerCommand -DumpPath (Join-Path $PrivateDirectory 'fault.dmp')), $EditorPath) + $actual) `
+        -Directory $Record.WorkingDirectory -Seconds $Seconds -Observation $case.Process `
+        -ReceiptPath (Join-Path $ArtifactsPath 'build-debugger-process.json') -PreserveSymbolPath
+    $safeOutput = ConvertTo-UnitySafeLogText -Text $output
+    [IO.File]::WriteAllText($LogPath, $safeOutput)
+    [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'build-debugger-console.log'), $safeOutput)
+    $case.TargetExitEvent = Get-NativeCaptureExitEvent -Text $output
+    $case.ControllerExitRelation = 'unexplained'
+    if ($null -ne $case.TargetExitEvent) {
+        $targetBits = [Convert]::ToUInt32($case.TargetExitEvent.ExitCodeHex, 16)
+        $case.TargetExitCode = [BitConverter]::ToInt32([BitConverter]::GetBytes($targetBits), 0)
+        if ($case.Process.RawExitCode -eq 0) { $case.ControllerExitRelation = 'zero' }
+        elseif ($case.Process.RawExitCode -eq $case.TargetExitCode) { $case.ControllerExitRelation = 'matches-observed-target' }
+    }
+    $case.ConsoleTailLimitCharacters = 524288
+    foreach ($name in @('upm.log')) {
+        $tail = Read-NativeCaptureTail -Path (Join-Path $PrivateDirectory $name)
+        [IO.File]::WriteAllText((Join-Path $ArtifactsPath ('build-' + $name)), (ConvertTo-UnitySafeLogText -Text $tail))
+    }
+    $dump = Join-Path $PrivateDirectory 'fault.dmp'
+    $case.DumpPresent = Test-Path -LiteralPath $dump -PathType Leaf
+    if ($case.DumpPresent) {
+        $case.DumpBytes = (Get-Item -LiteralPath $dump).Length
+        if ($case.DumpBytes -le 268435456) { $case.DumpSha256 = (Get-FileHash -LiteralPath $dump -Algorithm SHA256).Hash }
+    }
+    Save-NativeCaptureRecord
+    if (-not $case.Process.Reaped -or $null -ne $case.Process.KillReason) { throw 'Diagnostic build did not exit naturally' }
+    if ($null -eq $case.TargetExitEvent -or $case.ControllerExitRelation -ceq 'unexplained') { throw 'Debugger did not complete with one observed target exit' }
+    $Record.State = 'completed'
+    $Record.EndedUtc = [DateTime]::UtcNow.ToString('o')
+    Save-NativeCaptureRecord
 }
 
 function Get-NativeCaptureLayout {
@@ -394,6 +478,12 @@ try {
     }
     $record.DebuggerSource = $pins.Source
     $record.DebuggerSha256 = (Get-FileHash -LiteralPath $debugger -Algorithm SHA256).Hash
+    if ($PSCmdlet.ParameterSetName -eq 'Build') {
+        Invoke-NativeStandaloneBuildCapture -EditorPath $EditorPath -ProjectPath $ProjectPath `
+            -Arguments $BuildArguments -DebuggerPath $debugger -PrivateDirectory (Join-Path $privateRoot 'build') `
+            -ArtifactsPath $artifactRoot -LogPath $BuildLogPath -Seconds $TimeoutSeconds -Record $record
+        return
+    }
     $versionMatch = [regex]::Match($record.ProjectVersion, '(?m)^m_EditorVersion: ([^\s]+)')
     if (-not $versionMatch.Success) { throw 'Prepared project has no editor version' }
     $acceleratorArguments = @(Get-AcceleratorArguments -Endpoint $env:UNITY_ACCELERATOR_ENDPOINT -Version $versionMatch.Groups[1].Value -Mode editmode)
@@ -420,7 +510,7 @@ try {
         $executable = $EditorPath
         $arguments = $unityArguments
         if ($mode -eq 'debugger') {
-            $command = 'sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av;sxe -c ".lastevent;q" epr;bu ntdll!RtlExitUserProcess ".echo WUH_EXIT_REQUEST;!gflag;r rcx;kv20;g";g'
+            $command = Get-NativeCaptureDebuggerCommand
             $executable = $debugger
             $arguments = @('-c', $command, $EditorPath) + $unityArguments
         }

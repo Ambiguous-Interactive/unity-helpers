@@ -10,7 +10,9 @@ param(
     [string]$ArtifactsPath,
     [Parameter(Mandatory = $true)]
     [string]$TemporaryRoot,
-    [string]$Repository = (Join-Path $PSScriptRoot '../..')
+    [string]$Repository = (Join-Path $PSScriptRoot '../..'),
+    [ValidateSet('None', 'Direct', 'Debugger')]
+    [string]$StandaloneBuildCapture = 'None'
 )
 
 Set-StrictMode -Version Latest
@@ -311,6 +313,12 @@ function New-WProtoPlayerDeclaration {
     return $path
 }
 
+if ($StandaloneBuildCapture -ne 'None' -and $Acceptance -ne 'wproto') {
+    throw 'Standalone build capture is an evidence-only WProto diagnostic.'
+}
+if ($StandaloneBuildCapture -eq 'Debugger' -and [Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+    throw 'Debugger build capture requires Windows.'
+}
 if ($Acceptance -eq 'wproto' -and $UnityVersion -cnotin @('2021.3.45f1', '6000.6.0f1')) {
     throw 'WProto corpus acceptance requires the pinned floor or latest Unity version.'
 }
@@ -423,6 +431,7 @@ foreach ($kind in $selected) {
                 $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests;WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests'
                 Initialize-SerializationAcceptanceProject -Project $ownedProject -Repository $Repository
             } elseif ($kind -eq 'wproto') {
+                $parameters.StandaloneBuildCapture = $StandaloneBuildCapture
                 $timeouts = @{
                     UH_EDITOR_TEST_TIMEOUT_SECONDS = '900'
                     UH_STANDALONE_BUILD_TIMEOUT_SECONDS = '1800'

@@ -62,7 +62,7 @@ on:
         default: ""
         type: string
       native-diagnostics:
-        description: "Capture a direct/debugger exit pair on Unity 6000.6; evidence only."
+        description: "Capture Unity 6000.6 exits: EditMode pair or build-only Standalone debugger (expected diagnostic failure)."
         required: false
         default: false
         type: boolean
@@ -246,6 +246,16 @@ jobs:
         run: |
           if ($env:UH_NATIVE_DIAGNOSTICS -ne 'true' -or $env:UH_NATIVE_MODE -ne 'editmode' -or $env:UH_NATIVE_ACCEPTANCE -ne 'none') {
             throw 'Loader-snaps comparison requires native-diagnostics=true, test-mode=editmode and acceptance=none.'
+          }
+
+      - name: Validate Standalone native diagnostic selection
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-diagnostics && inputs.test-mode == 'standalone' }}
+        shell: pwsh
+        env:
+          UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
+        run: |
+          if ($env:UH_NATIVE_ACCEPTANCE -ne 'none') {
+            throw 'Standalone native diagnostics require acceptance=none; no timing campaign may run.'
           }
 
       # Assembly compatibility depends on target mode and integration opt-in,
@@ -768,12 +778,51 @@ jobs:
         id: acceptance_node
         if: >-
           ${{ !cancelled() && github.event_name == 'workflow_dispatch'
-          && inputs.acceptance == 'wproto'
+          && (inputs.acceptance == 'wproto' || (inputs.native-diagnostics
+          && inputs.test-mode == 'standalone' && inputs.acceptance == 'none' && matrix.unity-version == '6000.6.0f1'))
           && (matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')
           && steps.unity_lock.outputs.acquired == 'true' }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4
         with:
           node-version: "22.18.0"
+
+      - name: Setup Python for Standalone build diagnostics
+        id: native_build_python
+        if: >-
+          ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-diagnostics
+          && inputs.test-mode == 'standalone' && inputs.acceptance == 'none'
+          && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.run_standalone.outcome == 'success' }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+
+      - name: Capture Standalone build diagnostics
+        id: native_build_capture
+        if: >-
+          ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-diagnostics
+          && inputs.test-mode == 'standalone' && inputs.acceptance == 'none'
+          && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.run_standalone.outcome == 'success'
+          && steps.native_build_python.outcome == 'success' && steps.acceptance_node.outcome == 'success' }}
+        timeout-minutes: 55
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_PERF_COMMIT: ${{ github.sha }}
+          UH_PERF_BASE_COMMIT: ${{ github.sha }}
+          UH_PERF_OPTIMIZATION: "Release"
+        run: |
+          ./scripts/unity/run-acceptance.ps1 `
+            -Acceptance 'wproto' -UnityVersion '6000.6.0f1' `
+            -StandaloneBuildCapture 'Debugger' `
+            -ArtifactsPath '.artifacts/unity/6000.6.0f1-standalone/build-only-diagnostics' `
+            -TemporaryRoot $env:RUNNER_TEMP
 
       - name: Run additional native acceptance
         id: run_acceptance

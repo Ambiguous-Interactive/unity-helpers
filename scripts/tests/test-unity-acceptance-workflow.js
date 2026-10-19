@@ -828,3 +828,69 @@ for (const [name, input] of [
   }
 }
 console.log(`${readbackJobControls} historical readback job predicate controls passed.`);
+
+const nativeBuild = identified("native_build_capture");
+const nativeBuildPython = identified("native_build_python");
+assert.ok(steps.indexOf(acceptanceNode) < steps.indexOf(nativeBuildPython));
+assert.ok(steps.indexOf(nativeBuildPython) < steps.indexOf(nativeBuild));
+assert.ok(steps.indexOf(identified("run_standalone")) < steps.indexOf(nativeBuild));
+assert.match(nativeBuild, /-StandaloneBuildCapture 'Debugger'/);
+assert.match(nativeBuild, /-Acceptance 'wproto' -UnityVersion '6000\.6\.0f1'/);
+assert.match(
+  nativeBuild,
+  /ArtifactsPath '\.artifacts\/unity\/6000\.6\.0f1-standalone\/build-only-diagnostics'/
+);
+assert.match(nativeBuild, /UH_CENTRAL_LICENSE_RETURN: "true"/);
+assert.doesNotMatch(nativeBuild, /continue-on-error|CompareLoaderSnaps/);
+assert.match(
+  workflow,
+  /Standalone native diagnostics require acceptance=none; no timing campaign may run/
+);
+const captureBuildWhen = predicate(nativeBuild);
+const pythonBuildWhen = predicate(nativeBuildPython);
+let nativeBuildControls = 0;
+for (const event of ["workflow_dispatch", "push", "pull_request"]) {
+  for (const mode of ["standalone", "editmode", "playmode", "all"]) {
+    for (const acceptance of ["none", "wproto", "all"]) {
+      for (const version of ["2021.3.45f1", "2022.3.45f1", "6000.5.2f1", "6000.6.0f1"]) {
+        for (const requested of [undefined, false, true]) {
+          for (const cancelled of [false, true]) {
+            for (const acquired of ["false", "true"]) {
+              for (const standalone of ["skipped", "failure", "success"]) {
+                for (const setup of ["skipped", "failure", "success"]) {
+                  const context = {
+                    github: { event_name: event },
+                    inputs: { "native-diagnostics": requested, "test-mode": mode, acceptance },
+                    matrix: { "unity-version": version },
+                    cancelled,
+                    steps: {
+                      unity_lock: { outputs: { acquired } },
+                      run_standalone: { outcome: standalone },
+                      native_build_python: { outcome: setup },
+                      acceptance_node: { outcome: setup }
+                    }
+                  };
+                  const selected =
+                    event === "workflow_dispatch" &&
+                    requested === true &&
+                    mode === "standalone" &&
+                    acceptance === "none" &&
+                    version === "6000.6.0f1" &&
+                    !cancelled &&
+                    acquired === "true" &&
+                    standalone === "success";
+                  assert.equal(Boolean(pythonBuildWhen(context)), selected);
+                  assert.equal(Boolean(captureBuildWhen(context)), selected && setup === "success");
+                  nativeBuildControls += 2;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+console.log(
+  `${nativeBuildControls} build-only native diagnostic predicate and wiring controls passed.`
+);

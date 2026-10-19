@@ -55,6 +55,9 @@ param(
     # Optional diagnostic frozen-file/player provenance. No measurement eligibility.
     [string]$FrozenPlayerDeclarationPath = '',
 
+    [ValidateSet('None', 'Direct', 'Debugger')]
+    [string]$StandaloneBuildCapture = 'None',
+
     [string]$TestCategory = $(if ($env:UH_UNITY_TEST_CATEGORY) { $env:UH_UNITY_TEST_CATEGORY } else { '' }),
 
     [switch]$IncludeComparisons,
@@ -240,6 +243,10 @@ if ($UnboundArguments -and 0 -lt $UnboundArguments.Count) {
         "(-AdditionalScriptingDefines a,b,c) rather than space-separated values."
     )
     exit 64
+}
+
+if ($StandaloneBuildCapture -ne 'None' -and ($TestMode -ne 'standalone' -or $GenerateOnly -or [string]::IsNullOrWhiteSpace($FrozenPlayerDeclarationPath))) {
+    throw 'Standalone build capture requires Standalone mode and a frozen declaration; it never runs the player.'
 }
 
 if ($ForceFreshCompilationCache -and ($TestMode -ne 'standalone' -or $StandaloneScriptingBackend -ne 'IL2CPP')) {
@@ -3792,6 +3799,25 @@ function New-UnityNativeEvidenceCapture {
 }
 
 
+function Invoke-UnityStandaloneBuildDiagnostic {
+    param(
+        [ValidateSet('Direct', 'Debugger')][string]$Mode,
+        [string]$EditorPath, [string]$ProjectPath, [string[]]$Arguments,
+        [string]$ArtifactsPath, [string]$LogPath, [int]$TimeoutSeconds
+    )
+
+    if ($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 1800) { throw 'Build diagnostics require a bounded timeout.' }
+    if ($Mode -eq 'Debugger') {
+        & (Join-Path $PSScriptRoot 'capture-native-fault.ps1') -EditorPath $EditorPath -ProjectPath $ProjectPath `
+            -BuildArguments $Arguments -BuildLogPath $LogPath -ArtifactsPath (Join-Path $ArtifactsPath 'native-build-diagnostics') `
+            -TimeoutSeconds $TimeoutSeconds
+    } else {
+        $observation = @{}
+        $null = Invoke-UnityObservedEditor -EditorPath $EditorPath -Arguments $Arguments `
+            -TimeoutSeconds $TimeoutSeconds -LogPath $LogPath -Label 'Evidence-only Standalone build' -ProcessObservation $observation
+    }
+}
+
 function Invoke-UnityObservedEditor {
     param(
         [Parameter(Mandatory = $true)][string]$EditorPath,
@@ -4870,6 +4896,12 @@ function Invoke-UnityPackageExport {
     Write-Host "Unity package exported: $OutputPath (SHA256 $hash)"
 }
 
+if ($StandaloneBuildCapture -ne 'None') {
+    $captureTimeout = Get-StandaloneBuildTimeoutSeconds
+    if ($captureTimeout -lt 1 -or $captureTimeout -gt 1800) { throw 'Build capture requires a timeout between one and 1800 seconds.' }
+    if ($StandaloneBuildCapture -eq 'Debugger' -and [Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'Debugger build capture requires Windows.' }
+}
+
 Assert-UnityRunMode -Mode $TestMode -Assemblies $AssemblyNames -Project $ProjectPath `
     -ExportPath $ExportPackagePath -Version $UnityVersion `
     -HasTestOptions:($GenerateOnly -or $IncludeComparisons -or $IncludeIntegrations -or
@@ -5258,6 +5290,15 @@ try {
         # compilation and linking are legitimately silent for minutes under `-logFile -`,
         # so a no-output stall guard WOULD false-fire on a healthy build. The stall guard
         # is scoped to the in-editor -runTests pass instead.
+        if ($StandaloneBuildCapture -ne 'None') {
+            Invoke-UnityStandaloneBuildDiagnostic -Mode $StandaloneBuildCapture -EditorPath $UnityEditorPath `
+                -ProjectPath $ProjectPath -Arguments $buildArgs -ArtifactsPath $ArtifactsPath `
+                -LogPath $logPath -TimeoutSeconds (Get-StandaloneBuildTimeoutSeconds)
+            if ($null -ne $frozenPlayerProvenance) {
+                Add-FrozenPlayerProvenanceSnapshot -Context $frozenPlayerProvenance -Stage 'after-build' -IncludePayload
+            }
+            throw 'Evidence-only Standalone build capture stops before player launch and cannot satisfy acceptance.'
+        }
         $buildObservation = @{}
         $buildResult = Invoke-UnityObservedEditor `
             -EditorPath $UnityEditorPath `

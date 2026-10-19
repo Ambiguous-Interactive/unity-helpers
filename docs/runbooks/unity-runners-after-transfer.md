@@ -359,6 +359,33 @@ XML outcomes, and watchdog actions are recorded separately. These are diagnostic
 they cannot satisfy acceptance or explain a different earlier failure. Normal tests, license
 return, lock release, and cleanup checks still run.
 
+For the WProto Standalone build boundary, use `test-mode: standalone`,
+`acceptance: none`, and `native-diagnostics: true`. After ordinary latest-version
+Standalone succeeds, the existing acceptance driver creates a fresh owned WProto
+project and wraps its one existing Mono build in CDB. The exact build arguments,
+caller working directory, inherited symbol-path environment, safe build identity
+variables, debugger process outcome and unique target exit event are retained.
+The dump stays private even though the debugger retains the caller's working directory.
+
+This build-only route deliberately throws after the post-build inventory, before
+player launch. The diagnostic job and workflow therefore fail even when the
+capture completes naturally; inspect `build-only-diagnostics/wproto/native-build-diagnostics/receipt.json`
+and the frozen provenance separately. The receipt must be evidence-only with one
+completed build case. Missing, ambiguous, timed-out or failed debugger outcomes do
+not establish a completed capture. A target fault remains visible independently
+of a zero debugger exit. A nonzero debugger return must numerically match the unique
+observed target exit; both values remain distinct in the receipt. The ordinary player XML cannot qualify this separate build.
+No performance fixture or timing campaign runs in this route. Normal dispatches
+and their acceptance policy are unchanged; this route does not alter registry flags.
+
+For a paired direct control from an existing licensed, lock-owning runner context,
+invoke the same `run-acceptance.ps1` with `-Acceptance wproto`, the selected pinned
+version, fresh artifact/temporary paths, and `-StandaloneBuildCapture Direct`.
+Use a separate fresh invocation with `Debugger` for the other arm. Both modes
+stop with the explicit evidence-only error; neither returns player acceptance.
+Keep source, editor, backend, settings and caller environment matched. These
+controls characterize debugger effects and cannot by themselves resolve an older fault.
+
 The driver downloads only twelve x64 debugger files from a versioned Microsoft bundle using
 bounded HTTP ranges. Each file must match its committed size and SHA-256 digest, and CDB must
 have a valid Microsoft signature. It does not register a system debugger or install tools globally.
