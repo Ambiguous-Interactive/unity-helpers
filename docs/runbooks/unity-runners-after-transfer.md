@@ -578,11 +578,14 @@ only the generated test scene and its metadata, `ProjectSettings/SceneTemplateSe
 `ProjectSettings/UnityHelpersSettings.asset` may be added. All other prepared inputs must match the
 build inventory, and every later snapshot must match the restored build inventory.
 
-On Unity 6000.6 and newer, the WProto callback explicitly selects the Release managed-code variant
-for Mono after the launcher temporarily selects Checked. The configurator also selects Release
-before the build. IL2CPP and older Editors omit these API calls. Replay rejects a configured Checked
-variant or a prepared variant that differs from Release. Version 1 receipts keep the original
-strict equality rule; existing rejected captures are not reclassified.
+On Unity 6000.6 and newer, the WProto configurator saves an explicit Release managed-code variant
+before the build, including for the IL2CPP build-only diagnostic. This prevents restoration from
+adding an entry to an initially empty map. After the launcher temporarily selects Checked, the
+WProto callback selects Release again for Mono; IL2CPP keeps Checked, matching ordinary IL2CPP test
+builds. The verifier requires exactly this backend-specific preparation and byte-exact restoration
+of the configured settings. Ordinary IL2CPP configuration and older Editors omit the new pin.
+Version 1 receipts keep the original strict equality rule; existing rejected captures are not
+reclassified.
 
 Seven generated anchor files and four sealed evidence files are required for new WProto captures,
 including the separately retained prepared settings. Late changes to the preparation receipt or

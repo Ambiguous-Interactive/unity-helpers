@@ -575,63 +575,81 @@ try {
 
     $stableSettingsPath = Join-Path $transientContext.GeneratedRoot 'ProjectSettings/ProjectSettings.asset'
     $preparedSettingsPath = Join-Path $transientContext.Declaration.ReportDirectory 'build-player-settings.asset'
-    foreach ($settingCase in @('lf', 'crlf', 'bom', 'floor', 'checked', 'configured-checked', 'unrelated', 'restored-change',
-            'duplicate-key', 'missing-key', 'malformed-key', 'changed-line-endings', 'oversized', 'empty', 'invalid-utf8',
-            'prepared-hash', 'prepared-length', 'restored-hash', 'prepared-kind', 'missing-prepared', 'missing-restored',
-            'late-source', 'late-scene', 'wrong-run', 'wrong-version')) {
-        $recipeV2 = $transientContext.BuildPreparation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
-        $configuredV2 = $transientContext.Snapshots[1].ProjectInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
-        $builtV2 = $transientContext.Snapshots[2].ProjectInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
-        $declarationV2 = $transientContext.Declaration.Value | ConvertTo-Json -Depth 12 | ConvertFrom-Json
-        $stableText = $stablePlayerSettings.Replace("`r`n", "`n")
-        $preparedText = $preparedPlayerSettings.Replace("`r`n", "`n")
-        switch ($settingCase) {
-            'crlf' { $stableText = $stableText.Replace("`n", "`r`n"); $preparedText = $preparedText.Replace("`n", "`r`n") }
-            'bom' { $stableText = [char]0xfeff + $stableText; $preparedText = [char]0xfeff + $preparedText }
-            'floor' { $declarationV2.UnityVersion = '2021.3.45f1'; $preparedText = $preparedText.Replace('  aotOptions: ', '  aotOptions: nimt-trampolines=1024') }
-            'checked' { $preparedText = $preparedText.Replace('    Standalone: 3', '    Standalone: 1') }
-            'configured-checked' { $stableText = $stableText.Replace('    Standalone: 3', '    Standalone: 1'); $preparedText = $preparedText.Replace('    Standalone: 3', '    Standalone: 1') }
-            'unrelated' { $preparedText = $preparedText.Replace('companyName: preserved', 'companyName: changed') }
-            'restored-change' { $stableText = $stableText.Replace('companyName: preserved', 'companyName: changed') }
-            'duplicate-key' { $stableText += "`n  runInBackground: 0"; $preparedText += "`n  runInBackground: 1" }
-            'missing-key' { $stableText = $stableText.Replace("  resizableWindow: 0`n", ''); $preparedText = $preparedText.Replace("  resizableWindow: 1`n", '') }
-            'malformed-key' { $stableText = $stableText.Replace('runInBackground: 0', 'runInBackground: false') }
-            'changed-line-endings' { $preparedText = $preparedText.Replace("`n", "`r`n") }
-            'oversized' { $preparedText = 'x' * 1048577 }
-            'empty' { $preparedText = '' }
-            'wrong-run' { $recipeV2.RunId = 'other' }
-            'wrong-version' { $declarationV2.UnityVersion = 'invalid' }
-        }
-        [IO.File]::WriteAllText($stableSettingsPath, $stableText)
-        [IO.File]::WriteAllText($preparedSettingsPath, $preparedText)
-        if ($settingCase -eq 'invalid-utf8') { [IO.File]::WriteAllBytes($stableSettingsPath, [byte[]]@(0xff, 0xfe, 0xff)) }
-        foreach ($entry in @($configuredV2 + $builtV2 | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' })) {
-            $entry.Length = (Get-Item -LiteralPath $stableSettingsPath).Length
-            $entry.Sha256 = (Get-FileHash -LiteralPath $stableSettingsPath).Hash.ToLowerInvariant()
-        }
-        $preparedEntry = $recipeV2.ProjectInputs | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' }
-        $preparedEntry.Length = (Get-Item -LiteralPath $preparedSettingsPath).Length
-        $preparedEntry.Sha256 = (Get-FileHash -LiteralPath $preparedSettingsPath).Hash.ToLowerInvariant()
-        switch ($settingCase) {
-            'prepared-hash' { $preparedEntry.Sha256 = '0' * 64 }
-            'prepared-length' { $preparedEntry.Length++ }
-            'restored-hash' { ($configuredV2 | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' }).Sha256 = '0' * 64 }
-            'prepared-kind' { $preparedEntry.Kind = 'directory'; $preparedEntry.Length = $null; $preparedEntry.Sha256 = $null }
-            'missing-prepared' { Remove-Item -LiteralPath $preparedSettingsPath }
-            'missing-restored' { Remove-Item -LiteralPath $stableSettingsPath }
-            'late-source' { $builtV2 += [pscustomobject]@{ Path = 'Assets/late.cs'; Kind = 'file'; Length = 1; Sha256 = 'a' * 64 } }
-            'late-scene' { ($builtV2 | Where-Object { $_.Path -ceq $recipeV2.Scenes[0] }).Sha256 = '0' * 64 }
-        }
-        $verifySettings = {
-            Assert-WProtoBuildPreparation -Preparation $recipeV2 -ConfiguredInputs $configuredV2 -BuiltInputs $builtV2 `
-                -Declaration $declarationV2 -DeclarationSha256 $transientContext.Declaration.Sha256 `
-                -RestoredPlayerSettingsPath $stableSettingsPath -PreparedPlayerSettingsPath $preparedSettingsPath
-        }
-        if ($settingCase -in @('lf', 'crlf', 'bom', 'floor')) {
-            & $verifySettings
-            Assert-Control $true "version2 admits exact $settingCase framework transition"
-        } else {
-            Assert-Rejected $verifySettings "version2 rejects $settingCase prepared settings"
+    foreach ($settingsBackend in @('Mono2x', 'IL2CPP')) {
+        foreach ($settingCase in @('lf', 'crlf', 'bom', 'floor', 'wrong-prepared-variant', 'configured-checked', 'unrelated', 'restored-change',
+                'duplicate-key', 'missing-key', 'malformed-key', 'changed-line-endings', 'oversized', 'empty', 'invalid-utf8',
+                'prepared-hash', 'prepared-length', 'restored-hash', 'prepared-kind', 'missing-prepared', 'missing-restored',
+                'late-source', 'late-scene', 'wrong-run', 'wrong-version', 'wrong-backend', 'invalid-backend', 'missing-backend',
+                'other-map', 'other-map-change', 'other-managed-target', 'duplicate-variant', 'duplicate-empty-variant',
+                'duplicate-malformed-standalone', 'missing-variant', 'malformed-variant')) {
+            $recipeV2 = $transientContext.BuildPreparation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+            $configuredV2 = $transientContext.Snapshots[1].ProjectInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+            $builtV2 = $transientContext.Snapshots[2].ProjectInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+            $declarationV2 = $transientContext.Declaration.Value | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+            $declarationV2.Backend = $settingsBackend
+            $stableText = $stablePlayerSettings.Replace("`r`n", "`n")
+            $preparedText = $preparedPlayerSettings.Replace("`r`n", "`n")
+            $preparedVariant = if ($settingsBackend -ceq 'IL2CPP' -and $settingCase -cne 'floor') { '1' } else { '3' }
+            $preparedText = $preparedText.Replace('    Standalone: 3', "    Standalone: $preparedVariant")
+            switch ($settingCase) {
+                'crlf' { $stableText = $stableText.Replace("`n", "`r`n"); $preparedText = $preparedText.Replace("`n", "`r`n") }
+                'bom' { $stableText = [char]0xfeff + $stableText; $preparedText = [char]0xfeff + $preparedText }
+                'floor' { $declarationV2.UnityVersion = '2021.3.45f1'; $preparedText = $preparedText.Replace('  aotOptions: ', '  aotOptions: nimt-trampolines=1024') }
+                'wrong-prepared-variant' { $wrongVariant = if ($preparedVariant -ceq '1') { '3' } else { '1' }; $preparedText = $preparedText.Replace("    Standalone: $preparedVariant", "    Standalone: $wrongVariant") }
+                'configured-checked' { $stableText = $stableText.Replace('    Standalone: 3', '    Standalone: 1'); $preparedText = $preparedText.Replace('    Standalone: 3', '    Standalone: 1') }
+                'unrelated' { $preparedText = $preparedText.Replace('companyName: preserved', 'companyName: changed') }
+                'restored-change' { $stableText = $stableText.Replace('companyName: preserved', 'companyName: changed') }
+                'duplicate-key' { $stableText += "`n  runInBackground: 0"; $preparedText += "`n  runInBackground: 1" }
+                'missing-key' { $stableText = $stableText.Replace("  resizableWindow: 0`n", ''); $preparedText = $preparedText.Replace("  resizableWindow: 1`n", '') }
+                'malformed-key' { $stableText = $stableText.Replace('runInBackground: 0', 'runInBackground: false') }
+                'changed-line-endings' { $preparedText = $preparedText.Replace("`n", "`r`n") }
+                'oversized' { $preparedText = 'x' * 1048577 }
+                'empty' { $preparedText = '' }
+                'wrong-run' { $recipeV2.RunId = 'other' }
+                'wrong-version' { $declarationV2.UnityVersion = 'invalid' }
+                'wrong-backend' { $declarationV2.Backend = if ($settingsBackend -ceq 'IL2CPP') { 'Mono2x' } else { 'IL2CPP' } }
+                'invalid-backend' { $declarationV2.Backend = 'unknown' }
+                'missing-backend' { $declarationV2.PSObject.Properties.Remove('Backend') }
+                'other-map' { $stableText += "`n  scriptingBackend:`n    Standalone: 3`n"; $preparedText += "`n  scriptingBackend:`n    Standalone: 3`n" }
+                'other-map-change' { $stableText += "`n  scriptingBackend:`n    Standalone: 3`n"; $preparedText += "`n  scriptingBackend:`n    Standalone: 1`n" }
+                'duplicate-variant' { $stableText += "`n  managedCodeVariant:`n    Standalone: 3`n"; $preparedText += "`n  managedCodeVariant:`n    Standalone: $preparedVariant`n" }
+                'duplicate-empty-variant' { $stableText += "`n  managedCodeVariant: {}`n"; $preparedText += "`n  managedCodeVariant: {}`n" }
+                'duplicate-malformed-standalone' { $stableText += "`n    Standalone: Release`n"; $preparedText += "`n    Standalone: Release`n" }
+                'other-managed-target' { $stableText += "`n    Android: 3`n"; $preparedText += "`n    Android: 3`n" }
+                'missing-variant' { $stableText = $stableText.Replace("  managedCodeVariant:`n    Standalone: 3", '  managedCodeVariant: {}'); $preparedText = $preparedText.Replace("  managedCodeVariant:`n    Standalone: $preparedVariant", '  managedCodeVariant: {}') }
+                'malformed-variant' { $stableText = $stableText.Replace('    Standalone: 3', '    Standalone: Release') }
+            }
+            [IO.File]::WriteAllText($stableSettingsPath, $stableText)
+            [IO.File]::WriteAllText($preparedSettingsPath, $preparedText)
+            if ($settingCase -eq 'invalid-utf8') { [IO.File]::WriteAllBytes($stableSettingsPath, [byte[]]@(0xff, 0xfe, 0xff)) }
+            foreach ($entry in @($configuredV2 + $builtV2 | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' })) {
+                $entry.Length = (Get-Item -LiteralPath $stableSettingsPath).Length
+                $entry.Sha256 = (Get-FileHash -LiteralPath $stableSettingsPath).Hash.ToLowerInvariant()
+            }
+            $preparedEntry = $recipeV2.ProjectInputs | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' }
+            $preparedEntry.Length = (Get-Item -LiteralPath $preparedSettingsPath).Length
+            $preparedEntry.Sha256 = (Get-FileHash -LiteralPath $preparedSettingsPath).Hash.ToLowerInvariant()
+            switch ($settingCase) {
+                'prepared-hash' { $preparedEntry.Sha256 = '0' * 64 }
+                'prepared-length' { $preparedEntry.Length++ }
+                'restored-hash' { ($configuredV2 | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' }).Sha256 = '0' * 64 }
+                'prepared-kind' { $preparedEntry.Kind = 'directory'; $preparedEntry.Length = $null; $preparedEntry.Sha256 = $null }
+                'missing-prepared' { Remove-Item -LiteralPath $preparedSettingsPath }
+                'missing-restored' { Remove-Item -LiteralPath $stableSettingsPath }
+                'late-source' { $builtV2 += [pscustomobject]@{ Path = 'Assets/late.cs'; Kind = 'file'; Length = 1; Sha256 = 'a' * 64 } }
+                'late-scene' { ($builtV2 | Where-Object { $_.Path -ceq $recipeV2.Scenes[0] }).Sha256 = '0' * 64 }
+            }
+            $verifySettings = {
+                Assert-WProtoBuildPreparation -Preparation $recipeV2 -ConfiguredInputs $configuredV2 -BuiltInputs $builtV2 `
+                    -Declaration $declarationV2 -DeclarationSha256 $transientContext.Declaration.Sha256 `
+                    -RestoredPlayerSettingsPath $stableSettingsPath -PreparedPlayerSettingsPath $preparedSettingsPath
+            }
+            if ($settingCase -in @('lf', 'crlf', 'bom', 'floor', 'other-map', 'other-managed-target')) {
+                & $verifySettings
+                Assert-Control $true "version2 admits exact $settingsBackend/$settingCase framework transition"
+            } else {
+                Assert-Rejected $verifySettings "version2 rejects $settingsBackend/$settingCase prepared settings"
+            }
         }
     }
 

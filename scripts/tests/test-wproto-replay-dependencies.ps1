@@ -19,7 +19,7 @@ function Assert-Rejected {
     param([scriptblock]$Action, [string]$Expected)
     $failure = $null
     try { & $Action | Out-Null } catch { $failure = $_.ToString() }
-    Assert-Control ($null -ne $failure -and $failure.Contains($Expected)) $Expected
+    Assert-Control ($null -ne $failure -and $failure.Contains($Expected)) "$Expected (observed: $failure)"
 }
 try {
     foreach ($name in @('Assets', 'Packages', 'ProjectSettings')) {
@@ -44,41 +44,55 @@ try {
     Assert-Rejected { Assert-FrozenPlayerRegularPath -Path $root } 'wrong file/directory kind'
     Assert-Rejected { Assert-FrozenPlayerRegularPath -Path (Join-Path $root 'missing.txt') } 'does not exist'
 
-    foreach ($version in @('2021.3.45f1', '6000.6.0f1')) {
-        $restored = "PlayerSettings:`n  runInBackground: 0`n  fullscreenMode: 1`n  resizableWindow: 0`n  m_ShowUnitySplashScreen: 1`n  m_ShowUnitySplashLogo: 1`n"
-        $prepared = $restored.Replace('runInBackground: 0', 'runInBackground: 1').Replace('fullscreenMode: 1', 'fullscreenMode: 3').Replace(
-            'resizableWindow: 0', 'resizableWindow: 1').Replace('m_ShowUnitySplashScreen: 1', 'm_ShowUnitySplashScreen: 0').Replace(
-            'm_ShowUnitySplashLogo: 1', 'm_ShowUnitySplashLogo: 0')
-        if ($version -like '2021.*') {
-            $restored += "  aotOptions: none`n"
-            $prepared += "  aotOptions: nimt-trampolines=1024`n"
-        } else {
-            $restored += "  managedCodeVariant:`n    Standalone: 3`n"
-            $prepared += "  managedCodeVariant:`n    Standalone: 3`n"
+    foreach ($backend in @('Mono2x', 'IL2CPP')) {
+        foreach ($version in @('2021.3.45f1', '6000.6.0f1')) {
+            $restored = "PlayerSettings:`n  runInBackground: 0`n  fullscreenMode: 1`n  resizableWindow: 0`n  m_ShowUnitySplashScreen: 1`n  m_ShowUnitySplashLogo: 1`n"
+            $prepared = $restored.Replace('runInBackground: 0', 'runInBackground: 1').Replace('fullscreenMode: 1', 'fullscreenMode: 3').Replace(
+                'resizableWindow: 0', 'resizableWindow: 1').Replace('m_ShowUnitySplashScreen: 1', 'm_ShowUnitySplashScreen: 0').Replace(
+                'm_ShowUnitySplashLogo: 1', 'm_ShowUnitySplashLogo: 0')
+            if ($version -like '2021.*') {
+                $restored += "  aotOptions: none`n"
+                $prepared += "  aotOptions: nimt-trampolines=1024`n"
+            } else {
+                $restored += "  managedCodeVariant:`n    Standalone: 3`n"
+                $variant = if ($backend -ceq 'IL2CPP') { '1' } else { '3' }
+                $prepared += "  managedCodeVariant:`n    Standalone: $variant`n"
+            }
+            $restoredPath = Join-Path $temporary 'restored.asset'
+            $preparedPath = Join-Path $temporary 'prepared.asset'
+            [IO.File]::WriteAllText($restoredPath, $restored)
+            [IO.File]::WriteAllText($preparedPath, $prepared)
+            $configuredEntry = [pscustomobject]@{ Path = 'ProjectSettings/ProjectSettings.asset'; Kind = 'file'
+                Length = (Get-Item -LiteralPath $restoredPath).Length
+                Sha256 = (Get-FileHash -LiteralPath $restoredPath -Algorithm SHA256).Hash.ToLowerInvariant() }
+            $preparedEntry = [pscustomobject]@{ Path = 'ProjectSettings/ProjectSettings.asset'; Kind = 'file'
+                Length = (Get-Item -LiteralPath $preparedPath).Length
+                Sha256 = (Get-FileHash -LiteralPath $preparedPath -Algorithm SHA256).Hash.ToLowerInvariant() }
+            $parameters = @{ Configured = $configuredEntry; Prepared = $preparedEntry; Built = $configuredEntry
+                RestoredPath = $restoredPath; PreparedPath = $preparedPath; UnityVersion = $version; Backend = $backend }
+            Assert-WProtoPreparedPlayerSettings @parameters
+            Assert-Control $true "fresh-process prepared settings $version/$backend"
+            [IO.File]::AppendAllText($preparedPath, 'changed')
+            Assert-Rejected { Assert-WProtoPreparedPlayerSettings @parameters } 'bytes differ'
+            if ($version -ceq '6000.6.0f1') {
+                foreach ($duplicate in @("`n  managedCodeVariant: {}`n", "`n    Standalone: Release`n")) {
+                    [IO.File]::WriteAllText($restoredPath, $restored + $duplicate)
+                    [IO.File]::WriteAllText($preparedPath, $prepared + $duplicate)
+                    foreach ($entry in @(@{ Entry = $configuredEntry; Path = $restoredPath }, @{ Entry = $preparedEntry; Path = $preparedPath })) {
+                        $entry.Entry.Length = (Get-Item -LiteralPath $entry.Path).Length
+                        $entry.Entry.Sha256 = (Get-FileHash -LiteralPath $entry.Path -Algorithm SHA256).Hash.ToLowerInvariant()
+                    }
+                    Assert-Rejected { Assert-WProtoPreparedPlayerSettings @parameters } 'variant'
+                }
+            }
         }
-        $restoredPath = Join-Path $temporary 'restored.asset'
-        $preparedPath = Join-Path $temporary 'prepared.asset'
-        [IO.File]::WriteAllText($restoredPath, $restored)
-        [IO.File]::WriteAllText($preparedPath, $prepared)
-        $configuredEntry = [pscustomobject]@{ Path = 'ProjectSettings/ProjectSettings.asset'; Kind = 'file'
-            Length = (Get-Item -LiteralPath $restoredPath).Length
-            Sha256 = (Get-FileHash -LiteralPath $restoredPath -Algorithm SHA256).Hash.ToLowerInvariant() }
-        $preparedEntry = [pscustomobject]@{ Path = 'ProjectSettings/ProjectSettings.asset'; Kind = 'file'
-            Length = (Get-Item -LiteralPath $preparedPath).Length
-            Sha256 = (Get-FileHash -LiteralPath $preparedPath -Algorithm SHA256).Hash.ToLowerInvariant() }
-        $parameters = @{ Configured = $configuredEntry; Prepared = $preparedEntry; Built = $configuredEntry
-            RestoredPath = $restoredPath; PreparedPath = $preparedPath; UnityVersion = $version }
-        Assert-WProtoPreparedPlayerSettings @parameters
-        Assert-Control $true "fresh-process prepared settings $version"
-        [IO.File]::AppendAllText($preparedPath, 'changed')
-        Assert-Rejected { Assert-WProtoPreparedPlayerSettings @parameters } 'bytes differ'
     }
     $link = Join-Path $temporary 'linked Assets'
     $linkKind = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { 'Junction' } else { 'SymbolicLink' }
     $null = New-Item -ItemType $linkKind -Path $link -Target $root
     Assert-Rejected { Assert-FrozenPlayerRegularPath -Path $link -Directory } 'reparse ancestor'
     Assert-Rejected { Get-FrozenPlayerFileInventory -Root $link } 'reparse ancestor'
-    Assert-Control ($checks -eq 14) 'all dependency subjects executed'
+    Assert-Control ($checks -eq 22) 'all dependency subjects executed'
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force -ErrorAction SilentlyContinue
 }

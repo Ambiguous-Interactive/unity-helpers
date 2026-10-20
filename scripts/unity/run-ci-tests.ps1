@@ -1680,8 +1680,11 @@ function New-ConfiguratorSource {
         [ValidateSet('Release', 'Debug')]
         [string]$CompilerConfiguration = 'Release',
         [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
-        [string]$StrippingLevel = 'Disabled'
+        [string]$StrippingLevel = 'Disabled',
+        [switch]$RequireReleaseManagedCodeVariant
     )
+
+    $requireReleaseVariant = $RequireReleaseManagedCodeVariant.IsPresent.ToString().ToLowerInvariant()
 
     # NOTE: this is a DOUBLE-quoted here-string so $Backend interpolates into the
     # generated C#. Every LITERAL C# dollar sign (the Debug.Log interpolated
@@ -1730,7 +1733,7 @@ public static class UhCiTestConfigurator
         NamedBuildTarget target = NamedBuildTarget.Standalone;
         PlayerSettings.SetScriptingBackend(target, ScriptingImplementation.$Backend);
 #if UNITY_6000_6_OR_NEWER
-        if (PlayerSettings.GetScriptingBackend(target) == ScriptingImplementation.Mono2x)
+        if ($requireReleaseVariant || PlayerSettings.GetScriptingBackend(target) == ScriptingImplementation.Mono2x)
         {
             PlayerSettings.SetManagedCodeVariant(target, ManagedCodeVariant.Release);
             Debug.Log("UH perf managed code variant: " + PlayerSettings.GetManagedCodeVariant(target));
@@ -2155,6 +2158,7 @@ function Initialize-EphemeralProject {
         [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
         [string]$ManagedStrippingLevel = 'Disabled',
         [bool]$DevelopmentBuild = $false,
+        [switch]$RequireReleaseManagedCodeVariant,
         [string]$RepoRoot
     )
 
@@ -2214,7 +2218,7 @@ EditorSettings:
         -Content $editorSettings
     Set-EphemeralProjectContent `
         -Path (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') `
-        -Content (New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration -StrippingLevel $ManagedStrippingLevel)
+        -Content (New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration -StrippingLevel $ManagedStrippingLevel -RequireReleaseManagedCodeVariant:$RequireReleaseManagedCodeVariant)
 
     # STANDALONE ONLY: generate the split-build helpers that sever the test
     # player's PlayerConnection/TCP result streaming (the 10060 hang on multi-NIC
@@ -5011,7 +5015,7 @@ $AdditionalScriptingDefinesJoined = ($AdditionalScriptingDefinesList -join ';')
 $LibraryWarmth = if (Test-Path -LiteralPath (Join-Path $ProjectPath 'Library') -PathType Container) { 'warm (reused)' } else { 'cold (first run on this runner)' }
 
 if ($TestMode -ne 'export') {
-    $ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
+    $ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RequireReleaseManagedCodeVariant:($null -ne $frozenPlayerDeclaration -and $frozenPlayerDeclaration.CampaignKind -ceq 'wproto-seven-families-v1') -RepoRoot $RepoRoot
     $LibraryPath = Join-Path $ProjectPath 'Library'
     New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
     Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot -Force:$ForceFreshCompilationCache

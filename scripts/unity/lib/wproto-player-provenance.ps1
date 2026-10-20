@@ -328,7 +328,8 @@ function Assert-WProtoSnapshotInventory {
 }
 
 function Assert-WProtoPreparedPlayerSettings {
-    param($Configured, $Prepared, $Built, [string]$RestoredPath, [string]$PreparedPath, [string]$UnityVersion)
+    param($Configured, $Prepared, $Built, [string]$RestoredPath, [string]$PreparedPath, [string]$UnityVersion,
+        [Parameter(Mandatory = $true)][ValidateSet('Mono2x', 'IL2CPP')][string]$Backend)
     Assert-WProtoSnapshotInventory -Observed @($Built) -Expected @($Configured)
     $bytes = @{}
     $hash = [Security.Cryptography.SHA256]::Create()
@@ -356,11 +357,17 @@ function Assert-WProtoPreparedPlayerSettings {
         $major = [int]$Matches.major
         $minor = [int]$Matches.minor
         if ($major -gt 6000 -or ($major -eq 6000 -and $minor -ge 6)) {
-            $variants = [regex]::Matches($expected, '(?m)^  managedCodeVariant:\r?\n(?<entries>(?:    [^\r\n]*(?:\r?\n|$))+)')
-            if ($variants.Count -ne 1) { throw 'WProto requires one explicit managed-code variant map.' }
+            $variants = [regex]::Matches($expected, '(?m)^  managedCodeVariant:\r?\n(?<entries>(?:(?:    [^\r\n]*|[ \t]*)(?:\r?\n|$))+)')
+            $variantKeys = [regex]::Matches($expected, '(?m)^  managedCodeVariant:')
+            if ($variants.Count -ne 1 -or $variantKeys.Count -ne 1) { throw 'WProto requires one explicit managed-code variant map.' }
             $standalone = [regex]::Matches($variants[0].Groups['entries'].Value, '(?m)^    Standalone: (?<value>[0-3])\r?$')
-            if ($standalone.Count -ne 1 -or $standalone[0].Groups['value'].Value -cne '3') {
+            $standaloneKeys = [regex]::Matches($variants[0].Groups['entries'].Value, '(?m)^    Standalone:')
+            if ($standalone.Count -ne 1 -or $standaloneKeys.Count -ne 1 -or $standalone[0].Groups['value'].Value -cne '3') {
                 throw 'WProto requires the Release managed-code variant.'
+            }
+            if ($Backend -eq 'IL2CPP') {
+                $valueIndex = $variants[0].Groups['entries'].Index + $standalone[0].Groups['value'].Index
+                $expected = $expected.Remove($valueIndex, 1).Insert($valueIndex, '1')
             }
         }
         $changes = @(
@@ -449,7 +456,7 @@ function Assert-WProtoBuildPreparation {
             -not $inventories.built.ContainsKey($settingsPath)) { throw 'WProto player settings inventory is missing.' }
         Assert-WProtoPreparedPlayerSettings -Configured $configured[$settingsPath] -Prepared $prepared[$settingsPath] `
             -Built $inventories.built[$settingsPath] -RestoredPath $RestoredPlayerSettingsPath `
-            -PreparedPath $PreparedPlayerSettingsPath -UnityVersion $Declaration.UnityVersion
+            -PreparedPath $PreparedPlayerSettingsPath -UnityVersion $Declaration.UnityVersion -Backend $Declaration.Backend
         $expectedBuilt = @($Preparation.ProjectInputs | ForEach-Object {
                 if ($_.Path -ceq $settingsPath) { $configured[$settingsPath] } else { $_ }
             })

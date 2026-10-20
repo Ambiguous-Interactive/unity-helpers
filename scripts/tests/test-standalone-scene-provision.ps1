@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+. (Join-Path $repoRoot 'scripts/unity/lib/wproto-player-provenance.ps1')
 $sourcePath = Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1'
 $tokens = $null
 $parseErrors = $null
@@ -43,6 +44,13 @@ namespace UnityEditor {
             if (System.IO.File.Exists(playerSettings) && PlayerSettings.Variant == ManagedCodeVariant.Release)
             {
                 System.IO.File.WriteAllText(playerSettings, System.IO.File.ReadAllText(playerSettings).Replace("Standalone: 1", "Standalone: 3"));
+            }
+            if (System.IO.File.Exists(playerSettings) && PlayerSettings.VariantSetCount > 0)
+            {
+                string text = System.IO.File.ReadAllText(playerSettings);
+                text = System.Text.RegularExpressions.Regex.Replace(text, @"(?m)^  managedCodeVariant: \{\}\r?$", "  managedCodeVariant:\n    Standalone: " + (int)PlayerSettings.Variant);
+                text = System.Text.RegularExpressions.Regex.Replace(text, @"(?m)^    Standalone: [0-3]\r?$", "    Standalone: " + (int)PlayerSettings.Variant);
+                System.IO.File.WriteAllText(playerSettings, text);
             }
             SaveCount++;
         }
@@ -132,10 +140,13 @@ try {
         @{ Name = 'Stubs.cs'; Text = $stubs },
         @{ Name = 'LatestMono.cs'; Text = "#define UNITY_6000_6_OR_NEWER`n" + (New-ConfiguratorSource -Backend Mono2x).Replace('UhCiTestConfigurator', 'LatestMonoConfiguratorControl') },
         @{ Name = 'LatestIl2Cpp.cs'; Text = "#define UNITY_6000_6_OR_NEWER`n" + (New-ConfiguratorSource -Backend IL2CPP).Replace('UhCiTestConfigurator', 'LatestIl2CppConfiguratorControl') },
+        @{ Name = 'LatestFrozenIl2Cpp.cs'; Text = "#define UNITY_6000_6_OR_NEWER`n" + (New-ConfiguratorSource -Backend IL2CPP -RequireReleaseManagedCodeVariant).Replace('UhCiTestConfigurator', 'LatestFrozenIl2CppConfiguratorControl') },
+        @{ Name = 'OlderFrozenIl2Cpp.cs'; Text = (New-ConfiguratorSource -Backend IL2CPP -RequireReleaseManagedCodeVariant).Replace('UhCiTestConfigurator', 'OlderFrozenIl2CppConfiguratorControl') },
         @{ Name = 'OlderMono.cs'; Text = (New-ConfiguratorSource -Backend Mono2x).Replace('UhCiTestConfigurator', 'OlderMonoConfiguratorControl') }
     )
     $producerCases = @(
         @{ Name = 'Latest'; Invoke = { [LatestWProtoPreparationControl]::Invoke($preparationOptions) }; Reject = $false },
+        @{ Name = 'LatestIl2Cpp'; Invoke = { [LatestIl2CppWProtoPreparationControl]::Invoke($preparationOptions) }; Reject = $false },
         @{ Name = 'MissingCopy'; Invoke = { [MissingCopyWProtoPreparationControl]::Invoke($preparationOptions) }; Reject = $true },
         @{ Name = 'MissingRelease'; Invoke = { [MissingReleaseWProtoPreparationControl]::Invoke($preparationOptions) }; Reject = $true },
         @{ Name = 'MissingLimit'; Invoke = { [MissingLimitWProtoPreparationControl]::Invoke($preparationOptions) }; Reject = $true },
@@ -257,14 +268,17 @@ try {
     foreach ($case in $producerCases) {
         $directory = Join-Path $receiptDirectory $case.Name
         $snapshot = Join-Path $directory 'build-player-settings.asset'
-        [UnityEditor.PlayerSettings]::SetScriptingBackend([UnityEditor.Build.NamedBuildTarget]::Standalone, [UnityEditor.ScriptingImplementation]::Mono2x)
+        $backend = if ($case.Name -ceq 'LatestIl2Cpp') { [UnityEditor.ScriptingImplementation]::IL2CPP } else { [UnityEditor.ScriptingImplementation]::Mono2x }
+        [UnityEditor.PlayerSettings]::SetScriptingBackend([UnityEditor.Build.NamedBuildTarget]::Standalone, $backend)
         [UnityEditor.PlayerSettings]::Variant = [UnityEditor.ManagedCodeVariant]::Checked
         [UnityEditor.PlayerSettings]::VariantSetCount = 0
         [IO.File]::WriteAllText($playerSettingsPath, $(if ($case.Name -ceq 'MissingLimit') { 'x' * 1048577 } else { "actual prepared bytes`nStandalone: 1" }))
         & $case.Invoke
+        $expectedPins = if ($case.Name -ceq 'LatestIl2Cpp') { 0 } else { 1 }
+        $expectedVariant = if ($case.Name -ceq 'LatestIl2Cpp') { [UnityEditor.ManagedCodeVariant]::Checked } else { [UnityEditor.ManagedCodeVariant]::Release }
         $valid = (Test-Path -LiteralPath $snapshot) -and (Get-Item -LiteralPath $snapshot).Length -le 1048576 -and
-            [UnityEditor.PlayerSettings]::VariantSetCount -eq 1 -and [UnityEditor.AssetDatabase]::VariantAtSave -eq [UnityEditor.ManagedCodeVariant]::Release
-        if ($valid) { $valid = ([IO.File]::ReadAllText($snapshot) -ceq "actual prepared bytes`nStandalone: 3") }
+            [UnityEditor.PlayerSettings]::VariantSetCount -eq $expectedPins -and [UnityEditor.AssetDatabase]::VariantAtSave -eq $expectedVariant
+        if ($valid) { $valid = ([IO.File]::ReadAllText($snapshot) -ceq "actual prepared bytes`nStandalone: $([int]$expectedVariant)") }
         if ($case.Name -ceq 'Overwrite') {
             if (-not $valid) { throw 'Overwrite control must first capture valid prepared bytes.' }
             $original = (Get-FileHash -LiteralPath $snapshot).Hash
@@ -287,6 +301,8 @@ try {
     $configuratorCases = @(
         @{ Name = 'latest Mono'; Apply = { [LatestMonoConfiguratorControl]::Apply() }; Backend = [UnityEditor.ScriptingImplementation]::Mono2x; ExpectedPins = 1; ExpectedVariant = [UnityEditor.ManagedCodeVariant]::Release },
         @{ Name = 'latest IL2CPP'; Apply = { [LatestIl2CppConfiguratorControl]::Apply() }; Backend = [UnityEditor.ScriptingImplementation]::IL2CPP; ExpectedPins = 0; ExpectedVariant = [UnityEditor.ManagedCodeVariant]::Default },
+        @{ Name = 'latest frozen IL2CPP'; Apply = { [LatestFrozenIl2CppConfiguratorControl]::Apply() }; Backend = [UnityEditor.ScriptingImplementation]::IL2CPP; ExpectedPins = 1; ExpectedVariant = [UnityEditor.ManagedCodeVariant]::Release },
+        @{ Name = 'older frozen IL2CPP'; Apply = { [OlderFrozenIl2CppConfiguratorControl]::Apply() }; Backend = [UnityEditor.ScriptingImplementation]::IL2CPP; ExpectedPins = 0; ExpectedVariant = [UnityEditor.ManagedCodeVariant]::Default },
         @{ Name = 'older Mono'; Apply = { [OlderMonoConfiguratorControl]::Apply() }; Backend = [UnityEditor.ScriptingImplementation]::Mono2x; ExpectedPins = 0; ExpectedVariant = [UnityEditor.ManagedCodeVariant]::Default }
     )
     foreach ($case in $configuratorCases) {
@@ -305,7 +321,59 @@ try {
         $configLogs = @([UnityEngine.Debug]::Logs | Where-Object { $_.StartsWith('UH perf config: backend=' + $case.Backend + ',') })
         if ($configLogs.Count -ne 1) { throw "Missing effective backend log in $($case.Name)." }
     }
-    Write-Host 'Configurator: 3 shipping-generated C# branch controls passed (latest Mono, latest IL2CPP, older Mono; Unity APIs stubbed; no player proof).'
+    Write-Host "Configurator: $($configuratorCases.Count) shipping-generated C# branch controls passed (ordinary/frozen backends, older API guards; Unity APIs stubbed; no player proof)."
+
+    function Get-ControlSettingsEntry {
+        param([string]$Path)
+        return [pscustomobject]@{
+            Path = 'ProjectSettings/ProjectSettings.asset'; Kind = 'file'
+            Length = (Get-Item -LiteralPath $Path).Length
+            Sha256 = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+    }
+    $transitionCases = @(
+        @{ Name = 'Mono'; Backend = 'Mono2x'; PreparedVariant = 3; Configure = { [LatestMonoConfiguratorControl]::Apply() }; Prepare = { [LatestWProtoPreparationControl]::Invoke($preparationOptions) }; Directory = 'Latest' },
+        @{ Name = 'IL2CPP'; Backend = 'IL2CPP'; PreparedVariant = 1; Configure = { [LatestFrozenIl2CppConfiguratorControl]::Apply() }; Prepare = { [LatestIl2CppWProtoPreparationControl]::Invoke($preparationOptions) }; Directory = 'LatestIl2Cpp' }
+    )
+    $transitionChecks = 0
+    foreach ($case in $transitionCases) {
+        foreach ($initialMap in @('empty', 'Checked', 'Release')) {
+            $map = switch ($initialMap) {
+                'empty' { '  managedCodeVariant: {}' }
+                'Checked' { "  managedCodeVariant:`n    Standalone: 1" }
+                'Release' { "  managedCodeVariant:`n    Standalone: 3" }
+            }
+            $configuredText = "PlayerSettings:`n  companyName: preserved`n  runInBackground: 0`n  fullscreenMode: 1`n  resizableWindow: 0`n  m_ShowUnitySplashScreen: 1`n  m_ShowUnitySplashLogo: 1`n$map`n"
+            [IO.File]::WriteAllText($playerSettingsPath, $configuredText)
+            [UnityEditor.PlayerSettings]::Variant = if ($initialMap -ceq 'Checked') { [UnityEditor.ManagedCodeVariant]::Checked } else { [UnityEditor.ManagedCodeVariant]::Release }
+            [UnityEditor.PlayerSettings]::VariantSetCount = 0
+            & $case.Configure
+            $configuredText = [IO.File]::ReadAllText($playerSettingsPath)
+            if (-not $configuredText.Contains("  managedCodeVariant:`n    Standalone: 3`n")) { throw "Missing explicit configured Release map for $($case.Name)/$initialMap." }
+            $configuredEntry = Get-ControlSettingsEntry $playerSettingsPath
+            $oldVariant = [UnityEditor.PlayerSettings]::GetManagedCodeVariant([UnityEditor.Build.NamedBuildTarget]::Standalone)
+            [UnityEditor.PlayerSettings]::SetManagedCodeVariant([UnityEditor.Build.NamedBuildTarget]::Standalone, [UnityEditor.ManagedCodeVariant]::Checked)
+            $preparedText = $configuredText.Replace('runInBackground: 0', 'runInBackground: 1').Replace('fullscreenMode: 1', 'fullscreenMode: 3').Replace('resizableWindow: 0', 'resizableWindow: 1').Replace('m_ShowUnitySplashScreen: 1', 'm_ShowUnitySplashScreen: 0').Replace('m_ShowUnitySplashLogo: 1', 'm_ShowUnitySplashLogo: 0')
+            [IO.File]::WriteAllText($playerSettingsPath, $preparedText)
+            [UnityEditor.AssetDatabase]::SaveAssets()
+            if (-not [IO.File]::ReadAllText($playerSettingsPath).Contains('    Standalone: 1')) { throw 'Framework control did not select Checked.' }
+            $directory = Join-Path $receiptDirectory $case.Directory
+            Remove-Item -LiteralPath (Join-Path $directory 'build-player-settings.asset'), (Join-Path $directory 'build-preparation.json')
+            & $case.Prepare
+            $snapshot = Join-Path $directory 'build-player-settings.asset'
+            $preparedEntry = Get-ControlSettingsEntry $snapshot
+            if (-not [IO.File]::ReadAllText($snapshot).Contains("    Standalone: $($case.PreparedVariant)")) { throw "Wrong prepared variant for $($case.Name)/$initialMap." }
+            [IO.File]::WriteAllText($playerSettingsPath, $configuredText.Replace('    Standalone: 3', '    Standalone: 1'))
+            [UnityEditor.PlayerSettings]::SetManagedCodeVariant([UnityEditor.Build.NamedBuildTarget]::Standalone, $oldVariant)
+            [UnityEditor.AssetDatabase]::SaveAssets()
+            $restoredEntry = Get-ControlSettingsEntry $playerSettingsPath
+            Assert-WProtoPreparedPlayerSettings -Configured $configuredEntry -Prepared $preparedEntry -Built $restoredEntry `
+                -RestoredPath $playerSettingsPath -PreparedPath $snapshot -UnityVersion '6000.6.0f1' -Backend $case.Backend
+            if ([IO.File]::ReadAllText($playerSettingsPath) -cne $configuredText) { throw 'Restoration did not preserve the configured bytes.' }
+            $transitionChecks++
+        }
+    }
+    Write-Host "WProto settings transitions: $transitionChecks configure/Checked/callback/restore controls passed through the shipping strict verifier (Unity APIs stubbed; no native proof)."
 }
 finally {
     $env:UH_PLAYER_BUILD_PATH = $savedOutput

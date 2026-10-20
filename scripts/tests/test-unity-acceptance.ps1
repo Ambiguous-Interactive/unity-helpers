@@ -190,6 +190,32 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
     }
     function Resolve-FullPath { param($Path) return [IO.Path]::GetFullPath($Path) }
     function New-ManifestJson { return '{}' }
+    $initializeCall = $runner.Find({ param($node)
+        $node -is [Management.Automation.Language.CommandAst] -and $node.GetCommandName() -ceq 'Initialize-EphemeralProject'
+    }, $true)
+    if ($null -eq $initializeCall) { throw 'The real runner must initialize its project.' }
+    foreach ($campaignKind in @('ordinary', 'borrowed-buffer-preflight-v1', 'wproto-seven-families-v1')) {
+        foreach ($backend in @('Mono2x', 'IL2CPP')) {
+            $RepoRoot = $temporary
+            $UnityVersion = '6000.6.0f1'
+            $TestMode = 'editmode'
+            $ProjectPath = Join-Path $temporary "managed-variant-$campaignKind-$backend"
+            $IncludeComparisons = $false
+            $IncludeIntegrations = $false
+            $StandaloneScriptingBackend = $backend
+            $Il2CppCompilerConfiguration = 'Release'
+            $ManagedStrippingLevel = 'Disabled'
+            $UseReleasePlayerBuild = $true
+            $frozenPlayerDeclaration = if ($campaignKind -ceq 'ordinary') { $null } else { [pscustomobject]@{ CampaignKind = $campaignKind } }
+            $project = Invoke-Expression $initializeCall.Extent.Text
+            $generated = [IO.File]::ReadAllText((Join-Path $project 'Assets/Editor/UhCiTestConfigurator.cs'))
+            $expected = if ($campaignKind -ceq 'wproto-seven-families-v1') { 'true' } else { 'false' }
+            if (-not $generated.Contains("if ($expected || PlayerSettings.GetScriptingBackend(target) == ScriptingImplementation.Mono2x)")) {
+                throw "The runner lost the WProto-only managed variant selection for $campaignKind/$backend."
+            }
+            $checks++
+        }
+    }
     foreach ($level in @('Disabled', 'High')) {
         $project = Join-Path $temporary "configuration-$level"
         $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $project -ManagedStrippingLevel $level
