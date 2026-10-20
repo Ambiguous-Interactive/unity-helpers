@@ -413,11 +413,21 @@ The OS-observed command line and bounded first/last target output are retained s
 An exact unique heap-end output line is required; the debugger's printed command text alone
 cannot satisfy that check.
 
+For a later boundary, use `native-build-attach-after-shutdown: true` with attachment enabled
+and after-startup disabled. It waits for the first complete stdout line beginning
+`##utp:{"type":"MemoryLeaks",`. This labels Unity's reported final telemetry, after the
+shutdown messages in the retained Direct fault log. It does not prove shutdown completion
+or a guaranteed interval before exit. The same nonce/PID/time, ownership, deadline and
+no-player checks apply. A target that exits before attachment yields rejected evidence.
+The historical `Attach.Startup` receipt member retains the observation; `Attach.Boundary`
+labels it `reported-memory-leak-telemetry`.
+
 From an existing licensed, lock-owning context, pass
 `-StandaloneBuildCapture Debugger -StandaloneBuildAttachToDirect` to the same
 WProto acceptance command. The attach option requires an explicit evidence-only
 debugger build and refuses a simultaneous standard-heap launch request.
-Add `-StandaloneBuildAttachAfterStartup` to select the reported reload boundary.
+Add `-StandaloneBuildAttachAfterStartup` to select the reported reload boundary, or
+`-StandaloneBuildAttachAfterShutdown` for final telemetry. These options are mutually exclusive.
 
 This build-only route deliberately throws after the post-build inventory, before
 player launch. The diagnostic job and workflow therefore fail even when the

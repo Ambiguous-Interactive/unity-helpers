@@ -1158,7 +1158,8 @@ for (const event of ["workflow_dispatch", "pull_request", "push", "schedule"]) {
             github: { event_name: event },
             inputs: {
               "native-build-attach-control": attach,
-              "native-build-attach-after-startup": startup
+              "native-build-attach-after-startup": startup,
+              "native-build-attach-after-shutdown": false
             }
           }),
           !cancelled && event === "workflow_dispatch" && (attach || startup)
@@ -1298,4 +1299,108 @@ for (const [attach, startup, expected] of [
 }
 console.log(
   `${startupSelections.length} startup attachment admissions and three removed-guard controls passed.`
+);
+
+const shutdownOption = workflow.match(
+  /^      native-build-attach-after-shutdown:\n((?:        [^\n]*\n|\n)+)/m
+)[1];
+assert.match(shutdownOption, /^        default: false$/m);
+assert.match(shutdownOption, /^        type: boolean$/m);
+assert.ok(
+  attachSelection.includes(
+    "UH_NATIVE_ATTACH_AFTER_SHUTDOWN: ${{ inputs.native-build-attach-after-shutdown }}"
+  )
+);
+assert.ok(
+  nativeBuild.includes(
+    "UH_NATIVE_ATTACH_AFTER_SHUTDOWN: ${{ inputs.native-build-attach-after-shutdown }}"
+  )
+);
+assert.ok(
+  nativeBuild.includes(
+    "-StandaloneBuildAttachAfterShutdown:($env:UH_NATIVE_ATTACH_AFTER_SHUTDOWN -eq 'true')"
+  )
+);
+const { getShutdownAttachSelectionError } = require(attachHelperPath);
+const shutdownSelections = [];
+for (const selection of startupSelections) {
+  for (const shutdown of ["true", "false", "", "invalid"]) {
+    const environment = { ...selection.environment, UH_NATIVE_ATTACH_AFTER_SHUTDOWN: shutdown };
+    const permitted =
+      getAttachSelectionError(environment) === null &&
+      environment.UH_NATIVE_ATTACH_CONTROL === "true" &&
+      environment.UH_NATIVE_ATTACH_AFTER_STARTUP === "false" &&
+      shutdown === "true";
+    assert.equal(getShutdownAttachSelectionError(environment) === null, permitted);
+    assert.equal(
+      getStartupAttachSelectionError(environment) === null,
+      selection.permitted && shutdown === "false"
+    );
+    shutdownSelections.push({ environment, permitted });
+  }
+}
+const shutdownFunctionStart = attachHelperSource.indexOf(
+  "function getShutdownAttachSelectionError"
+);
+for (const condition of [
+  "getAttachSelectionError(environment) !== null",
+  'environment.UH_NATIVE_ATTACH_CONTROL !== "true"',
+  'environment.UH_NATIVE_ATTACH_AFTER_STARTUP !== "false"',
+  'environment.UH_NATIVE_ATTACH_AFTER_SHUTDOWN !== "true"'
+]) {
+  const before = attachHelperSource.slice(0, shutdownFunctionStart);
+  const after = attachHelperSource.slice(shutdownFunctionStart);
+  const removed = after.replace(condition, "false");
+  assert.notEqual(after, removed);
+  const sandbox = { module: { exports: {} }, require, console, process };
+  vm.runInNewContext(before + removed, sandbox, { filename: attachHelperPath });
+  assert.ok(
+    shutdownSelections.some(
+      ({ environment, permitted }) =>
+        (sandbox.module.exports.getShutdownAttachSelectionError(environment) === null) !== permitted
+    )
+  );
+}
+for (const event of ["workflow_dispatch", "push", "pull_request"]) {
+  for (const cancelled of [true, false]) {
+    for (const attach of [true, false]) {
+      for (const startup of [true, false]) {
+        for (const shutdown of [true, false]) {
+          assert.equal(
+            predicate(attachSelection)({
+              cancelled,
+              github: { event_name: event },
+              inputs: {
+                "native-build-attach-control": attach,
+                "native-build-attach-after-startup": startup,
+                "native-build-attach-after-shutdown": shutdown
+              }
+            }),
+            !cancelled && event === "workflow_dispatch" && (attach || startup || shutdown)
+          );
+        }
+      }
+    }
+  }
+}
+for (const [startup, shutdown, expected] of [
+  ["false", "true", 0],
+  ["true", "true", 1],
+  ["false", "invalid", 1],
+  ["true", "false", 0]
+]) {
+  const result = spawnSync(process.execPath, [attachHelperPath], {
+    env: {
+      ...process.env,
+      ...attachSelections[0].environment,
+      UH_NATIVE_ATTACH_CONTROL: "true",
+      UH_NATIVE_ATTACH_AFTER_STARTUP: startup,
+      UH_NATIVE_ATTACH_AFTER_SHUTDOWN: shutdown
+    },
+    encoding: "utf8"
+  });
+  assert.equal(result.status, expected, result.stderr);
+}
+console.log(
+  `${shutdownSelections.length} final telemetry attachment admissions and four removed guards passed.`
 );

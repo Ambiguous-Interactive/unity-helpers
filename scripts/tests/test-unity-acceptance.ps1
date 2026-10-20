@@ -52,7 +52,7 @@ return $sourceHash
     Set-Content -LiteralPath (Join-Path $temporary 'run-ci-tests.ps1') -Value @'
 param($UnityVersion, $RepoRoot, $ArtifactsPath, $ReleaseCodeOptimization, $ReleasePlayerBuild,
     $Il2CppCompilerConfiguration, $ProjectPath, $TestMode, $AssemblyNames, $TestFilter,
-    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics, $TestCategory, $FrozenPlayerDeclarationPath, $AdditionalScriptingDefines, $StandaloneBuildCapture = 'None', $StandaloneBuildDebuggerStandardHeap = $false, $StandaloneBuildAttachToDirect = $false, $StandaloneBuildAttachAfterStartup = $false)
+    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics, $TestCategory, $FrozenPlayerDeclarationPath, $AdditionalScriptingDefines, $StandaloneBuildCapture = 'None', $StandaloneBuildDebuggerStandardHeap = $false, $StandaloneBuildAttachToDirect = $false, $StandaloneBuildAttachAfterStartup = $false, $StandaloneBuildAttachAfterShutdown = $false)
 if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
     if ($env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne $ProjectPath -or
         [IO.File]::ReadAllText((Join-Path $ProjectPath '.sentinel-interaction-disposable')) -ne
@@ -493,6 +493,17 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             throw "Diagnostic backend selection changed the declared source/settings/filter contract: backend=$backend, stripping=$($calls[0].ManagedStrippingLevel), expected=$expectedStripping."
         }
         $checks++
+    }
+    foreach ($selection in @('wproto', 'all', 'intmap')) {
+        foreach ($mode in @('None', 'Direct', 'Debugger')) {
+            $directory = Join-Path $temporary ('invalid-shutdown-' + [Guid]::NewGuid().ToString('N'))
+            Clear-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
+            $failure = $null
+            try { & $subject -Acceptance $selection -UnityVersion '6000.6.0f1' -ArtifactsPath $directory -TemporaryRoot $temporary -StandaloneBuildCapture $mode -StandaloneBuildAttachAfterShutdown }
+            catch { $failure = $_.ToString() }
+            if ($null -eq $failure -or $failure -notmatch 'Shutdown-delayed attachment requires Direct attachment' -or (Test-Path -LiteralPath $directory) -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 0) { throw "Shutdown selection without attachment must fail before any project/process: $selection/$mode." }
+            $checks++
+        }
     }
     foreach ($selection in @('wproto', 'all', 'intmap')) {
         foreach ($mode in @('None', 'Direct', 'Debugger')) {

@@ -89,10 +89,10 @@ try {
             return $text
         }
         $program = Join-Path $root 'protocol target.ps1'
-        [IO.File]::WriteAllText($program, 'param($Signal,$Emit); if($Emit -eq "yes"){[Console]::WriteLine("Domain Reload Profiling: controlled")}else{[Console]::Error.WriteLine("Domain Reload Profiling: stderr only")}; while(-not(Test-Path -LiteralPath $Signal)){Start-Sleep -Milliseconds 20}')
-        foreach ($scenario in @('header-only', 'complete', 'duplicate-end', 'missing-startup', 'removed-end-guard')) {
+        [IO.File]::WriteAllText($program, 'param($Signal,$Emit); if($Emit -eq "shutdown"){[Console]::WriteLine(''##utp:{"type":"MemoryLeaks","controlled":true}'')}elseif($Emit -eq "yes"){[Console]::WriteLine("Domain Reload Profiling: controlled")}else{[Console]::Error.WriteLine("Domain Reload Profiling: stderr only")}; while(-not(Test-Path -LiteralPath $Signal)){Start-Sleep -Milliseconds 20}')
+        foreach ($scenario in @('header-only', 'complete', 'duplicate-end', 'missing-startup', 'removed-end-guard', 'shutdown-complete', 'shutdown-domain-only')) {
             ${function:Invoke-NativeAttachCapture} = $shipping
-            $script:boundaryEnds = if ($scenario -eq 'complete') { 1 } elseif ($scenario -eq 'duplicate-end') { 2 } else { 0 }
+            $script:boundaryEnds = if ($scenario -in @('complete', 'shutdown-complete')) { 1 } elseif ($scenario -eq 'duplicate-end') { 2 } else { 0 }
             if ($scenario -eq 'removed-end-guard') {
                 $mutant = $shipping.ToString().Replace("[regex]::Matches(`$head, '(?m)^WUH_ATTACH_HEAP_END\r?`$').Count -ne 1", '$false')
                 Assert-Startup ($mutant -cne $shipping.ToString()) 'Boundary guard removal binds actual shipping code.'
@@ -102,15 +102,16 @@ try {
             $script:boundarySignal = Join-Path $casePath 'release'
             $script:boundaryCalls = 0
             $record = [ordered]@{ Cases = @(@{ Process = @{}; TargetExitEvent = $null }); WorkingDirectory = $repo; DebuggerHeap = @{} }
-            $emit = if ($scenario -eq 'missing-startup') { 'no' } else { 'yes' }
+            $shutdown = $scenario.StartsWith('shutdown-', [StringComparison]::Ordinal)
+            $emit = if ($scenario -eq 'missing-startup') { 'no' } elseif ($scenario -eq 'shutdown-complete') { 'shutdown' } else { 'yes' }
             $errorText = $null
-            try { $null = Invoke-NativeAttachCapture -CaptureScript $source -EditorPath (Get-Process -Id $PID).Path -Arguments @('-NoProfile', '-File', $program, $script:boundarySignal, $emit) -DebuggerPath 'protocol output stand-in' -PrivateDirectory $private -ArtifactsPath $casePath -Seconds $(if ($scenario -eq 'missing-startup') { 8 } else { 15 }) -Record $record -AfterStartup }
+            try { $null = Invoke-NativeAttachCapture -CaptureScript $source -EditorPath (Get-Process -Id $PID).Path -Arguments @('-NoProfile', '-File', $program, $script:boundarySignal, $emit) -DebuggerPath 'protocol output stand-in' -PrivateDirectory $private -ArtifactsPath $casePath -Seconds $(if ($scenario -in @('missing-startup', 'shutdown-domain-only')) { 8 } else { 15 }) -Record $record -AfterStartup:(-not $shutdown) -AfterShutdown:$shutdown }
             catch { $errorText = $_.Exception.Message }
             $case = $record.Cases[0]
-            if ($scenario -in @('complete', 'removed-end-guard')) {
+            if ($scenario -in @('complete', 'removed-end-guard', 'shutdown-complete')) {
                 Assert-Startup ($null -eq $errorText -and $case.Attach.State -ceq 'completed' -and $null -ne $case.Attach.Startup -and $case.TargetProcess.RawExitCode -eq 0) "Complete actual worker protocol outcome: $scenario."
-            } elseif ($scenario -eq 'missing-startup') {
-                Assert-Startup ($errorText -ceq 'Direct target exited or timed out before the required domain-reload observation.' -and $script:boundaryCalls -eq 0 -and $case.TargetProcess.Reaped -and $null -ne $case.TargetProcess.KillReason) 'Stderr or missing startup cannot launch a debugger; timeout reaps the owned target.'
+            } elseif ($scenario -in @('missing-startup', 'shutdown-domain-only')) {
+                Assert-Startup ($errorText -ceq $(if ($shutdown) { 'Direct target exited or timed out before the required final memory-leak telemetry.' } else { 'Direct target exited or timed out before the required domain-reload observation.' }) -and $script:boundaryCalls -eq 0 -and $case.TargetProcess.Reaped -and $null -ne $case.TargetProcess.KillReason) 'Stderr or missing startup cannot launch a debugger; timeout reaps the owned target.'
             } else {
                 Assert-Startup ($errorText -ceq 'Debugger did not observe the exact owned target at the attachment boundary.' -and $case.Attach.State -cne 'completed') "Command echoes and ambiguous marker lines cannot complete capture: $scenario."
             }

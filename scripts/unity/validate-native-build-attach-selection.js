@@ -23,7 +23,9 @@ function getStartupAttachSelectionError(environment) {
   if (
     getAttachSelectionError(environment) !== null ||
     environment.UH_NATIVE_ATTACH_CONTROL !== "true" ||
-    environment.UH_NATIVE_ATTACH_AFTER_STARTUP !== "true"
+    environment.UH_NATIVE_ATTACH_AFTER_STARTUP !== "true" ||
+    (environment.UH_NATIVE_ATTACH_AFTER_SHUTDOWN !== undefined &&
+      environment.UH_NATIVE_ATTACH_AFTER_SHUTDOWN !== "false")
   ) {
     return "Startup-delayed attachment requires the admitted Direct attachment arm.";
   }
@@ -32,14 +34,33 @@ function getStartupAttachSelectionError(environment) {
 
 module.exports.getStartupAttachSelectionError = getStartupAttachSelectionError;
 
+function getShutdownAttachSelectionError(environment) {
+  if (
+    getAttachSelectionError(environment) !== null ||
+    environment.UH_NATIVE_ATTACH_CONTROL !== "true" ||
+    environment.UH_NATIVE_ATTACH_AFTER_STARTUP !== "false" ||
+    environment.UH_NATIVE_ATTACH_AFTER_SHUTDOWN !== "true"
+  ) {
+    return "Shutdown-delayed attachment requires the admitted Direct attachment arm without startup selection.";
+  }
+  return null;
+}
+
+module.exports.getShutdownAttachSelectionError = getShutdownAttachSelectionError;
+
 if (require.main === module) {
   const boundary = process.env.UH_NATIVE_ATTACH_AFTER_STARTUP;
+  const shutdown = process.env.UH_NATIVE_ATTACH_AFTER_SHUTDOWN;
   const error =
-    boundary === "true"
-      ? getStartupAttachSelectionError(process.env)
-      : boundary !== undefined && boundary !== "false"
-        ? "Unknown attachment startup selection."
-        : getAttachSelectionError(process.env);
+    shutdown === "true"
+      ? getShutdownAttachSelectionError(process.env)
+      : shutdown !== undefined && shutdown !== "false"
+        ? "Unknown attachment shutdown selection."
+        : boundary === "true"
+          ? getStartupAttachSelectionError(process.env)
+          : boundary !== undefined && boundary !== "false"
+            ? "Unknown attachment startup selection."
+            : getAttachSelectionError(process.env);
   if (error !== null) {
     console.error(error);
     process.exitCode = 1;

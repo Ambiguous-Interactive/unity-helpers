@@ -86,6 +86,11 @@ on:
         required: false
         default: false
         type: boolean
+      native-build-attach-after-shutdown:
+        description: "Wait for final MemoryLeaks telemetry before CDB attach; requires attachment and excludes after-startup."
+        required: false
+        default: false
+        type: boolean
       native-loader-snaps-comparison:
         description: "Temporarily clear Unity.exe loader snaps, capture, then restore; requires native diagnostics and EditMode."
         required: false
@@ -296,7 +301,9 @@ jobs:
         run: node scripts/unity/validate-native-build-heap-selection.js
 
       - name: Validate Standalone debugger attachment selection
-        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && (inputs.native-build-attach-control || inputs.native-build-attach-after-startup) }}
+        if: >-
+          ${{ !cancelled() && github.event_name == 'workflow_dispatch' &&
+          (inputs.native-build-attach-control || inputs.native-build-attach-after-startup || inputs.native-build-attach-after-shutdown) }}
         env:
           UH_NATIVE_DIAGNOSTICS: ${{ inputs.native-diagnostics }}
           UH_NATIVE_MODE: ${{ inputs.test-mode }}
@@ -305,6 +312,7 @@ jobs:
           UH_NATIVE_STANDARD_HEAP: ${{ inputs.native-debugger-standard-heap }}
           UH_NATIVE_ATTACH_CONTROL: ${{ inputs.native-build-attach-control }}
           UH_NATIVE_ATTACH_AFTER_STARTUP: ${{ inputs.native-build-attach-after-startup }}
+          UH_NATIVE_ATTACH_AFTER_SHUTDOWN: ${{ inputs.native-build-attach-after-shutdown }}
         run: node scripts/unity/validate-native-build-attach-selection.js
 
       # Assembly compatibility depends on target mode and integration opt-in,
@@ -870,6 +878,7 @@ jobs:
           UH_NATIVE_DEBUGGER_STANDARD_HEAP: ${{ inputs.native-debugger-standard-heap }}
           UH_NATIVE_ATTACH_CONTROL: ${{ inputs.native-build-attach-control }}
           UH_NATIVE_ATTACH_AFTER_STARTUP: ${{ inputs.native-build-attach-after-startup }}
+          UH_NATIVE_ATTACH_AFTER_SHUTDOWN: ${{ inputs.native-build-attach-after-shutdown }}
         run: |
           ./scripts/unity/run-acceptance.ps1 `
             -Acceptance 'wproto' -UnityVersion '6000.6.0f1' `
@@ -878,6 +887,7 @@ jobs:
             -StandaloneBuildDebuggerStandardHeap:($env:UH_NATIVE_DEBUGGER_STANDARD_HEAP -eq 'true') `
             -StandaloneBuildAttachToDirect:($env:UH_NATIVE_ATTACH_CONTROL -eq 'true') `
             -StandaloneBuildAttachAfterStartup:($env:UH_NATIVE_ATTACH_AFTER_STARTUP -eq 'true') `
+            -StandaloneBuildAttachAfterShutdown:($env:UH_NATIVE_ATTACH_AFTER_SHUTDOWN -eq 'true') `
             -ArtifactsPath '.artifacts/unity/6000.6.0f1-standalone/build-only-diagnostics' `
             -TemporaryRoot $env:RUNNER_TEMP
 

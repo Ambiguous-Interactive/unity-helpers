@@ -185,14 +185,16 @@ function Invoke-NativeAttachCapture {
     param(
         [string]$CaptureScript, [string]$EditorPath, [string[]]$Arguments, [string]$DebuggerPath,
         [string]$PrivateDirectory, [string]$ArtifactsPath, [int]$Seconds, [System.Collections.IDictionary]$Record,
-        [switch]$AfterStartup
+        [switch]$AfterStartup,
+        [switch]$AfterShutdown
     )
 
+    if ($AfterStartup -and $AfterShutdown) { throw 'Attachment boundaries are mutually exclusive.' }
     $captureId = [Guid]::NewGuid().ToString('N')
     $identityPath = Join-Path $PrivateDirectory 'target-identity.json'
     $cancelPath = Join-Path $PrivateDirectory 'cancel-target'
     $startupPath = Join-Path $PrivateDirectory 'target-startup.json'
-    $startupPrefix = 'Domain Reload Profiling:'
+    $startupPrefix = if ($AfterShutdown) { '##utp:{"type":"MemoryLeaks",' } else { 'Domain Reload Profiling:' }
     $expected = @{
         CaptureId = $captureId; ExecutablePath = [IO.Path]::GetFullPath($EditorPath)
         ExecutableSha256 = (Get-FileHash -LiteralPath $EditorPath -Algorithm SHA256).Hash
@@ -203,7 +205,7 @@ function Invoke-NativeAttachCapture {
         ExecutablePath = $expected.ExecutablePath; Arguments = $Arguments; Directory = $Record.WorkingDirectory; Seconds = $Seconds
         Coordination = @{ CaptureId = $captureId; IdentityPath = $identityPath; CancelPath = $cancelPath; ControllerPid = $PID }
     }
-    if ($AfterStartup) {
+    if ($AfterStartup -or $AfterShutdown) {
         $specification.Coordination.StartupMarkerPrefix = $startupPrefix
         $specification.Coordination.StartupReceiptPath = $startupPath
     }
@@ -212,7 +214,7 @@ function Invoke-NativeAttachCapture {
     $case.Attach = [ordered]@{
         CaptureId = $captureId; State = 'starting-worker'; Expected = $expected; Identity = $null
         RequestedUtc = $null; VerifiedUtc = $null; CleanupRequested = $false; WorkerState = $null
-        Boundary = $(if ($AfterStartup) { 'reported-domain-reload' } else { 'initial-identity' }); Startup = $null; ObservedCommandLine = $null
+        Boundary = $(if ($AfterShutdown) { 'reported-memory-leak-telemetry' } elseif ($AfterStartup) { 'reported-domain-reload' } else { 'initial-identity' }); Startup = $null; ObservedCommandLine = $null
         Qualification = 'Direct startup followed by invasive attachment. Heap output describes attachment only; startup heap and causal repair remain unverified.'
     }
     $Record.DebuggerHeap.Requested = 'direct-start-then-attach'
@@ -235,11 +237,12 @@ function Invoke-NativeAttachCapture {
         $case.Attach.VerifiedUtc = $opened.VerifiedUtc
         $case.Attach.ObservedCommandLine = $opened.ObservedCommandLine
         $case.Attach.State = 'identity-verified'
-        if ($AfterStartup) {
-            $case.Attach.State = 'waiting-domain-reload'
+        if ($AfterStartup -or $AfterShutdown) {
+            $case.Attach.State = if ($AfterShutdown) { 'waiting-memory-leak-telemetry' } else { 'waiting-domain-reload' }
             Save-NativeCaptureRecord
             while (-not (Test-Path -LiteralPath $startupPath -PathType Leaf)) {
                 if ($opened.Target.HasExited -or $job.State -notin @('Running', 'NotStarted') -or [DateTime]::UtcNow -ge $deadline) {
+                    if ($AfterShutdown) { throw 'Direct target exited or timed out before the required final memory-leak telemetry.' }
                     throw 'Direct target exited or timed out before the required domain-reload observation.'
                 }
                 Start-Sleep -Milliseconds 50

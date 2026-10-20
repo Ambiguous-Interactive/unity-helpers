@@ -773,36 +773,62 @@ Start-Sleep -Seconds 300
     $script:diagnosticSnapshots = 0
     $script:diagnosticPlayerCalls = 0
     $script:diagnosticHeapRequests = @()
-    function Invoke-UnityStandaloneBuildDiagnostic { param($Mode, $EditorPath, $ProjectPath, $Arguments, $ArtifactsPath, $LogPath, $TimeoutSeconds, [switch]$UseStandardHeap, [switch]$AttachToDirect, [switch]$AttachAfterStartup) ++$script:diagnosticBuildCalls; $script:diagnosticHeapRequests += [bool]$UseStandardHeap; $script:diagnosticAttachRequests += [bool]$AttachToDirect; $script:diagnosticStartupRequests += [bool]$AttachAfterStartup }
+    function Invoke-UnityStandaloneBuildDiagnostic { param($Mode, $EditorPath, $ProjectPath, $Arguments, $ArtifactsPath, $LogPath, $TimeoutSeconds, [switch]$UseStandardHeap, [switch]$AttachToDirect, [switch]$AttachAfterStartup, [switch]$AttachAfterShutdown) ++$script:diagnosticBuildCalls; $script:diagnosticHeapRequests += [bool]$UseStandardHeap; $script:diagnosticAttachRequests += [bool]$AttachToDirect; $script:diagnosticStartupRequests += [bool]$AttachAfterStartup; $script:diagnosticShutdownRequests += [bool]$AttachAfterShutdown }
     $StandaloneBuildAttachToDirect = $false
     $StandaloneBuildAttachAfterStartup = $false
+    $StandaloneBuildAttachAfterShutdown = $false
     $script:diagnosticAttachRequests = @()
     $script:diagnosticStartupRequests = @()
+    $script:diagnosticShutdownRequests = @()
     function Add-FrozenPlayerProvenanceSnapshot { param($Context, $Stage, [switch]$IncludePayload) Assert-Capture ($Stage -ceq 'after-build' -and $IncludePayload) 'Diagnostic records the actual post-build inventory'; ++$script:diagnosticSnapshots }
     function Get-StandaloneBuildTimeoutSeconds { return 123 }
     function Invoke-StandaloneTestPlayer { ++$script:diagnosticPlayerCalls }
-    foreach ($selection in @(@{ Mode = 'Direct'; StandardHeap = $false; Attach = $false; Startup = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $false; Startup = $false }, @{ Mode = 'Debugger'; StandardHeap = $true; Attach = $false; Startup = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $true; Startup = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $true; Startup = $true })) {
+    foreach ($selection in @(@{ Mode = 'Direct'; StandardHeap = $false; Attach = $false; Startup = $false; Shutdown = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $false; Startup = $false; Shutdown = $false }, @{ Mode = 'Debugger'; StandardHeap = $true; Attach = $false; Startup = $false; Shutdown = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $true; Startup = $false; Shutdown = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $true; Startup = $true; Shutdown = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $true; Startup = $false; Shutdown = $true })) {
         $StandaloneBuildCapture = $selection.Mode
         $StandaloneBuildDebuggerStandardHeap = $selection.StandardHeap
         $StandaloneBuildAttachToDirect = $selection.Attach
         $StandaloneBuildAttachAfterStartup = $selection.Startup
+        $StandaloneBuildAttachAfterShutdown = $selection.Shutdown
         $UnityEditorPath = 'exact-editor.exe'; $ProjectPath = $project; $buildArgs = $buildArguments; $ArtifactsPath = $root; $logPath = Join-Path $root 'integration.log'; $frozenPlayerProvenance = @{}
         $rejected = $false
         try { & ([scriptblock]::Create($buildBranch.Extent.Text + '; Invoke-StandaloneTestPlayer')) } catch { $rejected = $_.Exception.Message -like 'Evidence-only Standalone build capture stops before player launch*' }
-        Assert-Capture ($rejected -and $script:diagnosticPlayerCalls -eq 0 -and $script:diagnosticHeapRequests[-1] -eq $selection.StandardHeap -and $script:diagnosticAttachRequests[-1] -eq $selection.Attach -and $script:diagnosticStartupRequests[-1] -eq $selection.Startup) "Build-only route retains diagnostic selection and never launches a player: $($selection.Mode)/$($selection.StandardHeap)/$($selection.Attach)/$($selection.Startup)"
+        Assert-Capture ($rejected -and $script:diagnosticPlayerCalls -eq 0 -and $script:diagnosticHeapRequests[-1] -eq $selection.StandardHeap -and $script:diagnosticAttachRequests[-1] -eq $selection.Attach -and $script:diagnosticStartupRequests[-1] -eq $selection.Startup -and $script:diagnosticShutdownRequests[-1] -eq $selection.Shutdown) "Build-only route retains diagnostic selection and never launches a player: $($selection.Mode)/$($selection.StandardHeap)/$($selection.Attach)/$($selection.Startup)"
     }
-    Assert-Capture ($script:diagnosticBuildCalls -eq 5 -and $script:diagnosticSnapshots -eq 5) 'Each diagnostic arm performs one existing build and one post-build inventory'
+    Assert-Capture ($script:diagnosticBuildCalls -eq 6 -and $script:diagnosticSnapshots -eq 6) 'Each diagnostic arm performs one existing build and one post-build inventory'
     $StandaloneBuildCapture = 'None'
     $StandaloneBuildDebuggerStandardHeap = $false
     $StandaloneBuildAttachToDirect = $false
     $StandaloneBuildAttachAfterStartup = $false
+    $StandaloneBuildAttachAfterShutdown = $false
     & ([scriptblock]::Create($buildBranch.Extent.Text + '; Invoke-StandaloneTestPlayer'))
-    Assert-Capture ($script:diagnosticBuildCalls -eq 5 -and $script:diagnosticPlayerCalls -eq 1) 'Disabled diagnostic leaves the ordinary player path reachable'
+    Assert-Capture ($script:diagnosticBuildCalls -eq 6 -and $script:diagnosticPlayerCalls -eq 1) 'Disabled diagnostic leaves the ordinary player path reachable'
 
     $acceptanceTokens = $null
     $acceptanceErrors = $null
     $acceptanceAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts/unity/run-acceptance.ps1'), [ref]$acceptanceTokens, [ref]$acceptanceErrors)
     Assert-Capture ($acceptanceErrors.Count -eq 0) 'Heap acceptance driver parses'
+    $shutdownTransfer = $acceptanceAst.Find({ param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -ceq '$parameters.StandaloneBuildAttachAfterShutdown' }, $true)
+    Assert-Capture ($null -ne $shutdownTransfer) 'Acceptance forwards the final telemetry attachment request'
+    foreach ($requested in @($false, $true)) {
+        $StandaloneBuildAttachAfterShutdown = $requested; $parameters = @{}
+        Invoke-Expression $shutdownTransfer.Extent.Text
+        Assert-Capture ($parameters.StandaloneBuildAttachAfterShutdown -is [bool] -and $parameters.StandaloneBuildAttachAfterShutdown -eq $requested) 'Final telemetry selection forwards as Boolean'
+    }
+    foreach ($driverAst in @($runnerAst, $acceptanceAst)) {
+        $shutdownGuard = $driverAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text.StartsWith('$StandaloneBuildAttachAfterShutdown -and') }, $true)
+        Assert-Capture ($null -ne $shutdownGuard) 'Actual driver admits only one attachment boundary'
+        foreach ($requested in @($false, $true)) {
+            foreach ($attach in @($false, $true)) {
+                foreach ($startup in @($false, $true)) {
+                    $StandaloneBuildAttachAfterShutdown = $requested; $StandaloneBuildAttachToDirect = $attach; $StandaloneBuildAttachAfterStartup = $startup
+                    $rejected = $false
+                    try { Invoke-Expression $shutdownGuard.Extent.Text } catch { $rejected = $_.Exception.Message -ceq 'Shutdown-delayed attachment requires Direct attachment without startup selection.' }
+                    Assert-Capture ($rejected -eq ($requested -and (-not $attach -or $startup))) 'Final telemetry selection refuses startup or unattached targets'
+                }
+            }
+        }
+    }
+    $StandaloneBuildAttachAfterShutdown = $false
     $startupTransfer = $acceptanceAst.Find({ param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -ceq '$parameters.StandaloneBuildAttachAfterStartup' }, $true)
     Assert-Capture ($null -ne $startupTransfer) 'Acceptance forwards the startup attachment request'
     foreach ($requested in @($false, $true)) {

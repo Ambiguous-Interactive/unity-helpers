@@ -64,6 +64,8 @@ param(
 
     [switch]$StandaloneBuildAttachAfterStartup,
 
+    [switch]$StandaloneBuildAttachAfterShutdown,
+
     [string]$TestCategory = $(if ($env:UH_UNITY_TEST_CATEGORY) { $env:UH_UNITY_TEST_CATEGORY } else { '' }),
 
     [switch]$IncludeComparisons,
@@ -262,6 +264,7 @@ if ($StandaloneBuildAttachToDirect -and ($StandaloneBuildCapture -ne 'Debugger' 
     throw 'Direct attachment requires the evidence-only debugger arm without a debugger launch heap request.'
 }
 if ($StandaloneBuildAttachAfterStartup -and -not $StandaloneBuildAttachToDirect) { throw 'Startup-delayed attachment requires Direct attachment.' }
+if ($StandaloneBuildAttachAfterShutdown -and (-not $StandaloneBuildAttachToDirect -or $StandaloneBuildAttachAfterStartup)) { throw 'Shutdown-delayed attachment requires Direct attachment without startup selection.' }
 
 if ($ForceFreshCompilationCache -and ($TestMode -ne 'standalone' -or $StandaloneScriptingBackend -ne 'IL2CPP')) {
     throw 'ForceFreshCompilationCache requires Standalone IL2CPP mode.'
@@ -3825,17 +3828,19 @@ function Invoke-UnityStandaloneBuildDiagnostic {
         [string]$ArtifactsPath, [string]$LogPath, [int]$TimeoutSeconds,
         [switch]$UseStandardHeap,
         [switch]$AttachToDirect,
-        [switch]$AttachAfterStartup
+        [switch]$AttachAfterStartup,
+        [switch]$AttachAfterShutdown
     )
 
     if ($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 1800) { throw 'Build diagnostics require a bounded timeout.' }
     if ($UseStandardHeap -and $Mode -ne 'Debugger') { throw 'Standard heap selection requires a debugger build.' }
     if ($AttachToDirect -and ($Mode -ne 'Debugger' -or $UseStandardHeap)) { throw 'Direct attachment requires a debugger build without a launch heap request.' }
     if ($AttachAfterStartup -and -not $AttachToDirect) { throw 'Startup-delayed attachment requires Direct attachment.' }
+    if ($AttachAfterShutdown -and (-not $AttachToDirect -or $AttachAfterStartup)) { throw 'Shutdown-delayed attachment requires Direct attachment without startup selection.' }
     if ($Mode -eq 'Debugger') {
         & (Join-Path $PSScriptRoot 'capture-native-fault.ps1') -EditorPath $EditorPath -ProjectPath $ProjectPath `
             -BuildArguments $Arguments -BuildLogPath $LogPath -ArtifactsPath (Join-Path $ArtifactsPath 'native-build-diagnostics') `
-            -TimeoutSeconds $TimeoutSeconds -UseStandardHeap:$UseStandardHeap -AttachToDirect:$AttachToDirect -AttachAfterStartup:$AttachAfterStartup
+            -TimeoutSeconds $TimeoutSeconds -UseStandardHeap:$UseStandardHeap -AttachToDirect:$AttachToDirect -AttachAfterStartup:$AttachAfterStartup -AttachAfterShutdown:$AttachAfterShutdown
     } else {
         $observation = @{}
         $null = Invoke-UnityObservedEditor -EditorPath $EditorPath -Arguments $Arguments `
@@ -5318,7 +5323,7 @@ try {
         if ($StandaloneBuildCapture -ne 'None') {
             Invoke-UnityStandaloneBuildDiagnostic -Mode $StandaloneBuildCapture -EditorPath $UnityEditorPath `
                 -ProjectPath $ProjectPath -Arguments $buildArgs -ArtifactsPath $ArtifactsPath `
-                -LogPath $logPath -TimeoutSeconds (Get-StandaloneBuildTimeoutSeconds) -UseStandardHeap:$StandaloneBuildDebuggerStandardHeap -AttachToDirect:$StandaloneBuildAttachToDirect -AttachAfterStartup:$StandaloneBuildAttachAfterStartup
+                -LogPath $logPath -TimeoutSeconds (Get-StandaloneBuildTimeoutSeconds) -UseStandardHeap:$StandaloneBuildDebuggerStandardHeap -AttachToDirect:$StandaloneBuildAttachToDirect -AttachAfterStartup:$StandaloneBuildAttachAfterStartup -AttachAfterShutdown:$StandaloneBuildAttachAfterShutdown
             if ($null -ne $frozenPlayerProvenance) {
                 Add-FrozenPlayerProvenanceSnapshot -Context $frozenPlayerProvenance -Stage 'after-build' -IncludePayload
             }

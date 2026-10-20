@@ -16,6 +16,7 @@ param(
     [Parameter(ParameterSetName = 'Build')][switch]$UseStandardHeap,
     [Parameter(ParameterSetName = 'Build')][switch]$AttachToDirect,
     [Parameter(ParameterSetName = 'Build')][switch]$AttachAfterStartup,
+    [Parameter(ParameterSetName = 'Build')][switch]$AttachAfterShutdown,
     [Parameter(Mandatory = $true, ParameterSetName = 'Worker')][hashtable]$WorkerSpecification,
     [Parameter(ParameterSetName = 'Capture')][switch]$CompareLoaderSnaps,
     [Parameter(ParameterSetName = 'Capture')]
@@ -196,11 +197,13 @@ function Invoke-NativeStandaloneBuildCapture {
         [string]$LogPath, [int]$Seconds, [System.Collections.IDictionary]$Record,
         [switch]$UseStandardHeap,
         [switch]$AttachToDirect,
-        [switch]$AttachAfterStartup
+        [switch]$AttachAfterStartup,
+        [switch]$AttachAfterShutdown
     )
 
     if ($AttachToDirect -and $UseStandardHeap) { throw 'Direct attachment cannot request debugger launch heap policy.' }
     if ($AttachAfterStartup -and -not $AttachToDirect) { throw 'Startup-delayed attachment requires Direct attachment.' }
+    if ($AttachAfterShutdown -and (-not $AttachToDirect -or $AttachAfterStartup)) { throw 'Shutdown-delayed attachment requires Direct attachment without startup selection.' }
     foreach ($pair in @(@('-projectPath', $ProjectPath), @('-testPlatform', 'StandaloneWindows64'), @('-logFile', '-'))) {
         $positions = @(for ($index = 0; $index -lt $Arguments.Count; ++$index) { if ($Arguments[$index] -ceq $pair[0]) { $index } })
         if ($positions.Count -ne 1 -or $positions[0] + 1 -ge $Arguments.Count -or $Arguments[$positions[0] + 1] -cne $pair[1]) {
@@ -240,7 +243,7 @@ function Invoke-NativeStandaloneBuildCapture {
         $Record.Qualification = 'Direct startup followed by debugger attachment; target, worker and debugger outcomes remain separate. No player launch, timing or acceptance qualification.'
         $output = Invoke-NativeAttachCapture -CaptureScript (Join-Path $PSScriptRoot 'capture-native-fault.ps1') `
             -EditorPath $EditorPath -Arguments $actual -DebuggerPath $DebuggerPath -PrivateDirectory $PrivateDirectory `
-            -ArtifactsPath $ArtifactsPath -Seconds $Seconds -Record $Record -AfterStartup:$AttachAfterStartup
+            -ArtifactsPath $ArtifactsPath -Seconds $Seconds -Record $Record -AfterStartup:$AttachAfterStartup -AfterShutdown:$AttachAfterShutdown
     } else {
         $output = Invoke-NativeCaptureProcess -FilePath $DebuggerPath `
             -Arguments $debuggerArguments `
@@ -445,6 +448,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Worker') {
 
 if ($AttachToDirect -and $UseStandardHeap) { throw 'Direct attachment cannot request debugger launch heap policy.' }
 if ($AttachAfterStartup -and -not $AttachToDirect) { throw 'Startup-delayed attachment requires Direct attachment.' }
+if ($AttachAfterShutdown -and (-not $AttachToDirect -or $AttachAfterStartup)) { throw 'Shutdown-delayed attachment requires Direct attachment without startup selection.' }
 
 if ($PSCmdlet.ParameterSetName -ceq 'SelectReadback') {
     Get-NativeReadbackArtifactSelection -Repository $Repository -SourceRunId $SourceRunId -ArtifactsPath $ArtifactsPath -Token $env:GITHUB_TOKEN
@@ -537,7 +541,7 @@ try {
     if ($PSCmdlet.ParameterSetName -eq 'Build') {
         Invoke-NativeStandaloneBuildCapture -EditorPath $EditorPath -ProjectPath $ProjectPath `
             -Arguments $BuildArguments -DebuggerPath $debugger -PrivateDirectory (Join-Path $privateRoot 'build') `
-            -ArtifactsPath $artifactRoot -LogPath $BuildLogPath -Seconds $TimeoutSeconds -Record $record -UseStandardHeap:$UseStandardHeap -AttachToDirect:$AttachToDirect -AttachAfterStartup:$AttachAfterStartup
+            -ArtifactsPath $artifactRoot -LogPath $BuildLogPath -Seconds $TimeoutSeconds -Record $record -UseStandardHeap:$UseStandardHeap -AttachToDirect:$AttachToDirect -AttachAfterStartup:$AttachAfterStartup -AttachAfterShutdown:$AttachAfterShutdown
         return
     }
     $versionMatch = [regex]::Match($record.ProjectVersion, '(?m)^m_EditorVersion: ([^\s]+)')

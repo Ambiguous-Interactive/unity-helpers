@@ -178,8 +178,10 @@ try {
         if ([string]::IsNullOrWhiteSpace($DebuggerDirectory) -or [string]::IsNullOrWhiteSpace($NativeProgramsDirectory)) { throw 'Real Windows capture requires the pinned debugger and normal/AV control programs.' }
         $project = Join-Path $root 'project'; $null = [IO.Directory]::CreateDirectory((Join-Path $project 'ProjectSettings'))
         [IO.File]::WriteAllText((Join-Path $project 'ProjectSettings/ProjectVersion.txt'), "m_EditorVersion: 6000.6.0f1`n")
-        foreach ($kind in @('normal', 'av', 'startup-normal', 'startup-av')) {
-            $delayed = $kind.StartsWith('startup-', [StringComparison]::Ordinal)
+        foreach ($kind in @('normal', 'av', 'startup-normal', 'startup-av', 'shutdown-normal', 'shutdown-av')) {
+            $shutdown = $kind.StartsWith('shutdown-', [StringComparison]::Ordinal)
+            $startup = $kind.StartsWith('startup-', [StringComparison]::Ordinal)
+            $delayed = $startup -or $shutdown
             $isAv = $kind.EndsWith('av', [StringComparison]::Ordinal)
             $program = Join-Path $NativeProgramsDirectory ($kind + '/control.exe')
             $casePath = Join-Path $root $kind; $null = [IO.Directory]::CreateDirectory($casePath)
@@ -187,7 +189,7 @@ try {
             $direct = @{}
             $null = Invoke-NativeCaptureProcess -FilePath $program -Arguments $arguments -Directory ([Environment]::CurrentDirectory) -Seconds 30 -Observation $direct -PreserveSymbolPath
             & $source -EditorPath $program -ProjectPath $project -BuildArguments $arguments -BuildLogPath (Join-Path $casePath 'build.log') `
-                -ArtifactsPath (Join-Path $casePath 'capture') -DebuggerDirectory $DebuggerDirectory -TimeoutSeconds 45 -AttachToDirect -AttachAfterStartup:$delayed
+                -ArtifactsPath (Join-Path $casePath 'capture') -DebuggerDirectory $DebuggerDirectory -TimeoutSeconds 45 -AttachToDirect -AttachAfterStartup:$startup -AttachAfterShutdown:$shutdown
             $record = Get-Content -LiteralPath (Join-Path $casePath 'capture/receipt.json') -Raw | ConvertFrom-Json -AsHashtable
             $case = $record.Cases[0]
             $raw = if ($isAv) { -1073741819 } else { 0 }
@@ -200,7 +202,7 @@ try {
             Assert-Attach ($case.Attach.ObservedCommandLine.Contains($program) -and $case.Attach.ObservedCommandLine.Contains('-projectPath') -and
                 $case.Attach.ObservedCommandLine.Contains($project) -and (Test-Path -LiteralPath (Join-Path $casePath 'capture/build-target-console-head.log'))) "Actual $kind retains the observed OS command line and bounded startup output."
             if ($delayed) {
-                Assert-Attach ($case.Attach.Boundary -ceq 'reported-domain-reload' -and $case.Attach.Startup.Line -ceq 'Domain Reload Profiling: controlled' -and
+                Assert-Attach ($case.Attach.Boundary -ceq $(if ($shutdown) { 'reported-memory-leak-telemetry' } else { 'reported-domain-reload' }) -and $case.Attach.Startup.Line -ceq $(if ($shutdown) { '##utp:{"type":"MemoryLeaks","controlled":true}' } else { 'Domain Reload Profiling: controlled' }) -and
                     $case.Attach.Startup.Pid -eq $case.TargetProcess.Pid -and $case.Attach.Startup.CaptureId -ceq $case.Attach.CaptureId -and
                     [DateTimeOffset]::Parse($case.Attach.Startup.ObservedUtc) -le [DateTimeOffset]::Parse($case.Attach.RequestedUtc)) "Actual $kind observes startup on the exact target before requesting attachment."
             }
