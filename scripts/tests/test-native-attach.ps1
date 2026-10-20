@@ -178,7 +178,7 @@ try {
         if ([string]::IsNullOrWhiteSpace($DebuggerDirectory) -or [string]::IsNullOrWhiteSpace($NativeProgramsDirectory)) { throw 'Real Windows capture requires the pinned debugger and normal/AV control programs.' }
         $project = Join-Path $root 'project'; $null = [IO.Directory]::CreateDirectory((Join-Path $project 'ProjectSettings'))
         [IO.File]::WriteAllText((Join-Path $project 'ProjectSettings/ProjectVersion.txt'), "m_EditorVersion: 6000.6.0f1`n")
-        foreach ($kind in @('normal', 'av', 'startup-normal', 'startup-av', 'shutdown-normal', 'shutdown-av')) {
+        foreach ($kind in @('normal', 'av', 'startup-normal', 'startup-av', 'shutdown-normal', 'shutdown-av', 'shutdown-status', 'shutdown-handled')) {
             $shutdown = $kind.StartsWith('shutdown-', [StringComparison]::Ordinal)
             $startup = $kind.StartsWith('startup-', [StringComparison]::Ordinal)
             $delayed = $startup -or $shutdown
@@ -192,7 +192,7 @@ try {
                 -ArtifactsPath (Join-Path $casePath 'capture') -DebuggerDirectory $DebuggerDirectory -TimeoutSeconds 45 -AttachToDirect -AttachAfterStartup:$startup -AttachAfterShutdown:$shutdown
             $record = Get-Content -LiteralPath (Join-Path $casePath 'capture/receipt.json') -Raw | ConvertFrom-Json -AsHashtable
             $case = $record.Cases[0]
-            $raw = if ($isAv) { -1073741819 } else { 0 }
+            $raw = if ($isAv -or $kind -ceq 'shutdown-status') { -1073741819 } else { 0 }
             Assert-Attach ($record.EvidenceOnly -and $record.State -ceq 'completed' -and $case.Attach.State -ceq 'completed' -and
                 -not $case.Attach.CleanupRequested -and $case.Attach.WorkerState -ceq 'Completed' -and $case.TargetProcess.RawExitCode -eq $raw -and
                 $direct.RawExitCode -eq $raw -and $case.TargetExitEvent.Pid -eq $case.TargetProcess.Pid -and $case.Process.Reaped -and
@@ -207,6 +207,14 @@ try {
                     [DateTimeOffset]::Parse($case.Attach.Startup.ObservedUtc) -le [DateTimeOffset]::Parse($case.Attach.RequestedUtc)) "Actual $kind observes startup on the exact target before requesting attachment."
             }
             Assert-Attach ([Environment]::GetEnvironmentVariable('_NT_SYMBOL_PATH', 'Process') -ceq $symbols -and [Environment]::GetEnvironmentVariable('_NO_DEBUG_HEAP', 'Process') -ceq $heap) "Actual $kind capture preserves inherited environment."
+            $console = [IO.File]::ReadAllText((Join-Path $casePath 'capture/build-attach-console-head.log'))
+            $firstChanceCount = [regex]::Matches($console, '(?m)^WUH_FIRST_CHANCE_AV\r?$').Count
+            Assert-Attach ($console -match '(?m)^\s*av - Access violation - second-chance break - not handled\r?$' -and
+                [regex]::Matches($console, '(?m)^WUH_EXCEPTION_FILTERS_END\r?$').Count -eq 1) "Actual $kind retains the AV filter policy and executed filter output marker."
+            Assert-Attach ($firstChanceCount -eq $(if ($kind -ceq 'shutdown-handled') { 8 } elseif ($isAv) { 1 } else { 0 })) "Actual $kind distinguishes bounded handled AV, fault and status-only termination."
+            if ($kind -in @('shutdown-normal', 'shutdown-status', 'shutdown-handled')) {
+                Assert-Attach ([regex]::Matches($console, '(?m)^WUH_TERMINATE_REQUEST\r?$').Count -ge 1) "Actual $kind records the native termination request stack."
+            }
             Write-Host "Actual $kind Build entry evidence: $casePath"
         }
         foreach ($kind in @('early', 'timeout')) {

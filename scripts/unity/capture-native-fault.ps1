@@ -185,7 +185,7 @@ function Get-NativeCaptureExitEvent {
 function Get-NativeCaptureDebuggerCommand {
     param([string]$DumpPath = 'fault.dmp')
     if ($DumpPath.IndexOfAny([char[]]@([char]34, [char]10, [char]13)) -ge 0) { throw 'Invalid debugger dump path.' }
-    $command = 'sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av;sxe -c ".lastevent;q" epr;bu ntdll!RtlExitUserProcess ".echo WUH_EXIT_REQUEST;!gflag;r rcx;kv20;g";g'
+    $command = 'sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av;r @$t0=0;sx- -c ".if (@$t0 < 8) { .echo WUH_FIRST_CHANCE_AV;.exr -1;r;kv20 };r @$t0=@$t0+1" av;sx;.echo WUH_EXCEPTION_FILTERS_END;sxe -c ".lastevent;q" epr;bu ntdll!NtTerminateProcess ".echo WUH_TERMINATE_REQUEST;r rcx,rdx;kv20;g";bu ntdll!RtlExitUserProcess ".echo WUH_EXIT_REQUEST;!gflag;r rcx;kv20;g";g'
     if ($DumpPath -cne 'fault.dmp') { return $command.Replace('fault.dmp', '\"' + $DumpPath.Replace('\', '\\') + '\"') }
     return $command
 }

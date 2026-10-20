@@ -422,6 +422,20 @@ no-player checks apply. A target that exits before attachment yields rejected ev
 The historical `Attach.Startup` receipt member retains the observation; `Attach.Boundary`
 labels it `reported-memory-leak-telemetry`.
 
+Every debugger arm records the actual exception filters before continuing. It keeps
+AV handling at second-chance break, not handled, and logs the exception record,
+registers and up to 32 stack frames for the first eight first-chance AV events.
+Later first-chance events retain the debugger's ordinary notification behavior;
+the private second-chance fault dump remains enabled. The collector also records
+calls to `ntdll!NtTerminateProcess`, including the x64 process-handle/status
+registers and up to 32 caller frames. These observations can distinguish an
+observed handled exception from an unhandled fault or an explicit termination
+request. An AV-coded exit alone does not prove an exception, and missing trace
+records do not prove that no exception or external termination occurred.
+The first-chance command uses
+[`sx-`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/sx--sxd--sxe--sxi--sxn--sxr--sx---set-exceptions-)
+to preserve the existing break and handling policy.
+
 From an existing licensed, lock-owning context, pass
 `-StandaloneBuildCapture Debugger -StandaloneBuildAttachToDirect` to the same
 WProto acceptance command. The attach option requires an explicit evidence-only

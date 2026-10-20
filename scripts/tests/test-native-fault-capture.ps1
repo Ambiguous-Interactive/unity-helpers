@@ -680,6 +680,10 @@ Start-Sleep -Seconds 300
     }
 
     Assert-Capture ((Get-NativeCaptureDebuggerCommand -DumpPath 'C:\capture with spaces\fault.dmp').Contains('\"C:\\capture with spaces\\fault.dmp\"')) 'CDB command-string parsing preserves quoted Windows dump paths and separators'
+    $debuggerCommand = Get-NativeCaptureDebuggerCommand
+    Assert-Capture ($debuggerCommand.Contains('sx- -c ".if (@$t0 < 8)') -and $debuggerCommand.Contains('r @$t0=0;') -and $debuggerCommand.Contains('WUH_FIRST_CHANCE_AV') -and $debuggerCommand.Contains('r @$t0=@$t0+1')) 'First-chance AV records have an eight-event bound without changing break or handling policy'
+    Assert-Capture ($debuggerCommand.Contains('sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av') -and $debuggerCommand.Contains('sx;.echo WUH_EXCEPTION_FILTERS_END')) 'Retain the second-chance dump policy and print actual exception filters before continuation'
+    Assert-Capture ($debuggerCommand.Contains('bu ntdll!NtTerminateProcess ".echo WUH_TERMINATE_REQUEST;r rcx,rdx;kv20;g"')) 'Capture the local native termination request status and caller stack'
     $originalBuildCaptureProcess = ${function:Invoke-NativeCaptureProcess}
     $script:buildCaptureCalls = @()
     $script:buildSavedRecords = @()
