@@ -588,7 +588,7 @@ assert.match(readbackOption, /^        default: ""$/m);
 assert.match(readbackOption, /^        type: string$/m);
 assert.ok(
   [...workflow.slice(0, workflow.indexOf("\npermissions:")).matchAll(/^      [\w-]+:\n/gm)]
-    .length <= 10
+    .length <= 25
 );
 function jobGate(block) {
   return expression(block.match(/^    if: (?:>-\n\s*)?\$\{\{([\s\S]*?)\}\}/m)?.[1]);
@@ -1116,4 +1116,94 @@ for (const [direct, expected] of [
 }
 console.log(
   `${heapSelections.length} standard heap admission controls and four removed-guard controls passed.`
+);
+
+const attachOption = workflow.match(
+  /^      native-build-attach-control:\n((?:        [^\n]*\n|\n)+)/m
+)[1];
+assert.match(attachOption, /^        default: false$/m);
+assert.match(attachOption, /^        type: boolean$/m);
+const attachSelection = matrixConfig.match(
+  /- name: Validate Standalone debugger attachment selection\n[\s\S]*?(?=\n      - name:)/
+)[0];
+const attachFields = [
+  ["UH_NATIVE_DIAGNOSTICS", "native-diagnostics", "true"],
+  ["UH_NATIVE_MODE", "test-mode", "standalone"],
+  ["UH_NATIVE_ACCEPTANCE", "acceptance", "none"],
+  ["UH_NATIVE_DIRECT_CONTROL", "native-build-direct-control", "false"],
+  ["UH_NATIVE_STANDARD_HEAP", "native-debugger-standard-heap", "false"]
+];
+for (const [field, input] of attachFields) {
+  assert.ok(attachSelection.includes(`${field}: \u0024{{ inputs.${input} }}`));
+}
+assert.match(
+  attachSelection,
+  /run: node scripts\/unity\/validate-native-build-attach-selection\.js/
+);
+assert.match(
+  nativeBuild,
+  /UH_NATIVE_ATTACH_CONTROL: \$\{\{ inputs.native-build-attach-control \}\}/
+);
+assert.match(
+  nativeBuild,
+  /-StandaloneBuildAttachToDirect:\(\$env:UH_NATIVE_ATTACH_CONTROL -eq 'true'\)/
+);
+for (const event of ["workflow_dispatch", "pull_request", "push", "schedule"]) {
+  for (const attach of [false, true]) {
+    for (const cancelled of [false, true]) {
+      assert.equal(
+        predicate(attachSelection)({
+          cancelled,
+          github: { event_name: event },
+          inputs: { "native-build-attach-control": attach }
+        }),
+        !cancelled && event === "workflow_dispatch" && attach
+      );
+    }
+  }
+}
+const attachHelperPath = path.join(__dirname, "../unity/validate-native-build-attach-selection.js");
+const attachHelperSource = fs.readFileSync(attachHelperPath, "utf8");
+const { getAttachSelectionError } = require(attachHelperPath);
+const attachSelections = [];
+for (let mask = 0; mask < 1024; ++mask) {
+  const environment = {};
+  let cursor = mask;
+  for (const [field, , valid] of attachFields) {
+    environment[field] = [valid, "", "invalid", valid === "true" ? "false" : "true"][cursor % 4];
+    cursor = Math.floor(cursor / 4);
+  }
+  const permitted = mask === 0;
+  assert.equal(getAttachSelectionError(environment) === null, permitted);
+  attachSelections.push({ environment, permitted });
+}
+for (const missing of [null, undefined, {}]) {
+  assert.notEqual(getAttachSelectionError(missing), null);
+}
+for (const [field, , value] of attachFields) {
+  const withoutGuard = attachHelperSource.replace(`environment.${field} !== "${value}"`, "false");
+  assert.notEqual(withoutGuard, attachHelperSource);
+  const sandbox = { module: { exports: {} }, require, console, process };
+  vm.runInNewContext(withoutGuard, sandbox, { filename: attachHelperPath });
+  assert.equal(
+    attachSelections.filter(
+      ({ environment, permitted }) =>
+        (sandbox.module.exports.getAttachSelectionError(environment) === null) !== permitted
+    ).length,
+    3
+  );
+}
+for (const [selection, code] of [
+  [attachSelections[0], 0],
+  [attachSelections[1], 1],
+  [attachSelections[256], 1]
+]) {
+  const result = spawnSync(process.execPath, [attachHelperPath], {
+    env: { ...process.env, ...selection.environment },
+    encoding: "utf8"
+  });
+  assert.equal(result.status, code, result.stderr);
+}
+console.log(
+  `${attachSelections.length} attachment admission controls and five removed-guard controls passed.`
 );

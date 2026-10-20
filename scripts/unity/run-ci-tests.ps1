@@ -60,6 +60,8 @@ param(
 
     [switch]$StandaloneBuildDebuggerStandardHeap,
 
+    [switch]$StandaloneBuildAttachToDirect,
+
     [string]$TestCategory = $(if ($env:UH_UNITY_TEST_CATEGORY) { $env:UH_UNITY_TEST_CATEGORY } else { '' }),
 
     [switch]$IncludeComparisons,
@@ -253,6 +255,9 @@ if ($StandaloneBuildCapture -ne 'None' -and ($TestMode -ne 'standalone' -or $Gen
 
 if ($StandaloneBuildDebuggerStandardHeap -and $StandaloneBuildCapture -ne 'Debugger') {
     throw 'Standard heap selection requires an evidence-only Standalone debugger build.'
+}
+if ($StandaloneBuildAttachToDirect -and ($StandaloneBuildCapture -ne 'Debugger' -or $StandaloneBuildDebuggerStandardHeap)) {
+    throw 'Direct attachment requires the evidence-only debugger arm without a debugger launch heap request.'
 }
 
 if ($ForceFreshCompilationCache -and ($TestMode -ne 'standalone' -or $StandaloneScriptingBackend -ne 'IL2CPP')) {
@@ -3815,15 +3820,17 @@ function Invoke-UnityStandaloneBuildDiagnostic {
         [ValidateSet('Direct', 'Debugger')][string]$Mode,
         [string]$EditorPath, [string]$ProjectPath, [string[]]$Arguments,
         [string]$ArtifactsPath, [string]$LogPath, [int]$TimeoutSeconds,
-        [switch]$UseStandardHeap
+        [switch]$UseStandardHeap,
+        [switch]$AttachToDirect
     )
 
     if ($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 1800) { throw 'Build diagnostics require a bounded timeout.' }
     if ($UseStandardHeap -and $Mode -ne 'Debugger') { throw 'Standard heap selection requires a debugger build.' }
+    if ($AttachToDirect -and ($Mode -ne 'Debugger' -or $UseStandardHeap)) { throw 'Direct attachment requires a debugger build without a launch heap request.' }
     if ($Mode -eq 'Debugger') {
         & (Join-Path $PSScriptRoot 'capture-native-fault.ps1') -EditorPath $EditorPath -ProjectPath $ProjectPath `
             -BuildArguments $Arguments -BuildLogPath $LogPath -ArtifactsPath (Join-Path $ArtifactsPath 'native-build-diagnostics') `
-            -TimeoutSeconds $TimeoutSeconds -UseStandardHeap:$UseStandardHeap
+            -TimeoutSeconds $TimeoutSeconds -UseStandardHeap:$UseStandardHeap -AttachToDirect:$AttachToDirect
     } else {
         $observation = @{}
         $null = Invoke-UnityObservedEditor -EditorPath $EditorPath -Arguments $Arguments `
@@ -5306,7 +5313,7 @@ try {
         if ($StandaloneBuildCapture -ne 'None') {
             Invoke-UnityStandaloneBuildDiagnostic -Mode $StandaloneBuildCapture -EditorPath $UnityEditorPath `
                 -ProjectPath $ProjectPath -Arguments $buildArgs -ArtifactsPath $ArtifactsPath `
-                -LogPath $logPath -TimeoutSeconds (Get-StandaloneBuildTimeoutSeconds) -UseStandardHeap:$StandaloneBuildDebuggerStandardHeap
+                -LogPath $logPath -TimeoutSeconds (Get-StandaloneBuildTimeoutSeconds) -UseStandardHeap:$StandaloneBuildDebuggerStandardHeap -AttachToDirect:$StandaloneBuildAttachToDirect
             if ($null -ne $frozenPlayerProvenance) {
                 Add-FrozenPlayerProvenanceSnapshot -Context $frozenPlayerProvenance -Stage 'after-build' -IncludePayload
             }

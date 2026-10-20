@@ -14,6 +14,8 @@ param(
     [Parameter(Mandatory = $true, ParameterSetName = 'Build')][string[]]$BuildArguments,
     [Parameter(Mandatory = $true, ParameterSetName = 'Build')][string]$BuildLogPath,
     [Parameter(ParameterSetName = 'Build')][switch]$UseStandardHeap,
+    [Parameter(ParameterSetName = 'Build')][switch]$AttachToDirect,
+    [Parameter(Mandatory = $true, ParameterSetName = 'Worker')][hashtable]$WorkerSpecification,
     [Parameter(ParameterSetName = 'Capture')][switch]$CompareLoaderSnaps,
     [Parameter(ParameterSetName = 'Capture')]
     [Parameter(ParameterSetName = 'Build')][ValidateRange(1, 1800)][int]$TimeoutSeconds = 600,
@@ -33,6 +35,7 @@ if ($UnboundArguments -and $UnboundArguments.Count -gt 0) { throw 'Unbound argum
 . (Join-Path $PSScriptRoot 'lib/accelerator.ps1')
 . (Join-Path $PSScriptRoot 'lib/native-global-flags.ps1')
 . (Join-Path $PSScriptRoot 'lib/native-loader-flag-lease.ps1')
+. (Join-Path $PSScriptRoot 'lib/native-attach.ps1')
 
 function Invoke-NativeCaptureProcess {
     param(
@@ -42,7 +45,10 @@ function Invoke-NativeCaptureProcess {
         [int]$Seconds,
         [hashtable]$Observation,
         [string]$ReceiptPath,
-        [switch]$PreserveSymbolPath
+        [switch]$PreserveSymbolPath,
+        [hashtable]$Coordination,
+        [string]$HeadPath,
+        [string]$TailPath
     )
 
     $info = [Diagnostics.ProcessStartInfo]::new($FilePath)
@@ -56,6 +62,7 @@ function Invoke-NativeCaptureProcess {
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $info
     $tail = [Text.StringBuilder]::new()
+    $head = [Text.StringBuilder]::new()
     $Observation.StartedUtc = [DateTime]::UtcNow.ToString('o')
     $Observation.Pid = $null
     $Observation.RawExitCode = $null
@@ -68,6 +75,7 @@ function Invoke-NativeCaptureProcess {
         if (-not $process.Start()) { throw 'Native process did not start' }
         $Observation.Pid = $process.Id
         if ($ReceiptPath) { $Observation | ConvertTo-Json | Set-Content -LiteralPath $ReceiptPath -Encoding utf8 }
+        if ($null -ne $Coordination) { Write-NativeAttachIdentity -Process $process -Coordination $Coordination }
         $readers = @($process.StandardOutput, $process.StandardError)
         $buffers = @([char[]]::new(4096), [char[]]::new(4096))
         $tasks = @($readers[0].ReadAsync($buffers[0], 0, 4096), $readers[1].ReadAsync($buffers[1], 0, 4096))
@@ -85,10 +93,17 @@ function Invoke-NativeCaptureProcess {
                         ++$Observation.ReadOperations
                         if ($index -eq 0) { $Observation.StdoutCharacters += $count } else { $Observation.StderrCharacters += $count }
                         [void]$tail.Append($buffers[$index], 0, $count)
+                        if ($HeadPath -and $head.Length -lt 524288) {
+                            [void]$head.Append($buffers[$index], 0, [Math]::Min($count, 524288 - $head.Length))
+                        }
                         if ($tail.Length -gt 524288) { [void]$tail.Remove(0, $tail.Length - 524288) }
                         $tasks[$index] = $readers[$index].ReadAsync($buffers[$index], 0, 4096)
                     }
                 }
+            }
+            if ($null -ne $Coordination -and (Test-Path -LiteralPath $Coordination.CancelPath -PathType Leaf)) {
+                $Observation.KillReason = 'coordinator-cancellation'
+                break
             }
             if ([DateTime]::UtcNow -ge $deadline) {
                 $Observation.KillReason = 'wall-clock-timeout'
@@ -118,6 +133,8 @@ function Invoke-NativeCaptureProcess {
             $Observation.EndedUtc = [DateTime]::UtcNow.ToString('o')
             $Observation.ConsoleTailTruncated = ($Observation.StdoutCharacters + $Observation.StderrCharacters) -gt 524288
             try {
+                if ($HeadPath) { [IO.File]::WriteAllText($HeadPath, (ConvertTo-UnitySafeLogText -Text $head.ToString())) }
+                if ($TailPath) { [IO.File]::WriteAllText($TailPath, (ConvertTo-UnitySafeLogText -Text $tail.ToString())) }
                 if ($ReceiptPath) { $Observation | ConvertTo-Json | Set-Content -LiteralPath $ReceiptPath -Encoding utf8 }
             } finally { $process.Dispose() }
         }
@@ -169,9 +186,11 @@ function Invoke-NativeStandaloneBuildCapture {
         [string]$EditorPath, [string]$ProjectPath, [string[]]$Arguments,
         [string]$DebuggerPath, [string]$PrivateDirectory, [string]$ArtifactsPath,
         [string]$LogPath, [int]$Seconds, [System.Collections.IDictionary]$Record,
-        [switch]$UseStandardHeap
+        [switch]$UseStandardHeap,
+        [switch]$AttachToDirect
     )
 
+    if ($AttachToDirect -and $UseStandardHeap) { throw 'Direct attachment cannot request debugger launch heap policy.' }
     foreach ($pair in @(@('-projectPath', $ProjectPath), @('-testPlatform', 'StandaloneWindows64'), @('-logFile', '-'))) {
         $positions = @(for ($index = 0; $index -lt $Arguments.Count; ++$index) { if ($Arguments[$index] -ceq $pair[0]) { $index } })
         if ($positions.Count -ne 1 -or $positions[0] + 1 -ge $Arguments.Count -or $Arguments[$positions[0] + 1] -cne $pair[1]) {
@@ -206,12 +225,21 @@ function Invoke-NativeStandaloneBuildCapture {
     if ($UseStandardHeap) { $debuggerArguments = @('-hd') + $debuggerArguments }
     $Record.DebuggerArguments = $debuggerArguments
     Save-NativeCaptureRecord
-    $output = Invoke-NativeCaptureProcess -FilePath $DebuggerPath `
-        -Arguments $debuggerArguments `
-        -Directory $Record.WorkingDirectory -Seconds $Seconds -Observation $case.Process `
-        -ReceiptPath (Join-Path $ArtifactsPath 'build-debugger-process.json') -PreserveSymbolPath
+    if ($AttachToDirect) {
+        $Record.ConsoleScope = 'separate-bounded-direct-target-and-debugger-console-windows'
+        $Record.Qualification = 'Direct startup followed by debugger attachment; target, worker and debugger outcomes remain separate. No player launch, timing or acceptance qualification.'
+        $output = Invoke-NativeAttachCapture -CaptureScript (Join-Path $PSScriptRoot 'capture-native-fault.ps1') `
+            -EditorPath $EditorPath -Arguments $actual -DebuggerPath $DebuggerPath -PrivateDirectory $PrivateDirectory `
+            -ArtifactsPath $ArtifactsPath -Seconds $Seconds -Record $Record
+    } else {
+        $output = Invoke-NativeCaptureProcess -FilePath $DebuggerPath `
+            -Arguments $debuggerArguments `
+            -Directory $Record.WorkingDirectory -Seconds $Seconds -Observation $case.Process `
+            -ReceiptPath (Join-Path $ArtifactsPath 'build-debugger-process.json') -PreserveSymbolPath
+    }
     $safeOutput = ConvertTo-UnitySafeLogText -Text $output
-    [IO.File]::WriteAllText($LogPath, $safeOutput)
+    $buildOutput = if ($AttachToDirect) { [IO.File]::ReadAllText((Join-Path $ArtifactsPath 'build-target-console.log')) + [Environment]::NewLine + $safeOutput } else { $safeOutput }
+    [IO.File]::WriteAllText($LogPath, $buildOutput)
     [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'build-debugger-console.log'), $safeOutput)
     $case.TargetExitEvent = Get-NativeCaptureExitEvent -Text $output
     $case.ControllerExitRelation = 'unexplained'
@@ -400,6 +428,13 @@ function Invoke-NativeEvidenceReadback {
     return [pscustomobject]$record
 }
 
+if ($PSCmdlet.ParameterSetName -ceq 'Worker') {
+    Invoke-NativeAttachWorker -Specification $WorkerSpecification -ArtifactsPath $ArtifactsPath
+    return
+}
+
+if ($AttachToDirect -and $UseStandardHeap) { throw 'Direct attachment cannot request debugger launch heap policy.' }
+
 if ($PSCmdlet.ParameterSetName -ceq 'SelectReadback') {
     Get-NativeReadbackArtifactSelection -Repository $Repository -SourceRunId $SourceRunId -ArtifactsPath $ArtifactsPath -Token $env:GITHUB_TOKEN
     return
@@ -491,7 +526,7 @@ try {
     if ($PSCmdlet.ParameterSetName -eq 'Build') {
         Invoke-NativeStandaloneBuildCapture -EditorPath $EditorPath -ProjectPath $ProjectPath `
             -Arguments $BuildArguments -DebuggerPath $debugger -PrivateDirectory (Join-Path $privateRoot 'build') `
-            -ArtifactsPath $artifactRoot -LogPath $BuildLogPath -Seconds $TimeoutSeconds -Record $record -UseStandardHeap:$UseStandardHeap
+            -ArtifactsPath $artifactRoot -LogPath $BuildLogPath -Seconds $TimeoutSeconds -Record $record -UseStandardHeap:$UseStandardHeap -AttachToDirect:$AttachToDirect
         return
     }
     $versionMatch = [regex]::Match($record.ProjectVersion, '(?m)^m_EditorVersion: ([^\s]+)')

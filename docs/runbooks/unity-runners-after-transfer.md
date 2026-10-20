@@ -383,6 +383,30 @@ changing the environment or registry. It does not infer the target's actual heap
 Compare separate captures on the same source before attributing a fault to this difference.
 Missing or rejected captures and later successful exits retain their original dispositions.
 
+For a fault that disappears when CDB launches Unity, separately select
+`native-build-attach-control: true`. Keep `native-diagnostics: true`,
+`test-mode: standalone`, `acceptance: none`, `native-build-direct-control: false`
+and `native-debugger-standard-heap: false`. Unity starts directly in an isolated
+collector worker. Before attaching CDB to its PID, the collector verifies a fresh
+capture identity, machine, executable path/hash, actual creation time and process
+parent ownership. It holds process handles while attaching; missing, exited,
+reused or mismatched identities fail the capture without a replacement launch.
+
+Target, worker and debugger outcomes remain separate. The receipt records the
+attachment request and observed target PID. Bounded first/last debugger output
+retains read-only global-flag and heap-summary commands at attachment; command
+errors must be interpreted explicitly. This describes the attachment boundary,
+not the startup heap. Attachment itself can change behavior. A zero exit cannot
+establish a repaired cause or qualify timing. Target output is retained separately
+and included in the build log; minidumps stay private. Timeouts and cancellation
+record termination origin rather than presenting cleanup as a natural fault.
+The existing static matrix, strict provenance and deliberate no-player stop still apply.
+
+From an existing licensed, lock-owning context, pass
+`-StandaloneBuildCapture Debugger -StandaloneBuildAttachToDirect` to the same
+WProto acceptance command. The attach option requires an explicit evidence-only
+debugger build and refuses a simultaneous standard-heap launch request.
+
 This build-only route deliberately throws after the post-build inventory, before
 player launch. The diagnostic job and workflow therefore fail even when the
 capture completes naturally; inspect `build-only-diagnostics/wproto/native-build-diagnostics/receipt.json`

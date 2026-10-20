@@ -52,7 +52,7 @@ return $sourceHash
     Set-Content -LiteralPath (Join-Path $temporary 'run-ci-tests.ps1') -Value @'
 param($UnityVersion, $RepoRoot, $ArtifactsPath, $ReleaseCodeOptimization, $ReleasePlayerBuild,
     $Il2CppCompilerConfiguration, $ProjectPath, $TestMode, $AssemblyNames, $TestFilter,
-    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics, $TestCategory, $FrozenPlayerDeclarationPath, $AdditionalScriptingDefines, $StandaloneBuildCapture = 'None', $StandaloneBuildDebuggerStandardHeap = $false)
+    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics, $TestCategory, $FrozenPlayerDeclarationPath, $AdditionalScriptingDefines, $StandaloneBuildCapture = 'None', $StandaloneBuildDebuggerStandardHeap = $false, $StandaloneBuildAttachToDirect = $false)
 if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
     if ($env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne $ProjectPath -or
         [IO.File]::ReadAllText((Join-Path $ProjectPath '.sentinel-interaction-disposable')) -ne
@@ -493,6 +493,23 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             throw "Diagnostic backend selection changed the declared source/settings/filter contract: backend=$backend, stripping=$($calls[0].ManagedStrippingLevel), expected=$expectedStripping."
         }
         $checks++
+    }
+    foreach ($selection in @('wproto', 'all', 'intmap')) {
+        foreach ($mode in @('None', 'Direct', 'Debugger')) {
+            foreach ($heapRequest in @($false, $true)) {
+                if ($selection -ceq 'wproto' -and $mode -ceq 'Debugger' -and -not $heapRequest) { continue }
+                $directory = Join-Path $temporary ('invalid-attach-' + [Guid]::NewGuid().ToString('N'))
+                Clear-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
+                $failure = $null
+                try { & $subject -Acceptance $selection -UnityVersion '6000.6.0f1' -ArtifactsPath $directory -TemporaryRoot $temporary -StandaloneBuildCapture $mode -StandaloneBuildDebuggerStandardHeap:$heapRequest -StandaloneBuildAttachToDirect }
+                catch { $failure = $_.ToString() }
+                $expectedError = if ($heapRequest -and ($mode -ne 'Debugger' -or $selection -ne 'wproto')) { 'Standard heap selection requires' } else { 'Direct attachment requires' }
+                if ($null -eq $failure -or $failure -notmatch $expectedError -or (Test-Path -LiteralPath $directory) -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 0) {
+                    throw "Invalid attachment selection must fail before project or process creation: $selection/$mode/$heapRequest."
+                }
+                $checks++
+            }
+        }
     }
     foreach ($selection in @('wproto', 'all', 'intmap')) {
         foreach ($mode in @('None', 'Direct')) {

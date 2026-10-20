@@ -773,28 +773,58 @@ Start-Sleep -Seconds 300
     $script:diagnosticSnapshots = 0
     $script:diagnosticPlayerCalls = 0
     $script:diagnosticHeapRequests = @()
-    function Invoke-UnityStandaloneBuildDiagnostic { param($Mode, $EditorPath, $ProjectPath, $Arguments, $ArtifactsPath, $LogPath, $TimeoutSeconds, [switch]$UseStandardHeap) ++$script:diagnosticBuildCalls; $script:diagnosticHeapRequests += [bool]$UseStandardHeap }
+    function Invoke-UnityStandaloneBuildDiagnostic { param($Mode, $EditorPath, $ProjectPath, $Arguments, $ArtifactsPath, $LogPath, $TimeoutSeconds, [switch]$UseStandardHeap, [switch]$AttachToDirect) ++$script:diagnosticBuildCalls; $script:diagnosticHeapRequests += [bool]$UseStandardHeap; $script:diagnosticAttachRequests += [bool]$AttachToDirect }
+    $StandaloneBuildAttachToDirect = $false
+    $script:diagnosticAttachRequests = @()
     function Add-FrozenPlayerProvenanceSnapshot { param($Context, $Stage, [switch]$IncludePayload) Assert-Capture ($Stage -ceq 'after-build' -and $IncludePayload) 'Diagnostic records the actual post-build inventory'; ++$script:diagnosticSnapshots }
     function Get-StandaloneBuildTimeoutSeconds { return 123 }
     function Invoke-StandaloneTestPlayer { ++$script:diagnosticPlayerCalls }
-    foreach ($selection in @(@{ Mode = 'Direct'; StandardHeap = $false }, @{ Mode = 'Debugger'; StandardHeap = $false }, @{ Mode = 'Debugger'; StandardHeap = $true })) {
+    foreach ($selection in @(@{ Mode = 'Direct'; StandardHeap = $false; Attach = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $false }, @{ Mode = 'Debugger'; StandardHeap = $true; Attach = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $true })) {
         $StandaloneBuildCapture = $selection.Mode
         $StandaloneBuildDebuggerStandardHeap = $selection.StandardHeap
+        $StandaloneBuildAttachToDirect = $selection.Attach
         $UnityEditorPath = 'exact-editor.exe'; $ProjectPath = $project; $buildArgs = $buildArguments; $ArtifactsPath = $root; $logPath = Join-Path $root 'integration.log'; $frozenPlayerProvenance = @{}
         $rejected = $false
         try { & ([scriptblock]::Create($buildBranch.Extent.Text + '; Invoke-StandaloneTestPlayer')) } catch { $rejected = $_.Exception.Message -like 'Evidence-only Standalone build capture stops before player launch*' }
-        Assert-Capture ($rejected -and $script:diagnosticPlayerCalls -eq 0 -and $script:diagnosticHeapRequests[-1] -eq $selection.StandardHeap) "Build-only route retains heap selection and never launches a player: $($selection.Mode)/$($selection.StandardHeap)"
+        Assert-Capture ($rejected -and $script:diagnosticPlayerCalls -eq 0 -and $script:diagnosticHeapRequests[-1] -eq $selection.StandardHeap -and $script:diagnosticAttachRequests[-1] -eq $selection.Attach) "Build-only route retains diagnostic selection and never launches a player: $($selection.Mode)/$($selection.StandardHeap)/$($selection.Attach)"
     }
-    Assert-Capture ($script:diagnosticBuildCalls -eq 3 -and $script:diagnosticSnapshots -eq 3) 'Each diagnostic arm performs one existing build and one post-build inventory'
+    Assert-Capture ($script:diagnosticBuildCalls -eq 4 -and $script:diagnosticSnapshots -eq 4) 'Each diagnostic arm performs one existing build and one post-build inventory'
     $StandaloneBuildCapture = 'None'
     $StandaloneBuildDebuggerStandardHeap = $false
+    $StandaloneBuildAttachToDirect = $false
     & ([scriptblock]::Create($buildBranch.Extent.Text + '; Invoke-StandaloneTestPlayer'))
-    Assert-Capture ($script:diagnosticBuildCalls -eq 3 -and $script:diagnosticPlayerCalls -eq 1) 'Disabled diagnostic leaves the ordinary player path reachable'
+    Assert-Capture ($script:diagnosticBuildCalls -eq 4 -and $script:diagnosticPlayerCalls -eq 1) 'Disabled diagnostic leaves the ordinary player path reachable'
 
     $acceptanceTokens = $null
     $acceptanceErrors = $null
     $acceptanceAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts/unity/run-acceptance.ps1'), [ref]$acceptanceTokens, [ref]$acceptanceErrors)
     Assert-Capture ($acceptanceErrors.Count -eq 0) 'Heap acceptance driver parses'
+    $attachTransfer = $acceptanceAst.Find({ param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -ceq '$parameters.StandaloneBuildAttachToDirect' }, $true)
+    Assert-Capture ($null -ne $attachTransfer) 'Acceptance forwards the attachment request to the runner'
+    foreach ($requested in @($false, $true)) {
+        $StandaloneBuildAttachToDirect = $requested
+        $parameters = @{}
+        Invoke-Expression $attachTransfer.Extent.Text
+        Assert-Capture ($parameters.StandaloneBuildAttachToDirect -is [bool] -and $parameters.StandaloneBuildAttachToDirect -eq $requested) 'Acceptance forwards the actual attachment request as a Boolean'
+    }
+    foreach ($driverAst in @($runnerAst, $acceptanceAst)) {
+        $attachGuard = $driverAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text.StartsWith('$StandaloneBuildAttachToDirect -and') }, $true)
+        Assert-Capture ($null -ne $attachGuard) 'Actual driver has a direct attachment admission guard'
+        foreach ($requested in @($false, $true)) {
+            foreach ($mode in @('None', 'Direct', 'Debugger')) {
+                foreach ($heapRequest in @($false, $true)) {
+                    foreach ($selection in @('wproto', 'all', 'intmap')) {
+                        $StandaloneBuildAttachToDirect = $requested; $StandaloneBuildCapture = $mode
+                        $StandaloneBuildDebuggerStandardHeap = $heapRequest; $Acceptance = $selection
+                        $rejected = $false
+                        try { Invoke-Expression $attachGuard.Extent.Text } catch { $rejected = $_.Exception.Message -like 'Direct attachment requires*' }
+                        $expected = $requested -and ($mode -cne 'Debugger' -or $heapRequest -or ($driverAst -eq $acceptanceAst -and $selection -cne 'wproto'))
+                        Assert-Capture ($rejected -eq $expected) "Actual driver attachment admission: $requested/$mode/$heapRequest/$selection"
+                    }
+                }
+            }
+        }
+    }
     $heapTransfer = $acceptanceAst.Find({ param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -ceq '$parameters.StandaloneBuildDebuggerStandardHeap' }, $true)
     Assert-Capture ($null -ne $heapTransfer) 'Acceptance forwards the heap request to the runner'
     foreach ($requested in @($false, $true)) {
@@ -837,6 +867,7 @@ Start-Sleep -Seconds 300
     $restoreSource = [IO.File]::ReadAllText((Join-Path $repo 'scripts/unity/restore-native-loader-snaps.ps1'))
     Assert-Capture ($restoreSource.Contains('Read-NativeLoaderFlagRecoveryLease') -and $restoreSource.Contains('Invoke-NativeLoaderFlagRecovery')) 'Independent recovery uses the phase-aware receipt and cleanup policy'
     Write-Host "$passed native capture controls passed"
+    & (Join-Path $PSScriptRoot 'test-native-attach.ps1')
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force
 }

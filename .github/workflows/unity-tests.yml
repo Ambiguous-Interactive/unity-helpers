@@ -76,6 +76,11 @@ on:
         required: false
         default: false
         type: boolean
+      native-build-attach-control:
+        description: "Start directly, then attach CDB; requires native Standalone diagnostics, Direct disabled and standard heap disabled."
+        required: false
+        default: false
+        type: boolean
       native-loader-snaps-comparison:
         description: "Temporarily clear Unity.exe loader snaps, capture, then restore; requires native diagnostics and EditMode."
         required: false
@@ -284,6 +289,16 @@ jobs:
           UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
           UH_NATIVE_DIRECT_CONTROL: ${{ inputs.native-build-direct-control }}
         run: node scripts/unity/validate-native-build-heap-selection.js
+
+      - name: Validate Standalone debugger attachment selection
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-build-attach-control }}
+        env:
+          UH_NATIVE_DIAGNOSTICS: ${{ inputs.native-diagnostics }}
+          UH_NATIVE_MODE: ${{ inputs.test-mode }}
+          UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
+          UH_NATIVE_DIRECT_CONTROL: ${{ inputs.native-build-direct-control }}
+          UH_NATIVE_STANDARD_HEAP: ${{ inputs.native-debugger-standard-heap }}
+        run: node scripts/unity/validate-native-build-attach-selection.js
 
       # Assembly compatibility depends on target mode and integration opt-in,
       # never on Unity version. Compute each distinct list once on this hosted
@@ -846,12 +861,14 @@ jobs:
           UH_PERF_OPTIMIZATION: "Release"
           UH_NATIVE_BUILD_CAPTURE_MODE: ${{ inputs.native-build-direct-control && 'Direct' || 'Debugger' }}
           UH_NATIVE_DEBUGGER_STANDARD_HEAP: ${{ inputs.native-debugger-standard-heap }}
+          UH_NATIVE_ATTACH_CONTROL: ${{ inputs.native-build-attach-control }}
         run: |
           ./scripts/unity/run-acceptance.ps1 `
             -Acceptance 'wproto' -UnityVersion '6000.6.0f1' `
             -StandaloneBuildCapture $env:UH_NATIVE_BUILD_CAPTURE_MODE `
             -StandaloneBuildCaptureBackend 'IL2CPP' `
             -StandaloneBuildDebuggerStandardHeap:($env:UH_NATIVE_DEBUGGER_STANDARD_HEAP -eq 'true') `
+            -StandaloneBuildAttachToDirect:($env:UH_NATIVE_ATTACH_CONTROL -eq 'true') `
             -ArtifactsPath '.artifacts/unity/6000.6.0f1-standalone/build-only-diagnostics' `
             -TemporaryRoot $env:RUNNER_TEMP
 
