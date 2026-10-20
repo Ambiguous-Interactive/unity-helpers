@@ -15,6 +15,7 @@ param(
     [Parameter(Mandatory = $true, ParameterSetName = 'Build')][string]$BuildLogPath,
     [Parameter(ParameterSetName = 'Build')][switch]$UseStandardHeap,
     [Parameter(ParameterSetName = 'Build')][switch]$AttachToDirect,
+    [Parameter(ParameterSetName = 'Build')][switch]$AttachAfterStartup,
     [Parameter(Mandatory = $true, ParameterSetName = 'Worker')][hashtable]$WorkerSpecification,
     [Parameter(ParameterSetName = 'Capture')][switch]$CompareLoaderSnaps,
     [Parameter(ParameterSetName = 'Capture')]
@@ -63,6 +64,10 @@ function Invoke-NativeCaptureProcess {
     $process.StartInfo = $info
     $tail = [Text.StringBuilder]::new()
     $head = [Text.StringBuilder]::new()
+    $startup = $null
+    if ($null -ne $Coordination -and $Coordination.ContainsKey('StartupMarkerPrefix')) {
+        $startup = @{ Pending = ''; Discarding = $false; Completed = $false }
+    }
     $Observation.StartedUtc = [DateTime]::UtcNow.ToString('o')
     $Observation.Pid = $null
     $Observation.RawExitCode = $null
@@ -95,6 +100,9 @@ function Invoke-NativeCaptureProcess {
                         [void]$tail.Append($buffers[$index], 0, $count)
                         if ($HeadPath -and $head.Length -lt 524288) {
                             [void]$head.Append($buffers[$index], 0, [Math]::Min($count, 524288 - $head.Length))
+                        }
+                        if ($index -eq 0 -and $null -ne $startup) {
+                            Add-NativeAttachStartupOutput -Coordination $Coordination -State $startup -Buffer $buffers[$index] -Count $count -ProcessId $Observation.Pid -DeliveredCharacters $Observation.StdoutCharacters
                         }
                         if ($tail.Length -gt 524288) { [void]$tail.Remove(0, $tail.Length - 524288) }
                         $tasks[$index] = $readers[$index].ReadAsync($buffers[$index], 0, 4096)
@@ -187,10 +195,12 @@ function Invoke-NativeStandaloneBuildCapture {
         [string]$DebuggerPath, [string]$PrivateDirectory, [string]$ArtifactsPath,
         [string]$LogPath, [int]$Seconds, [System.Collections.IDictionary]$Record,
         [switch]$UseStandardHeap,
-        [switch]$AttachToDirect
+        [switch]$AttachToDirect,
+        [switch]$AttachAfterStartup
     )
 
     if ($AttachToDirect -and $UseStandardHeap) { throw 'Direct attachment cannot request debugger launch heap policy.' }
+    if ($AttachAfterStartup -and -not $AttachToDirect) { throw 'Startup-delayed attachment requires Direct attachment.' }
     foreach ($pair in @(@('-projectPath', $ProjectPath), @('-testPlatform', 'StandaloneWindows64'), @('-logFile', '-'))) {
         $positions = @(for ($index = 0; $index -lt $Arguments.Count; ++$index) { if ($Arguments[$index] -ceq $pair[0]) { $index } })
         if ($positions.Count -ne 1 -or $positions[0] + 1 -ge $Arguments.Count -or $Arguments[$positions[0] + 1] -cne $pair[1]) {
@@ -230,7 +240,7 @@ function Invoke-NativeStandaloneBuildCapture {
         $Record.Qualification = 'Direct startup followed by debugger attachment; target, worker and debugger outcomes remain separate. No player launch, timing or acceptance qualification.'
         $output = Invoke-NativeAttachCapture -CaptureScript (Join-Path $PSScriptRoot 'capture-native-fault.ps1') `
             -EditorPath $EditorPath -Arguments $actual -DebuggerPath $DebuggerPath -PrivateDirectory $PrivateDirectory `
-            -ArtifactsPath $ArtifactsPath -Seconds $Seconds -Record $Record
+            -ArtifactsPath $ArtifactsPath -Seconds $Seconds -Record $Record -AfterStartup:$AttachAfterStartup
     } else {
         $output = Invoke-NativeCaptureProcess -FilePath $DebuggerPath `
             -Arguments $debuggerArguments `
@@ -434,6 +444,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Worker') {
 }
 
 if ($AttachToDirect -and $UseStandardHeap) { throw 'Direct attachment cannot request debugger launch heap policy.' }
+if ($AttachAfterStartup -and -not $AttachToDirect) { throw 'Startup-delayed attachment requires Direct attachment.' }
 
 if ($PSCmdlet.ParameterSetName -ceq 'SelectReadback') {
     Get-NativeReadbackArtifactSelection -Repository $Repository -SourceRunId $SourceRunId -ArtifactsPath $ArtifactsPath -Token $env:GITHUB_TOKEN
@@ -526,7 +537,7 @@ try {
     if ($PSCmdlet.ParameterSetName -eq 'Build') {
         Invoke-NativeStandaloneBuildCapture -EditorPath $EditorPath -ProjectPath $ProjectPath `
             -Arguments $BuildArguments -DebuggerPath $debugger -PrivateDirectory (Join-Path $privateRoot 'build') `
-            -ArtifactsPath $artifactRoot -LogPath $BuildLogPath -Seconds $TimeoutSeconds -Record $record -UseStandardHeap:$UseStandardHeap -AttachToDirect:$AttachToDirect
+            -ArtifactsPath $artifactRoot -LogPath $BuildLogPath -Seconds $TimeoutSeconds -Record $record -UseStandardHeap:$UseStandardHeap -AttachToDirect:$AttachToDirect -AttachAfterStartup:$AttachAfterStartup
         return
     }
     $versionMatch = [regex]::Match($record.ProjectVersion, '(?m)^m_EditorVersion: ([^\s]+)')

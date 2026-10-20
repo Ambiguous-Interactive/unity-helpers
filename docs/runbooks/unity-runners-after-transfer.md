@@ -402,10 +402,22 @@ and included in the build log; minidumps stay private. Timeouts and cancellation
 record termination origin rather than presenting cleanup as a natural fault.
 The existing static matrix, strict provenance and deliberate no-player stop still apply.
 
+To preserve the reported domain-reload startup phase before attachment, additionally set
+`native-build-attach-after-startup: true`. This requires the admitted attachment arm.
+The collector waits for the first complete stdout line beginning
+`Domain Reload Profiling:` under the original deadline. It records that line, observation time,
+nonce and target PID before requesting CDB. Stderr, partial lines, an exited target or a
+missing/mismatched observation cannot trigger attachment. This labels a reported reload
+boundary; it does not prove every startup phase or the initial heap state.
+The OS-observed command line and bounded first/last target output are retained separately.
+An exact unique heap-end output line is required; the debugger's printed command text alone
+cannot satisfy that check.
+
 From an existing licensed, lock-owning context, pass
 `-StandaloneBuildCapture Debugger -StandaloneBuildAttachToDirect` to the same
 WProto acceptance command. The attach option requires an explicit evidence-only
 debugger build and refuses a simultaneous standard-heap launch request.
+Add `-StandaloneBuildAttachAfterStartup` to select the reported reload boundary.
 
 This build-only route deliberately throws after the post-build inventory, before
 player launch. The diagnostic job and workflow therefore fail even when the

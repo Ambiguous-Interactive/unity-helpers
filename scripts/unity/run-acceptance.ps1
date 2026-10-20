@@ -16,7 +16,8 @@ param(
     [ValidateSet('Mono2x', 'IL2CPP')]
     [string]$StandaloneBuildCaptureBackend = 'Mono2x',
     [switch]$StandaloneBuildDebuggerStandardHeap,
-    [switch]$StandaloneBuildAttachToDirect
+    [switch]$StandaloneBuildAttachToDirect,
+    [switch]$StandaloneBuildAttachAfterStartup
 )
 
 Set-StrictMode -Version Latest
@@ -324,6 +325,7 @@ if ($StandaloneBuildDebuggerStandardHeap -and ($StandaloneBuildCapture -ne 'Debu
 if ($StandaloneBuildAttachToDirect -and ($StandaloneBuildCapture -ne 'Debugger' -or $Acceptance -ne 'wproto' -or $StandaloneBuildDebuggerStandardHeap)) {
     throw 'Direct attachment requires an evidence-only WProto debugger build without a launch heap request.'
 }
+if ($StandaloneBuildAttachAfterStartup -and -not $StandaloneBuildAttachToDirect) { throw 'Startup-delayed attachment requires Direct attachment.' }
 if ($StandaloneBuildCaptureBackend -ne 'Mono2x' -and ($StandaloneBuildCapture -eq 'None' -or $Acceptance -ne 'wproto')) {
     throw 'An IL2CPP WProto build capture requires explicit evidence-only capture mode and Acceptance wproto.'
 }
@@ -448,6 +450,7 @@ foreach ($kind in $selected) {
                 $parameters.StandaloneBuildCapture = $StandaloneBuildCapture
                 $parameters.StandaloneBuildDebuggerStandardHeap = [bool]$StandaloneBuildDebuggerStandardHeap
                 $parameters.StandaloneBuildAttachToDirect = [bool]$StandaloneBuildAttachToDirect
+                $parameters.StandaloneBuildAttachAfterStartup = [bool]$StandaloneBuildAttachAfterStartup
                 $timeouts = @{
                     UH_EDITOR_TEST_TIMEOUT_SECONDS = '900'
                     UH_STANDALONE_BUILD_TIMEOUT_SECONDS = '1800'

@@ -1151,14 +1151,19 @@ assert.match(
 for (const event of ["workflow_dispatch", "pull_request", "push", "schedule"]) {
   for (const attach of [false, true]) {
     for (const cancelled of [false, true]) {
-      assert.equal(
-        predicate(attachSelection)({
-          cancelled,
-          github: { event_name: event },
-          inputs: { "native-build-attach-control": attach }
-        }),
-        !cancelled && event === "workflow_dispatch" && attach
-      );
+      for (const startup of [false, true]) {
+        assert.equal(
+          predicate(attachSelection)({
+            cancelled,
+            github: { event_name: event },
+            inputs: {
+              "native-build-attach-control": attach,
+              "native-build-attach-after-startup": startup
+            }
+          }),
+          !cancelled && event === "workflow_dispatch" && (attach || startup)
+        );
+      }
     }
   }
 }
@@ -1206,4 +1211,91 @@ for (const [selection, code] of [
 }
 console.log(
   `${attachSelections.length} attachment admission controls and five removed-guard controls passed.`
+);
+
+const startupOption = workflow.match(
+  /^      native-build-attach-after-startup:\n((?:        [^\n]*\n|\n)+)/m
+)[1];
+assert.match(startupOption, /^        default: false$/m);
+assert.match(startupOption, /^        type: boolean$/m);
+for (const [field, input] of [
+  ["UH_NATIVE_ATTACH_CONTROL", "native-build-attach-control"],
+  ["UH_NATIVE_ATTACH_AFTER_STARTUP", "native-build-attach-after-startup"]
+]) {
+  assert.ok(attachSelection.includes(`${field}: \u0024{{ inputs.${input} }}`));
+}
+assert.match(
+  nativeBuild,
+  /UH_NATIVE_ATTACH_AFTER_STARTUP: \$\{\{ inputs.native-build-attach-after-startup \}\}/
+);
+assert.match(
+  nativeBuild,
+  /-StandaloneBuildAttachAfterStartup:\(\$env:UH_NATIVE_ATTACH_AFTER_STARTUP -eq 'true'\)/
+);
+const { getStartupAttachSelectionError } = require(attachHelperPath);
+const startupSelections = [];
+for (const selection of attachSelections) {
+  for (const attach of ["true", "false", "", "invalid"]) {
+    for (const startup of ["true", "false", "", "invalid"]) {
+      const environment = {
+        ...selection.environment,
+        UH_NATIVE_ATTACH_CONTROL: attach,
+        UH_NATIVE_ATTACH_AFTER_STARTUP: startup
+      };
+      const permitted = selection.permitted && attach === "true" && startup === "true";
+      assert.equal(getStartupAttachSelectionError(environment) === null, permitted);
+      startupSelections.push({ environment, permitted });
+    }
+  }
+}
+for (const [field, value] of [
+  ["UH_NATIVE_ATTACH_CONTROL", "true"],
+  ["UH_NATIVE_ATTACH_AFTER_STARTUP", "true"]
+]) {
+  const mutant = attachHelperSource.replace(`environment.${field} !== "${value}"`, "false");
+  assert.notEqual(mutant, attachHelperSource);
+  const sandbox = { module: { exports: {} }, require, console, process };
+  vm.runInNewContext(mutant, sandbox, { filename: attachHelperPath });
+  assert.equal(
+    startupSelections.filter(
+      ({ environment, permitted }) =>
+        (sandbox.module.exports.getStartupAttachSelectionError(environment) === null) !== permitted
+    ).length,
+    3
+  );
+}
+const delegateMutant = attachHelperSource.replace(
+  "getAttachSelectionError(environment) !== null",
+  "false"
+);
+assert.notEqual(delegateMutant, attachHelperSource);
+const delegateSandbox = { module: { exports: {} }, require, console, process };
+vm.runInNewContext(delegateMutant, delegateSandbox, { filename: attachHelperPath });
+assert.equal(
+  startupSelections.filter(
+    ({ environment, permitted }) =>
+      (delegateSandbox.module.exports.getStartupAttachSelectionError(environment) === null) !==
+      permitted
+  ).length,
+  1023
+);
+for (const [attach, startup, expected] of [
+  ["true", "true", 0],
+  ["false", "true", 1],
+  ["true", "false", 0],
+  ["true", "invalid", 1]
+]) {
+  const result = spawnSync(process.execPath, [attachHelperPath], {
+    env: {
+      ...process.env,
+      ...attachSelections[0].environment,
+      UH_NATIVE_ATTACH_CONTROL: attach,
+      UH_NATIVE_ATTACH_AFTER_STARTUP: startup
+    },
+    encoding: "utf8"
+  });
+  assert.equal(result.status, expected, result.stderr);
+}
+console.log(
+  `${startupSelections.length} startup attachment admissions and three removed-guard controls passed.`
 );

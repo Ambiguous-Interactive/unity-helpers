@@ -178,25 +178,46 @@ try {
         if ([string]::IsNullOrWhiteSpace($DebuggerDirectory) -or [string]::IsNullOrWhiteSpace($NativeProgramsDirectory)) { throw 'Real Windows capture requires the pinned debugger and normal/AV control programs.' }
         $project = Join-Path $root 'project'; $null = [IO.Directory]::CreateDirectory((Join-Path $project 'ProjectSettings'))
         [IO.File]::WriteAllText((Join-Path $project 'ProjectSettings/ProjectVersion.txt'), "m_EditorVersion: 6000.6.0f1`n")
-        foreach ($kind in @('normal', 'av')) {
+        foreach ($kind in @('normal', 'av', 'startup-normal', 'startup-av')) {
+            $delayed = $kind.StartsWith('startup-', [StringComparison]::Ordinal)
+            $isAv = $kind.EndsWith('av', [StringComparison]::Ordinal)
             $program = Join-Path $NativeProgramsDirectory ($kind + '/control.exe')
             $casePath = Join-Path $root $kind; $null = [IO.Directory]::CreateDirectory($casePath)
             $arguments = @('-batchmode', '-nographics', '-projectPath', $project, '-runTests', '-testPlatform', 'StandaloneWindows64', '-logFile', '-')
             $direct = @{}
             $null = Invoke-NativeCaptureProcess -FilePath $program -Arguments $arguments -Directory ([Environment]::CurrentDirectory) -Seconds 30 -Observation $direct -PreserveSymbolPath
             & $source -EditorPath $program -ProjectPath $project -BuildArguments $arguments -BuildLogPath (Join-Path $casePath 'build.log') `
-                -ArtifactsPath (Join-Path $casePath 'capture') -DebuggerDirectory $DebuggerDirectory -TimeoutSeconds 45 -AttachToDirect
+                -ArtifactsPath (Join-Path $casePath 'capture') -DebuggerDirectory $DebuggerDirectory -TimeoutSeconds 45 -AttachToDirect -AttachAfterStartup:$delayed
             $record = Get-Content -LiteralPath (Join-Path $casePath 'capture/receipt.json') -Raw | ConvertFrom-Json -AsHashtable
             $case = $record.Cases[0]
-            $raw = if ($kind -eq 'av') { -1073741819 } else { 0 }
+            $raw = if ($isAv) { -1073741819 } else { 0 }
             Assert-Attach ($record.EvidenceOnly -and $record.State -ceq 'completed' -and $case.Attach.State -ceq 'completed' -and
                 -not $case.Attach.CleanupRequested -and $case.Attach.WorkerState -ceq 'Completed' -and $case.TargetProcess.RawExitCode -eq $raw -and
                 $direct.RawExitCode -eq $raw -and $case.TargetExitEvent.Pid -eq $case.TargetProcess.Pid -and $case.Process.Reaped -and
                 $null -eq $case.Process.KillReason -and $case.Process.Pid -ne $case.TargetProcess.Pid) "Actual $kind program preserves separate natural target and controller exits."
-            Assert-Attach ($case.DumpPresent -eq ($kind -eq 'av') -and $record.DebuggerArguments[0] -ceq '-pd' -and $record.DebuggerArguments[1] -ceq '-p' -and
+            Assert-Attach ($case.DumpPresent -eq $isAv -and $record.DebuggerArguments[0] -ceq '-pd' -and $record.DebuggerArguments[1] -ceq '-p' -and
                 $record.DebuggerHeap.Requested -ceq 'direct-start-then-attach') "Actual $kind Build entry binds attach mode and private fault dump."
+            Assert-Attach ($case.Attach.ObservedCommandLine.Contains($program) -and $case.Attach.ObservedCommandLine.Contains('-projectPath') -and
+                $case.Attach.ObservedCommandLine.Contains($project) -and (Test-Path -LiteralPath (Join-Path $casePath 'capture/build-target-console-head.log'))) "Actual $kind retains the observed OS command line and bounded startup output."
+            if ($delayed) {
+                Assert-Attach ($case.Attach.Boundary -ceq 'reported-domain-reload' -and $case.Attach.Startup.Line -ceq 'Domain Reload Profiling: controlled' -and
+                    $case.Attach.Startup.Pid -eq $case.TargetProcess.Pid -and $case.Attach.Startup.CaptureId -ceq $case.Attach.CaptureId -and
+                    [DateTimeOffset]::Parse($case.Attach.Startup.ObservedUtc) -le [DateTimeOffset]::Parse($case.Attach.RequestedUtc)) "Actual $kind observes startup on the exact target before requesting attachment."
+            }
             Assert-Attach ([Environment]::GetEnvironmentVariable('_NT_SYMBOL_PATH', 'Process') -ceq $symbols -and [Environment]::GetEnvironmentVariable('_NO_DEBUG_HEAP', 'Process') -ceq $heap) "Actual $kind capture preserves inherited environment."
             Write-Host "Actual $kind Build entry evidence: $casePath"
+        }
+        foreach ($kind in @('early', 'timeout')) {
+            $casePath = Join-Path $root ('startup-' + $kind); $null = [IO.Directory]::CreateDirectory($casePath)
+            $failed = $false
+            try {
+                & $source -EditorPath (Join-Path $NativeProgramsDirectory ($kind + '/control.exe')) -ProjectPath $project -BuildArguments $arguments -BuildLogPath (Join-Path $casePath 'build.log') `
+                    -ArtifactsPath (Join-Path $casePath 'capture') -DebuggerDirectory $DebuggerDirectory -TimeoutSeconds 8 -AttachToDirect -AttachAfterStartup
+            } catch { $failed = $true }
+            $record = Get-Content -LiteralPath (Join-Path $casePath 'capture/receipt.json') -Raw | ConvertFrom-Json -AsHashtable
+            $case = $record.Cases[0]
+            Assert-Attach ($failed -and $record.State -ceq 'failed' -and $case.Process.Count -eq 0 -and $null -eq $case.Attach.Startup -and
+                $case.TargetProcess.Reaped -and $case.Attach.WorkerState -cne 'Running') "Actual startup $kind cannot attach without a complete startup observation and reaps the target."
         }
         foreach ($kind in @('early', 'timeout')) {
             $program = Join-Path $NativeProgramsDirectory ($kind + '/control.exe')
@@ -269,6 +290,7 @@ Invoke-NativeAttachWorker -Specification $WorkerSpecification -ArtifactsPath $Ar
         Write-Host "Retained Windows controls at $root"
     } else { Write-Host 'Actual Windows CDB attachment controls were not requested; no Windows qualification claimed.' }
     Write-Host "$passed native attach controls passed"
+    & (Join-Path $PSScriptRoot 'test-native-attach-startup.ps1')
     $completed = $true
 } finally {
     if ($completed -and -not $RequireWindows) { Remove-Item -LiteralPath $root -Recurse -Force }

@@ -81,6 +81,11 @@ on:
         required: false
         default: false
         type: boolean
+      native-build-attach-after-startup:
+        description: "Wait for the first completed domain-reload profile line before CDB attach; requires native-build-attach-control."
+        required: false
+        default: false
+        type: boolean
       native-loader-snaps-comparison:
         description: "Temporarily clear Unity.exe loader snaps, capture, then restore; requires native diagnostics and EditMode."
         required: false
@@ -291,13 +296,15 @@ jobs:
         run: node scripts/unity/validate-native-build-heap-selection.js
 
       - name: Validate Standalone debugger attachment selection
-        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-build-attach-control }}
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && (inputs.native-build-attach-control || inputs.native-build-attach-after-startup) }}
         env:
           UH_NATIVE_DIAGNOSTICS: ${{ inputs.native-diagnostics }}
           UH_NATIVE_MODE: ${{ inputs.test-mode }}
           UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
           UH_NATIVE_DIRECT_CONTROL: ${{ inputs.native-build-direct-control }}
           UH_NATIVE_STANDARD_HEAP: ${{ inputs.native-debugger-standard-heap }}
+          UH_NATIVE_ATTACH_CONTROL: ${{ inputs.native-build-attach-control }}
+          UH_NATIVE_ATTACH_AFTER_STARTUP: ${{ inputs.native-build-attach-after-startup }}
         run: node scripts/unity/validate-native-build-attach-selection.js
 
       # Assembly compatibility depends on target mode and integration opt-in,
@@ -862,6 +869,7 @@ jobs:
           UH_NATIVE_BUILD_CAPTURE_MODE: ${{ inputs.native-build-direct-control && 'Direct' || 'Debugger' }}
           UH_NATIVE_DEBUGGER_STANDARD_HEAP: ${{ inputs.native-debugger-standard-heap }}
           UH_NATIVE_ATTACH_CONTROL: ${{ inputs.native-build-attach-control }}
+          UH_NATIVE_ATTACH_AFTER_STARTUP: ${{ inputs.native-build-attach-after-startup }}
         run: |
           ./scripts/unity/run-acceptance.ps1 `
             -Acceptance 'wproto' -UnityVersion '6000.6.0f1' `
@@ -869,6 +877,7 @@ jobs:
             -StandaloneBuildCaptureBackend 'IL2CPP' `
             -StandaloneBuildDebuggerStandardHeap:($env:UH_NATIVE_DEBUGGER_STANDARD_HEAP -eq 'true') `
             -StandaloneBuildAttachToDirect:($env:UH_NATIVE_ATTACH_CONTROL -eq 'true') `
+            -StandaloneBuildAttachAfterStartup:($env:UH_NATIVE_ATTACH_AFTER_STARTUP -eq 'true') `
             -ArtifactsPath '.artifacts/unity/6000.6.0f1-standalone/build-only-diagnostics' `
             -TemporaryRoot $env:RUNNER_TEMP
 
