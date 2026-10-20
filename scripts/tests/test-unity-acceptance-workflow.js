@@ -16,6 +16,12 @@ const directOption = workflow.match(
 assert.ok(directOption, "Manual Direct build control input must exist");
 assert.match(directOption, /^        default: false$/m);
 assert.match(directOption, /^        type: boolean$/m);
+const heapOption = workflow.match(
+  /^      native-debugger-standard-heap:\n((?:        [^\n]*\n|\n)+)/m
+)?.[1];
+assert.ok(heapOption, "Manual standard heap control input must exist");
+assert.match(heapOption, /^        default: false$/m);
+assert.match(heapOption, /^        type: boolean$/m);
 const option = workflow.match(/^      acceptance:\n((?:        [^\n]*\n|\n)+)/m)?.[1];
 assert.ok(option, "Manual acceptance input must exist");
 assert.match(option, /^        required: false$/m);
@@ -842,6 +848,14 @@ assert.ok(steps.indexOf(nativeBuildPython) < steps.indexOf(nativeBuild));
 assert.ok(steps.indexOf(identified("run_standalone")) < steps.indexOf(nativeBuild));
 assert.match(nativeBuild, /-StandaloneBuildCapture \$env:UH_NATIVE_BUILD_CAPTURE_MODE/);
 assert.match(nativeBuild, /-StandaloneBuildCaptureBackend 'IL2CPP'/);
+assert.match(
+  nativeBuild,
+  /UH_NATIVE_DEBUGGER_STANDARD_HEAP: \$\{\{ inputs.native-debugger-standard-heap \}\}/
+);
+assert.match(
+  nativeBuild,
+  /-StandaloneBuildDebuggerStandardHeap:\(\$env:UH_NATIVE_DEBUGGER_STANDARD_HEAP -eq 'true'\)/
+);
 assert.match(nativeBuild, /-Acceptance 'wproto' -UnityVersion '6000\.6\.0f1'/);
 assert.match(
   nativeBuild,
@@ -1008,4 +1022,98 @@ for (const [diagnostics, mode, acceptance, exitCode] of [
 }
 console.log(
   `${directSelections.length} Direct build selection controls, three removed-guard controls, CLI and workflow wiring passed.`
+);
+
+const heapSelection = matrixConfig.match(
+  /- name: Validate Standalone debugger heap selection\n[\s\S]*?(?=\n      - name:)/
+)?.[0];
+assert.ok(heapSelection);
+assert.match(heapSelection, /run: node scripts\/unity\/validate-native-build-heap-selection\.js/);
+for (const [field, input] of [
+  ["UH_NATIVE_DIAGNOSTICS", "native-diagnostics"],
+  ["UH_NATIVE_MODE", "test-mode"],
+  ["UH_NATIVE_ACCEPTANCE", "acceptance"],
+  ["UH_NATIVE_DIRECT_CONTROL", "native-build-direct-control"]
+]) {
+  assert.ok(heapSelection.includes(field + ": ${{ inputs." + input + " }}"));
+}
+for (const event of ["workflow_dispatch", "pull_request", "push", "schedule"]) {
+  for (const heap of [false, true]) {
+    for (const cancelled of [false, true]) {
+      assert.equal(
+        predicate(heapSelection)({
+          cancelled,
+          github: { event_name: event },
+          inputs: { "native-debugger-standard-heap": heap }
+        }),
+        !cancelled && event === "workflow_dispatch" && heap
+      );
+    }
+  }
+}
+const heapHelperPath = path.join(__dirname, "../unity/validate-native-build-heap-selection.js");
+const heapHelperSource = fs.readFileSync(heapHelperPath, "utf8");
+const { getStandardHeapSelectionError } = require(heapHelperPath);
+const heapSelections = [];
+for (const diagnostics of ["", "false", "true", "invalid"]) {
+  for (const mode of ["", "editmode", "standalone", "all"]) {
+    for (const acceptance of ["", "none", "wproto", "all"]) {
+      for (const direct of ["", "false", "true", "invalid"]) {
+        const environment = {
+          UH_NATIVE_DIAGNOSTICS: diagnostics,
+          UH_NATIVE_MODE: mode,
+          UH_NATIVE_ACCEPTANCE: acceptance,
+          UH_NATIVE_DIRECT_CONTROL: direct
+        };
+        const permitted =
+          diagnostics === "true" &&
+          mode === "standalone" &&
+          acceptance === "none" &&
+          direct === "false";
+        assert.equal(getStandardHeapSelectionError(environment) === null, permitted);
+        heapSelections.push({ environment, permitted });
+      }
+    }
+  }
+}
+for (const missing of [null, undefined, {}]) {
+  assert.notEqual(getStandardHeapSelectionError(missing), null);
+}
+for (const [field, value] of [
+  ["UH_NATIVE_DIAGNOSTICS", "true"],
+  ["UH_NATIVE_MODE", "standalone"],
+  ["UH_NATIVE_ACCEPTANCE", "none"],
+  ["UH_NATIVE_DIRECT_CONTROL", "false"]
+]) {
+  const withoutGuard = heapHelperSource.replace(`environment.${field} !== "${value}"`, "false");
+  assert.notEqual(withoutGuard, heapHelperSource);
+  const sandbox = { module: { exports: {} }, require, console, process };
+  vm.runInNewContext(withoutGuard, sandbox, { filename: heapHelperPath });
+  assert.equal(
+    heapSelections.filter(
+      ({ environment, permitted }) =>
+        (sandbox.module.exports.getStandardHeapSelectionError(environment) === null) !== permitted
+    ).length,
+    3
+  );
+}
+for (const [direct, expected] of [
+  ["false", 0],
+  ["true", 1],
+  ["", 1]
+]) {
+  const result = spawnSync(process.execPath, [heapHelperPath], {
+    env: {
+      ...process.env,
+      UH_NATIVE_DIAGNOSTICS: "true",
+      UH_NATIVE_MODE: "standalone",
+      UH_NATIVE_ACCEPTANCE: "none",
+      UH_NATIVE_DIRECT_CONTROL: direct
+    },
+    encoding: "utf8"
+  });
+  assert.equal(result.status, expected, result.stderr);
+}
+console.log(
+  `${heapSelections.length} standard heap admission controls and four removed-guard controls passed.`
 );

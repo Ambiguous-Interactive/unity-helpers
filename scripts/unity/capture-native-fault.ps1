@@ -13,6 +13,7 @@ param(
     [Parameter(ParameterSetName = 'Build')][string]$DebuggerDirectory,
     [Parameter(Mandatory = $true, ParameterSetName = 'Build')][string[]]$BuildArguments,
     [Parameter(Mandatory = $true, ParameterSetName = 'Build')][string]$BuildLogPath,
+    [Parameter(ParameterSetName = 'Build')][switch]$UseStandardHeap,
     [Parameter(ParameterSetName = 'Capture')][switch]$CompareLoaderSnaps,
     [Parameter(ParameterSetName = 'Capture')]
     [Parameter(ParameterSetName = 'Build')][ValidateRange(1, 1800)][int]$TimeoutSeconds = 600,
@@ -167,7 +168,8 @@ function Invoke-NativeStandaloneBuildCapture {
     param(
         [string]$EditorPath, [string]$ProjectPath, [string[]]$Arguments,
         [string]$DebuggerPath, [string]$PrivateDirectory, [string]$ArtifactsPath,
-        [string]$LogPath, [int]$Seconds, [System.Collections.IDictionary]$Record
+        [string]$LogPath, [int]$Seconds, [System.Collections.IDictionary]$Record,
+        [switch]$UseStandardHeap
     )
 
     foreach ($pair in @(@('-projectPath', $ProjectPath), @('-testPlatform', 'StandaloneWindows64'), @('-logFile', '-'))) {
@@ -190,14 +192,22 @@ function Invoke-NativeStandaloneBuildCapture {
     $Record.InputArguments = @($Arguments)
     $Record.ActualArguments = $actual
     $Record.BuildEnvironment = [ordered]@{}
+    $Record.DebuggerHeap = [ordered]@{
+        Requested = $(if ($UseStandardHeap) { 'standard' } else { 'debugger-default' })
+        InheritedNoDebugHeap = $(if ($null -eq [Environment]::GetEnvironmentVariable('_NO_DEBUG_HEAP', 'Process')) { 'absent' } else { 'present' })
+        TargetState = 'unverified'
+    }
     foreach ($name in @('UH_PLAYER_BUILD_PATH', 'UH_PERF_COMMIT', 'UH_PERF_BASE_COMMIT', 'UH_PERF_OPTIMIZATION')) {
         $Record.BuildEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
     }
     $Record.Qualification = 'One existing build under a debugger; controller and target exits are distinct. No player launch, timing or acceptance qualification. Symbol-path environment is inherited unchanged.'
     $Record.Cases += $case
+    $debuggerArguments = @('-c', (Get-NativeCaptureDebuggerCommand -DumpPath (Join-Path $PrivateDirectory 'fault.dmp')), $EditorPath) + $actual
+    if ($UseStandardHeap) { $debuggerArguments = @('-hd') + $debuggerArguments }
+    $Record.DebuggerArguments = $debuggerArguments
     Save-NativeCaptureRecord
     $output = Invoke-NativeCaptureProcess -FilePath $DebuggerPath `
-        -Arguments (@('-c', (Get-NativeCaptureDebuggerCommand -DumpPath (Join-Path $PrivateDirectory 'fault.dmp')), $EditorPath) + $actual) `
+        -Arguments $debuggerArguments `
         -Directory $Record.WorkingDirectory -Seconds $Seconds -Observation $case.Process `
         -ReceiptPath (Join-Path $ArtifactsPath 'build-debugger-process.json') -PreserveSymbolPath
     $safeOutput = ConvertTo-UnitySafeLogText -Text $output
@@ -481,7 +491,7 @@ try {
     if ($PSCmdlet.ParameterSetName -eq 'Build') {
         Invoke-NativeStandaloneBuildCapture -EditorPath $EditorPath -ProjectPath $ProjectPath `
             -Arguments $BuildArguments -DebuggerPath $debugger -PrivateDirectory (Join-Path $privateRoot 'build') `
-            -ArtifactsPath $artifactRoot -LogPath $BuildLogPath -Seconds $TimeoutSeconds -Record $record
+            -ArtifactsPath $artifactRoot -LogPath $BuildLogPath -Seconds $TimeoutSeconds -Record $record -UseStandardHeap:$UseStandardHeap
         return
     }
     $versionMatch = [regex]::Match($record.ProjectVersion, '(?m)^m_EditorVersion: ([^\s]+)')

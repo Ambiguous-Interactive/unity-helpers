@@ -372,6 +372,17 @@ caller working directory, inherited symbol-path environment, safe build identity
 variables, debugger process outcome and unique target exit event are retained.
 The dump stays private even though the debugger retains the caller's working directory.
 
+To test whether the debugger's heap behavior affects a fault, separately opt into
+`native-debugger-standard-heap: true`. This requires the Standalone debugger arm,
+`native-diagnostics: true`, `native-build-direct-control: false`, and `acceptance: none`.
+The collector adds only CDB's `-hd` launch option; Unity arguments, symbols, working directory
+and ordinary test execution stay the same. Microsoft documents the
+[standard-heap option](https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/debugging-a-user-mode-process-using-cdb).
+The receipt records the requested policy and inherited `_NO_DEBUG_HEAP` presence without
+changing the environment or registry. It does not infer the target's actual heap state.
+Compare separate captures on the same source before attributing a fault to this difference.
+Missing or rejected captures and later successful exits retain their original dispositions.
+
 This build-only route deliberately throws after the post-build inventory, before
 player launch. The diagnostic job and workflow therefore fail even when the
 capture completes naturally; inspect `build-only-diagnostics/wproto/native-build-diagnostics/receipt.json`

@@ -685,11 +685,13 @@ Start-Sleep -Seconds 300
     $script:buildSavedRecords = @()
     $script:buildControllerExit = 0
     $script:buildKillReason = $null
+    $script:buildThrowOnLaunch = $false
     $script:buildTargetText = 'Last event: 2a.1: Exit process 0:2a, code c0000005'
     function Save-NativeCaptureRecord { $script:buildSavedRecords += ($Record | ConvertTo-Json -Depth 12 -Compress) }
     function Invoke-NativeCaptureProcess {
         param($FilePath, $Arguments, $Directory, $Seconds, $Observation, $ReceiptPath, [switch]$PreserveSymbolPath)
         $script:buildCaptureCalls += @{ FilePath = $FilePath; Arguments = @($Arguments); Directory = $Directory; Seconds = $Seconds; PreserveSymbolPath = [bool]$PreserveSymbolPath }
+        if ($script:buildThrowOnLaunch) { throw 'Controlled debugger launch failure.' }
         $Observation.RawExitCode = $script:buildControllerExit
         $Observation.Reaped = $true
         $Observation.KillReason = $script:buildKillReason
@@ -716,6 +718,26 @@ Start-Sleep -Seconds 300
         $matchingRecord = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = $null }
         Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root 'matching-target-code') -ArtifactsPath $root -LogPath (Join-Path $root 'matching-target-code.log') -Seconds 123 -Record $matchingRecord
         Assert-Capture ($matchingRecord.State -ceq 'completed' -and $matchingRecord.Cases[0].TargetExitCode -eq -1073741819 -and $matchingRecord.Cases[0].ControllerExitRelation -ceq 'matches-observed-target') 'A matching nonzero controller code preserves the observed target fault independently'
+        $standardRecord = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = $null }
+        $standardPrivate = Join-Path $root 'standard heap private'
+        $originalNoDebugHeap = [Environment]::GetEnvironmentVariable('_NO_DEBUG_HEAP', 'Process')
+        Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory $standardPrivate -ArtifactsPath $root -LogPath (Join-Path $root 'standard-heap.log') -Seconds 123 -Record $standardRecord -UseStandardHeap
+        $standardCall = $script:buildCaptureCalls[-1]
+        Assert-Capture ($standardCall.Arguments[0] -ceq '-hd' -and $standardCall.Arguments[1] -ceq '-c' -and $standardCall.Arguments[3] -ceq 'exact-editor.exe') 'Standard heap selection changes only CDB launch options'
+        $standardForwarded = @($standardCall.Arguments | Select-Object -Skip 4)
+        Assert-Capture (($standardForwarded[0..($buildArguments.Count - 1)] -join [char]0) -ceq ($buildArguments -join [char]0) -and $standardForwarded.Count -eq $buildArguments.Count + 4) 'Standard heap selection preserves every Unity argument and its order'
+        Assert-Capture ($standardRecord.DebuggerHeap.Requested -ceq 'standard' -and $buildRecord.DebuggerHeap.Requested -ceq 'debugger-default') 'Receipts distinguish requested standard heap from the unchanged debugger default'
+        Assert-Capture (($standardRecord.DebuggerArguments -join [char]0) -ceq ($standardCall.Arguments -join [char]0) -and ($buildRecord.DebuggerArguments -join [char]0) -ceq ($call.Arguments -join [char]0)) 'Receipts bind both requested policies to the actual CDB argument arrays'
+        Assert-Capture ($standardRecord.DebuggerHeap.TargetState -ceq 'unverified' -and [Environment]::GetEnvironmentVariable('_NO_DEBUG_HEAP', 'Process') -ceq $originalNoDebugHeap) 'Heap request does not claim target state or mutate inherited heap environment'
+        Assert-Capture ($standardRecord.Cases[0].TargetExitCode -eq -1073741819 -and $standardRecord.Cases[0].Process.RawExitCode -eq -1073741819 -and $standardCall.PreserveSymbolPath -and $standardCall.Directory -ceq [Environment]::CurrentDirectory) 'Standard heap capture preserves target/controller faults and environment boundaries'
+        $failedRecord = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = $null }
+        $savedBeforeLaunch = $script:buildSavedRecords.Count
+        $script:buildThrowOnLaunch = $true
+        $launchFailed = $false
+        try { Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root 'failed-standard-launch') -ArtifactsPath $root -LogPath (Join-Path $root 'failed-standard.log') -Seconds 123 -Record $failedRecord -UseStandardHeap }
+        catch { $launchFailed = $_.Exception.Message -ceq 'Controlled debugger launch failure.' }
+        finally { $script:buildThrowOnLaunch = $false }
+        Assert-Capture ($launchFailed -and $script:buildSavedRecords.Count -eq $savedBeforeLaunch + 1 -and $failedRecord.State -ceq 'preparing' -and $failedRecord.DebuggerArguments[0] -ceq '-hd' -and -not $failedRecord.Cases[0].Process.ContainsKey('RawExitCode')) 'Failed launch retains requested heap arguments before starting and cannot fabricate an exit'
         foreach ($scenario in @('controller-failed', 'target-missing', 'target-ambiguous', 'timeout')) {
             $script:buildControllerExit = if ($scenario -eq 'controller-failed') { 1 } else { 0 }
             $script:buildKillReason = if ($scenario -eq 'timeout') { 'wall-clock-timeout' } else { $null }
@@ -750,21 +772,54 @@ Start-Sleep -Seconds 300
     $script:diagnosticBuildCalls = 0
     $script:diagnosticSnapshots = 0
     $script:diagnosticPlayerCalls = 0
-    function Invoke-UnityStandaloneBuildDiagnostic { param($Mode, $EditorPath, $ProjectPath, $Arguments, $ArtifactsPath, $LogPath, $TimeoutSeconds) ++$script:diagnosticBuildCalls }
+    $script:diagnosticHeapRequests = @()
+    function Invoke-UnityStandaloneBuildDiagnostic { param($Mode, $EditorPath, $ProjectPath, $Arguments, $ArtifactsPath, $LogPath, $TimeoutSeconds, [switch]$UseStandardHeap) ++$script:diagnosticBuildCalls; $script:diagnosticHeapRequests += [bool]$UseStandardHeap }
     function Add-FrozenPlayerProvenanceSnapshot { param($Context, $Stage, [switch]$IncludePayload) Assert-Capture ($Stage -ceq 'after-build' -and $IncludePayload) 'Diagnostic records the actual post-build inventory'; ++$script:diagnosticSnapshots }
     function Get-StandaloneBuildTimeoutSeconds { return 123 }
     function Invoke-StandaloneTestPlayer { ++$script:diagnosticPlayerCalls }
-    foreach ($mode in @('Direct', 'Debugger')) {
-        $StandaloneBuildCapture = $mode
+    foreach ($selection in @(@{ Mode = 'Direct'; StandardHeap = $false }, @{ Mode = 'Debugger'; StandardHeap = $false }, @{ Mode = 'Debugger'; StandardHeap = $true })) {
+        $StandaloneBuildCapture = $selection.Mode
+        $StandaloneBuildDebuggerStandardHeap = $selection.StandardHeap
         $UnityEditorPath = 'exact-editor.exe'; $ProjectPath = $project; $buildArgs = $buildArguments; $ArtifactsPath = $root; $logPath = Join-Path $root 'integration.log'; $frozenPlayerProvenance = @{}
         $rejected = $false
         try { & ([scriptblock]::Create($buildBranch.Extent.Text + '; Invoke-StandaloneTestPlayer')) } catch { $rejected = $_.Exception.Message -like 'Evidence-only Standalone build capture stops before player launch*' }
-        Assert-Capture ($rejected -and $script:diagnosticPlayerCalls -eq 0) "Build-only route never launches a player or returns acceptance: $mode"
+        Assert-Capture ($rejected -and $script:diagnosticPlayerCalls -eq 0 -and $script:diagnosticHeapRequests[-1] -eq $selection.StandardHeap) "Build-only route retains heap selection and never launches a player: $($selection.Mode)/$($selection.StandardHeap)"
     }
-    Assert-Capture ($script:diagnosticBuildCalls -eq 2 -and $script:diagnosticSnapshots -eq 2) 'Each diagnostic arm performs one existing build and one post-build inventory'
+    Assert-Capture ($script:diagnosticBuildCalls -eq 3 -and $script:diagnosticSnapshots -eq 3) 'Each diagnostic arm performs one existing build and one post-build inventory'
     $StandaloneBuildCapture = 'None'
+    $StandaloneBuildDebuggerStandardHeap = $false
     & ([scriptblock]::Create($buildBranch.Extent.Text + '; Invoke-StandaloneTestPlayer'))
-    Assert-Capture ($script:diagnosticBuildCalls -eq 2 -and $script:diagnosticPlayerCalls -eq 1) 'Disabled diagnostic leaves the ordinary player path reachable'
+    Assert-Capture ($script:diagnosticBuildCalls -eq 3 -and $script:diagnosticPlayerCalls -eq 1) 'Disabled diagnostic leaves the ordinary player path reachable'
+
+    $acceptanceTokens = $null
+    $acceptanceErrors = $null
+    $acceptanceAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts/unity/run-acceptance.ps1'), [ref]$acceptanceTokens, [ref]$acceptanceErrors)
+    Assert-Capture ($acceptanceErrors.Count -eq 0) 'Heap acceptance driver parses'
+    $heapTransfer = $acceptanceAst.Find({ param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -ceq '$parameters.StandaloneBuildDebuggerStandardHeap' }, $true)
+    Assert-Capture ($null -ne $heapTransfer) 'Acceptance forwards the heap request to the runner'
+    foreach ($requested in @($false, $true)) {
+        $StandaloneBuildDebuggerStandardHeap = $requested
+        $parameters = @{}
+        Invoke-Expression $heapTransfer.Extent.Text
+        Assert-Capture ($parameters.StandaloneBuildDebuggerStandardHeap -is [bool] -and $parameters.StandaloneBuildDebuggerStandardHeap -eq $requested) 'Acceptance forwards the actual heap request as a Boolean'
+    }
+    foreach ($driverAst in @($runnerAst, $acceptanceAst)) {
+        $heapGuard = $driverAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text.StartsWith('$StandaloneBuildDebuggerStandardHeap -and') }, $true)
+        Assert-Capture ($null -ne $heapGuard) 'Each driver refuses incompatible heap requests'
+        foreach ($requested in @($false, $true)) {
+            foreach ($mode in @('None', 'Direct', 'Debugger')) {
+                foreach ($selection in @('wproto', 'all', 'borrowed')) {
+                    $StandaloneBuildDebuggerStandardHeap = $requested
+                    $StandaloneBuildCapture = $mode
+                    $Acceptance = $selection
+                    $rejected = $false
+                    try { Invoke-Expression $heapGuard.Extent.Text } catch { $rejected = $_.Exception.Message -like 'Standard heap selection requires*' }
+                    $expected = $requested -and ($mode -cne 'Debugger' -or ($driverAst -eq $acceptanceAst -and $selection -cne 'wproto'))
+                    Assert-Capture ($rejected -eq $expected) "Actual driver heap admission: $requested/$mode/$selection"
+                }
+            }
+        }
+    }
 
     $workflow = [IO.File]::ReadAllText((Join-Path $repo '.github/workflows/unity-tests.yml'))
     Assert-Capture ($workflow -match '(?s)native-diagnostics:.*?default: false.*?type: boolean') 'Diagnostic input defaults off'

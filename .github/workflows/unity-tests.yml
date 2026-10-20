@@ -71,6 +71,11 @@ on:
         required: false
         default: false
         type: boolean
+      native-debugger-standard-heap:
+        description: "Request CDB standard heap for the Standalone debugger arm; requires native diagnostics and acceptance=none."
+        required: false
+        default: false
+        type: boolean
       native-loader-snaps-comparison:
         description: "Temporarily clear Unity.exe loader snaps, capture, then restore; requires native diagnostics and EditMode."
         required: false
@@ -270,6 +275,15 @@ jobs:
           UH_NATIVE_MODE: ${{ inputs.test-mode }}
           UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
         run: node scripts/unity/validate-native-build-direct-selection.js
+
+      - name: Validate Standalone debugger heap selection
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-debugger-standard-heap }}
+        env:
+          UH_NATIVE_DIAGNOSTICS: ${{ inputs.native-diagnostics }}
+          UH_NATIVE_MODE: ${{ inputs.test-mode }}
+          UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
+          UH_NATIVE_DIRECT_CONTROL: ${{ inputs.native-build-direct-control }}
+        run: node scripts/unity/validate-native-build-heap-selection.js
 
       # Assembly compatibility depends on target mode and integration opt-in,
       # never on Unity version. Compute each distinct list once on this hosted
@@ -831,11 +845,13 @@ jobs:
           UH_PERF_BASE_COMMIT: ${{ github.sha }}
           UH_PERF_OPTIMIZATION: "Release"
           UH_NATIVE_BUILD_CAPTURE_MODE: ${{ inputs.native-build-direct-control && 'Direct' || 'Debugger' }}
+          UH_NATIVE_DEBUGGER_STANDARD_HEAP: ${{ inputs.native-debugger-standard-heap }}
         run: |
           ./scripts/unity/run-acceptance.ps1 `
             -Acceptance 'wproto' -UnityVersion '6000.6.0f1' `
             -StandaloneBuildCapture $env:UH_NATIVE_BUILD_CAPTURE_MODE `
             -StandaloneBuildCaptureBackend 'IL2CPP' `
+            -StandaloneBuildDebuggerStandardHeap:($env:UH_NATIVE_DEBUGGER_STANDARD_HEAP -eq 'true') `
             -ArtifactsPath '.artifacts/unity/6000.6.0f1-standalone/build-only-diagnostics' `
             -TemporaryRoot $env:RUNNER_TEMP
 

@@ -14,7 +14,8 @@ param(
     [ValidateSet('None', 'Direct', 'Debugger')]
     [string]$StandaloneBuildCapture = 'None',
     [ValidateSet('Mono2x', 'IL2CPP')]
-    [string]$StandaloneBuildCaptureBackend = 'Mono2x'
+    [string]$StandaloneBuildCaptureBackend = 'Mono2x',
+    [switch]$StandaloneBuildDebuggerStandardHeap
 )
 
 Set-StrictMode -Version Latest
@@ -316,6 +317,9 @@ function New-WProtoPlayerDeclaration {
     return $path
 }
 
+if ($StandaloneBuildDebuggerStandardHeap -and ($StandaloneBuildCapture -ne 'Debugger' -or $Acceptance -ne 'wproto')) {
+    throw 'Standard heap selection requires an evidence-only WProto debugger build.'
+}
 if ($StandaloneBuildCaptureBackend -ne 'Mono2x' -and ($StandaloneBuildCapture -eq 'None' -or $Acceptance -ne 'wproto')) {
     throw 'An IL2CPP WProto build capture requires explicit evidence-only capture mode and Acceptance wproto.'
 }
@@ -438,6 +442,7 @@ foreach ($kind in $selected) {
                 Initialize-SerializationAcceptanceProject -Project $ownedProject -Repository $Repository
             } elseif ($kind -eq 'wproto') {
                 $parameters.StandaloneBuildCapture = $StandaloneBuildCapture
+                $parameters.StandaloneBuildDebuggerStandardHeap = [bool]$StandaloneBuildDebuggerStandardHeap
                 $timeouts = @{
                     UH_EDITOR_TEST_TIMEOUT_SECONDS = '900'
                     UH_STANDALONE_BUILD_TIMEOUT_SECONDS = '1800'
