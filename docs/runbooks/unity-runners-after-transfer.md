@@ -335,6 +335,32 @@ duplicate or truncated selections fail explicitly. Normal Unity jobs and success
 aggregates skip in this diagnostic mode. Failure diagnostics remain available in
 a separate artifact; they do not qualify the original run.
 
+For a prior direct-start/attach **Build** capture on DAD, also set
+`native-readback-build-receipt-sha256` to the SHA256 of the original
+`build-only-diagnostics/wproto/native-build-diagnostics/receipt.json`. This route
+requires the `DAD-MACHINE` scheduling label in both preflight and the job. If that
+label is absent, restore it through the runner setup described above before
+dispatch; do not remove the label or collect on a different host.
+
+Build readback selects only the original standalone artifact. It requires the
+exact saved receipt hash, terminal process identity, executable identity, original
+account capture directory and private crash-folder arguments. It reads bounded
+text and file metadata plus matching Windows events. Dump bodies stay private.
+The old process must be terminal, and the output directory must be fresh and
+outside the original capture. An exit code with no collector kill does not prove
+natural termination; absent files or events do not establish the cause or healthy
+completion. The ordinary ELI readback remains the default when the Build hash is
+empty.
+
+The same reader can run directly on the original DAD account:
+
+```powershell
+pwsh -NoProfile -File scripts/unity/read-native-build-evidence.ps1 `
+  -BuildReceiptPath 'D:\diagnostics\original\receipt.json' `
+  -ExpectedReceiptSha256 '<original receipt SHA256>' -ExpectedMachine 'DAD-MACHINE' `
+  -ArtifactsPath 'D:\diagnostics\build-readback'
+```
+
 The standalone readback also passes `-TestFrameworkLogPath` with its saved
 `unity.log`. For the observed test-framework 1.8.0 cache, it can copy the manifest
 and two launcher source files from the persistent project named in that log.

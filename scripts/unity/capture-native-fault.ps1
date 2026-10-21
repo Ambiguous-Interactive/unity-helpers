@@ -26,6 +26,7 @@ param(
     [Parameter(ParameterSetName = 'Readback')][string]$TestFrameworkLogPath,
     [Parameter(Mandatory = $true, ParameterSetName = 'SelectReadback')][string]$SourceRunId,
     [Parameter(Mandatory = $true, ParameterSetName = 'SelectReadback')][string]$Repository,
+    [Parameter(ParameterSetName = 'SelectReadback')][switch]$BuildReceipt,
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$UnboundArguments
 )
 
@@ -459,7 +460,7 @@ if ($AttachAfterStartup -and -not $AttachToDirect) { throw 'Startup-delayed atta
 if ($AttachAfterShutdown -and (-not $AttachToDirect -or $AttachAfterStartup)) { throw 'Shutdown-delayed attachment requires Direct attachment without startup selection.' }
 
 if ($PSCmdlet.ParameterSetName -ceq 'SelectReadback') {
-    Get-NativeReadbackArtifactSelection -Repository $Repository -SourceRunId $SourceRunId -ArtifactsPath $ArtifactsPath -Token $env:GITHUB_TOKEN
+    Get-NativeReadbackArtifactSelection -Repository $Repository -SourceRunId $SourceRunId -ArtifactsPath $ArtifactsPath -Token $env:GITHUB_TOKEN -BuildReceipt:$BuildReceipt
     return
 }
 

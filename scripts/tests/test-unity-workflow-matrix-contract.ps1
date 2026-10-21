@@ -161,15 +161,16 @@ function Test-WatchdogCadenceFitsRecoveryWindow {
 function Test-JobInstallsOnlyRedactionNode {
     <#
         .SYNOPSIS
-        True when the only Node toolchain a self-hosted Unity leg installs is the redactor's.
+        True when Node installation serves redaction or the guarded native acceptance route.
 
         .DESCRIPTION
         Node used to arrive on these legs to rediscover asmdefs, and this contract banned
         `actions/setup-node@` outright to stop that. The ban is on the rediscovery, not on Node
         itself: `.github/actions/redact-unity-artifacts` removes the Unity license serial from the
         artifact tree before it is uploaded, it is a Node script, and these runners have no Node on
-        PATH. So exactly one setup-node is permitted here, the one named for that job, and any
-        other setup-node still fails the contract.
+        PATH. The existing manual WProto route also requires a pinned Node toolchain. Its
+        exact dispatch, mode, version and held-lock guard must remain intact. Other Node
+        installations still fail the contract.
     #>
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$JobText)
 
@@ -177,7 +178,78 @@ function Test-JobInstallsOnlyRedactionNode {
     $redactionNodeCount = @(
         [regex]::Matches($JobText, '- name: Setup Node\.js for credential redaction')
     ).Count
-    return ($setupNodeCount -eq $redactionNodeCount)
+    $nativeSteps = [regex]::Matches($JobText, '(?ms)^      - name: Setup Node\.js for WProto native acceptance\r?\n(?<body>.*?)(?=^      - name:|\z)')
+    if ($nativeSteps.Count -gt 1) { return $false }
+    if ($nativeSteps.Count -eq 1) {
+        $step = $nativeSteps[0].Value
+        $guard = [regex]::Match($step, '(?ms)^        if: >-\r?\n(?<body>.*?)(?=^        [^ \r\n]|\z)')
+        $folded = [regex]::Replace($guard.Groups['body'].Value, '\s+', ' ').Trim()
+        $expected = '${{ !cancelled() && github.event_name == ''workflow_dispatch'' && (inputs.acceptance == ''wproto'' || (inputs.native-diagnostics && inputs.test-mode == ''standalone'' && inputs.acceptance == ''none'' && matrix.unity-version == ''6000.6.0f1'')) && (matrix.unity-version == ''2021.3.45f1'' || matrix.unity-version == ''6000.6.0f1'') && steps.unity_lock.outputs.acquired == ''true'' }}'
+        if ($folded -cne $expected -or [regex]::Matches($step, 'actions/setup-node@').Count -ne 1) { return $false }
+    }
+    return ($setupNodeCount -eq ($redactionNodeCount + $nativeSteps.Count))
+}
+
+$nativeNodeWorkflow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/workflows/unity-tests.yml') -Raw
+$nativeNodeSubject = [regex]::Match($nativeNodeWorkflow, '(?ms)^      - name: Setup Node\.js for WProto native acceptance\r?\n.*?(?=^      - name:|\z)').Value
+if ([string]::IsNullOrWhiteSpace($nativeNodeSubject) -or -not (Test-JobInstallsOnlyRedactionNode -JobText $nativeNodeSubject)) {
+    throw 'Actual guarded WProto Node step must be recognized.'
+}
+foreach ($control in @(
+        @('github.event_name == ''workflow_dispatch''', 'github.event_name == ''push'''),
+        @('steps.unity_lock.outputs.acquired == ''true''', 'true'),
+        @('inputs.test-mode == ''standalone''', 'true'),
+        @('matrix.unity-version == ''6000.6.0f1''', 'true')
+    )) {
+    if (-not $nativeNodeSubject.Contains($control[0]) -or (Test-JobInstallsOnlyRedactionNode -JobText $nativeNodeSubject.Replace($control[0], $control[1]))) {
+        throw 'Weakened WProto Node guard must be rejected.'
+    }
+}
+
+function Test-NativeBuildReadbackWorkflow {
+    param([string]$Content)
+    $job = [regex]::Match($Content, '(?ms)^  native-historical-readback:\r?\n.*?(?=^  [A-Za-z][A-Za-z0-9_-]*:|\z)').Value
+    $buildSteps = [regex]::Matches($job, '(?ms)^      - name: Read exact historical native Build evidence\r?\n.*?(?=^      - name:|\z)')
+    if ($buildSteps.Count -ne 1) { return $false }
+    $build = $buildSteps[0].Value
+    foreach ($required in @(
+            "inputs.native-readback-build-receipt-sha256 != ''",
+            "steps.readback_standalone_input.outcome == 'success'",
+            "steps.readback_host_idle.outcome == 'success'",
+            'read-native-build-evidence.ps1',
+            '-BuildReceiptPath ''.artifacts/native-readback/input/standalone/build-only-diagnostics/wproto/native-build-diagnostics/receipt.json''',
+            '-ExpectedReceiptSha256 $env:UH_BUILD_RECEIPT_SHA256 -ExpectedMachine ''DAD-MACHINE''',
+            'UH_BUILD_RECEIPT_SHA256: ${{ inputs.native-readback-build-receipt-sha256 }}'
+        )) {
+        if (-not $build.Contains($required)) { return $false }
+    }
+    foreach ($required in @(
+            'runs-on: ${{ fromJSON(inputs.native-readback-build-receipt-sha256 != '''' && ''["self-hosted","Windows","RAM-64GB","DAD-MACHINE"]'' || ''["self-hosted","Windows","RAM-64GB","fast"]'') }}',
+            '-BuildReceipt:([bool]$env:UH_BUILD_RECEIPT_SHA256)',
+            "if ([Environment]::MachineName -cne `$expectedMachine)",
+            "inputs.native-readback-build-receipt-sha256 == '' && steps.readback_acceptance_input.outcome == 'success'",
+            "inputs.native-readback-build-receipt-sha256 == '' && steps.readback_standalone_input.outcome == 'success'"
+        )) {
+        if (-not $job.Contains($required)) { return $false }
+    }
+    $sourceGuard = [regex]::Match($Content, '(?ms)^      - name: Validate Build readback source selection\r?\n.*?(?=^      - name:|\z)').Value
+    return $sourceGuard.Contains("inputs.native-readback-build-receipt-sha256 != ''") -and $sourceGuard.Contains("throw 'Build readback requires an explicit original source run ID.'")
+}
+
+if (-not (Test-NativeBuildReadbackWorkflow -Content $nativeNodeWorkflow)) { throw 'Actual Build readback workflow must retain source, hash, host and outcome guards.' }
+foreach ($control in @(
+        @("-ExpectedMachine 'DAD-MACHINE'", "-ExpectedMachine 'ELI-MACHINE'"),
+        @('-ExpectedReceiptSha256 $env:UH_BUILD_RECEIPT_SHA256', '-ExpectedReceiptSha256 (''0'' * 64)'),
+        @('native-build-diagnostics/receipt.json', 'native-build-diagnostics/other.json'),
+        @("steps.readback_host_idle.outcome == 'success'", 'true'),
+        @("steps.readback_standalone_input.outcome == 'success'", 'true'),
+        @('-BuildReceipt:([bool]$env:UH_BUILD_RECEIPT_SHA256)', ''),
+        @("inputs.native-readback-build-receipt-sha256 == ''", 'true'),
+        @('Validate Build readback source selection', 'Removed source selection')
+    )) {
+    if (-not $nativeNodeWorkflow.Contains($control[0]) -or (Test-NativeBuildReadbackWorkflow -Content $nativeNodeWorkflow.Replace($control[0], $control[1]))) {
+        throw 'Weakened historical Build readback workflow must be rejected.'
+    }
 }
 
 function Get-BuildLockActionPins {
@@ -1824,11 +1896,12 @@ if (-not $runnerBootstrapPinsRequestedMachine) {
 function Test-UnityRunnerPreflightLabels {
     param([string]$JobText, [switch]$AllowHistoricalReadback)
 
-    $labels = [regex]::Matches($JobText, '(?m)^          required-label-sets: (?<value>[^\r\n]+)\r?$')
+    $labels = [regex]::Matches($JobText, '(?m)^          required-label-sets: (?<value>>-\r?\n(?:            [^\r\n]+\r?\n)+|[^\r\n]+)')
     if ($labels.Count -ne 1) { return $false }
     $value = $labels[0].Groups['value'].Value
+    if ($value.StartsWith('>-')) { $value = [regex]::Replace($value.Substring(2), '\s+', ' ').Trim() }
     return $value -ceq '''[["self-hosted","Windows","RAM-64GB"]]''' -or ($AllowHistoricalReadback -and
-        $value -ceq '${{ format(''[["self-hosted","Windows","RAM-64GB"{0}]]'', github.event_name == ''workflow_dispatch'' && inputs.native-readback-run-id != '''' && '',"fast"'' || '''') }}')
+        $value -ceq '${{ format(''[["self-hosted","Windows","RAM-64GB"{0}]]'', github.event_name == ''workflow_dispatch'' && inputs.native-readback-run-id != '''' && (inputs.native-readback-build-receipt-sha256 != '''' && '',"DAD-MACHINE"'' || '',"fast"'') || '''') }}')
 }
 
 function Test-UnityAggregateAlwaysGuard {
@@ -1843,7 +1916,7 @@ function Test-UnityAggregateAlwaysGuard {
 
 $unityTestsRunnerPreflightJob = if ($jobTexts.ContainsKey('runner-preflight')) { $jobTexts['runner-preflight'] } else { '' }
 $benchmarksRunnerPreflightJob = if ($benchmarksJobTexts.ContainsKey('runner-preflight')) { $benchmarksJobTexts['runner-preflight'] } else { '' }
-$readbackLabelLine = [regex]::Match($unityTestsRunnerPreflightJob, '(?m)^          required-label-sets: [^\r\n]+').Value
+$readbackLabelLine = [regex]::Match($unityTestsRunnerPreflightJob, '(?m)^          required-label-sets: (?:>-\r?\n(?:            [^\r\n]+\r?\n)+|[^\r\n]+)').Value
 $readbackAggregateLine = [regex]::Match([string]$jobTexts['unity-ci-success'], '(?m)^    if: [^\r\n]+').Value
 $ordinaryLabelLine = '          required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]'''
 $ordinaryAggregateLine = '    if: ${{ always() }}'
@@ -1861,6 +1934,8 @@ if ([string]::IsNullOrWhiteSpace($readbackLabelLine) -or [string]::IsNullOrWhite
 }
 foreach ($control in @(
         @{ Kind = 'Labels'; Name = 'absent machine-name label'; From = ',"fast"'; To = ',"ELI-MACHINE"' },
+        @{ Kind = 'Labels'; Name = 'wrong build machine'; From = ',"DAD-MACHINE"'; To = ',"ELI-MACHINE"' },
+        @{ Kind = 'Labels'; Name = 'wrong build selector'; From = 'inputs.native-readback-build-receipt-sha256'; To = 'inputs.native-diagnostics' },
         @{ Kind = 'Labels'; Name = 'wrong default labels'; From = '"self-hosted","Windows","RAM-64GB"{0}'; To = '"self-hosted","Linux","RAM-64GB"{0}' },
         @{ Kind = 'Labels'; Name = 'wrong target labels'; From = ',"fast"'; To = ',"Linux","fast"' },
         @{ Kind = 'Labels'; Name = 'wrong dispatch selector'; From = "'workflow_dispatch'"; To = "'push'" },

@@ -61,6 +61,11 @@ on:
         required: false
         default: ""
         type: string
+      native-readback-build-receipt-sha256:
+        description: "Read the exact historical DAD Build receipt; requires the DAD-MACHINE runner label. No new capture."
+        required: false
+        default: ""
+        type: string
       native-diagnostics:
         description: "Capture Unity 6000.6 exits: EditMode pair or build-only Standalone debugger (expected diagnostic failure)."
         required: false
@@ -115,10 +120,10 @@ concurrency:
 
 jobs:
   native-historical-readback:
-    name: Historical ELI native evidence (diagnostic only)
+    name: Historical native evidence (diagnostic only)
     needs: runner-preflight
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' && needs.runner-preflight.result == 'success' }}
-    runs-on: [self-hosted, Windows, RAM-64GB, fast]
+    runs-on: ${{ fromJSON(inputs.native-readback-build-receipt-sha256 != '' && '["self-hosted","Windows","RAM-64GB","DAD-MACHINE"]' || '["self-hosted","Windows","RAM-64GB","fast"]') }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -137,12 +142,15 @@ jobs:
           UH_READBACK_ACCEPTANCE: ${{ inputs.acceptance }}
           UH_READBACK_CAPTURE: ${{ inputs.native-diagnostics }}
           UH_READBACK_LOADER: ${{ inputs.native-loader-snaps-comparison }}
+          UH_BUILD_RECEIPT_SHA256: ${{ inputs.native-readback-build-receipt-sha256 }}
         run: |
           if ($env:UH_READBACK_RUN_ID -cnotmatch '^[1-9][0-9]{0,19}$') { throw 'Readback requires a positive decimal source run ID.' }
           if ($env:UH_READBACK_ACCEPTANCE -ne 'none' -or $env:UH_READBACK_CAPTURE -eq 'true' -or $env:UH_READBACK_LOADER -eq 'true') {
             throw 'Historical readback cannot request acceptance or a new capture.'
           }
-          if ([Environment]::MachineName -ine 'ELI-MACHINE') { throw 'Historical readback must run on ELI-MACHINE.' }
+          $expectedMachine = if ($env:UH_BUILD_RECEIPT_SHA256) { 'DAD-MACHINE' } else { 'ELI-MACHINE' }
+          if ($env:UH_BUILD_RECEIPT_SHA256 -and $env:UH_BUILD_RECEIPT_SHA256 -cnotmatch '^[a-fA-F0-9]{64}$') { throw 'Build readback requires the exact original receipt SHA256.' }
+          if ([Environment]::MachineName -cne $expectedMachine) { throw 'Historical readback requires the original machine.' }
 
       - name: Resolve exact historical artifact identities
         id: readback_selection
@@ -151,16 +159,17 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           UH_READBACK_RUN_ID: ${{ inputs.native-readback-run-id }}
           UH_READBACK_REPOSITORY: ${{ github.repository }}
+          UH_BUILD_RECEIPT_SHA256: ${{ inputs.native-readback-build-receipt-sha256 }}
         run: |
           $selection = ./scripts/unity/capture-native-fault.ps1 `
             -SourceRunId $env:UH_READBACK_RUN_ID -Repository $env:UH_READBACK_REPOSITORY `
-            -ArtifactsPath '.artifacts/native-readback/output/selection'
+            -ArtifactsPath '.artifacts/native-readback/output/selection' -BuildReceipt:([bool]$env:UH_BUILD_RECEIPT_SHA256)
           "acceptance-id=$($selection.AcceptanceArtifactId)" >> $env:GITHUB_OUTPUT
           "standalone-id=$($selection.StandaloneArtifactId)" >> $env:GITHUB_OUTPUT
 
       - name: Download original latest acceptance evidence
         id: readback_acceptance_input
-        if: ${{ !cancelled() && steps.readback_selection.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.native-readback-build-receipt-sha256 == '' && steps.readback_selection.outcome == 'success' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           github-token: ${{ github.token }}
@@ -189,7 +198,7 @@ jobs:
         run: ./scripts/unity/assert-no-active-unity-editor.ps1
 
       - name: Read historical acceptance process evidence
-        if: ${{ !cancelled() && steps.readback_acceptance_input.outcome == 'success' && steps.readback_host_idle.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.native-readback-build-receipt-sha256 == '' && steps.readback_acceptance_input.outcome == 'success' && steps.readback_host_idle.outcome == 'success' }}
         timeout-minutes: 2
         shell: pwsh
         run: |
@@ -198,7 +207,7 @@ jobs:
             -ExpectedMachine 'ELI-MACHINE' -ArtifactsPath '.artifacts/native-readback/output/acceptance'
 
       - name: Read historical standalone process and package sources
-        if: ${{ !cancelled() && steps.readback_standalone_input.outcome == 'success' && steps.readback_host_idle.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.native-readback-build-receipt-sha256 == '' && steps.readback_standalone_input.outcome == 'success' && steps.readback_host_idle.outcome == 'success' }}
         timeout-minutes: 2
         shell: pwsh
         run: |
@@ -206,6 +215,18 @@ jobs:
             -ExecutionDiagnosticsPath '.artifacts/native-readback/input/standalone/unity.execution-diagnostics.json' `
             -TestFrameworkLogPath '.artifacts/native-readback/input/standalone/unity.log' `
             -ExpectedMachine 'ELI-MACHINE' -ArtifactsPath '.artifacts/native-readback/output/standalone'
+
+      - name: Read exact historical native Build evidence
+        if: ${{ !cancelled() && inputs.native-readback-build-receipt-sha256 != '' && steps.readback_standalone_input.outcome == 'success' && steps.readback_host_idle.outcome == 'success' }}
+        timeout-minutes: 2
+        shell: pwsh
+        env:
+          UH_BUILD_RECEIPT_SHA256: ${{ inputs.native-readback-build-receipt-sha256 }}
+        run: |
+          ./scripts/unity/read-native-build-evidence.ps1 `
+            -BuildReceiptPath '.artifacts/native-readback/input/standalone/build-only-diagnostics/wproto/native-build-diagnostics/receipt.json' `
+            -ExpectedReceiptSha256 $env:UH_BUILD_RECEIPT_SHA256 -ExpectedMachine 'DAD-MACHINE' `
+            -ArtifactsPath '.artifacts/native-readback/output/build'
 
       - name: Setup Node.js for historical evidence redaction
         if: ${{ always() }}
@@ -224,7 +245,9 @@ jobs:
         if: ${{ always() && steps.redact_native_readback.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: native-readback-ELI-MACHINE-${{ inputs.native-readback-run-id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: >-
+            native-readback-${{ inputs.native-readback-build-receipt-sha256 != '' && 'DAD-MACHINE' || 'ELI-MACHINE'
+            }}-${{ inputs.native-readback-run-id }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .artifacts/native-readback/output
           if-no-files-found: warn
           retention-days: 30
@@ -260,6 +283,14 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.18.0"
+
+      - name: Validate Build readback source selection
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-readback-build-receipt-sha256 != '' }}
+        shell: pwsh
+        env:
+          UH_READBACK_RUN_ID: ${{ inputs.native-readback-run-id }}
+        run: |
+          if ($env:UH_READBACK_RUN_ID -cnotmatch '^[1-9][0-9]{0,19}$') { throw 'Build readback requires an explicit original source run ID.' }
 
       - name: Validate native comparison selection
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-loader-snaps-comparison }}
@@ -495,7 +526,9 @@ jobs:
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
-          required-label-sets: ${{ format('[["self-hosted","Windows","RAM-64GB"{0}]]', github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' && ',"fast"' || '') }}
+          required-label-sets: >-
+            ${{ format('[["self-hosted","Windows","RAM-64GB"{0}]]', github.event_name == 'workflow_dispatch' &&
+            inputs.native-readback-run-id != '' && (inputs.native-readback-build-receipt-sha256 != '' && ',"DAD-MACHINE"' || ',"fast"') || '') }}
 
   # Group all selected modes by Unity version. Each version pays checkout,
   # provisioning, organization-lock acquisition, and central cleanup once while

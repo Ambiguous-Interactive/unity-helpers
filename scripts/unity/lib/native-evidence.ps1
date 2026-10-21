@@ -312,7 +312,7 @@ function Get-NativeTestFrameworkSources {
 }
 
 function Get-NativeReadbackArtifactSelection {
-    param([string]$Repository, [string]$SourceRunId, [string]$ArtifactsPath, [string]$Token)
+    param([string]$Repository, [string]$SourceRunId, [string]$ArtifactsPath, [string]$Token, [switch]$BuildReceipt)
     $output = [IO.Path]::GetFullPath($ArtifactsPath)
     if (Test-Path -LiteralPath $output) { throw 'Readback selection output must be fresh.' }
     $null = New-Item -ItemType Directory -Path $output -ErrorAction Stop
@@ -333,7 +333,8 @@ function Get-NativeReadbackArtifactSelection {
         $record.RunId = $run.id; $record.HeadSha = $run.head_sha; $record.RunAttempt = $run.run_attempt
         $response = Invoke-RestMethod -Method Get -Uri ($base + '/artifacts?per_page=100') -Headers $headers -TimeoutSec 30
         if (($response.total_count -isnot [int] -and $response.total_count -isnot [long]) -or $response.total_count -lt 1 -or $response.total_count -gt 100 -or @($response.artifacts).Count -ne $response.total_count) { throw 'Readback artifact inventory is empty, truncated, or exceeds its bound.' }
-        foreach ($name in @('unity-6000.6.0f1-acceptance', 'unity-6000.6.0f1-standalone')) {
+        $requiredNames = if ($BuildReceipt) { @('unity-6000.6.0f1-standalone') } else { @('unity-6000.6.0f1-acceptance', 'unity-6000.6.0f1-standalone') }
+        foreach ($name in $requiredNames) {
             $matches = @($response.artifacts | Where-Object { $_.name -ceq $name })
             if ($matches.Count -ne 1) { throw "Readback requires exactly one artifact named $name." }
             $artifact = $matches[0]

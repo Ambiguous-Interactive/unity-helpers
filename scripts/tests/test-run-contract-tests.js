@@ -278,6 +278,60 @@ runTest("--list prints every registered id", () => {
   );
 });
 
+function reachablePowerShellSuites(initial, sources) {
+  const reachable = new Set(initial);
+  let expanded = true;
+  while (expanded) {
+    expanded = false;
+    for (const [owner, source] of sources) {
+      if (!reachable.has(owner)) {
+        continue;
+      }
+      const text = source
+        .split(/\r?\n/)
+        .filter((line) => !/^\s*#/.test(line))
+        .join("\n");
+      const calls =
+        /^\s*&\s+(?:\(\[Environment\]::ProcessPath\)\s+-NoProfile\s+-File\s+)?\(Join-Path\s+\$PSScriptRoot\s+['"]([A-Za-z0-9.-]+\.ps1)['"]\)\s*$/gm;
+      for (const match of text.matchAll(calls)) {
+        const target = path.posix.join(path.posix.dirname(owner), match[1]);
+        if (sources.has(target) && !reachable.has(target)) {
+          reachable.add(target);
+          expanded = true;
+        }
+      }
+    }
+  }
+  return reachable;
+}
+
+runTest("nested PowerShell suites require a reachable executable owner", () => {
+  const owner = "scripts/tests/root.ps1";
+  const child = "scripts/tests/child.ps1";
+  const leaf = "scripts/tests/leaf.ps1";
+  const call = "& (Join-Path $PSScriptRoot 'child.ps1')";
+  const sources = new Map([
+    [owner, call],
+    [child, "& ([Environment]::ProcessPath) -NoProfile -File (Join-Path $PSScriptRoot 'leaf.ps1')"],
+    [leaf, "& (Join-Path $PSScriptRoot 'child.ps1')"]
+  ]);
+  assert.deepStrictEqual([...reachablePowerShellSuites([owner], sources)], [owner, child, leaf]);
+  for (const replacement of [
+    "",
+    `# ${call}`,
+    "Write-Host 'child.ps1'",
+    "(Join-Path $PSScriptRoot 'child.ps1')"
+  ]) {
+    const removed = new Map(sources);
+    removed.set(owner, replacement);
+    assert.deepStrictEqual([...reachablePowerShellSuites([owner], removed)], [owner]);
+  }
+  assert.deepStrictEqual([...reachablePowerShellSuites([], sources)], []);
+  const removed = new Map(sources);
+  removed.set(child, "");
+  assert.deepStrictEqual([...reachablePowerShellSuites([owner], removed)], [owner, child]);
+});
+
 runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   // The same shape as the linter-orphan assertion in test-run-repo-lint.js, for the same reason:
   // consolidation trades a loud failure (a chain that visibly lost an entry) for a quiet one (a
@@ -291,7 +345,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["workflow", (file) => filesInvoking(".github/workflows", file).length > 0]
   ]);
 
-  const reachable = new Set([
+  const directlyReachable = new Set([
     ...scriptPathsIn(leafCommands(CHECKS)),
     ...scriptPathsIn(leafCommands(repoLintChecks)),
     ...scriptPathsIn(expandNpmScript("validate:tests:hook-regressions")),
@@ -304,6 +358,13 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     .filter((name) => /^test-.*\.(?:ps1|sh|js|mjs|py)$/.test(name))
     .map((name) => `scripts/tests/${name}`)
     .sort();
+
+  const sources = new Map(
+    suites
+      .filter((file) => file.endsWith(".ps1"))
+      .map((file) => [file, fs.readFileSync(path.join(repoRoot, file), "utf8")])
+  );
+  const reachable = reachablePowerShellSuites(directlyReachable, sources);
 
   const orphans = suites.filter((file) => !reachable.has(file) && !runElsewhere.has(file));
   assert.deepStrictEqual(
