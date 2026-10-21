@@ -178,11 +178,12 @@ try {
         if ([string]::IsNullOrWhiteSpace($DebuggerDirectory) -or [string]::IsNullOrWhiteSpace($NativeProgramsDirectory)) { throw 'Real Windows capture requires the pinned debugger and normal/AV control programs.' }
         $project = Join-Path $root 'project'; $null = [IO.Directory]::CreateDirectory((Join-Path $project 'ProjectSettings'))
         [IO.File]::WriteAllText((Join-Path $project 'ProjectSettings/ProjectVersion.txt'), "m_EditorVersion: 6000.6.0f1`n")
-        foreach ($kind in @('normal', 'av', 'startup-normal', 'startup-av', 'shutdown-normal', 'shutdown-av', 'shutdown-status', 'shutdown-handled')) {
+        foreach ($kind in @('normal', 'av', 'startup-normal', 'startup-av', 'shutdown-normal', 'shutdown-av', 'shutdown-status', 'shutdown-handled', 'shutdown-thread')) {
             $shutdown = $kind.StartsWith('shutdown-', [StringComparison]::Ordinal)
             $startup = $kind.StartsWith('startup-', [StringComparison]::Ordinal)
             $delayed = $startup -or $shutdown
             $isAv = $kind.EndsWith('av', [StringComparison]::Ordinal)
+            $isThreadExit = $kind -ceq 'shutdown-thread'
             $program = Join-Path $NativeProgramsDirectory ($kind + '/control.exe')
             $casePath = Join-Path $root $kind; $null = [IO.Directory]::CreateDirectory($casePath)
             $arguments = @('-batchmode', '-nographics', '-projectPath', $project, '-runTests', '-testPlatform', 'StandaloneWindows64', '-logFile', '-')
@@ -192,10 +193,10 @@ try {
                 -ArtifactsPath (Join-Path $casePath 'capture') -DebuggerDirectory $DebuggerDirectory -TimeoutSeconds 45 -AttachToDirect -AttachAfterStartup:$startup -AttachAfterShutdown:$shutdown
             $record = Get-Content -LiteralPath (Join-Path $casePath 'capture/receipt.json') -Raw | ConvertFrom-Json -AsHashtable
             $case = $record.Cases[0]
-            $raw = if ($isAv -or $kind -ceq 'shutdown-status') { -1073741819 } else { 0 }
+            $raw = if ($isThreadExit) { $case.TargetProcess.RawExitCode } elseif ($isAv -or $kind -ceq 'shutdown-status') { -1073741819 } else { 0 }
             Assert-Attach ($record.EvidenceOnly -and $record.State -ceq 'completed' -and $case.Attach.State -ceq 'completed' -and
                 -not $case.Attach.CleanupRequested -and $case.Attach.WorkerState -ceq 'Completed' -and $case.TargetProcess.RawExitCode -eq $raw -and
-                $direct.RawExitCode -eq $raw -and $case.TargetExitEvent.Pid -eq $case.TargetProcess.Pid -and $case.Process.Reaped -and
+                ($isThreadExit -or $direct.RawExitCode -eq $raw) -and $case.TargetExitEvent.Pid -eq $case.TargetProcess.Pid -and $case.Process.Reaped -and
                 $null -eq $case.Process.KillReason -and $case.Process.Pid -ne $case.TargetProcess.Pid) "Actual $kind program preserves separate natural target and controller exits."
             Assert-Attach ($case.DumpPresent -eq $isAv -and $record.DebuggerArguments[0] -ceq '-pd' -and $record.DebuggerArguments[1] -ceq '-p' -and
                 $record.DebuggerHeap.Requested -ceq 'direct-start-then-attach') "Actual $kind Build entry binds attach mode and private fault dump."
@@ -210,7 +211,7 @@ try {
             $console = [IO.File]::ReadAllText((Join-Path $casePath 'capture/build-attach-console-head.log'))
             $breakpointSections = [regex]::Matches($console, '(?ms)^WUH_BREAKPOINTS_BEGIN\r?\n(?<Rows>.*?)^WUH_BREAKPOINTS_END\r?$')
             Assert-Attach ($breakpointSections.Count -eq 1) "Actual $kind retains one executed breakpoint-state section."
-            foreach ($name in @('NtTerminateProcess', 'RtlExitUserProcess')) {
+            foreach ($name in @('NtTerminateProcess', 'RtlExitUserProcess', 'RtlExitUserThread', 'NtTerminateThread')) {
                 $pattern = '(?m)^\s*\d+ e [0-9a-f`]+\s+[^\r\n]*ntdll!' + $name + '(?:\s|$)'
                 Assert-Attach ([regex]::Matches($breakpointSections[0].Groups['Rows'].Value, $pattern).Count -eq 1) "Actual $kind resolves and enables $name before continuation."
             }
@@ -220,6 +221,35 @@ try {
             Assert-Attach ($firstChanceCount -eq $(if ($kind -ceq 'shutdown-handled') { 8 } elseif ($isAv) { 1 } else { 0 })) "Actual $kind distinguishes bounded handled AV, fault and status-only termination."
             if ($kind -in @('shutdown-normal', 'shutdown-status', 'shutdown-handled')) {
                 Assert-Attach ([regex]::Matches($console, '(?m)^WUH_TERMINATE_REQUEST\r?$').Count -ge 1) "Actual $kind records the native termination request stack."
+            }
+            if ($isThreadExit) {
+                Assert-Attach ($raw -in @(0, -1073741819) -and $direct.RawExitCode -in @(0, -1073741819) -and
+                    $case.TargetProcess.Reaped -and $null -eq $case.TargetProcess.KillReason -and $direct.Reaped -and $null -eq $direct.KillReason) 'Thread-status controls retain separate natural outcomes without assuming the caller is the final thread.'
+                $targetHead = [IO.File]::ReadAllText((Join-Path $casePath 'capture/build-target-console-head.log'))
+                $mainThread = [regex]::Matches($targetHead, '(?m)^WUH_CONTROL_MAIN_THREAD=(\d+)\r?$')
+                Assert-Attach ($mainThread.Count -eq 1) 'Native thread control reports one actual main OS thread ID.'
+                $threadId = [uint32]$mainThread[0].Groups[1].Value
+                $waiterThread = [regex]::Matches($targetHead, '(?m)^WUH_CONTROL_WAITER_THREAD=(\d+)\r?$')
+                Assert-Attach ($waiterThread.Count -eq 1 -and [uint32]$waiterThread[0].Groups[1].Value -ne $threadId) 'Native control owns a distinct waiter thread until the main thread terminates.'
+                $waiterId = [uint32]$waiterThread[0].Groups[1].Value
+                foreach ($observation in @(@{ Marker = 'WUH_THREAD_EXIT'; Register = 'rcx' }, @{ Marker = 'WUH_THREAD_TERMINATE'; Register = 'rdx' })) {
+                    $threadSections = [regex]::Matches($console, '(?ms)^' + $observation.Marker + '\r?\n(?<Body>.*?)^' + $observation.Marker + '_END\r?$')
+                    $observedCalls = 0
+                    foreach ($section in $threadSections) {
+                        $body = $section.Groups['Body'].Value
+                        $identity = [regex]::Match($body, '(?m)^Evaluate expression: (\d+) = ([0-9a-f`]+)\r?$', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+                        $status = [regex]::Match($body, '\b' + $observation.Register + '=([0-9a-f]{16})\b', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+                        if ($identity.Success -and $status.Success -and [uint32]$identity.Groups[1].Value -eq $threadId -and
+                            [Convert]::ToUInt32($identity.Groups[2].Value.Replace('`', ''), 16) -eq $threadId -and
+                            ([Convert]::ToUInt64($status.Groups[1].Value, 16) -band 4294967295L) -eq 3221225477L) {
+                            foreach ($listedThread in [regex]::Matches($body, '(?im)^\s*[.#]?\s*\d+\s+Id:\s+[0-9a-f]+\.([0-9a-f]+)\s')) {
+                                if ([Convert]::ToUInt32($listedThread.Groups[1].Value, 16) -eq $waiterId) { ++$observedCalls }
+                            }
+                        }
+                    }
+                    Assert-Attach ($observedCalls -ge 1) "Observe the actual control thread's C0000005 status with its owned waiter still listed at $($observation.Marker)."
+                }
+                Assert-Attach (-not $case.Process.ConsoleTailTruncated -and $console -ceq [IO.File]::ReadAllText((Join-Path $casePath 'capture/build-debugger-console.log'))) 'Native thread-status assertions use a complete retained debugger console.'
             }
             Write-Host "Actual $kind Build entry evidence: $casePath"
         }

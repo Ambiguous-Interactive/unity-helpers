@@ -432,13 +432,28 @@ registers and up to 32 caller frames. These observations can distinguish an
 observed handled exception from an unhandled fault or an explicit termination
 request. An AV-coded exit alone does not prove an exception, and missing trace
 records do not prove that no exception or external termination occurred.
-The collector prints a marked breakpoint list after installing both termination
-breakpoints and before resuming. Read the actual enabled or disabled state,
+The collector also records `ntdll!RtlExitUserThread` and `ntdll!NtTerminateThread`
+entry, including the OS thread ID, x64 status/handle registers, up to 32 caller
+frames and the stopped thread list. Thread exit can carry a nonzero status without
+an AV exception; other threads may still be alive. These observations do not
+establish that the caller is the final thread or identify a Unity fault.
+The collector prints a marked breakpoint list after installing the process and
+thread termination breakpoints and before resuming. Read the actual enabled or disabled state,
 resolved address, and unresolved indicator in
 [`bl /L`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/bl--breakpoint-list-)
 output. Requested commands alone do not establish that a breakpoint resolved or
 was enabled; absent hit markers cannot fill that gap. The list describes that
-stopped instant and does not prove that later code traversed either breakpoint.
+stopped instant and does not prove that later code traversed any breakpoint.
+The Windows attach controls also require `shutdown-thread/control.exe` in the
+native-program directory. Build it from
+`Tests/Acceptance~/native-thread-exit.c` with the
+same x64 MSVC toolchain as the other controls. It reports its main and waiter OS thread IDs
+and calls `ExitThread(C0000005)` after the controlled telemetry line. Its owned
+waiter cannot return until the main thread terminates. The test requires both
+thread-entry observations to match the main ID and status while the waiter is
+still listed, with no AV exception or dump. It retains Direct and attached outcomes separately: injected
+or runtime threads can outlive the caller, so neither a sole-thread condition nor
+a fixed process exit status is assumed.
 The first-chance command uses
 [`sx-`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/sx--sxd--sxe--sxi--sxn--sxr--sx---set-exceptions-)
 to preserve the existing break and handling policy.

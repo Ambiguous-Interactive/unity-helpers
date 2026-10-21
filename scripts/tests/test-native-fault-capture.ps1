@@ -684,7 +684,9 @@ Start-Sleep -Seconds 300
     Assert-Capture ($debuggerCommand.Contains('sx- -c ".if (@$t0 < 8)') -and $debuggerCommand.Contains('r @$t0=0;') -and $debuggerCommand.Contains('WUH_FIRST_CHANCE_AV') -and $debuggerCommand.Contains('r @$t0=@$t0+1')) 'First-chance AV records have an eight-event bound without changing break or handling policy'
     Assert-Capture ($debuggerCommand.Contains('sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av') -and $debuggerCommand.Contains('sx;.echo WUH_EXCEPTION_FILTERS_END')) 'Retain the second-chance dump policy and print actual exception filters before continuation'
     Assert-Capture ($debuggerCommand.Contains('bu ntdll!NtTerminateProcess ".echo WUH_TERMINATE_REQUEST;r rcx,rdx;kv20;g"')) 'Capture the local native termination request status and caller stack'
-    Assert-Capture ($debuggerCommand.EndsWith(';.echo WUH_BREAKPOINTS_BEGIN;bl /L;.echo WUH_BREAKPOINTS_END;g')) 'Print breakpoint state after installing both termination breakpoints and before resuming'
+    Assert-Capture ($debuggerCommand.Contains('bu ntdll!RtlExitUserThread ".echo WUH_THREAD_EXIT;?@$tid;r rcx;kv20;~;.echo WUH_THREAD_EXIT_END;g"')) 'Record actual thread-exit status, OS thread identity, caller stack and stopped thread list'
+    Assert-Capture ($debuggerCommand.Contains('bu ntdll!NtTerminateThread ".echo WUH_THREAD_TERMINATE;?@$tid;r rcx,rdx;kv20;~;.echo WUH_THREAD_TERMINATE_END;g"')) 'Record native thread-termination handle and status without treating a process exit code as an exception'
+    Assert-Capture ($debuggerCommand.EndsWith(';.echo WUH_BREAKPOINTS_BEGIN;bl /L;.echo WUH_BREAKPOINTS_END;g')) 'Print process and thread breakpoint state before resuming'
     $originalBuildCaptureProcess = ${function:Invoke-NativeCaptureProcess}
     $script:buildCaptureCalls = @()
     $script:buildSavedRecords = @()

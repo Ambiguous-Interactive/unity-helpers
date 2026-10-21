@@ -185,7 +185,7 @@ function Get-NativeCaptureExitEvent {
 function Get-NativeCaptureDebuggerCommand {
     param([string]$DumpPath = 'fault.dmp')
     if ($DumpPath.IndexOfAny([char[]]@([char]34, [char]10, [char]13)) -ge 0) { throw 'Invalid debugger dump path.' }
-    $command = 'sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av;r @$t0=0;sx- -c ".if (@$t0 < 8) { .echo WUH_FIRST_CHANCE_AV;.exr -1;r;kv20 };r @$t0=@$t0+1" av;sx;.echo WUH_EXCEPTION_FILTERS_END;sxe -c ".lastevent;q" epr;bu ntdll!NtTerminateProcess ".echo WUH_TERMINATE_REQUEST;r rcx,rdx;kv20;g";bu ntdll!RtlExitUserProcess ".echo WUH_EXIT_REQUEST;!gflag;r rcx;kv20;g";.echo WUH_BREAKPOINTS_BEGIN;bl /L;.echo WUH_BREAKPOINTS_END;g'
+    $command = 'sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av;r @$t0=0;sx- -c ".if (@$t0 < 8) { .echo WUH_FIRST_CHANCE_AV;.exr -1;r;kv20 };r @$t0=@$t0+1" av;sx;.echo WUH_EXCEPTION_FILTERS_END;sxe -c ".lastevent;q" epr;bu ntdll!NtTerminateProcess ".echo WUH_TERMINATE_REQUEST;r rcx,rdx;kv20;g";bu ntdll!RtlExitUserProcess ".echo WUH_EXIT_REQUEST;!gflag;r rcx;kv20;g";bu ntdll!RtlExitUserThread ".echo WUH_THREAD_EXIT;?@$tid;r rcx;kv20;~;.echo WUH_THREAD_EXIT_END;g";bu ntdll!NtTerminateThread ".echo WUH_THREAD_TERMINATE;?@$tid;r rcx,rdx;kv20;~;.echo WUH_THREAD_TERMINATE_END;g";.echo WUH_BREAKPOINTS_BEGIN;bl /L;.echo WUH_BREAKPOINTS_END;g'
     if ($DumpPath -cne 'fault.dmp') { return $command.Replace('fault.dmp', '\"' + $DumpPath.Replace('\', '\\') + '\"') }
     return $command
 }
