@@ -737,8 +737,68 @@ function Test-GeneratedPreflightSafety {
 
 }
 
+function Test-RepositoryRootWriteDestination {
+    foreach ($kind in @('SelectedDirectory', 'GeneratedTree', 'GeneratedChild')) {
+        foreach ($poisonGit in @($false, $true)) {
+            $repo = New-TestRepo -ConfigurePushDefaults
+            $relativeLink = switch ($kind) { 'SelectedDirectory' { 'root-alias' } 'GeneratedTree' { '.agents/skills' } default { '.agents/skills/linked-root' } }
+            $link = Join-Path $repo $relativeLink
+            try {
+                Add-FakePrettierPackage -RepoPath $repo
+                Add-FakeMarkdownlintPackage -RepoPath $repo
+                [void][IO.Directory]::CreateDirectory((Split-Path $link -Parent))
+                [void][IO.Directory]::CreateDirectory((Join-Path $repo '.llm/skills'))
+                [IO.File]::WriteAllText((Join-Path $repo '.llm/skills/input.md'), "# Input`n")
+                $sentinel = Join-Path $repo 'user.json'
+                [IO.File]::WriteAllText($sentinel, '{"user":"retained"}')
+                $linkKind = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
+                [void](New-Item -ItemType $linkKind -Path $link -Target $repo)
+                if ($poisonGit) { [void](New-Item -ItemType HardLink -Path (Join-Path $repo '.git/unsafe-enumeration') -Target $sentinel) }
+                [IO.File]::WriteAllText((Join-Path $repo 'node_modules/prettier/bin/prettier.cjs'), 'require("fs").writeFileSync("tool-started.marker", "tool ran"); console.log("3.8.3");')
+                $before = @((Get-FileHash -LiteralPath $sentinel).Hash, (Get-FileHash -LiteralPath (Join-Path $repo '.git/index')).Hash) -join '|'
+                $selection = if ($kind -ceq 'SelectedDirectory') { $relativeLink } else { '.llm/skills/input.md' }
+                $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '-Paths', $selection) -UseCli
+                $after = @((Get-FileHash -LiteralPath $sentinel).Hash, (Get-FileHash -LiteralPath (Join-Path $repo '.git/index')).Hash) -join '|'
+                $name = "DiscoveryScope_RootAlias_${kind}_PoisonGit${poisonGit}"
+                Write-TestResult "${name}_RefusedAtRoot" ($result.ExitCode -ne 0 -and $result.Output.Contains('write destination resolves to repository root')) $result.Output
+                Write-TestResult "${name}_BeforeTools" (-not (Test-Path -LiteralPath (Join-Path $repo 'tool-started.marker'))) $result.Output
+                Write-TestResult "${name}_UserBytesAndIndexPreserved" ($before -ceq $after) $result.Output
+                Write-TestResult "${name}_NoGitDirectoryTraversal" (-not $result.Output.Contains('Cannot prove all hard-link write destinations')) $result.Output
+            } finally {
+                if ([IO.Directory]::Exists($link)) { [IO.Directory]::Delete($link) }
+                Remove-Item -LiteralPath $repo -Recurse -Force
+            }
+        }
+    }
+    $repo = New-TestRepo -ConfigurePushDefaults
+    try {
+        $scopeTokens = $null; $scopeErrors = $null
+        $scopeAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot '../agent-preflight.ps1'), [ref]$scopeTokens, [ref]$scopeErrors)
+        if (@($scopeErrors).Count -ne 0) { throw 'Actual write-scope source did not parse.' }
+        foreach ($name in @('Resolve-PreflightPhysicalPath', 'Get-PreflightPhysicalRelativePath', 'Get-PreflightSafetyPaths', 'Assert-PreflightWriteScope')) {
+            $definitions = @($scopeAst.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name }, $false))
+            if ($definitions.Count -ne 1) { throw 'Actual write-scope helper missing or duplicated.' }
+            . ([ScriptBlock]::Create($definitions[0].Extent.Text))
+        }
+        foreach ($wholeRepository in @($false, $true)) {
+            $scope = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            if (-not $wholeRepository) { [void]$scope.Add('.') }
+            $script:PreflightWriteSafety = @{ RepoRoot = $repo; Scope = $scope; WholeRepository = $wholeRepository }
+            $message = ''
+            try { Assert-PreflightWriteScope -Paths @('unchecked.json') } catch { $message = $_.Exception.Message }
+            $correct = if ($wholeRepository) { $message -ceq '' } else { $message.Contains('write destination changed after safety discovery') }
+            Write-TestResult "DiscoveryScope_RootMarkerDoesNotGrantGlobalCoverage_WholeRepository${wholeRepository}" $correct $message
+        }
+    } finally {
+        $script:PreflightWriteSafety = $null
+        Remove-Item -LiteralPath $repo -Recurse -Force
+    }
+
+}
+
 function Test-ScopedSafetyDiscovery {
     Test-ScopedDestinationTransition
+    Test-RepositoryRootWriteDestination
     . (Join-Path $PSScriptRoot '../git-staging-helpers.ps1')
     foreach ($fixMode in @($false, $true)) {
         foreach ($mode in @('Paths', 'PathList')) {

@@ -237,6 +237,7 @@ function Get-PreflightSafetyPaths {
         while ($pending.Count -gt 0) {
             $path = $pending.Dequeue()
             $physical = Get-PreflightPhysicalRelativePath -RepoRoot $RepoRoot -Path $path -PhysicalRoot $physicalRoot
+            if ($physical -eq '.') { throw "Preflight write destination resolves to repository root: $path" }
             if ($physical -cne $path) { [void]$scope.Add($physical) }
             if (-not $visited.Add($physical)) { continue }
             $full = Join-Path $RepoRoot $physical
@@ -274,7 +275,7 @@ function Assert-PreflightWriteScope {
     $current = Get-PreflightSafetyPaths -RepoRoot $safety.RepoRoot -Paths $Paths -CheckDestinations -IncludeCompanions:$false
     $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
     foreach ($path in $current) {
-        $covered = $safety.Scope.Contains('.')
+        $covered = $safety.WholeRepository
         foreach ($checked in $safety.Scope) {
             if ([string]::Equals($path, $checked, $comparison) -or $path.StartsWith($checked.TrimEnd('/') + '/', $comparison)) { $covered = $true; break }
         }
@@ -1975,12 +1976,7 @@ if ($relativePaths.Count -gt 0) {
     $initiallyUnstagedPaths = Get-GitUnstagedOrUntrackedPaths -RepoRoot $repoRoot -PathScope $queryScope
     if ($Fix) { Add-PreflightPhysicalAliases -RepoRoot $repoRoot -Scope $safetyScope -DirtyPaths $initiallyUnstagedPaths }
     $null = Get-GitStagedPaths -RepoRoot $repoRoot
-    $checkedScope = $safetyScope
-    if (-not $explicitSelection) {
-        $checkedScope = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-        [void]$checkedScope.Add('.')
-    }
-    $script:PreflightWriteSafety = @{ RepoRoot = $repoRoot; Scope = $checkedScope }
+    $script:PreflightWriteSafety = @{ RepoRoot = $repoRoot; Scope = $safetyScope; WholeRepository = -not $explicitSelection }
 }
 
 Test-GitPushConfig -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix

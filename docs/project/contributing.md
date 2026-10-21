@@ -239,7 +239,7 @@ matrix or provide performance measurements.
   queries run before any fixes.
   Explicit selections use literal Git path scopes for their safety checks and known generated
   outputs. Fixes must resolve inside the repository; linked targets keep partial-staging
-  protection. Changed destinations outside the checked scope and hard links with unknown
+  protection. A linked destination that resolves to the repository root is refused before tools start. Changed destinations outside the checked scope and hard links with unknown
   destinations fail before writing. Metadata recovery checks every staged source and its parent/file companions,
   including sources outside the selected validation list. With no explicit selection, discovery
   still covers the whole repository.
