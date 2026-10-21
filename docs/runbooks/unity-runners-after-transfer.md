@@ -432,6 +432,13 @@ registers and up to 32 caller frames. These observations can distinguish an
 observed handled exception from an unhandled fault or an explicit termination
 request. An AV-coded exit alone does not prove an exception, and missing trace
 records do not prove that no exception or external termination occurred.
+The collector prints a marked breakpoint list after installing both termination
+breakpoints and before resuming. Read the actual enabled or disabled state,
+resolved address, and unresolved indicator in
+[`bl /L`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/bl--breakpoint-list-)
+output. Requested commands alone do not establish that a breakpoint resolved or
+was enabled; absent hit markers cannot fill that gap. The list describes that
+stopped instant and does not prove that later code traversed either breakpoint.
 The first-chance command uses
 [`sx-`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/sx--sxd--sxe--sxi--sxn--sxr--sx---set-exceptions-)
 to preserve the existing break and handling policy.

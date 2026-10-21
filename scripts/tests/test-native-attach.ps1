@@ -208,6 +208,12 @@ try {
             }
             Assert-Attach ([Environment]::GetEnvironmentVariable('_NT_SYMBOL_PATH', 'Process') -ceq $symbols -and [Environment]::GetEnvironmentVariable('_NO_DEBUG_HEAP', 'Process') -ceq $heap) "Actual $kind capture preserves inherited environment."
             $console = [IO.File]::ReadAllText((Join-Path $casePath 'capture/build-attach-console-head.log'))
+            $breakpointSections = [regex]::Matches($console, '(?ms)^WUH_BREAKPOINTS_BEGIN\r?\n(?<Rows>.*?)^WUH_BREAKPOINTS_END\r?$')
+            Assert-Attach ($breakpointSections.Count -eq 1) "Actual $kind retains one executed breakpoint-state section."
+            foreach ($name in @('NtTerminateProcess', 'RtlExitUserProcess')) {
+                $pattern = '(?m)^\s*\d+ e [0-9a-f`]+\s+[^\r\n]*ntdll!' + $name + '(?:\s|$)'
+                Assert-Attach ([regex]::Matches($breakpointSections[0].Groups['Rows'].Value, $pattern).Count -eq 1) "Actual $kind resolves and enables $name before continuation."
+            }
             $firstChanceCount = [regex]::Matches($console, '(?m)^WUH_FIRST_CHANCE_AV\r?$').Count
             Assert-Attach ($console -match '(?m)^\s*av - Access violation - second-chance break - not handled\r?$' -and
                 [regex]::Matches($console, '(?m)^WUH_EXCEPTION_FILTERS_END\r?$').Count -eq 1) "Actual $kind retains the AV filter policy and executed filter output marker."
