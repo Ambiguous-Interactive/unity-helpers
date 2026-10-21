@@ -164,10 +164,16 @@ function Get-PathListEntries {
 
     if (-not (Test-Path -LiteralPath $pathListPath -PathType Leaf)) {
         Write-ErrorMsg "Path list file not found: $pathListPath"
-        return @()
+        exit 2
     }
 
-    $bytes = [System.IO.File]::ReadAllBytes($pathListPath)
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($pathListPath)
+    }
+    catch {
+        Write-ErrorMsg "Cannot read path list file '$pathListPath': $($_.Exception.Message)"
+        exit 2
+    }
     if ($bytes.Length -eq 0) {
         return @()
     }
@@ -1783,9 +1789,6 @@ $prettierAvailable = $false
 $script:NodeDependencyRepairAttempted = $false
 $script:NodeDependencyRepairSucceeded = $false
 
-Test-GitPushConfig -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
-Test-StrayArtifactFiles -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
-
 $candidatePaths = if (-not [string]::IsNullOrWhiteSpace($PathList)) {
     Get-PathListEntries -RepoRoot $repoRoot -PathList $PathList
 }
@@ -1799,6 +1802,9 @@ elseif ($null -ne $Paths -and $Paths.Count -gt 0) {
 else {
     Get-GitChangedPaths -RepoRoot $repoRoot
 }
+
+Test-GitPushConfig -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
+Test-StrayArtifactFiles -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
 
 $dedupedPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 $relativePaths = New-Object System.Collections.Generic.List[string]
