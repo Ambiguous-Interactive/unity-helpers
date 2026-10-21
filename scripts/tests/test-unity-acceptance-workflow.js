@@ -1,6 +1,6 @@
 "use strict";
 
-// cspell:ignore ine
+// cspell:ignore ine cne
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -65,7 +65,7 @@ function expression(text) {
   return (context) =>
     evaluate(
       context.github,
-      context.inputs,
+      { "native-readback-build-receipt-sha256": "", ...context.inputs },
       context.steps,
       context.needs,
       context.matrix,
@@ -574,7 +574,13 @@ const historicalJob = workflow.match(
 )?.[1];
 assert.ok(historicalJob);
 assert.match(historicalJob, /^    needs: runner-preflight$/m);
-assert.match(historicalJob, /^    runs-on: \[self-hosted, Windows, RAM-64GB, fast\]$/m);
+const historicalRunsOn = expression(historicalJob.match(/^    runs-on: (.+)$/m)?.[1]);
+for (const buildHash of ["", "a".repeat(64)]) {
+  assert.deepEqual(
+    historicalRunsOn({ inputs: { "native-readback-build-receipt-sha256": buildHash } }),
+    ["self-hosted", "Windows", "RAM-64GB", buildHash ? "DAD-MACHINE" : "fast"]
+  );
+}
 assert.match(historicalJob, /^      actions: read$/m);
 assert.match(historicalJob, /^      contents: read$/m);
 assert.doesNotMatch(
@@ -743,24 +749,34 @@ assert.match(
 );
 const preflightBlock = workflow.match(/^  runner-preflight:\n([\s\S]*?)(?=^  [\w-]+:\n)/m)?.[1];
 const requiredLabels = expression(
-  preflightBlock.match(/^          required-label-sets: (.+)$/m)?.[1]
+  preflightBlock
+    .match(/^          required-label-sets: ([^\n]*(?:\n            [^\n]*)*)/m)?.[1]
+    .replace(/^>-\s*/, "")
 );
 for (const event of ["push", "pull_request", "workflow_dispatch"]) {
   for (const request of ["", "39132725629"]) {
-    const labels = JSON.parse(
-      requiredLabels({
-        github: { event_name: event },
-        inputs: { "native-readback-run-id": request }
-      })
-    );
-    assert.deepEqual(labels, [
-      [
-        "self-hosted",
-        "Windows",
-        "RAM-64GB",
-        ...(event === "workflow_dispatch" && request !== "" ? ["fast"] : [])
-      ]
-    ]);
+    for (const buildHash of ["", "a".repeat(64)]) {
+      const labels = JSON.parse(
+        requiredLabels({
+          github: { event_name: event },
+          inputs: {
+            "native-readback-run-id": request,
+            "native-readback-build-receipt-sha256": buildHash
+          }
+        })
+      );
+      assert.deepEqual(labels, [
+        [
+          "self-hosted",
+          "Windows",
+          "RAM-64GB",
+          ...(event === "workflow_dispatch" && request !== ""
+            ? [buildHash ? "DAD-MACHINE" : "fast"]
+            : [])
+        ]
+      ]);
+      readbackJobControls++;
+    }
   }
 }
 const registeredWindowsRunners = [
@@ -779,10 +795,49 @@ assert.deepEqual(
     .map((runner) => runner.name),
   ["ELI-MACHINE"]
 );
-assert.match(
-  historicalStep("Validate historical readback selection"),
-  /if \(\[Environment\]::MachineName -ine 'ELI-MACHINE'\) \{ throw 'Historical readback must run on ELI-MACHINE\.' \}/
+const historicalSelection = historicalStep("Validate historical readback selection");
+assert.ok(
+  historicalSelection.includes(
+    "$expectedMachine = if ($env:UH_BUILD_RECEIPT_SHA256) { 'DAD-MACHINE' } else { 'ELI-MACHINE' }"
+  )
 );
+assert.ok(
+  historicalSelection.includes(
+    "if ([Environment]::MachineName -cne $expectedMachine) { throw 'Historical readback requires the original machine.' }"
+  )
+);
+const buildLabels = JSON.parse(
+  requiredLabels({
+    github: { event_name: "workflow_dispatch" },
+    inputs: {
+      "native-readback-run-id": "39132725629",
+      "native-readback-build-receipt-sha256": "a".repeat(64)
+    }
+  })
+)[0];
+assert.deepEqual(
+  registeredWindowsRunners.filter((runner) =>
+    buildLabels.every((label) => runner.labels.includes(label))
+  ),
+  [],
+  "a runner name cannot substitute for its missing DAD scheduling label"
+);
+for (const buildHash of ["", "a".repeat(64)]) {
+  for (const [name, allowed] of [
+    ["Download original latest acceptance evidence", buildHash === ""],
+    ["Download original latest standalone evidence", true]
+  ]) {
+    assert.equal(
+      predicate(historicalStep(name))({
+        cancelled: false,
+        inputs: { "native-readback-build-receipt-sha256": buildHash },
+        steps: { readback_selection: { outcome: "success" } }
+      }),
+      allowed
+    );
+    readbackJobControls++;
+  }
+}
 const preflightGroup = foldedGroup(preflightBlock, 6);
 groupContext.github.workflow = "Unity Tests";
 groupContext.inputs["native-readback-run-id"] = "";
@@ -819,22 +874,38 @@ for (const event of ["push", "pull_request", "workflow_dispatch"]) {
   }
 }
 assert.doesNotMatch(historicalJob, /continue-on-error:/);
-for (const [name, input] of [
-  ["Read historical acceptance process evidence", "readback_acceptance_input"],
-  ["Read historical standalone process and package sources", "readback_standalone_input"]
+for (const [name, input, build] of [
+  ["Read historical acceptance process evidence", "readback_acceptance_input", false],
+  ["Read historical standalone process and package sources", "readback_standalone_input", false],
+  ["Read exact historical native Build evidence", "readback_standalone_input", true]
 ]) {
   const step = historicalStep(name);
-  assert.match(step, /-ExpectedMachine 'ELI-MACHINE'/);
-  for (const cancelled of [false, true]) {
-    for (const download of ["success", "failure", "skipped", "cancelled"]) {
-      for (const idle of ["success", "failure", "skipped"]) {
-        assert.equal(
-          predicate(step)({
-            cancelled,
-            steps: { [input]: { outcome: download }, readback_host_idle: { outcome: idle } }
-          }),
-          !cancelled && download === "success" && idle === "success"
-        );
+  assert.ok(step.includes(`-ExpectedMachine '${build ? "DAD-MACHINE" : "ELI-MACHINE"}'`));
+  if (build) {
+    assert.ok(step.includes("-ExpectedReceiptSha256 $env:UH_BUILD_RECEIPT_SHA256"));
+    assert.ok(
+      step.includes(
+        "-BuildReceiptPath '.artifacts/native-readback/input/standalone/build-only-diagnostics/wproto/native-build-diagnostics/receipt.json'"
+      )
+    );
+  }
+  for (const buildHash of ["", "a".repeat(64)]) {
+    for (const cancelled of [false, true]) {
+      for (const download of ["success", "failure", "skipped", "cancelled"]) {
+        for (const idle of ["success", "failure", "skipped"]) {
+          assert.equal(
+            predicate(step)({
+              cancelled,
+              inputs: { "native-readback-build-receipt-sha256": buildHash },
+              steps: { [input]: { outcome: download }, readback_host_idle: { outcome: idle } }
+            }),
+            !cancelled &&
+              download === "success" &&
+              idle === "success" &&
+              build === (buildHash !== "")
+          );
+          readbackJobControls++;
+        }
       }
     }
   }

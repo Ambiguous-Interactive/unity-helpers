@@ -24,6 +24,11 @@ and test doubles remain included. Each scope accepts files only from its corresp
 These commands retain source generators and compiler errors but omit performance analyzers.
 Run the normal applicable typecheck commands and changed-file preflight before publishing.
 
+The analyzer placement check evaluates MSBuild compiler inputs for each owned .NET project with
+both protobuf oracle settings. Each shipped analyzer must appear exactly once at its package
+path. Normal assembly references, including the compiler compatibility test reference, do not
+count as compiler inputs. Run it with `node scripts/tests/test-analyzer-placement.js`.
+
 ### GitHub Credentials in the Container
 
 The container resolves github.com credentials from a cached token. The Dev Containers credential

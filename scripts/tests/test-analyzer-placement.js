@@ -14,6 +14,8 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
+const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
@@ -232,15 +234,105 @@ const generatorProjectFiles = fs
       .filter((fileName) => fileName.endsWith(".csproj"))
       .map((fileName) => path.join(root, "Generator~", entry.name, fileName))
   );
+function evaluatedAnalyzers(projectFile, oracle) {
+  const output = execFileSync(
+    "dotnet",
+    ["msbuild", projectFile, "--nologo", "-getItem:Analyzer", `-p:ProtobufNetOracle=${oracle}`],
+    { cwd: root, encoding: "utf8", timeout: 30000, maxBuffer: 1024 * 1024 }
+  );
+  const items = JSON.parse(output).Items.Analyzer;
+  assert.ok(Array.isArray(items), `MSBuild did not return analyzer items for ${projectFile}`);
+  return items;
+}
+
+function validAnalyzerPlacement(items) {
+  const identity = (value) => {
+    const fullPath = path.resolve(value);
+    return process.platform === "win32" ? fullPath.toLowerCase() : fullPath;
+  };
+  return analyzerDlls.every((analyzerDll) => {
+    const matches = items.filter(
+      (item) => path.basename(identity(item.FullPath)) === path.basename(identity(analyzerDll))
+    );
+    return matches.length === 1 && identity(matches[0].FullPath) === identity(analyzerDll);
+  });
+}
+
+check("owned project discovery is nonempty", generatorProjectFiles.length > 0, "Generator~");
 check(
-  "owned projects inherit analyzer binaries exactly once",
-  generatorProjectFiles.every((projectFile) =>
-    analyzerDlls.every(
-      (analyzerDll) => !fs.readFileSync(projectFile, "utf8").includes(path.basename(analyzerDll))
-    )
-  ),
-  "individual projects must not duplicate the analyzer references from Directory.Build.props"
+  "compiler compatibility project remains in the placement check",
+  generatorProjectFiles.some(
+    (file) =>
+      path.basename(file) === "WallstopStudios.UnityHelpers.Proto.CompilerFloor.Tests.csproj"
+  )
 );
+for (const projectFile of generatorProjectFiles) {
+  for (const oracle of ["v3", "v2"]) {
+    check(
+      `owned project inherits each shipped analyzer once: ${path.relative(root, projectFile)} (${oracle})`,
+      validAnalyzerPlacement(evaluatedAnalyzers(projectFile, oracle)),
+      "MSBuild must evaluate exactly one compiler input at each shipped path"
+    );
+  }
+}
+
+// Exercise real MSBuild item semantics: a normal Reference is data, while a
+// duplicate Analyzer (including a property alias) or removed compiler input fails.
+const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "wuh analyzer placement-"));
+try {
+  const projectFile = path.join(fixtureRoot, "Fixture.proj");
+  const attribute = (value) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+  const inherited = `<Import Project="${attribute(path.join(root, "Generator~/Directory.Build.props"))}" />`;
+  const probe = (body, oracle = "v3") => {
+    fs.writeFileSync(projectFile, `<Project>${body}</Project>`);
+    return validAnalyzerPlacement(evaluatedAnalyzers(projectFile, oracle));
+  };
+  check(
+    "ordinary assembly references do not duplicate compiler inputs",
+    probe(
+      inherited +
+        analyzerDlls
+          .map(
+            (file) =>
+              `<ItemGroup><Reference Include="Fixture"><HintPath>${attribute(file)}</HintPath></Reference></ItemGroup>`
+          )
+          .join("")
+    )
+  );
+  for (const analyzerDll of analyzerDlls) {
+    const file = attribute(analyzerDll);
+    check(
+      `duplicate analyzer is rejected: ${path.basename(analyzerDll)}`,
+      !probe(`${inherited}<ItemGroup><Analyzer Include="${file}" /></ItemGroup>`)
+    );
+    check(
+      `property-aliased duplicate is rejected: ${path.basename(analyzerDll)}`,
+      !probe(
+        `${inherited}<PropertyGroup><OwnedCompiler>${file}</OwnedCompiler></PropertyGroup><ItemGroup><Analyzer Include="$(OwnedCompiler)" /></ItemGroup>`
+      )
+    );
+    check(
+      `v2-only duplicate is rejected: ${path.basename(analyzerDll)}`,
+      !probe(
+        `${inherited}<ItemGroup Condition="'$(ProtobufNetOracle)' == 'v2'"><Analyzer Include="${file}" /></ItemGroup>`,
+        "v2"
+      )
+    );
+    check(
+      `an analyzer from a different directory is rejected: ${path.basename(analyzerDll)}`,
+      !probe(
+        `${inherited}<ItemGroup><Analyzer Remove="${file}" /><Analyzer Include="${attribute(path.join(fixtureRoot, path.basename(analyzerDll)))}" /></ItemGroup>`
+      )
+    );
+    check(
+      `missing analyzer is rejected: ${path.basename(analyzerDll)}`,
+      !probe(`${inherited}<ItemGroup><Analyzer Remove="${file}" /></ItemGroup>`)
+    );
+  }
+  check("an empty compiler item set is rejected", !probe(""));
+} finally {
+  fs.rmSync(fixtureRoot, { recursive: true, force: true });
+}
 const promotedPolicyIds = [...generatorBuildPolicy.matchAll(/(?:^|;)(WUH\d{3})(?=;|<)/g)].map(
   (match) => match[1]
 );
