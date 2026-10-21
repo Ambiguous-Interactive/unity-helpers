@@ -31,6 +31,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'git-staging-helpers.ps1')
 . (Join-Path $PSScriptRoot 'git-push-defaults-helpers.ps1')
 . (Join-Path $PSScriptRoot 'git-path-helpers.ps1')
+$script:PreflightWriteSafety = $null
 
 function Write-Info($Message) {
     if ($VerboseOutput) {
@@ -51,8 +52,14 @@ function Invoke-GitPathList {
         [Parameter(Mandatory = $true)]
         [string]$RepoRoot,
         [Parameter(Mandatory = $true)]
-        [string[]]$Arguments
+        [string[]]$Arguments,
+        [AllowNull()][string[]]$PathScope = $null
     )
+
+    if ($null -ne $PathScope) {
+        if ($PathScope.Count -eq 0) { return @() }
+        $Arguments += @('--') + @($PathScope | ForEach-Object { ":(literal)$_" })
+    }
 
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = 'git'
@@ -119,7 +126,7 @@ function Get-GitStagedPaths {
         [string]$RepoRoot
     )
 
-    $stagedPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $stagedPaths = [System.Collections.Generic.HashSet[string]]::new($(if ($IsWindows) { [StringComparer]::OrdinalIgnoreCase } else { [StringComparer]::Ordinal }))
 
     foreach ($path in @(Invoke-GitPathList -RepoRoot $RepoRoot -Arguments @('diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR'))) {
         $stagedPaths.Add($path) | Out-Null
@@ -131,22 +138,149 @@ function Get-GitStagedPaths {
 function Get-GitUnstagedOrUntrackedPaths {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RepoRoot
+        [string]$RepoRoot,
+        [AllowNull()][string[]]$PathScope = $null
     )
 
-    $paths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $paths = [System.Collections.Generic.HashSet[string]]::new($(if ($IsWindows) { [StringComparer]::OrdinalIgnoreCase } else { [StringComparer]::Ordinal }))
     $commands = @(
         @('diff', '--name-only', '-z', '--diff-filter=ACMRTUXB'),
         @('ls-files', '--others', '--exclude-standard', '-z')
     )
 
-    foreach ($command in $commands) {
-        foreach ($path in @(Invoke-GitPathList -RepoRoot $RepoRoot -Arguments $command)) {
-            $paths.Add($path) | Out-Null
+    $scopes = [Collections.Generic.List[object]]::new()
+    if ($null -eq $PathScope) { $scopes.Add($null) }
+    else {
+        $batch = [Collections.Generic.List[string]]::new()
+        $characters = 0
+        foreach ($path in $PathScope) {
+            $length = $path.Length + 16
+            if ($length -gt 16000) { throw 'Preflight path exceeds the Git query argument budget.' }
+            if ($characters + $length -gt 16000 -and $batch.Count -gt 0) {
+                $scopes.Add($batch.ToArray()); $batch.Clear(); $characters = 0
+            }
+            $batch.Add($path); $characters += $length
+        }
+        if ($batch.Count -gt 0) { $scopes.Add($batch.ToArray()) }
+    }
+    foreach ($scope in $scopes) {
+        foreach ($command in $commands) {
+            foreach ($path in @(Invoke-GitPathList -RepoRoot $RepoRoot -Arguments $command -PathScope $scope)) {
+                $paths.Add($path) | Out-Null
+            }
         }
     }
 
     return ,$paths
+}
+
+function Resolve-PreflightPhysicalPath {
+    param([string]$Path, [string]$BaseDirectory)
+    $full = [IO.Path]::GetFullPath($Path)
+    $current = if ($BaseDirectory) { $BaseDirectory } else { [IO.Path]::GetPathRoot($full) }
+    $relative = if ($BaseDirectory) { [IO.Path]::GetRelativePath($BaseDirectory, $full) } else { $full.Substring($current.Length) }
+    foreach ($part in $relative.Split([IO.Path]::DirectorySeparatorChar, [StringSplitOptions]::RemoveEmptyEntries)) {
+        if ($part -eq '.') { continue }
+        if ($part -eq '..') { $current = [IO.Directory]::GetParent($current).FullName; continue }
+        $current = Join-Path $current $part
+        try { $entry = Get-Item -LiteralPath $current -Force -ErrorAction Stop }
+        catch [System.Management.Automation.ItemNotFoundException] { continue }
+        if ($entry.LinkType -eq 'HardLink') { throw "Cannot prove all hard-link write destinations: $current" }
+        if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            $target = $entry.ResolveLinkTarget($true)
+            if ($null -eq $target) { throw "Cannot resolve preflight write destination: $current" }
+            if ($target.LinkType -eq 'HardLink') { throw "Cannot prove all hard-link write destinations: $current" }
+            $current = $target.FullName
+        }
+    }
+    return $current
+}
+
+function Get-PreflightPhysicalRelativePath {
+    param([string]$RepoRoot, [string]$Path, [string]$PhysicalRoot)
+    $root = if ($PhysicalRoot) { $PhysicalRoot } else { Resolve-PreflightPhysicalPath $RepoRoot }
+    $actual = Resolve-PreflightPhysicalPath -Path (Join-Path $root $Path) -BaseDirectory $root
+    $relative = [IO.Path]::GetRelativePath($root, $actual).Replace('\', '/')
+    if ($relative -eq '..' -or $relative.StartsWith('../') -or [IO.Path]::IsPathRooted($relative)) {
+        throw "Preflight write destination is outside the repository: $Path"
+    }
+    return $relative
+}
+
+function Get-PreflightSafetyPaths {
+    param([string]$RepoRoot, [string[]]$Paths, [switch]$IncludeGenerated, [switch]$CheckDestinations, [bool]$IncludeCompanions = $true)
+    $scope = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($path in $Paths) {
+        [void]$scope.Add($path)
+        if ($IncludeCompanions -and (Test-MetaRequiredPath -RelativePath $path)) {
+            [void]$scope.Add($path + '.meta')
+            $parent = (Split-Path $path -Parent).Replace('\', '/')
+            while ($parent -and $parent -ne '.' -and $parent -notin @('Runtime', 'Editor', 'Tests', 'Samples~', 'Shaders', 'Styles', 'URP', 'docs', 'scripts')) {
+                [void]$scope.Add($parent + '.meta')
+                $parent = (Split-Path $parent -Parent).Replace('\', '/')
+            }
+        }
+    }
+    if ($IncludeGenerated) {
+        if (@($Paths | Where-Object { $_ -like '.llm/*' }).Count -gt 0) {
+            foreach ($path in @('.llm/context.md', '.llm/skills/index.md', '.agents/skills', '.claude/skills')) { [void]$scope.Add($path) }
+        }
+        if (@($Paths | Where-Object { $_ -like 'Generator~/WallstopStudios.UnityHelpers.Analyzers/*' -or $_ -like 'Generator~/WallstopStudios.UnityHelpers.Proto.Generator/*' -or $_ -like 'Generator~/WallstopStudios.UnityHelpers.OdinMigration.Generator/*' }).Count -gt 0) {
+            [void]$scope.Add('Runtime/Analyzers')
+        }
+    }
+    if ($CheckDestinations) {
+        $physicalRoot = Resolve-PreflightPhysicalPath $RepoRoot
+        $pending = [Collections.Generic.Queue[string]]::new()
+        foreach ($path in @($scope)) { $pending.Enqueue($path) }
+        $visited = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        while ($pending.Count -gt 0) {
+            $path = $pending.Dequeue()
+            $physical = Get-PreflightPhysicalRelativePath -RepoRoot $RepoRoot -Path $path -PhysicalRoot $physicalRoot
+            if ($physical -eq '.') { throw "Preflight write destination resolves to repository root: $path" }
+            if ($physical -cne $path) { [void]$scope.Add($physical) }
+            if (-not $visited.Add($physical)) { continue }
+            $full = Join-Path $RepoRoot $physical
+            if (Test-Path -LiteralPath $full -PathType Container) {
+                foreach ($entry in Get-ChildItem -LiteralPath $full -Force -ErrorAction Stop) {
+                    $pending.Enqueue(($physical.TrimEnd('/') + '/' + $entry.Name))
+                }
+            }
+        }
+    }
+    return ,$scope
+}
+
+function Add-PreflightPhysicalAliases {
+    param([string]$RepoRoot, [Collections.Generic.HashSet[string]]$Scope, [Collections.Generic.HashSet[string]]$DirtyPaths)
+    $physicalRoot = Resolve-PreflightPhysicalPath $RepoRoot
+    $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    foreach ($path in $Scope) {
+        $physical = Get-PreflightPhysicalRelativePath -RepoRoot $RepoRoot -Path $path -PhysicalRoot $physicalRoot
+        if ($physical -ceq $path) { continue }
+        foreach ($dirty in @($DirtyPaths)) {
+            if ($physical -eq '.') { [void]$DirtyPaths.Add($path.TrimEnd('/') + '/' + $dirty) }
+            elseif ([string]::Equals($dirty, $physical, $comparison)) { [void]$DirtyPaths.Add($path) }
+            elseif ($dirty.StartsWith($physical.TrimEnd('/') + '/', $comparison)) {
+                [void]$DirtyPaths.Add($path.TrimEnd('/') + $dirty.Substring($physical.Length))
+            }
+        }
+    }
+}
+
+function Assert-PreflightWriteScope {
+    param([string[]]$Paths)
+    if ($null -eq $script:PreflightWriteSafety -or $null -eq $Paths -or $Paths.Count -eq 0) { return }
+    $safety = $script:PreflightWriteSafety
+    $current = Get-PreflightSafetyPaths -RepoRoot $safety.RepoRoot -Paths $Paths -CheckDestinations -IncludeCompanions:$false
+    $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    foreach ($path in $current) {
+        $covered = $safety.WholeRepository
+        foreach ($checked in $safety.Scope) {
+            if ([string]::Equals($path, $checked, $comparison) -or $path.StartsWith($checked.TrimEnd('/') + '/', $comparison)) { $covered = $true; break }
+        }
+        if (-not $covered) { throw "Preflight write destination changed after safety discovery: $path" }
+    }
 }
 
 function Get-PathListEntries {
@@ -354,10 +488,14 @@ function Get-UnsafeWholeFileAutoFixPaths {
         return @()
     }
 
-    return @(
-        Get-NormalizedUniquePaths -Paths $Paths |
-            Where-Object { $InitiallyUnstagedPaths.Contains($_) }
-    )
+    $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    $unsafePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($path in @(Get-NormalizedUniquePaths -Paths $Paths)) {
+        foreach ($dirty in $InitiallyUnstagedPaths) {
+            if ([string]::Equals($dirty, $path, $comparison) -or $dirty.StartsWith($path.TrimEnd('/') + '/', $comparison)) { [void]$unsafePaths.Add($path) }
+        }
+    }
+    return @($unsafePaths)
 }
 
 function Write-WholeFileAutoFixRefusal {
@@ -387,6 +525,7 @@ function Test-CanRunWholeFileAutoFix {
         [string]$Phase = 'before'
     )
 
+    Assert-PreflightWriteScope -Paths $Paths
     $unsafePaths = @(Get-UnsafeWholeFileAutoFixPaths -Paths $Paths -InitiallyUnstagedPaths $InitiallyUnstagedPaths)
     if ($unsafePaths.Count -eq 0) {
         return $true
@@ -407,10 +546,14 @@ function Test-CanRunWholeFileAutoFixOnStagedTargets {
         [string]$Context = 'auto-fix'
     )
 
+    Assert-PreflightWriteScope -Paths $Paths
     $stagedPaths = Get-GitStagedPaths -RepoRoot $RepoRoot
+    $physicalRoot = Resolve-PreflightPhysicalPath $RepoRoot
     $stagedTargets = @(
-        Get-NormalizedUniquePaths -Paths $Paths |
-            Where-Object { $stagedPaths.Contains($_) }
+        foreach ($path in @(Get-NormalizedUniquePaths -Paths $Paths)) {
+            $physical = Get-PreflightPhysicalRelativePath -RepoRoot $RepoRoot -Path $path -PhysicalRoot $physicalRoot
+            if ($stagedPaths.Contains($path) -or $stagedPaths.Contains($physical)) { $path; $physical }
+        }
     )
 
     return (Test-CanRunWholeFileAutoFix `
@@ -1813,7 +1956,9 @@ $dedupedPaths = [System.Collections.Generic.HashSet[string]]::new([System.String
 $relativePaths = New-Object System.Collections.Generic.List[string]
 
 foreach ($candidate in $candidatePaths) {
-    $relative = ConvertTo-GitRelativePosixPath -Path $candidate -RepoRoot $repoRoot
+    $fullCandidate = [IO.Path]::GetFullPath($candidate, $repoRoot)
+    $relative = ConvertTo-GitRelativePosixPath -Path $fullCandidate -RepoRoot $repoRoot
+    if ($null -eq $relative) { throw "Preflight target is outside the repository: $candidate" }
     if ($null -eq $relative -or [string]::IsNullOrWhiteSpace($relative) -or $relative -eq '.') {
         continue
     }
@@ -1823,10 +1968,15 @@ foreach ($candidate in $candidatePaths) {
     }
 }
 
+$explicitSelection = (-not [string]::IsNullOrWhiteSpace($PathList)) -or ($null -ne $Paths -and $Paths.Count -gt 0)
 $initiallyUnstagedPaths = $null
 if ($relativePaths.Count -gt 0) {
-    $initiallyUnstagedPaths = Get-GitUnstagedOrUntrackedPaths -RepoRoot $repoRoot
+    $safetyScope = Get-PreflightSafetyPaths -RepoRoot $repoRoot -Paths @($relativePaths) -IncludeGenerated -CheckDestinations:$Fix
+    $queryScope = if ($explicitSelection) { @($safetyScope) } else { $null }
+    $initiallyUnstagedPaths = Get-GitUnstagedOrUntrackedPaths -RepoRoot $repoRoot -PathScope $queryScope
+    if ($Fix) { Add-PreflightPhysicalAliases -RepoRoot $repoRoot -Scope $safetyScope -DirtyPaths $initiallyUnstagedPaths }
     $null = Get-GitStagedPaths -RepoRoot $repoRoot
+    $script:PreflightWriteSafety = @{ RepoRoot = $repoRoot; Scope = $safetyScope; WholeRepository = -not $explicitSelection }
 }
 
 Test-GitPushConfig -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
@@ -1946,7 +2096,7 @@ if ($llmFiles.Count -gt 0) {
     $canRunLlmFix = $true
     if ($Fix) {
         $canRunLlmFix = Test-CanRunWholeFileAutoFix `
-            -Paths @('.llm/context.md', '.llm/skills/index.md') `
+            -Paths @('.llm/context.md', '.llm/skills/index.md', '.agents/skills', '.claude/skills') `
             -InitiallyUnstagedPaths $initiallyUnstagedPaths `
             -Context 'LLM instruction auto-fix' `
             -Phase 'before'
@@ -2461,7 +2611,10 @@ if ($csharpierTargets.Count -gt 0) {
             $_ -like 'Generator~/WallstopStudios.UnityHelpers.Proto.Generator/*' -or
             $_ -like 'Generator~/WallstopStudios.UnityHelpers.OdinMigration.Generator/*'
         })
-    if ($analyzerSourceTargets.Count -gt 0) {
+    if ($analyzerSourceTargets.Count -gt 0 -and $Fix -and -not (Test-CanRunWholeFileAutoFix -Paths @('Runtime/Analyzers') -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'shipped analyzer rebuild')) {
+        $failureCount++
+    }
+    elseif ($analyzerSourceTargets.Count -gt 0) {
         Write-Host '[agent-preflight] Rebuilding the shipped analyzer assemblies (their sources changed)...' -ForegroundColor Blue
         Push-Location $repoRoot
         try {
@@ -2567,6 +2720,7 @@ if ($metaRelevantPaths.Count -gt 0) {
 
     if ($missingMetaTargets.Count -gt 0 -and $Fix) {
         foreach ($target in ($missingMetaTargets | Sort-Object -Unique)) {
+            Assert-PreflightWriteScope -Paths @($target + '.meta')
             if (-not (New-UnityMetaFile -RepoRoot $repoRoot -RelativePath $target)) {
                 Write-ErrorMsg "Failed to auto-generate .meta for: $target"
                 $failureCount++
@@ -2599,18 +2753,12 @@ if ($metaRelevantPaths.Count -gt 0) {
 
         $stagedPaths = Get-GitStagedPaths -RepoRoot $repoRoot
     if ($stagedPaths.Count -gt 0) {
-        $unstagedOrUntrackedPaths = Get-GitUnstagedOrUntrackedPaths -RepoRoot $repoRoot
+        $metaSafetyScope = Get-PreflightSafetyPaths -RepoRoot $repoRoot -Paths @($stagedPaths)
+        $metaQueryScope = if ($explicitSelection) { @($metaSafetyScope) } else { $null }
+        $unstagedOrUntrackedPaths = Get-GitUnstagedOrUntrackedPaths -RepoRoot $repoRoot -PathScope $metaQueryScope
         $unstagedMetaCompanionsSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-        $pathScopedMetaRelevantSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-        foreach ($metaPath in $metaRelevantPaths) {
-            $pathScopedMetaRelevantSet.Add($metaPath) | Out-Null
-        }
 
         foreach ($stagedPath in $stagedPaths) {
-            if (($null -ne $Paths -and $Paths.Count -gt 0) -and -not $pathScopedMetaRelevantSet.Contains($stagedPath)) {
-                continue
-            }
-
             if (-not (Test-MetaRequiredPath -RelativePath $stagedPath)) {
                 continue
             }
