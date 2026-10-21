@@ -565,7 +565,79 @@ function New-AdmissionRepo {
     return $repo
 }
 
+function Test-PathListAdmissionPreflight {
+    foreach ($fixMode in @($false, $true)) {
+        foreach ($selection in @('MissingRelative', 'MissingAbsolute', 'Directory', 'Unreadable')) {
+            $repo = New-AdmissionRepo -UnsafeConfig:$fixMode
+            if (-not $fixMode) { Remove-Item -LiteralPath (Join-Path $repo '.githooks/pre-commit.log') -Force }
+            $lease = $null
+            try {
+                $list = switch ($selection) {
+                    'MissingRelative' { 'missing list Ω.txt' }
+                    'MissingAbsolute' { Join-Path $repo 'missing list Ω.txt' }
+                    'Directory' { 'Runtime' }
+                    'Unreadable' {
+                        $path = Join-Path $repo 'locked list Ω.txt'
+                        [IO.File]::WriteAllText($path, "Runtime/Selected.png.meta`n")
+                        $path
+                    }
+                }
+                $before = Get-AdmissionSnapshot $repo
+                if ($selection -eq 'Unreadable') {
+                    $lease = [IO.File]::Open($list, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+                }
+                $arguments = @('-PathList', $list)
+                if ($fixMode) { $arguments = @('-Fix') + $arguments }
+                $result = Invoke-Preflight -RepoPath $repo -Arguments $arguments -UseCli
+                if ($null -ne $lease) { $lease.Dispose(); $lease = $null }
+                $label = "PathListAdmission_${selection}_Fix${fixMode}"
+                Write-TestResult "${label}_Nonzero" ($result.ExitCode -ne 0) $result.Output
+                Write-TestResult "${label}_Diagnostic" ($result.Output -match '(?i)path list' -and $result.Output -notmatch 'Nothing to validate|All relevant changed-file checks passed') $result.Output
+                Write-TestResult "${label}_NoMutation" ((Get-AdmissionSnapshot $repo) -ceq $before) 'Rejected input changed files, metadata, config or the index.'
+            }
+            finally {
+                if ($null -ne $lease) { $lease.Dispose() }
+                Remove-Item -LiteralPath $repo -Recurse -Force
+            }
+        }
+    }
+    foreach ($delimiter in @("`n", [string][char]0)) {
+        $repo = New-AdmissionRepo
+        try {
+            Remove-Item -LiteralPath (Join-Path $repo '.githooks/pre-commit.log') -Force
+            $selected = 'Runtime/With space Ω.png.meta'
+            [IO.File]::WriteAllText((Join-Path $repo $selected), "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`n")
+            $list = 'selected list Ω.txt'
+            [IO.File]::WriteAllText((Join-Path $repo $list), $selected + $delimiter + 'Runtime/Additional.png.meta' + $delimiter)
+            $userBefore = [IO.File]::ReadAllBytes((Join-Path $repo 'Runtime/User.png.meta'))
+            $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '-PathList', $list) -UseCli
+            Write-TestResult 'PathListAdmission_DelimitedExitZero' ($result.ExitCode -eq 0) $result.Output
+            foreach ($path in @($selected, 'Runtime/Additional.png.meta')) {
+                Write-TestResult 'PathListAdmission_DelimitedSelectedFixed' ([IO.File]::ReadAllText((Join-Path $repo $path)).Contains("`r`n")) $result.Output
+            }
+            Write-TestResult 'PathListAdmission_DelimitedUnselectedPreserved' (Test-ByteArrayEqual $userBefore ([IO.File]::ReadAllBytes((Join-Path $repo 'Runtime/User.png.meta')))) 'Unselected user input changed.'
+        }
+        finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+    }
+    foreach ($fixMode in @($false, $true)) {
+        $repo = New-AdmissionRepo
+        try {
+            Remove-Item -LiteralPath (Join-Path $repo '.githooks/pre-commit.log') -Force
+            $list = Join-Path $repo 'empty list.txt'
+            [IO.File]::WriteAllBytes($list, [byte[]]::new(0))
+            $before = Get-AdmissionSnapshot $repo
+            $arguments = @('-PathList', $list)
+            if ($fixMode) { $arguments = @('-Fix') + $arguments }
+            $result = Invoke-Preflight -RepoPath $repo -Arguments $arguments -UseCli
+            Write-TestResult 'PathListAdmission_EmptyListAccepted' ($result.ExitCode -eq 0 -and $result.Output.Contains('Nothing to validate')) $result.Output
+            Write-TestResult 'PathListAdmission_EmptyListUnchanged' ((Get-AdmissionSnapshot $repo) -ceq $before) 'A valid empty list changed user input.'
+        }
+        finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+    }
+}
+
 function Test-ArgumentAdmissionPreflight {
+    Test-PathListAdmissionPreflight
     $repo = New-AdmissionRepo -UnsafeConfig
     try {
         foreach ($arguments in @(
