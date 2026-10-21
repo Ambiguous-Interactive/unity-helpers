@@ -76,22 +76,19 @@ function Get-NativeReportSummary {
 # Unity.Licensing.Client.exe failed its own signature check, Unity logged
 # "LicensingClient has failed validation; ignoring" and carried on, so the suite ran
 # and every test passed -- and the leg then failed forty minutes later at
-# return-unity-license with "return-missing-positive-evidence", because there was no
-# licensing client left to report a return through. The cause is visible in the
-# editor log's first seconds and nothing was reading it.
+# return-unity-license with "return-missing-positive-evidence". Later runs observed
+# the same signature warning followed by confirmed cleanup. Report the observed
+# log message; the final cleanup receipt determines cleanup health.
 #
-# These are WARNINGS, never errors: the run is not wrong, the machine is, and reddening
-# a green suite on a host-level fault would be a worse trade than a slow diagnosis.
-# The point is that the next occurrence is named in the job summary instead of costing
-# an hour of log archaeology.
-
+# Keep these as WARNINGS. Preserve the observations in the job summary without
+# changing test acceptance or predicting the independent cleanup result.
 function Get-EnvironmentWarningPatterns {
     [CmdletBinding()]
     param()
 
     return @(
-        @{ Label = 'Licensing client failed signature validation (host fault; the seat cannot be returned and the leg will fail at return-unity-license -- issue #657)'; Pattern = 'while verifying Licensing Client signature'; UseSimple = $true }
-        @{ Label = 'Licensing client ignored after failing validation (host fault; see issue #657)'; Pattern = 'LicensingClient has failed validation'; UseSimple = $true }
-        @{ Label = 'Licensing IPC channel absent (the License Client never started on this runner -- issue #657)'; Pattern = 'failed because channel doesn''t exist'; UseSimple = $true }
+        @{ Label = 'Licensing client signature validation failed (issue #657; final cleanup is evaluated separately)'; Pattern = 'while verifying Licensing Client signature'; UseSimple = $true }
+        @{ Label = 'Licensing client ignored after failing validation (issue #657)'; Pattern = 'LicensingClient has failed validation'; UseSimple = $true }
+        @{ Label = 'Licensing IPC channel absent at connection attempt (issue #657)'; Pattern = 'failed because channel doesn''t exist'; UseSimple = $true }
     )
 }

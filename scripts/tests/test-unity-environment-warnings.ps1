@@ -5,11 +5,10 @@
     (issue #657).
 
 .DESCRIPTION
-    A Unity leg can pass every test and still be running on a host whose licensing
-    client is broken; the leg then fails tens of minutes later at
-    return-unity-license, with a classification that names the return rather than
-    the cause. The scan reads the editor log the runner already writes and names the
-    cause as a warning.
+    The scan reports licensing observations without predicting the final cleanup
+    result. Signature and connection warnings can precede confirmed cleanup.
+    Return-helper controls execute the actual source function with a fixture
+    command; no Unity process, account or licensing service is contacted.
 
     Subjects are the verbatim log lines from run 33365150391, so a rewording of the
     pattern list that stops matching the real log fails here. The function is pulled
@@ -123,6 +122,67 @@ Assert-That 'an absent log says nothing was scanned' (@($absentOutput | Where-Ob
 Assert-That 'an absent log raises no warning' (@($absentOutput | Where-Object { $_ -like '::warning::*' }).Count -eq 0)
 
 Assert-That 'the pattern list is not empty' (@(Get-EnvironmentWarningPatterns).Count -ge 1)
+
+# Keep the observed pattern and warning severity, but do not infer client lifetime,
+# service-side seat state or the outcome of a later independent cleanup command.
+Assert-That 'signature warning names the observed validation failure' (@($sickWarnings | Where-Object { $_ -match 'signature validation failed' }).Count -eq 1)
+Assert-That 'IPC warning names the connection observation' (@($sickWarnings | Where-Object { $_ -match 'absent at connection attempt' }).Count -eq 1)
+Assert-That 'warnings do not predict final cleanup or client lifetime' (($sickWarnings -join "`n") -notmatch 'cannot be returned|will fail|never started|leaked seat')
+Assert-That 'the three original observations remain warnings' ($sickWarnings.Count -eq 3)
+Assert-That 'all matching log lines remain counted' (@($sickOutput | Where-Object { $_ -like '*3 match(es)*' }).Count -eq 1)
+
+# This final receipt follows signature warnings in actual package-export job
+# 119432668050 (run 39660650635). Scanning both observations must retain the early
+# warnings without turning the later confirmation into another warning.
+$cleanupConfirmation = 'Licensed Unity cleanup is confirmed. acquired=true classification=true cleanup=confirmed/healthy cleanup-reason=cleanup-confirmed release=success/cooldown-started released=true release-health=healthy release-reason=cleanup-confirmed reservation=cooldown/present incident=none'
+$confirmedOutput = Invoke-Scan -Lines @($sickLog + $cleanupConfirmation)
+$confirmedWarnings = @($confirmedOutput | Where-Object { $_ -like '::warning::*' })
+Assert-That 'later cleanup confirmation does not suppress licensing observations' ($confirmedWarnings.Count -eq 3)
+Assert-That 'later cleanup confirmation does not contradict early warning labels' (($confirmedWarnings -join "`n") -notmatch 'cannot be returned|will fail|never started|leaked seat')
+Assert-That 'the combined scan retains all six input lines' (@($confirmedOutput | Where-Object { $_ -like '*Scanned 6 log line(s)*3 match(es)*' }).Count -eq 1)
+
+foreach ($name in @('Invoke-UnityLicenseReturn', 'Write-CiNotice')) {
+    $definition = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name }, $true))
+    if ($definition.Count -ne 1) { throw "Expected exactly one production function: $name" }
+    Invoke-Expression $definition[0].Extent.Text
+}
+
+$fixtureRoot = Join-Path ([IO.Path]::GetTempPath()) ('uh-license-observations-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $fixtureRoot | Out-Null
+$priorExit = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+try {
+    function Invoke-FixtureLicenseEditor {
+        param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Arguments)
+        if ($script:ReturnCase.Throws) { throw 'Fixture launch was unavailable.' }
+        Write-Output $script:ReturnCase.Line
+        $global:LASTEXITCODE = $script:ReturnCase.Exit
+    }
+    foreach ($case in @(
+        @{ Name = 'SkippedZero'; Line = 'Serial number unavailable for ULF return'; Exit = 0; Throws = $false; Warning = $true; Observation = 'skipped ULF return.*exit code 0' },
+        @{ Name = 'SkippedNonzero'; Line = '[Licensing::Module] Error: Serial number unavailable for ULF return; skipping operation'; Exit = 9; Throws = $false; Warning = $true; Observation = 'skipped ULF return.*exit code 9' },
+        @{ Name = 'Nonzero'; Line = 'Return command did not complete.'; Exit = 2; Throws = $false; Warning = $true; Observation = 'return exited with code 2' },
+        @{ Name = 'Zero'; Line = 'Return command completed.'; Exit = 0; Throws = $false; Warning = $false; Observation = 'return process exited with code 0' },
+        @{ Name = 'LaunchFailure'; Line = ''; Exit = 0; Throws = $true; Warning = $true; Observation = 'return failed: Fixture launch was unavailable' }
+    )) {
+        $script:ReturnCase = $case
+        $privateLog = Join-Path $fixtureRoot ($case.Name + '/return.log')
+        $output = @(Invoke-UnityLicenseReturn -EditorPath 'Invoke-FixtureLicenseEditor' -Email 'fixture-private-email' -Password 'fixture-private-password' -LogPath $privateLog 6>&1 | ForEach-Object { "$_" })
+        $text = $output -join "`n"
+        Assert-That "$($case.Name): actual return observation is retained" ($text -match $case.Observation)
+        Assert-That "$($case.Name): warning severity is retained" ((@($output | Where-Object { $_ -like '::warning::*' }).Count -eq 1) -eq $case.Warning)
+        Assert-That "$($case.Name): no asserted leak or completed seat return" ($text -notmatch 'leaked seat|Returned the Unity license|cannot be returned|will fail')
+        Assert-That "$($case.Name): account values stay out of output" ($text -notmatch 'fixture-private-email|fixture-private-password')
+        if (-not $case.Throws) {
+            Assert-That "$($case.Name): private log records the actual process status" ((Get-Content -LiteralPath $privateLog -Raw) -match "exit_return_rc=$($case.Exit)")
+            Assert-That "$($case.Name): final cleanup stays independent" ($text -match 'final cleanup')
+        }
+    }
+} finally {
+    if ($null -eq $priorExit) { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
+    else { $global:LASTEXITCODE = $priorExit.Value }
+    Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
+    Remove-Item Function:Invoke-FixtureLicenseEditor
+}
 
 Write-Host "Unity environment warnings: $passed passed, $failed failed."
 if ($failed -gt 0) {
