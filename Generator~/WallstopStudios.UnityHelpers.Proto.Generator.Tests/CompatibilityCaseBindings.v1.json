@@ -176,6 +176,20 @@
       "sha256": "757ab70e82d03030a262d754fc630bd76083181f977f17dfdf0f8fe76106d4f6",
       "purpose": "case-discovery-only",
       "qualification": "none"
+    },
+    {
+      "id": "inventory-order-full-v3",
+      "label": "eb82109f-9971-48db-97dd-64d98e6402c5/results.trx",
+      "sha256": "5b987ce23517dfed1ac82c8c1fdac0bc6f4777460c26ffc781100462f2a88cfa",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "inventory-order-full-v2",
+      "label": "6511fa52-1091-4006-9253-83bf8c5acf30/results.trx",
+      "sha256": "856acf8fa3dee70b530bcf79f85e39d10d422cea65bca00f6c06345b9ab29193",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
     }
   ],
   "selectors": [
@@ -3672,6 +3686,8 @@
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.RecordedImplicitPoliciesMatchRuntimeAttributeDefaults",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.RefParameterChangeFailsApiInventory",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.RefStructChangeFailsApiInventory",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.ReferencedEnumInventoryIsIndependentOfDeclarationOrder(False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.ReferencedEnumInventoryIsIndependentOfDeclarationOrder(True)",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.RepeatedPublicAttributeChangeFailsApiInventory",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.ReturnAttributeChangeFailsApiInventory",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.SealedTypeChangeFailsApiInventory",
@@ -3691,8 +3707,8 @@
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.UnresolvedPublicApiCannotProduceACleanInventory(\"where T : class\",\"where T : Missing\")",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.VirtualMemberChangeFailsApiInventory"
           ],
-          "discoveryArtifact": "formatter-full-v2",
-          "reason": "Complete fixture names observed in an ordinary full oracle run; discovery is not qualification."
+          "discoveryArtifact": "inventory-order-full-v2",
+          "reason": "Complete fixture names observed in an ordinary full oracle run after adding both enum declaration-order controls; no prior cases removed. Discovery is not qualification."
         },
         {
           "lane": "host-v3",
@@ -3763,6 +3779,8 @@
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.RecordedImplicitPoliciesMatchRuntimeAttributeDefaults",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.RefParameterChangeFailsApiInventory",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.RefStructChangeFailsApiInventory",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.ReferencedEnumInventoryIsIndependentOfDeclarationOrder(False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.ReferencedEnumInventoryIsIndependentOfDeclarationOrder(True)",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.RepeatedPublicAttributeChangeFailsApiInventory",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.ReturnAttributeChangeFailsApiInventory",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.SealedTypeChangeFailsApiInventory",
@@ -3782,8 +3800,8 @@
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.UnresolvedPublicApiCannotProduceACleanInventory(\"where T : class\",\"where T : Missing\")",
             "WallstopStudios.UnityHelpers.Proto.Generator.Tests.CompatibilityInventoryTests.VirtualMemberChangeFailsApiInventory"
           ],
-          "discoveryArtifact": "formatter-full-v3",
-          "reason": "Complete fixture names observed in an ordinary full oracle run; discovery is not qualification."
+          "discoveryArtifact": "inventory-order-full-v3",
+          "reason": "Complete fixture names observed in an ordinary full oracle run after adding both enum declaration-order controls; no prior cases removed. Discovery is not qualification."
         },
         {
           "lane": "unity-editor-playmode",
