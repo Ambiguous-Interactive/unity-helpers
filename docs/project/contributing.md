@@ -229,7 +229,10 @@ matrix or provide performance measurements.
   `node scripts/run-contract-tests.js --include-hook-regressions --only agent-preflight`.
 - Run changed-file checks with `npm run agent:preflight` (or `agent:preflight:fix`).
   Select paths with `-Paths first/path second/path`, or use `-PathList list.txt` for a file
-  containing one path per line. Unsupported options such as `--files` fail before any mutation.
+  containing one path per line or separated by NUL characters. Relative list filenames resolve
+  from the repository root. Missing, directory and unreadable list inputs fail before any mutation,
+  including with `-Fix`. An empty readable list selects no files.
+  Unsupported options such as `--files` fail before any mutation.
   Trailing paths require `-Paths`; prefix filenames starting with a hyphen with `./`, or use
   an absolute path. With no path arguments, preflight checks the changed-file set.
 - Enforce EOL/encoding: `npm run eol:check`
