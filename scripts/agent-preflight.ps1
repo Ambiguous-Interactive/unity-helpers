@@ -71,11 +71,17 @@ function Invoke-GitPathList {
         $stdoutTask = $process.StandardOutput.ReadToEndAsync()
         $stderrTask = $process.StandardError.ReadToEndAsync()
         $stdout = $stdoutTask.GetAwaiter().GetResult()
-        [void]$stderrTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
         $process.WaitForExit()
 
         if ($process.ExitCode -ne 0) {
-            return @()
+            $diagnostic = $stderr.Trim()
+            $maximumDiagnosticCharacters = 4096
+            if ($diagnostic.Length -gt $maximumDiagnosticCharacters) {
+                $diagnostic = $diagnostic.Substring(0, $maximumDiagnosticCharacters) + ' [truncated]'
+            }
+            [Console]::Error.WriteLine("[agent-preflight] git $($Arguments -join ' ') failed with exit code $($process.ExitCode): $diagnostic")
+            exit $process.ExitCode
         }
 
         return @(Split-NulPathText -Text $stdout)
@@ -1803,9 +1809,6 @@ else {
     Get-GitChangedPaths -RepoRoot $repoRoot
 }
 
-Test-GitPushConfig -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
-Test-StrayArtifactFiles -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
-
 $dedupedPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 $relativePaths = New-Object System.Collections.Generic.List[string]
 
@@ -1820,6 +1823,15 @@ foreach ($candidate in $candidatePaths) {
     }
 }
 
+$initiallyUnstagedPaths = $null
+if ($relativePaths.Count -gt 0) {
+    $initiallyUnstagedPaths = Get-GitUnstagedOrUntrackedPaths -RepoRoot $repoRoot
+    $null = Get-GitStagedPaths -RepoRoot $repoRoot
+}
+
+Test-GitPushConfig -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
+Test-StrayArtifactFiles -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
+
 if ($relativePaths.Count -eq 0) {
     if ($failureCount -gt 0) {
         Write-Host "[agent-preflight] Failed with $failureCount check group(s) reporting issues." -ForegroundColor Red
@@ -1831,7 +1843,6 @@ if ($relativePaths.Count -eq 0) {
 
 Write-Info "Detected $($relativePaths.Count) changed path(s)."
 
-$initiallyUnstagedPaths = Get-GitUnstagedOrUntrackedPaths -RepoRoot $repoRoot
 $llmFiles = @($relativePaths | Where-Object { $_ -like '.llm/*' })
 $llmSizeTargets = @(
     $relativePaths | Where-Object {

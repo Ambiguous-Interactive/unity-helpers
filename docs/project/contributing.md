@@ -235,6 +235,8 @@ matrix or provide performance measurements.
   Unsupported options such as `--files` fail before any mutation.
   Trailing paths require `-Paths`; prefix filenames starting with a hyphen with `./`, or use
   an absolute path. With no path arguments, preflight checks the changed-file set.
+  A failed required Git query stops preflight with Git's status and diagnostic. Initial index
+  queries run before any fixes.
 - Enforce EOL/encoding: `npm run eol:check`
 - Lint GitHub Actions: `actionlint`
 - Verify Markdown/code links: `npm run lint:doc-links` (cross-platform wrapper that locates PowerShell automatically)

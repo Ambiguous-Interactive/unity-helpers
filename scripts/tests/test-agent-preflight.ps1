@@ -3,6 +3,7 @@ Param(
     [switch]$LicensePipeOnly,
     [switch]$PipePressureOnly,
     [switch]$ArgumentAdmissionOnly,
+    [switch]$GitDiscoveryOnly,
     [string]$ArgumentAdmissionEvidencePath,
     [switch]$JavaScriptLibraryOnly
 )
@@ -524,7 +525,11 @@ exit 0
         foreach ($helper in @('Invoke-GitPathList', 'Invoke-GitRawText')) {
             $result = Invoke-BoundedPipeProcess -FileName (Get-Command pwsh -ErrorAction Stop).Source -Arguments @('-NoProfile', '-File', $runnerPath, '-Helper', $helper, '-RepoRoot', $repoPath) -WorkingDirectory $repoPath
             Write-TestResult "GitStderrPipeDrain.$helper.CompletesWithinTimeout" $result.Completed "The actual helper did not complete within 10 seconds. Stderr: $($result.Stderr)"
-            Write-TestResult "GitStderrPipeDrain.$helper.PreservesReturnSemantics" ($result.Completed -and $result.ExitCode -eq 0 -and $result.Stdout.Contains('PIPE_RETURN_OK')) "The actual helper's return semantics failed. Exit=$($result.ExitCode); stderr=$($result.Stderr)"
+            if ($helper -eq 'Invoke-GitPathList') {
+                Write-TestResult "GitStderrPipeDrain.$helper.PreservesFailureStatus" ($result.Completed -and $result.ExitCode -eq 37 -and -not $result.Stdout.Contains('PIPE_RETURN_OK') -and $result.Stderr.Contains('failed with exit code 37: x')) "The actual path-query failure was lost. Exit=$($result.ExitCode); stderr=$($result.Stderr)"
+            } else {
+                Write-TestResult "GitStderrPipeDrain.$helper.PreservesReturnSemantics" ($result.Completed -and $result.ExitCode -eq 0 -and $result.Stdout.Contains('PIPE_RETURN_OK')) "The actual helper's return semantics failed. Exit=$($result.ExitCode); stderr=$($result.Stderr)"
+            }
         }
     }
     finally {
@@ -563,6 +568,71 @@ function New-AdmissionRepo {
     [IO.File]::WriteAllText((Join-Path $repo '.githooks/pre-commit.log'), 'owned ignored user artifact')
     & git -C $repo add -- Runtime/Selected.png.meta
     return $repo
+}
+
+function Test-GitDiscoveryFailurePreflight {
+    foreach ($mode in @('Default', 'Explicit')) {
+        foreach ($fixMode in @($false, $true)) {
+            foreach ($failure in @('CorruptIndex', 'NonRepository')) {
+                $repo = New-AdmissionRepo -UnsafeConfig:$fixMode
+                try {
+                    if (-not $fixMode) { Remove-Item -LiteralPath (Join-Path $repo '.githooks/pre-commit.log') -Force }
+                    if ($failure -eq 'CorruptIndex') {
+                        [IO.File]::WriteAllBytes((Join-Path $repo '.git/index'), [Text.Encoding]::UTF8.GetBytes('invalid index witness'))
+                    } else {
+                        Remove-Item -LiteralPath (Join-Path $repo '.git') -Recurse -Force
+                    }
+                    $before = Get-AdmissionSnapshot $repo
+                    $baseline = Invoke-BoundedPipeProcess -FileName (Get-Command git -ErrorAction Stop).Source -Arguments @('diff', '--name-only', '-z', '--diff-filter=ACMRTUXB') -WorkingDirectory $repo
+                    if (-not $baseline.Completed -or $baseline.ExitCode -eq 0 -or [string]::IsNullOrWhiteSpace($baseline.Stderr)) { throw 'Actual Git failure baseline was not established.' }
+                    $originalDiagnostic = ($baseline.Stderr -split '\r?\n')[0]
+                    $arguments = @()
+                    if ($mode -eq 'Explicit') { $arguments = @('-Paths', 'Runtime/Selected.png.meta') }
+                    if ($fixMode) { $arguments = @('-Fix') + $arguments }
+                    $result = Invoke-Preflight -RepoPath $repo -Arguments $arguments -UseCli
+                    $label = "GitDiscovery_${mode}_${failure}_Fix${fixMode}"
+                    Write-TestResult "${label}_GitStatusPreserved" ($result.ExitCode -eq $baseline.ExitCode) $result.Output
+                    Write-TestResult "${label}_OriginalDiagnostic" ($result.Output.Contains($originalDiagnostic) -and $result.Output -notmatch 'Nothing to validate|All relevant changed-file checks passed') $result.Output
+                    Write-TestResult "${label}_NoMutation" ((Get-AdmissionSnapshot $repo) -ceq $before) 'Failed required discovery changed files, metadata, config or index.'
+                }
+                finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+            }
+        }
+    }
+    $repo = New-TestRepo -ConfigurePushDefaults
+    try {
+        [IO.File]::WriteAllBytes((Join-Path $repo '.git/index'), [Text.Encoding]::UTF8.GetBytes('invalid index witness'))
+        $sourceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        $errors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'scripts/agent-preflight.ps1'), [ref]$null, [ref]$errors)
+        if ($errors.Count -gt 0) { throw 'Actual preflight source did not parse.' }
+        $runner = [Collections.Generic.List[string]]::new()
+        $runner.Add('param([string]$Helper, [string]$RepoRoot)')
+        $runner.Add("Set-StrictMode -Version Latest`n`$ErrorActionPreference = 'Stop'")
+        foreach ($name in @('Split-NulPathText', 'Invoke-GitPathList', 'Get-GitChangedPaths', 'Get-GitStagedPaths', 'Get-GitUnstagedOrUntrackedPaths')) {
+            $functions = @($ast.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name }, $false))
+            if ($functions.Count -ne 1) { throw "Expected one actual preflight function named $name." }
+            $runner.Add($functions[0].Extent.Text)
+        }
+        $runner.Add(@'
+if ($Helper -ceq 'Invoke-GitPathList') {
+    & $Helper -RepoRoot $RepoRoot -Arguments @('ls-files', '--others', '--exclude-standard', '-z')
+} else {
+    & $Helper -RepoRoot $RepoRoot
+}
+[Console]::WriteLine('UNEXPECTED_CONTINUATION')
+exit 0
+'@)
+        $path = Join-Path $repo 'scripts/actual-path-query.ps1'
+        [IO.File]::WriteAllText($path, ($runner -join "`n"))
+        foreach ($helper in @('Get-GitChangedPaths', 'Get-GitStagedPaths', 'Get-GitUnstagedOrUntrackedPaths', 'Invoke-GitPathList')) {
+            $result = Invoke-BoundedPipeProcess -FileName (Get-Command pwsh -ErrorAction Stop).Source -Arguments @('-NoProfile', '-File', $path, '-Helper', $helper, '-RepoRoot', $repo) -WorkingDirectory $repo
+            Write-TestResult "GitDiscovery_${helper}_FailurePropagated" ($result.Completed -and $result.ExitCode -eq 128) ($result.Stdout + $result.Stderr)
+            Write-TestResult "GitDiscovery_${helper}_DiagnosticPreserved" ($result.Stderr.Contains('index file smaller than expected')) ($result.Stdout + $result.Stderr)
+            Write-TestResult "GitDiscovery_${helper}_NoContinuation" (-not $result.Stdout.Contains('UNEXPECTED_CONTINUATION')) 'Failed discovery returned as an empty successful set.'
+        }
+    }
+    finally { Remove-Item -LiteralPath $repo -Recurse -Force }
 }
 
 function Test-PathListAdmissionPreflight {
@@ -638,6 +708,7 @@ function Test-PathListAdmissionPreflight {
 
 function Test-ArgumentAdmissionPreflight {
     Test-PathListAdmissionPreflight
+    Test-GitDiscoveryFailurePreflight
     $repo = New-AdmissionRepo -UnsafeConfig
     try {
         foreach ($arguments in @(
@@ -865,6 +936,12 @@ function Test-JavaScriptLibraryPreflight {
     finally {
         Remove-Item -LiteralPath $repoPath -Recurse -Force -ErrorAction SilentlyContinue
     }
+}
+
+if ($GitDiscoveryOnly) {
+    Test-GitDiscoveryFailurePreflight
+    if ($script:TestsFailed -gt 0) { exit 1 }
+    exit 0
 }
 
 if ($JavaScriptLibraryOnly) {
