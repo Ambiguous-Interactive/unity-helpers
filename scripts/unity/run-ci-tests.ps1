@@ -2477,8 +2477,8 @@ function Invoke-UnityLicenseReturn {
     # Best-effort, defense-in-depth: this MUST NEVER throw. The license is also
     # returned by the workflow if:always() step (a backstop for a hard-killed
     # editor that never reaches this finally) and by the NEXT run's
-    # return-at-start (which reclaims a seat leaked by a prior force-killed run on
-    # this persistent self-hosted runner).
+    # return-at-start (which attempts cleanup after an interrupted prior run on
+    # this persistent self-hosted runner). Final central evidence decides health.
     try {
         $logDir = Split-Path -Parent $LogPath
         if ($logDir -and -not (Test-Path -LiteralPath $logDir -PathType Container)) {
@@ -2514,11 +2514,11 @@ function Invoke-UnityLicenseReturn {
             -CaseSensitive `
             -Quiet
         if ($ulfReturnSkipped) {
-            Write-Host "::warning::Unity skipped ULF return; exact cleanup evidence was not confirmed (exit code $exitCode). The workflow if:always() return step and the next run's return-at-start are the backstops for the leaked seat."
+            Write-Host "::warning::Unity skipped ULF return; exact cleanup evidence was not confirmed (exit code $exitCode). The workflow if:always() return step evaluates final cleanup; the next run also attempts return-at-start."
         } elseif ($exitCode -ne 0) {
-            Write-Host "::warning::Unity license return exited with code $exitCode; exact ULF cleanup evidence was not confirmed. The workflow if:always() return step and the next run's return-at-start are the backstops for the leaked seat."
+            Write-Host "::warning::Unity license return exited with code $exitCode; exact ULF cleanup evidence was not confirmed. The workflow if:always() return step evaluates final cleanup; the next run also attempts return-at-start."
         } else {
-            Write-CiNotice 'Returned the Unity license (serial).'
+            Write-CiNotice 'Unity license return process exited with code 0; final cleanup is evaluated separately.'
         }
     } catch {
         Write-Host "::warning::Unity license return failed: $($_.Exception.Message). The workflow if:always() return step and the next run's return-at-start are the backstops."

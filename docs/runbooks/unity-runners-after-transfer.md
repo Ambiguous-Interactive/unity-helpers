@@ -433,6 +433,13 @@ The Unity workflows expect the following repository (or organization) secrets. T
 
 Provision the required Unity and build-lock credentials as organization secrets selected for this repository. The licensed workflows intentionally do not bind jobs to a per-repository environment, so trusted pull requests from branches in this repository validate automatically without an environment approval. Pull requests from forks remain ineligible for licensed jobs and do not receive these secrets.
 
+Licensing warnings report the observed signature validation failure, ignored client or missing
+interprocess communication channel at a connection attempt. They do not determine the client's complete lifetime or
+predict whether final cleanup succeeds. An early return command's exit status or skipped ULF
+return also does not prove service-side seat state. Use the final central cleanup classification
+and release receipt to assess cleanup health; missing, partial or skipped evidence still fails
+closed.
+
 ## Focused native acceptance
 
 Manually dispatch **Unity Tests** with `acceptance` set to `sentinel`, `intmap`, or `all`.
