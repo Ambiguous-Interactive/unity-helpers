@@ -16,6 +16,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../unity/lib/credential-redaction.ps1')
+. (Join-Path $PSScriptRoot '../unity/lib/native-evidence.ps1')
 
 $scriptRoot = Split-Path -Parent $PSScriptRoot
 $target = Join-Path $scriptRoot 'unity/run-ci-tests.ps1'
@@ -34,21 +35,16 @@ if ($parseErrors -and $parseErrors.Count -gt 0) {
 }
 
 foreach ($name in @(
-        'ConvertTo-SingleLineDiagnostic',
         'Assert-NoUnityCompilerWarnings',
         'Test-UnityPackageManagerTransientFailure',
         'Test-UnityConfigurePackageManagerRetryableFailure',
         'Write-UnityPackageManagerTransientFailureWarnings',
         'Clear-UnityPackageManagerRetryState',
         'Test-UnityConfigureMarker',
-        'Select-UnityProcessFailureEvents',
-        'Get-UnityProcessFailureEvents',
-        'Read-UnityProcessFailureEvents',
         'Write-UnityConfigureFailureObservation',
         'Get-UnityNativeReportSummary',
         'Write-UnityExecutionObservation',
         'New-UnityNativeEvidenceCapture',
-        'Get-UnityNativeEvidence',
         'Invoke-UnityObservedEditor',
         'Invoke-UnityEditor',
         'Get-EditorTestCompletionGraceSeconds',

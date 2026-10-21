@@ -12,10 +12,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Every write reports success rather than throwing, and a refused write leaves the buffer and
-    /// <see cref="Position"/> untouched while latching <see cref="Faulted"/>. The latch means a
-    /// formatter can emit a whole message without branching on each call and check once at the end;
-    /// once latched, later writes are refused so a truncated message can never look complete.
+    /// Refused writes latch <see cref="Faulted"/>. A refused primitive reservation leaves the buffer
+    /// and <see cref="Position"/> untouched; compound writes can leave a partial tag, prefix or payload.
+    /// Discard partial output after failure. Once latched, later writes are refused so a truncated
+    /// message can never look complete.
     /// </para>
     /// <para>
     /// <b>Every</b> refusal latches, including a rejected field number or wire type -- not only
@@ -46,7 +46,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         /// <summary>
         /// Indicates whether any write has been refused -- for lack of space, or for an invalid
-        /// field number, wire type or length. Once set, it stays set and later writes are refused.
+        /// field number, wire type or length -- or a formatter threw inside <see cref="TryWriteMessage{T}"/>.
+        /// Once set, it stays set and later writes are refused.
         /// </summary>
         public bool Faulted => _faulted;
 
@@ -390,6 +391,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// the minimum width instead. Closing always recomputes the actual payload size and moves it
         /// left or right if the planned width disagrees, so a hint can change cost but never bytes.
         /// </para>
+        /// <para>
+        /// Formatters must not throw. If one does, this method latches <see cref="Faulted"/>, unwinds
+        /// its nesting frame and rethrows the original exception. Partial output remains and must be
+        /// discarded, including when an enclosing formatter catches the exception.
+        /// </para>
         /// </remarks>
         public bool TryWriteMessage<T>(int fieldNumber, IWProtoFormatter<T> formatter, in T value)
         {
@@ -432,6 +438,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             {
                 // Unwind failed frames here; successful frames remain open until TryCloseLengthDelimited decrements them.
                 _depth--;
+                _faulted = true;
                 throw;
             }
 

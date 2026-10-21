@@ -44,6 +44,7 @@ on:
           - serialization
           - nullableconsumer
           - borrowed
+          - wproto
           - all
       fresh-conversion:
         description: "Clear Standalone compilation outputs before IL2CPP acceptance builds."
@@ -55,8 +56,43 @@ on:
         required: false
         default: false
         type: boolean
+      native-readback-run-id:
+        description: "Historical ELI evidence only: source run ID; skips all Unity jobs."
+        required: false
+        default: ""
+        type: string
+      native-readback-build-receipt-sha256:
+        description: "Read the exact historical DAD Build receipt; requires the DAD-MACHINE runner label. No new capture."
+        required: false
+        default: ""
+        type: string
       native-diagnostics:
-        description: "Capture a direct/debugger exit pair on Unity 6000.6; evidence only."
+        description: "Capture Unity 6000.6 exits: EditMode pair or build-only Standalone debugger (expected diagnostic failure)."
+        required: false
+        default: false
+        type: boolean
+      native-build-direct-control:
+        description: "Use a Direct build control instead of Debugger; requires native diagnostics, Standalone and acceptance=none."
+        required: false
+        default: false
+        type: boolean
+      native-debugger-standard-heap:
+        description: "Request CDB standard heap for the Standalone debugger arm; requires native diagnostics and acceptance=none."
+        required: false
+        default: false
+        type: boolean
+      native-build-attach-control:
+        description: "Start directly, then attach CDB; requires native Standalone diagnostics, Direct disabled and standard heap disabled."
+        required: false
+        default: false
+        type: boolean
+      native-build-attach-after-startup:
+        description: "Wait for the first completed domain-reload profile line before CDB attach; requires native-build-attach-control."
+        required: false
+        default: false
+        type: boolean
+      native-build-attach-after-shutdown:
+        description: "Wait for final MemoryLeaks telemetry before CDB attach; requires attachment and excludes after-startup."
         required: false
         default: false
         type: boolean
@@ -76,18 +112,152 @@ permissions:
 # central cancellation-safe cleanup path: `always()` returns the Unity license, classifies the
 # evidence, releases the organization lock, and requires confirmed cleanup before the job ends.
 concurrency:
-  group: unity-tests-${{ github.event_name == 'push' && github.sha || github.event.pull_request.number || github.ref }}
+  group: >-
+    unity-tests-${{ github.event_name == 'push' && github.sha || github.event.pull_request.number ||
+    github.ref }}${{ github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' &&
+    format('-native-readback-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:
+  native-historical-readback:
+    name: Historical native evidence (diagnostic only)
+    needs: runner-preflight
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' && needs.runner-preflight.result == 'success' }}
+    runs-on: ${{ fromJSON(inputs.native-readback-build-receipt-sha256 != '' && '["self-hosted","Windows","RAM-64GB","DAD-MACHINE"]' || '["self-hosted","Windows","RAM-64GB","fast"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Validate historical readback selection
+        shell: pwsh
+        env:
+          UH_READBACK_RUN_ID: ${{ inputs.native-readback-run-id }}
+          UH_READBACK_ACCEPTANCE: ${{ inputs.acceptance }}
+          UH_READBACK_CAPTURE: ${{ inputs.native-diagnostics }}
+          UH_READBACK_LOADER: ${{ inputs.native-loader-snaps-comparison }}
+          UH_BUILD_RECEIPT_SHA256: ${{ inputs.native-readback-build-receipt-sha256 }}
+        run: |
+          if ($env:UH_READBACK_RUN_ID -cnotmatch '^[1-9][0-9]{0,19}$') { throw 'Readback requires a positive decimal source run ID.' }
+          if ($env:UH_READBACK_ACCEPTANCE -ne 'none' -or $env:UH_READBACK_CAPTURE -eq 'true' -or $env:UH_READBACK_LOADER -eq 'true') {
+            throw 'Historical readback cannot request acceptance or a new capture.'
+          }
+          $expectedMachine = if ($env:UH_BUILD_RECEIPT_SHA256) { 'DAD-MACHINE' } else { 'ELI-MACHINE' }
+          if ($env:UH_BUILD_RECEIPT_SHA256 -and $env:UH_BUILD_RECEIPT_SHA256 -cnotmatch '^[a-fA-F0-9]{64}$') { throw 'Build readback requires the exact original receipt SHA256.' }
+          if ([Environment]::MachineName -cne $expectedMachine) { throw 'Historical readback requires the original machine.' }
+
+      - name: Resolve exact historical artifact identities
+        id: readback_selection
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          UH_READBACK_RUN_ID: ${{ inputs.native-readback-run-id }}
+          UH_READBACK_REPOSITORY: ${{ github.repository }}
+          UH_BUILD_RECEIPT_SHA256: ${{ inputs.native-readback-build-receipt-sha256 }}
+        run: |
+          $selection = ./scripts/unity/capture-native-fault.ps1 `
+            -SourceRunId $env:UH_READBACK_RUN_ID -Repository $env:UH_READBACK_REPOSITORY `
+            -ArtifactsPath '.artifacts/native-readback/output/selection' -BuildReceipt:([bool]$env:UH_BUILD_RECEIPT_SHA256)
+          "acceptance-id=$($selection.AcceptanceArtifactId)" >> $env:GITHUB_OUTPUT
+          "standalone-id=$($selection.StandaloneArtifactId)" >> $env:GITHUB_OUTPUT
+
+      - name: Download original latest acceptance evidence
+        id: readback_acceptance_input
+        if: ${{ !cancelled() && inputs.native-readback-build-receipt-sha256 == '' && steps.readback_selection.outcome == 'success' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.native-readback-run-id }}
+          merge-multiple: true
+          artifact-ids: ${{ steps.readback_selection.outputs.acceptance-id }}
+          path: .artifacts/native-readback/input/acceptance
+
+      - name: Download original latest standalone evidence
+        id: readback_standalone_input
+        if: ${{ !cancelled() && steps.readback_selection.outcome == 'success' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.native-readback-run-id }}
+          merge-multiple: true
+          artifact-ids: ${{ steps.readback_selection.outputs.standalone-id }}
+          path: .artifacts/native-readback/input/standalone
+
+      - name: Require no active Unity Editor for historical collection
+        id: readback_host_idle
+        if: ${{ !cancelled() && steps.readback_selection.outcome == 'success' }}
+        shell: pwsh
+        run: ./scripts/unity/assert-no-active-unity-editor.ps1
+
+      - name: Read historical acceptance process evidence
+        if: ${{ !cancelled() && inputs.native-readback-build-receipt-sha256 == '' && steps.readback_acceptance_input.outcome == 'success' && steps.readback_host_idle.outcome == 'success' }}
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          ./scripts/unity/capture-native-fault.ps1 `
+            -ExecutionDiagnosticsPath '.artifacts/native-readback/input/acceptance/wproto/unity.execution-diagnostics.json' `
+            -ExpectedMachine 'ELI-MACHINE' -ArtifactsPath '.artifacts/native-readback/output/acceptance'
+
+      - name: Read historical standalone process and package sources
+        if: ${{ !cancelled() && inputs.native-readback-build-receipt-sha256 == '' && steps.readback_standalone_input.outcome == 'success' && steps.readback_host_idle.outcome == 'success' }}
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          ./scripts/unity/capture-native-fault.ps1 `
+            -ExecutionDiagnosticsPath '.artifacts/native-readback/input/standalone/unity.execution-diagnostics.json' `
+            -TestFrameworkLogPath '.artifacts/native-readback/input/standalone/unity.log' `
+            -ExpectedMachine 'ELI-MACHINE' -ArtifactsPath '.artifacts/native-readback/output/standalone'
+
+      - name: Read exact historical native Build evidence
+        if: ${{ !cancelled() && inputs.native-readback-build-receipt-sha256 != '' && steps.readback_standalone_input.outcome == 'success' && steps.readback_host_idle.outcome == 'success' }}
+        timeout-minutes: 2
+        shell: pwsh
+        env:
+          UH_BUILD_RECEIPT_SHA256: ${{ inputs.native-readback-build-receipt-sha256 }}
+        run: |
+          ./scripts/unity/read-native-build-evidence.ps1 `
+            -BuildReceiptPath '.artifacts/native-readback/input/standalone/build-only-diagnostics/wproto/native-build-diagnostics/receipt.json' `
+            -ExpectedReceiptSha256 $env:UH_BUILD_RECEIPT_SHA256 -ExpectedMachine 'DAD-MACHINE' `
+            -ArtifactsPath '.artifacts/native-readback/output/build'
+
+      - name: Setup Node.js for historical evidence redaction
+        if: ${{ always() }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "22.18.0"
+
+      - name: Redact historical readback output
+        id: redact_native_readback
+        if: ${{ steps.checkout.outcome == 'success' && always() }}
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/native-readback/output
+
+      - name: Upload historical readback diagnostics
+        if: ${{ always() && steps.redact_native_readback.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: >-
+            native-readback-${{ inputs.native-readback-build-receipt-sha256 != '' && 'DAD-MACHINE' || 'ELI-MACHINE'
+            }}-${{ inputs.native-readback-run-id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .artifacts/native-readback/output
+          if-no-files-found: warn
+          retention-days: 30
+
   matrix-config:
     name: Resolve Unity test matrix
     if: >-
-      ${{
-        (github.event_name != 'pull_request' ||
+      ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && ((github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
-        (github.event_name != 'push' || github.ref_protected)
-      }}
+        (github.event_name != 'push' || github.ref_protected)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
@@ -114,6 +284,14 @@ jobs:
         with:
           node-version: "22.18.0"
 
+      - name: Validate Build readback source selection
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-readback-build-receipt-sha256 != '' }}
+        shell: pwsh
+        env:
+          UH_READBACK_RUN_ID: ${{ inputs.native-readback-run-id }}
+        run: |
+          if ($env:UH_READBACK_RUN_ID -cnotmatch '^[1-9][0-9]{0,19}$') { throw 'Build readback requires an explicit original source run ID.' }
+
       - name: Validate native comparison selection
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-loader-snaps-comparison }}
         shell: pwsh
@@ -125,6 +303,48 @@ jobs:
           if ($env:UH_NATIVE_DIAGNOSTICS -ne 'true' -or $env:UH_NATIVE_MODE -ne 'editmode' -or $env:UH_NATIVE_ACCEPTANCE -ne 'none') {
             throw 'Loader-snaps comparison requires native-diagnostics=true, test-mode=editmode and acceptance=none.'
           }
+
+      - name: Validate Standalone native diagnostic selection
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-diagnostics && inputs.test-mode == 'standalone' }}
+        shell: pwsh
+        env:
+          UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
+        run: |
+          if ($env:UH_NATIVE_ACCEPTANCE -ne 'none') {
+            throw 'Standalone native diagnostics require acceptance=none; no timing campaign may run.'
+          }
+
+      - name: Validate Standalone Direct control selection
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-build-direct-control }}
+        env:
+          UH_NATIVE_DIAGNOSTICS: ${{ inputs.native-diagnostics }}
+          UH_NATIVE_MODE: ${{ inputs.test-mode }}
+          UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
+        run: node scripts/unity/validate-native-build-direct-selection.js
+
+      - name: Validate Standalone debugger heap selection
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-debugger-standard-heap }}
+        env:
+          UH_NATIVE_DIAGNOSTICS: ${{ inputs.native-diagnostics }}
+          UH_NATIVE_MODE: ${{ inputs.test-mode }}
+          UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
+          UH_NATIVE_DIRECT_CONTROL: ${{ inputs.native-build-direct-control }}
+        run: node scripts/unity/validate-native-build-heap-selection.js
+
+      - name: Validate Standalone debugger attachment selection
+        if: >-
+          ${{ !cancelled() && github.event_name == 'workflow_dispatch' &&
+          (inputs.native-build-attach-control || inputs.native-build-attach-after-startup || inputs.native-build-attach-after-shutdown) }}
+        env:
+          UH_NATIVE_DIAGNOSTICS: ${{ inputs.native-diagnostics }}
+          UH_NATIVE_MODE: ${{ inputs.test-mode }}
+          UH_NATIVE_ACCEPTANCE: ${{ inputs.acceptance }}
+          UH_NATIVE_DIRECT_CONTROL: ${{ inputs.native-build-direct-control }}
+          UH_NATIVE_STANDARD_HEAP: ${{ inputs.native-debugger-standard-heap }}
+          UH_NATIVE_ATTACH_CONTROL: ${{ inputs.native-build-attach-control }}
+          UH_NATIVE_ATTACH_AFTER_STARTUP: ${{ inputs.native-build-attach-after-startup }}
+          UH_NATIVE_ATTACH_AFTER_SHUTDOWN: ${{ inputs.native-build-attach-after-shutdown }}
+        run: node scripts/unity/validate-native-build-attach-selection.js
 
       # Assembly compatibility depends on target mode and integration opt-in,
       # never on Unity version. Compute each distinct list once on this hosted
@@ -292,7 +512,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     concurrency:
-      group: ${{ github.workflow }}-runner-preflight-${{ github.event_name == 'push' && github.sha || github.ref }}
+      group: >-
+        ${{ github.workflow }}-runner-preflight-${{ github.event_name == 'push' && github.sha ||
+        github.ref }}${{ github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' &&
+        format('-native-readback-{0}', github.run_id) || '' }}
       cancel-in-progress: true
     steps:
       # Verifies only that every required label set has a registered runner
@@ -303,7 +526,9 @@ jobs:
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
-          required-label-sets: '[["self-hosted","Windows","RAM-64GB"]]'
+          required-label-sets: >-
+            ${{ format('[["self-hosted","Windows","RAM-64GB"{0}]]', github.event_name == 'workflow_dispatch' &&
+            inputs.native-readback-run-id != '' && (inputs.native-readback-build-receipt-sha256 != '' && ',"DAD-MACHINE"' || ',"fast"') || '') }}
 
   # Group all selected modes by Unity version. Each version pays checkout,
   # provisioning, organization-lock acquisition, and central cleanup once while
@@ -314,8 +539,8 @@ jobs:
       - matrix-config
       - runner-preflight
     if: >-
-      ${{
-        !cancelled() &&
+      ${{ !cancelled() &&
+        !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
@@ -639,6 +864,66 @@ jobs:
             -ManagedStrippingLevel 'High' `
             -Il2CppCompilerConfiguration 'Release'
 
+      - name: Setup Node.js for WProto native acceptance
+        id: acceptance_node
+        if: >-
+          ${{ !cancelled() && github.event_name == 'workflow_dispatch'
+          && (inputs.acceptance == 'wproto' || (inputs.native-diagnostics
+          && inputs.test-mode == 'standalone' && inputs.acceptance == 'none' && matrix.unity-version == '6000.6.0f1'))
+          && (matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')
+          && steps.unity_lock.outputs.acquired == 'true' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4
+        with:
+          node-version: "22.18.0"
+
+      - name: Setup Python for Standalone build diagnostics
+        id: native_build_python
+        if: >-
+          ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-diagnostics
+          && inputs.test-mode == 'standalone' && inputs.acceptance == 'none'
+          && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.run_standalone.outcome == 'success' }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+
+      - name: Capture Standalone build diagnostics
+        id: native_build_capture
+        if: >-
+          ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-diagnostics
+          && inputs.test-mode == 'standalone' && inputs.acceptance == 'none'
+          && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.run_standalone.outcome == 'success'
+          && steps.native_build_python.outcome == 'success' && steps.acceptance_node.outcome == 'success' }}
+        timeout-minutes: 55
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_PERF_COMMIT: ${{ github.sha }}
+          UH_PERF_BASE_COMMIT: ${{ github.sha }}
+          UH_PERF_OPTIMIZATION: "Release"
+          UH_NATIVE_BUILD_CAPTURE_MODE: ${{ inputs.native-build-direct-control && 'Direct' || 'Debugger' }}
+          UH_NATIVE_DEBUGGER_STANDARD_HEAP: ${{ inputs.native-debugger-standard-heap }}
+          UH_NATIVE_ATTACH_CONTROL: ${{ inputs.native-build-attach-control }}
+          UH_NATIVE_ATTACH_AFTER_STARTUP: ${{ inputs.native-build-attach-after-startup }}
+          UH_NATIVE_ATTACH_AFTER_SHUTDOWN: ${{ inputs.native-build-attach-after-shutdown }}
+        run: |
+          ./scripts/unity/run-acceptance.ps1 `
+            -Acceptance 'wproto' -UnityVersion '6000.6.0f1' `
+            -StandaloneBuildCapture $env:UH_NATIVE_BUILD_CAPTURE_MODE `
+            -StandaloneBuildCaptureBackend 'IL2CPP' `
+            -StandaloneBuildDebuggerStandardHeap:($env:UH_NATIVE_DEBUGGER_STANDARD_HEAP -eq 'true') `
+            -StandaloneBuildAttachToDirect:($env:UH_NATIVE_ATTACH_CONTROL -eq 'true') `
+            -StandaloneBuildAttachAfterStartup:($env:UH_NATIVE_ATTACH_AFTER_STARTUP -eq 'true') `
+            -StandaloneBuildAttachAfterShutdown:($env:UH_NATIVE_ATTACH_AFTER_SHUTDOWN -eq 'true') `
+            -ArtifactsPath '.artifacts/unity/6000.6.0f1-standalone/build-only-diagnostics' `
+            -TemporaryRoot $env:RUNNER_TEMP
+
       - name: Run additional native acceptance
         id: run_acceptance
         # Acceptance runs once per version after the selected test modes. The
@@ -646,9 +931,12 @@ jobs:
         if: >-
           ${{ !cancelled() && github.event_name == 'workflow_dispatch'
           && inputs.acceptance != '' && inputs.acceptance != 'none'
-          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') && steps.unity_lock.outputs.acquired == 'true' }}
+          && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto')
+          || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')
+          && (inputs.acceptance != 'wproto' || steps.acceptance_node.outcome == 'success')
+          && steps.unity_lock.outputs.acquired == 'true' }}
         continue-on-error: true
-        timeout-minutes: 120
+        timeout-minutes: ${{ inputs.acceptance == 'wproto' && 150 || 120 }}
         shell: pwsh
         env:
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
@@ -973,7 +1261,7 @@ jobs:
         id: verify_acceptance
         if: >-
           ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none'
-          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') }}
+          && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto') || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') }}
         continue-on-error: true
         shell: pwsh
         env:
@@ -993,38 +1281,65 @@ jobs:
           ${{ steps.checkout.outcome == 'success' && (always()
           && github.event_name == 'workflow_dispatch'
           && inputs.acceptance != '' && inputs.acceptance != 'none'
-          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')) }}
+          && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto') || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')) }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:
           paths: .artifacts/unity/${{ matrix.unity-version }}-acceptance
 
+      - name: Reverify retained WProto evidence after redaction
+        id: reverify_wproto_acceptance
+        if: >-
+          ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance == 'wproto'
+          && (matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') && steps.redact_acceptance.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: pwsh
+        env:
+          UH_UNITY_VERSION: ${{ matrix.unity-version }}
+          UH_COMMIT: ${{ github.sha }}
+        run: |
+          ./scripts/unity/verify-acceptance.ps1 `
+            -Acceptance 'wproto' `
+            -ArtifactsPath ".artifacts/unity/$env:UH_UNITY_VERSION-acceptance" `
+            -Commit $env:UH_COMMIT `
+            -UnityVersion $env:UH_UNITY_VERSION
+
       - name: Upload acceptance artifacts
         id: upload_acceptance
         if: >-
           ${{ always() && github.event_name == 'workflow_dispatch'
           && inputs.acceptance != '' && inputs.acceptance != 'none'
-          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') && steps.redact_acceptance.outcome == 'success' }}
+          && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto')
+          || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')
+          && steps.redact_acceptance.outcome == 'success' }}
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unity-${{ matrix.unity-version }}-acceptance
-          path: .artifacts/unity/${{ matrix.unity-version }}-acceptance
+          path: |
+            .artifacts/unity/${{ matrix.unity-version }}-acceptance
+            ${{ inputs.acceptance == 'wproto' && steps.reverify_wproto_acceptance.outcome != 'success' && '!**/corpus-summary.json' || '' }}
           if-no-files-found: error
           retention-days: 30
 
       - name: Require requested native acceptance
         if: >-
           ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none'
-          && (inputs.acceptance != 'nullableconsumer' || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') }}
+          && ((inputs.acceptance != 'nullableconsumer' && inputs.acceptance != 'wproto') || matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1') }}
         shell: pwsh
         env:
+          UH_ACCEPTANCE: ${{ inputs.acceptance }}
+          ACCEPTANCE_REVERIFY: ${{ steps.reverify_wproto_acceptance.outcome }}
           ACCEPTANCE_RUN: ${{ steps.run_acceptance.outcome }}
           ACCEPTANCE_VERIFY: ${{ steps.verify_acceptance.outcome }}
           ACCEPTANCE_REDACT: ${{ steps.redact_acceptance.outcome }}
           ACCEPTANCE_UPLOAD: ${{ steps.upload_acceptance.outcome }}
         run: |
+          if ($env:UH_ACCEPTANCE -eq 'wproto' -and $env:ACCEPTANCE_REVERIFY -ne 'success') {
+            throw "WProto post-redaction verification was $env:ACCEPTANCE_REVERIFY."
+          }
           foreach ($stage in @('RUN', 'VERIFY', 'REDACT', 'UPLOAD')) {
             $outcome = [Environment]::GetEnvironmentVariable("ACCEPTANCE_$stage")
             if ($outcome -ne 'success') { throw "Native acceptance $stage was $outcome." }
@@ -1100,8 +1415,8 @@ jobs:
       - matrix-config
       - runner-preflight
     if: >-
-      ${{
-        !cancelled() &&
+      ${{ !cancelled() &&
+        !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
@@ -1584,8 +1899,8 @@ jobs:
       - matrix-config
       - runner-preflight
     if: >-
-      ${{
-        !cancelled() &&
+      ${{ !cancelled() &&
+        !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
@@ -1811,7 +2126,7 @@ jobs:
   # per gate.
   unity-tests-aggregate:
     name: Unity CI aggregate gate (tests)
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - runner-preflight
       - unity-tests
@@ -1837,7 +2152,7 @@ jobs:
 
   unity-tests-single-threaded-aggregate:
     name: Unity CI aggregate gate (single-threaded)
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - runner-preflight
       - unity-tests-single-threaded
@@ -1863,7 +2178,7 @@ jobs:
 
   unitypackage-smoke-aggregate:
     name: Unity CI aggregate gate (package smoke)
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - runner-preflight
       - unitypackage-smoke
@@ -1889,7 +2204,7 @@ jobs:
 
   unity-ci-success:
     name: Unity CI Success
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - matrix-config
       - runner-preflight

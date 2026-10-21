@@ -201,6 +201,14 @@ option is rejected.
   generation and optimization settings remain `unknown`. Seed, iteration count, and measured
   warmup durations/executions accompany the samples.
 
+Backend labels identify `IL2CPP` from its compilation symbol, `Mono` from the executing core
+library, and `.NET` otherwise. The `.NET` label does not distinguish CoreCLR from NativeAOT or
+other .NET implementations. Reports also preserve the raw runtime framework description; it
+does not prove the compilation mode. Standalone host reports mark Unity fields as unavailable
+and CPU identity as `unknown`, using the host OS and build configuration. The borrowed-buffer
+preflight uses the same backend detector. A host build with the IL2CPP symbol exercises branch
+selection only; player qualification requires actual player execution.
+
 `IntMapPerformanceTests` allows 30 minutes per test case so its grouped dictionary workloads can
 use the maximum calibration target. Its default target remains 20 ms; the timeout does not relax
 any timing or stability gate.
@@ -219,6 +227,36 @@ samples; generated reads and oracle reads must reproduce the original payload. E
 emits its raw record as `WPROTO_WARM_SAMPLES` JSON. Table timings are median nanoseconds per
 operation, and unstable or insufficient samples report an inconclusive speedup. These editor
 measurements do not establish cold-start, allocation or Release-player acceptance.
+
+The explicit `CompareFrozenSevenFamilyCorpus` campaign extends that fixture
+with corpus `wproto-seven-families-v1`: scalar-heavy, text-heavy, repeated numeric, maps,
+nested/polymorphic, generic/enum, and binary workloads. Each has empty/default-heavy, small,
+typical, and large cases; numeric reads include packed and unpacked inputs. Scalar cases populate
+zero, one, five, or ten fields. Empty fields use a nonempty envelope so the public facade's
+empty-input contract is preserved. This synthetic corpus has 28 write and 32 read cases; retained
+consumer models remain a required expansion before representative acceptance. The versioned
+input inventory pins every case's encoded length and SHA256 fingerprint and requires each expected
+identity exactly once; changed bytes, duplicate cases, and missing cases fail the normal correctness
+witness before a campaign can qualify.
+
+Memory and stream reads, finite-limit reads, direct codecs, public facade operations, returned
+arrays, and reusable writes are reported separately. The modern protobuf-net v3 buffer/memory
+APIs are the reference for the corresponding operations. Both reusable write arms retain their
+backing storage without clearing payload bytes between calls. Finite reads enable wire, packed-element,
+per-region tag, and total-tag budgets. Every read comparison uses identical
+bytes. Independent semantic checks run before and after sampling, and generated registration is
+required so fallback cannot hide a missing formatter. `WPROTO_CORPUS_SAMPLES` records retain input
+hashes, operation/family/case identities, and the calibrated raw samples. The normal semantic
+witness runs without executing the long timing campaign.
+
+`BenchmarkFamilyMeasurement` averages workload log-ratios within each family and then gives each
+family equal weight. Its 95% interval resamples whole counterbalanced batches within each workload.
+A missing workload, reused measurement, changed sampling plan, unstable arm, or diagnostic run cannot meet the timing
+target. Read and write operations must each reach a lower confidence bound of 2x, and every
+workload must remain within the five-percent runtime non-inferiority margin. A timing predicate
+alone cannot establish release acceptance: floor/latest non-development Mono runs, instrument
+controls, cold startup, allocation/retention, and code-size evidence remain required. IL2CPP and
+WebGL comparisons must use baseline and candidate on the same backend.
 
 For the IntMap player experiment, manually dispatch **Unity Tests** with `acceptance=intmap`
 and a supported `unity-version`. Normal selected tests remain mandatory. The extra test runs in

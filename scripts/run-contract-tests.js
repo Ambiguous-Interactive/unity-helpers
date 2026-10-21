@@ -29,6 +29,11 @@ const { runChecks, runRegistry } = require("./check-runner");
 /** A check whose `run` is executed with `bash -c` from the repository root. */
 const CHECKS = [
   {
+    id: "native-build-readback",
+    name: "Historical native Build receipt readback",
+    run: "npm run validate:tests:native-build-readback"
+  },
+  {
     id: "native-fault-capture",
     name: "Native capture and loader-flag transaction controls",
     run: "npm run test:native-fault-capture"
@@ -95,6 +100,26 @@ const CHECKS = [
     id: "wproto-annotations",
     name: "WallstopProto annotations",
     run: "npm run test:wproto-annotations"
+  },
+  {
+    id: "test-result-evidence",
+    name: "Strict NUnit and TRX evidence controls",
+    run: "npm run test:test-result-evidence"
+  },
+  {
+    id: "wproto-evidence",
+    name: "WProto catalog and provenance controls",
+    run: "npm run test:wproto-evidence"
+  },
+  {
+    id: "run-wproto-evidence",
+    name: "WProto evidence process collector controls",
+    run: "npm run test:run-wproto-evidence"
+  },
+  {
+    id: "wproto-corpus",
+    name: "WProto frozen corpus measurement controls",
+    run: "npm run test:wproto-corpus"
   },
 
   // Linter self-tests.

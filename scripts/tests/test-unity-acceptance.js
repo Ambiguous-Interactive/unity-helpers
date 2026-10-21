@@ -194,6 +194,84 @@ try {
     assert.match(result.stderr, /Expected all four IntMap workloads/);
     assert.equal(fs.existsSync(summary), false);
   });
+  const powershell = spawnSync("pwsh", ["-NoProfile", "-Command", "[Environment]::ProcessPath"], {
+    encoding: "utf8"
+  });
+  assert.ifError(powershell.error);
+  assert.equal(powershell.status, 0);
+  const powershellPath = powershell.stdout.trim();
+  const launcher = path.join(directory, "run-acceptance.ps1");
+  fs.copyFileSync(path.join(__dirname, "../unity/run-acceptance.ps1"), launcher);
+  fs.writeFileSync(
+    path.join(directory, "assert-no-active-unity-editor.ps1"),
+    "[IO.File]::AppendAllText($env:ACCEPTANCE_NODE_BOUNDARY, 'entered'); throw 'launch boundary'"
+  );
+  for (const unityVersion of ["2021.3.45f1", "6000.6.0f1"]) {
+    for (const mode of ["missing", "nonzero", "malformed", "healthy", "healthy-duplicates"]) {
+      test(`WProto Node preflight ${unityVersion} ${mode}`, () => {
+        const tools = path.join(directory, `${unityVersion}-${mode}`);
+        fs.mkdirSync(tools);
+        if (mode !== "missing") {
+          const versionText = mode === "malformed" ? "unusable" : "v22.18.0";
+          const exitCode = mode === "nonzero" ? 1 : 0;
+          const windows = process.platform === "win32";
+          fs.writeFileSync(
+            path.join(tools, windows ? "node.cmd" : "node"),
+            windows
+              ? `@echo off\r\necho ${versionText}\r\nexit /b ${exitCode}\r\n`
+              : `#!/bin/sh\nprintf '%s\\n' '${versionText}'\nexit ${exitCode}\n`,
+            { mode: 0o755 }
+          );
+        }
+        const boundary = path.join(tools, "boundary.txt");
+        const artifacts = path.join(tools, "artifacts");
+        let toolPath = tools;
+        if (mode === "healthy-duplicates") {
+          const secondary = path.join(tools, "secondary");
+          fs.mkdirSync(secondary);
+          fs.copyFileSync(
+            path.join(tools, process.platform === "win32" ? "node.cmd" : "node"),
+            path.join(secondary, process.platform === "win32" ? "node.cmd" : "node")
+          );
+          toolPath += path.delimiter + secondary;
+        }
+        const result = spawnSync(
+          powershellPath,
+          [
+            "-NoProfile",
+            "-File",
+            launcher,
+            "-Acceptance",
+            "wproto",
+            "-UnityVersion",
+            unityVersion,
+            "-ArtifactsPath",
+            artifacts,
+            "-TemporaryRoot",
+            tools
+          ],
+          {
+            encoding: "utf8",
+            env: { ...process.env, PATH: toolPath, ACCEPTANCE_NODE_BOUNDARY: boundary }
+          }
+        );
+        assert.ifError(result.error);
+        assert.equal(result.status, 1);
+        assert.equal(
+          fs.existsSync(boundary),
+          mode.startsWith("healthy"),
+          result.stdout + result.stderr
+        );
+        assert.equal(fs.existsSync(artifacts), false);
+        assert.match(
+          result.stdout + result.stderr,
+          mode.startsWith("healthy")
+            ? /launch boundary/
+            : /WProto acceptance requires a working Node.js executable/
+        );
+      });
+    }
+  }
   process.stdout.write(`${passed} acceptance controls passed.\n`);
 } finally {
   fs.rmSync(directory, { recursive: true, force: true });

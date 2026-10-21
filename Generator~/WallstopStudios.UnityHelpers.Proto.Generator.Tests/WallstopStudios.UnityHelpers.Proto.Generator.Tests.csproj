@@ -24,6 +24,9 @@
     <DefineConstants Condition="'$(ProtobufNetOracle)' == 'v2'"
       >$(DefineConstants);PROTOBUF_NET_ORACLE_V2</DefineConstants>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="WallstopStudios.UnityHelpers.SchemaConformance.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile
@@ -48,6 +51,35 @@
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationFailureException.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoEnumFormatterTests.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoReadLimitsTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetEvents.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetContract.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetImmutable.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetSkipped.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetBase.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetDerived.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetValue.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetSeeded.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetAbstract.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetConcrete.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoConstructionBudgetUnseededImmutable.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoCollectionBudgetContract.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoCollectionBudgetSeedContract.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoCollectionBudgetGenericContract.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoDecodedPayloadContract.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoFormatterFailureTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Core/PairedMeasurementTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkCpuSetRecord.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkCpuSetTopology.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkProtocol.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkRuntimeIdentity.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkSlotDiagnostics.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkSlotObservation.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkThreadSnapshot.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/CalibratedBenchmarkMeasurement.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Core/PairedMeasurement.cs" />
     <!-- SerializableValueTuple implements it explicitly, so the file is not optional here. This
          project names its Runtime sources one by one rather than globbing, which is why a new
          dependency of one of them fails HERE and nowhere else. -->
@@ -160,10 +192,25 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference
+      Include="UnityEngine.Modules"
+      Version="2021.3.33"
+      GeneratePathProperty="true"
+      PrivateAssets="all"
+      ExcludeAssets="all"
+    />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None
+      Include="$(PkgUnityEngine_Modules)/lib/netstandard2.0/*.dll"
+      Link="CompatibilityReferences/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
   </ItemGroup>
 
   <Target Name="ValidateProtobufNetOracle" BeforeTargets="ResolveReferences">

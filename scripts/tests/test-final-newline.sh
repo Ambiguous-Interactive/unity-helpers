@@ -111,6 +111,15 @@ check_file() {
     files_checked=$((files_checked + 1))
 
     if [[ "$(tail -c 1 -- "$file" | wc -l)" -eq 0 ]]; then
+        local attributes
+        if ! attributes=$(git check-attr --cached text -- "$file"); then
+            echo "Cannot inspect staged text attribute for $file" >&2
+            exit 1
+        fi
+        if [[ "$attributes" == *': text: unset' ]]; then
+            files_checked=$((files_checked - 1))
+            return
+        fi
         files_failed=$((files_failed + 1))
         failed_files+=("$file")
         # Include line ending type in the failure message for clarity

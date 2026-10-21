@@ -1178,9 +1178,11 @@ protobuf-net's model builder cannot. `Serializer` routes through it **per annota
 wire layer is public and usable today either way. It is public **for your code, not just this
 package's**: a game annotates its own types and gets the same treatment.
 
-The reader and writer are `ref struct`s over spans that allocate nothing and never throw. Every
-operation reports success, and a failure latches so a truncated write cannot look complete and a corrupt
-payload cannot decode as data:
+The reader and writer are `ref struct`s over spans. Caller-owned output can avoid allocations after
+registration and buffer setup; deserialization still allocates returned strings and object graphs.
+Finite shared read limits also allocate accounting state. Checked wire operations report success;
+malformed input and insufficient output latch the reader or writer so later operations refuse to
+continue. A clean end of input from `TryReadTag` is not malformed:
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -1271,8 +1273,10 @@ failure instead of handing back an object whose derived state was rebuilt from h
 ### The generator
 
 For a plain `netstandard2.1` consumer, the generator supplies `ModuleInitializerAttribute` if the
-target framework does not define it. The generated registrar therefore compiles without a consumer
-polyfill. A test double derived from a `[WProtoContract]` base can carry
+target framework does not expose an accessible definition. An internal polyfill in another library
+does not prevent generation of a local one. Existing source, public, and friend-assembly definitions
+are reused. The generated registrar therefore compiles without a consumer polyfill.
+A test double derived from a `[WProtoContract]` base can carry
 `[WProtoNotSerialized]` when it never reaches the serializer. `WPROTO001` and `WPROTO011` now
 point inherited-only subclasses to this opt-out; see
 [A subclass that is not serialized](#a-subclass-that-is-not-serialized).
@@ -1299,20 +1303,22 @@ maps, surrogates, and a generic contract's closed type parameters. An unsupporte
 error naming the type, the member and the remedy**, never a silent skip: a contract that quietly got
 no formatter would surface as an exception from the first save in a shipped player:
 
-| Code        | Meaning                                                                              |
-| ----------- | ------------------------------------------------------------------------------------ |
-| `WPROTO001` | The contract, or a type enclosing it, is not `partial`                               |
-| `WPROTO002` | Two members claim the same field number                                              |
-| `WPROTO003` | A member's type is not supported yet                                                 |
-| `WPROTO004` | A field number is outside 1-536,870,911, or inside the reserved 19000-19999          |
-| `WPROTO005` | A lifecycle hook sits on a type with no `[WProtoContract]`, so nothing calls it      |
-| `WPROTO006` | Two methods carry the same lifecycle attribute                                       |
-| `WPROTO007` | A member is read-only, so a decoded value cannot be assigned to it                   |
-| `WPROTO008` | A lifecycle hook is static, or takes parameters                                      |
-| `WPROTO009` | A contract is nested inside a generic type and cannot be registered                  |
-| `WPROTO010` | A hook sits on a struct contract, where `in` copies the value and discards mutations |
-| `WPROTO011` | A class contract has no parameterless constructor to read into                       |
-| `WPROTO050` | A generated constructor cannot call an accessible base constructor without arguments |
+| Code        | Meaning                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------- |
+| `WPROTO001` | The contract, or a type enclosing it, is not `partial`                                  |
+| `WPROTO002` | Two members claim the same field number                                                 |
+| `WPROTO003` | A member's type is not supported yet                                                    |
+| `WPROTO004` | A field number is outside 1-536,870,911, or inside the reserved 19000-19999             |
+| `WPROTO005` | A lifecycle hook sits on a type with no `[WProtoContract]`, so nothing calls it         |
+| `WPROTO006` | Two methods carry the same lifecycle attribute                                          |
+| `WPROTO008` | A lifecycle hook is static, or takes parameters                                         |
+| `WPROTO009` | A contract is nested inside a generic type and cannot be registered                     |
+| `WPROTO010` | A hook sits on a struct contract, where `in` copies the value and discards mutations    |
+| `WPROTO011` | A mutable class without `SkipConstructor` lacks an accessible parameterless constructor |
+| `WPROTO050` | A generated constructor cannot call an accessible base constructor without arguments    |
+
+Readonly fields and get-only properties use [immutable construction](#immutable-contracts), with
+its construction and inheritance limits.
 
 `WPROTO028` is a **warning** that reports a skip rather than a refusal. It fires when a
 closed construction found in your source cannot be named by the generated registrar, most often a
@@ -2276,7 +2282,7 @@ A member taking a reserved value or a reserved name is `WPROTO046`. Two differen
 - **The value range is any `int32`**, not a field number's 1-536,870,911. Reserving `0` is legal and
   is often the one worth pinning; a negative value is legal too.
 
-The exported `.proto` carries the reservation inside the `enum` block, so a consumer's own toolchain
+For enums with an exported `enum` declaration, the `.proto` carries the reservation inside that block, so a consumer's own toolchain
 refuses the reuse as well rather than permitting one build system over exactly what this refuses
 here.
 
@@ -2566,10 +2572,56 @@ message PlayerState {
 
 The export mirrors the wire exactly: jagged collections become the wrapper messages the generator
 synthesizes, rectangular arrays become the `dims`/`values` wrapper, maps become proto3 `map` fields,
-and a subtype is emitted as one message holding the subtype's members plus the
-base's, which is the byte layout (the schema lists them in field-number order). A member type
+and included subtypes use separate payload messages containing their declared members. Inherited
+members stay at their own level of the include chain. A member type
 nothing can express is skipped and reported in the export window rather than silently missing. From code, `WProtoSchemaText.TryWriteSchema(contracts, packageName, surrogates,
 out string schema, out IReadOnlyList<string> diagnostics)` renders the same text.
+
+An included subtype's public root and member schema uses its declared contract name and the full
+outermost envelope. Its include payload uses the contract name followed by `Payload`. For example,
+a `Warrior` included by `Actor` at tag 7 has these two entry points:
+
+```protobuf
+message Actor {
+  int32 id = 1;
+  WarriorPayload warrior = 7;
+}
+message Warrior {
+  int32 id = 1;
+  WarriorPayload warrior = 7;
+}
+message WarriorPayload {
+  int32 armor = 10;
+}
+```
+
+Exporting either root, both roots, or a contract with a `Warrior` member describes the same wire
+envelope. Deeper includes nest their payloads at each level. Regenerate external bindings after
+exporting these corrected schemas: include payload message names gain the `Payload` suffix.
+Include field names stay the same unless they collide with a member name; the exporter reports
+each renamed field in its diagnostics. Serializer bytes and contract tags stay the same.
+
+Native maps render as `map<key, value>` without a `repeated` label. Keys that need message
+encodings retain explicit repeated entry messages. URI members, repeated URI elements and URI
+map values use `string`, matching the original UTF-8 text with no inner message tag. Explicit
+surrogate mappings take precedence over native scalar, nullable, binary, BCL and array shapes.
+
+Enums backed by `uint`, `long`, or `ulong` use `uint32`, `int64`, or `uint64` fields. Proto3
+enum declarations only accept signed 32-bit values, so numeric fields preserve the full CLR range
+and unnamed values. This also applies inside nullable values, collections, wrappers and maps.
+These numeric schema fields have no enum member names or enum reservations; keep the original
+C# enum reservations to prevent reuse in your game. Other enum widths keep their enum declarations.
+Serializer bytes are unchanged, including the accepted alternate varints for unsigned enum values.
+
+The separate Linux x64 host conformance suite compiles actual exports with pinned protoc 27.2
+and cross-reads independent text-format values through its C++ codec and WProto. It covers a
+finite set of scalar, collection, map, URI, BCL and wide-enum shapes, including absent and present
+nullable defaults, with malformed-schema, changed-tag and narrowed-enum controls. It does not qualify every schema,
+consumer deployment or Unity backend.
+
+```bash
+dotnet test Generator~/WallstopStudios.UnityHelpers.SchemaConformance.Tests/WallstopStudios.UnityHelpers.SchemaConformance.Tests.csproj -c Release -p:ProtobufNetOracle=v3
+```
 
 Editor scripts can also write schemas without opening the window. `ProtoSchemaExporter.Export`
 accepts the exact contract types, destination, layout, optional package name, and optional surrogate
@@ -2923,20 +2975,153 @@ WProtoReadLimits limits = new WProtoReadLimits(
     maximumNestingDepth: 16,
     maximumPackedElementCount: 4096
 );
+limits = limits.WithTotalFieldCount(4096);
+limits = limits.WithMessageMergeCopyBytes(128 * 1024);
+limits = limits.WithDecodedPayloadBytes(64 * 1024);
+limits = limits.WithCollectionElementCount(4096);
+limits = limits.WithContractConstructionCount(2048);
 WProtoReader reader = new WProtoReader(bytes, limits);
 ```
 
-| Limit                  | Scope                                                                                          |
-| ---------------------- | ---------------------------------------------------------------------------------------------- |
-| Message bytes          | Each reader region                                                                             |
-| Length-delimited bytes | Each field, checked before copying or decoding                                                 |
-| Field count            | Tags per region, including duplicate, unknown, and skipped-group tags                          |
-| Nesting depth          | Combined sub-message and group depth; maximum 64                                               |
-| Packed elements        | All packed runs and nested messages in one root read, checked before reserving packed capacity |
+These factories return new limits with the other settings preserved and the requested allowance
+replaced. The original limits remain unchanged; their order gives the same settings.
+
+| Limit                    | Scope                                                                                                      |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Message bytes            | Each reader region                                                                                         |
+| Length-delimited bytes   | Each field, checked before copying or decoding                                                             |
+| Field count              | Tags per region, including duplicate, unknown, and skipped-group tags                                      |
+| Total field count        | Tags across the root, nested readers, groups, and reader copies; checked before consuming the next tag     |
+| Nesting depth            | Combined sub-message and group depth; maximum 64                                                           |
+| Packed elements          | All packed runs and nested messages in one root read, checked before reserving packed capacity             |
+| Message-merge copy bytes | Actual bytes copied by parent-aware duplicate-message accumulators across a root read                      |
+| Decoded payload bytes    | UTF-8 input bytes decoded as strings or URIs, plus bytes materialized as byte arrays across a root read    |
+| Collection elements      | Repeated element and map-entry occurrences across the root, descendants and reader copies                  |
+| Contract constructions   | Explicit generated reference-contract construction attempts across the root, descendants and reader copies |
 
 Defaults leave byte and count limits unrestricted, with depth capped at 64. Negative limits become
-zero. These limits do not bound total decoded memory or configure protobuf-net fallback or
-[JSON reads](#reading-untrusted-json).
+zero. The message-merge copy and decoded payload allowances default to `long.MaxValue`, which disables their caps.
+These limits do not bound total decoded memory. Independent root
+readers created by custom formatters do not share an existing root's allowances. The limits do not
+configure protobuf-net fallback or [JSON reads](#reading-untrusted-json).
+
+Regenerated codecs use `WProtoMessageAccumulator.TryAdd(payload, ref parent)` to validate duplicate
+message boundaries with the parent's shared tag allowance and remaining depth before allocating or
+growing a merge buffer. Final decoding spends tag allowance again. The first occurrence remains
+borrowed; a refused duplicate preserves previously accepted bytes. Existing `TryAdd(payload)` keeps
+its independent validation behavior. Precompiled codecs using that overload need regeneration for
+cumulative boundary-scan accounting. Regenerate with the generator and runtime from the same package version.
+
+`WithMessageMergeCopyBytes(long)` limits cumulative copying by these parent-aware accumulators.
+The first borrowed occurrence costs zero. Consolidation and buffer growth charge the existing
+accepted bytes plus the incoming bytes; an append within existing capacity charges only the
+incoming bytes. For five two-byte occurrences, cumulative charges are 0, 4, 10, 12, and 22 bytes.
+The allowance is checked before allocation or copying. A refused reservation leaves the accepted
+payload and remaining copy allowance intact and marks the supplied reader malformed; boundary
+scans may already have spent tag allowance. Successful reservations are not refunded if allocation
+later throws. Descendants, reader copies, and sibling accumulators share the allowance.
+
+A finite copy allowance adds one accounting object per root reader. Default readers allocate no
+copy-accounting state. This cap excludes buffer capacity, ordinary string and byte-array reads,
+decoded object graphs, and the legacy accumulator overload without a parent. It is not a total
+allocation or retained-memory limit.
+
+#### Limiting decoded payloads
+
+`WithDecodedPayloadBytes(long)` bounds cumulative delivered payload lengths before built-in string,
+byte-array, and URI materialization. String and URI charges count UTF-8 input bytes, not UTF-16
+storage: decoded characters can occupy up to twice that byte count before object overhead. Byte
+arrays charge their payload length. Empty strings and arrays cost zero. Repeated fields, map keys
+and values, nested messages, reader copies, and parent-aware custom readers share one allowance.
+Independent root readers have separate allowances.
+
+A refused charge marks the reader malformed and clears the result; the encoded field has already
+been consumed. Accepted charges are not refunded if UTF-8 validation, URI construction, or later
+work fails. Truncated payloads that were never delivered do not spend this allowance. Borrowed
+`TryReadBytes` spans and skipped unknown fields cost zero. Custom formatters can use
+`TryReadByteArray` to charge before copying, or remain responsible for allocations they perform
+from borrowed spans.
+
+Regenerate precompiled byte-array member codecs with the generator and runtime from the same
+package version. Older generated codecs copy borrowed spans directly and cannot enforce this
+allowance for those members. A finite allowance creates one shared accounting object per root;
+default readers create none. The cap excludes collection capacity, object headers, URI object
+storage, custom allocations, and decoded object graphs. It is not a total memory limit. The
+message-merge copy allowance remains separate.
+
+#### Limiting collection elements
+
+`WithCollectionElementCount(int)` adds a shared allowance for generated collection reads. The
+`int.MaxValue` default disables it; negative values become zero. A finite allowance creates one
+accounting object per root. Disabled allowances create none. Existing constructors and wire encodings
+are unchanged.
+
+Each repeated element costs one, including empty strings and duplicate set entries. Each map entry
+costs one, including repeated keys and entries with omitted keys or values. A nested collection costs
+one for its outer occurrence plus its inner elements: `[[1, 2], [3]]` costs five. Rectangular array
+values count individually; their dimension metadata does not. Ordinary scalar strings and byte arrays
+cost no elements; a repeated byte-array value costs one element plus its separate decoded-byte charge.
+
+A recognized unpacked element or map entry reserves its allowance before decoding the value or
+seeding the collection. Packed runs reserve their element count from the delivered bytes before
+collection seeding or capacity reservation. This is separate from the packed-element allowance,
+which also covers packed metadata. Malformed values can still fail after a reservation; accepted
+charges are not refunded. Refusal faults the reader and generated reads clear their partial output.
+A refused charge itself does not spend remaining allowance. Reader copies replay already charged
+occurrences against the same allowance. Descendants and parent-aware custom readers share it;
+independent roots do not.
+
+Regenerate precompiled collection codecs with the generator and runtime from the same package
+version. Older generated repeated/map reads do not perform these charges. Custom formatters can use
+`TryChargeCollectionElements(count)` before their own decoding and reservation, or
+`TryReadPackedCollection(wireType, out packed)` to reserve an entire packed run. Do not charge that
+run again during scalar reads. Ordinary `TryReadPackedRun` remains available for packed metadata
+and custom formats; it does not apply collection accounting automatically.
+
+Constructor seeds, collection capacity, object headers and other custom work are excluded. Unknown
+fields cost no elements. This is not an object, total-memory or general work limit. Existing
+unsupported models, including nullable repeated elements, remain unsupported; limits do not change
+formatter availability or the facade's dispatch/data-error contracts.
+
+#### Limiting contract construction
+
+`WithContractConstructionCount(int)` limits how many reference-contract instances generated reads
+can construct. Use it with decoded-byte, collection-element and wire limits when reading untrusted
+saves or messages. The `int.MaxValue` default disables this allowance; negative values become zero.
+Finite allowances add one shared accounting object per root reader. Disabled allowances add none.
+Existing public constructors and wire encodings remain unchanged.
+
+Each explicit generated class construction costs one, checked before its constructor or field
+initializers run. This includes generated `SkipConstructor` constructors. Immutable reads that
+create a temporary instance to obtain constructor defaults and then a final instance cost two.
+An immutable read that needs only its final instance costs one. A concrete polymorphic base and
+its concrete subtype each cost one when both are constructed. An abstract base costs none;
+delegating root and formatter wrappers do not charge again. Struct values cost no constructions.
+
+Supplied merge seeds are reused without a construction charge. Instances created inside a user
+constructor or field initializer belong to that user code, even when a later generated read merges
+into them. Duplicate message occurrences that are accumulated and decoded once construct one
+child. Replaying a construction through a reader copy spends the shared allowance again.
+
+A refused charge faults the reader and clears the generated read's output before that constructor
+runs. Earlier accepted work and side effects are not reversed. Successful charges are not refunded
+when a later field, constructor or hook fails. Copies, descendants and parent-aware readers share
+one allowance; independent roots remain independent. Generated contract reads also refuse readers
+that are already malformed before invoking constructors, setters or hooks.
+
+Regenerate precompiled formatters with the generator and runtime from the same package version.
+Older generated constructors do not perform these charges. Custom formatters can call
+`TryChargeContractConstructions(count)` before constructing their own contract instances.
+
+This allowance counts explicit generated contract construction attempts, not every managed object.
+Collection, string, array and URI storage, constructor and hook allocations, custom formatter work,
+surrogate conversions and pool internals remain outside it. It does not bound total allocation,
+retained capacity or general parsing work, and it does not configure protobuf-net fallback or JSON.
+
+Unknown fields are skipped and are not retained for rewriting, including fields inside known
+nested messages. An older model can read a newer save successfully, then drop those fields when
+it writes the save again. Keep the original payload for rollback; successful decoding alone does
+not prove a lossless rewrite.
 
 `WProtoFacade.TryDeserialize(bytes, limits, out T value)` and `TryDeserializeAs` also accept limits.
 They throw `InvalidOperationException` for malformed or over-budget handled payloads; `false` means
@@ -2962,10 +3147,99 @@ serializer, and use the value-returning methods when a missing formatter must fa
 Custom formatters must consume the complete payload. Use `TryReadMessage` or
 `new WProtoReader(payload, in reader)` to preserve parent limits. For packed fields, use
 `TryReadPackedRun(wireType, out reader)` before allocating and decode with that wire type.
-Reader copies share the packed allowance; copies of an accepted typed run replay its prepaid bytes.
+Reader copies share the packed and total-field allowances. Reading tags again through a copy spends
+additional total-field allowance because it repeats parsing work; ending exactly at the limit is
+valid. Copies of an accepted typed packed run replay its prepaid bytes.
+Call `reader.MarkMalformed()` when nested decoding or semantic validation fails before returning
+`false`, and set the output to `default`. Regenerated readers and built-in formatters latch read
+failures, including invalid temporal or decimal values, invalid URI text, collection restoration,
+map entries, packed readers, subtype dispatch, and formatter forwarding. An unavailable formatter
+still makes the facade decline the request before decoding. Failure state belongs to the reader instance;
+existing reader copies retain their own state while sharing the work allowances.
 Custom allocations remain the formatter's responsibility.
 
+`IWProtoFormatter` implementations must report failure with `false` rather than throw.
+If a formatter throws inside `TryWriteMessage`, the writer latches `Faulted`, unwinds its own
+nesting frame and propagates the original exception. An enclosing formatter cannot
+catch that exception and complete the write successfully. Compound writes may already have
+written a tag, reserved prefix or partial payload; discard that output after failure.
+
 ### Wire compatibility
+
+Compatibility belongs to a versioned contract: protobuf has
+[no canonical byte representation](https://protobuf.dev/programming-guides/serialization-not-canonical/).
+Freeze tags, defaults, packing, subtype numbers, and root/surrogate encodings before changing a writer.
+WProto writes packed repeated scalars by default; use explicit `IsPacked = false` when preserving a
+legacy unpacked writer. Accepting both forms on read does not make their serialized hashes equal.
+The existing v3 map-write policy and named v2 exceptions below remain part of the contract.
+
+The host oracle suite's `CompatibilityInventoryTests` compares package and retained consumer
+metadata against `CompatibilityInventory.v1.json`. Under its frozen `WALLSTOP_PROTO` and
+`UNITY_5_3_OR_NEWER` declarations, it also pins externally visible types and members in the
+WallstopProto namespace, plus selected protobuf/shared `Serializer` operations. This includes
+reader/writer and formatter extension signatures, type and parameter constraints, construction,
+constants, accessors, optional parameters, and source annotation rules. This is a source contract
+snapshot for those declarations, not an ABI or all-configuration guarantee.
+
+The inventory resolves attribute constants and records effective WProto packing/default policies;
+coordinated edits to both legacy and WProto tags still change the frozen record. Mutation controls
+cover wire metadata and public declaration changes; unresolved API types/defaults cannot pass.
+Review a candidate inventory diff as a wire/API change, preserving historical entries when extending
+coverage; never overwrite the baseline merely to pass a check.
+`CompatibilityEvidence.v1.json` classifies a curated set of executable witnesses as identical
+bytes, readable alternate encodings, known oracle defects, behavior, or unsupported declarations.
+It records the source revision, pinned writers, reader directions, and unqualified backends.
+`CompatibilityEvidenceTests` executes those witnesses in both isolated host oracle lanes.
+This metadata gate and initial evidence ledger complement golden bytes and semantic assertions.
+They do not prove every advertised capability, custom formatter bodies, all consumer deployments,
+or platform performance.
+
+`CompatibilityClaimCatalog.v1.json` maps the documented capabilities to source witnesses,
+compatibility classes, reader directions, lane requirements, and named evidence gaps.
+`CompatibilityCaseBindings.v1.json` freezes the complete discovered case set for each selected
+fixture and lane. Missing discovery and partial coverage remain explicit. The source guard parses
+test declarations without invoking them; ordinary NUnit owns case expansion and lifecycle.
+
+The main guide's diagnostic codes have reviewed identifier/severity assertions bound to exact
+ordinary cases in each host lane. Review hashes cover the assertion sources, including their local
+case providers and helpers; edits require renewed review. `WPROTO041` separately pins the player,
+Editor, and preprocessor-symbol controls for explicit subtype declarations. These bindings check
+reviewed metadata and execution identity. Human review establishes what each assertion means;
+the verifier does not prove arbitrary C# semantics or every diagnostic trigger path. Unadvertised
+generator descriptors remain outside this diagnostic inventory.
+
+From the repository root, validate the catalog with
+`pwsh -NoProfile -File scripts/verify-wproto-evidence.ps1 -Mode catalog`.
+Run either isolated host lane with
+`pwsh -NoProfile -File scripts/run-wproto-evidence.ps1 -Oracle v3` or `-Oracle v2`.
+Each invocation retains a new directory under `progress/.artifacts/wproto-evidence` by default.
+It records a fresh Release build, source and binary inventories, raw process streams, exit status,
+and ordinary TRX results, then verifies their identities and exact fixture case sets.
+Changed, missing, duplicated, skipped, or inconclusive required cases cannot qualify.
+Review case-binding changes against complete runner results; do not regenerate them to conceal
+lost coverage.
+
+Catalog and initial source-census failures retain their primary error without launching the SDK,
+build or tests. Their rejected receipts have no completed before/after source comparison.
+Source drift is checked only after the initial census completes, including when a later build
+or test fails. Missing or incomplete source observations never qualify an invocation.
+
+This verifier accepts CoreCLR host fixture evidence only. Its process observation covers the
+`dotnet` parent exit and captured output; it does not establish Unity native-process stability.
+Passing host receipts do not complete partial or missing lane requirements, player qualification,
+consumer deployment, allocation, or throughput acceptance. Historical results without a matching
+invocation receipt remain historical evidence.
+
+The generator remains `ISourceGenerator` with the Unity 2021.3 compiler floor. Unity documents
+[Roslyn 3.8 for that editor](https://docs.unity3d.com/2021.3/Documentation/Manual/roslyn-analyzers.html).
+The separate compiler-floor host suite loads the shipped generator through Roslyn 3.8, compiles
+C# 9 consumers against .NET Standard 2.1 metadata, and checks the emitted module constructor.
+It covers absent, source, public, inaccessible internal and friend-assembly attribute definitions,
+with controls for removed polyfills and initializer uses. Its retained inputs and ordinary NUnit
+results are separate from strict oracle receipts. It does not compile the complete platform-neutral
+source closure or establish Unity compiler-process or player startup acceptance.
+The hybrid facade and bundled runtime remain supported during migration; dependency retirement
+requires separate release qualification.
 
 The differential suite runs in two isolated processes: one loads protobuf-net 2.4.9 and the other
 loads 3.2.56. Isolation matters because both assemblies have the same name; each run asserts the
@@ -2992,5 +3266,5 @@ Three protobuf-net behaviors are worth knowing because they are easy to trip ove
   omitted.
 - **Negative zero is not preserved.** Default-value omission tests `value == 0`, and `-0.0 == 0.0`, so a
   `-0f` member is omitted and reads back as `+0f`.
-- **Members go out in ascending field number, not declaration order.** `FastVector3Int` declares
-  x, y, z, hash but tags them 1, 2, 4, 3, so its cached hash is written before z.
+- **Members go out in ascending field number.** Declarations with tags 3, 1, 2 are emitted as
+  1, 2, 3.

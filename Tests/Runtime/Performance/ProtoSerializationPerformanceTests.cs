@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.Serialization;
 
     [TestFixture]
     [Category("Performance")]
@@ -165,15 +166,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             );
         }
 
-        private static void RequireObservableClock()
+        private static void RequireObservableClock(string operation = null)
         {
             Stopwatch clock = Stopwatch.StartNew();
             Thread.Sleep(ClockControlMilliseconds);
             clock.Stop();
             double elapsed = clock.Elapsed.TotalMilliseconds;
             UnityEngine.Debug.Log(
-                $"WPROTO_CLOCK_CONTROL requested={ClockControlMilliseconds}ms measured={elapsed:F4}ms frequency={Stopwatch.Frequency}"
+                FormattableString.Invariant(
+                    $"WPROTO_CLOCK_CONTROL requested={ClockControlMilliseconds}ms measured={elapsed:F4}ms frequency={Stopwatch.Frequency}"
+                )
             );
+            if (operation != null)
+            {
+                UnityEngine.Debug.Log(
+                    FormattableString.Invariant(
+                        $"WPROTO_CORPUS_CLOCK {WProtoBenchmarkCorpus.CorpusVersion} {operation} {{\"RequestedMilliseconds\":{ClockControlMilliseconds},\"ElapsedMilliseconds\":{elapsed:R},\"Frequency\":{Stopwatch.Frequency}}}"
+                    )
+                );
+            }
             if (elapsed < ClockControlMilliseconds / 2.0)
             {
                 Assert.Ignore("The timer did not observe the sleep control.");

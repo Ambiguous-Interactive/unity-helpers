@@ -827,7 +827,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AFormatterThatThrowsLeavesTheNestingDepthWhereItFoundIt()
         {
-            // A caught formatter exception must restore depth for subsequent writes.
+            // A caught formatter exception must unwind its nesting frame and refuse continuation.
 
             // Assert.Throws cannot capture a ref struct in its lambda.
             byte[] scratch = new byte[ScratchSize];
@@ -846,6 +846,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.IsTrue(threw, "The test double did not throw, so this proves nothing.");
             Assert.AreEqual(0, writer.Depth, "The nesting depth was not restored.");
+            Assert.IsTrue(writer.Faulted);
         }
 
         [TestCase(63, true, TestName = "TryWriteMessageIsBoundedAtTheDocumentedDepth(63 accepted)")]

@@ -334,6 +334,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsFalse(wroteWithoutRefusing);
         }
 
+        [TestCase("")]
+        [TestCase("0801")]
+        public void MissingRequestedSubtypeLatchesGeneratedRootReader(string hex)
+        {
+            WProtoReader reader = new WProtoReader(Parse(hex));
+            Assert.IsFalse(
+                WProtoFormatterProvider
+                    .Get<IncludeAlpha>()
+                    .TryRead(ref reader, out IncludeAlpha value)
+            );
+            Assert.IsTrue(value == null);
+            Assert.IsTrue(reader.Malformed);
+            Assert.IsFalse(reader.TryReadTag(out _, out _));
+        }
+
         [Test]
         public void AnAbstractContractReadsOnlyWhenThePayloadNamesASubtype()
         {
@@ -343,11 +358,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             WProtoReader missing = new WProtoReader(new byte[] { 0x08, 0x03 });
             Assert.IsFalse(formatter.TryRead(ref missing, out AbstractShape none));
-            Assert.IsNull(none);
+            Assert.IsTrue(none == null);
+            Assert.IsTrue(missing.Malformed);
 
             WProtoReader empty = new WProtoReader(Array.Empty<byte>());
             Assert.IsFalse(formatter.TryRead(ref empty, out AbstractShape nothing));
-            Assert.IsNull(nothing);
+            Assert.IsTrue(nothing == null);
+            Assert.IsTrue(empty.Malformed);
 
             AbstractShape decoded = Decode<AbstractShape>("A20602" + "0805" + "0803");
             Assert.IsInstanceOf<ConcreteShape>(decoded);

@@ -220,6 +220,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             return restored;
         }
 
+        [Test]
+        public void MalformedPackedRunCannotContinueAtTheNextRootField()
+        {
+            WProtoReader reader = new WProtoReader(new byte[] { 0x0A, 1, 0x80, 0x08, 1 });
+            Assert.IsFalse(
+                WProtoFormatterProvider
+                    .Get<RepeatedContract>()
+                    .TryRead(ref reader, out RepeatedContract value)
+            );
+            Assert.IsTrue(value == null);
+            Assert.IsTrue(reader.Malformed);
+            Assert.AreEqual(2, reader.Remaining);
+            int refusedAt = reader.Position;
+            Assert.IsFalse(reader.TryReadTag(out _, out _));
+            Assert.AreEqual(refusedAt, reader.Position);
+        }
+
         /// <summary>
         /// Pins the exact bytes each element shape produces, and that protobuf-net reads them.
         /// </summary>

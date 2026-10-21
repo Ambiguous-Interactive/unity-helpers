@@ -10,7 +10,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
     internal readonly struct BenchmarkThreadSnapshot
     {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         private const string NativeLibrary = "kernel32.dll";
+#endif
 
         internal long CaptureStartTimestamp { get; }
         internal long CaptureEndTimestamp { get; }

@@ -148,8 +148,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <summary>
         /// Emits the two statements that abandon a read, shared by every failure path.
         /// </summary>
+        protected static void EmitCollectionElementCharge(Writer writer, string qualifiedContract)
+        {
+            writer.Line("if (!reader.TryChargeCollectionElements(1))" + Writer.Open);
+            writer.Indent();
+            EmitReadFailure(writer, qualifiedContract);
+            Close(writer);
+            writer.Blank();
+        }
+
         protected static void EmitReadFailure(Writer writer, string qualifiedContract)
         {
+            writer.Line("reader.MarkMalformed();");
             writer.Line("value = default(" + qualifiedContract + ");");
             writer.Line("return false;");
         }

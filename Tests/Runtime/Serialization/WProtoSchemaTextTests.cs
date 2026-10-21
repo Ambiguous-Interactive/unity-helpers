@@ -287,7 +287,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             StringAssert.Contains("BclDateTime Moment = 2;", schema);
             StringAssert.Contains("BclTimeSpan Duration = 3;", schema);
             StringAssert.Contains("BclDecimal Amount = 4;", schema);
-            StringAssert.Contains("BclUri Source = 5;", schema);
+            StringAssert.Contains("string Source = 5;", schema);
+            StringAssert.DoesNotContain("BclUri", schema);
             StringAssert.Contains(
                 "message BclGuid {\n  fixed64 low = 1;\n  fixed64 high = 2;\n}",
                 schema
@@ -328,6 +329,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
             StringAssert.Contains("GridRect Grid = 3;", schema);
             StringAssert.Contains("map<string, int32> Counts = 4;", schema);
+            StringAssert.DoesNotContain("repeated map<", schema);
             StringAssert.Contains("repeated SchemaPoint Points = 5;", schema);
         }
 
@@ -382,6 +384,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsEmpty(diagnostics);
         }
 
+        [TestCase(typeof(SchemaBcl), typeof(Uri), nameof(SchemaBcl.Source), 5)]
+        [TestCase(typeof(SchemaBcl), typeof(Guid), nameof(SchemaBcl.Id), 1)]
+        [TestCase(typeof(SchemaBcl), typeof(DateTime), nameof(SchemaBcl.Moment), 2)]
+        [TestCase(typeof(SchemaScalars), typeof(int), nameof(SchemaScalars.Signed), 2)]
+        [TestCase(typeof(SchemaScalars), typeof(int?), nameof(SchemaScalars.Maybe), 10)]
+        [TestCase(typeof(SchemaScalars), typeof(byte[]), nameof(SchemaScalars.Payload), 7)]
+        [TestCase(typeof(SchemaCollections), typeof(int[,]), nameof(SchemaCollections.Grid), 3)]
+        public void ExplicitSurrogatesOverrideNativeMemberShapes(
+            Type contract,
+            Type replaced,
+            string member,
+            int tag
+        )
+        {
+            Assert.IsTrue(
+                WProtoSchemaText.TryWriteSchema(
+                    new[] { contract },
+                    null,
+                    new Dictionary<Type, Type> { { replaced, typeof(SchemaPoint) } },
+                    out string schema,
+                    out IReadOnlyList<string> diagnostics
+                )
+            );
+            Assert.IsEmpty(diagnostics);
+            StringAssert.Contains($"SchemaPoint {member} = {tag};", schema);
+        }
+
         [Test]
         public void NameCollisionsAreRenamedWithADiagnostic()
         {
@@ -426,8 +455,84 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
 
             Assert.IsTrue(rendered);
-            StringAssert.Contains("Huge = 18446744073709551615;", schema);
+            StringAssert.Contains("uint64 Value = 1;", schema);
+            StringAssert.DoesNotContain("enum SchemaUnsignedColor", schema);
             Assert.IsEmpty(diagnostics, "A legal ulong enum member is not an error.");
+        }
+
+        [Test]
+        public void WideEnumsUseNumericSchemaTypesAcrossContainers()
+        {
+            Assert.IsTrue(
+                WProtoSchemaText.TryWriteSchema(
+                    new[] { typeof(WProtoSchemaWideEnumContract) },
+                    null,
+                    null,
+                    out string schema,
+                    out IReadOnlyList<string> diagnostics
+                )
+            );
+            Assert.IsEmpty(diagnostics);
+            StringAssert.DoesNotContain("enum ", schema);
+            StringAssert.Contains("uint32 Unsigned = 1;", schema);
+            StringAssert.Contains("int64 Signed = 2;", schema);
+            StringAssert.Contains("uint64 WideUnsigned = 3;", schema);
+            StringAssert.Contains("optional uint32 Optional = 4;", schema);
+            StringAssert.Contains("repeated int64 Packed = 5;", schema);
+            StringAssert.Contains("repeated uint32 Unpacked = 6 [packed = false];", schema);
+            StringAssert.Contains("map<uint64, int64> ByNumber = 7;", schema);
+            StringAssert.Contains("repeated uint64 values = 1;", schema);
+            StringAssert.Contains("repeated uint32 values = 2;", schema);
+            StringAssert.Contains("map<string, uint64> ByName = 10;", schema);
+        }
+
+        [TestCase(
+            uint.MaxValue,
+            long.MinValue,
+            ulong.MaxValue,
+            "08FFFFFFFFFFFFFFFFFF01108080808080808080800118FFFFFFFFFFFFFFFFFF012000"
+        )]
+        [TestCase(
+            2147483648u,
+            -2147483649L,
+            9223372036854775808UL,
+            "0880808080F8FFFFFFFF0110FFFFFFFFF7FFFFFFFF0118808080808080808080012000"
+        )]
+        [TestCase(42u, long.MaxValue, 42UL, "082A10FFFFFFFFFFFFFFFF7F182A2000")]
+        [TestCase(0u, 0L, 0UL, "2000")]
+        public void WideEnumWireBytesRemainIndependentOfSchemaNames(
+            uint unsigned,
+            long signed,
+            ulong wideUnsigned,
+            string golden
+        )
+        {
+            WProtoSchemaWideEnumContract original = new WProtoSchemaWideEnumContract
+            {
+                Unsigned = (WProtoSchemaUnsigned32)unsigned,
+                Signed = (WProtoSchemaSigned64)signed,
+                WideUnsigned = (WProtoSchemaUnsigned64)wideUnsigned,
+                Optional = (WProtoSchemaUnsigned32)0,
+            };
+            IWProtoFormatter<WProtoSchemaWideEnumContract> formatter =
+                WProtoFormatterProvider.Get<WProtoSchemaWideEnumContract>();
+            Assert.IsTrue(formatter != null);
+            byte[] bytes = new byte[formatter.Measure(original)];
+            WProtoWriter writer = new WProtoWriter(bytes);
+            Assert.IsTrue(formatter.Write(ref writer, original));
+            Assert.AreEqual(bytes.Length, writer.Position);
+            Assert.AreEqual(golden, BitConverter.ToString(bytes).Replace("-", string.Empty));
+            CollectionAssert.AreEqual(bytes, WProtoFacade.Serialize(original));
+            WProtoReader reader = new WProtoReader(bytes);
+            Assert.IsTrue(formatter.TryRead(ref reader, out WProtoSchemaWideEnumContract actual));
+            Assert.IsTrue(reader.End);
+            Assert.IsFalse(reader.Malformed);
+            Assert.IsTrue(actual != null);
+            Assert.AreEqual(unsigned, (uint)actual.Unsigned);
+            Assert.AreEqual(signed, (long)actual.Signed);
+            Assert.AreEqual(wideUnsigned, (ulong)actual.WideUnsigned);
+            Assert.IsTrue(actual.Optional.HasValue);
+            Assert.AreEqual(0u, (uint)actual.Optional.Value);
         }
 
         [Test]
@@ -492,7 +597,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 schema.Split("message SchemaDerived {").Length - 1,
                 "The derived message must appear exactly once."
             );
-            StringAssert.Contains("SchemaDerived schemaDerived = 7;", schema);
+            StringAssert.Contains("SchemaDerivedPayload schemaDerived = 7;", schema);
             Assert.IsEmpty(diagnostics);
         }
 
@@ -513,11 +618,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.IsTrue(rendered);
             int derivedIndex = schema.IndexOf(
-                "message SchemaChainDerived {",
+                "message SchemaChainDerivedPayload {",
                 StringComparison.Ordinal
             );
-            StringAssert.Contains("SchemaChainSubDerived schemaChainSubDerived = 8;", schema);
-            StringAssert.Contains("message SchemaChainSubDerived {", schema);
+            StringAssert.Contains(
+                "SchemaChainSubDerivedPayload schemaChainSubDerived = 8;",
+                schema
+            );
+            StringAssert.Contains("message SchemaChainSubDerivedPayload {", schema);
             Assert.Greater(derivedIndex, 0);
             Assert.IsEmpty(diagnostics);
         }
@@ -591,12 +699,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             StringAssert.Contains("int32 Extra = 10;", schema);
             StringAssert.Contains("int32 BaseId = 1;", schema);
             StringAssert.Contains("string BaseName = 2;", schema);
-            StringAssert.Contains("SchemaDerived schemaDerived = 7;", schema);
+            StringAssert.Contains("SchemaDerivedPayload schemaDerived = 7;", schema);
             StringAssert.Contains(
-                "// Subtype tag 7 carries the whole SchemaDerived message on the wire.",
+                "// Subtype tag 7 carries the whole SchemaDerivedPayload message on the wire.",
                 schema
             );
-            int derivedIndex = schema.IndexOf("message SchemaDerived {", StringComparison.Ordinal);
+            int derivedIndex = schema.IndexOf(
+                "message SchemaDerivedPayload {",
+                StringComparison.Ordinal
+            );
             Assert.Greater(derivedIndex, 0, "The include renders the subtype as its own message.");
             Assert.IsEmpty(diagnostics);
         }
@@ -671,14 +782,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.IsTrue(rendered);
             StringAssert.Contains(
-                "SchemaSelfDeclaredDerived schemaSelfDeclaredDerived = 7;",
+                "SchemaSelfDeclaredDerivedPayload schemaSelfDeclaredDerived = 7;",
                 schema
             );
-            StringAssert.Contains("message SchemaSelfDeclaredDerived {", schema);
+            StringAssert.Contains("message SchemaSelfDeclaredDerivedPayload {", schema);
             StringAssert.Contains("int32 Extra = 10;", schema);
             Assert.AreEqual(
                 1,
-                schema.Split("message SchemaSelfDeclaredDerived {").Length - 1,
+                schema.Split("message SchemaSelfDeclaredDerivedPayload {").Length - 1,
                 "The derived message must appear exactly once."
             );
             Assert.IsEmpty(diagnostics);

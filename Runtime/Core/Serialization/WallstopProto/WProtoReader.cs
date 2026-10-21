@@ -61,12 +61,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </summary>
         public bool Malformed => _malformed;
 
+        internal WProtoByteBudget MessageMergeCopyBudget => _messageMergeCopyBudget;
+
         private WProtoReadLimits Limits => _limits ?? WProtoReadLimits.Default;
 
         private readonly ReadOnlySpan<byte> _buffer;
         private readonly int _depth;
         private readonly WProtoReadLimits _limits;
-        private readonly PackedReadBudget _packedBudget;
+        private readonly ReadBudget _packedBudget;
+        private readonly ReadBudget _totalFieldBudget;
+        private readonly ReadBudget _collectionElementBudget;
+        private readonly ReadBudget _contractConstructionBudget;
+        private readonly WProtoByteBudget _messageMergeCopyBudget;
+        private readonly WProtoByteBudget _decodedPayloadBudget;
         private bool _countPackedElements;
         private int _fieldCount;
         private int _position;
@@ -84,7 +91,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="limits">Immutable limits; null uses the default limits.</param>
         /// <remarks>A region exceeding the byte limit starts malformed, with no bytes consumed.</remarks>
         public WProtoReader(ReadOnlySpan<byte> buffer, WProtoReadLimits limits)
-            : this(buffer, 0, limits ?? WProtoReadLimits.Default, CreatePackedBudget(limits)) { }
+            : this(
+                buffer,
+                0,
+                limits ?? WProtoReadLimits.Default,
+                CreatePackedBudget(limits),
+                CreateTotalFieldBudget(limits),
+                CreateMessageMergeCopyBudget(limits),
+                CreateDecodedPayloadBudget(limits),
+                CreateCollectionElementBudget(limits),
+                CreateContractConstructionBudget(limits)
+            ) { }
 
         /// <summary>
         /// Initializes a reader over a sub-message payload already carved out of <paramref name="parent"/>.
@@ -110,6 +127,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             _limits = parent._limits ?? WProtoReadLimits.Default;
             _packedBudget = parent._packedBudget;
+            _totalFieldBudget = parent._totalFieldBudget;
+            _messageMergeCopyBudget = parent._messageMergeCopyBudget;
+            _decodedPayloadBudget = parent._decodedPayloadBudget;
+            _collectionElementBudget = parent._collectionElementBudget;
+            _contractConstructionBudget = parent._contractConstructionBudget;
             _countPackedElements = false;
             bool exhausted = parent._malformed || _limits.MaximumNestingDepth <= parent._depth;
             _buffer = exhausted ? default : buffer;
@@ -123,13 +145,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             ReadOnlySpan<byte> buffer,
             int depth,
             WProtoReadLimits limits,
-            PackedReadBudget packedBudget = null
+            ReadBudget packedBudget = null,
+            ReadBudget totalFieldBudget = null,
+            WProtoByteBudget messageMergeCopyBudget = null,
+            WProtoByteBudget decodedPayloadBudget = null,
+            ReadBudget collectionElementBudget = null,
+            ReadBudget contractConstructionBudget = null
         )
         {
             _buffer = buffer;
             _depth = depth;
             _limits = limits;
             _packedBudget = packedBudget;
+            _totalFieldBudget = totalFieldBudget;
+            _messageMergeCopyBudget = messageMergeCopyBudget;
+            _decodedPayloadBudget = decodedPayloadBudget;
+            _collectionElementBudget = collectionElementBudget;
+            _contractConstructionBudget = contractConstructionBudget;
             _countPackedElements = false;
             _position = 0;
             _fieldCount = 0;
@@ -146,6 +178,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 && !expected.Malformed
                 && ReferenceEquals(reader.Limits, expected.Limits)
                 && ReferenceEquals(reader._packedBudget, expected._packedBudget)
+                && ReferenceEquals(reader._totalFieldBudget, expected._totalFieldBudget)
+                && ReferenceEquals(reader._messageMergeCopyBudget, expected._messageMergeCopyBudget)
+                && ReferenceEquals(reader._decodedPayloadBudget, expected._decodedPayloadBudget)
+                && ReferenceEquals(
+                    reader._collectionElementBudget,
+                    expected._collectionElementBudget
+                )
+                && ReferenceEquals(
+                    reader._contractConstructionBudget,
+                    expected._contractConstructionBudget
+                )
                 && !reader.Malformed
                 && reader.End
                 && reader.Depth == expected.Depth
@@ -157,10 +200,45 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 );
         }
 
-        private static PackedReadBudget CreatePackedBudget(WProtoReadLimits limits)
+        private static ReadBudget CreateCollectionElementBudget(WProtoReadLimits limits)
+        {
+            return limits != null && limits.MaximumCollectionElementCount < int.MaxValue
+                ? new ReadBudget(limits.MaximumCollectionElementCount)
+                : null;
+        }
+
+        private static ReadBudget CreateContractConstructionBudget(WProtoReadLimits limits)
+        {
+            return limits != null && limits.MaximumContractConstructionCount < int.MaxValue
+                ? new ReadBudget(limits.MaximumContractConstructionCount)
+                : null;
+        }
+
+        private static ReadBudget CreatePackedBudget(WProtoReadLimits limits)
         {
             return limits != null && limits.MaximumPackedElementCount < int.MaxValue
-                ? new PackedReadBudget(limits.MaximumPackedElementCount)
+                ? new ReadBudget(limits.MaximumPackedElementCount)
+                : null;
+        }
+
+        private static ReadBudget CreateTotalFieldBudget(WProtoReadLimits limits)
+        {
+            return limits != null && limits.MaximumTotalFieldCount < int.MaxValue
+                ? new ReadBudget(limits.MaximumTotalFieldCount)
+                : null;
+        }
+
+        private static WProtoByteBudget CreateMessageMergeCopyBudget(WProtoReadLimits limits)
+        {
+            return limits != null && limits.MaximumMessageMergeCopyBytes < long.MaxValue
+                ? new WProtoByteBudget(limits.MaximumMessageMergeCopyBytes)
+                : null;
+        }
+
+        private static WProtoByteBudget CreateDecodedPayloadBudget(WProtoReadLimits limits)
+        {
+            return limits != null && limits.MaximumDecodedPayloadBytes < long.MaxValue
+                ? new WProtoByteBudget(limits.MaximumDecodedPayloadBytes)
                 : null;
         }
 
@@ -171,7 +249,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="wireType">Receives the wire type, or -1 on failure.</param>
         /// <returns><c>true</c> when a valid key was read; <c>false</c> at end of input or on a malformed key.</returns>
         /// <remarks>
-        /// Reaching the configured field count refuses the next tag before consuming it.
+        /// Reaching either field count refuses the next tag before consuming it. Total counts
+        /// include tags replayed through reader copies because they bound parsing work.
         /// A clean end of input returns <c>false</c> without latching <see cref="Malformed"/>, so
         /// <c>while (reader.TryReadTag(...))</c> terminates normally on a well-formed message.
         /// </remarks>
@@ -185,7 +264,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            if (Limits.MaximumFieldCount <= _fieldCount)
+            if (
+                Limits.MaximumFieldCount <= _fieldCount
+                || (_totalFieldBudget != null && !_totalFieldBudget.TryCharge(1))
+            )
             {
                 _malformed = true;
                 fieldNumber = 0;
@@ -485,6 +567,24 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return true;
         }
 
+        /// <summary>Copies a length-delimited field after charging the shared decoded-payload allowance.</summary>
+        /// <param name="value">Receives the copied bytes, an empty array for an empty field, or null on failure.</param>
+        /// <returns>Whether the complete field was copied within the configured limits.</returns>
+        /// <remarks>A refusal has consumed the encoded field and latches <see cref="Malformed"/>.</remarks>
+        public bool TryReadByteArray(out byte[] value)
+        {
+            if (
+                !TryReadBytes(out ReadOnlySpan<byte> payload)
+                || !TryChargeDecodedPayloadBytes(payload.Length)
+            )
+            {
+                value = null;
+                return false;
+            }
+            value = payload.ToArray();
+            return true;
+        }
+
         /// <summary>
         /// Reads every byte this reader has left, without copying it.
         /// </summary>
@@ -537,6 +637,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return true;
             }
 
+            if (!TryChargeDecodedPayloadBytes(payload.Length))
+            {
+                value = null;
+                return false;
+            }
+
             try
             {
                 value = WProtoText.StrictUtf8.GetString(payload);
@@ -567,7 +673,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             if (Limits.MaximumNestingDepth <= _depth)
             {
                 _malformed = true;
-                nested = new WProtoReader(default, _depth, Limits, _packedBudget)
+                nested = new WProtoReader(
+                    default,
+                    _depth,
+                    Limits,
+                    _packedBudget,
+                    _totalFieldBudget,
+                    _messageMergeCopyBudget,
+                    _decodedPayloadBudget,
+                    _collectionElementBudget,
+                    _contractConstructionBudget
+                )
                 {
                     _malformed = true,
                 };
@@ -576,14 +692,34 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
             {
-                nested = new WProtoReader(default, _depth + 1, Limits, _packedBudget)
+                nested = new WProtoReader(
+                    default,
+                    _depth + 1,
+                    Limits,
+                    _packedBudget,
+                    _totalFieldBudget,
+                    _messageMergeCopyBudget,
+                    _decodedPayloadBudget,
+                    _collectionElementBudget,
+                    _contractConstructionBudget
+                )
                 {
                     _malformed = true,
                 };
                 return false;
             }
 
-            nested = new WProtoReader(payload, _depth + 1, Limits, _packedBudget);
+            nested = new WProtoReader(
+                payload,
+                _depth + 1,
+                Limits,
+                _packedBudget,
+                _totalFieldBudget,
+                _messageMergeCopyBudget,
+                _decodedPayloadBudget,
+                _collectionElementBudget,
+                _contractConstructionBudget
+            );
             return true;
         }
 
@@ -612,14 +748,34 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
             {
-                packed = new WProtoReader(default, _depth, Limits, _packedBudget)
+                packed = new WProtoReader(
+                    default,
+                    _depth,
+                    Limits,
+                    _packedBudget,
+                    _totalFieldBudget,
+                    _messageMergeCopyBudget,
+                    _decodedPayloadBudget,
+                    _collectionElementBudget,
+                    _contractConstructionBudget
+                )
                 {
                     _malformed = true,
                 };
                 return false;
             }
 
-            packed = new WProtoReader(payload, _depth, Limits, _packedBudget)
+            packed = new WProtoReader(
+                payload,
+                _depth,
+                Limits,
+                _packedBudget,
+                _totalFieldBudget,
+                _messageMergeCopyBudget,
+                _decodedPayloadBudget,
+                _collectionElementBudget,
+                _contractConstructionBudget
+            )
             {
                 _countPackedElements = _packedBudget != null,
             };
@@ -656,6 +812,67 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             packed._countPackedElements = false;
+            return true;
+        }
+
+        /// <summary>Charges delivered collection elements before their decoding or reservation.</summary>
+        /// <param name="count">Number of element occurrences, including duplicates.</param>
+        /// <returns>False and a malformed reader when the charge is negative or exceeds the allowance.</returns>
+        /// <remarks>Successful charges are shared across descendants and copies and are not refunded.</remarks>
+        public bool TryChargeCollectionElements(int count)
+        {
+            if (
+                _malformed
+                || count < 0
+                || (_collectionElementBudget != null && !_collectionElementBudget.TryCharge(count))
+            )
+            {
+                _malformed = true;
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>Charges reference-contract construction attempts before invoking their constructors.</summary>
+        /// <param name="count">Number of explicit construction attempts.</param>
+        /// <returns>False and a malformed reader when the charge is negative or exceeds the allowance.</returns>
+        /// <remarks>Descendants and copies share successful charges, which are not refunded on later failure.</remarks>
+        public bool TryChargeContractConstructions(int count)
+        {
+            if (
+                _malformed
+                || count < 0
+                || (
+                    _contractConstructionBudget != null
+                    && !_contractConstructionBudget.TryCharge(count)
+                )
+            )
+            {
+                _malformed = true;
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>Reads a packed collection run and charges its elements before reservation.</summary>
+        /// <param name="wireType">The packed scalar wire type.</param>
+        /// <param name="packed">Receives the scoped packed reader.</param>
+        /// <returns>False with both readers malformed when a packed or collection allowance refuses the run.</returns>
+        /// <remarks>The caller must not charge these elements again during their scalar reads.</remarks>
+        public bool TryReadPackedCollection(int wireType, out WProtoReader packed)
+        {
+            if (!TryReadPackedRun(wireType, out packed))
+            {
+                return false;
+            }
+            if (
+                _collectionElementBudget != null
+                && !TryChargeCollectionElements(packed.CountPackedElementsCore(wireType))
+            )
+            {
+                packed._malformed = true;
+                return false;
+            }
             return true;
         }
 
@@ -773,7 +990,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            WProtoReader nested = new WProtoReader(payload, _depth + 1, Limits, _packedBudget);
+            WProtoReader nested = new WProtoReader(
+                payload,
+                _depth + 1,
+                Limits,
+                _packedBudget,
+                _totalFieldBudget,
+                _messageMergeCopyBudget,
+                _decodedPayloadBudget,
+                _collectionElementBudget,
+                _contractConstructionBudget
+            );
             if (nested.Malformed)
             {
                 _malformed = true;
@@ -825,7 +1052,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            WProtoReader nested = new WProtoReader(payload, _depth + 1, Limits, _packedBudget);
+            WProtoReader nested = new WProtoReader(
+                payload,
+                _depth + 1,
+                Limits,
+                _packedBudget,
+                _totalFieldBudget,
+                _messageMergeCopyBudget,
+                _decodedPayloadBudget,
+                _collectionElementBudget,
+                _contractConstructionBudget
+            );
             if (nested.Malformed)
             {
                 _malformed = true;
@@ -891,6 +1128,48 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             // Groups and sub-messages share one nesting budget to prevent multiplied stack depth.
             return TrySkipField(fieldNumber, wireType, _depth);
+        }
+
+        /// <summary>Latches a formatter failure so later reads on this reader are refused.</summary>
+        /// <remarks>Call when nested decoding or semantic validation fails. Existing reader copies retain their own failure state.</remarks>
+        public void MarkMalformed()
+        {
+            _malformed = true;
+        }
+
+        internal bool TryValidateMessage(ReadOnlySpan<byte> payload)
+        {
+            WProtoReader nested = new WProtoReader(payload, in this);
+            while (nested.TryReadTag(out int fieldNumber, out int wireType))
+            {
+                if (!nested.TrySkipField(fieldNumber, wireType))
+                {
+                    _malformed = true;
+                    return false;
+                }
+            }
+
+            if (nested.Malformed || !nested.End)
+            {
+                _malformed = true;
+                return false;
+            }
+
+            return true;
+        }
+
+        internal bool TryChargeDecodedPayloadBytes(long count)
+        {
+            if (
+                _malformed
+                || count < 0
+                || (_decodedPayloadBudget != null && !_decodedPayloadBudget.TryCharge(count))
+            )
+            {
+                _malformed = true;
+                return false;
+            }
+            return true;
         }
 
         private int CountPackedElementsCore(int wireType)
@@ -1079,11 +1358,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return true;
         }
 
-        private sealed class PackedReadBudget
+        private sealed class ReadBudget
         {
             internal int Remaining;
 
-            internal PackedReadBudget(int remaining)
+            internal ReadBudget(int remaining)
             {
                 Remaining = remaining;
             }

@@ -55,6 +55,17 @@ param(
     # Optional diagnostic frozen-file/player provenance. No measurement eligibility.
     [string]$FrozenPlayerDeclarationPath = '',
 
+    [ValidateSet('None', 'Direct', 'Debugger')]
+    [string]$StandaloneBuildCapture = 'None',
+
+    [switch]$StandaloneBuildDebuggerStandardHeap,
+
+    [switch]$StandaloneBuildAttachToDirect,
+
+    [switch]$StandaloneBuildAttachAfterStartup,
+
+    [switch]$StandaloneBuildAttachAfterShutdown,
+
     [string]$TestCategory = $(if ($env:UH_UNITY_TEST_CATEGORY) { $env:UH_UNITY_TEST_CATEGORY } else { '' }),
 
     [switch]$IncludeComparisons,
@@ -219,6 +230,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/compilation-fixture-results.ps1')
+. (Join-Path $PSScriptRoot 'lib/test-result-evidence.ps1')
+. (Join-Path $PSScriptRoot 'lib/wproto-player-provenance.ps1')
 if ($IsolateCompilationFixtures -and $TestMode -ne 'editmode') {
     throw 'Compilation fixture isolation requires EditMode.'
 }
@@ -239,6 +252,19 @@ if ($UnboundArguments -and 0 -lt $UnboundArguments.Count) {
     )
     exit 64
 }
+
+if ($StandaloneBuildCapture -ne 'None' -and ($TestMode -ne 'standalone' -or $GenerateOnly -or [string]::IsNullOrWhiteSpace($FrozenPlayerDeclarationPath))) {
+    throw 'Standalone build capture requires Standalone mode and a frozen declaration; it never runs the player.'
+}
+
+if ($StandaloneBuildDebuggerStandardHeap -and $StandaloneBuildCapture -ne 'Debugger') {
+    throw 'Standard heap selection requires an evidence-only Standalone debugger build.'
+}
+if ($StandaloneBuildAttachToDirect -and ($StandaloneBuildCapture -ne 'Debugger' -or $StandaloneBuildDebuggerStandardHeap)) {
+    throw 'Direct attachment requires the evidence-only debugger arm without a debugger launch heap request.'
+}
+if ($StandaloneBuildAttachAfterStartup -and -not $StandaloneBuildAttachToDirect) { throw 'Startup-delayed attachment requires Direct attachment.' }
+if ($StandaloneBuildAttachAfterShutdown -and (-not $StandaloneBuildAttachToDirect -or $StandaloneBuildAttachAfterStartup)) { throw 'Shutdown-delayed attachment requires Direct attachment without startup selection.' }
 
 if ($ForceFreshCompilationCache -and ($TestMode -ne 'standalone' -or $StandaloneScriptingBackend -ne 'IL2CPP')) {
     throw 'ForceFreshCompilationCache requires Standalone IL2CPP mode.'
@@ -283,6 +309,7 @@ $TestFrameworkVersion = '1.4.5'
 # assigned to $script:CatastrophicPatterns below.
 . (Join-Path $PSScriptRoot 'lib/catastrophic-patterns.ps1')
 . (Join-Path $PSScriptRoot 'lib/credential-redaction.ps1')
+. (Join-Path $PSScriptRoot 'lib/native-evidence.ps1')
 
 # Resolves WHERE the generated project and its Library live, and prunes the
 # persistent root when a self-hosted runner's disk gets tight. Dot-sourced for
@@ -1083,20 +1110,6 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
         -StallSeconds $runStall
 }
 
-# Collapse any run of whitespace (including CR/LF) to a single space and trim, so
-# a multi-line NUnit <failure>/<message> renders as ONE line. GitHub `::error::`
-# annotations are single-line: an embedded newline silently truncates the
-# annotation at the first line break, so the whole message must be flattened
-# before it is emitted. Mirrors the `.Trim()` collapse the catastrophic-pattern
-# scanner applies to each matched log line.
-function ConvertTo-SingleLineDiagnostic {
-    param([string]$Text)
-    if (-not $Text) {
-        return ''
-    }
-    return (((ConvertTo-UnitySafeLogText -Text $Text) -replace '\s+', ' ').Trim())
-}
-
 # Holder for the ::stop-commands::<token> ... ::<token>:: fence token that wraps
 # caller-controlled raw multi-line dumps (NUnit <message>/<stack-trace>). GitHub
 # parses every stdout line for `::command::` directives; fencing the raw body
@@ -1684,8 +1697,11 @@ function New-ConfiguratorSource {
         [ValidateSet('Release', 'Debug')]
         [string]$CompilerConfiguration = 'Release',
         [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
-        [string]$StrippingLevel = 'Disabled'
+        [string]$StrippingLevel = 'Disabled',
+        [switch]$RequireReleaseManagedCodeVariant
     )
+
+    $requireReleaseVariant = $RequireReleaseManagedCodeVariant.IsPresent.ToString().ToLowerInvariant()
 
     # NOTE: this is a DOUBLE-quoted here-string so $Backend interpolates into the
     # generated C#. Every LITERAL C# dollar sign (the Debug.Log interpolated
@@ -1733,6 +1749,13 @@ public static class UhCiTestConfigurator
         // the Mono backend for the Mono perf leg via -Backend.
         NamedBuildTarget target = NamedBuildTarget.Standalone;
         PlayerSettings.SetScriptingBackend(target, ScriptingImplementation.$Backend);
+#if UNITY_6000_6_OR_NEWER
+        if ($requireReleaseVariant || PlayerSettings.GetScriptingBackend(target) == ScriptingImplementation.Mono2x)
+        {
+            PlayerSettings.SetManagedCodeVariant(target, ManagedCodeVariant.Release);
+            Debug.Log("UH perf managed code variant: " + PlayerSettings.GetManagedCodeVariant(target));
+        }
+#endif
         // Use the non-deprecated ApiCompatibilityLevel.NET_Standard (targets .NET
         // Standard 2.1). The deprecated 2.0 form and the non-existent 2.1 enum
         // member are intentionally NOT used.
@@ -1878,10 +1901,12 @@ using UnityEngine.TestTools;
 // clears on the PlayerConnection runFinished message, which never arrives when
 // the player is not launched. PostBuildCleanup is the framework's hook (run after
 // the build) to exit the editor cleanly.
-public sealed class UhCiStandaloneBuildModifier : ITestPlayerBuildModifier, IPostBuildCleanup
+public sealed partial class UhCiStandaloneBuildModifier : ITestPlayerBuildModifier, IPostBuildCleanup
 {
     private static bool s_Armed;
     private static readonly EditorApplication.CallbackFunction s_Exit = () => EditorApplication.Exit(0);
+
+    static partial void WriteFrozenBuildPreparation(BuildPlayerOptions playerOptions);
 
     public BuildPlayerOptions ModifyOptions(BuildPlayerOptions playerOptions)
     {
@@ -1918,6 +1943,7 @@ $developmentOption
         Debug.Log("UH player build config: backend=" + UnityEditor.PlayerSettings.GetScriptingBackend(target)
             + ", stripping=" + UnityEditor.PlayerSettings.GetManagedStrippingLevel(target)
             + ", development=" + ((playerOptions.options & UnityEditor.BuildOptions.Development) != 0));
+        WriteFrozenBuildPreparation(playerOptions);
         return playerOptions;
     }
 
@@ -2149,6 +2175,7 @@ function Initialize-EphemeralProject {
         [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
         [string]$ManagedStrippingLevel = 'Disabled',
         [bool]$DevelopmentBuild = $false,
+        [switch]$RequireReleaseManagedCodeVariant,
         [string]$RepoRoot
     )
 
@@ -2208,7 +2235,7 @@ EditorSettings:
         -Content $editorSettings
     Set-EphemeralProjectContent `
         -Path (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') `
-        -Content (New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration -StrippingLevel $ManagedStrippingLevel)
+        -Content (New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration -StrippingLevel $ManagedStrippingLevel -RequireReleaseManagedCodeVariant:$RequireReleaseManagedCodeVariant)
 
     # STANDALONE ONLY: generate the split-build helpers that sever the test
     # player's PlayerConnection/TCP result streaming (the 10060 hang on multi-NIC
@@ -3031,94 +3058,6 @@ function Invoke-ProcessWithTreeKillTimeout {
 
 # Opt-in diagnostic provenance only. Explicit input lists do not prove source coverage
 # or that a player consumed the declared corpus; no campaign becomes eligible here.
-function Assert-FrozenPlayerRegularPath {
-    param([Parameter(Mandatory = $true)][string]$Path, [switch]$Directory)
-    $fullPath = [IO.Path]::GetFullPath($Path)
-    $item = Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop
-    if ($item.PSIsContainer -ne $Directory.IsPresent) { throw "Frozen path has the wrong file/directory kind: $fullPath" }
-    $ancestorPath = $fullPath
-    while ($ancestorPath) {
-        $ancestor = Get-Item -LiteralPath $ancestorPath -Force -ErrorAction Stop
-        if ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Frozen path has a reparse ancestor: $ancestorPath" }
-        $parent = [IO.Directory]::GetParent($ancestorPath)
-        $ancestorPath = if ($null -eq $parent) { $null } else { $parent.FullName }
-    }
-}
-
-function Get-FrozenPlayerFileInventory {
-    param(
-        [Parameter(Mandatory = $true)][string]$Root,
-        [AllowNull()][object[]]$DeclaredFiles = $null
-    )
-    $rootPath = [IO.Path]::GetFullPath($Root)
-    Assert-FrozenPlayerRegularPath -Path $rootPath -Directory
-    $paths = New-Object 'System.Collections.Generic.List[string]'
-    $expected = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::OrdinalIgnoreCase)
-    if ($null -ne $DeclaredFiles) {
-        if ($DeclaredFiles.Count -lt 1 -or $DeclaredFiles.Count -gt 4096) {
-            throw 'Frozen input lists require between 1 and 4096 files.'
-        }
-        foreach ($entry in $DeclaredFiles) {
-            if ($entry.Path -isnot [string] -or $entry.Sha256 -isnot [string]) { throw 'Frozen input paths and hashes must be scalar strings.' }
-            $relative = [string]$entry.Path
-            $sha = [string]$entry.Sha256
-            if ([string]::IsNullOrWhiteSpace($relative) -or $relative.Length -gt 1024 -or
-                $relative -match '[\\:<>"|?*\x00-\x1f]' -or [IO.Path]::IsPathRooted($relative) -or
-                @($relative.Split('/') | Where-Object { $_ -eq '' -or $_ -eq '.' -or $_ -eq '..' -or $_ -match '[. ]$' }).Count -ne 0 -or
-                $sha -cnotmatch '^[a-f0-9]{64}$' -or $expected.ContainsKey($relative)) {
-                throw "Invalid or colliding frozen input path/hash: $relative"
-            }
-            $expected.Add($relative, $sha)
-            $paths.Add($relative)
-        }
-    } else {
-        $directories = New-Object 'System.Collections.Generic.Stack[string]'
-        $directories.Push($rootPath)
-        $fileCount = 0
-        while ($directories.Count -gt 0) {
-            foreach ($item in @(Get-ChildItem -LiteralPath $directories.Pop() -Force -ErrorAction Stop)) {
-                if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                    throw "Frozen payload contains a reparse point: $($item.FullName)"
-                }
-                $relative = $item.FullName.Substring($rootPath.TrimEnd([IO.Path]::DirectorySeparatorChar).Length + 1).Replace('\', '/')
-                if ($expected.ContainsKey($relative)) { throw "Frozen payload has colliding paths: $relative" }
-                $expected.Add($relative, '')
-                $paths.Add($relative)
-                if ($item.PSIsContainer) { $directories.Push($item.FullName) } else { $fileCount++ }
-                if ($paths.Count -gt 100000) { throw 'Frozen payload exceeds 100000 entries.' }
-            }
-        }
-        if ($fileCount -eq 0) { throw 'Frozen payload contains no files.' }
-    }
-    [string[]]$orderedPaths = $paths.ToArray()
-    [Array]::Sort($orderedPaths, [StringComparer]::Ordinal)
-    foreach ($relative in $orderedPaths) {
-        $fullPath = $rootPath
-        foreach ($component in $relative.Split('/')) {
-            $fullPath = [IO.Path]::GetFullPath((Join-Path $fullPath $component))
-            $rootPrefix = $rootPath.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-            if (-not $fullPath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw "Frozen path leaves inventory root: $relative" }
-            $item = Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop
-            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                throw "Frozen inventory contains a reparse point: $relative"
-            }
-        }
-        if ($item.PSIsContainer) {
-            if ($null -ne $DeclaredFiles) { throw "Frozen input is not a file: $relative" }
-            [pscustomobject][ordered]@{ Path = $relative; Kind = 'directory'; Length = $null; Sha256 = $null }
-            continue
-        }
-        $lengthBefore = $item.Length
-        $hash = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
-        $lengthAfter = (Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Length
-        if ($lengthBefore -ne $lengthAfter) { throw "Frozen file changed while hashing: $relative" }
-        [pscustomobject][ordered]@{ Path = $relative; Kind = 'file'; Length = $lengthAfter; Sha256 = $hash }
-        if ($expected[$relative] -and $expected[$relative] -cne $hash) {
-            throw "Frozen declared file hash does not match: $relative"
-        }
-    }
-}
-
 function Read-FrozenPlayerDeclaration {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -3127,16 +3066,17 @@ function Read-FrozenPlayerDeclaration {
         [Parameter(Mandatory = $true)][string]$Backend,
         [Parameter(Mandatory = $true)][string]$ArtifactsPath,
         [Parameter(Mandatory = $true)][string]$RepoRoot,
-        [switch]$GenerateOnly
+        [switch]$GenerateOnly,
+        [switch]$BuildCaptureOnly
     )
     if ($Mode -ne 'standalone' -or $GenerateOnly) {
         throw 'FrozenPlayerDeclarationPath requires an executed standalone player run.'
     }
     $fullPath = [IO.Path]::GetFullPath($Path)
     $item = Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop
-    if ($item.PSIsContainer -or $item.Length -lt 1 -or $item.Length -gt 1048576 -or
+    if ($item.PSIsContainer -or $item.Length -lt 1 -or $item.Length -gt 4194304 -or
         ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-        throw 'Frozen player declaration must be a nonempty regular file of at most 1 MiB.'
+        throw 'Frozen player declaration must be a nonempty regular file of at most 4 MiB.'
     }
     Assert-FrozenPlayerRegularPath -Path $fullPath
     $bytes = [IO.File]::ReadAllBytes($fullPath)
@@ -3149,10 +3089,28 @@ function Read-FrozenPlayerDeclaration {
         $declaration.UnityVersion -cne $UnityVersion -or $declaration.Backend -cne $Backend) {
         throw 'Frozen declaration schema, RunId, Unity version, or backend does not match this request.'
     }
+    $kind = 'borrowed-diagnostic'
+    if ($declaration.PSObject.Properties.Name -contains 'CampaignKind') {
+        if ($declaration.CampaignKind -isnot [string] -or $declaration.CampaignKind -cne 'wproto-seven-families-v1') {
+            throw 'Unknown frozen player campaign kind.'
+        }
+        $kind = $declaration.CampaignKind
+    }
+    $maximumFiles = if ($kind -ceq 'wproto-seven-families-v1') { 16384 } else { 4096 }
+    if ($kind -ceq 'borrowed-diagnostic' -and $bytes.Length -gt 1048576) { throw 'Borrowed declaration exceeds 1 MiB.' }
+    if ($kind -ceq 'wproto-seven-families-v1') {
+        if (($declaration.SchemaVersion -isnot [int] -and $declaration.SchemaVersion -isnot [long]) -or
+            ($Backend -cne 'Mono2x' -and -not ($BuildCaptureOnly -and $Backend -ceq 'IL2CPP')) -or $declaration.SourceCommit -isnot [string] -or
+            $declaration.SourceCommit -cnotmatch '^[a-f0-9]{40}$' -or
+            $declaration.CanonicalCorpusPath -cne 'scripts/unity/wproto-corpus.v1.json') {
+            throw 'WProto declaration requires Mono2x or an explicit IL2CPP build-only capture, an exact source commit, and the canonical synthetic corpus.'
+        }
+        Assert-WProtoSourceCensus -Repository $RepoRoot -DeclaredFiles $declaration.SourceFiles
+    }
     foreach ($name in @('SourceFiles', 'CorpusFiles')) {
         $entries = @($declaration.$name)
-        if ($entries.Count -lt 1 -or $entries.Count -gt 4096) { throw "Frozen declaration requires nonempty bounded $name." }
-        Get-FrozenPlayerFileInventory -Root $RepoRoot -DeclaredFiles $entries | Out-Null
+        if ($entries.Count -lt 1 -or $entries.Count -gt $maximumFiles) { throw "Frozen declaration requires nonempty bounded $name." }
+        Get-FrozenPlayerFileInventory -Root $RepoRoot -DeclaredFiles $entries -MaximumFiles $maximumFiles | Out-Null
     }
     $canonicalCorpus = $null
     if ($declaration.PSObject.Properties.Name -contains 'CanonicalCorpusPath') {
@@ -3163,7 +3121,7 @@ function Read-FrozenPlayerDeclaration {
     }
     $reportDirectory = Join-Path $ArtifactsPath "frozen-player-$($declaration.RunId)"
     if (Test-Path -LiteralPath $reportDirectory) { throw "Frozen RunId already has an output directory: $reportDirectory" }
-    return [pscustomobject]@{ Path = $fullPath; Bytes = $bytes; Sha256 = $hash; Value = $declaration; ReportDirectory = $reportDirectory; CanonicalCorpus = $canonicalCorpus }
+    return [pscustomobject]@{ Path = $fullPath; Bytes = $bytes; Sha256 = $hash; Value = $declaration; ReportDirectory = $reportDirectory; CanonicalCorpus = $canonicalCorpus; CampaignKind = $kind; MaximumFiles = $maximumFiles }
 }
 
 function Start-FrozenPlayerProvenance {
@@ -3189,7 +3147,130 @@ function Start-FrozenPlayerProvenance {
         Snapshots = (New-Object 'System.Collections.Generic.List[object]'); PayloadBaseline = $null
         GeneratedRoot = $null; GeneratedFiles = @()
         LaunchAttempted = $false; InvocationObserved = $false; ResultsValidated = $false; PlayerOutcome = $null; ExecutionError = $null
+        ConfigureOutcomes = (New-Object 'System.Collections.Generic.List[object]'); BuildOutcome = $null
+        ProjectSettingsBaseline = $null; BuildPreparation = $null; BuildPreparationSha256 = $null
+        BuildObservation = $null; KnownFaultScan = $null; NativeSupportScans = @()
     }
+}
+
+function New-WProtoBuildPreparationSource {
+    param([Parameter(Mandatory = $true)]$Context)
+    $runId = $Context.Declaration.Value.RunId
+    $declarationHash = $Context.Declaration.Sha256
+    $commit = $Context.Declaration.Value.SourceCommit
+    $receiptPath = (Join-Path $Context.Declaration.ReportDirectory 'build-preparation.json').Replace('"', '""')
+    $year = (Get-Date).Year
+    @"
+// MIT License - Copyright (c) $year wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text.Json;
+using UnityEditor;
+using UnityEngine;
+
+public sealed partial class UhCiStandaloneBuildModifier
+{
+    static partial void WriteFrozenBuildPreparation(BuildPlayerOptions playerOptions)
+    {
+#if UNITY_6000_6_OR_NEWER
+        if (PlayerSettings.GetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Standalone) == ScriptingImplementation.Mono2x)
+        {
+            PlayerSettings.SetManagedCodeVariant(UnityEditor.Build.NamedBuildTarget.Standalone, ManagedCodeVariant.Release);
+        }
+#endif
+        WallstopStudios.UnityHelpers.Editor.Settings.UnityHelpersSettings.instance.SaveSettings();
+        AssetDatabase.SaveAssets();
+        string project = Directory.GetParent(Application.dataPath).FullName;
+        List<string> entries = new List<string>();
+        Stack<string> pending = new Stack<string>();
+        foreach (string directory in new[] { "Assets", "Packages", "ProjectSettings" })
+        {
+            string root = Path.Combine(project, directory);
+            if (!Directory.Exists(root) || (File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidOperationException("Invalid WProto preparation root: " + directory);
+            }
+            pending.Push(root);
+        }
+        while (pending.TryPop(out string current))
+        {
+            foreach (string path in Directory.EnumerateFileSystemEntries(current))
+            {
+                FileAttributes attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.ReparsePoint) != 0 || 16384 <= entries.Count)
+                {
+                    throw new InvalidOperationException("Invalid or excessive WProto preparation inputs.");
+                }
+                entries.Add(path);
+                if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    pending.Push(path);
+                }
+            }
+        }
+        entries.Sort(StringComparer.Ordinal);
+        string playerSettingsPath = Path.Combine(project, "ProjectSettings", "ProjectSettings.asset");
+        FileInfo playerSettings = new FileInfo(playerSettingsPath);
+        if ((playerSettings.Attributes & FileAttributes.ReparsePoint) != 0 || playerSettings.Length < 1 || 1048576 < playerSettings.Length)
+        {
+            throw new InvalidOperationException("Invalid WProto prepared player settings.");
+        }
+        File.Copy(playerSettingsPath, Path.Combine(Path.GetDirectoryName(@"$receiptPath"), "build-player-settings.asset"), false);
+        using (FileStream output = new FileStream(@"$receiptPath", FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            Utf8JsonWriter writer = new Utf8JsonWriter(output);
+            try
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("SchemaVersion", 2);
+                writer.WriteString("RunId", "$runId");
+                writer.WriteString("DeclarationSha256", "$declarationHash");
+                writer.WriteString("SourceCommit", "$commit");
+                writer.WriteStartArray("Scenes");
+                foreach (string scene in playerOptions.scenes ?? Array.Empty<string>())
+                {
+                    writer.WriteStringValue(scene.Replace('\\', '/'));
+                }
+                writer.WriteEndArray();
+                writer.WriteStartArray("ProjectInputs");
+                foreach (string path in entries)
+                {
+                    string relative = path.Substring(project.Length + 1).Replace('\\', '/');
+                    writer.WriteStartObject();
+                    writer.WriteString("Path", relative);
+                    if (Directory.Exists(path))
+                    {
+                        writer.WriteString("Kind", "directory");
+                        writer.WriteNull("Length");
+                        writer.WriteNull("Sha256");
+                    }
+                    else
+                    {
+                        using (FileStream input = File.OpenRead(path))
+                        using (SHA256 hash = SHA256.Create())
+                        {
+                            writer.WriteString("Kind", "file");
+                            writer.WriteNumber("Length", input.Length);
+                            writer.WriteString("Sha256", BitConverter.ToString(hash.ComputeHash(input)).Replace("-", string.Empty).ToLowerInvariant());
+                        }
+                    }
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+                writer.WriteEndObject();
+            }
+            finally
+            {
+                writer.Dispose();
+            }
+        }
+    }
+}
+"@
 }
 
 function New-FrozenPlayerAnchor {
@@ -3229,9 +3310,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     }
 }
 "@
+    $anchorName = 'BorrowedBufferPreflightTests.Anchor.cs'
+    if ($Context.Declaration.CampaignKind -ceq 'wproto-seven-families-v1') {
+        $anchorName = 'ProtoSerializationPerformanceTests.Anchor.cs'
+        $anchorSource = $anchorSource.Replace('BorrowedBufferPreflightTests', 'ProtoSerializationPerformanceTests')
+        $anchorSource = $anchorSource.Replace('ref string corpusSha256', "ref string corpusSha256,`n            ref string sourceCommit")
+        $anchorSource = $anchorSource.Replace('corpusSha256 = "' + $corpusHash + '";',
+            'corpusSha256 = "' + $corpusHash + '";' + "`n            sourceCommit = `"$($Context.Declaration.Value.SourceCommit)`";")
+    }
     New-Item -ItemType Directory -Path $anchorDirectory -ErrorAction Stop | Out-Null
     $generated = [ordered]@{
-        'Assets/FrozenPlayerAnchor/BorrowedBufferPreflightTests.Anchor.cs' = $anchorSource
+        ("Assets/FrozenPlayerAnchor/$anchorName") = $anchorSource
         'Assets/FrozenPlayerAnchor/FrozenPlayerAnchor.asmref' = "{`"reference`":`"GUID:$assemblyGuid`"}"
         'Assets/FrozenPlayerAnchor.meta' = @'
 fileFormatVersion: 2
@@ -3243,7 +3332,7 @@ DefaultImporter:
   assetBundleName:
   assetBundleVariant:
 '@
-        'Assets/FrozenPlayerAnchor/BorrowedBufferPreflightTests.Anchor.cs.meta' = @'
+        ("Assets/FrozenPlayerAnchor/$anchorName.meta") = @'
 fileFormatVersion: 2
 guid: d60d7181d309022b7d213e8407fcccc6
 MonoImporter:
@@ -3266,6 +3355,11 @@ AssemblyDefinitionReferenceImporter:
   assetBundleVariant:
 '@
     }
+    if ($Context.Declaration.CampaignKind -ceq 'wproto-seven-families-v1') {
+        $generated['Assets/Editor/UhCiStandaloneBuildModifier.WProto.cs'] = New-WProtoBuildPreparationSource -Context $Context
+        $generated['Assets/Editor/UhCiStandaloneBuildModifier.WProto.cs.meta'] = $generated["Assets/FrozenPlayerAnchor/$anchorName.meta"].Replace(
+            'd60d7181d309022b7d213e8407fcccc6', '6d83710f21db498e9c7362a09eaaae01')
+    }
     foreach ($relative in $generated.Keys) {
         $path = Join-Path $ProjectPath $relative
         if (Test-Path -LiteralPath $path) { throw "Frozen anchor output already exists: $relative" }
@@ -3287,6 +3381,9 @@ function Get-FrozenPlayerRuntimeJoin {
         [string]$PlayerLogPath,
         [Parameter(Mandatory = $true)][bool]$PrerequisitesPassed
     )
+    if ($Context.Declaration.CampaignKind -ceq 'wproto-seven-families-v1') {
+        return Get-WProtoFrozenPlayerRuntimeJoin -Context $Context -PlayerLogPath $PlayerLogPath -PrerequisitesPassed $PrerequisitesPassed
+    }
     $raw = New-Object 'System.Collections.Generic.List[object]'
     $errors = New-Object 'System.Collections.Generic.List[string]'
     $state = 'unverified'
@@ -3412,7 +3509,7 @@ function Add-FrozenPlayerProvenanceSnapshot {
         [switch]$IncludePayload,
         [switch]$AllowRejected
     )
-    $snapshot = [ordered]@{ Stage = $Stage; DeclarationSha256 = $null; SourceFiles = @(); CorpusFiles = @(); GeneratedAnchorFiles = @(); PayloadFiles = @(); State = 'passed'; Errors = @() }
+    $snapshot = [ordered]@{ Stage = $Stage; DeclarationSha256 = $null; SourceFiles = @(); CorpusFiles = @(); GeneratedAnchorFiles = @(); PayloadFiles = @(); ProjectInputs = @(); State = 'passed'; Errors = @() }
     try {
         Assert-FrozenPlayerRegularPath -Path $Context.Declaration.Path
         $snapshot.DeclarationSha256 = (Get-FileHash -LiteralPath $Context.Declaration.Path -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
@@ -3421,7 +3518,7 @@ function Add-FrozenPlayerProvenanceSnapshot {
     foreach ($name in @('SourceFiles', 'CorpusFiles')) {
         $observed = New-Object 'System.Collections.Generic.List[object]'
         try {
-            Get-FrozenPlayerFileInventory -Root $Context.RepoRoot -DeclaredFiles @($Context.Declaration.Value.$name) |
+            Get-FrozenPlayerFileInventory -Root $Context.RepoRoot -DeclaredFiles @($Context.Declaration.Value.$name) -MaximumFiles $Context.Declaration.MaximumFiles |
                 ForEach-Object { $observed.Add($_) }
         } catch { $snapshot.Errors += $_.ToString() }
         $snapshot[$name] = $observed.ToArray()
@@ -3429,11 +3526,38 @@ function Add-FrozenPlayerProvenanceSnapshot {
     if ($null -ne $Context.Declaration.CanonicalCorpus) {
         $observed = New-Object 'System.Collections.Generic.List[object]'
         try {
-            if ($Context.GeneratedFiles.Count -ne 5) { throw 'Frozen compiled anchor files are missing.' }
+            $expectedAnchors = if ($Context.Declaration.CampaignKind -ceq 'wproto-seven-families-v1') { 7 } else { 5 }
+            if ($Context.GeneratedFiles.Count -ne $expectedAnchors) { throw 'Frozen compiled anchor files are missing.' }
             Get-FrozenPlayerFileInventory -Root $Context.GeneratedRoot -DeclaredFiles $Context.GeneratedFiles |
                 ForEach-Object { $observed.Add($_) }
         } catch { $snapshot.Errors += $_.ToString() }
         $snapshot.GeneratedAnchorFiles = $observed.ToArray()
+    }
+    if ($Context.Declaration.CampaignKind -ceq 'wproto-seven-families-v1') {
+        try {
+            Assert-WProtoSourceCensus -Repository $Context.RepoRoot -DeclaredFiles $Context.Declaration.Value.SourceFiles
+            $projectInputs = @(Get-WProtoProjectInputs -ProjectPath $Context.GeneratedRoot)
+            $snapshot.ProjectInputs = $projectInputs
+            $projectIdentity = ConvertTo-Json -InputObject $projectInputs -Depth 4 -Compress
+            if ($Stage -ceq 'after-configure') { $Context.ProjectSettingsBaseline = $projectIdentity }
+            elseif ($Stage -ceq 'after-build') {
+                $preparationPath = Join-Path $Context.Declaration.ReportDirectory 'build-preparation.json'
+                Assert-FrozenPlayerRegularPath -Path $preparationPath
+                if ((Get-Item -LiteralPath $preparationPath).Length -gt 4194304) { throw 'WProto build preparation receipt exceeds 4 MiB.' }
+                $Context.BuildPreparationSha256 = (Get-FileHash -LiteralPath $preparationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                $Context.BuildPreparation = Get-Content -LiteralPath $preparationPath -Raw | ConvertFrom-Json -ErrorAction Stop
+                $configured = @($Context.Snapshots | Where-Object { $_.Stage -ceq 'after-configure' })
+                if ($configured.Count -ne 1) { throw 'WProto build preparation requires exactly one configured snapshot.' }
+                Assert-WProtoBuildPreparation -Preparation $Context.BuildPreparation -ConfiguredInputs $configured[0].ProjectInputs `
+                    -BuiltInputs $projectInputs -Declaration $Context.Declaration.Value -DeclarationSha256 $Context.Declaration.Sha256 `
+                    -RestoredPlayerSettingsPath (Join-Path $Context.GeneratedRoot 'ProjectSettings/ProjectSettings.asset') `
+                    -PreparedPlayerSettingsPath (Join-Path $Context.Declaration.ReportDirectory 'build-player-settings.asset')
+                $Context.ProjectSettingsBaseline = $projectIdentity
+            }
+            elseif ($Stage -cne 'before-configure' -and ($null -eq $Context.ProjectSettingsBaseline -or $Context.ProjectSettingsBaseline -cne $projectIdentity)) {
+                throw 'WProto generated project settings or compilation inputs changed after configuration.'
+            }
+        } catch { $snapshot.Errors += $_.ToString() }
     }
     if ($IncludePayload) {
         $observed = New-Object 'System.Collections.Generic.List[object]'
@@ -3454,37 +3578,25 @@ function Add-FrozenPlayerProvenanceSnapshot {
 }
 
 function Get-FrozenPlayerJointCorrectness {
-    param([Parameter(Mandatory = $true)][string]$ResultsPath)
+    param([Parameter(Mandatory = $true)][string]$ResultsPath, [string]$CampaignKind = 'borrowed-diagnostic')
     $expected = @(
         'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.BorrowedBufferPreflightTests.ReleasePlayerChannelsAreReported',
         'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.BorrowedDecoderMatchesShippedDecoderAcrossPoolBoundariesAndUtf8Failures',
         'WallstopStudios.UnityHelpers.Tests.Extensions.BorrowedBase64Tests.ProductionAndBorrowedWholeCallsAvoidLeaseWorkWithShippedPositiveControl'
     )
+    if ($CampaignKind -ceq 'wproto-seven-families-v1') {
+        $expected = @(Get-WProtoFrozenOperationNames | ForEach-Object {
+                'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus("' + $_ + '")'
+            })
+    }
     $leaves = @()
     $reason = $null
     try {
-        $resultFile = Get-Item -LiteralPath $ResultsPath -Force -ErrorAction Stop
-        if ($resultFile.PSIsContainer -or $resultFile.Length -lt 1 -or $resultFile.Length -gt 33554432) {
-            throw 'Joint correctness XML must be a nonempty file of at most 32 MiB.'
-        }
-        $settings = New-Object Xml.XmlReaderSettings
-        $settings.MaxCharactersInDocument = 33554432
-        $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
-        $settings.XmlResolver = $null
-        $reader = [Xml.XmlReader]::Create($ResultsPath, $settings)
-        try { $xml = New-Object Xml.XmlDocument; $xml.Load($reader) } finally { $reader.Dispose() }
-        $run = $xml.SelectSingleNode('/test-run')
-        if ($null -eq $run -or $run.GetAttribute('result') -cne 'Passed' -or
-            $run.GetAttribute('testcasecount') -cne '3' -or $run.GetAttribute('total') -cne '3' -or $run.GetAttribute('passed') -cne '3' -or
-            $run.GetAttribute('failed') -cne '0' -or $run.GetAttribute('skipped') -cne '0' -or
-            $run.GetAttribute('inconclusive') -cne '0' -or
-            $xml.SelectNodes("//test-suite[not(@result='Passed')]|//failure").Count -ne 0) {
-            throw 'Joint correctness root counts or lifecycle results contradict three passed cases.'
-        }
-        $leaves = @($xml.SelectNodes('//test-case') | ForEach-Object {
-                [pscustomobject]@{ FullName = $_.GetAttribute('fullname'); Result = $_.GetAttribute('result') }
+        $evidence = Read-TestResultEvidence -Path $ResultsPath -Format NUnit
+        $leaves = @($evidence.Cases | ForEach-Object {
+                [pscustomobject]@{ FullName = $_.FullName; Result = $_.Result }
             })
-        if ($leaves.Count -ne $expected.Count) { throw 'Joint correctness requires exactly the three declared native cases.' }
+        if ($leaves.Count -ne $expected.Count) { throw "Joint correctness requires exactly $($expected.Count) declared native cases." }
         foreach ($name in $expected) {
             $matching = @($leaves | Where-Object { $_.FullName -ceq $name })
             if ($matching.Count -ne 1 -or $matching[0].Result -cne 'Passed') {
@@ -3503,7 +3615,7 @@ function Complete-FrozenPlayerProvenance {
         [string]$PlayerLogPath
     )
     Add-FrozenPlayerProvenanceSnapshot -Context $Context -Stage 'final' -IncludePayload:($Context.LaunchAttempted -or $null -ne $Context.PayloadBaseline) -AllowRejected
-    $correctness = Get-FrozenPlayerJointCorrectness -ResultsPath $ResultsPath
+    $correctness = Get-FrozenPlayerJointCorrectness -ResultsPath $ResultsPath -CampaignKind $Context.Declaration.CampaignKind
     if (-not $Context.InvocationObserved -or -not $Context.ResultsValidated) {
         $correctness.State = 'rejected'
         $correctness.Reason = 'No observed invocation with validated results exists for this run; existing XML cannot prove current correctness.'
@@ -3517,8 +3629,19 @@ function Complete-FrozenPlayerProvenance {
         }
     )
     $stable = $null -ne $Context.PayloadBaseline -and @($Context.Snapshots | Where-Object { $_.State -ne 'passed' }).Count -eq 0
-    $runtimeJoin = Get-FrozenPlayerRuntimeJoin -Context $Context -PlayerLogPath $PlayerLogPath `
-        -PrerequisitesPassed:($stable -and $Context.InvocationObserved -and $Context.ResultsValidated -and $correctness.State -eq 'passed')
+    $wproto = $Context.Declaration.CampaignKind -ceq 'wproto-seven-families-v1'
+    $healthy = $false
+    if ($wproto) {
+        $expectedStages = @('before-configure', 'after-configure', 'after-build', 'before-launch', 'final')
+        $stages = @($Context.Snapshots | ForEach-Object { $_.Stage })
+        $stable = $stable -and ($stages.Count -eq $expectedStages.Count) -and (($stages -join '|') -ceq ($expectedStages -join '|'))
+        $Context.KnownFaultScan = Get-WProtoKnownFaultScan -Paths @($EvidencePaths | Where-Object { $_ -cne $ResultsPath })
+        $Context.NativeSupportScans = @(Get-WProtoNativeSupportScans -Context $Context)
+        $healthy = Test-WProtoFrozenProcessHealth -Context $Context
+    }
+    $prerequisites = $stable -and $Context.InvocationObserved -and $Context.ResultsValidated -and $correctness.State -eq 'passed'
+    if ($wproto) { $prerequisites = $prerequisites -and $healthy }
+    $runtimeJoin = Get-FrozenPlayerRuntimeJoin -Context $Context -PlayerLogPath $PlayerLogPath -PrerequisitesPassed $prerequisites
     $report = [ordered]@{
         SchemaVersion = 1; RunId = $Context.Declaration.Value.RunId; IsDiagnosticOnly = $true
         CampaignEligible = $false; AdoptionEligible = $false
@@ -3532,6 +3655,82 @@ function Complete-FrozenPlayerProvenance {
         PlayerOutcome = $Context.PlayerOutcome; ExecutionError = $Context.ExecutionError
         Snapshots = $Context.Snapshots.ToArray(); JointCorrectness = $correctness; EvidenceFiles = $evidence; RuntimeJoin = $runtimeJoin
     }
+    if ($wproto) {
+        $validCapture = $prerequisites -and $runtimeJoin.State -ceq 'passed'
+        $report.CampaignKind = $Context.Declaration.CampaignKind
+        $report.SourceCommit = $Context.Declaration.Value.SourceCommit
+        $report.SourceFilesCount = @($Context.Declaration.Value.SourceFiles).Count
+        $report.CapturedEvidenceValid = $validCapture
+        $report.FullQualification = $false
+        $report.ProcessHealthState = if ($healthy) { 'passed' } else { 'rejected' }
+        $report.SourceCoverageState = if ($stable) { 'passed' } else { 'rejected' }
+        $report.CorpusConsumptionState = $runtimeJoin.State
+        $report.CampaignCorpusConsumptionState = $runtimeJoin.State
+        $report.SyntheticTimingQualified = $validCapture -and $runtimeJoin.Summary.timingQualified -eq $true
+        $report.TimingTwofoldTarget = $validCapture -and $runtimeJoin.Summary.timingTwofoldTarget -eq $true
+        $report.ConfigureOutcomes = $Context.ConfigureOutcomes.ToArray()
+        $report.BuildOutcome = $Context.BuildOutcome
+        $report.BuildObservation = $Context.BuildObservation
+        $report.BuildPreparation = $Context.BuildPreparation
+        $report.BuildPreparationSha256 = $Context.BuildPreparationSha256
+        $report.KnownFaultScan = $Context.KnownFaultScan
+        $report.NativeSupportScans = $Context.NativeSupportScans
+        $report.OriginalGeneratedRoot = $Context.GeneratedRoot
+        $report.OriginalPayloadRoot = $Context.PayloadRoot
+        $retained = Join-Path $Context.Declaration.ReportDirectory 'retained'
+        $report.GeneratedRoot = 'retained/project-inputs'
+        $report.PayloadRoot = 'retained/player'
+        $report.PlayerLogPath = 'retained/corpus-records.txt'
+        $report.ResultsPath = 'retained/results.xml'
+        $report.BuildPreparationPath = 'retained/build-preparation.json'
+        $report.EvidenceFilesScope = 'Historical pre-redaction support-log observations; replay uses RetainedFiles only.'
+        $generatedRoot = Join-Path $Context.Declaration.ReportDirectory $report.GeneratedRoot
+        $payloadRoot = Join-Path $Context.Declaration.ReportDirectory $report.PayloadRoot
+        try {
+            if (Test-Path -LiteralPath $retained) { throw 'WProto retained evidence directory already exists.' }
+            $null = New-Item -ItemType Directory -Path $generatedRoot -Force -ErrorAction Stop
+            foreach ($directoryName in @('Assets', 'Packages', 'ProjectSettings')) {
+                Copy-Item -LiteralPath (Join-Path $Context.GeneratedRoot $directoryName) -Destination $generatedRoot -Recurse -ErrorAction Stop
+            }
+            Copy-Item -LiteralPath $Context.PayloadRoot -Destination $payloadRoot -Recurse -ErrorAction Stop
+            $built = @($Context.Snapshots | Where-Object { $_.Stage -ceq 'after-build' })
+            if ($built.Count -ne 1) { throw 'WProto retained evidence requires exactly one build snapshot.' }
+            Assert-WProtoRecordedInventory -Root $payloadRoot -Entries $built[0].PayloadFiles -Complete
+            Assert-WProtoRecordedInventory -Root $generatedRoot -Entries $built[0].ProjectInputs
+            Assert-WProtoRecordedInventory -Root $generatedRoot -Entries $built[0].GeneratedAnchorFiles
+            Copy-Item -LiteralPath (Join-Path $Context.Declaration.ReportDirectory 'build-preparation.json') `
+                -Destination (Join-Path $Context.Declaration.ReportDirectory $report.BuildPreparationPath) -ErrorAction Stop
+            if ((Get-FileHash -LiteralPath (Join-Path $retained 'build-preparation.json') -Algorithm SHA256).Hash.ToLowerInvariant() -cne $Context.BuildPreparationSha256) {
+                throw 'WProto build preparation changed before retention.'
+            }
+            if ($Context.BuildPreparation.SchemaVersion -eq 2) {
+                Copy-Item -LiteralPath (Join-Path $Context.Declaration.ReportDirectory 'build-player-settings.asset') `
+                    -Destination (Join-Path $retained 'build-player-settings.asset') -ErrorAction Stop
+                $preparedSettings = @($Context.BuildPreparation.ProjectInputs | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' })
+                if ($preparedSettings.Count -ne 1) { throw 'WProto prepared player settings identity is missing.' }
+                Assert-WProtoRecordedInventory -Root $retained -Entries @([pscustomobject]@{
+                        Path = 'build-player-settings.asset'; Kind = 'file'; Length = $preparedSettings[0].Length; Sha256 = $preparedSettings[0].Sha256
+                    })
+            }
+            Copy-Item -LiteralPath $ResultsPath -Destination (Join-Path $retained 'results.xml') -ErrorAction Stop
+            Copy-WProtoCorpusRecords -Source $PlayerLogPath -Destination (Join-Path $retained 'corpus-records.txt')
+            $retainedPaths = @($report.PlayerLogPath, $report.ResultsPath, $report.BuildPreparationPath)
+            if ($Context.BuildPreparation.SchemaVersion -eq 2) { $retainedPaths += 'retained/build-player-settings.asset' }
+            $report.RetainedFiles = @(foreach ($relative in $retainedPaths) {
+                    $path = Join-Path $Context.Declaration.ReportDirectory $relative
+                    $item = Get-Item -LiteralPath $path -ErrorAction Stop
+                    [pscustomobject]@{ Path = $relative; Kind = 'file'; Length = $item.Length; Sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
+                })
+            $report.RetainedEvidenceState = 'passed'
+        } catch {
+            $report.RetainedEvidenceState = 'rejected'
+            $report.RetainedEvidenceError = $_.ToString()
+            $report.CapturedEvidenceValid = $false
+            $report.SyntheticTimingQualified = $false
+            $report.TimingTwofoldTarget = $false
+        }
+        $report.Scope = 'Synthetic corpus capture only; adoption, representative target, and whole-capability qualification remain open.'
+    }
     Assert-FrozenPlayerRegularPath -Path $Context.ReportPath
     $output = [IO.File]::Open($Context.ReportPath, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::None)
     try {
@@ -3540,6 +3739,7 @@ function Complete-FrozenPlayerProvenance {
         $output.Write($bytes, 0, $bytes.Length)
         $output.Flush()
     } finally { $output.Dispose() }
+    if ($wproto -and -not $report.CapturedEvidenceValid) { throw "WProto frozen capture rejected; retained report: $($Context.ReportPath)" }
     if ($null -eq $Context.ExecutionError -and (-not $stable -or $correctness.State -ne 'passed' -or
         ($null -ne $Context.Declaration.CanonicalCorpus -and $runtimeJoin.State -ne 'passed'))) {
         throw "Frozen player provenance or joint correctness rejected; retained report: $($Context.ReportPath)"
@@ -3620,93 +3820,32 @@ function New-UnityNativeEvidenceCapture {
     } catch { return $capture }
 }
 
-function Get-UnityNativeEvidence {
-    param([hashtable]$Capture, [string]$LogPath)
 
-    $report = [ordered]@{ State = 'capture-unavailable'; Files = @() }
-    try {
-        if (-not $Capture -or $Capture['State'] -ne 'configured') {
-            return @{ State = if ($Capture) { $Capture['State'] } else { 'unsupported-platform' }; Files = @() }
-        }
-        $report = [ordered]@{
-            State = 'capture-unavailable'; CaptureId = $Capture.CaptureId
-            CrashDirectory = $Capture.CrashDirectory; UpmLogPath = $Capture.UpmLogPath
-            UpmLogState = if (Test-Path -LiteralPath $Capture.UpmLogPath -PathType Leaf) { 'present-at-capture' } else { 'missing-at-capture' }
-            UpmTextArtifact = $null
-            CapturedUtc = [DateTime]::UtcNow.ToString('o'); Files = @(); FileLimitReached = $false
-            MaximumDirectoryDepth = 2
-            Qualification = 'An isolated folder associates files with this invocation. Dump identity and timing still need verification. Missing or delayed files do not rule out a native failure. Raw dumps stay on the runner.'
-        }
-        $root = Get-Item -LiteralPath $Capture.CrashDirectory -Force -ErrorAction Stop
-        if ($root.Attributes -band [IO.FileAttributes]::ReparsePoint) { return $report }
-        $entries = @(Get-ChildItem -LiteralPath $Capture.CrashDirectory -File -Recurse -Depth 2 -Force -ErrorAction Stop | Select-Object -First 65)
-        $report.FileLimitReached = $entries.Count -gt 64
-        $number = 0
-        foreach ($entry in @($entries | Select-Object -First 64 | Sort-Object FullName)) {
-            if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
-            $number++
-            $file = [ordered]@{
-                RelativePath = [IO.Path]::GetRelativePath($Capture.CrashDirectory, $entry.FullName)
-                Length = $entry.Length; LastWriteUtc = $entry.LastWriteTimeUtc.ToString('o')
-                Sha256 = $null; HashState = 'over-hash-limit'; HashBytes = 0L; HashScope = 'bounded-observed-bytes'
-                TextArtifact = $null; TextTruncated = $false
-            }
-            if ($entry.Length -le 268435456) {
-                $hashStream = $null
-                $algorithm = $null
-                try {
-                    $hashStream = [IO.File]::Open($entry.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
-                    $algorithm = [Security.Cryptography.SHA256]::Create()
-                    $buffer = [byte[]]::new(65536)
-                    $remaining = [long]$entry.Length
-                    while ($remaining -gt 0) {
-                        $read = $hashStream.Read($buffer, 0, [int][Math]::Min($buffer.Length, $remaining))
-                        if ($read -eq 0) { break }
-                        [void]$algorithm.TransformBlock($buffer, 0, $read, $buffer, 0)
-                        $remaining -= $read
-                        $file.HashBytes += $read
-                    }
-                    [void]$algorithm.TransformFinalBlock([byte[]]::new(0), 0, 0)
-                    $file.Sha256 = [BitConverter]::ToString($algorithm.Hash).Replace('-', '').ToLowerInvariant()
-                    $file.HashState = if ($file.HashBytes -eq $entry.Length -and $hashStream.Length -eq $entry.Length) { 'observed' } else { 'changed-during-capture' }
-                } catch { $file.HashState = 'unavailable' }
-                finally {
-                    if ($hashStream) { $hashStream.Dispose() }
-                    if ($algorithm) { $algorithm.Dispose() }
-                }
-            }
-            if ($entry.Extension -in @('.log', '.txt')) {
-                $reader = $null
-                $textStream = $null
-                try {
-                    $textStream = [IO.File]::Open($entry.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
-                    $reader = [IO.StreamReader]::new($textStream, [Text.UTF8Encoding]::new($false, $true), $true, 4096)
-                    $characters = [char[]]::new(262144)
-                    $read = $reader.ReadBlock($characters, 0, $characters.Length)
-                    $file.TextTruncated = $reader.Peek() -ne -1
-                    $text = [string]::new($characters, 0, $read)
-                    if ($text.IndexOf([char]0) -ge 0) {
-                        $file.TextArtifact = 'non-text-file'
-                    } else {
-                        $name = "native-$($Capture.CaptureId)-$number.txt"
-                        $destination = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($LogPath))) $name
-                        Set-Content -LiteralPath $destination -Value (ConvertTo-UnitySafeLogText -Text $text) -Encoding UTF8 -ErrorAction Stop
-                        $file.TextArtifact = $name
-                    }
-                } catch { $file.TextArtifact = 'capture-failed' }
-                finally {
-                    if ($reader) { $reader.Dispose() }
-                    elseif ($textStream) { $textStream.Dispose() }
-                }
-            }
-            if ([string]::Equals($entry.FullName, $Capture.UpmLogPath, [StringComparison]::OrdinalIgnoreCase)) {
-                $report.UpmTextArtifact = $file.TextArtifact
-            }
-            $report.Files += $file
-        }
-        $report.State = if ($report.Files.Count -gt 0) { 'files-observed' } else { 'no-files-at-capture' }
-    } catch { $report.State = 'capture-unavailable' }
-    return $report
+function Invoke-UnityStandaloneBuildDiagnostic {
+    param(
+        [ValidateSet('Direct', 'Debugger')][string]$Mode,
+        [string]$EditorPath, [string]$ProjectPath, [string[]]$Arguments,
+        [string]$ArtifactsPath, [string]$LogPath, [int]$TimeoutSeconds,
+        [switch]$UseStandardHeap,
+        [switch]$AttachToDirect,
+        [switch]$AttachAfterStartup,
+        [switch]$AttachAfterShutdown
+    )
+
+    if ($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 1800) { throw 'Build diagnostics require a bounded timeout.' }
+    if ($UseStandardHeap -and $Mode -ne 'Debugger') { throw 'Standard heap selection requires a debugger build.' }
+    if ($AttachToDirect -and ($Mode -ne 'Debugger' -or $UseStandardHeap)) { throw 'Direct attachment requires a debugger build without a launch heap request.' }
+    if ($AttachAfterStartup -and -not $AttachToDirect) { throw 'Startup-delayed attachment requires Direct attachment.' }
+    if ($AttachAfterShutdown -and (-not $AttachToDirect -or $AttachAfterStartup)) { throw 'Shutdown-delayed attachment requires Direct attachment without startup selection.' }
+    if ($Mode -eq 'Debugger') {
+        & (Join-Path $PSScriptRoot 'capture-native-fault.ps1') -EditorPath $EditorPath -ProjectPath $ProjectPath `
+            -BuildArguments $Arguments -BuildLogPath $LogPath -ArtifactsPath (Join-Path $ArtifactsPath 'native-build-diagnostics') `
+            -TimeoutSeconds $TimeoutSeconds -UseStandardHeap:$UseStandardHeap -AttachToDirect:$AttachToDirect -AttachAfterStartup:$AttachAfterStartup -AttachAfterShutdown:$AttachAfterShutdown
+    } else {
+        $observation = @{}
+        $null = Invoke-UnityObservedEditor -EditorPath $EditorPath -Arguments $Arguments `
+            -TimeoutSeconds $TimeoutSeconds -LogPath $LogPath -Label 'Evidence-only Standalone build' -ProcessObservation $observation
+    }
 }
 
 function Invoke-UnityObservedEditor {
@@ -4526,160 +4665,12 @@ function Test-NUnitResults {
     Write-CiNotice "${Label}: total=$total passed=$passed failed=$failed skipped=$skipped"
 }
 
-function Select-UnityProcessFailureEvents {
-    param([hashtable]$ProcessObservation, [object[]]$Candidates)
 
-    $matched = New-Object System.Collections.Generic.List[object]
-    $parsed = New-Object System.Collections.Generic.List[object]
-    $reportIds = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-    $malformed = 0
-    $startUtc = [DateTime]::Parse($ProcessObservation['LaunchUtc']).ToUniversalTime().AddSeconds(-2)
-    $endUtc = [DateTime]::Parse($ProcessObservation['EndObservedUtc']).ToUniversalTime().AddSeconds(15)
-    foreach ($candidate in @($Candidates | Select-Object -First 64)) {
-        try {
-            if ($candidate.TimeCreated.ToUniversalTime() -lt $startUtc -or $candidate.TimeCreated.ToUniversalTime() -gt $endUtc) { continue }
-            if (($candidate.Id -ne 1000 -or $candidate.ProviderName -ne 'Application Error') -and
-                ($candidate.Id -ne 1001 -or $candidate.ProviderName -ne 'Windows Error Reporting')) { continue }
-            $xml = New-Object System.Xml.XmlDocument
-            $xml.XmlResolver = $null
-            $eventXml = $candidate.ToXml()
-            if ($eventXml.Length -gt 65536) { ++$malformed; continue }
-            $settings = New-Object System.Xml.XmlReaderSettings
-            $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
-            $settings.MaxCharactersInDocument = 65536
-            $reader = [System.Xml.XmlReader]::Create([IO.StringReader]::new($eventXml), $settings)
-            try { $xml.Load($reader) } finally { $reader.Dispose() }
-            $fields = @{}
-            foreach ($node in $xml.SelectNodes("//*[local-name()='EventData']/*[local-name()='Data']")) {
-                $name = $node.GetAttribute('Name')
-                if (-not [string]::IsNullOrWhiteSpace($name)) { $fields[$name] = $node.InnerText }
-            }
-            $pidValue = if ($fields.ContainsKey('ProcessId')) { $fields.ProcessId } else { $fields['FaultingProcessId'] }
-            $targetPid = 0L
-            $pidMatches = $false
-            if ($pidValue -match '^0x[0-9a-fA-F]+$') {
-                $pidMatches = [long]::TryParse($pidValue.Substring(2), [Globalization.NumberStyles]::HexNumber,
-                    [Globalization.CultureInfo]::InvariantCulture, [ref]$targetPid)
-            } elseif ($pidValue -match '^\d+$') {
-                $pidMatches = [long]::TryParse($pidValue, [ref]$targetPid)
-            }
-            $pidMatches = $pidMatches -and $targetPid -eq $ProcessObservation['ProcessId']
-            $pathMatches = $fields.ContainsKey('AppPath') -and [string]::Equals(
-                $fields.AppPath.Replace('\', '/'), $ProcessObservation['ExecutablePath'].Replace('\', '/'),
-                [StringComparison]::OrdinalIgnoreCase)
-            $reportId = if ($fields.ContainsKey('IntegratorReportId')) { $fields.IntegratorReportId } else { $fields['ReportId'] }
-            $validReportId = [Guid]::Empty
-            if (-not [Guid]::TryParse($reportId, [ref]$validReportId) -or $validReportId -eq [Guid]::Empty) { $reportId = $null }
-            $directMatch = $pidMatches -and $pathMatches
-            $identityConflict = ($null -ne $pidValue -and -not $pidMatches) -or ($fields.ContainsKey('AppPath') -and -not $pathMatches)
-            if ($candidate.Id -eq 1000 -and $directMatch -and $reportId) { [void]$reportIds.Add($reportId) }
-            $parsed.Add(@{ Candidate = $candidate; Fields = $fields; DirectMatch = $directMatch; IdentityConflict = $identityConflict; ReportId = $reportId })
-        } catch { ++$malformed }
-    }
-    foreach ($item in $parsed) {
-        $joined = $item.Candidate.Id -eq 1001 -and -not $item.IdentityConflict -and $item.ReportId -and $reportIds.Contains($item.ReportId)
-        if (-not $item.DirectMatch -and -not $joined) { continue }
-        $safeFields = [ordered]@{}
-        foreach ($name in @('AppName', 'ModuleName', 'ModulePath', 'ExceptionCode', 'FaultingOffset')) {
-            if ($item.Fields.ContainsKey($name)) {
-                $value = ConvertTo-SingleLineDiagnostic -Text $item.Fields[$name]
-                $safeFields[$name] = $value.Substring(0, [Math]::Min(256, $value.Length))
-            }
-        }
-        $matched.Add([ordered]@{
-            EventUtc = $item.Candidate.TimeCreated.ToUniversalTime().ToString('o')
-            Provider = $item.Candidate.ProviderName
-            EventId = $item.Candidate.Id
-            RecordId = $item.Candidate.RecordId
-            Match = if ($item.DirectMatch) { 'path-and-pid' } else { 'joined-report-id' }
-            ReportId = $item.ReportId
-            Fields = $safeFields
-        })
-    }
-    return @{
-        State = if ($matched.Count -gt 0) { 'matched-events' } else { 'no-matching-events' }
-        Events = @($matched | Select-Object -First 8)
-        CandidateLimitReached = @($Candidates).Count -gt 64
-        MatchLimitReached = $matched.Count -gt 8
-        MalformedEvents = $malformed
-    }
-}
 
-function Get-UnityProcessFailureEvents {
-    param([hashtable]$ProcessObservation)
-
-    $report = @{ State = 'no-query'; Reason = 'process-identity-unavailable'; Events = @() }
-    if (-not $ProcessObservation -or -not $ProcessObservation['ProcessId'] -or
-        -not $ProcessObservation['ExecutablePath'] -or -not $ProcessObservation['LaunchUtc'] -or
-        -not $ProcessObservation['EndObservedUtc']) { return $report }
-    if (-not $IsWindows) { $report.Reason = 'unsupported-platform'; return $report }
-    return Read-UnityProcessFailureEvents -ProcessObservation $ProcessObservation
-}
-
-function Read-UnityProcessFailureEvents {
-    param([hashtable]$ProcessObservation)
-
-    $report = @{ State = 'query-unavailable'; Reason = 'event-query-failed'; Events = @() }
-    try {
-        $startUtc = [DateTime]::Parse($ProcessObservation['LaunchUtc']).ToUniversalTime().AddSeconds(-2)
-        $captureUtc = [DateTime]::UtcNow
-        $endUtc = [DateTime]::Parse($ProcessObservation['EndObservedUtc']).ToUniversalTime().AddSeconds(15)
-        if ($endUtc -gt $captureUtc) { $endUtc = $captureUtc }
-        $queryErrors = @()
-        $candidates = @(Get-WinEvent -FilterHashtable @{
-            LogName = 'Application'; ProviderName = @('Application Error', 'Windows Error Reporting')
-            Id = @(1000, 1001); StartTime = $startUtc; EndTime = $endUtc
-        } -MaxEvents 65 -ErrorAction SilentlyContinue -ErrorVariable queryErrors)
-        $unavailable = @($queryErrors | Where-Object { $_.FullyQualifiedErrorId -notlike 'NoMatchingEventsFound*' })
-        if ($unavailable.Count -gt 0) {
-            $report.State = 'query-unavailable'
-            $report.Reason = 'event-query-failed'
-        } else {
-            $report = Select-UnityProcessFailureEvents -ProcessObservation $ProcessObservation -Candidates $candidates
-        }
-        $report.WindowStartUtc = $startUtc.ToString('o')
-        $report.WindowEndUtc = $endUtc.ToString('o')
-        $report.CapturedUtc = $captureUtc.ToString('o')
-        $report.Qualification = 'Only events observed by capture time; missing or delayed events do not rule out a crash.'
-    } catch {
-        $report.State = 'query-unavailable'
-        $report.Reason = 'event-query-failed'
-    }
-    return $report
-}
 
 function Get-UnityNativeReportSummary {
     param([string]$LogPath)
-
-    $summary = [ordered]@{
-        State = 'missing-log'
-        NativeReportHeaderCount = 0
-        UnknownNativeConditionCount = 0
-        NativeReportHeaderLines = @()
-        UnknownNativeConditionLines = @()
-        LocationsTruncated = $false
-    }
-    if ([string]::IsNullOrWhiteSpace($LogPath) -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return $summary }
-    try {
-        $lineNumber = 0
-        foreach ($line in [IO.File]::ReadLines($LogPath)) {
-            ++$lineNumber
-            if (0 -le $line.IndexOf('Native Crash Reporting', [StringComparison]::OrdinalIgnoreCase)) {
-                ++$summary.NativeReportHeaderCount
-                if ($summary.NativeReportHeaderLines.Count -lt 8) { $summary.NativeReportHeaderLines += $lineNumber }
-                else { $summary.LocationsTruncated = $true }
-            }
-            if (0 -le $line.IndexOf('Got a UNKNOWN while executing native code', [StringComparison]::OrdinalIgnoreCase)) {
-                ++$summary.UnknownNativeConditionCount
-                if ($summary.UnknownNativeConditionLines.Count -lt 8) { $summary.UnknownNativeConditionLines += $lineNumber }
-                else { $summary.LocationsTruncated = $true }
-            }
-        }
-        $summary.State = 'observed'
-    } catch {
-        $summary.State = 'unreadable-log'
-    }
-    return $summary
+    return Get-NativeReportSummary -LogPath $LogPath
 }
 
 function Write-UnityExecutionObservation {
@@ -4748,7 +4739,8 @@ function Invoke-UnityConfigurePass {
         [Parameter(Mandatory = $true)][string]$LogPath,
         [Parameter(Mandatory = $true)][string]$Label,
         [string[]]$ExtraArguments = @(),
-        [scriptblock]$ConfigureInvoker
+        [scriptblock]$ConfigureInvoker,
+        $FrozenContext = $null
     )
 
     if (Test-Path -LiteralPath $MarkerPath -PathType Leaf) {
@@ -4795,6 +4787,7 @@ function Invoke-UnityConfigurePass {
     try {
         $configureExit = & $invokeConfigure $Label
     } finally {
+        if ($null -ne $FrozenContext) { $FrozenContext.ConfigureOutcomes.Add([pscustomobject]$processObservation.Clone()) }
         # The configurator has run; drop the marker-path env var so it cannot be
         # inherited by later child processes (only Apply reads it).
         Remove-Item -LiteralPath Env:\UH_CONFIGURE_MARKER_PATH -ErrorAction SilentlyContinue
@@ -4829,6 +4822,7 @@ function Invoke-UnityConfigurePass {
         try {
             $configureExit = & $invokeConfigure "$Label (retry 1 after UPM cancellation)"
         } finally {
+            if ($null -ne $FrozenContext) { $FrozenContext.ConfigureOutcomes.Add([pscustomobject]$processObservation.Clone()) }
             Remove-Item -LiteralPath Env:\UH_CONFIGURE_MARKER_PATH -ErrorAction SilentlyContinue
         }
         $configureProblem = Test-UnityConfigureMarker -MarkerPath $MarkerPath -StartedUtc $configureStartedUtc
@@ -4932,6 +4926,12 @@ function Invoke-UnityPackageExport {
     Write-Host "Unity package exported: $OutputPath (SHA256 $hash)"
 }
 
+if ($StandaloneBuildCapture -ne 'None') {
+    $captureTimeout = Get-StandaloneBuildTimeoutSeconds
+    if ($captureTimeout -lt 1 -or $captureTimeout -gt 1800) { throw 'Build capture requires a timeout between one and 1800 seconds.' }
+    if ($StandaloneBuildCapture -eq 'Debugger' -and [Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'Debugger build capture requires Windows.' }
+}
+
 Assert-UnityRunMode -Mode $TestMode -Assemblies $AssemblyNames -Project $ProjectPath `
     -ExportPath $ExportPackagePath -Version $UnityVersion `
     -HasTestOptions:($GenerateOnly -or $IncludeComparisons -or $IncludeIntegrations -or
@@ -4946,7 +4946,7 @@ $frozenPlayerDeclaration = $null
 if (-not [string]::IsNullOrWhiteSpace($FrozenPlayerDeclarationPath)) {
     $frozenPlayerDeclaration = Read-FrozenPlayerDeclaration -Path $FrozenPlayerDeclarationPath `
         -Mode $TestMode -UnityVersion $UnityVersion -Backend $StandaloneScriptingBackend `
-        -ArtifactsPath $ArtifactsPath -RepoRoot $RepoRoot -GenerateOnly:$GenerateOnly
+        -ArtifactsPath $ArtifactsPath -RepoRoot $RepoRoot -GenerateOnly:$GenerateOnly -BuildCaptureOnly:($StandaloneBuildCapture -ne 'None')
 }
 $frozenPlayerProvenance = $null
 
@@ -5040,7 +5040,7 @@ $AdditionalScriptingDefinesJoined = ($AdditionalScriptingDefinesList -join ';')
 $LibraryWarmth = if (Test-Path -LiteralPath (Join-Path $ProjectPath 'Library') -PathType Container) { 'warm (reused)' } else { 'cold (first run on this runner)' }
 
 if ($TestMode -ne 'export') {
-    $ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
+    $ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RequireReleaseManagedCodeVariant:($null -ne $frozenPlayerDeclaration -and $frozenPlayerDeclaration.CampaignKind -ceq 'wproto-seven-families-v1') -RepoRoot $RepoRoot
     $LibraryPath = Join-Path $ProjectPath 'Library'
     New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
     Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot -Force:$ForceFreshCompilationCache
@@ -5248,6 +5248,7 @@ try {
             -MarkerPath $configureMarkerPath `
             -LogPath $configureLogPath `
             -Label 'Configure standalone IL2CPP project' `
+            -FrozenContext $frozenPlayerProvenance `
             -ExtraArguments $acceleratorArgs
     } elseif ($AdditionalScriptingDefinesList.Count -gt 0) {
         # EDITMODE/PLAYMODE with extra global scripting defines (e.g. SINGLE_THREADED):
@@ -5319,12 +5320,28 @@ try {
         # compilation and linking are legitimately silent for minutes under `-logFile -`,
         # so a no-output stall guard WOULD false-fire on a healthy build. The stall guard
         # is scoped to the in-editor -runTests pass instead.
+        if ($StandaloneBuildCapture -ne 'None') {
+            Invoke-UnityStandaloneBuildDiagnostic -Mode $StandaloneBuildCapture -EditorPath $UnityEditorPath `
+                -ProjectPath $ProjectPath -Arguments $buildArgs -ArtifactsPath $ArtifactsPath `
+                -LogPath $logPath -TimeoutSeconds (Get-StandaloneBuildTimeoutSeconds) -UseStandardHeap:$StandaloneBuildDebuggerStandardHeap -AttachToDirect:$StandaloneBuildAttachToDirect -AttachAfterStartup:$StandaloneBuildAttachAfterStartup -AttachAfterShutdown:$StandaloneBuildAttachAfterShutdown
+            if ($null -ne $frozenPlayerProvenance) {
+                Add-FrozenPlayerProvenanceSnapshot -Context $frozenPlayerProvenance -Stage 'after-build' -IncludePayload
+            }
+            throw 'Evidence-only Standalone build capture stops before player launch and cannot satisfy acceptance.'
+        }
+        $buildObservation = @{}
         $buildResult = Invoke-UnityObservedEditor `
             -EditorPath $UnityEditorPath `
             -Arguments $buildArgs `
             -TimeoutSeconds (Get-StandaloneBuildTimeoutSeconds) `
             -LogPath $logPath `
-            -Label "Build standalone IL2CPP test player (Unity $UnityVersion)"
+            -Label "Build standalone IL2CPP test player (Unity $UnityVersion)" `
+            -ProcessObservation $buildObservation
+
+        if ($null -ne $frozenPlayerProvenance) {
+            $frozenPlayerProvenance.BuildOutcome = $buildResult
+            $frozenPlayerProvenance.BuildObservation = [pscustomobject]$buildObservation
+        }
 
         # Validate the fresh player independently of the process outcome. Accepted output
         # does not establish the timing or cause of a native exit.

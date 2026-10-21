@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'borrowed', 'all')]
+    [ValidateSet('sentinel', 'intmap', 'serialization', 'nullableconsumer', 'borrowed', 'wproto', 'all')]
     [string]$Acceptance,
     [Parameter(Mandatory = $true)]
     [string]$UnityVersion,
@@ -10,11 +10,20 @@ param(
     [string]$ArtifactsPath,
     [Parameter(Mandatory = $true)]
     [string]$TemporaryRoot,
-    [string]$Repository = (Join-Path $PSScriptRoot '../..')
+    [string]$Repository = (Join-Path $PSScriptRoot '../..'),
+    [ValidateSet('None', 'Direct', 'Debugger')]
+    [string]$StandaloneBuildCapture = 'None',
+    [ValidateSet('Mono2x', 'IL2CPP')]
+    [string]$StandaloneBuildCaptureBackend = 'Mono2x',
+    [switch]$StandaloneBuildDebuggerStandardHeap,
+    [switch]$StandaloneBuildAttachToDirect,
+    [switch]$StandaloneBuildAttachAfterStartup,
+    [switch]$StandaloneBuildAttachAfterShutdown
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$StandaloneBuildCaptureBackend = if ($StandaloneBuildCaptureBackend -eq 'IL2CPP') { 'IL2CPP' } else { 'Mono2x' }
 function Initialize-SerializationAcceptanceProject {
     param([string]$Project, [string]$Repository, [switch]$ConflictingSibling)
 
@@ -279,6 +288,69 @@ function New-BorrowedPlayerDeclaration {
     return $path
 }
 
+function New-WProtoPlayerDeclaration {
+    param([string]$Repository, [string]$ArtifactsPath, [string]$UnityVersion, [ValidateSet('Mono2x', 'IL2CPP')][string]$Backend = 'Mono2x')
+
+    $path = Join-Path $ArtifactsPath 'declaration.json'
+    if (Test-Path -LiteralPath $path) { throw 'An existing WProto declaration cannot be replaced.' }
+    $commit = (& git -C $Repository rev-parse HEAD | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $commit -cnotmatch '^[0-9a-f]{40}$') { throw 'Cannot bind WProto acceptance to its source commit.' }
+    $inheritedCommit = [Environment]::GetEnvironmentVariable('UH_PERF_COMMIT', 'Process')
+    if (-not [string]::IsNullOrWhiteSpace($inheritedCommit) -and $inheritedCommit -cne $commit) {
+        throw 'UH_PERF_COMMIT conflicts with the WProto source revision.'
+    }
+    . (Join-Path $Repository 'scripts/unity/lib/wproto-player-provenance.ps1')
+    $sourceFiles = @(Get-WProtoPlayerSourceFiles -Repository $Repository)
+    $corpusPath = 'scripts/unity/wproto-corpus.v1.json'
+    $corpusHash = (Get-FileHash -LiteralPath (Join-Path $Repository $corpusPath) -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
+    $declaration = [ordered]@{
+        SchemaVersion = 1; CampaignKind = 'wproto-seven-families-v1'
+        RunId = 'wproto-' + [Guid]::NewGuid().ToString('N')
+        UnityVersion = $UnityVersion; Backend = $Backend; SourceCommit = $commit
+        SourceFiles = $sourceFiles
+        CorpusFiles = @(@{ Path = $corpusPath; Sha256 = $corpusHash })
+        CanonicalCorpusPath = $corpusPath
+    }
+    $null = New-Item -ItemType Directory -Force -Path $ArtifactsPath
+    $stream = [IO.File]::Open($path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try {
+        $bytes = [Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject $declaration -Depth 5))
+        $stream.Write($bytes, 0, $bytes.Length)
+    } finally { $stream.Dispose() }
+    return $path
+}
+
+if ($StandaloneBuildDebuggerStandardHeap -and ($StandaloneBuildCapture -ne 'Debugger' -or $Acceptance -ne 'wproto')) {
+    throw 'Standard heap selection requires an evidence-only WProto debugger build.'
+}
+if ($StandaloneBuildAttachToDirect -and ($StandaloneBuildCapture -ne 'Debugger' -or $Acceptance -ne 'wproto' -or $StandaloneBuildDebuggerStandardHeap)) {
+    throw 'Direct attachment requires an evidence-only WProto debugger build without a launch heap request.'
+}
+if ($StandaloneBuildAttachAfterStartup -and -not $StandaloneBuildAttachToDirect) { throw 'Startup-delayed attachment requires Direct attachment.' }
+if ($StandaloneBuildAttachAfterShutdown -and (-not $StandaloneBuildAttachToDirect -or $StandaloneBuildAttachAfterStartup)) { throw 'Shutdown-delayed attachment requires Direct attachment without startup selection.' }
+if ($StandaloneBuildCaptureBackend -ne 'Mono2x' -and ($StandaloneBuildCapture -eq 'None' -or $Acceptance -ne 'wproto')) {
+    throw 'An IL2CPP WProto build capture requires explicit evidence-only capture mode and Acceptance wproto.'
+}
+if ($StandaloneBuildCapture -ne 'None' -and $Acceptance -ne 'wproto') {
+    throw 'Standalone build capture is an evidence-only WProto diagnostic.'
+}
+if ($StandaloneBuildCapture -eq 'Debugger' -and [Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+    throw 'Debugger build capture requires Windows.'
+}
+if ($Acceptance -eq 'wproto' -and $UnityVersion -cnotin @('2021.3.45f1', '6000.6.0f1')) {
+    throw 'WProto corpus acceptance requires the pinned floor or latest Unity version.'
+}
+if ($Acceptance -eq 'wproto') {
+    try {
+        $node = @(Get-Command node -CommandType Application -ErrorAction Stop)[0]
+        $nodeVersion = (& $node.Source --version | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0 -or $nodeVersion -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+            throw 'Node.js did not return a successful version response.'
+        }
+    } catch {
+        throw "WProto acceptance requires a working Node.js executable before Unity launch: $($_.Exception.Message)"
+    }
+}
 if ($Acceptance -eq 'nullableconsumer') {
     & (Join-Path $PSScriptRoot 'run-nullable-consumer.ps1') -UnityVersion $UnityVersion -UnityEditorPath $env:UNITY_EDITOR_PATH -Repository $Repository -TemporaryRoot $TemporaryRoot -ArtifactsPath $ArtifactsPath
     return
@@ -288,6 +360,8 @@ $selected = if ($Acceptance -eq 'all') { @('sentinel', 'capture', 'intmap', 'ser
 foreach ($kind in $selected) {
     $ownedProject = $null
     $oldNativeProbeSourceSha256 = $env:UH_NATIVE_PROBE_SOURCE_SHA256
+    $oldWProtoTimeouts = @{}
+    $oldWProtoCommit = [Environment]::GetEnvironmentVariable('UH_PERF_COMMIT', 'Process')
     try {
         & (Join-Path $PSScriptRoot 'assert-no-active-unity-editor.ps1')
         $parameters = @{
@@ -374,6 +448,30 @@ foreach ($kind in $selected) {
                 $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime'
                 $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests;WallstopStudios.UnityHelpers.Tests.Serialization.WProtoConsumerMigrationTests'
                 Initialize-SerializationAcceptanceProject -Project $ownedProject -Repository $Repository
+            } elseif ($kind -eq 'wproto') {
+                $parameters.StandaloneBuildCapture = $StandaloneBuildCapture
+                $parameters.StandaloneBuildDebuggerStandardHeap = [bool]$StandaloneBuildDebuggerStandardHeap
+                $parameters.StandaloneBuildAttachToDirect = [bool]$StandaloneBuildAttachToDirect
+                $parameters.StandaloneBuildAttachAfterStartup = [bool]$StandaloneBuildAttachAfterStartup
+                $parameters.StandaloneBuildAttachAfterShutdown = [bool]$StandaloneBuildAttachAfterShutdown
+                $timeouts = @{
+                    UH_EDITOR_TEST_TIMEOUT_SECONDS = '900'
+                    UH_STANDALONE_BUILD_TIMEOUT_SECONDS = '1800'
+                    UH_STANDALONE_PLAYER_TIMEOUT_SECONDS = '3600'
+                }
+                foreach ($key in $timeouts.Keys) {
+                    $oldWProtoTimeouts[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
+                    [Environment]::SetEnvironmentVariable($key, $timeouts[$key], 'Process')
+                }
+                $parameters.StandaloneScriptingBackend = $StandaloneBuildCaptureBackend
+                $parameters.ManagedStrippingLevel = if ($parameters.StandaloneScriptingBackend -eq 'IL2CPP') { 'High' } else { 'Disabled' }
+                $parameters.AdditionalScriptingDefines = @('WALLSTOP_PROTO')
+                $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance'
+                $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus'
+                $parameters.TestCategory = ''
+                $parameters.FrozenPlayerDeclarationPath = New-WProtoPlayerDeclaration -Repository $Repository -ArtifactsPath $parameters.ArtifactsPath -UnityVersion $UnityVersion -Backend $parameters.StandaloneScriptingBackend
+                $declaration = Get-Content -LiteralPath $parameters.FrozenPlayerDeclarationPath -Raw | ConvertFrom-Json
+                $env:UH_PERF_COMMIT = $declaration.SourceCommit
             } elseif ($kind -eq 'borrowed') {
                 $env:UH_NATIVE_PROBE_SOURCE_SHA256 = & (Join-Path $PSScriptRoot 'build-native-allocation-probe.ps1') -ProjectPath $ownedProject -ArtifactsPath $parameters.ArtifactsPath -Repository $Repository
                 $parameters.AdditionalScriptingDefines = @('UNITY_HELPERS_NATIVE_ALLOCATION_PROBE')
@@ -393,6 +491,20 @@ foreach ($kind in $selected) {
         Write-Warning "Acceptance run failed: $kind. Preserving artifacts and continuing other selected work."
     } finally {
         $env:UH_NATIVE_PROBE_SOURCE_SHA256 = $oldNativeProbeSourceSha256
+        foreach ($key in $oldWProtoTimeouts.Keys) {
+            if ($null -eq $oldWProtoTimeouts[$key]) {
+                Remove-Item -LiteralPath "Env:$key" -ErrorAction SilentlyContinue
+            } else {
+                [Environment]::SetEnvironmentVariable($key, $oldWProtoTimeouts[$key], 'Process')
+            }
+        }
+        if ($kind -eq 'wproto') {
+            if ($null -eq $oldWProtoCommit) {
+                Remove-Item -LiteralPath 'Env:UH_PERF_COMMIT' -ErrorAction SilentlyContinue
+            } else {
+                [Environment]::SetEnvironmentVariable('UH_PERF_COMMIT', $oldWProtoCommit, 'Process')
+            }
+        }
         if ($null -ne $ownedProject -and (Test-Path -LiteralPath $ownedProject)) {
             try {
                 & (Join-Path $PSScriptRoot 'assert-no-active-unity-editor.ps1')

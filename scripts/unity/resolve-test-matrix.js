@@ -31,13 +31,13 @@ function resolveTestMatrix(
   }
   const acceptance = requestedAcceptance.trim();
   if (
-    acceptance === "nullableconsumer" &&
+    ["nullableconsumer", "wproto"].includes(acceptance) &&
     version &&
     version !== "2021.3.45f1" &&
     version !== "6000.6.0f1"
   ) {
     throw new Error(
-      `Nullable consumer acceptance requires its pinned floor or latest Unity version: ${version}`
+      `${acceptance === "wproto" ? "WProto corpus" : "Nullable consumer"} acceptance requires its pinned floor or latest Unity version: ${version}`
     );
   }
   const acceptanceRequested = acceptance !== "" && acceptance !== "none";

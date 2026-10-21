@@ -360,6 +360,11 @@ const CHECKS = [
     run: "bash scripts/tests/test-unity-nunit-results.sh"
   },
   {
+    id: "wproto-claim-catalog",
+    name: "WProto capability catalog",
+    run: "pwsh -NoProfile -File scripts/verify-wproto-evidence.ps1 -Mode catalog"
+  },
+  {
     id: "process-watchdog",
     name: "Process watchdog",
     run: "pwsh -NoProfile -File scripts/tests/test-process-watchdog.ps1 -VerboseOutput"

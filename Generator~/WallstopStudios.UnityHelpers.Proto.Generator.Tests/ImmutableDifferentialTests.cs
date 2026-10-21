@@ -150,6 +150,39 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             return restored;
         }
 
+        [TestCase("", 7, 3, new[] { 5 })]
+        [TestCase("082A10171A020809", 42, 23, new[] { 5, 8, 9 })]
+        [TestCase("080B082A1017", 42, 23, new[] { 5 })]
+        public void ImmutableBeforeDeserializationSeesFinalMembersAndRunsOnceBeforeAfter(
+            string payload,
+            int expectedValue,
+            int expectedMarker,
+            int[] expectedValues
+        )
+        {
+            Assert.IsTrue(
+                WProtoFormatterProvider.TryGet(
+                    out IWProtoFormatter<ImmutableHookTimingContract> formatter
+                )
+            );
+            WProtoReader reader = new WProtoReader(Parse(payload));
+            Assert.IsTrue(formatter.TryRead(ref reader, out ImmutableHookTimingContract restored));
+            Assert.IsTrue(restored != null);
+            Assert.IsTrue(reader.End);
+            Assert.IsFalse(reader.Malformed);
+            Assert.AreEqual(expectedValue, restored.Value);
+            Assert.AreEqual(expectedValue, restored.BeforeValue);
+            Assert.AreEqual(expectedMarker, restored.BeforeMarker);
+            CollectionAssert.AreEqual(expectedValues, restored.Values);
+            CollectionAssert.AreEqual(expectedValues, restored.BeforeValuesSnapshot);
+            Assert.AreSame(restored.Values, restored.BeforeValues);
+            Assert.AreEqual(99, restored.Marker);
+            Assert.AreEqual(99, restored.AfterMarker);
+            Assert.AreEqual(1, restored.BeforeCalls);
+            Assert.AreEqual(1, restored.AfterCalls);
+            Assert.AreEqual(12, restored.HookOrder);
+        }
+
         [Test]
         public void AnImmutableStructRoundTripsThroughItsGeneratedConstructor()
         {

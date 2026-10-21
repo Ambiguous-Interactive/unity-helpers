@@ -8,10 +8,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using System.Globalization;
     using System.IO;
     using System.Runtime.CompilerServices;
+    using System.Runtime.InteropServices;
     using System.Text;
     using System.Text.Json;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Extensions;
 
     [TestFixture]
@@ -368,11 +370,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 );
                 writer.WriteStartObject("RuntimeIdentity");
                 writer.WriteString("UnityVersion", Application.unityVersion);
-#if ENABLE_IL2CPP
-                writer.WriteString("Backend", "IL2CPP");
-#else
-                writer.WriteString("Backend", "Mono");
-#endif
+                writer.WriteString("Backend", BenchmarkRuntimeIdentity.Backend);
+                writer.WriteString("FrameworkDescription", RuntimeInformation.FrameworkDescription);
                 writer.WriteBoolean("IsEditor", Application.isEditor);
                 writer.WriteBoolean("DevelopmentBuild", UnityEngine.Debug.isDebugBuild);
                 writer.WriteString("Platform", Application.platform.ToString());
@@ -531,6 +530,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             ref string declarationSha256,
             ref string corpusSha256
         );
+
+        [Test]
+        public void PreflightRecordCapturesTheExecutingRuntimeIdentity()
+        {
+            string record = CreateRecord(
+                Array.Empty<ClockObservation>(),
+                Array.Empty<AllocationObservation>(),
+                false,
+                false,
+                false,
+                343,
+                null,
+                Array.Empty<NativeAllocationObservation>(),
+                false,
+                0,
+                null,
+                null
+            );
+            using JsonDocument document = JsonDocument.Parse(record);
+            JsonElement identity = document.RootElement.GetProperty("RuntimeIdentity");
+            string framework = RuntimeInformation.FrameworkDescription;
+#if ENABLE_IL2CPP
+            const string expectedBackend = "IL2CPP";
+#else
+            string expectedBackend = framework.StartsWith("Mono ", StringComparison.Ordinal)
+                ? "Mono"
+                : ".NET";
+#endif
+            Assert.AreEqual(expectedBackend, identity.GetProperty("Backend").GetString());
+            Assert.AreEqual(framework, identity.GetProperty("FrameworkDescription").GetString());
+        }
 
         [TestCase("6000.2.0f1", true)]
         [TestCase("6000.5.2f1", true)]

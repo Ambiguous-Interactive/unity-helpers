@@ -236,7 +236,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             EmitReadFailure(writer, qualifiedContract);
             Close(writer);
             writer.Blank();
-            writer.Line("if (!" + Occurrences + ".TryAdd(" + chunk + "))" + Writer.Open);
+            writer.Line(
+                "if (!" + Occurrences + ".TryAdd(" + chunk + ", ref reader))" + Writer.Open
+            );
             writer.Indent();
             EmitReadFailure(writer, qualifiedContract);
             Close(writer);

@@ -47,10 +47,8 @@
       Include="../../Runtime/Core/Serialization/WallstopProto/WProtoGeneratedNames.cs"
       Link="WProtoGeneratedNames.cs"
     />
-    <!-- 3.8 deliberately, not 4.x. Unity 2021.3 ships Roslyn 3.9 and cannot load an analyzer built
-         against 4.x at all, nor run an IIncrementalGenerator, which did not exist yet. Compiling
-         against 3.8 produces an ISourceGenerator every Unity version this package supports can
-         run. -->
+    <!-- Unity 2021.3 documents Microsoft.CodeAnalysis 3.8 as the source-generator API requirement.
+         Keep ISourceGenerator and this API floor rather than depending on IIncrementalGenerator. -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.8.0" PrivateAssets="all" />
     <PackageReference
       Include="Microsoft.CodeAnalysis.Analyzers"

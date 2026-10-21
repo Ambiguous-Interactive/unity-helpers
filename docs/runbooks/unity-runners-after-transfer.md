@@ -290,6 +290,86 @@ result gates. A receipt write failure warns without replacing the original proce
 
 Use those observations to investigate the original process on the named runner before selecting a repair. A successful later launch does not explain an earlier failure, and the diagnostic report does not replace the fresh configure marker or required player results.
 
+### Historical native evidence readback
+
+After timing collection finishes, recover delayed records on the machine named in the
+original execution receipt:
+
+```powershell
+pwsh -NoProfile -File scripts/unity/capture-native-fault.ps1 `
+  -ExecutionDiagnosticsPath 'D:\diagnostics\original\unity.execution-diagnostics.json' `
+  -ExpectedMachine 'ELI-MACHINE' `
+  -ArtifactsPath 'D:\diagnostics\readback-22536'
+```
+
+The expected, saved and actual machine names must agree before collection starts. The
+output directory must be fresh. Readback preserves the original receipt bytes and hash,
+queries the original process identity and event window, and inventories the original
+private capture folder using the existing file, depth, hash and text limits. The old
+Editor and generated project need not exist. It launches no Unity or debugger process
+and changes no host settings.
+
+The separate receipt records collection times and remains `EvidenceOnly`. Newly available
+events can be recovered only within the original window, ending fifteen seconds after
+the observed process exit; later event timestamps remain outside that query. Unavailable
+queries or files and no matching observations remain distinct. Missing evidence does not
+explain the original failure or establish test or performance acceptance.
+
+For an existing **Unity Tests** run, dispatch that same workflow with
+`native-readback-run-id` set to its exact numeric run ID, `acceptance: none`,
+`native-diagnostics: false`, and `native-loader-snaps-comparison: false`. Wait for
+all timing campaigns on the selected host to finish before dispatch. The job
+checks for active Unity Editors; that check does not detect a standalone player
+that continues after its Editor exits. Separate diagnostic concurrency prevents
+cancelling qualification work, but does not serialize execution with it.
+
+This route requests `[self-hosted, Windows, RAM-64GB, fast]` in both runner-access
+preflight and job scheduling. The registered ELI-MACHINE runner carries `fast`;
+its runner name is not itself a scheduling label. The job separately requires
+`[Environment]::MachineName` to equal `ELI-MACHINE` before reading evidence.
+It selects a completed
+run from the current repository with exactly one attempt, verifies unique latest
+acceptance and standalone artifact identities against that run and its source
+revision, and downloads by artifact ID. Repeated attempts and missing, expired,
+duplicate or truncated selections fail explicitly. Normal Unity jobs and success
+aggregates skip in this diagnostic mode. Failure diagnostics remain available in
+a separate artifact; they do not qualify the original run.
+
+For a prior direct-start/attach **Build** capture on DAD, also set
+`native-readback-build-receipt-sha256` to the SHA256 of the original
+`build-only-diagnostics/wproto/native-build-diagnostics/receipt.json`. This route
+requires the `DAD-MACHINE` scheduling label in both preflight and the job. If that
+label is absent, restore it through the runner setup described above before
+dispatch; do not remove the label or collect on a different host.
+
+Build readback selects only the original standalone artifact. It requires the
+exact saved receipt hash, terminal process identity, executable identity, original
+account capture directory and private crash-folder arguments. It reads bounded
+text and file metadata plus matching Windows events. Dump bodies stay private.
+The old process must be terminal, and the output directory must be fresh and
+outside the original capture. An exit code with no collector kill does not prove
+natural termination; absent files or events do not establish the cause or healthy
+completion. The ordinary ELI readback remains the default when the Build hash is
+empty.
+
+The same reader can run directly on the original DAD account:
+
+```powershell
+pwsh -NoProfile -File scripts/unity/read-native-build-evidence.ps1 `
+  -BuildReceiptPath 'D:\diagnostics\original\receipt.json' `
+  -ExpectedReceiptSha256 '<original receipt SHA256>' -ExpectedMachine 'DAD-MACHINE' `
+  -ArtifactsPath 'D:\diagnostics\build-readback'
+```
+
+The standalone readback also passes `-TestFrameworkLogPath` with its saved
+`unity.log`. For the observed test-framework 1.8.0 cache, it can copy the manifest
+and two launcher source files from the persistent project named in that log.
+Copies retain byte counts and hashes and are explicitly current cache observations;
+they do not prove the removed measurement project's original build-source bytes.
+Unavailable or rejected sources remain distinct. Readback writes an unfinished
+receipt before querying events so an interrupted collection preserves its original
+process identity. This route performs no new Unity, debugger or timing invocation.
+
 ### Opt-in native debugger capture
 
 <!-- cspell:ignore gflag -->
@@ -304,6 +384,172 @@ case, editor hash, machine, process IDs, UTC boundaries, actual process exits, t
 XML outcomes, and watchdog actions are recorded separately. These are diagnostic observations;
 they cannot satisfy acceptance or explain a different earlier failure. Normal tests, license
 return, lock release, and cleanup checks still run.
+
+For the WProto Standalone build boundary, use `test-mode: standalone`,
+`acceptance: none`, and `native-diagnostics: true`. After ordinary latest-version
+Standalone succeeds, the existing acceptance driver creates a fresh owned WProto
+project and wraps its one existing IL2CPP build in CDB by default. IL2CPP diagnostics use
+`High` managed stripping, matching the ordinary Standalone lane. Mono diagnostics
+retain `Disabled`; Unity documents that setting as
+[Mono-only](https://docs.unity3d.com/6000.0/Documentation/Manual/managed-code-stripping-configure.html).
+This selects the backend of the ordinary build fault; a clean Mono capture does not characterize an IL2CPP
+failure. The exact build arguments,
+caller working directory, inherited symbol-path environment, safe build identity
+variables, debugger process outcome and unique target exit event are retained.
+The dump stays private even though the debugger retains the caller's working directory.
+
+To test whether the debugger's heap behavior affects a fault, separately opt into
+`native-debugger-standard-heap: true`. This requires the Standalone debugger arm,
+`native-diagnostics: true`, `native-build-direct-control: false`, and `acceptance: none`.
+The collector adds only CDB's `-hd` launch option; Unity arguments, symbols, working directory
+and ordinary test execution stay the same. Microsoft documents the
+[standard-heap option](https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/debugging-a-user-mode-process-using-cdb).
+The receipt records the requested policy and inherited `_NO_DEBUG_HEAP` presence without
+changing the environment or registry. It does not infer the target's actual heap state.
+Compare separate captures on the same source before attributing a fault to this difference.
+Missing or rejected captures and later successful exits retain their original dispositions.
+
+For a fault that disappears when CDB launches Unity, separately select
+`native-build-attach-control: true`. Keep `native-diagnostics: true`,
+`test-mode: standalone`, `acceptance: none`, `native-build-direct-control: false`
+and `native-debugger-standard-heap: false`. Unity starts directly in an isolated
+collector worker. Before attaching CDB to its PID, the collector verifies a fresh
+capture identity, machine, executable path/hash, actual creation time and process
+parent ownership. It holds process handles while attaching; missing, exited,
+reused or mismatched identities fail the capture without a replacement launch.
+
+Target, worker and debugger outcomes remain separate. The receipt records the
+attachment request and observed target PID. Bounded first/last debugger output
+retains read-only global-flag and heap-summary commands at attachment; command
+errors must be interpreted explicitly. This describes the attachment boundary,
+not the startup heap. Attachment itself can change behavior. A zero exit cannot
+establish a repaired cause or qualify timing. Target output is retained separately
+and included in the build log; minidumps stay private. Timeouts and cancellation
+record termination origin rather than presenting cleanup as a natural fault.
+The existing static matrix, strict provenance and deliberate no-player stop still apply.
+
+Debugger captures record `DebuggerCommandBudget` before CDB starts. Its `Maximum`
+is 4,095 characters, `Actual` counts the complete rendered `-c` command, and
+`Admitted` reports whether it fits. The attachment prefix and escaped dump path
+count toward that limit. The pinned CDB rejects a 4,096-character command. An initial
+newline preserves the anchored attachment identity when CDB truncates its echoed
+startup line. An overlength command produces a failed partial receipt
+without a debugger process outcome. If Direct startup already occurred, its
+coordinator cancels and reaps the owned target; this is a setup rejection rather
+than a natural native exit. Legacy debugger captures retain this budget and their
+planned debugger arguments on the corresponding case. Other modes retain their
+existing behavior. See the [debugger command limit](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/using-debugger-commands).
+
+To preserve the reported domain-reload startup phase before attachment, additionally set
+`native-build-attach-after-startup: true`. This requires the admitted attachment arm.
+The collector waits for the first complete stdout line beginning
+`Domain Reload Profiling:` under the original deadline. It records that line, observation time,
+nonce and target PID before requesting CDB. Stderr, partial lines, an exited target or a
+missing/mismatched observation cannot trigger attachment. This labels a reported reload
+boundary; it does not prove every startup phase or the initial heap state.
+The OS-observed command line and bounded first/last target output are retained separately.
+An exact unique heap-end output line is required; the debugger's printed command text alone
+cannot satisfy that check.
+
+Attachment also records `ThreadDebugApi` and `ThreadDebugState`. It opens at most
+256 owned thread handles after verifying the target identity. Each query phase
+has a two-second work budget; API initialization occurs before Direct startup.
+The receipt retains owner PID, native thread creation/exit times, native status,
+returned length and an optional `HideFromDebugger` value. Missing APIs, failed
+queries, expired budgets and omitted threads remain unknown. A held-object
+follow-up after coordinator cleanup preserves creation-time identity and can
+observe a flag set after the first query. `ThreadExitObserved` reports whether
+that thread's exit time was available. Opened handles close during final cleanup,
+including cancellation and debugger-launch rejection paths.
+
+This is an initial-thread snapshot, not a complete thread history: newly created
+threads are not covered. A process-exit event's thread ID need not identify the
+faulting thread. Controlled hidden-thread AVs can exit with `C0000005` without
+CDB AV records. These fields do not establish Unity's cause or qualify timing.
+The native query is an internal Windows API and can become unavailable; its
+failure never becomes a clear flag. See [NtQueryInformationThread](https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntqueryinformationthread).
+
+For a later boundary, use `native-build-attach-after-shutdown: true` with attachment enabled
+and after-startup disabled. It waits for the first complete stdout line beginning
+`##utp:{"type":"MemoryLeaks",`. This labels Unity's reported final telemetry, after the
+shutdown messages in the retained Direct fault log. It does not prove shutdown completion
+or a guaranteed interval before exit. The same nonce/PID/time, ownership, deadline and
+no-player checks apply. A target that exits before attachment yields rejected evidence.
+The historical `Attach.Startup` receipt member retains the observation; `Attach.Boundary`
+labels it `reported-memory-leak-telemetry`.
+
+Every debugger arm records the actual exception filters before continuing. It keeps
+AV handling at second-chance break, not handled, and logs the exception record,
+registers and up to 32 stack frames for the first eight first-chance AV events.
+Later first-chance events retain the debugger's ordinary notification behavior;
+the private second-chance fault dump remains enabled. The collector also records
+calls to `ntdll!NtTerminateProcess`, including the x64 process-handle/status
+registers and up to 32 caller frames. These observations can distinguish an
+observed handled exception from an unhandled fault or an explicit termination
+request. An AV-coded exit alone does not prove an exception, and missing trace
+records do not prove that no exception or external termination occurred.
+The collector also records `ntdll!RtlExitUserThread` and `ntdll!NtTerminateThread`
+entry, including the OS thread ID, x64 status/handle registers, up to 32 caller
+frames and the stopped thread list. Thread exit can carry a nonzero status without
+an AV exception; other threads may still be alive. These observations do not
+establish that the caller is the final thread or identify a Unity fault.
+The collector prints a marked breakpoint list after installing the process and
+thread termination breakpoints and before resuming. Read the actual enabled or disabled state,
+resolved address, and unresolved indicator in
+[`bl /L`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/bl--breakpoint-list-)
+output. Requested commands alone do not establish that a breakpoint resolved or
+was enabled; absent hit markers cannot fill that gap. The list describes that
+stopped instant and does not prove that later code traversed any breakpoint.
+The Windows attach controls also require `shutdown-thread/control.exe` in the
+native-program directory. Build it from
+`Tests/Acceptance~/native-thread-exit.c` with the
+same x64 MSVC toolchain as the other controls. It reports its main and waiter OS thread IDs
+and calls `ExitThread(C0000005)` after the controlled telemetry line. Its owned
+waiter cannot return until the main thread terminates. The test requires both
+thread-entry observations to match the main ID and status while the waiter is
+still listed, with no AV exception or dump. It retains Direct and attached outcomes separately: injected
+or runtime threads can outlive the caller, so neither a sole-thread condition nor
+a fixed process exit status is assumed.
+The first-chance command uses
+[`sx-`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/sx--sxd--sxe--sxi--sxn--sxr--sx---set-exceptions-)
+to preserve the existing break and handling policy.
+
+From an existing licensed, lock-owning context, pass
+`-StandaloneBuildCapture Debugger -StandaloneBuildAttachToDirect` to the same
+WProto acceptance command. The attach option requires an explicit evidence-only
+debugger build and refuses a simultaneous standard-heap launch request.
+Add `-StandaloneBuildAttachAfterStartup` to select the reported reload boundary, or
+`-StandaloneBuildAttachAfterShutdown` for final telemetry. These options are mutually exclusive.
+
+This build-only route deliberately throws after the post-build inventory, before
+player launch. The diagnostic job and workflow therefore fail even when the
+capture completes naturally; inspect `build-only-diagnostics/wproto/native-build-diagnostics/receipt.json`
+and the frozen provenance separately. The receipt must be evidence-only with one
+completed build case. Missing, ambiguous, timed-out or failed debugger outcomes do
+not establish a completed capture. A target fault remains visible independently
+of a zero debugger exit. A nonzero debugger return must numerically match the unique
+observed target exit; both values remain distinct in the receipt. The ordinary player XML cannot qualify this separate build.
+No performance fixture or timing campaign runs in this route. Normal dispatches
+and their acceptance policy are unchanged; this route does not alter registry flags.
+
+For a matching Direct workflow arm, set `native-build-direct-control: true` with
+`native-diagnostics: true`, `test-mode: standalone`, and `acceptance: none`.
+The hosted matrix job rejects other combinations before licensed work starts.
+The default remains Debugger. Both arms retain the same IL2CPP/High/Release
+settings and stop before player launch; neither qualifies timing or adoption.
+Use separate source-bound runs and compare their recorded inputs and outcomes.
+
+For a paired direct control from an existing licensed, lock-owning runner context,
+invoke the same `run-acceptance.ps1` with `-Acceptance wproto`, the selected pinned
+version, fresh artifact/temporary paths, `-StandaloneBuildCapture Direct`, and
+`-StandaloneBuildCaptureBackend IL2CPP`.
+Use a separate fresh invocation with `Debugger` and the same explicit backend for
+the other arm. The driver defaults to Mono when the backend option is omitted.
+An IL2CPP backend request without explicit build-only capture is refused; ordinary
+WProto timing acceptance remains Mono-only. Both capture modes
+stop with the explicit evidence-only error; neither returns player acceptance.
+Keep source, editor, backend, settings and caller environment matched. These
+controls characterize debugger effects and cannot by themselves resolve an older fault.
 
 The driver downloads only twelve x64 debugger files from a versioned Microsoft bundle using
 bounded HTTP ranges. Each file must match its committed size and SHA-256 digest, and CDB must
@@ -437,10 +683,74 @@ Provision the required Unity and build-lock credentials as organization secrets 
 
 Manually dispatch **Unity Tests** with `acceptance` set to `sentinel`, `intmap`, or `all`.
 The default is `none`. The selected normal test modes still run; acceptance adds work under the
-same organization license lease. `unity-version` can select a supported editor to bound the run.
+same organization license lease. The licensed workflow retains its static four-version matrix;
+`unity-version` validates the requested version but does not reduce those jobs.
 Artifacts named `unity-<version>-acceptance` contain separate result directories and a summary.
 Each requested test, verification, credential redaction and upload must succeed. These optional
 runs are separate from the benchmark dispatch and release export workflows.
+
+For the frozen seven-family WProto synthetic baseline, dispatch **Unity Tests** on the feature
+branch with `acceptance: wproto` and `test-mode: standalone`. No pull request is required. This
+opt-in selection is excluded from `all`; its additional player runs execute only on
+2021.3.45f1 and 6000.6.0f1. Both use Mono, Release code optimization, a non-development player,
+and the generated-first `WALLSTOP_PROTO` facade. The exact corpus method selects ten read/write
+API cases; a missing, skipped, duplicated or unexpected case cannot establish baseline evidence.
+Normal selected correctness jobs, runner access checks, the organization lock and license cleanup
+remain in place.
+
+The workflow installs the pinned Node.js runtime before WProto acceptance. Direct script runs
+also require a working `node` executable on `PATH`; the launcher checks it before creating a
+campaign or starting Unity. A failed Node setup prevents the workflow from starting that campaign.
+
+The additional WProto step allows 150 minutes. Its scoped configure timeout is 900 seconds per
+attempt (at most one existing package-resolution retry), build timeout is 1800 seconds, and player
+timeout is 3600 seconds. Previous timeout environment values are restored after success or failure.
+A terminated or unsuccessful process cannot qualify the capture even if it wrote passing XML.
+The player is not automatically rerun to obtain a more favorable timing result.
+
+The `wproto` directory inside each `unity-<version>-acceptance` artifact retains the declaration,
+source and player provenance, result XML and player log, plus `corpus-summary.json` when verification
+succeeds. Before deleting the owned temporary project, the runner retains the actual player payload
+and generated `Assets`, `Packages` and `ProjectSettings` inputs under the frozen report directory. It also retains
+exact result XML and every original line containing `WPROTO_CORPUS_`, including malformed records.
+The WProto build modifier writes a declaration-bound `build-preparation.json` receipt after the test
+framework prepares its scene and the modifier saves settings and assets. Version 2 also copies the
+actual `ProjectSettings.asset` to `build-player-settings.asset` before the framework restores it.
+The copy must match the preparation inventory and is retained separately for replay.
+
+The framework may temporarily change only the background, fullscreen, resizable-window, splash-screen
+and splash-logo scalars. Before Unity 6000 it also sets the documented AOT trampoline option.
+The verifier reconstructs those exact byte changes from the configured settings. It rejects every
+other change, missing or duplicate scalar keys, invalid text, and files larger than 1 MiB.
+Post-build settings must match the configured bytes. Every other configured input stays frozen;
+only the generated test scene and its metadata, `ProjectSettings/SceneTemplateSettings.json` and
+`ProjectSettings/UnityHelpersSettings.asset` may be added. All other prepared inputs must match the
+build inventory, and every later snapshot must match the restored build inventory.
+
+On Unity 6000.6 and newer, the WProto configurator saves an explicit Release managed-code variant
+before the build, including for the IL2CPP build-only diagnostic. This prevents restoration from
+adding an entry to an initially empty map. After the launcher temporarily selects Checked, the
+WProto callback selects Release again for Mono; IL2CPP keeps Checked, matching ordinary IL2CPP test
+builds. The verifier requires exactly this backend-specific preparation and byte-exact restoration
+of the configured settings. Ordinary IL2CPP configuration and older Editors omit the new pin.
+Version 1 receipts keep the original strict equality rule; existing rejected captures are not
+reclassified.
+
+Seven generated anchor files and four sealed evidence files are required for new WProto captures,
+including the separately retained prepared settings. Late changes to the preparation receipt or
+settings reject before retention completes. The separate borrowed-buffer route keeps its five-file
+anchor, and legacy WProto receipts retain their three-file evidence set.
+Full support logs may be redacted; their original hashes describe the observed invocation, not the
+uploaded redacted bytes. The same verifier runs again after redaction and checks the retained
+measurement records, XML and build inputs. After successful redaction, rejected diagnostics are also
+uploaded; unsuccessful or skipped readback excludes `corpus-summary.json` so an earlier successful
+summary cannot be published as current evidence. Readback failure still fails the acceptance gate.
+The declaration binds the `wproto-seven-families-v1` campaign to
+`scripts/unity/wproto-corpus.v1.json`, the source revision, and the compiler inputs. Artifacts retain
+the existing 30-day lifetime; preserve accepted and rejected campaign evidence before expiry. Verification distinguishes complete raw capture from
+stable timing and the twofold target. Unstable or below-target results remain visible; a successful
+baseline capture does not claim representative consumer coverage, allocation or retained-memory
+qualification, code-size qualification, or release acceptance.
 
 For fresh IL2CPP conversion evidence, set `fresh-conversion=true` on a manual **Unity Tests**
 dispatch. The default is `false`, preserving normal warm CI. This clears only `Bee`,
