@@ -29,6 +29,10 @@ both protobuf oracle settings. Each shipped analyzer must appear exactly once at
 path. Normal assembly references, including the compiler compatibility test reference, do not
 count as compiler inputs. Run it with `node scripts/tests/test-analyzer-placement.js`.
 
+The WProto compatibility inventory checks referenced enum values independently of source file
+order. Its regression compiles both declaration orders and requires the same inventory, including
+the enum underlying type and constants. Preserve the frozen inventory when fixing its collector.
+
 ### GitHub Credentials in the Container
 
 The container resolves github.com credentials from a cached token. The Dev Containers credential

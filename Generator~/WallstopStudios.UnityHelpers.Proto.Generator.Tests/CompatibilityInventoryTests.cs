@@ -105,6 +105,50 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ReferencedEnumInventoryIsIndependentOfDeclarationOrder(bool enumFirst)
+        {
+            const string enumSource =
+                "namespace InventoryOrder { public enum Mode : byte { None = 0, Read = 1 } }";
+            const string contractSource =
+                @"
+                namespace InventoryOrder
+                {
+                    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+                    [WProtoContract]
+                    public partial class Message
+                    {
+                        [WProtoMember(1)] public Mode Value;
+                        [WProtoMember(2)] public Mode[] Values;
+                        [WProtoMember(3)] public System.Collections.Generic.List<Mode> Items;
+                    }
+                }";
+            SyntaxTree enumTree = CSharpSyntaxTree.ParseText(enumSource);
+            SyntaxTree contractTree = CSharpSyntaxTree.ParseText(contractSource);
+            CSharpCompilation compilation = CompatibilityInventory.Compile(
+                enumFirst ? new[] { enumTree, contractTree } : new[] { contractTree, enumTree }
+            );
+            Assert.IsEmpty(
+                compilation
+                    .GetDiagnostics()
+                    .Where(item => item.Severity == DiagnosticSeverity.Error)
+            );
+            string[] inventory = CompatibilityInventory.Capture(compilation);
+            CollectionAssert.Contains(
+                inventory,
+                "enum global::InventoryOrder.Mode underlying=byte"
+            );
+            CollectionAssert.Contains(inventory, "enum-value global::InventoryOrder.Mode.None=0");
+            CollectionAssert.Contains(inventory, "enum-value global::InventoryOrder.Mode.Read=1");
+            CollectionAssert.AreEqual(
+                CompatibilityInventory.Capture(
+                    CompatibilityInventory.Compile(new[] { contractTree, enumTree })
+                ),
+                inventory
+            );
+        }
+
         private static string[] CaptureControl(string source)
         {
             string[] result = CompatibilityInventory.Capture(

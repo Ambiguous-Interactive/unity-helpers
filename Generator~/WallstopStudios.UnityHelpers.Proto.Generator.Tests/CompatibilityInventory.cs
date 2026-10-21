@@ -50,7 +50,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         internal static string[] Capture(CSharpCompilation compilation)
         {
             SortedSet<string> entries = new SortedSet<string>(StringComparer.Ordinal);
-            HashSet<ISymbol> seen = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            HashSet<ISymbol> seenTypes = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            HashSet<ISymbol> seenEnums = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
             foreach (SyntaxTree tree in compilation.SyntaxTrees)
             {
                 SemanticModel model = compilation.GetSemanticModel(tree);
@@ -67,7 +68,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         model.GetDeclaredSymbol(declaration) as INamedTypeSymbol;
                     Assert.IsTrue(type != null, declaration.ToString());
                     CapturePublicSurface(type, compilation, entries);
-                    if (!seen.Add(type) || !type.GetAttributes().Any(IsContract))
+                    if (!seenTypes.Add(type) || !type.GetAttributes().Any(IsContract))
                     {
                         continue;
                     }
@@ -96,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                             entries.Add(
                                 $"member {memberIdentity} type={memberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}"
                             );
-                            CaptureEnums(memberType, entries, seen);
+                            CaptureEnums(memberType, entries, seenEnums);
                         }
                     }
                 }
