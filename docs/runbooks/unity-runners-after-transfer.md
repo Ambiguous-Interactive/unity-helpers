@@ -425,6 +425,24 @@ The OS-observed command line and bounded first/last target output are retained s
 An exact unique heap-end output line is required; the debugger's printed command text alone
 cannot satisfy that check.
 
+Attachment also records `ThreadDebugApi` and `ThreadDebugState`. It opens at most
+256 owned thread handles after verifying the target identity. Each query phase
+has a two-second work budget; API initialization occurs before Direct startup.
+The receipt retains owner PID, native thread creation/exit times, native status,
+returned length and an optional `HideFromDebugger` value. Missing APIs, failed
+queries, expired budgets and omitted threads remain unknown. A held-object
+follow-up after coordinator cleanup preserves creation-time identity and can
+observe a flag set after the first query. `ThreadExitObserved` reports whether
+that thread's exit time was available. Opened handles close during final cleanup,
+including cancellation and debugger-launch rejection paths.
+
+This is an initial-thread snapshot, not a complete thread history: newly created
+threads are not covered. A process-exit event's thread ID need not identify the
+faulting thread. Controlled hidden-thread AVs can exit with `C0000005` without
+CDB AV records. These fields do not establish Unity's cause or qualify timing.
+The native query is an internal Windows API and can become unavailable; its
+failure never becomes a clear flag. See [NtQueryInformationThread](https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntqueryinformationthread).
+
 For a later boundary, use `native-build-attach-after-shutdown: true` with attachment enabled
 and after-startup disabled. It waits for the first complete stdout line beginning
 `##utp:{"type":"MemoryLeaks",`. This labels Unity's reported final telemetry, after the

@@ -1,5 +1,7 @@
 #!/usr/bin/env pwsh
 
+. (Join-Path $PSScriptRoot 'native-thread-debug-state.ps1')
+
 function Write-NativeAttachIdentity {
     param([Diagnostics.Process]$Process, [hashtable]$Coordination)
 
@@ -222,8 +224,13 @@ function Invoke-NativeAttachCapture {
     Save-NativeCaptureRecord
     $job = $null
     $opened = $null
+    $threadDebugContext = $null
     $output = ''
     try {
+        [string]$threadApiError = $null
+        $threadApiReady = Initialize-NativeThreadDebugInterop -ErrorType ([ref]$threadApiError)
+        $case.Attach.ThreadDebugApi = @{ Available = $threadApiReady; ErrorType = $threadApiError }
+        Save-NativeCaptureRecord
         $job = Start-Job -ScriptBlock {
             param($Script, $Specification, $Artifacts)
             & $Script -WorkerSpecification $Specification -ArtifactsPath $Artifacts
@@ -257,6 +264,9 @@ function Invoke-NativeAttachCapture {
         $case.Attach.State = 'attach-requested'
         Save-NativeCaptureRecord
         if (-not $Record.DebuggerCommandBudget.Admitted) { throw 'Debugger command exceeds the explicit 4095-character budget.' }
+        $threadDebugContext = Start-NativeThreadDebugSnapshot -Target $opened.Target -ExpectedPid $opened.Identity.Pid -Deadline $deadline
+        $case.Attach.ThreadDebugState = $threadDebugContext.Observation
+        Save-NativeCaptureRecord
         if ($opened.Target.HasExited -or $opened.Worker.HasExited) { throw 'Owned process exited before debugger launch.' }
         $remaining = [int][Math]::Floor(($deadline - [DateTime]::UtcNow).TotalSeconds)
         if ($remaining -lt 1) { throw 'Attach deadline expired before debugger launch.' }
@@ -283,28 +293,32 @@ function Invoke-NativeAttachCapture {
         $case.Attach.State = 'completed'
         return $output
     } finally {
-        if ($null -ne $job) {
-            if ($job.State -in @('Running', 'NotStarted')) {
-                $case.Attach.CleanupRequested = $true
-                [IO.File]::WriteAllText($cancelPath, 'coordinator-cleanup')
-                $null = Wait-Job -Job $job -Timeout 12
-            }
-            if ($job.State -in @('Running', 'NotStarted')) {
-                if ($null -ne $opened -and -not $opened.Target.HasExited) {
-                    $case.Attach.TargetKilledByCoordinator = $true
-                    $opened.Target.Kill($true)
-                    $case.Attach.TargetReapedByCoordinator = $opened.Target.WaitForExit(10000)
+        try {
+            if ($null -ne $job) {
+                if ($job.State -in @('Running', 'NotStarted')) {
+                    $case.Attach.CleanupRequested = $true
+                    [IO.File]::WriteAllText($cancelPath, 'coordinator-cleanup')
+                    $null = Wait-Job -Job $job -Timeout 12
                 }
-                Stop-Job -Job $job
+                if ($job.State -in @('Running', 'NotStarted')) {
+                    if ($null -ne $opened -and -not $opened.Target.HasExited) {
+                        $case.Attach.TargetKilledByCoordinator = $true
+                        $opened.Target.Kill($true)
+                        $case.Attach.TargetReapedByCoordinator = $opened.Target.WaitForExit(10000)
+                    }
+                    Stop-Job -Job $job
+                }
+                $case.Attach.WorkerState = [string]$job.State
+                $case.Attach.WorkerErrors = @($job.ChildJobs | ForEach-Object { $_.Error | ForEach-Object { ConvertTo-UnitySafeLogText -Text $_.ToString() } })
+                if (Test-Path -LiteralPath (Join-Path $ArtifactsPath 'build-worker-result.json') -PathType Leaf) {
+                    $case.TargetProcess = Get-Content -LiteralPath (Join-Path $ArtifactsPath 'build-worker-result.json') -Raw | ConvertFrom-Json -AsHashtable
+                }
+                Remove-Job -Job $job
             }
-            $case.Attach.WorkerState = [string]$job.State
-            $case.Attach.WorkerErrors = @($job.ChildJobs | ForEach-Object { $_.Error | ForEach-Object { ConvertTo-UnitySafeLogText -Text $_.ToString() } })
-            if (Test-Path -LiteralPath (Join-Path $ArtifactsPath 'build-worker-result.json') -PathType Leaf) {
-                $case.TargetProcess = Get-Content -LiteralPath (Join-Path $ArtifactsPath 'build-worker-result.json') -Raw | ConvertFrom-Json -AsHashtable
-            }
-            Remove-Job -Job $job
+        } finally {
+            Complete-NativeThreadDebugSnapshot -Context $threadDebugContext
+            if ($null -ne $opened) { $opened.Target.Dispose(); $opened.Worker.Dispose() }
+            Save-NativeCaptureRecord
         }
-        if ($null -ne $opened) { $opened.Target.Dispose(); $opened.Worker.Dispose() }
-        Save-NativeCaptureRecord
     }
 }

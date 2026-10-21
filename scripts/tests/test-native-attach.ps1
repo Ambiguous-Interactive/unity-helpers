@@ -209,6 +209,8 @@ try {
             }
             Assert-Attach ([Environment]::GetEnvironmentVariable('_NT_SYMBOL_PATH', 'Process') -ceq $symbols -and [Environment]::GetEnvironmentVariable('_NO_DEBUG_HEAP', 'Process') -ceq $heap) "Actual $kind capture preserves inherited environment."
             Assert-Attach ($record.DebuggerCommandBudget.Admitted -and $record.DebuggerCommandBudget.Maximum -eq 4095 -and $record.DebuggerCommandBudget.Actual -eq $record.DebuggerArguments[4].Length) "Actual $kind binds the complete debugger command budget."
+            $threadState = $case.Attach.ThreadDebugState
+            Assert-Attach ($case.Attach.ThreadDebugApi.Available -and $threadState.OpenedHandles -gt 0 -and $threadState.OpenedHandles -eq $threadState.ClosedHandles -and $null -ne $threadState.CompletedUtc) "Actual $kind records and closes its owned thread observations."
             $console = [IO.File]::ReadAllText((Join-Path $casePath 'capture/build-attach-console-head.log'))
             $breakpointSections = [regex]::Matches($console, '(?ms)^WUH_BREAKPOINTS_BEGIN\r?\n(?<Rows>.*?)^WUH_BREAKPOINTS_END\r?$')
             Assert-Attach ($breakpointSections.Count -eq 1) "Actual $kind retains one executed breakpoint-state section."
@@ -355,6 +357,7 @@ Invoke-NativeAttachWorker -Specification $WorkerSpecification -ArtifactsPath $Ar
     } else { Write-Host 'Actual Windows CDB attachment controls were not requested; no Windows qualification claimed.' }
     Write-Host "$passed native attach controls passed"
     & (Join-Path $PSScriptRoot 'test-native-attach-startup.ps1')
+    & (Join-Path $PSScriptRoot 'test-native-thread-debug-state.ps1')
     $completed = $true
 } finally {
     if ($completed -and -not $RequireWindows) { Remove-Item -LiteralPath $root -Recurse -Force }
