@@ -105,6 +105,46 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
+        private static string[] CaptureControl(string source)
+        {
+            string[] result = CompatibilityInventory.Capture(
+                CompatibilityInventory.Compile(new[] { CSharpSyntaxTree.ParseText(source) })
+            );
+            Assert.Less(0, result.Length);
+            return result;
+        }
+
+        private static string[] CaptureApiControl(string source)
+        {
+            CSharpCompilation compilation = CompatibilityInventory.Compile(
+                new[] { CSharpSyntaxTree.ParseText(source) }
+            );
+            Assert.IsEmpty(
+                compilation
+                    .GetDiagnostics()
+                    .Where(item => item.Severity == DiagnosticSeverity.Error),
+                "API mutation controls must remain valid C# declarations."
+            );
+            string[] result = CompatibilityInventory.Capture(compilation);
+            Assert.Less(0, result.Length);
+            return result;
+        }
+
+        private static MetadataReference[] ReadUnityReferences(string directory)
+        {
+            Assert.IsTrue(
+                Directory.Exists(directory),
+                "Missing copied Unity references; restore and build this host test project."
+            );
+            string[] files = Directory.GetFiles(directory, "*.dll");
+            Assert.IsTrue(
+                File.Exists(Path.Combine(directory, "UnityEngine.CoreModule.dll")),
+                "Unity core reference is missing from the inventory inputs."
+            );
+            Assert.Less(0, files.Length);
+            return files.Select(path => MetadataReference.CreateFromFile(path)).ToArray();
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void ReferencedEnumInventoryIsIndependentOfDeclarationOrder(bool enumFirst)
@@ -147,46 +187,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 ),
                 inventory
             );
-        }
-
-        private static string[] CaptureControl(string source)
-        {
-            string[] result = CompatibilityInventory.Capture(
-                CompatibilityInventory.Compile(new[] { CSharpSyntaxTree.ParseText(source) })
-            );
-            Assert.Less(0, result.Length);
-            return result;
-        }
-
-        private static string[] CaptureApiControl(string source)
-        {
-            CSharpCompilation compilation = CompatibilityInventory.Compile(
-                new[] { CSharpSyntaxTree.ParseText(source) }
-            );
-            Assert.IsEmpty(
-                compilation
-                    .GetDiagnostics()
-                    .Where(item => item.Severity == DiagnosticSeverity.Error),
-                "API mutation controls must remain valid C# declarations."
-            );
-            string[] result = CompatibilityInventory.Capture(compilation);
-            Assert.Less(0, result.Length);
-            return result;
-        }
-
-        private static MetadataReference[] ReadUnityReferences(string directory)
-        {
-            Assert.IsTrue(
-                Directory.Exists(directory),
-                "Missing copied Unity references; restore and build this host test project."
-            );
-            string[] files = Directory.GetFiles(directory, "*.dll");
-            Assert.IsTrue(
-                File.Exists(Path.Combine(directory, "UnityEngine.CoreModule.dll")),
-                "Unity core reference is missing from the inventory inputs."
-            );
-            Assert.Less(0, files.Length);
-            return files.Select(path => MetadataReference.CreateFromFile(path)).ToArray();
         }
 
         [TestCase(false)]
