@@ -11,7 +11,7 @@ $source = Join-Path $repo 'scripts/unity/capture-native-fault.ps1'
 $tokens = $null; $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw 'Shipping capture did not parse.' }
-foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureDebuggerCommand', 'Get-NativeCaptureExitEvent')) {
+foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureDebuggerCommandBudget', 'Get-NativeCaptureDebuggerCommand', 'Get-NativeCaptureExitEvent')) {
     $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name }, $true)
     if ($null -eq $function) { throw "Missing shipping function $name" }
     . ([scriptblock]::Create($function.Extent.Text))
@@ -208,6 +208,7 @@ try {
                     [DateTimeOffset]::Parse($case.Attach.Startup.ObservedUtc) -le [DateTimeOffset]::Parse($case.Attach.RequestedUtc)) "Actual $kind observes startup on the exact target before requesting attachment."
             }
             Assert-Attach ([Environment]::GetEnvironmentVariable('_NT_SYMBOL_PATH', 'Process') -ceq $symbols -and [Environment]::GetEnvironmentVariable('_NO_DEBUG_HEAP', 'Process') -ceq $heap) "Actual $kind capture preserves inherited environment."
+            Assert-Attach ($record.DebuggerCommandBudget.Admitted -and $record.DebuggerCommandBudget.Maximum -eq 4095 -and $record.DebuggerCommandBudget.Actual -eq $record.DebuggerArguments[4].Length) "Actual $kind binds the complete debugger command budget."
             $console = [IO.File]::ReadAllText((Join-Path $casePath 'capture/build-attach-console-head.log'))
             $breakpointSections = [regex]::Matches($console, '(?ms)^WUH_BREAKPOINTS_BEGIN\r?\n(?<Rows>.*?)^WUH_BREAKPOINTS_END\r?$')
             Assert-Attach ($breakpointSections.Count -eq 1) "Actual $kind retains one executed breakpoint-state section."
@@ -283,6 +284,23 @@ try {
                 Assert-Attach ($null -ne $case.TargetProcess.KillReason -and $case.TargetProcess.KillReason -in @('coordinator-cancellation', 'wall-clock-timeout')) 'Timed-out direct target records its explicit termination origin.'
             }
         }
+        $originalBudgetCommand = ${function:Get-NativeCaptureDebuggerCommand}
+        try {
+            function Get-NativeCaptureDebuggerCommand { param($DumpPath) return (';' * 4095) }
+            $casePath = Join-Path $root 'overlength-attach'; $null = [IO.Directory]::CreateDirectory($casePath)
+            $private = Join-Path $casePath 'private'; $null = [IO.Directory]::CreateDirectory($private)
+            $record = [ordered]@{ Cases = @(@{ Process = @{}; TargetExitEvent = $null }); WorkingDirectory = [Environment]::CurrentDirectory; DebuggerHeap = @{} }
+            $failed = $false
+            try {
+                $null = Invoke-NativeAttachCapture -CaptureScript $source -EditorPath (Join-Path $NativeProgramsDirectory 'timeout/control.exe') -Arguments @() -DebuggerPath (Join-Path $root 'must-not-launch-cdb.exe') -PrivateDirectory $private -ArtifactsPath $casePath -Seconds 15 -Record $record
+            } catch {
+                if ($_.Exception.Message -notlike '*4095-character*') { throw }
+                $failed = $true
+            }
+            $case = $record.Cases[0]
+            Assert-Attach ($failed -and -not $record.DebuggerCommandBudget.Admitted -and $record.DebuggerCommandBudget.Actual -eq $record.DebuggerArguments[4].Length -and $record.DebuggerCommandBudget.Actual -gt 4095) 'The attachment prefix counts toward the complete command limit.'
+            Assert-Attach ($case.Process.Count -eq 0 -and $case.TargetProcess.Reaped -and $case.TargetProcess.KillReason -ceq 'coordinator-cancellation' -and $case.Attach.WorkerState -ceq 'Completed') 'Overlength attachment launches no debugger and cancels/reaps its owned direct target.'
+        } finally { ${function:Get-NativeCaptureDebuggerCommand} = $originalBudgetCommand }
         foreach ($failure in @('missing-debugger', 'no-attach-controller')) {
             $casePath = Join-Path $root $failure; $null = [IO.Directory]::CreateDirectory($casePath)
             $private = Join-Path $casePath 'private'; $null = [IO.Directory]::CreateDirectory($private)

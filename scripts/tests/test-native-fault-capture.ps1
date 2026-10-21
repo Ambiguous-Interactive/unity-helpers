@@ -14,7 +14,7 @@ $tokens = $null
 $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw ($errors | Out-String) }
-foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureDebuggerCommand', 'Invoke-NativeStandaloneBuildCapture', 'Get-NativeCaptureLayout', 'Get-NativeCaptureExitEvent', 'Get-NativeCaptureXmlOutcome', 'Read-NativeCaptureTail', 'Test-NativeCaptureInputsUnchanged', 'Invoke-NativeEvidenceReadback')) {
+foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureDebuggerCommandBudget', 'Get-NativeCaptureDebuggerCommand', 'Invoke-NativeStandaloneBuildCapture', 'Get-NativeCaptureLayout', 'Get-NativeCaptureExitEvent', 'Get-NativeCaptureXmlOutcome', 'Read-NativeCaptureTail', 'Test-NativeCaptureInputsUnchanged', 'Invoke-NativeEvidenceReadback')) {
     $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
     if ($null -eq $function) { throw "Missing shipping function $name" }
     . ([scriptblock]::Create($function.Extent.Text))
@@ -768,6 +768,53 @@ Start-Sleep -Seconds 300
             try { Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $arguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root ('invalid-' + $scenario)) -ArtifactsPath $root -LogPath (Join-Path $root 'invalid.log') -Seconds $(if ($scenario -eq 'unbounded') { 0 } else { 123 }) -Record $record } catch { $rejected = $true }
             Assert-Capture ($rejected -and $script:buildCaptureCalls.Count -eq $before -and $record.Cases.Count -eq 0) "Invalid build selection starts no process: $scenario"
         }
+        $originalBudgetCommand = ${function:Get-NativeCaptureDebuggerCommand}
+        $script:buildKillReason = $null
+        $script:buildControllerExit = 0
+        $script:buildThrowOnLaunch = $false
+        $script:buildTargetText = 'Last event: 2a.1: Exit process 0:2a, code c0000005'
+        try {
+            foreach ($standardHeap in @($false, $true)) {
+                foreach ($length in @(4096, 4095, 4094)) {
+                    $script:controlledCommandLength = $length
+                    function Get-NativeCaptureDebuggerCommand { param($DumpPath) return (';' * $script:controlledCommandLength) }
+                    $record = [ordered]@{ State = 'preparing'; Cases = @() }
+                    $callsBefore = $script:buildCaptureCalls.Count
+                    $rejected = $false
+                    try {
+                        Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root ('command-budget-' + $standardHeap + '-' + $length)) -ArtifactsPath $root -LogPath (Join-Path $root 'command-budget.log') -Seconds 123 -Record $record -UseStandardHeap:$standardHeap
+                    } catch {
+                        if ($_.Exception.Message -notlike '*4095-character*') { throw }
+                        $rejected = $true
+                    }
+                    $admitted = $length -le 4095
+                    Assert-Capture ($rejected -eq (-not $admitted) -and $script:buildCaptureCalls.Count -eq $callsBefore + [int]$admitted) "Complete debugger command length controls launch admission: $length"
+                    Assert-Capture ($record.DebuggerCommandBudget.Maximum -eq 4095 -and $record.DebuggerCommandBudget.Actual -eq $length -and $record.DebuggerCommandBudget.Admitted -eq $admitted) 'Persist the actual complete command budget before debugger launch'
+                    if (-not $admitted) {
+                        Assert-Capture ($record.Cases[0].Process.Count -eq 0 -and $record.State -ceq 'preparing' -and $record.DebuggerArguments[(1 + [int]$standardHeap)].Length -eq $length) 'Overlength rejection retains planned arguments without fabricating a debugger process'
+                    }
+                }
+            }
+            $legacyLoop = $ast.Find({ param($node) $node -is [Management.Automation.Language.ForEachStatementAst] -and $node.Variable.Extent.Text -ceq '$mode' }, $true)
+            $firstLegacy = @($legacyLoop.Body.Statements | Where-Object { $_.Extent.Text -ceq '$executable = $EditorPath' })[0]
+            $lastLegacy = @($legacyLoop.Body.Statements | Where-Object { $_.Extent.Text.StartsWith('$output = Invoke-NativeCaptureProcess -FilePath $executable') })[0]
+            $legacyLaunch = [scriptblock]::Create($ast.Extent.Text.Substring($firstLegacy.Extent.StartOffset, $lastLegacy.Extent.EndOffset - $firstLegacy.Extent.StartOffset))
+            foreach ($length in @(4096, 4095, 4094)) {
+                $script:controlledCommandLength = $length
+                $mode = 'debugger'; $EditorPath = 'exact-editor.exe'; $debugger = 'pinned-cdb.exe'
+                $unityArguments = $buildArguments; $privateCase = $root; $artifactRoot = $root; $TimeoutSeconds = 123; $CompareLoaderSnaps = $false
+                $record = [ordered]@{ Cases = @() }; $callsBefore = $script:buildCaptureCalls.Count; $rejected = $false
+                try { . $legacyLaunch } catch {
+                    if ($_.Exception.Message -notlike '*4095-character*') { throw }
+                    $rejected = $true
+                }
+                $admitted = $length -le 4095
+                Assert-Capture ($rejected -eq (-not $admitted) -and $script:buildCaptureCalls.Count -eq $callsBefore + [int]$admitted -and $record.Cases[0].DebuggerCommandBudget.Actual -eq $length) 'Legacy debugger launch applies the same complete command budget'
+            }
+            $mode = 'direct'; $callsBefore = $script:buildCaptureCalls.Count; $record = [ordered]@{ Cases = @() }
+            . $legacyLaunch
+            Assert-Capture ($script:buildCaptureCalls.Count -eq $callsBefore + 1 -and -not $record.Cases[0].ContainsKey('DebuggerCommandBudget')) 'Legacy Direct does not acquire a debugger command budget'
+        } finally { ${function:Get-NativeCaptureDebuggerCommand} = $originalBudgetCommand }
     } finally { ${function:Invoke-NativeCaptureProcess} = $originalBuildCaptureProcess }
 
     $runnerTokens = $null

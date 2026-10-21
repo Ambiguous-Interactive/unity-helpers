@@ -249,12 +249,14 @@ function Invoke-NativeAttachCapture {
             }
             $case.Attach.Startup = Read-NativeAttachStartup -Path $startupPath -Identity $opened.Identity -Prefix $startupPrefix
         }
-        $command = '.printf "WUH_ATTACH_PID=%x\n", @$tpid;!gflag;!heap -s;.echo WUH_ATTACH_HEAP_END;' + (Get-NativeCaptureDebuggerCommand -DumpPath (Join-Path $PrivateDirectory 'fault.dmp'))
+        $command = '.printf "\nWUH_ATTACH_PID=%x\n", @$tpid;!gflag;!heap -s;.echo WUH_ATTACH_HEAP_END;' + (Get-NativeCaptureDebuggerCommand -DumpPath (Join-Path $PrivateDirectory 'fault.dmp'))
         $debuggerArguments = @('-pd', '-p', [string]$opened.Identity.Pid, '-c', $command)
         $Record.DebuggerArguments = $debuggerArguments
+        $Record.DebuggerCommandBudget = Get-NativeCaptureDebuggerCommandBudget -Command $command
         $case.Attach.RequestedUtc = [DateTime]::UtcNow.ToString('o')
         $case.Attach.State = 'attach-requested'
         Save-NativeCaptureRecord
+        if (-not $Record.DebuggerCommandBudget.Admitted) { throw 'Debugger command exceeds the explicit 4095-character budget.' }
         if ($opened.Target.HasExited -or $opened.Worker.HasExited) { throw 'Owned process exited before debugger launch.' }
         $remaining = [int][Math]::Floor(($deadline - [DateTime]::UtcNow).TotalSeconds)
         if ($remaining -lt 1) { throw 'Attach deadline expired before debugger launch.' }

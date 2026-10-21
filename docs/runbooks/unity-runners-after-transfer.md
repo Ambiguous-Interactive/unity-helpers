@@ -402,6 +402,18 @@ and included in the build log; minidumps stay private. Timeouts and cancellation
 record termination origin rather than presenting cleanup as a natural fault.
 The existing static matrix, strict provenance and deliberate no-player stop still apply.
 
+Debugger captures record `DebuggerCommandBudget` before CDB starts. Its `Maximum`
+is 4,095 characters, `Actual` counts the complete rendered `-c` command, and
+`Admitted` reports whether it fits. The attachment prefix and escaped dump path
+count toward that limit. The pinned CDB rejects a 4,096-character command. An initial
+newline preserves the anchored attachment identity when CDB truncates its echoed
+startup line. An overlength command produces a failed partial receipt
+without a debugger process outcome. If Direct startup already occurred, its
+coordinator cancels and reaps the owned target; this is a setup rejection rather
+than a natural native exit. Legacy debugger captures retain this budget and their
+planned debugger arguments on the corresponding case. Other modes retain their
+existing behavior. See the [debugger command limit](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/using-debugger-commands).
+
 To preserve the reported domain-reload startup phase before attachment, additionally set
 `native-build-attach-after-startup: true`. This requires the admitted attachment arm.
 The collector waits for the first complete stdout line beginning

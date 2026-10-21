@@ -182,6 +182,11 @@ function Get-NativeCaptureExitEvent {
     }
 }
 
+function Get-NativeCaptureDebuggerCommandBudget {
+    param([string]$Command)
+    return [ordered]@{ Maximum = 4095; Actual = $Command.Length; Admitted = ($Command.Length -le 4095) }
+}
+
 function Get-NativeCaptureDebuggerCommand {
     param([string]$DumpPath = 'fault.dmp')
     if ($DumpPath.IndexOfAny([char[]]@([char]34, [char]10, [char]13)) -ge 0) { throw 'Invalid debugger dump path.' }
@@ -234,10 +239,13 @@ function Invoke-NativeStandaloneBuildCapture {
     }
     $Record.Qualification = 'One existing build under a debugger; controller and target exits are distinct. No player launch, timing or acceptance qualification. Symbol-path environment is inherited unchanged.'
     $Record.Cases += $case
-    $debuggerArguments = @('-c', (Get-NativeCaptureDebuggerCommand -DumpPath (Join-Path $PrivateDirectory 'fault.dmp')), $EditorPath) + $actual
+    $command = Get-NativeCaptureDebuggerCommand -DumpPath (Join-Path $PrivateDirectory 'fault.dmp')
+    $debuggerArguments = @('-c', $command, $EditorPath) + $actual
     if ($UseStandardHeap) { $debuggerArguments = @('-hd') + $debuggerArguments }
     $Record.DebuggerArguments = $debuggerArguments
+    if (-not $AttachToDirect) { $Record.DebuggerCommandBudget = Get-NativeCaptureDebuggerCommandBudget -Command $command }
     Save-NativeCaptureRecord
+    if (-not $AttachToDirect -and -not $Record.DebuggerCommandBudget.Admitted) { throw 'Debugger command exceeds the explicit 4095-character budget.' }
     if ($AttachToDirect) {
         $Record.ConsoleScope = 'separate-bounded-direct-target-and-debugger-console-windows'
         $Record.Qualification = 'Direct startup followed by debugger attachment; target, worker and debugger outcomes remain separate. No player launch, timing or acceptance qualification.'
@@ -578,7 +586,12 @@ try {
         $case = @{ Mode = $mode; Process = $observation; TargetExitEvent = $null; DumpPresent = $false }
         if ($CompareLoaderSnaps) { $case.GlobalFlagRegistry = Get-NativeGlobalFlagSnapshot }
         $record.Cases += $case
+        if ($mode -eq 'debugger') {
+            $case.DebuggerArguments = $arguments
+            $case.DebuggerCommandBudget = Get-NativeCaptureDebuggerCommandBudget -Command $command
+        }
         Save-NativeCaptureRecord
+        if ($mode -eq 'debugger' -and -not $case.DebuggerCommandBudget.Admitted) { throw 'Debugger command exceeds the explicit 4095-character budget.' }
         $output = Invoke-NativeCaptureProcess -FilePath $executable -Arguments $arguments -Directory $privateCase -Seconds $TimeoutSeconds -Observation $observation -ReceiptPath (Join-Path $artifactRoot "$mode-process.json")
         [IO.File]::WriteAllText((Join-Path $artifactRoot "$mode-console.log"), (ConvertTo-UnitySafeLogText -Text $output))
         if ($mode -eq 'debugger') { $case.TargetExitEvent = Get-NativeCaptureExitEvent -Text $output }

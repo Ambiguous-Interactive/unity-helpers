@@ -9,7 +9,7 @@ $source = Join-Path $repo 'scripts/unity/capture-native-fault.ps1'
 $tokens = $null; $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw 'Native capture source did not parse.' }
-foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureDebuggerCommand', 'Get-NativeCaptureExitEvent')) {
+foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureDebuggerCommandBudget', 'Get-NativeCaptureDebuggerCommand', 'Get-NativeCaptureExitEvent')) {
     $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name }, $true)
     . ([scriptblock]::Create($function.Extent.Text))
 }
