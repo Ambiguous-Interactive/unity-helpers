@@ -18,7 +18,7 @@
          the leg that is about to run, and it stops as soon as the projected free
          space clears the floor.
 
-    Pure and deterministic: no disk, no Unity, no network.
+    Uses temporary filesystem controls; no Unity or network access.
 
 .PARAMETER VerboseOutput
     Show detailed output during test execution.
@@ -197,6 +197,163 @@ try {
 }
 
 Write-Host ''
+Write-Host 'Interrupted migration project isolation' -ForegroundColor White
+$residueRoot = Join-Path ([IO.Path]::GetTempPath()) ('unity-migration-residue-' + [guid]::NewGuid().ToString('N'))
+try {
+    $project = Join-Path $residueRoot 'projects/editor'
+    $sourceRelative = 'Assets/OdinApplyIntegration-0123456789abcdef0123456789abcdef/Consumer.cs'
+    $contents = @{
+        'Assets/Editor/UhCiTestConfigurator.cs' = 'public static class UhCiTestConfigurator {}'
+        'Packages/manifest.json' = '{"dependencies":{}}'
+        'Library/ScriptAssemblies/Consumer.dll' = 'derived assembly control'
+        'Library/WallstopOdinMigrationApply/active.txt' = 'retained-migration'
+        'Library/WallstopOdinMigrationBackups/retained-migration/state.json' = 'retained backup control'
+        $sourceRelative = 'interrupted consumer control'
+    }
+    foreach ($relative in $contents.Keys) {
+        $target = Join-Path $project $relative
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+        [IO.File]::WriteAllText($target, $contents[$relative])
+    }
+    $retained = Move-UnityProjectWithMigrationResidue -Project $project
+    Write-TestResult -TestName 'interrupted migration cannot contaminate the next generated project' `
+        -Passed (-not (Test-Path -LiteralPath $project) -and $null -ne $retained)
+    foreach ($relative in $contents.Keys) {
+        Assert-Equal -TestName "retained project preserves $relative" -Expected $contents[$relative] `
+            -Actual ([IO.File]::ReadAllText((Join-Path $retained.RetainedPath $relative)))
+    }
+    Write-TestResult -TestName 'retained project is outside ordinary sibling pruning' `
+        -Passed ((Split-Path -Parent $retained.RetainedPath) -eq (Join-Path $residueRoot 'retained-projects'))
+    Assert-Equal -TestName 'missing replacement is an idempotent no-op' -Expected $null `
+        -Actual (Move-UnityProjectWithMigrationResidue -Project $project)
+
+    foreach ($relative in @('Assets/Editor/UhCiTestConfigurator.cs', 'Library/cache.bin', 'Assets/OdinApplyIntegration-not-a-guid/Consumer.cs')) {
+        $target = Join-Path $project $relative
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+        [IO.File]::WriteAllText($target, 'healthy project control')
+    }
+    Assert-Equal -TestName 'healthy project keeps its warm Library' -Expected $null `
+        -Actual (Move-UnityProjectWithMigrationResidue -Project $project)
+    Assert-Equal -TestName 'healthy Library bytes remain unchanged' -Expected 'healthy project control' `
+        -Actual ([IO.File]::ReadAllText((Join-Path $project 'Library/cache.bin')))
+
+    foreach ($prefix in @('OdinApplyIntegration', 'OdinImportVerification', 'OdinBoundConversion', 'OdinSceneScope',
+            'OdinMigrationImport', 'OdinMigrationReferences', 'OdinPairedPreview', 'OdinLiveAddress')) {
+        $fixture = Join-Path $residueRoot ('projects/' + $prefix)
+        $asset = Join-Path $fixture ('Assets/' + $prefix + '-0123456789abcdef0123456789abcdef')
+        New-Item -ItemType Directory -Force -Path $asset | Out-Null
+        New-Item -ItemType Directory -Force -Path (Join-Path $fixture 'Assets/Editor') | Out-Null
+        [IO.File]::WriteAllText((Join-Path $fixture 'Assets/Editor/UhCiTestConfigurator.cs'), 'public static class UhCiTestConfigurator {}')
+        $moved = Move-UnityProjectWithMigrationResidue -Project $fixture
+        Write-TestResult -TestName "$prefix residue is isolated without requiring a pointer" `
+            -Passed ($null -ne $moved -and (Test-Path -LiteralPath (Join-Path $moved.RetainedPath ('Assets/' + (Split-Path -Leaf $asset)))))
+    }
+
+    $pointer = Join-Path $project 'Library/WallstopOdinMigrationApply/active.txt'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pointer) | Out-Null
+    [IO.File]::WriteAllText($pointer, 'active-only control')
+    $refused = $false
+    try { Move-UnityProjectWithMigrationResidue -Project $project -ExplicitProject | Out-Null }
+    catch { $refused = $_.Exception.Message -match 'explicit' }
+    Write-TestResult -TestName 'explicit caller project is refused without moving its migration' `
+        -Passed ($refused -and [IO.File]::ReadAllText($pointer) -eq 'active-only control')
+    [IO.File]::WriteAllText((Join-Path $project 'Assets/Editor/UhCiTestConfigurator.cs'), 'unrelated authoring source')
+    $refused = $false
+    try { Move-UnityProjectWithMigrationResidue -Project $project | Out-Null }
+    catch { $refused = $_.Exception.Message -match 'generated' }
+    Write-TestResult -TestName 'unproven project provenance is refused without moving its migration' `
+        -Passed ($refused -and [IO.File]::ReadAllText($pointer) -eq 'active-only control')
+    [IO.File]::WriteAllText((Join-Path $project 'Assets/Editor/UhCiTestConfigurator.cs'), 'public static class UhCiTestConfigurator {}')
+    $moved = Move-UnityProjectWithMigrationResidue -Project $project
+    Assert-Equal -TestName 'pointer alone preserves the interrupted project' -Expected 'active-only control' `
+        -Actual ([IO.File]::ReadAllText((Join-Path $moved.RetainedPath 'Library/WallstopOdinMigrationApply/active.txt')))
+
+    $failureProject = Join-Path $residueRoot 'failed-preservation/projects/editor'
+    $failurePointer = Join-Path $failureProject 'Library/WallstopOdinMigrationApply/active.txt'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $failurePointer) | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $failureProject 'Assets/Editor') | Out-Null
+    [IO.File]::WriteAllText((Join-Path $failureProject 'Assets/Editor/UhCiTestConfigurator.cs'), 'public static class UhCiTestConfigurator {}')
+    [IO.File]::WriteAllText($failurePointer, 'failed preservation control')
+    $blockedDestination = Join-Path $residueRoot 'failed-preservation/retained-projects'
+    [IO.File]::WriteAllText($blockedDestination, 'destination conflict control')
+    $refused = $false
+    try { Move-UnityProjectWithMigrationResidue -Project $failureProject | Out-Null }
+    catch { $refused = $true }
+    Write-TestResult -TestName 'failed preservation leaves the original pointer and conflicting destination unchanged' `
+        -Passed ($refused -and [IO.File]::ReadAllText($failurePointer) -ceq 'failed preservation control' -and
+            [IO.File]::ReadAllText($blockedDestination) -ceq 'destination conflict control')
+
+    $linkType = if ($env:OS -eq 'Windows_NT') { 'Junction' } else { 'SymbolicLink' }
+    foreach ($relative in @('', 'Assets', 'Library', 'Assets/Editor', 'Library/WallstopOdinMigrationApply')) {
+        $linkRoot = Join-Path $residueRoot ('linked-' + [guid]::NewGuid().ToString('N'))
+        $linkedProject = Join-Path $linkRoot 'projects/editor'
+        $linkTarget = Join-Path $linkRoot 'outside'
+        New-Item -ItemType Directory -Force -Path $linkTarget | Out-Null
+        [IO.File]::WriteAllText((Join-Path $linkTarget 'canary'), 'outside control')
+        $linkedPath = if ($relative) { Join-Path $linkedProject $relative } else { $linkedProject }
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $linkedPath) | Out-Null
+        New-Item -ItemType $linkType -Path $linkedPath -Target $linkTarget | Out-Null
+        $refused = $false
+        try { Move-UnityProjectWithMigrationResidue -Project $linkedProject | Out-Null }
+        catch { $refused = $_.Exception.Message -match 'linked' }
+        Write-TestResult -TestName "linked project path '$relative' is refused without changing its target" `
+            -Passed ($refused -and [IO.File]::ReadAllText((Join-Path $linkTarget 'canary')) -ceq 'outside control')
+        Remove-Item -LiteralPath $linkedPath -Force
+    }
+    Remove-Item -LiteralPath $blockedDestination
+    $outside = Join-Path $residueRoot 'retention-link-target'
+    New-Item -ItemType Directory -Path $outside | Out-Null
+    New-Item -ItemType $linkType -Path $blockedDestination -Target $outside | Out-Null
+    $refused = $false
+    try { Move-UnityProjectWithMigrationResidue -Project $failureProject | Out-Null }
+    catch { $refused = $_.Exception.Message -match 'linked' }
+    Write-TestResult -TestName 'linked retention root is refused without moving the source' `
+        -Passed ($refused -and [IO.File]::ReadAllText($failurePointer) -ceq 'failed preservation control' -and
+            @(Get-ChildItem -LiteralPath $outside -Force).Count -eq 0)
+    Remove-Item -LiteralPath $blockedDestination -Force
+
+    $runnerSource = Get-Content -LiteralPath (Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1') -Raw
+    $guardOffset = $runnerSource.IndexOf('$retainedProject = Move-UnityProjectWithMigrationResidue')
+    $initializeOffset = $runnerSource.IndexOf('$ProjectPath = Initialize-EphemeralProject')
+    $warmthOffset = $runnerSource.IndexOf('$LibraryWarmth =')
+    Write-TestResult -TestName 'runner isolates residue before measuring cache warmth or generating compiler inputs' `
+        -Passed ($guardOffset -ge 0 -and $guardOffset -lt $warmthOffset -and $guardOffset -lt $initializeOffset)
+    Write-TestResult -TestName 'runner retains explicit-path provenance before resolving workspace' `
+        -Passed ($runnerSource.IndexOf('$ExplicitProjectRequested =') -ge 0 -and
+            $runnerSource.IndexOf('$ExplicitProjectRequested =') -lt $runnerSource.IndexOf('$ProjectWorkspace = Resolve-UnityProjectWorkspace'))
+    $tokens = $null
+    $parseErrors = $null
+    $runnerAst = [Management.Automation.Language.Parser]::ParseInput($runnerSource, [ref]$tokens, [ref]$parseErrors)
+    if ($parseErrors.Count -ne 0) { throw 'Unity runner must parse before exercising its retention guard.' }
+    $guard = @($runnerAst.EndBlock.Statements | Where-Object {
+        $_ -is [Management.Automation.Language.IfStatementAst] -and
+        $_.Extent.Text.Contains('$retainedProject = Move-UnityProjectWithMigrationResidue')
+    })
+    if ($guard.Count -ne 1) { throw 'Expected exactly one top-level project retention guard.' }
+    $ProjectPath = $failureProject
+    $ArtifactsPath = Join-Path $residueRoot 'public-artifacts'
+    $ExplicitProjectRequested = $false
+    function Write-CiWarning { param([string]$Message) }
+    $TestMode = 'export'
+    Invoke-Expression $guard[0].Extent.Text
+    Write-TestResult -TestName 'export never moves its staged project or writes a retention receipt' `
+        -Passed ((Test-Path -LiteralPath $failurePointer) -and -not (Test-Path -LiteralPath $ArtifactsPath))
+    $TestMode = 'editmode'
+    Invoke-Expression $guard[0].Extent.Text
+    $receipt = Get-Content -LiteralPath (Join-Path $ArtifactsPath 'retained-project.json') -Raw | ConvertFrom-Json
+    Write-TestResult -TestName 'shipping guard preserves residue and writes the actual destination receipt' `
+        -Passed ($receipt.OriginalPath -ceq $failureProject -and -not (Test-Path -LiteralPath $failureProject) -and
+            [IO.File]::ReadAllText((Join-Path $receipt.RetainedPath 'Library/WallstopOdinMigrationApply/active.txt')) -ceq 'failed preservation control')
+    $lifecycle = @($runnerAst.EndBlock.Statements | Where-Object {
+        $_ -is [Management.Automation.Language.TryStatementAst] -and
+        $_.Body.Extent.Text.Contains('Invoke-UnityNativeStartupProbe')
+    })
+    Write-TestResult -TestName 'shipping guard runs before the native editor and license lifecycle' `
+        -Passed ($lifecycle.Count -eq 1 -and $guard[0].Extent.EndOffset -lt $lifecycle[0].Extent.StartOffset)
+} finally {
+    if (Test-Path -LiteralPath $residueRoot) { Remove-Item -LiteralPath $residueRoot -Recurse -Force }
+}
+
 Write-Host "Passed: $script:TestsPassed" -ForegroundColor Green
 if ($script:TestsFailed -gt 0) {
     Write-Host "Failed: $script:TestsFailed" -ForegroundColor Red

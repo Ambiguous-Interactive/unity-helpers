@@ -4993,6 +4993,7 @@ catch {
     Write-Host "MSVC toolchain report unavailable: $($_.Exception.Message)"
 }
 
+$ExplicitProjectRequested = -not [string]::IsNullOrWhiteSpace($ProjectPath)
 $ProjectWorkspace = Resolve-UnityProjectWorkspace `
     -RepoRoot $RepoRoot `
     -Version $UnityVersion `
@@ -5032,6 +5033,15 @@ $AdditionalScriptingDefinesList = @(
         Select-Object -Unique
 )
 $AdditionalScriptingDefinesJoined = ($AdditionalScriptingDefinesList -join ';')
+
+if ($TestMode -ne 'export') {
+    $retainedProject = Move-UnityProjectWithMigrationResidue -Project $ProjectPath -ExplicitProject:$ExplicitProjectRequested
+    if ($null -ne $retainedProject) {
+        New-Item -ItemType Directory -Force -Path $ArtifactsPath | Out-Null
+        $retainedProject | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $ArtifactsPath 'retained-project.json') -Encoding UTF8
+        Write-CiWarning "Retained interrupted migration project at '$($retainedProject.RetainedPath)'. Tests will use a fresh generated project."
+    }
+}
 
 # Measured BEFORE the project is (re)generated: this single line is how a run
 # proves the Library survived since the previous leg instead of being imported

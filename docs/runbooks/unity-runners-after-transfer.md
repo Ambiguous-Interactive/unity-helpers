@@ -218,6 +218,23 @@ because its player build settings differ. Each mode still writes its own logs an
 separate `<unity-version>-playmode[-<scope>]` project so the second result remains
 independent of assets left by the failed run.
 
+Before opening a generated test project, the runner checks for an active dictionary
+migration pointer and temporary Odin fixture folders left by an interrupted run.
+It moves an affected project, including its sources, backups and `Library`, to
+`<project-root-parent>/retained-projects/<project-name>-<unique-id>` and generates a
+fresh replacement. This retention directory sits beside `projects/`, outside the
+automatic project-prune set. Healthy projects keep their existing `Library`.
+The mode's `retained-project.json` artifact records the original path, retained
+path, detected residue and UTC observation time. The retained project itself stays
+on the runner for investigation; review and remove it manually after preserving
+the evidence you need. Native crash-report qualification remains independent.
+
+Automatic retention requires the generated CI configurator and refuses linked
+roots. An explicit `-ProjectPath` containing migration residue fails before Unity
+starts and leaves that project in place. Preserve and isolate it before retrying;
+do not delete an active migration pointer or its backups to make a test pass.
+A failed move also stops the run without clearing the original project.
+
 EditMode runs compiler-isolation fixtures in a fresh editor process before the broader suite.
 These cases carry `CompilationIsolation` and must all pass without skips. Their results and log
 remain under the mode's `compilation/` artifact directory. The source API, backup recovery,
