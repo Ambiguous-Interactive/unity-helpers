@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add opt-in `WUH019` to suggest caching stable loop bounds while keeping live bounds for changing collections ([#894](https://github.com/Ambiguous-Interactive/unity-helpers/issues/894)).
 - Add cached read-only enum values and an ordinal enum-name comparer for allocation-free iteration and warmed name ordering ([#889](https://github.com/Ambiguous-Interactive/unity-helpers/issues/889)).
 
+### Changed
+
+- Update bundled JSON and immutable collections to 10.0.13 and patched protobuf-net to 3.4.40, retaining existing Unity assembly constraints ([#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052)).
+
 ### Fixed
 
 - Fix exported protobuf map fields, URI text, and explicit surrogate overrides so other protobuf tools can read the generated schemas ([#1027](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1027)).

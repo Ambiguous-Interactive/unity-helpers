@@ -15,6 +15,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
     using WallstopStudios.UnityHelpers.Editor;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Utils;
+    using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
 
     [TestFixture]
@@ -35,6 +37,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             RegexOptions.Compiled
         );
 
+        private EditorAssetFileScope _directorySettings;
+
         private static IEnumerable<string> ThrowingFolders()
         {
             yield return Root;
@@ -54,6 +58,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()
         {
+            _directorySettings = new EditorAssetFileScope(
+                PersistentDirectorySettings.TargetAssetPath
+            );
             base.CommonOneTimeSetUp();
             ExecuteWithImmediateImport(() => EnsureFolder(Root));
         }
@@ -61,7 +68,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [OneTimeTearDown]
         public override void OneTimeTearDown()
         {
-            base.OneTimeTearDown();
+            try
+            {
+                base.OneTimeTearDown();
+            }
+            finally
+            {
+                try
+                {
+                    _directorySettings?.Dispose();
+                }
+                finally
+                {
+                    ScriptableObjectSingleton<PersistentDirectorySettings>.ClearInstance();
+                    AssetPostprocessorDeferralTestAccess.Flush();
+                }
+            }
         }
 
         [Test]

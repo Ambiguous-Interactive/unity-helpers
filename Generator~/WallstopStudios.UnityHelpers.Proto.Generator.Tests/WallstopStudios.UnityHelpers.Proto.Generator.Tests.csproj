@@ -18,10 +18,10 @@
     <ProtobufNetOraclePath Condition="'$(ProtobufNetOracle)' == 'v2'"
       >$(RepoRoot)/Generator~/ProtobufNetV2Oracle/protobuf-net.dll</ProtobufNetOraclePath>
     <ProtobufNetOraclePath Condition="'$(ProtobufNetOracle)' == 'v3'"
-      >$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</ProtobufNetOraclePath>
+      >$(RepoRoot)/Generator~/ProtobufNetV3Oracle/protobuf-net.dll</ProtobufNetOraclePath>
     <ProtobufNetOraclePath Condition="'$(ProtobufNetOracle)' == 'candidate'"
       >$(ProtobufNetCandidateRoot)/protobuf-net.dll</ProtobufNetOraclePath>
-    <ProtobufNetCorePath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</ProtobufNetCorePath>
+    <ProtobufNetCorePath>$(RepoRoot)/Generator~/ProtobufNetV3Oracle/protobuf-net.Core.dll</ProtobufNetCorePath>
     <ProtobufNetCorePath Condition="'$(ProtobufNetOracle)' == 'candidate'"
       >$(ProtobufNetCandidateRoot)/protobuf-net.Core.dll</ProtobufNetCorePath>
     <BaseOutputPath>bin/$(ProtobufNetOracle)/</BaseOutputPath>

@@ -36,11 +36,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     [NUnit.Framework.Category("Integration")]
     public sealed class DetectAssetChangePrefabSubAssetTests : BatchedEditorTestBase
     {
-        // Owned by the sprite handler because that handler filters on it; see its XML doc.
-        private const string TestRoot = TestSpriteSubAssetChangeHandler.WatchedFolder;
-
         private const string SendMessageMessagePrefix =
             "SendMessage cannot be called during Awake, CheckConsistency, or OnValidate";
+
+        private readonly string _testRoot =
+            TestSpriteSubAssetChangeHandler.WatchedFolder + "/Run-" + Guid.NewGuid().ToString("N");
+
+        private bool _ownsWatcherFolder;
 
         private AssetChangeDetectionEnabledScope _watcherScope;
 
@@ -119,17 +121,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
         }
 
-        private static void EnsureTestFolder()
-        {
-            // Use batch-safe folder creation so AssetDatabase recognizes the folder immediately.
-            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(TestRoot))
-            {
-                Debug.LogWarning(
-                    $"EnsureTestFolder: Failed to register folder '{TestRoot}' in the AssetDatabase."
-                );
-            }
-        }
-
         private static void WriteSolidColorTexture(string path, int width, int height, Color color)
         {
             Texture2D texture = new(width, height, TextureFormat.RGBA32, mipChain: false);
@@ -161,10 +152,42 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
+            _ownsWatcherFolder =
+                !Directory.Exists(TestSpriteSubAssetChangeHandler.WatchedFolder)
+                && !AssetDatabase.IsValidFolder(TestSpriteSubAssetChangeHandler.WatchedFolder)
+                && !File.Exists(TestSpriteSubAssetChangeHandler.WatchedFolder + ".meta");
+            if (_ownsWatcherFolder)
+            {
+                TrackFolder(TestSpriteSubAssetChangeHandler.WatchedFolder);
+            }
             EnsureTestFolder();
-            TrackFolder(TestRoot);
+            TrackFolder(_testRoot);
             // Folder creation can queue drains that would pollute the first test.
             AssetPostprocessorDeferralTestAccess.Flush();
+        }
+
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+            AssetPostprocessorDeferralTestAccess.Flush();
+            Assert.That(AssetDatabase.IsValidFolder(_testRoot), Is.False, _testRoot);
+            Assert.That(Directory.Exists(_testRoot), Is.False, _testRoot);
+            Assert.That(File.Exists(_testRoot + ".meta"), Is.False, _testRoot);
+            if (_ownsWatcherFolder)
+            {
+                string watchedFolder = TestSpriteSubAssetChangeHandler.WatchedFolder;
+                Assert.That(AssetDatabase.IsValidFolder(watchedFolder), Is.False, watchedFolder);
+                Assert.That(Directory.Exists(watchedFolder), Is.False, watchedFolder);
+                Assert.That(File.Exists(watchedFolder + ".meta"), Is.False, watchedFolder);
+            }
         }
 
         [SetUp]
@@ -209,7 +232,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void PrefabIsNeverDeserializedWhenMatchedAgainstWatchers()
         {
-            string prefabPath = TestRoot + "/LoadCountProbe.prefab";
+            string prefabPath = _testRoot + "/LoadCountProbe.prefab";
             CreateProbePrefab(prefabPath);
 
             // A prefab’s GameObject main type forces non-GameObject watchers through the sub-asset probe.
@@ -261,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void PrefabMatchedAgainstWatchersEmitsNoSendMessageWarnings()
         {
-            string prefabPath = TestRoot + "/SendMessageProbe.prefab";
+            string prefabPath = _testRoot + "/SendMessageProbe.prefab";
             CreateProbePrefab(prefabPath);
 
             DetectAssetChangeProcessorTestAccess.EnsureInitialized();
@@ -292,7 +315,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void NestedScriptableObjectSubAssetStillMatchesWatcherOnNestedType()
         {
-            string containerPath = TestRoot + "/NestedSubAssetContainer.asset";
+            string containerPath = _testRoot + "/NestedSubAssetContainer.asset";
             TrackAssetPath(containerPath);
 
             ExecuteWithImmediateImport(
@@ -354,7 +377,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void NestedSubAssetMatchingDoesNotDeserializeContainer()
         {
-            string containerPath = TestRoot + "/UnloadedSubAssetContainer.asset";
+            string containerPath = _testRoot + "/UnloadedSubAssetContainer.asset";
             TrackAssetPath(containerPath);
 
             TestSubAssetContainerAsset container = Track(
@@ -422,7 +445,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void ContainerWithoutMatchingSubAssetDoesNotNotifyNestedTypeWatcher()
         {
-            string containerPath = TestRoot + "/UnrelatedSubAssetContainer.asset";
+            string containerPath = _testRoot + "/UnrelatedSubAssetContainer.asset";
             TrackAssetPath(containerPath);
 
             ExecuteWithImmediateImport(() =>
@@ -463,7 +486,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void TextureSpriteSubAssetStillMatchesSpriteWatcher()
         {
-            string texturePath = TestRoot + "/SpriteSubAsset.png";
+            string texturePath = _testRoot + "/SpriteSubAsset.png";
             TrackAssetPath(texturePath);
 
             ExecuteWithImmediateImport(
@@ -524,6 +547,17 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 $"A watcher on {nameof(Sprite)} should still match '{texturePath}' through its "
                     + "sprite sub-assets"
             );
+        }
+
+        private void EnsureTestFolder()
+        {
+            // Use batch-safe folder creation so AssetDatabase recognizes the folder immediately.
+            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(_testRoot))
+            {
+                Debug.LogWarning(
+                    $"EnsureTestFolder: Failed to register folder '{_testRoot}' in the AssetDatabase."
+                );
+            }
         }
 
         private void CreateProbePrefab(string prefabPath)

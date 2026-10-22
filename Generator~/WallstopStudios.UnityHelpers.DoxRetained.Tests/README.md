@@ -15,8 +15,18 @@ The generator workflow runs this command separately from the ordinary host oracl
 v3 host runtime closure and inherits the shipped compiler inputs from `Generator~/Directory.Build.props`.
 Explicit compile references select the repository's pinned protobuf-net and protobuf-net.Core DLLs;
 the project reference does not supply these raw DLL references transitively.
-It rejects v2 and external oracle-path overrides. Loaded protobuf-net assemblies must match the pinned
-byte hashes in `DoxRetainedInventory.v1.json`.
+The historical lane rejects v2 and external oracle-path overrides. Its loaded assemblies must
+match the frozen byte hashes in `DoxRetainedInventory.v1.json`, using the preserved v3 DLLs
+under `Generator~/ProtobufNetV3Oracle`.
+
+The same retained inputs also run against the current source-built runtime, in a separate process:
+
+```bash
+dotnet test Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/WallstopStudios.UnityHelpers.DoxRetained.Tests.csproj -c Release -p:ProtobufNetOracle=candidate -p:ProtobufNetCandidateRoot=/tmp/protobuf-candidate/assemblies
+```
+
+That lane checks the current build receipt, patch and loaded DLL hashes instead of expecting
+the old DLL bytes. Both lanes preserve every captured source, value, payload and inventory byte.
 
 ## Captures and provenance
 

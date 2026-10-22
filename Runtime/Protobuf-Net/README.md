@@ -1,19 +1,16 @@
 # Bundled protobuf-net
 
-The two protobuf-net assemblies are patched builds of upstream **3.2.56**, targeting
-.NET Standard 2.1. Source commit: `dfdfce61a739cfd76f05fcdacf8a4b3b9e94e684`.
-The annotated tag object is `421b80a9b128be779036e600b996efb9e48b9f92`.
-Upstream source and license: [protobuf-net](https://github.com/protobuf-net/protobuf-net/tree/dfdfce61a739cfd76f05fcdacf8a4b3b9e94e684)
+The two protobuf-net assemblies are patched builds of upstream **3.4.40**, targeting
+.NET Standard 2.1. Source commit: `3aa672eaaf7763b86d62bec9ed7d7896b0511a8b`.
+Upstream source and license: [protobuf-net](https://github.com/protobuf-net/protobuf-net/tree/3aa672eaaf7763b86d62bec9ed7d7896b0511a8b)
 and [bundled license](./Licence.txt).
 
 [The source patch](./il2cpp-aot.patch) changes runtime behavior:
 
-- Construct fallback value checkers directly, avoiding reflected closed generic constructors.
-  Primary primitive checkers keep their original default-value policy. Nonnullable structs
-  remain present even at their default value. Nullable fallback structs use constrained
-  `Equals(null)` to check presence without calling the underlying struct's equality method.
-- Unwrap nullable member types before effective-type classification, so primitive nullable
-  members do not depend on reflective dynamic-stub construction.
+Upstream 3.4.40 already constructs nullable and nonnullable fallback value checkers directly.
+The rebase keeps that implementation and its trimming annotations. The package patch unwraps
+nullable member types before effective-type classification, avoiding reflective dynamic-stub
+construction for primitive nullable members.
 
 - Read and write runtime map entries through nongeneric slot nodes when dynamic code is unavailable.
   The nodes retain the active model, actual key/value services, wire options, factories and merge
@@ -90,41 +87,30 @@ contracts still require their own IL2CPP qualification. See
 
 ## Rebuild
 
-Use Git and .NET SDK **9.0.306**. Run from the package root. Keep the full source history:
-upstream versioning computes the assembly file version from it.
+Use Git, Python 3.10 or newer, and .NET SDK **9.0.319**. From the package root:
 
 ```bash
-package_root="$PWD"
-source_root="$(mktemp -d)"
-git -c core.autocrlf=false clone --branch 3.2.56 https://github.com/protobuf-net/protobuf-net.git "$source_root"
-git -C "$source_root" config core.autocrlf false
-git -C "$source_root" checkout dfdfce61a739cfd76f05fcdacf8a4b3b9e94e684
-git -C "$source_root" apply "$package_root/Runtime/Protobuf-Net/il2cpp-aot.patch"
-cat > "$source_root/global.json" <<'JSON'
-{
-  "sdk": {
-    "version": "9.0.306",
-    "rollForward": "disable",
-    "allowPrerelease": false
-  }
-}
-JSON
-(
-  cd "$source_root"
-  dotnet build src/protobuf-net/protobuf-net.csproj -c Release -f netstandard2.1 \
-    -p:TargetFrameworks=netstandard2.1 -p:GeneratePackageOnBuild=false \
-    -p:UseSharedCompilation=false --nologo
-)
-sha256sum "$source_root/src/protobuf-net/bin/Release/netstandard2.1/protobuf-net.dll"
-sha256sum "$source_root/src/protobuf-net.Core/bin/Release/netstandard2.1/protobuf-net.Core.dll"
+python3 scripts/build-protobuf-candidate.py --output /tmp/protobuf-candidate
+python3 scripts/verify-protobuf-shipped.py --candidate-root /tmp/protobuf-candidate/assemblies
 ```
 
-The upstream build uses its pinned central package versions, Release optimization,
-deterministic compilation, embedded debugging information and its supplied signing key.
-The build uses SDK 9 in place of upstream's SDK 8 selection; this SDK change does not change
-the .NET Standard 2.1 target. Check the hashes before replacing the shipped files.
+The output directory must be new. `--dotnet` selects the SDK executable;
+`--upstream` can select a full local clone while retaining the pinned commit and
+canonical source URL. The builder keeps upstream history, signing key and Release
+.NET Standard 2.1 target, applies the exact patch, and retains source inventories,
+NuGet assets, command logs, process status and DLL/XML hashes. CI rebuilds and
+byte-compares both shipped DLLs and the patch against this recipe.
 
 | File                  | SHA256                                                             |
 | --------------------- | ------------------------------------------------------------------ |
-| protobuf-net.dll      | `01c0eb2062c70f3eb27b1c662288247514741391f82b549c63c68ffa7d672630` |
-| protobuf-net.Core.dll | `be800dd4484bddada630bde8e7a7ea753022bba2856e8d8cf378a6a768424f04` |
+| protobuf-net.dll      | `6f75170c678c32eb8dddde13ef697387205a4e6dd52bd0b3240fd5f1cd6de6d2` |
+| protobuf-net.Core.dll | `11a176b195d44b88ae13c3a0687d874eb8b937c88e2d1c6a2978c7f996ce8da4` |
+
+The runtime uses Immutable 10.0.13 and Unsafe 6.1.2 from the official .NET Standard
+2.0 NuGet assets. Their existing importers retain assembly ownership rules.
+The [historical v3 oracle](../../Generator~/ProtobufNetV3Oracle/README.md) preserves
+the previous patched 3.2.56 DLLs and original patch. The v2 oracle is unchanged;
+current-upstream tests run in a separate process rather than replacing either
+historical witness. The retained-consumer suite runs against both v3 and current
+protobuf. Native backend and process-health qualification remains tracked in
+[#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052).

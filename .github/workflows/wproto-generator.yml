@@ -17,6 +17,7 @@ on:
       - "docs/features/serialization/serialization.md"
       - "scripts/run-wproto-evidence.ps1"
       - "scripts/build-protobuf-candidate.py"
+      - "scripts/verify-protobuf-shipped.py"
       - "scripts/tests/test-protobuf-candidate.py"
       - "scripts/verify-wproto-evidence.ps1"
       - "scripts/unity/lib/test-result-evidence.ps1"
@@ -32,6 +33,7 @@ on:
       - "docs/features/serialization/serialization.md"
       - "scripts/run-wproto-evidence.ps1"
       - "scripts/build-protobuf-candidate.py"
+      - "scripts/verify-protobuf-shipped.py"
       - "scripts/tests/test-protobuf-candidate.py"
       - "scripts/verify-wproto-evidence.ps1"
       - "scripts/unity/lib/test-result-evidence.ps1"
@@ -156,6 +158,22 @@ jobs:
           --results-directory "${{ runner.temp }}/protobuf-candidate/results"
           -- RunConfiguration.TreatNoTestsAsError=true
 
+      - name: Verify shipped protobuf matches its source build
+        run: >-
+          python3 scripts/verify-protobuf-shipped.py
+          --candidate-root "${{ runner.temp }}/protobuf-candidate/assemblies"
+
+      - name: Admit retained Dox contracts against current protobuf
+        run: >-
+          dotnet test
+          Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/WallstopStudios.UnityHelpers.DoxRetained.Tests.csproj
+          -c Release -p:ProtobufNetOracle=candidate
+          -p:ProtobufNetCandidateRoot="${{ runner.temp }}/protobuf-candidate/assemblies"
+          -p:UseSharedCompilation=false --nologo
+          --logger "trx;LogFileName=dox-retained-candidate.trx"
+          --results-directory "${{ runner.temp }}/protobuf-candidate/retained-results"
+          -- RunConfiguration.TreatNoTestsAsError=true
+
       - name: Retain current protobuf candidate evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -166,6 +184,7 @@ jobs:
             ${{ runner.temp }}/protobuf-candidate/*.json
             ${{ runner.temp }}/protobuf-candidate/assemblies
             ${{ runner.temp }}/protobuf-candidate/results
+            ${{ runner.temp }}/protobuf-candidate/retained-results
           if-no-files-found: warn
 
       - name: Retain oracle invocation evidence

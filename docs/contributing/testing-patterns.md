@@ -16,6 +16,22 @@ This removes the released test APIs `AttributeMetadataCache.ForceRebuildForTests
 
 The production-hook gate checks forbidden identifiers and explicit test-only markers with positive controls. Review still checks suffix-free injection and instrumentation. Legitimate discovery of test assemblies and UI suppression during automated editor runs remain supported. The `ValidationRun` loader overload also remains: automatic validation uses it to resolve live prefab-stage roots before falling back to asset loading. Tests use real asset targets and implementation phases.
 
+## Preserve editor assets during fixtures
+
+Use a unique directory for generated fixture assets. Register only paths the fixture owns,
+then explicitly call `CleanupTrackedFoldersAndAssets`. Batched fixtures must transfer their
+tracked paths before calling the base `OneTimeTearDown`, which removes the deferred paths.
+Check the database, directory and importer metadata after cleanup.
+
+When a fixture exercises a tool that persists a shared settings or cache asset, use the
+test-only `EditorAssetFileScope` with those exact asset paths. Capture it before the tool runs
+and dispose it after fixture teardown, including failure paths. It restores existing file and
+metadata bytes, removes newly created assets, and removes only newly created empty parents.
+It preserves unrelated sibling assets. Clear the tool's cached singleton reference afterward.
+
+Inspect full NUnit results as well as leaf counts. A fixture teardown failure can leave all
+individual test cases passing while the run itself fails.
+
 ## Source validation must find its subjects
 
 Package source scans resolve the owning package from its assembly, then use the source file path

@@ -122,9 +122,9 @@ function New-ControlFixture {
         Write-ControlFile (Join-Path $root "Runtime/Analyzers/$name") "synthetic analyzer $name; never loaded or executed"
     }
     foreach ($name in @('protobuf-net.dll', 'protobuf-net.Core.dll')) {
-        $pinned = Join-Path $root "Runtime/Protobuf-Net/$name"
+        $pinned = Join-Path $root "Generator~/ProtobufNetV3Oracle/$name"
         [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($pinned))
-        [IO.File]::Copy((Join-Path $repository "Runtime/Protobuf-Net/$name"), $pinned)
+        [IO.File]::Copy((Join-Path $repository "Generator~/ProtobufNetV3Oracle/$name"), $pinned)
         [IO.File]::Copy($pinned, (Join-Path $binaryRoot $name))
     }
     $selectors = @(

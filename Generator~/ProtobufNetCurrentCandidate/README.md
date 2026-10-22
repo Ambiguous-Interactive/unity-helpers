@@ -3,8 +3,8 @@
 This is the AOT patch rebased onto protobuf-net **3.4.40**, upstream commit
 `3aa672eaaf7763b86d62bec9ed7d7896b0511a8b`. It supports the dependency admission
 work in [#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052).
-The package still ships the patched 3.2.56 binaries. Historical v2 and v3 oracle
-identities remain frozen.
+The package runtime uses these patched 3.4.40 binaries. Historical v2 and v3
+oracle identities remain frozen in their separate directories.
 
 The rebase keeps upstream's direct nullable/nonnullable value checkers and updated
 trimming annotations. It carries forward the package's lazy default holder,
@@ -20,6 +20,7 @@ that Unity ignores. The builder refuses existing output directories.
 
 ```bash
 python3 scripts/build-protobuf-candidate.py --output /tmp/protobuf-candidate
+python3 scripts/verify-protobuf-shipped.py --candidate-root /tmp/protobuf-candidate/assemblies
 dotnet test Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj \
   -c Release -p:ProtobufNetOracle=candidate \
   -p:ProtobufNetCandidateRoot=/tmp/protobuf-candidate/assemblies \
@@ -46,9 +47,10 @@ versions and DLL hashes against the build receipt. It runs the same differential
 and source-linked regression fixtures as v3. Build warnings remain visible.
 
 The candidate needs `System.Collections.Immutable` 10.0.13 and its dependencies.
-Its host NuGet references apply only to the candidate lane. Do not copy them into
-the Unity package: assembly ownership, retained consumer migration, supported Unity
-versions, stripped IL2CPP and native process health still need qualification.
+Its host NuGet references apply only to the candidate lane. The Unity package uses
+the official Immutable 10.0.13 .NET Standard 2.0 asset with the existing importer.
+Assembly ownership, retained consumer migration, supported Unity versions, stripped
+IL2CPP and native process health require their own qualification.
 The receipt records `nativeQualificationComplete: false`; host tests cannot change
 that conclusion. See the [assembly ownership guide](../../docs/guides/bundled-assembly-conflicts.md).
 

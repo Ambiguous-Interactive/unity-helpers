@@ -16,6 +16,12 @@ SPEC = importlib.util.spec_from_file_location(
 CANDIDATE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CANDIDATE)
 
+VERIFY_SPEC = importlib.util.spec_from_file_location(
+    "protobuf_shipped", Path(__file__).parents[1] / "verify-protobuf-shipped.py"
+)
+SHIPPED = importlib.util.module_from_spec(VERIFY_SPEC)
+VERIFY_SPEC.loader.exec_module(SHIPPED)
+
 
 class CandidateBuildTests(unittest.TestCase):
     def test_digest_measures_exact_bytes(self):
@@ -270,6 +276,87 @@ class CandidateBuildTests(unittest.TestCase):
             self.assertEqual(
                 [{"path": " input.cs", "sha256": CANDIDATE.digest(subject)}], records
             )
+
+
+class ShippedIdentityTests(unittest.TestCase):
+    def fixture(self, directory):
+        candidate = directory / "candidate"
+        shipped = directory / "shipped"
+        candidate.mkdir()
+        shipped.mkdir()
+        source_patch = directory / "source.patch"
+        source_patch.write_bytes(b"source patch\r\n")
+        (shipped / "il2cpp-aot.patch").write_bytes(source_patch.read_bytes())
+        files = {}
+        for name in ("protobuf-net.dll", "protobuf-net.Core.dll"):
+            contents = name.encode("utf-8")
+            (candidate / name).write_bytes(contents)
+            (shipped / name).write_bytes(contents)
+            files[name] = hashlib.sha256(contents).hexdigest()
+        receipt = {
+            "sourceCommit": CANDIDATE.SOURCE_COMMIT,
+            "sourceUrl": CANDIDATE.SOURCE_URL,
+            "sdk": CANDIDATE.SDK_VERSION,
+            "targetFramework": "netstandard2.1",
+            "files": files,
+            "patchSha256": SHIPPED.digest(source_patch),
+        }
+        (candidate / "candidate-receipt.json").write_text(json.dumps(receipt))
+        return candidate, shipped, source_patch, receipt
+
+    def test_exact_shipped_payloads_are_accepted(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate, shipped, source_patch, _ = self.fixture(Path(temporary))
+            SHIPPED.verify(candidate, shipped, source_patch)
+
+    def test_each_changed_or_missing_payload_is_rejected(self):
+        for side in ("candidate", "shipped"):
+            for name in ("protobuf-net.dll", "protobuf-net.Core.dll"):
+                for missing in (False, True):
+                    with self.subTest(side=side, name=name, missing=missing):
+                        with tempfile.TemporaryDirectory() as temporary:
+                            candidate, shipped, source_patch, _ = self.fixture(
+                                Path(temporary)
+                            )
+                            target = (
+                                candidate if side == "candidate" else shipped
+                            ) / name
+                            if missing:
+                                target.unlink()
+                            else:
+                                target.write_bytes(target.read_bytes() + b"tamper")
+                            with self.assertRaises((ValueError, OSError)):
+                                SHIPPED.verify(candidate, shipped, source_patch)
+
+    def test_each_changed_provenance_field_is_rejected(self):
+        for field in (
+            "sourceCommit",
+            "sourceUrl",
+            "sdk",
+            "targetFramework",
+            "patchSha256",
+        ):
+            with self.subTest(field=field):
+                with tempfile.TemporaryDirectory() as temporary:
+                    candidate, shipped, source_patch, receipt = self.fixture(
+                        Path(temporary)
+                    )
+                    receipt[field] = "changed"
+                    (candidate / "candidate-receipt.json").write_text(
+                        json.dumps(receipt)
+                    )
+                    with self.assertRaises(ValueError):
+                        SHIPPED.verify(candidate, shipped, source_patch)
+
+    def test_changed_shipped_or_source_patch_is_rejected(self):
+        for source in (False, True):
+            with self.subTest(source=source):
+                with tempfile.TemporaryDirectory() as temporary:
+                    candidate, shipped, source_patch, _ = self.fixture(Path(temporary))
+                    target = source_patch if source else shipped / "il2cpp-aot.patch"
+                    target.write_bytes(target.read_bytes() + b"tamper")
+                    with self.assertRaises(ValueError):
+                        SHIPPED.verify(candidate, shipped, source_patch)
 
 
 if __name__ == "__main__":

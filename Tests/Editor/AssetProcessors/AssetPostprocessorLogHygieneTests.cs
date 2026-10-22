@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 {
+    using System;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
@@ -24,7 +25,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     [NUnit.Framework.Category("Integration")]
     public sealed class AssetPostprocessorLogHygieneTests : BatchedEditorTestBase
     {
-        private const string TestRoot = "Assets/__AssetPostprocessorHygieneTests__";
+        private readonly string _testRoot =
+            "Assets/__AssetPostprocessorHygieneTests__-" + Guid.NewGuid().ToString("N");
 
         private AssetChangeDetectionEnabledScope _watcherScope;
 
@@ -35,20 +37,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 Assert.Inconclusive(
                     "Skipping: UnityHelpersSettings.GetDeferAssetPostprocessorCallbacks() is false. "
                         + "This test only exercises the deferred path; re-enable the setting to run it."
-                );
-            }
-        }
-
-        private static void EnsureTestFolder()
-        {
-            /*
-                The batch-safe helper synchronizes folder creation with AssetDatabase, avoiding unregistered or
-                numbered duplicate folders.
-            */
-            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(TestRoot))
-            {
-                Debug.LogWarning(
-                    $"EnsureTestFolder: Failed to register folder '{TestRoot}' in the AssetDatabase."
                 );
             }
         }
@@ -85,9 +73,26 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             base.CommonOneTimeSetUp();
             EnsureTestFolder();
-            TrackFolder(TestRoot);
+            TrackFolder(_testRoot);
             // Folder creation can queue drains that would pollute the first test.
             AssetPostprocessorDeferralTestAccess.Flush();
+        }
+
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+            AssetPostprocessorDeferralTestAccess.Flush();
+            Assert.That(AssetDatabase.IsValidFolder(_testRoot), Is.False, _testRoot);
+            Assert.That(Directory.Exists(_testRoot), Is.False, _testRoot);
+            Assert.That(File.Exists(_testRoot + ".meta"), Is.False, _testRoot);
         }
 
         [SetUp]
@@ -135,8 +140,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void DetectAssetChangedPrefabSubscriberDoesNotEmitSendMessageWarnings()
         {
-            string prefabPath = TestRoot + "/HygienePrefabSubscriber.prefab";
-            string payloadPath = TestRoot + "/HygienePayload.asset";
+            string prefabPath = _testRoot + "/HygienePrefabSubscriber.prefab";
+            string payloadPath = _testRoot + "/HygienePayload.asset";
             TrackAssetPath(prefabPath);
             TrackAssetPath(payloadPath);
 
@@ -193,8 +198,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void SubAssetMatchingDoesNotEmitSendMessageWarnings()
         {
-            string texturePath = TestRoot + "/HygieneSpriteTexture.png";
-            string prefabPath = TestRoot + "/HygieneSpriteConsumerPrefab.prefab";
+            string texturePath = _testRoot + "/HygieneSpriteTexture.png";
+            string prefabPath = _testRoot + "/HygieneSpriteConsumerPrefab.prefab";
             TrackAssetPath(texturePath);
             TrackAssetPath(prefabPath);
 
@@ -241,6 +246,20 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             AssetPostprocessorDeferralTestAccess.Flush();
 
             logScope.AssertNoSendMessageWarnings();
+        }
+
+        private void EnsureTestFolder()
+        {
+            /*
+                The batch-safe helper synchronizes folder creation with AssetDatabase, avoiding unregistered or
+                numbered duplicate folders.
+            */
+            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(_testRoot))
+            {
+                Debug.LogWarning(
+                    $"EnsureTestFolder: Failed to register folder '{_testRoot}' in the AssetDatabase."
+                );
+            }
         }
     }
 }
