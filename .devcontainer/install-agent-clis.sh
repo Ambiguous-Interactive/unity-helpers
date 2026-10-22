@@ -37,6 +37,7 @@ PACKAGES=(
 NPM_PREFIX="${NPM_CONFIG_PREFIX:-${HOME}/.local}"
 VIEW_TIMEOUT_SECONDS="${CODEX_NPM_VIEW_TIMEOUT_SECONDS:-20}"
 INSTALL_TIMEOUT_SECONDS="${CODEX_NPM_INSTALL_TIMEOUT_SECONDS:-300}"
+VERSION_TIMEOUT_SECONDS="${CODEX_VERSION_TIMEOUT_SECONDS:-10}"
 LOG_PREFIX="[install-agent-clis]"
 
 log() {
@@ -90,6 +91,12 @@ if [[ ! -w "${NPM_PREFIX}" ]]; then
     exit 0
 fi
 
+NPM_VERSION="$(timeout "${VIEW_TIMEOUT_SECONDS}" npm --version 2>/dev/null || true)"
+NPM_MAJOR_VERSION=0
+if [[ "$NPM_VERSION" =~ ^([0-9]+)\. ]]; then
+    NPM_MAJOR_VERSION="${BASH_REMATCH[1]}"
+fi
+
 # Read the currently installed version from the user-global install location.
 installed_version() {
     local pkg="$1"
@@ -126,23 +133,32 @@ resolve_latest_versions() {
     wait
 }
 
-# Returns 0 when the package is installed and its binary resolves.
 verify_package() {
     local bin="$1"
-    command -v "${bin}" >/dev/null 2>&1
+    command -v "${bin}" >/dev/null 2>&1 || return 1
+    case "$bin" in
+        opencode|claude) timeout "${VERSION_TIMEOUT_SECONDS}" "$bin" --version >/dev/null 2>&1 ;;
+        *) return 0 ;;
+    esac
 }
 
 install_package() {
     local pkg="$1" bin="$2" latest="$3"
     local attempt
+    local install_options=()
+    if ((10#$NPM_MAJOR_VERSION >= 12)); then
+        case "$pkg" in
+            opencode-ai|@anthropic-ai/claude-code) install_options+=(--allow-scripts="$pkg") ;;
+        esac
+    fi
     for attempt in 1 2 3; do
-        if timeout "${INSTALL_TIMEOUT_SECONDS}" npm install -g "${pkg}@${latest}" --silent --no-fund --no-audit; then
+        if timeout "${INSTALL_TIMEOUT_SECONDS}" npm install -g "${pkg}@${latest}" "${install_options[@]}" --silent --no-fund --no-audit; then
             hash -r 2>/dev/null || true
             if verify_package "${bin}"; then
                 log "${pkg} ready: $(${bin} --version 2>/dev/null | head -1 || echo "${latest}")"
                 return 0
             fi
-            warn "${bin} binary missing from PATH after install attempt ${attempt}/3."
+            warn "${bin} launcher unavailable after install attempt ${attempt}/3."
         else
             warn "npm install failed for ${pkg} (attempt ${attempt}/3)."
         fi
@@ -179,7 +195,7 @@ for package in "${PACKAGES[@]}"; do
             log "${pkg}@${installed} already up-to-date."
             continue
         fi
-        warn "${pkg}@${installed} is registered but ${bin} is not on PATH; reinstalling."
+        warn "${pkg}@${installed} is registered but ${bin} is unavailable; reinstalling."
     fi
 
     log "Installing ${pkg}@${latest} (previously: ${installed:-not installed})"

@@ -74,7 +74,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: "9.0.306"
+          dotnet-version: "9.0.319"
 
       - name: Publish the generator host
         run: |
@@ -240,7 +240,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: "9.0.306"
+          dotnet-version: "9.0.319"
 
       # TestU01 is the second battery, and it answers a different question from PractRand.
       # PractRand streams until something fails and reports the depth; SmallCrush runs 15 fixed
@@ -347,7 +347,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: "9.0.306"
+          dotnet-version: "9.0.319"
 
       - name: Download generator host
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333

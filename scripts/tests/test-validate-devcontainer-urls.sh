@@ -205,6 +205,21 @@ assert_contract_exit_code "$fixture_comment_ok" 0 "validator ignores commented a
 assert_contract_exit_code "$fixture_case_fail" 1 "validator rejects case-variant apt powershell install"
 assert_contract_exit_code "$fixture_chain_fail" 1 "validator rejects chained apt powershell install"
 
+if validator_sdk_output="$("$VALIDATOR" --list-tools --dockerfile .devcontainer/Dockerfile 2>&1)" \
+    && grep -Fq 'dotnet_sdk|9.0.319|x64|arm64|https://builds.dotnet.microsoft.com/dotnet/Sdk/{VERSION}/dotnet-sdk-{VERSION}-linux-{ARCH}.tar.gz' <<< "$validator_sdk_output"; then
+    pass "validator resolves .NET SDK archive URLs for both architectures"
+else
+    fail "validator resolves .NET SDK archive URLs for both architectures" "$validator_sdk_output"
+fi
+
+manifest_csharpier_version="$(node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).tools.CSharpier.version);' "$REPO_ROOT/.config/dotnet-tools.json")"
+image_csharpier_version="$(sed -n 's/^RUN dotnet tool install -g csharpier --version \([0-9.]*\).*/\1/p' "$DOCKERFILE")"
+if [[ "$manifest_csharpier_version" == "$image_csharpier_version" ]]; then
+    pass "global CSharpier version matches the repository tool manifest"
+else
+    fail "global CSharpier version matches the repository tool manifest" "Manifest requires $manifest_csharpier_version; image installs $image_csharpier_version."
+fi
+
 lychee_command="$(awk '
     { sub(/\r$/, "") }
     /^RUN LYCHEE_VERSION=/ { capture=1; sub(/^RUN /, ""); print; next }
@@ -223,7 +238,7 @@ for fixture_arch in amd64 arm64; do
     printf '#!/bin/sh\nprintf "nested archive %s\\n"\n' "$fixture_arch" > "$fixture_input/lychee-$fixture_triple/lychee"
     tar -czf "$fixture_archive" -C "$fixture_input" "lychee-$fixture_triple"
     if (
-        TARGETARCH="$fixture_arch"
+        export TARGETARCH="$fixture_arch"
         curl() {
             local requested_url="${!#}"
             [[ "$requested_url" == */"lychee-$fixture_triple.tar.gz" ]] || return 1

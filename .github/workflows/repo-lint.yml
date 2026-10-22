@@ -95,7 +95,7 @@ jobs:
       - name: Setup .NET for semantic safety checks
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: "9.0.306"
+          dotnet-version: "9.0.319"
 
       # The three check groups each record an outcome instead of ending the job, so one failure
       # never hides the other two. The gate at the end is what actually reds the run.

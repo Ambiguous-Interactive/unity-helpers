@@ -44,6 +44,9 @@ esac
 
 # Ensure temporary directories are removed even on early failures.
 cleanup_temp_dirs() {
+    if [[ -n "${cli_install_fixture:-}" && -d "$cli_install_fixture" ]]; then
+        rm -rf "$cli_install_fixture" 2>/dev/null || true
+    fi
     [[ -n "${tmp_bin_dir:-}" && -d "$tmp_bin_dir" ]] && rm -rf "$tmp_bin_dir" 2>/dev/null || true
     [[ -n "${tmp_yolo_bin_dir:-}" && -d "$tmp_yolo_bin_dir" ]] && rm -rf "$tmp_yolo_bin_dir" 2>/dev/null || true
 }
@@ -933,6 +936,87 @@ if command -v shellcheck >/dev/null 2>&1; then
 else
     pass "shellcheck not available (skipped)"
 fi
+
+cli_install_fixture="$(mktemp -d)"
+mkdir -p "$cli_install_fixture/bin"
+cat >"$cli_install_fixture/bin/npm" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1" in
+    --version) printf '%s\n' "$CLI_TEST_NPM_VERSION" ;;
+    view) printf '1.0.0\n' ;;
+    install)
+        printf '%s\n' "$*" >> "$CLI_TEST_PREFIX/install-calls"
+        [[ "$*" == *"$CLI_TEST_PACKAGE@1.0.0"* ]] || exit 91
+        if [[ "$CLI_TEST_NPM_VERSION" == 12.* && "$*" != *"--allow-scripts=$CLI_TEST_PACKAGE"* ]]; then
+            exit 0
+        fi
+        if [[ "$CLI_TEST_NPM_VERSION" == 10.* && "$*" == *"--allow-scripts"* ]]; then
+            exit 92
+        fi
+        if [[ "$CLI_TEST_MODE" != blocked ]]; then rm -f "$CLI_TEST_PREFIX/$CLI_TEST_BIN-broken"; fi
+        ;;
+    *) exit 93 ;;
+esac
+EOF
+printf '#!/bin/sh\nexit 0\n' > "$cli_install_fixture/bin/sleep"
+chmod +x "$cli_install_fixture/bin/npm" "$cli_install_fixture/bin/sleep"
+for cli_test_npm_version in 10.9.2 12.2.1; do
+    for cli_test_target in 'opencode-ai|opencode' '@anthropic-ai/claude-code|claude'; do
+        cli_test_target_package="${cli_test_target%%|*}"
+        cli_test_target_bin="${cli_test_target##*|}"
+        for cli_test_mode in working broken blocked; do
+            cli_test_prefix="$cli_install_fixture/$cli_test_npm_version-$cli_test_target_bin-$cli_test_mode"
+            mkdir -p "$cli_test_prefix/bin"
+            : > "$cli_test_prefix/install-calls"
+            for cli_test_package in '@openai/codex|codex' '@anthropic-ai/claude-code|claude' 'opencode-ai|opencode' \
+                '@nanocollective/nanocoder|nanocoder' '@z_ai/mcp-server|zai-mcp-server' 'mcp-remote|mcp-remote'; do
+                cli_test_name="${cli_test_package%%|*}"
+                cli_test_bin="${cli_test_package##*|}"
+                mkdir -p "$cli_test_prefix/lib/node_modules/$cli_test_name"
+                printf '{"version":"1.0.0"}\n' > "$cli_test_prefix/lib/node_modules/$cli_test_name/package.json"
+                cat > "$cli_test_prefix/bin/$cli_test_bin" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${0##*/}" == "$CLI_TEST_BIN" && -f "$CLI_TEST_PREFIX/$CLI_TEST_BIN-broken" ]]; then exit 1; fi
+printf '1.0.0\n'
+EOF
+                chmod +x "$cli_test_prefix/bin/$cli_test_bin"
+            done
+            if [[ "$cli_test_mode" != working ]]; then touch "$cli_test_prefix/$cli_test_target_bin-broken"; fi
+            cli_test_status=0
+            env NPM_CONFIG_PREFIX="$cli_test_prefix" CLI_TEST_PREFIX="$cli_test_prefix" \
+                CLI_TEST_NPM_VERSION="$cli_test_npm_version" CLI_TEST_MODE="$cli_test_mode" \
+                CLI_TEST_PACKAGE="$cli_test_target_package" CLI_TEST_BIN="$cli_test_target_bin" \
+                PATH="$cli_install_fixture/bin:$cli_test_prefix/bin:$PATH" \
+                bash "$INSTALL_AGENT_CLIS" > "$cli_test_prefix/output" 2>&1 || cli_test_status=$?
+            cli_test_calls="$(wc -l < "$cli_test_prefix/install-calls")"
+            cli_test_expected=0
+            [[ "$cli_test_mode" != broken ]] || cli_test_expected=1
+            [[ "$cli_test_mode" != blocked ]] || cli_test_expected=3
+            cli_test_ok=1
+            [[ "$cli_test_status" -eq 0 && "$cli_test_calls" -eq "$cli_test_expected" ]] || cli_test_ok=0
+            if [[ "$cli_test_mode" == blocked ]]; then
+                grep -Fq "Failed to install $cli_test_target_package" "$cli_test_prefix/output" || cli_test_ok=0
+                [[ -f "$cli_test_prefix/$cli_test_target_bin-broken" ]] || cli_test_ok=0
+            else
+                [[ ! -f "$cli_test_prefix/$cli_test_target_bin-broken" ]] || cli_test_ok=0
+            fi
+            if [[ "$cli_test_mode" != working ]]; then
+                if [[ "$cli_test_npm_version" == 12.* ]]; then
+                    grep -Fq -- "--allow-scripts=$cli_test_target_package" "$cli_test_prefix/install-calls" || cli_test_ok=0
+                elif grep -q -- '--allow-scripts' "$cli_test_prefix/install-calls"; then
+                    cli_test_ok=0
+                fi
+            fi
+            if [[ "$cli_test_ok" -eq 1 ]]; then
+                pass "agent installer verifies $cli_test_target_bin readiness with npm $cli_test_npm_version ($cli_test_mode)"
+            else
+                fail "agent installer verifies $cli_test_target_bin readiness with npm $cli_test_npm_version ($cli_test_mode)" \
+                    "status=$cli_test_status installs=$cli_test_calls expected=$cli_test_expected"
+            fi
+        done
+    done
+done
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 

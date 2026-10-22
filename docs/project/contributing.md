@@ -64,6 +64,11 @@ The dev container includes these additional tools that are **not required** on y
 - **yamllint**: YAML linter
 - **lychee**: Fast link checker
 
+The container also installs the coding agent CLIs at startup. With npm 12, the installer
+allows the OpenCode and Claude install scripts by package name, then checks that each
+launcher responds to `--version`. It repairs a broken launcher even when its package is
+already current. Registry failures remain nonfatal and are reported in the startup log.
+
 ### Required Tools (All Environments)
 
 These tools are required and installed via npm/dotnet:
@@ -107,7 +112,7 @@ refused because they hide member names. Size and reference-identity queries rema
 The positive controls require plain, escaped, formatted and interpolated calls to be found.
 Separate sources exercise format characters without an ordinary spelling that could mask a prefilter regression.
 
-Stack-allocation and memory-access checks use the existing Roslyn policy tool and require .NET SDK 9.0.306.
+Stack-allocation and memory-access checks use the existing Roslyn policy tool and require .NET SDK 9.0.319.
 Repo Lint installs that SDK before running the checks. The compiler resolves constants and the actual length symbol;
 parameters, locals, readonly fields and properties cannot borrow an unrelated constant's name.
 Constant expressions and shared constants remain supported. The scan covers conditional branches

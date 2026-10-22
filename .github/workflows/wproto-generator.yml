@@ -55,7 +55,7 @@ jobs:
           # Pinned to a patch. The byte comparison below is only meaningful against the same
           # compiler, and every SDK patch ships its own Roslyn; 9.0.x floated onto a different one
           # and the gate failed for a reason no developer could reproduce.
-          dotnet-version: "9.0.306"
+          dotnet-version: "9.0.319"
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9

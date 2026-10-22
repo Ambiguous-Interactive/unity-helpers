@@ -1,11 +1,27 @@
 # Use the .NET devcontainer base image
-FROM mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm
+FROM mcr.microsoft.com/devcontainers/dotnet:2.3.2-9.0-bookworm
 
 # Architecture for downloading binaries (supports amd64 and arm64)
 ARG TARGETARCH=amd64
 
 # Set non-interactive frontend for apt to avoid prompts
 ENV DEBIAN_FRONTEND=noninteractive
+
+# The current devcontainer base trails the supported .NET 9 servicing release.
+ENV DOTNET_SDK_VERSION=9.0.319 DOTNET_VERSION=9.0.21 ASPNET_VERSION=9.0.21
+RUN DOTNET_SDK_VERSION="9.0.319" \
+    && case "${TARGETARCH}" in \
+        amd64) DOTNET_SDK_ARCH="x64" ; DOTNET_SDK_SHA512="ed080b81dd2cca56a453c939468b0061a60a083a87eaf21e035794cd28a14fc00faf52d96a4e4116f3cc1de40e6289cd0f08a8fd478d49e4dc4f28570e2f602c" ;; \
+        arm64) DOTNET_SDK_ARCH="arm64" ; DOTNET_SDK_SHA512="940b056511b078c4ab15318f3a7a6114c57c6c636ab32027e90129e3f8b205236a1c6af794eb35a887d7bf3219ff49522da2cb9f9a6d5d26e390909c25536ed2" ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSL "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${DOTNET_SDK_ARCH}.tar.gz" -o /tmp/dotnet-sdk.tar.gz \
+    && echo "${DOTNET_SDK_SHA512}  /tmp/dotnet-sdk.tar.gz" | sha512sum -c - \
+    && rm -rf /usr/share/dotnet \
+    && mkdir -p /usr/share/dotnet \
+    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
+    && rm -f /tmp/dotnet-sdk.tar.gz \
+    && test "$(dotnet --version)" = "${DOTNET_SDK_VERSION}"
 
 # Fix: Remove the Yarn repository with expired GPG key
 # The base image includes yarn repo, but the GPG key (23E7166788B63E1E) expired.
@@ -287,7 +303,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
     && test -x /usr/local/bin/mcp-server-fetch \
     && ln -sf /opt/python-tools/bin/yamllint /usr/local/bin/yamllint \
     && git lfs install \
-    && npm install -g npm@10.9.2 \
+    && npm install -g npm@12.2.1 \
     && rm -f /tmp/requirements-tools.txt \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -309,7 +325,7 @@ RUN mkdir -p /home/vscode/.npm \
 
 # Install CSharpier as a global .NET tool for the vscode user
 USER vscode
-RUN dotnet tool install -g csharpier --version 1.2.6
+RUN dotnet tool install -g csharpier --version 1.3.0
 
 # Point npm's global prefix at a user-owned directory so `npm install -g` works
 # without sudo for the vscode user (npm docs: "resolving EACCES permissions
@@ -322,7 +338,7 @@ RUN npm config set prefix "${HOME}/.local"
 # built/rebuilt image has them even before post-create runs. post-create.sh and
 # post-start.sh refresh these to the latest versions, so this layer is a fast
 # offline-safe baseline rather than the source of truth.
-RUN npm install -g --no-fund --no-audit \
+RUN npm install -g --no-fund --no-audit --allow-scripts=opencode-ai \
     "@openai/codex@latest" \
     "opencode-ai@latest" \
     "@nanocollective/nanocoder@latest" \
