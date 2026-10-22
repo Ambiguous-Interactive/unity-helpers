@@ -16,7 +16,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Editor;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
+    using WallstopStudios.UnityHelpers.Tags;
+    using WallstopStudios.UnityHelpers.Utils;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.AssetProcessors;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -60,6 +63,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             typeof(Duplicate),
         };
 
+        private EditorAssetFileScope _productionAssets;
         private bool _previousIncludeTestAssemblies;
         private Func<Type, bool> _previousTypeFilter;
         private bool _previousEditorUiSuppress;
@@ -265,6 +269,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
+            _productionAssets = new EditorAssetFileScope(
+                PersistentDirectorySettings.TargetAssetPath,
+                "Assets/Resources/Wallstop Studios/Unity Helpers/"
+                    + nameof(AttributeMetadataCache)
+                    + ".asset"
+            );
             CleanupAllKnownTestFolders();
         }
 
@@ -311,9 +321,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
         public override void OneTimeTearDown()
         {
-            base.OneTimeTearDown();
-
-            CleanupAllKnownTestFolders();
+            try
+            {
+                base.OneTimeTearDown();
+                CleanupAllKnownTestFolders();
+            }
+            finally
+            {
+                try
+                {
+                    _productionAssets?.Dispose();
+                }
+                finally
+                {
+                    ScriptableObjectSingleton<PersistentDirectorySettings>.ClearInstance();
+                    ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
+                    AssetPostprocessorDeferralTestAccess.Flush();
+                }
+            }
         }
 
         [Test]

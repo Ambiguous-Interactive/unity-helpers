@@ -87,7 +87,7 @@ pillow==13.0.0
     #   cairosvg
 platformdirs==4.13.5
     # via mkdocs-get-deps
-pycparser==3.11 ; implementation_name != 'PyPy'
+pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi
 pygments==2.21.0
     # via mkdocs-material

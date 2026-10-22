@@ -14,6 +14,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
     using WallstopStudios.UnityHelpers.Editor;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Utils;
+    using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
 
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
@@ -22,6 +24,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
     {
         private const string Root = "Assets/Temp/PrefabCheckerFolderAdditionTests";
         private const string TempRoot = "Assets/Temp";
+
+        private EditorAssetFileScope _directorySettings;
 
         /// <summary>
         /// Cleans up the Assets/Temp folder and all its duplicates (Temp 1, Temp 2, etc.).
@@ -382,6 +386,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
+            _directorySettings = new EditorAssetFileScope(
+                PersistentDirectorySettings.TargetAssetPath
+            );
             CleanupAllKnownTestFolders();
             CleanupTempFoldersAndDuplicates();
         }
@@ -410,12 +417,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [OneTimeTearDown]
         public override void OneTimeTearDown()
         {
-            base.OneTimeTearDown();
+            try
+            {
+                base.OneTimeTearDown();
 
-            DeleteFolderAndContents(Root);
+                DeleteFolderAndContents(Root);
 
-            CleanupTempFoldersAndDuplicates();
-            CleanupAllKnownTestFolders();
+                CleanupTempFoldersAndDuplicates();
+                CleanupAllKnownTestFolders();
+            }
+            finally
+            {
+                try
+                {
+                    _directorySettings?.Dispose();
+                }
+                finally
+                {
+                    ScriptableObjectSingleton<PersistentDirectorySettings>.ClearInstance();
+                    AssetPostprocessorDeferralTestAccess.Flush();
+                }
+            }
         }
 
         [Test]

@@ -3,11 +3,13 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
+    using System;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
@@ -15,15 +17,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [Category("Integration")]
     public sealed class SpriteHelpersCompressedEditorTests : BatchedEditorTestBase
     {
-        private const string TestFolder = "Assets/TempSpriteHelpersCompressedTests";
-        private const string TexturePath = TestFolder + "/crunched.png";
+        private string TexturePath => _testFolder + "/crunched.png";
+
+        private readonly string _testFolder =
+            "Assets/TempSpriteHelpersCompressedTests-" + Guid.NewGuid().ToString("N");
 
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
-            EnsureFolder(TestFolder);
-            TrackFolder(TestFolder);
+            Assert.That(AssetDatabaseBatchHelper.EnsureAssetFolder(_testFolder), Is.True);
+            TrackFolder(_testFolder);
+        }
+
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+            Assert.That(AssetDatabase.IsValidFolder(_testFolder), Is.False, _testFolder);
+            Assert.That(Directory.Exists(_testFolder), Is.False, _testFolder);
+            Assert.That(File.Exists(_testFolder + ".meta"), Is.False, _testFolder);
         }
 
         [Test]

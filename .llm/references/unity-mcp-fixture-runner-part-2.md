@@ -17,6 +17,11 @@ parameter expansion, UnityTest coroutines, and LogAssert scopes.
    and `async_tests: true`. Poll `test_status` if execution is still running.
 4. Read actual case results and require a nonzero total, zero failures, and passing target cases.
    Skipped or inconclusive cases cannot prove the requested behavior.
+   Also inspect the full NUnit result tree: the CLI bridge can report all leaves passing while
+   a fixture's `OneTimeTearDown` failed. On 2026-10-22 three cleanup controls reproduced this:
+   the bridge reported 6/6, 1/1 and 2/2 passes, while each XML root was `Failed(Child)` with
+   `site="TearDown"`. Register a test-owned `ICallbacks` observer through `run_script` and save
+   `RunFinished` with `TestRunnerApi.SaveResultToFile`; require a passing root and no failed suites.
 5. Run broader checks once before push; repeat them only after new changes or unresolved failures.
 
 | Fixture assembly | Native mode |

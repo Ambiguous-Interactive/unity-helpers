@@ -600,7 +600,7 @@ jobs:
       # one -- a pull request opened with GITHUB_TOKEN does not trigger workflows,
       # so its required checks never start and auto-merge stalls forever.
       - name: Commit perf results
-        uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d
+        uses: stefanzweifel/git-auto-commit-action@d0b01107b5db882071f96de5dd4b54961ea93f4c
         with:
           commit_message: "chore(perf): refresh CI perf results [skip ci]"
           # Commit current measurement documentation, generated reports, and raw XML.
