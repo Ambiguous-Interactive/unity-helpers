@@ -62,31 +62,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
         }
 
         [UnityTearDown]
-        public IEnumerator VerifyOwnedAssetsRemoved()
+        public override IEnumerator UnityTearDown()
         {
-            if (string.IsNullOrEmpty(_folder))
+            IEnumerator baseEnumerator = base.UnityTearDown();
+            while (baseEnumerator.MoveNext())
             {
-                yield break;
+                yield return baseEnumerator.Current;
             }
-            for (int frame = 0; frame < 10; ++frame)
-            {
-                if (
-                    !AssetDatabase.IsValidFolder(_folder)
-                    && !Directory.Exists(_folder)
-                    && !File.Exists(_folder + ".meta")
-                )
-                {
-                    yield break;
-                }
-                yield return null;
-            }
-            Assert.That(AssetDatabase.IsValidFolder(_folder), Is.False, _folder);
-            Assert.That(Directory.Exists(_folder), Is.False, _folder);
-            Assert.That(File.Exists(_folder + ".meta"), Is.False, _folder);
+            yield return VerifyOwnedAssetsRemoved();
         }
 
-        [Test]
-        public void TearDownRestoresSettingsAndRemovesOwnedAssetsAfterFailure()
+        [UnityTest]
+        public IEnumerator TearDownRestoresSettingsAndRemovesOwnedAssetsAfterFailure()
         {
             Scene existing = SceneManager.GetActiveScene();
             string path = _folder + "/Interrupted.unity";
@@ -114,9 +101,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 SceneCanonicalizer.GetAutomaticFolders(),
                 Is.EqualTo(_previousAutomaticFolders)
             );
-            Assert.That(AssetDatabase.IsValidFolder(_folder), Is.False);
-            Assert.That(Directory.Exists(_folder), Is.False);
-            Assert.That(File.Exists(_folder + ".meta"), Is.False);
+            yield return VerifyOwnedAssetsRemoved();
             Assert.That(File.Exists(path), Is.False);
             Assert.That(File.Exists(path + ".meta"), Is.False);
         }
@@ -474,6 +459,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 Assert.That(EditorSceneManager.CloseScene(scene, true), Is.True);
             }
             _ownedScenes.Remove(scene);
+        }
+
+        private IEnumerator VerifyOwnedAssetsRemoved()
+        {
+            if (string.IsNullOrEmpty(_folder))
+            {
+                yield break;
+            }
+            for (int frame = 0; frame < 10; ++frame)
+            {
+                if (
+                    !AssetDatabase.IsValidFolder(_folder)
+                    && !Directory.Exists(_folder)
+                    && !File.Exists(_folder + ".meta")
+                )
+                {
+                    yield break;
+                }
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                yield return null;
+            }
+            Assert.That(AssetDatabase.IsValidFolder(_folder), Is.False, _folder);
+            Assert.That(Directory.Exists(_folder), Is.False, _folder);
+            Assert.That(File.Exists(_folder + ".meta"), Is.False, _folder);
         }
 
         private void SaveFreshScene(string path)
