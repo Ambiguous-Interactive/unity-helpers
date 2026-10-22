@@ -50,12 +50,25 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Setup .NET
+        id: dotnet
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
           # Pinned to a patch. The byte comparison below is only meaningful against the same
           # compiler, and every SDK patch ships its own Roslyn; 9.0.x floated onto a different one
           # and the gate failed for a reason no developer could reproduce.
           dotnet-version: "9.0.319"
+
+      - name: Require the installed .NET SDK
+        shell: bash
+        env:
+          EXPECTED_DOTNET_SDK: ${{ steps.dotnet.outputs.dotnet-version }}
+        run: |
+          set -euo pipefail
+          selected_sdk="$(dotnet --version)"
+          printf 'Selected .NET SDK: %s\n' "$selected_sdk"
+          test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing installed SDK version}"
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9

@@ -113,7 +113,10 @@ The positive controls require plain, escaped, formatted and interpolated calls t
 Separate sources exercise format characters without an ordinary spelling that could mask a prefilter regression.
 
 Stack-allocation and memory-access checks use the existing Roslyn policy tool and require .NET SDK 9.0.319.
-Repo Lint installs that SDK before running the checks. The compiler resolves constants and the actual length symbol;
+CI installs that SDK into an isolated runner directory and verifies the selected version.
+A newer SDK preinstalled on the runner cannot override the declared compiler.
+
+The compiler resolves constants and the actual length symbol;
 parameters, locals, readonly fields and properties cannot borrow an unrelated constant's name.
 Constant expressions and shared constants remain supported. The scan covers conditional branches
 and follows the declarations and base types used by a bound to include their conditional symbols.

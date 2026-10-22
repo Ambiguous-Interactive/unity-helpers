@@ -72,9 +72,22 @@ jobs:
           persist-credentials: false
 
       - name: Setup .NET
+        id: dotnet
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
           dotnet-version: "9.0.319"
+
+      - name: Require the installed .NET SDK
+        shell: bash
+        env:
+          EXPECTED_DOTNET_SDK: ${{ steps.dotnet.outputs.dotnet-version }}
+        run: |
+          set -euo pipefail
+          selected_sdk="$(dotnet --version)"
+          printf 'Selected .NET SDK: %s\n' "$selected_sdk"
+          test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing installed SDK version}"
 
       - name: Publish the generator host
         run: |
@@ -238,7 +251,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup .NET
+        id: dotnet
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
           dotnet-version: "9.0.319"
 
@@ -252,6 +268,16 @@ jobs:
       # 908 MB of stream per generator, so the whole inventory is minutes. Crush and BigCrush are
       # hours per generator; the driver takes either by name for a deliberate dispatch when a
       # generator is being promoted.
+      - name: Require the installed .NET SDK
+        shell: bash
+        env:
+          EXPECTED_DOTNET_SDK: ${{ steps.dotnet.outputs.dotnet-version }}
+        run: |
+          set -euo pipefail
+          selected_sdk="$(dotnet --version)"
+          printf 'Selected .NET SDK: %s\n' "$selected_sdk"
+          test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing installed SDK version}"
+
       - name: Download generator host
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
@@ -345,9 +371,22 @@ jobs:
         width: ["32", "64"]
     steps:
       - name: Setup .NET
+        id: dotnet
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
           dotnet-version: "9.0.319"
+
+      - name: Require the installed .NET SDK
+        shell: bash
+        env:
+          EXPECTED_DOTNET_SDK: ${{ steps.dotnet.outputs.dotnet-version }}
+        run: |
+          set -euo pipefail
+          selected_sdk="$(dotnet --version)"
+          printf 'Selected .NET SDK: %s\n' "$selected_sdk"
+          test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing installed SDK version}"
 
       - name: Download generator host
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333

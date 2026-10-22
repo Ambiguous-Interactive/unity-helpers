@@ -18,6 +18,8 @@ const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
+const yaml = require("yaml");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const {
@@ -323,7 +325,13 @@ runTest("parallel host phases retain complete commands without fail-fast cancell
   assert.match(phaseJob, /fail-fast: false/);
   assert.match(phaseJob, /phase: \[sources, controls\]/);
   assert.doesNotMatch(phaseJob, /continue-on-error:|max-parallel: 1/);
-  const commands = [...phaseJob.matchAll(/^        run: (.+)$/gm)].map((match) => match[1]);
+  const phaseSteps = yaml.parse(workflow).jobs["typecheck-phases"].steps;
+  const setupIndex = phaseSteps.findIndex((step) => step.uses?.startsWith("actions/setup-dotnet@"));
+  assert.ok(setupIndex >= 0);
+  const sdkGuard = phaseSteps[setupIndex + 1];
+  const commands = phaseSteps
+    .filter((step) => step !== sdkGuard && typeof step.run === "string")
+    .map((step) => step.run);
   assert.deepEqual(commands, [
     "npm run typecheck:unity",
     "npm run test:enumeration",
@@ -387,6 +395,84 @@ runTest("the stable type-check gate fails for every non-success phase result", (
     assert.equal(result.status === 0, state === "success", `${state || "empty"}: ${result.stderr}`);
   }
 });
+
+const sdkWorkflows = [
+  "wproto-generator.yml",
+  "repo-lint.yml",
+  "local-gates.yml",
+  "random-quality.yml"
+];
+let pinnedSdkSteps = 0;
+for (const file of sdkWorkflows) {
+  const workflow = yaml.parse(
+    fs.readFileSync(path.join(repoRoot, ".github/workflows", file), "utf8")
+  );
+  for (const [jobName, job] of Object.entries(workflow.jobs)) {
+    const steps = job.steps || [];
+    for (let index = 0; index < steps.length; index++) {
+      const setup = steps[index];
+      if (!setup.uses?.startsWith("actions/setup-dotnet@")) continue;
+      pinnedSdkSteps++;
+      runTest(
+        `${file}/${jobName} selects its installed SDK and rejects missing or mismatched versions`,
+        () => {
+          const expected = setup.with["dotnet-version"];
+          assert.match(expected, /^\d+\.\d+\.\d+$/);
+          assert.match(
+            setup.env?.DOTNET_INSTALL_DIR || "",
+            /^\$\{\{ runner\.temp \}\}\/[a-z0-9-]+$/
+          );
+          assert.ok(setup.id);
+          const guard = steps[index + 1];
+          assert.equal(
+            guard.env?.EXPECTED_DOTNET_SDK,
+            "${{ steps." + setup.id + ".outputs.dotnet-version }}"
+          );
+          assert.equal(guard.shell, "bash");
+          const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "sdk-selection-"));
+          try {
+            fs.writeFileSync(
+              path.join(fixture, "dotnet"),
+              '#!/bin/sh\n[ "$1" = --version ] || exit 91\nprintf "%s\\n" "$STUB_SDK_VERSION"\nexit "$STUB_SDK_STATUS"\n',
+              { mode: 0o755 }
+            );
+            const newer = `${Number(expected.split(".")[0]) + 1}.0.999`;
+            for (const [selected, required, status, accepted] of [
+              [expected, expected, 0, true],
+              [newer, expected, 0, false],
+              ["", "", 0, false],
+              [expected, expected, 17, false],
+              [expected, "", 0, false]
+            ]) {
+              const result = spawnSync("bash", ["-c", guard.run], {
+                cwd: repoRoot,
+                encoding: "utf8",
+                env: {
+                  ...process.env,
+                  PATH: fixture + path.delimiter + process.env.PATH,
+                  EXPECTED_DOTNET_SDK: required,
+                  STUB_SDK_VERSION: selected,
+                  STUB_SDK_STATUS: String(status)
+                }
+              });
+              assert.ifError(result.error);
+              assert.equal(
+                result.status === 0,
+                accepted,
+                `selected=${selected || "empty"} required=${required || "empty"} exit=${status}: ${result.stdout} ${result.stderr}`
+              );
+            }
+          } finally {
+            fs.rmSync(fixture, { recursive: true, force: true });
+          }
+        }
+      );
+    }
+  }
+}
+runTest("all seven pinned SDK installations have selection controls", () =>
+  assert.equal(pinnedSdkSteps, 7)
+);
 
 console.log("");
 console.log(`Tests passed: ${passed}`);
