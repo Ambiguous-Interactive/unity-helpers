@@ -113,7 +113,9 @@ def canonicalize_origin(source: Path, output: Path) -> str:
         output / "canonical-origin.log",
     )
     actual = run(
-        ["git", "remote", "get-url", "origin"], source, output / "source-url.log"
+        ["git", "config", "--local", "--get", "remote.origin.url"],
+        source,
+        output / "source-url.log",
     )
     if actual != SOURCE_URL:
         raise ValueError("Candidate source origin mismatch")

@@ -229,6 +229,35 @@ class CandidateBuildTests(unittest.TestCase):
             )
             self.assertEqual(actual, observed)
 
+    def test_canonical_origin_ignores_global_transport_rewrites(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / "source"
+            source.mkdir()
+            config = directory / "global.gitconfig"
+            config.write_text(
+                '[url "ssh://git@github.com/"]\n    insteadOf = https://github.com/\n'
+            )
+            with patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(config)}):
+                CANDIDATE.run(["git", "init"], source, directory / "init.log")
+                CANDIDATE.run(
+                    ["git", "remote", "add", "origin", CANDIDATE.SOURCE_URL],
+                    source,
+                    directory / "remote.log",
+                )
+                rewritten = CANDIDATE.run(
+                    ["git", "remote", "get-url", "origin"],
+                    source,
+                    directory / "rewritten.log",
+                )
+                self.assertEqual(
+                    "ssh://git@github.com/protobuf-net/protobuf-net.git", rewritten
+                )
+                actual = CANDIDATE.canonicalize_origin(source, directory)
+                self.assertEqual(
+                    "https://github.com/protobuf-net/protobuf-net.git", actual
+                )
+
     def test_inventory_retains_leading_spaces_in_file_names(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
