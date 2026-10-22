@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Tests.AssetProcessors;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
@@ -164,6 +165,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [SetUp]
         public override void BaseSetUp()
         {
+            AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
             if (Application.isPlaying)
             {
