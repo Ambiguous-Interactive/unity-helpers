@@ -872,7 +872,7 @@ jobs:
           && inputs.test-mode == 'standalone' && inputs.acceptance == 'none' && matrix.unity-version == '6000.6.0f1'))
           && (matrix.unity-version == '2021.3.45f1' || matrix.unity-version == '6000.6.0f1')
           && steps.unity_lock.outputs.acquired == 'true' }}
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22.18.0"
 

@@ -50,6 +50,7 @@
     <!-- Unity 2021.3 documents Microsoft.CodeAnalysis 3.8 as the source-generator API requirement.
          Keep ISourceGenerator and this API floor rather than depending on IIncrementalGenerator. -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.8.0" PrivateAssets="all" />
+    <!-- Newer analyzer packages ban the source-generator APIs required by the Unity Roslyn 3.8 floor (RS1035). -->
     <PackageReference
       Include="Microsoft.CodeAnalysis.Analyzers"
       Version="3.3.4"

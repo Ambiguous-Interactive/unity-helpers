@@ -64,7 +64,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install fd-find (faster alternative to find) from GitHub releases
 # fd respects .gitignore by default and has intuitive syntax
-RUN FD_VERSION="10.4.2" \
+RUN FD_VERSION="10.5.0" \
     && case "${TARGETARCH}" in \
         amd64) FD_ARCH="x86_64-unknown-linux-gnu" ;; \
         arm64) FD_ARCH="aarch64-unknown-linux-gnu" ;; \
@@ -86,7 +86,7 @@ RUN BAT_VERSION="0.26.1" \
     && chmod +x /usr/local/bin/bat
 
 # Install fzf (fuzzy finder) from GitHub releases
-RUN FZF_VERSION="0.70.0" \
+RUN FZF_VERSION="0.74.5" \
     && case "${TARGETARCH}" in \
         amd64) FZF_ARCH="linux_amd64" ;; \
         arm64) FZF_ARCH="linux_arm64" ;; \
@@ -97,7 +97,7 @@ RUN FZF_VERSION="0.70.0" \
     && chmod +x /usr/local/bin/fzf
 
 # Install delta (better git diff viewer) from GitHub releases
-RUN DELTA_VERSION="0.18.2" \
+RUN DELTA_VERSION="0.20.1" \
     && case "${TARGETARCH}" in \
         amd64) DELTA_ARCH="x86_64-unknown-linux-gnu" ;; \
         arm64) DELTA_ARCH="aarch64-unknown-linux-gnu" ;; \
@@ -108,7 +108,7 @@ RUN DELTA_VERSION="0.18.2" \
     && chmod +x /usr/local/bin/delta
 
 # Install eza (modern replacement for ls, successor to exa) from GitHub releases
-RUN EZA_VERSION="0.23.4" \
+RUN EZA_VERSION="0.23.5" \
     && case "${TARGETARCH}" in \
         amd64) EZA_ARCH="x86_64-unknown-linux-gnu" ;; \
         arm64) EZA_ARCH="aarch64-unknown-linux-gnu" ;; \
@@ -119,7 +119,7 @@ RUN EZA_VERSION="0.23.4" \
     && chmod +x /usr/local/bin/eza
 
 # Install zoxide (smarter cd command) from GitHub releases
-RUN ZOXIDE_VERSION="0.9.9" \
+RUN ZOXIDE_VERSION="0.10.0" \
     && case "${TARGETARCH}" in \
         amd64) ZOXIDE_ARCH="x86_64-unknown-linux-musl" ;; \
         arm64) ZOXIDE_ARCH="aarch64-unknown-linux-musl" ;; \
@@ -130,7 +130,7 @@ RUN ZOXIDE_VERSION="0.9.9" \
     && chmod +x /usr/local/bin/zoxide
 
 # Install yq (YAML processor, like jq for YAML) from GitHub releases
-RUN YQ_VERSION="4.52.4" \
+RUN YQ_VERSION="4.54.1" \
     && case "${TARGETARCH}" in \
         amd64) YQ_ARCH="linux_amd64" ;; \
         arm64) YQ_ARCH="linux_arm64" ;; \
@@ -163,7 +163,7 @@ RUN SD_VERSION="1.1.0" \
     && chmod +x /usr/local/bin/sd
 
 # Install dust (intuitive disk usage, better du) from GitHub releases
-RUN DUST_VERSION="1.2.4" \
+RUN DUST_VERSION="1.2.6" \
     && case "${TARGETARCH}" in \
         amd64) DUST_ARCH="x86_64-unknown-linux-gnu" ;; \
         arm64) DUST_ARCH="aarch64-unknown-linux-gnu" ;; \
@@ -174,7 +174,7 @@ RUN DUST_VERSION="1.2.4" \
     && chmod +x /usr/local/bin/dust
 
 # Install procs (modern replacement for ps) from GitHub releases
-RUN PROCS_VERSION="0.14.11" \
+RUN PROCS_VERSION="0.14.12" \
     && case "${TARGETARCH}" in \
         amd64) PROCS_ARCH="x86_64-linux" ;; \
         arm64) PROCS_ARCH="aarch64-linux" ;; \
@@ -187,6 +187,7 @@ RUN PROCS_VERSION="0.14.11" \
     && install -m 0755 "${PROCS_BIN}" /usr/local/bin/procs \
     && rm -rf /tmp/procs /tmp/procs.zip
 
+# Newer tokei releases publish no binaries; retain the last prebuilt release for both architectures.
 # Install tokei (code statistics) from GitHub releases
 RUN TOKEI_VERSION="12.1.2" \
     && case "${TARGETARCH}" in \
@@ -200,19 +201,19 @@ RUN TOKEI_VERSION="12.1.2" \
 
 # Install lychee (fast link checker) from GitHub releases
 # Version should match lychee-action in .github/workflows/lint-doc-links.yml
-RUN LYCHEE_VERSION="0.23.0" \
+RUN LYCHEE_VERSION="0.24.2" \
     && case "${TARGETARCH}" in \
-        amd64) LYCHEE_ARCH="x86_64-unknown-linux-gnu" ;; \
-        arm64) LYCHEE_ARCH="aarch64-unknown-linux-gnu" ;; \
+        amd64) LYCHEE_ARCH="x86_64-unknown-linux-musl" ;; \
+        arm64) LYCHEE_ARCH="aarch64-unknown-linux-musl" ;; \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
     && curl -fsSL "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-${LYCHEE_ARCH}.tar.gz" \
-    | tar -xz -C /usr/local/bin lychee \
+    | tar -xz --strip-components=1 -C /usr/local/bin "lychee-${LYCHEE_ARCH}/lychee" \
     && chmod +x /usr/local/bin/lychee
 
 # Install actionlint (GitHub Actions workflow linter) from GitHub releases
 # https://github.com/rhysd/actionlint - validates workflow syntax and detects common errors
-RUN ACTIONLINT_VERSION="1.7.11" \
+RUN ACTIONLINT_VERSION="1.7.12" \
     && case "${TARGETARCH}" in \
         amd64) ACTIONLINT_ARCH="linux_amd64" ;; \
         arm64) ACTIONLINT_ARCH="linux_arm64" ;; \
@@ -242,10 +243,10 @@ RUN command -v fd >/dev/null \
 COPY .devcontainer/requirements-tools.txt /tmp/requirements-tools.txt
 
 # Install PowerShell from GitHub releases to support both amd64 and arm64.
-RUN POWERSHELL_VERSION="7.5.3" \
+RUN POWERSHELL_VERSION="7.6.7" \
     && case "${TARGETARCH}" in \
-        amd64) POWERSHELL_ARCH="x64" ; POWERSHELL_SHA256="5C74E0BBAFD8BE59E72267F05700FD6615344D9CF4D30460D9B6D12CD4A88A8C" ;; \
-        arm64) POWERSHELL_ARCH="arm64" ; POWERSHELL_SHA256="4A6B656DD0E751E82C5DF9B9A4245BD1EC7D21DE5334AFBBD802DFD009595599" ;; \
+        amd64) POWERSHELL_ARCH="x64" ; POWERSHELL_SHA256="6896f9e3a6b0a354bf470835a96da76d2f801cd50dcf047ad7c4563bf93bf431" ;; \
+        arm64) POWERSHELL_ARCH="arm64" ; POWERSHELL_SHA256="ba465efdfb0984c1c5dc5ed9eb0b79a7e91a1b52c45f99377058c0659b84d3f1" ;; \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
     && curl -fsSL "https://github.com/PowerShell/PowerShell/releases/download/v${POWERSHELL_VERSION}/powershell-${POWERSHELL_VERSION}-linux-${POWERSHELL_ARCH}.tar.gz" -o /tmp/powershell.tar.gz \
@@ -274,12 +275,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
     python3-pip \
     python3-venv \
     && python3 -m venv /opt/python-tools \
-    && /opt/python-tools/bin/pip install --no-cache-dir "uv==0.12.10" \
+    && /opt/python-tools/bin/pip install --no-cache-dir "uv==0.13.4" \
     && /opt/python-tools/bin/uv pip install --python /opt/python-tools/bin/python --no-cache --requirement /tmp/requirements-tools.txt \
     && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \
-        /opt/python-tools/bin/uv tool install "mcp-server-git==2026.8.18" \
+        /opt/python-tools/bin/uv tool install "mcp-server-git==2026.10.19" \
     && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \
-        /opt/python-tools/bin/uv tool install "mcp-server-fetch==2026.8.18" \
+        /opt/python-tools/bin/uv tool install "mcp-server-fetch==2026.10.19" \
     && test -x /opt/python-tools/bin/uv \
     && ln -sf /opt/python-tools/bin/uv /usr/local/bin/uv \
     && test -x /usr/local/bin/mcp-server-git \

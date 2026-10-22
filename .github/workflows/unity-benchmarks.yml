@@ -595,7 +595,7 @@ jobs:
       # The moment a pull_request or required_status_checks rule is added, this
       # push starts failing on the following Sunday. The fallback is DxMessaging's
       # perf-numbers.yml: a GitHub App installation token
-      # (actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1)
+      # (actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510)
       # that opens an auto-merge PR. It has to be an App token, not the built-in
       # one -- a pull request opened with GITHUB_TOKEN does not trigger workflows,
       # so its required checks never start and auto-merge stalls forever.
