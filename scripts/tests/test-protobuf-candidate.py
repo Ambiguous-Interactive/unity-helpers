@@ -209,6 +209,26 @@ class CandidateBuildTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "inventory is empty"):
                 CANDIDATE.inventory(source, directory, "empty")
 
+    def test_offline_source_origin_is_canonical_before_building(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / "source"
+            source.mkdir()
+            CANDIDATE.run(["git", "init"], source, directory / "init.log")
+            CANDIDATE.run(
+                ["git", "remote", "add", "origin", str(directory / "offline-cache")],
+                source,
+                directory / "remote.log",
+            )
+            actual = CANDIDATE.canonicalize_origin(source, directory)
+            self.assertEqual("https://github.com/protobuf-net/protobuf-net.git", actual)
+            observed = CANDIDATE.run(
+                ["git", "config", "--get", "remote.origin.url"],
+                source,
+                directory / "observed.log",
+            )
+            self.assertEqual(actual, observed)
+
     def test_inventory_retains_leading_spaces_in_file_names(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

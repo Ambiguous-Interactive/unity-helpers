@@ -106,6 +106,20 @@ def select_target(project: Path) -> None:
     )
 
 
+def canonicalize_origin(source: Path, output: Path) -> str:
+    run(
+        ["git", "remote", "set-url", "origin", SOURCE_URL],
+        source,
+        output / "canonical-origin.log",
+    )
+    actual = run(
+        ["git", "remote", "get-url", "origin"], source, output / "source-url.log"
+    )
+    if actual != SOURCE_URL:
+        raise ValueError("Candidate source origin mismatch")
+    return actual
+
+
 def inventory(source: Path, output: Path, phase: str) -> list[dict[str, str]]:
     log = output / f"inventory-{phase}.log"
     run(
@@ -158,6 +172,7 @@ def build(output: Path, dotnet: str, upstream: str) -> dict:
     actual = run(["git", "rev-parse", "HEAD"], source, output / "source-identity.log")
     if actual != SOURCE_COMMIT:
         raise ValueError("Upstream source identity mismatch")
+    source_url = canonicalize_origin(source, output)
     run(["git", "apply", "--check", str(PATCH)], source, output / "patch-check.log")
     run(["git", "apply", str(PATCH)], source, output / "patch-apply.log")
     (source / "global.json").write_text(
@@ -221,6 +236,7 @@ def build(output: Path, dotnet: str, upstream: str) -> dict:
     runtime = run([executable, "--info"], source, output / "dotnet-info.log")
     receipt = {
         "sourceCommit": SOURCE_COMMIT,
+        "sourceUrl": source_url,
         "patchSha256": patch_hash,
         "buildScriptSha256": script_hash,
         "sourceInventorySha256": digest(output / "source-before.json"),

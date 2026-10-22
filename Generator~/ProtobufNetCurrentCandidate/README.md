@@ -27,7 +27,10 @@ dotnet test Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/Wallst
 ```
 
 `--dotnet` selects an explicit executable. `--upstream` can name an existing full
-upstream clone for offline use; the source commit remains pinned. Partial clones
+upstream clone for offline use; the source commit remains pinned.
+The builder resets the cloned origin to the canonical upstream URL so offline and
+hosted builds record the same repository provenance.
+Partial clones
 need their complete history objects because upstream's versioning task reads
 historical blobs without Git's lazy fetching.
 
