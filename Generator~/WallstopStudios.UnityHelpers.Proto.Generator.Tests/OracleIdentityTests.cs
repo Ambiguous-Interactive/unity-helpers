@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.Reflection;
     using System.Security.Cryptography;
     using System.Text;
+    using System.Text.Json;
     using NUnit.Framework;
 
     /// <summary>
@@ -38,6 +39,38 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             const string expectedInformationalVersion = "2.4.9.1+f4bacb1a94";
             const string expectedSha256 =
                 "8f8f1c205ecebb5bd74d0bed130e8ce8745e8053f52838517d74535f2096742c";
+#elif PROTOBUF_NET_ORACLE_CANDIDATE
+            const string expectedAssemblyVersion = "3.0.0.0";
+            const string expectedInformationalVersion = "3.4.40+3aa672eaaf";
+            using JsonDocument receipt = JsonDocument.Parse(
+                File.ReadAllText(
+                    Path.Combine(TestContext.CurrentContext.TestDirectory, "candidate-receipt.json")
+                )
+            );
+            JsonElement candidateIdentity = receipt.RootElement;
+            Assert.AreEqual(
+                "3aa672eaaf7763b86d62bec9ed7d7896b0511a8b",
+                candidateIdentity.GetProperty("sourceCommit").GetString()
+            );
+            Assert.AreEqual("9.0.319", candidateIdentity.GetProperty("sdk").GetString());
+            Assert.AreEqual(
+                "netstandard2.1",
+                candidateIdentity.GetProperty("targetFramework").GetString()
+            );
+            Assert.AreEqual(
+                Sha256(
+                    Path.Combine(TestContext.CurrentContext.TestDirectory, "candidate-source.patch")
+                ),
+                candidateIdentity.GetProperty("patchSha256").GetString()
+            );
+            string expectedSha256 = candidateIdentity
+                .GetProperty("files")
+                .GetProperty("protobuf-net.dll")
+                .GetString();
+            string expectedCoreSha256 = candidateIdentity
+                .GetProperty("files")
+                .GetProperty("protobuf-net.Core.dll")
+                .GetString();
 #else
             const string expectedAssemblyVersion = "3.0.0.0";
             const string expectedInformationalVersion = "3.2.56+dfdfce61a7";

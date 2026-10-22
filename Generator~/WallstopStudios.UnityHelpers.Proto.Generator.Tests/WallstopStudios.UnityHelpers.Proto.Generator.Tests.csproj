@@ -19,10 +19,18 @@
       >$(RepoRoot)/Generator~/ProtobufNetV2Oracle/protobuf-net.dll</ProtobufNetOraclePath>
     <ProtobufNetOraclePath Condition="'$(ProtobufNetOracle)' == 'v3'"
       >$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</ProtobufNetOraclePath>
+    <ProtobufNetOraclePath Condition="'$(ProtobufNetOracle)' == 'candidate'"
+      >$(ProtobufNetCandidateRoot)/protobuf-net.dll</ProtobufNetOraclePath>
+    <ProtobufNetCorePath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</ProtobufNetCorePath>
+    <ProtobufNetCorePath Condition="'$(ProtobufNetOracle)' == 'candidate'"
+      >$(ProtobufNetCandidateRoot)/protobuf-net.Core.dll</ProtobufNetCorePath>
     <BaseOutputPath>bin/$(ProtobufNetOracle)/</BaseOutputPath>
     <IntermediateOutputPath>obj/$(ProtobufNetOracle)/$(Configuration)/</IntermediateOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
     <DefineConstants Condition="'$(ProtobufNetOracle)' == 'v2'"
       >$(DefineConstants);PROTOBUF_NET_ORACLE_V2</DefineConstants>
+    <DefineConstants Condition="'$(ProtobufNetOracle)' == 'candidate'"
+      >$(DefineConstants);PROTOBUF_NET_ORACLE_CANDIDATE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="WallstopStudios.UnityHelpers.SchemaConformance.Tests" />
@@ -177,18 +185,31 @@
     </Reference>
     <Reference
       Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67"
-      Condition="'$(ProtobufNetOracle)' == 'v3'"
+      Condition="'$(ProtobufNetOracle)' == 'v3' or '$(ProtobufNetOracle)' == 'candidate'"
     >
       <HintPath>$(ProtobufNetOraclePath)</HintPath>
       <SpecificVersion>true</SpecificVersion>
     </Reference>
     <Reference
       Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67"
-      Condition="'$(ProtobufNetOracle)' == 'v3'"
+      Condition="'$(ProtobufNetOracle)' == 'v3' or '$(ProtobufNetOracle)' == 'candidate'"
     >
-      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</HintPath>
+      <HintPath>$(ProtobufNetCorePath)</HintPath>
       <SpecificVersion>true</SpecificVersion>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ProtobufNetOracle)' == 'candidate'">
+    <PackageReference Include="System.Collections.Immutable" Version="10.0.13" />
+    <None
+      Include="$(ProtobufNetCandidateRoot)/candidate-receipt.json"
+      CopyToOutputDirectory="Always"
+    />
+    <None
+      Include="../ProtobufNetCurrentCandidate/il2cpp-aot.patch"
+      Link="candidate-source.patch"
+      CopyToOutputDirectory="Always"
+    />
   </ItemGroup>
 
   <ItemGroup>
@@ -215,8 +236,12 @@
 
   <Target Name="ValidateProtobufNetOracle" BeforeTargets="ResolveReferences">
     <Error
-      Condition="'$(ProtobufNetOracle)' != 'v2' and '$(ProtobufNetOracle)' != 'v3'"
-      Text="Unknown ProtobufNetOracle '$(ProtobufNetOracle)'. Expected v2 or v3."
+      Condition="'$(ProtobufNetOracle)' != 'v2' and '$(ProtobufNetOracle)' != 'v3' and '$(ProtobufNetOracle)' != 'candidate'"
+      Text="Unknown ProtobufNetOracle '$(ProtobufNetOracle)'. Expected v2, v3, or candidate."
+    />
+    <Error
+      Condition="'$(ProtobufNetOracle)' == 'candidate' and ('$(ProtobufNetCandidateRoot)' == '' or !Exists('$(ProtobufNetCandidateRoot)/candidate-receipt.json') or !Exists('$(ProtobufNetCorePath)'))"
+      Text="The candidate lane requires ProtobufNetCandidateRoot with both built assemblies and candidate-receipt.json."
     />
     <Error
       Condition="!Exists('$(ProtobufNetOraclePath)')"

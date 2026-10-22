@@ -55,9 +55,8 @@ $expectedConstraints = @{
     'System.IO.Pipelines'           = @()
 }
 
-# Assemblies this package compiles against but deliberately does NOT ship, because every editor in
-# the support matrix (2021.3+) provides them and a fourth copy of a contested name is what makes
-# resolution unstable in the first place. Shipping one would be a decision, not a refresh artifact.
+# Keep Unsafe out of Runtime/Binaries. The overridable legacy copy under Runtime/Protobuf-Net
+# has a separate importer; adding another copy here changes Unity's assembly selection.
 $deliberatelyNotShipped = @('System.Runtime.CompilerServices.Unsafe')
 
 $failed = $false
