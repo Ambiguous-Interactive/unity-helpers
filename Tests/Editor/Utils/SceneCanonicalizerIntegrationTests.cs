@@ -4,12 +4,15 @@
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
 {
     using System;
+    using System.Collections;
+    using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEditor.SceneManagement;
     using UnityEngine;
     using UnityEngine.SceneManagement;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -18,49 +21,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
     [Category("Integration")]
     public sealed class SceneCanonicalizerIntegrationTests : CommonTestBase
     {
+        private readonly List<Scene> _ownedScenes = new();
         private string _folder;
         private string[] _previousAutomaticFolders;
-
-        private static bool HasUntitledScene()
-        {
-            for (int i = 0; i < SceneManager.sceneCount; ++i)
-            {
-                Scene scene = SceneManager.GetSceneAt(i);
-                if (string.IsNullOrEmpty(scene.path))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private static Scene CreateWorkingScene()
-        {
-            return EditorSceneManager.NewScene(
-                NewSceneSetup.EmptyScene,
-                HasUntitledScene() ? NewSceneMode.Single : NewSceneMode.Additive
-            );
-        }
-
-        private static Scene OpenWorkingScene(string path)
-        {
-            return EditorSceneManager.OpenScene(
-                path,
-                HasUntitledScene() ? OpenSceneMode.Single : OpenSceneMode.Additive
-            );
-        }
-
-        private static void CloseWorkingScene(Scene scene)
-        {
-            if (1 < SceneManager.sceneCount)
-            {
-                EditorSceneManager.CloseScene(scene, true);
-            }
-            else
-            {
-                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            }
-        }
 
         [SetUp]
         public void SetUpAssets()
@@ -75,10 +38,87 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
         [TearDown]
         public void RestoreAutomaticFolders()
         {
+            try
+            {
+                while (0 < _ownedScenes.Count)
+                {
+                    CloseWorkingScene(_ownedScenes[_ownedScenes.Count - 1]);
+                }
+            }
+            finally
+            {
+                try
+                {
+                    Assert.That(
+                        SceneCanonicalizer.TrySetAutomaticFolders(_previousAutomaticFolders, out _),
+                        Is.True
+                    );
+                }
+                finally
+                {
+                    CleanupTrackedFoldersAndAssets();
+                }
+            }
+        }
+
+        [UnityTearDown]
+        public IEnumerator VerifyOwnedAssetsRemoved()
+        {
+            if (string.IsNullOrEmpty(_folder))
+            {
+                yield break;
+            }
+            for (int frame = 0; frame < 10; ++frame)
+            {
+                if (
+                    !AssetDatabase.IsValidFolder(_folder)
+                    && !Directory.Exists(_folder)
+                    && !File.Exists(_folder + ".meta")
+                )
+                {
+                    yield break;
+                }
+                yield return null;
+            }
+            Assert.That(AssetDatabase.IsValidFolder(_folder), Is.False, _folder);
+            Assert.That(Directory.Exists(_folder), Is.False, _folder);
+            Assert.That(File.Exists(_folder + ".meta"), Is.False, _folder);
+        }
+
+        [Test]
+        public void TearDownRestoresSettingsAndRemovesOwnedAssetsAfterFailure()
+        {
+            Scene existing = SceneManager.GetActiveScene();
+            string path = _folder + "/Interrupted.unity";
+            Scene owned = CreateWorkingScene(path);
+            Assert.That(EditorSceneManager.SaveScene(owned, path), Is.True);
             Assert.That(
-                SceneCanonicalizer.TrySetAutomaticFolders(_previousAutomaticFolders, out _),
+                SceneCanonicalizer.TrySetAutomaticFolders(new[] { _folder }, out _),
                 Is.True
             );
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                try
+                {
+                    throw new InvalidOperationException();
+                }
+                finally
+                {
+                    RestoreAutomaticFolders();
+                }
+            });
+            Assert.That(owned.isLoaded, Is.False);
+            Assert.That(existing.isLoaded, Is.True);
+            Assert.That(SceneManager.GetActiveScene(), Is.EqualTo(existing));
+            Assert.That(
+                SceneCanonicalizer.GetAutomaticFolders(),
+                Is.EqualTo(_previousAutomaticFolders)
+            );
+            Assert.That(AssetDatabase.IsValidFolder(_folder), Is.False);
+            Assert.That(Directory.Exists(_folder), Is.False);
+            Assert.That(File.Exists(_folder + ".meta"), Is.False);
+            Assert.That(File.Exists(path), Is.False);
+            Assert.That(File.Exists(path + ".meta"), Is.False);
         }
 
         [Test]
@@ -158,7 +198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 Is.SameAs(prefab.GetComponent<Rigidbody>())
             );
             string scenePath = _folder + "/PrefabInstances.unity";
-            Scene scene = CreateWorkingScene();
+            Scene scene = CreateWorkingScene(scenePath);
             try
             {
                 for (int i = 0; i < 2; ++i)
@@ -269,7 +309,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             string[] canonical = new string[2];
             for (int generation = 0; generation < 2; ++generation)
             {
-                Scene scene = CreateWorkingScene();
+                Scene scene = CreateWorkingScene(scenePath);
                 try
                 {
                     GameObject parent = (GameObject)
@@ -413,9 +453,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             Assert.That(File.ReadAllText(path), Is.EqualTo(original));
         }
 
+        private Scene CreateWorkingScene(string path)
+        {
+            File.WriteAllText(path, "%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n");
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            return OpenWorkingScene(path);
+        }
+
+        private Scene OpenWorkingScene(string path)
+        {
+            Scene scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+            _ownedScenes.Add(scene);
+            return scene;
+        }
+
+        private void CloseWorkingScene(Scene scene)
+        {
+            if (scene.IsValid() && scene.isLoaded)
+            {
+                Assert.That(EditorSceneManager.CloseScene(scene, true), Is.True);
+            }
+            _ownedScenes.Remove(scene);
+        }
+
         private void SaveFreshScene(string path)
         {
-            Scene scene = CreateWorkingScene();
+            Scene scene = CreateWorkingScene(path);
             try
             {
                 GameObject root = Track(new GameObject("Root"));

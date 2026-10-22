@@ -387,7 +387,7 @@ function Assert-WProtoEvidence {
         if ((ConvertTo-Json -InputObject $currentBinaries -Depth 5 -Compress) -cne (ConvertTo-Json -InputObject $record[$snapshot] -Depth 5 -Compress)) { throw 'Binary inventory differs.' }
     }
     $oracleSources = if ($oracleKey -ceq 'v2') { @(@{ output = 'protobuf-net.dll'; source = 'Generator~/ProtobufNetV2Oracle/protobuf-net.dll' }) }
-    else { @(@{ output = 'protobuf-net.dll'; source = 'Runtime/Protobuf-Net/protobuf-net.dll' }, @{ output = 'protobuf-net.Core.dll'; source = 'Runtime/Protobuf-Net/protobuf-net.Core.dll' }) }
+    else { @(@{ output = 'protobuf-net.dll'; source = 'Generator~/ProtobufNetV3Oracle/protobuf-net.dll' }, @{ output = 'protobuf-net.Core.dll'; source = 'Generator~/ProtobufNetV3Oracle/protobuf-net.Core.dll' }) }
     foreach ($oracleFile in $oracleSources) {
         if ((Get-WProtoFileHash (Join-Path $record.binaryRoot $oracleFile.output)) -cne (Get-WProtoFileHash (Join-Path $Root $oracleFile.source))) { throw 'Compiled oracle differs from the pinned input.' }
     }

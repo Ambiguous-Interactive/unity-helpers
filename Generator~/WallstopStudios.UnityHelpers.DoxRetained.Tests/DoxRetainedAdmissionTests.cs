@@ -145,10 +145,13 @@ namespace WallstopStudios.UnityHelpers.DoxRetained.Tests
         }
 
         [Test]
-        public void CapturedInputsAndLoadedV3AssembliesMatchTheFrozenInventory()
+        public void CapturedInputsAndLoadedOracleMatchPinnedIdentities()
         {
             JsonObject inventory = DoxRetainedCorpus.ReadInventory();
             DoxRetainedCorpus.Validate(inventory, DoxRetainedCorpus.Read);
+#if PROTOBUF_NET_ORACLE_CANDIDATE
+            new WallstopStudios.UnityHelpers.Proto.Generator.Tests.OracleIdentityTests().LoadedOracleHasTheExpectedPhysicalIdentity();
+#else
             DoxRetainedCorpus.ValidateFiles(
                 inventory["oracleAssemblies"].AsArray(),
                 new[] { "protobuf-net.dll", "protobuf-net.Core.dll" },
@@ -159,6 +162,7 @@ namespace WallstopStudios.UnityHelpers.DoxRetained.Tests
                             : typeof(ProtoReader).Assembly.Location
                     )
             );
+#endif
             Assert.AreEqual(
                 new Version(3, 0, 0, 0),
                 typeof(ProtoBuf.Serializer).Assembly.GetName().Version

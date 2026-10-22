@@ -7,18 +7,22 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <ProtobufNetOracle Condition="'$(ProtobufNetOracle)' == ''">v3</ProtobufNetOracle>
+    <DoxProtobufRoot>$(MSBuildProjectDirectory)/../ProtobufNetV3Oracle</DoxProtobufRoot>
+    <DoxProtobufRoot Condition="'$(ProtobufNetOracle)' == 'candidate'"
+      >$(ProtobufNetCandidateRoot)</DoxProtobufRoot>
+    <DefineConstants Condition="'$(ProtobufNetOracle)' == 'candidate'"
+      >$(DefineConstants);PROTOBUF_NET_ORACLE_CANDIDATE</DefineConstants>
+    <BaseOutputPath>bin/$(ProtobufNetOracle)/</BaseOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference
-      Include="../WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj"
-      AdditionalProperties="ProtobufNetOracle=v3"
-    />
+    <ProjectReference Include="../WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj" />
     <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67">
-      <HintPath>../../Runtime/Protobuf-Net/protobuf-net.dll</HintPath>
+      <HintPath>$(DoxProtobufRoot)/protobuf-net.dll</HintPath>
       <SpecificVersion>true</SpecificVersion>
     </Reference>
     <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67">
-      <HintPath>../../Runtime/Protobuf-Net/protobuf-net.Core.dll</HintPath>
+      <HintPath>$(DoxProtobufRoot)/protobuf-net.Core.dll</HintPath>
       <SpecificVersion>true</SpecificVersion>
     </Reference>
     <Compile
@@ -37,14 +41,17 @@
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="6.3.1" />
   </ItemGroup>
-  <Target Name="RequireDoxV3Oracle" BeforeTargets="PrepareForBuild;ResolveProjectReferences">
+  <ItemGroup Condition="'$(ProtobufNetOracle)' == 'candidate'">
+    <PackageReference Include="System.Collections.Immutable" Version="10.0.13" />
+  </ItemGroup>
+  <Target Name="RequireDoxOracle" BeforeTargets="PrepareForBuild;ResolveProjectReferences">
     <Error
-      Condition="'$(ProtobufNetOracle)' != 'v3'"
-      Text="Dox retained admission requires ProtobufNetOracle=v3; v2 and mixed global configurations are unsupported."
+      Condition="'$(ProtobufNetOracle)' != 'v3' and '$(ProtobufNetOracle)' != 'candidate'"
+      Text="Dox retained admission requires ProtobufNetOracle=v3 or candidate."
     />
     <Error
       Condition="'$(ProtobufNetOraclePath)' != ''"
-      Text="Dox retained admission uses the pinned repository v3 oracle; an external ProtobufNetOraclePath is unsupported."
+      Text="Dox retained admission selects its pinned oracle through v3 or candidate; external ProtobufNetOraclePath overrides are unsupported."
     />
   </Target>
 </Project>

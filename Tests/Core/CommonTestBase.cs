@@ -1570,10 +1570,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /// <summary>
-        /// Ensures a folder exists both on disk and in the AssetDatabase.
-        /// This prevents Unity's internal "Moving file failed" modal dialog.
-        /// Tracks created folders for automatic cleanup during TearDown.
+        /// Ensures a folder exists on disk and in the AssetDatabase, tracking only newly created folders.
         /// </summary>
+        /// <remarks>Call <see cref="CleanupTrackedFoldersAndAssets"/> explicitly to remove tracked paths.</remarks>
         /// <param name="folderPath">Unity relative path (e.g., Assets/Resources/Test).</param>
         /// <returns>List of folder paths that were created (for external tracking if needed).</returns>
         protected List<string> EnsureFolder(string folderPath)
@@ -1662,9 +1661,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /// <summary>
-        /// Tracks a folder path for cleanup during TearDown.
-        /// Only tracked folders will be deleted - pre-existing user folders are safe.
+        /// Registers a fixture-owned folder for explicit cleanup with <see cref="CleanupTrackedFoldersAndAssets"/>.
         /// </summary>
+        /// <remarks>Tracking does not delete paths automatically; do not register pre-existing user folders.</remarks>
         /// <param name="folderPath">The Unity-relative folder path (e.g., "Assets/Temp/MyTest")</param>
         protected void TrackFolder(string folderPath)
         {
@@ -1681,9 +1680,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /// <summary>
-        /// Tracks an asset path for cleanup during TearDown.
-        /// Only tracked assets will be deleted - pre-existing user assets are safe.
+        /// Registers a fixture-owned asset for explicit cleanup with <see cref="CleanupTrackedFoldersAndAssets"/>.
         /// </summary>
+        /// <remarks>Tracking does not delete paths automatically; do not register pre-existing user assets.</remarks>
         /// <param name="assetPath">The Unity-relative asset path (e.g., "Assets/Temp/MyAsset.asset")</param>
         protected void TrackAssetPath(string assetPath)
         {

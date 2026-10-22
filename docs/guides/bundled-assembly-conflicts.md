@@ -71,7 +71,7 @@ to **Project Settings → Player → Scripting Define Symbols**:
 | `EXCLUDE_COMPILER_SERVICES_UNSAFE` | `System.Runtime.CompilerServices.Unsafe` |
 
 Dropping the explicitly-referenced copy lets this package's auto-referenced copy win the name, and
-the AI Assistant's own assemblies then resolve against it; they are the same 9.0.0.0 assemblies.
+the AI Assistant's own assemblies then resolve against it; the winning assemblies must expose the APIs that each consumer requires.
 Verified on Unity `6000.4.6f1`: `System.Text.Encodings.Web` went from 0 of 245 assemblies to 221
 of 221, and every `Unity.AI.Assistant.*` assembly still compiled.
 
@@ -94,7 +94,7 @@ unconditionally.
 `System.Runtime.CompilerServices.Unsafe` is used across the runtime (`EnumExtensions`,
 `ReflectionHelpers`, `Objects`, `AbstractRandom`, `RuntimeSingleton`). The package already
 contains an overridable Unsafe **6.1.2** assembly under `Runtime/Protobuf-Net/`, alongside
-Immutable **9.0.8**. The Unsafe importer disables the Editor platform; the Immutable importer
+Immutable **10.0.13**. The Unsafe importer disables the Editor platform; the Immutable importer
 enables it. Check the actual winning assembly path and references in the consuming editor.
 Importer settings alone do not identify an assembly already loaded into a running domain.
 
@@ -109,21 +109,30 @@ refresh that regenerates an importer without its constraint, or drops in a new D
 restore the conflict. The linter fails on an unclassified DLL, so a refresh cannot proceed without a
 conscious decision recorded here.
 
-## Dependency upgrade candidates
+## Bundled dependency versions
 
-Dependency updates need tests against Unity's actual assembly set before publication.
-A NuGet package's .NET Standard target does not prove that its dependency versions
-or APIs match every supported Unity editor and player.
+The four BCL assemblies under `Runtime/Binaries/` use official NuGet **10.0.13**
+.NET Standard 2.0 assets. Their package source commit is
+`4099f83977f4d29604a9aeb971fb0a7bc1d5f699`. DLL/XML provenance is recorded in the
+[bundled BCL inventory](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Binaries/README.md).
+The existing Unity-version constraints and importer GUIDs remain unchanged.
+Newer Unity versions continue to use their own JSON, encodings and async-interface assemblies.
 
-The protobuf-net 3.4.40 candidate can be built with
-`python3 scripts/build-protobuf-candidate.py --output /tmp/protobuf-candidate`.
-It requires SDK 9.0.319 and produces isolated binaries and a build receipt. The
-host differential project selects those binaries with `ProtobufNetOracle=candidate`
-and `ProtobufNetCandidateRoot=/tmp/protobuf-candidate/assemblies`. The frozen v2/v3
-lanes continue to use their original binaries.
+Protobuf-net **3.4.40** uses the rebased AOT patch, Immutable **10.0.13** and
+Unsafe **6.1.2**. Build and verify it with:
 
-This candidate requires newer Immutable and the existing Unsafe 6.1.2 version. Its host test
-lane resolves those through NuGet; that result does not authorize bundling new
-Unity assemblies. The package continues to ship its existing runtime dependencies
-until the candidate passes the supported compiler, Unity, retained-save and native
-health gates tracked in [#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052).
+```bash
+python3 scripts/build-protobuf-candidate.py --output /tmp/protobuf-candidate
+python3 scripts/verify-protobuf-shipped.py --candidate-root /tmp/protobuf-candidate/assemblies
+```
+
+The builder requires SDK 9.0.319 and produces isolated binaries with a source-bound
+build receipt. The independent current lane uses `ProtobufNetOracle=candidate`
+and `ProtobufNetCandidateRoot=/tmp/protobuf-candidate/assemblies`. Frozen v2/v3 lanes
+retain their original DLLs under `Generator~`; dependency upgrades never refresh them.
+The retained Dox consumer suite exercises both the frozen v3 and current builds.
+
+A .NET Standard target and passing host tests do not establish Unity assembly
+ownership or backend health. Supported-version, stripped IL2CPP, WebGL and native
+process qualification remain tracked in
+[#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052).
