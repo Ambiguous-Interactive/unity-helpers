@@ -246,6 +246,28 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
             }
 
+            StringBuilder writeAllocationRounds = new StringBuilder();
+            for (int round = 0; round < MeasurementRounds; ++round)
+            {
+                if (0 < round)
+                {
+                    writeAllocationRounds.Append(", ");
+                }
+                writeAllocationRounds.Append(wallstopProtoSerializeRounds[round].AllocatedBytes);
+            }
+            TestContext.WriteLine(
+                $"WProto write allocated bytes by round ({MeasuredIterations} calls each): {writeAllocationRounds}"
+            );
+            TestContext.WriteLine(
+                $"Benchmark process {Environment.ProcessId}, managed thread {Environment.CurrentManagedThreadId}, "
+                    + $"runtime {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}, "
+                    + $"OS {System.Runtime.InteropServices.RuntimeInformation.OSDescription}."
+            );
+            TestContext.WriteLine(
+                $"Benchmark test assembly: {typeof(AllocationBenchmarkTests).Assembly.Location}; "
+                    + $"MVID {typeof(AllocationBenchmarkTests).Assembly.ManifestModule.ModuleVersionId}."
+            );
+
             Measurement wallstopProtoSerialize = Summarize(wallstopProtoSerializeRounds);
             Measurement protobufNetSerialize = Summarize(protobufNetSerializeRounds);
             Measurement wallstopProtoDeserialize = Summarize(wallstopProtoDeserializeRounds);

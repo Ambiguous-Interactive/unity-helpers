@@ -958,7 +958,8 @@
         "ntdll",
         "rcx",
         "dmp",
-        "killpg"
+        "killpg",
+        "PDB"
       ]
     }
   ],
