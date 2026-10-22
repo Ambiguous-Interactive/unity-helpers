@@ -26,6 +26,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         private const string PackedScenePath =
             "Packages/com.wallstop-studios.unity-helpers/Tests/Runtime/Scenes/Test1.unity";
 
+        private string _ownedFolderPath;
+
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static (
             SceneHelper.SceneLoadScope scope,
@@ -61,6 +63,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             return new WeakReference(new object());
         }
 
+        [TearDown]
+        public override void TearDown()
+        {
+            try
+            {
+                base.TearDown();
+            }
+            finally
+            {
+                CleanupTrackedFoldersAndAssets();
+                if (!string.IsNullOrEmpty(_ownedFolderPath))
+                {
+                    ForceAssetUnloaded(_ownedFolderPath);
+                    Assert.IsFalse(AssetDatabase.IsValidFolder(_ownedFolderPath));
+                    string absoluteFolder = Path.Combine(
+                        Path.GetDirectoryName(Application.dataPath),
+                        _ownedFolderPath
+                    );
+                    Assert.IsFalse(
+                        Directory.Exists(absoluteFolder),
+                        "The owned scene folder must be removed."
+                    );
+                    Assert.IsFalse(
+                        File.Exists(absoluteFolder + ".meta"),
+                        "The owned folder importer must be removed."
+                    );
+                }
+            }
+        }
+
         [UnityTest]
         public IEnumerator NativeLoadFailureSettlesAndReleasesCallbackAndHandler()
         {
@@ -84,6 +116,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(rooted.IsAlive);
             Assert.IsFalse(released.IsAlive);
             string folder = "Assets/SceneFailureProbe" + Guid.NewGuid().ToString("N");
+            _ownedFolderPath = folder;
             EnsureFolder(folder);
             string assetPath = folder + "/Owned.unity";
             TrackAssetPath(assetPath);
