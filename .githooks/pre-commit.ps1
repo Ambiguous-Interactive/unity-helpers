@@ -395,6 +395,15 @@ function Add-FinalNewlines {
             continue
         }
 
+        $attributeResult = Invoke-Git -Arguments @('check-attr', '--cached', '-z', 'text', '--', $path)
+        $attributeFields = $attributeResult.Stdout.Split([char]0)
+        if ($attributeFields.Count -ne 4 -or $attributeFields[0] -cne $path -or $attributeFields[1] -cne 'text' -or $attributeFields[3] -cne '') {
+            throw "Unexpected staged text attribute response for '$path'."
+        }
+        if ($attributeFields[2] -ceq 'unset') {
+            continue
+        }
+
         $appendBytes = if ($bytes.Length -gt 0 -and $bytes -contains 13) {
             [byte[]](13, 10)
         }

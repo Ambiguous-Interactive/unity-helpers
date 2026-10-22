@@ -54,6 +54,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             )
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }
@@ -111,6 +112,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             )
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }

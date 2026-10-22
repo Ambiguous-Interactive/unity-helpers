@@ -3,6 +3,10 @@ Param(
     [switch]$LicensePipeOnly,
     [switch]$PipePressureOnly,
     [switch]$ArgumentAdmissionOnly,
+    [switch]$GitDiscoveryOnly,
+    [switch]$DiscoveryScopeOnly,
+    [switch]$DestinationTransitionOnly,
+    [switch]$GeneratedSafetyOnly,
     [string]$ArgumentAdmissionEvidencePath,
     [switch]$JavaScriptLibraryOnly
 )
@@ -524,7 +528,11 @@ exit 0
         foreach ($helper in @('Invoke-GitPathList', 'Invoke-GitRawText')) {
             $result = Invoke-BoundedPipeProcess -FileName (Get-Command pwsh -ErrorAction Stop).Source -Arguments @('-NoProfile', '-File', $runnerPath, '-Helper', $helper, '-RepoRoot', $repoPath) -WorkingDirectory $repoPath
             Write-TestResult "GitStderrPipeDrain.$helper.CompletesWithinTimeout" $result.Completed "The actual helper did not complete within 10 seconds. Stderr: $($result.Stderr)"
-            Write-TestResult "GitStderrPipeDrain.$helper.PreservesReturnSemantics" ($result.Completed -and $result.ExitCode -eq 0 -and $result.Stdout.Contains('PIPE_RETURN_OK')) "The actual helper's return semantics failed. Exit=$($result.ExitCode); stderr=$($result.Stderr)"
+            if ($helper -eq 'Invoke-GitPathList') {
+                Write-TestResult "GitStderrPipeDrain.$helper.PreservesFailureStatus" ($result.Completed -and $result.ExitCode -eq 37 -and -not $result.Stdout.Contains('PIPE_RETURN_OK') -and $result.Stderr.Contains('failed with exit code 37: x')) "The actual path-query failure was lost. Exit=$($result.ExitCode); stderr=$($result.Stderr)"
+            } else {
+                Write-TestResult "GitStderrPipeDrain.$helper.PreservesReturnSemantics" ($result.Completed -and $result.ExitCode -eq 0 -and $result.Stdout.Contains('PIPE_RETURN_OK')) "The actual helper's return semantics failed. Exit=$($result.ExitCode); stderr=$($result.Stderr)"
+            }
         }
     }
     finally {
@@ -563,6 +571,443 @@ function New-AdmissionRepo {
     [IO.File]::WriteAllText((Join-Path $repo '.githooks/pre-commit.log'), 'owned ignored user artifact')
     & git -C $repo add -- Runtime/Selected.png.meta
     return $repo
+}
+
+function Test-GitDiscoveryFailurePreflight {
+    foreach ($mode in @('Default', 'Explicit')) {
+        foreach ($fixMode in @($false, $true)) {
+            foreach ($failure in @('CorruptIndex', 'NonRepository')) {
+                $repo = New-AdmissionRepo -UnsafeConfig:$fixMode
+                try {
+                    if (-not $fixMode) { Remove-Item -LiteralPath (Join-Path $repo '.githooks/pre-commit.log') -Force }
+                    if ($failure -eq 'CorruptIndex') {
+                        [IO.File]::WriteAllBytes((Join-Path $repo '.git/index'), [Text.Encoding]::UTF8.GetBytes('invalid index witness'))
+                    } else {
+                        Remove-Item -LiteralPath (Join-Path $repo '.git') -Recurse -Force
+                    }
+                    $before = Get-AdmissionSnapshot $repo
+                    $baseline = Invoke-BoundedPipeProcess -FileName (Get-Command git -ErrorAction Stop).Source -Arguments @('diff', '--name-only', '-z', '--diff-filter=ACMRTUXB') -WorkingDirectory $repo
+                    if (-not $baseline.Completed -or $baseline.ExitCode -eq 0 -or [string]::IsNullOrWhiteSpace($baseline.Stderr)) { throw 'Actual Git failure baseline was not established.' }
+                    $originalDiagnostic = ($baseline.Stderr -split '\r?\n')[0]
+                    $arguments = @()
+                    if ($mode -eq 'Explicit') { $arguments = @('-Paths', 'Runtime/Selected.png.meta') }
+                    if ($fixMode) { $arguments = @('-Fix') + $arguments }
+                    $result = Invoke-Preflight -RepoPath $repo -Arguments $arguments -UseCli
+                    $label = "GitDiscovery_${mode}_${failure}_Fix${fixMode}"
+                    Write-TestResult "${label}_GitStatusPreserved" ($result.ExitCode -eq $baseline.ExitCode) $result.Output
+                    Write-TestResult "${label}_OriginalDiagnostic" ($result.Output.Contains($originalDiagnostic) -and $result.Output -notmatch 'Nothing to validate|All relevant changed-file checks passed') $result.Output
+                    Write-TestResult "${label}_NoMutation" ((Get-AdmissionSnapshot $repo) -ceq $before) 'Failed required discovery changed files, metadata, config or index.'
+                }
+                finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+            }
+        }
+    }
+    $repo = New-TestRepo -ConfigurePushDefaults
+    try {
+        [IO.File]::WriteAllBytes((Join-Path $repo '.git/index'), [Text.Encoding]::UTF8.GetBytes('invalid index witness'))
+        $sourceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        $errors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'scripts/agent-preflight.ps1'), [ref]$null, [ref]$errors)
+        if ($errors.Count -gt 0) { throw 'Actual preflight source did not parse.' }
+        $runner = [Collections.Generic.List[string]]::new()
+        $runner.Add('param([string]$Helper, [string]$RepoRoot)')
+        $runner.Add("Set-StrictMode -Version Latest`n`$ErrorActionPreference = 'Stop'")
+        foreach ($name in @('Split-NulPathText', 'Invoke-GitPathList', 'Get-GitChangedPaths', 'Get-GitStagedPaths', 'Get-GitUnstagedOrUntrackedPaths')) {
+            $functions = @($ast.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name }, $false))
+            if ($functions.Count -ne 1) { throw "Expected one actual preflight function named $name." }
+            $runner.Add($functions[0].Extent.Text)
+        }
+        $runner.Add(@'
+if ($Helper -ceq 'Invoke-GitPathList') {
+    & $Helper -RepoRoot $RepoRoot -Arguments @('ls-files', '--others', '--exclude-standard', '-z')
+} else {
+    & $Helper -RepoRoot $RepoRoot
+}
+[Console]::WriteLine('UNEXPECTED_CONTINUATION')
+exit 0
+'@)
+        $path = Join-Path $repo 'scripts/actual-path-query.ps1'
+        [IO.File]::WriteAllText($path, ($runner -join "`n"))
+        foreach ($helper in @('Get-GitChangedPaths', 'Get-GitStagedPaths', 'Get-GitUnstagedOrUntrackedPaths', 'Invoke-GitPathList')) {
+            $result = Invoke-BoundedPipeProcess -FileName (Get-Command pwsh -ErrorAction Stop).Source -Arguments @('-NoProfile', '-File', $path, '-Helper', $helper, '-RepoRoot', $repo) -WorkingDirectory $repo
+            Write-TestResult "GitDiscovery_${helper}_FailurePropagated" ($result.Completed -and $result.ExitCode -eq 128) ($result.Stdout + $result.Stderr)
+            Write-TestResult "GitDiscovery_${helper}_DiagnosticPreserved" ($result.Stderr.Contains('index file smaller than expected')) ($result.Stdout + $result.Stderr)
+            Write-TestResult "GitDiscovery_${helper}_NoContinuation" (-not $result.Stdout.Contains('UNEXPECTED_CONTINUATION')) 'Failed discovery returned as an empty successful set.'
+        }
+    }
+    finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+}
+
+function Test-ScopedDestinationTransition {
+    . (Join-Path $PSScriptRoot '../git-staging-helpers.ps1')
+    foreach ($kind in @('Inside', 'Outside', 'GeneratedInside')) {
+        $repo = New-TestRepo -ConfigurePushDefaults
+        $outside = $repo + '-outside.json'
+        $generated = $kind -ceq 'GeneratedInside'
+        $alias = if ($generated) { '.agents/skills/linked/SKILL.md' } else { 'alias.json' }
+        $link = Join-Path $repo $alias
+        try {
+            Add-FakePrettierPackage -RepoPath $repo
+            $oldName = if ($generated) { 'old.md' } else { 'old.json' }
+            $newName = if ($generated) { 'new.md' } else { 'new.json' }
+            $old = Join-Path $repo $oldName
+            $actual = if ($kind -ceq 'Outside') { $outside } else { Join-Path $repo $newName }
+            [void][IO.Directory]::CreateDirectory((Split-Path $link -Parent))
+            $selection = 'alias.json'
+            if ($generated) {
+                Add-FakeMarkdownlintPackage -RepoPath $repo
+                $selection = '.llm/skills/input.md'
+                [void][IO.Directory]::CreateDirectory((Join-Path $repo '.llm/skills'))
+                [IO.File]::WriteAllText((Join-Path $repo $selection), "# Input`n")
+                [IO.File]::WriteAllText((Join-Path $repo 'scripts/lint-skill-sizes.ps1'), 'param([string[]]$Paths, [switch]$FailOnCritical, [switch]$VerboseOutput) exit 0')
+                [IO.File]::WriteAllText((Join-Path $repo 'scripts/lint-llm-instructions.ps1'), 'param([switch]$Fix,[switch]$VerboseOutput) $root=Split-Path $PSScriptRoot -Parent; [IO.File]::WriteAllText((Join-Path $root "new.md"),"overwritten"); [IO.File]::WriteAllText((Join-Path $root "formatter-write.marker"),"unsafe"); exit 0')
+            }
+            [IO.File]::WriteAllText($old, '{"old":true}')
+            [IO.File]::WriteAllText($actual, '{"base":true}')
+            [void](New-Item -ItemType SymbolicLink -Path $link -Target $old)
+            Push-Location $repo
+            try {
+                $items = @($oldName, $alias)
+                if ($kind -cne 'Outside') { $items += $newName }
+                if ((Invoke-GitAddWithRetry -Items $items -IndexLockPath (Join-Path $repo '.git/index.lock')) -ne 0) { throw 'Fixture staging failed' }
+            } finally { Pop-Location }
+            [IO.File]::WriteAllText($actual, '{"user":"unstaged"}')
+            $before = @((Get-FileHash -LiteralPath $actual).Hash, (Get-FileHash -LiteralPath (Join-Path $repo '.git/index')).Hash) -join '|'
+            $script = @'
+const fs = require('fs');
+const path = require('path');
+if (process.argv.includes('--version')) {
+  fs.unlinkSync('alias.json');
+  fs.symlinkSync(REPLACE_DESTINATION, 'alias.json');
+  console.log('3.8.3');
+}
+if (process.argv.includes('--write')) {
+  fs.writeFileSync('alias.json', '{"overwritten":true}');
+  fs.writeFileSync('formatter-write.marker', 'unsafe');
+}
+'@
+            $destinationJson = ConvertTo-Json -InputObject $actual -Compress
+            [IO.File]::WriteAllText((Join-Path $repo 'node_modules/prettier/bin/prettier.cjs'), $script.Replace('REPLACE_DESTINATION', $destinationJson).Replace('alias.json', $alias))
+            $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '-Paths', $selection) -UseCli
+            $after = @((Get-FileHash -LiteralPath $actual).Hash, (Get-FileHash -LiteralPath (Join-Path $repo '.git/index')).Hash) -join '|'
+            $message = if ($kind -ceq 'Outside') { 'outside the repository' } else { 'safety discovery' }
+            Write-TestResult "DiscoveryScope_Retarget${kind}_Refused" ($result.ExitCode -ne 0 -and $result.Output.Contains($message)) $result.Output
+            Write-TestResult "DiscoveryScope_Retarget${kind}_NoFormatterWrite" (-not (Test-Path -LiteralPath (Join-Path $repo 'formatter-write.marker'))) $result.Output
+            Write-TestResult "DiscoveryScope_Retarget${kind}_UserBytesAndIndexPreserved" ($before -ceq $after) $result.Output
+        } finally {
+            if (Test-Path -LiteralPath $link) { [IO.File]::Delete($link) }
+            Remove-Item -LiteralPath $repo -Recurse -Force
+            if (Test-Path -LiteralPath $outside) { Remove-Item -LiteralPath $outside -Force }
+        }
+    }
+}
+
+function Test-GeneratedPreflightSafety {
+    $sourceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    foreach ($generated in @('AgentStub', 'ClaudeStub', 'Analyzer', 'ProtoGenerator', 'OdinMigrationGenerator')) {
+        $repo = New-TestRepo -ConfigurePushDefaults
+        try {
+            Add-FakePrettierPackage -RepoPath $repo
+            Add-FakeMarkdownlintPackage -RepoPath $repo
+            if ($generated.EndsWith('Stub')) {
+                $selected = '.llm/skills/input.md'
+                $destination = if ($generated -ceq 'AgentStub') { '.agents/skills/stale/SKILL.md' } else { '.claude/skills/stale/SKILL.md' }
+                [void][IO.Directory]::CreateDirectory((Join-Path $repo '.llm/skills'))
+                [IO.File]::WriteAllText((Join-Path $repo $selected), "# Input`n`n<!-- trigger: input | Input | Core -->`n")
+                [IO.File]::WriteAllText((Join-Path $repo 'scripts/lint-skill-sizes.ps1'), 'param([string[]]$Paths, [switch]$FailOnCritical, [switch]$VerboseOutput) exit 0')
+                Copy-Item -LiteralPath (Join-Path $sourceRoot 'scripts/generate-agent-skill-stubs.mjs') -Destination (Join-Path $repo 'scripts/generate-agent-skill-stubs.mjs')
+                [IO.File]::WriteAllText((Join-Path $repo 'scripts/lint-llm-instructions.ps1'), 'param([switch]$Fix, [switch]$VerboseOutput) & node (Join-Path $PSScriptRoot "generate-agent-skill-stubs.mjs") --write; $code=$LASTEXITCODE; [IO.File]::WriteAllText((Join-Path (Split-Path $PSScriptRoot -Parent) "generated-write.marker"), "generator ran"); exit $code')
+            } else {
+                $project = switch ($generated) { 'Analyzer' { 'Analyzers' } 'ProtoGenerator' { 'Proto.Generator' } default { 'OdinMigration.Generator' } }
+                $selected = 'Generator~/WallstopStudios.UnityHelpers.' + $project + '/input.csproj'
+                $destination = 'Runtime/Analyzers/WallstopStudios.UnityHelpers.' + $project + '.dll'
+                [void][IO.Directory]::CreateDirectory((Split-Path (Join-Path $repo $selected) -Parent))
+                [IO.File]::WriteAllText((Join-Path $repo $selected), '<Project />')
+                $compiler = 'const fs=require("fs"); fs.writeFileSync("REPLACE_DESTINATION", "rebuilt DLL bytes"); fs.writeFileSync("generated-write.marker", "compiler ran");'
+                [IO.File]::WriteAllText((Join-Path $repo 'scripts/verify-shipped-analyzers.js'), $compiler.Replace('REPLACE_DESTINATION', $destination))
+            }
+            [void][IO.Directory]::CreateDirectory((Split-Path (Join-Path $repo $destination) -Parent))
+            [IO.File]::WriteAllText((Join-Path $repo $destination), 'user untracked generated file<!-- Generated by scripts/generate-agent-skill-stubs.mjs; edit the canonical skill instead. -->')
+            $before = (Get-FileHash -LiteralPath (Join-Path $repo $destination)).Hash
+            $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '-Paths', $selected) -UseCli
+            Write-TestResult "DiscoveryScope_${generated}_RefusedBeforeGenerator" ($result.ExitCode -ne 0 -and $result.Output.Contains('pre-existing unstaged changes') -and -not (Test-Path -LiteralPath (Join-Path $repo 'generated-write.marker'))) $result.Output
+            Write-TestResult "DiscoveryScope_${generated}_UntrackedBytesPreserved" ((Test-Path -LiteralPath (Join-Path $repo $destination)) -and (Get-FileHash -LiteralPath (Join-Path $repo $destination)).Hash -ceq $before) $result.Output
+        } finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+    }
+
+}
+
+function Test-RepositoryRootWriteDestination {
+    foreach ($kind in @('SelectedDirectory', 'GeneratedTree', 'GeneratedChild')) {
+        foreach ($poisonGit in @($false, $true)) {
+            $repo = New-TestRepo -ConfigurePushDefaults
+            $relativeLink = switch ($kind) { 'SelectedDirectory' { 'root-alias' } 'GeneratedTree' { '.agents/skills' } default { '.agents/skills/linked-root' } }
+            $link = Join-Path $repo $relativeLink
+            try {
+                Add-FakePrettierPackage -RepoPath $repo
+                Add-FakeMarkdownlintPackage -RepoPath $repo
+                [void][IO.Directory]::CreateDirectory((Split-Path $link -Parent))
+                [void][IO.Directory]::CreateDirectory((Join-Path $repo '.llm/skills'))
+                [IO.File]::WriteAllText((Join-Path $repo '.llm/skills/input.md'), "# Input`n")
+                $sentinel = Join-Path $repo 'user.json'
+                [IO.File]::WriteAllText($sentinel, '{"user":"retained"}')
+                $linkKind = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
+                [void](New-Item -ItemType $linkKind -Path $link -Target $repo)
+                if ($poisonGit) { [void](New-Item -ItemType HardLink -Path (Join-Path $repo '.git/unsafe-enumeration') -Target $sentinel) }
+                [IO.File]::WriteAllText((Join-Path $repo 'node_modules/prettier/bin/prettier.cjs'), 'require("fs").writeFileSync("tool-started.marker", "tool ran"); console.log("3.8.3");')
+                $before = @((Get-FileHash -LiteralPath $sentinel).Hash, (Get-FileHash -LiteralPath (Join-Path $repo '.git/index')).Hash) -join '|'
+                $selection = if ($kind -ceq 'SelectedDirectory') { $relativeLink } else { '.llm/skills/input.md' }
+                $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '-Paths', $selection) -UseCli
+                $after = @((Get-FileHash -LiteralPath $sentinel).Hash, (Get-FileHash -LiteralPath (Join-Path $repo '.git/index')).Hash) -join '|'
+                $name = "DiscoveryScope_RootAlias_${kind}_PoisonGit${poisonGit}"
+                Write-TestResult "${name}_RefusedAtRoot" ($result.ExitCode -ne 0 -and $result.Output.Contains('write destination resolves to repository root')) $result.Output
+                Write-TestResult "${name}_BeforeTools" (-not (Test-Path -LiteralPath (Join-Path $repo 'tool-started.marker'))) $result.Output
+                Write-TestResult "${name}_UserBytesAndIndexPreserved" ($before -ceq $after) $result.Output
+                Write-TestResult "${name}_NoGitDirectoryTraversal" (-not $result.Output.Contains('Cannot prove all hard-link write destinations')) $result.Output
+            } finally {
+                if ([IO.Directory]::Exists($link)) { [IO.Directory]::Delete($link) }
+                Remove-Item -LiteralPath $repo -Recurse -Force
+            }
+        }
+    }
+    $repo = New-TestRepo -ConfigurePushDefaults
+    try {
+        $scopeTokens = $null; $scopeErrors = $null
+        $scopeAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot '../agent-preflight.ps1'), [ref]$scopeTokens, [ref]$scopeErrors)
+        if (@($scopeErrors).Count -ne 0) { throw 'Actual write-scope source did not parse.' }
+        foreach ($name in @('Resolve-PreflightPhysicalPath', 'Get-PreflightPhysicalRelativePath', 'Get-PreflightSafetyPaths', 'Assert-PreflightWriteScope')) {
+            $definitions = @($scopeAst.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name }, $false))
+            if ($definitions.Count -ne 1) { throw 'Actual write-scope helper missing or duplicated.' }
+            . ([ScriptBlock]::Create($definitions[0].Extent.Text))
+        }
+        foreach ($wholeRepository in @($false, $true)) {
+            $scope = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            if (-not $wholeRepository) { [void]$scope.Add('.') }
+            $script:PreflightWriteSafety = @{ RepoRoot = $repo; Scope = $scope; WholeRepository = $wholeRepository }
+            $message = ''
+            try { Assert-PreflightWriteScope -Paths @('unchecked.json') } catch { $message = $_.Exception.Message }
+            $correct = if ($wholeRepository) { $message -ceq '' } else { $message.Contains('write destination changed after safety discovery') }
+            Write-TestResult "DiscoveryScope_RootMarkerDoesNotGrantGlobalCoverage_WholeRepository${wholeRepository}" $correct $message
+        }
+    } finally {
+        $script:PreflightWriteSafety = $null
+        Remove-Item -LiteralPath $repo -Recurse -Force
+    }
+
+}
+
+function Test-ScopedSafetyDiscovery {
+    Test-ScopedDestinationTransition
+    Test-RepositoryRootWriteDestination
+    . (Join-Path $PSScriptRoot '../git-staging-helpers.ps1')
+    foreach ($fixMode in @($false, $true)) {
+        foreach ($mode in @('Paths', 'PathList')) {
+            $repo = New-TestRepo -ConfigurePushDefaults
+            $trace = $repo + '.trace.json'
+            $savedTrace = $env:GIT_TRACE2_EVENT
+            try {
+                [void][IO.Directory]::CreateDirectory((Join-Path $repo 'Runtime/Nested'))
+                $selected = 'Runtime/Nested/Selected.png.meta'
+                [IO.File]::WriteAllText((Join-Path $repo $selected), "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nDefaultImporter:`n  userData:`n")
+                Push-Location $repo
+                try { if ((Invoke-GitAddWithRetry -Items @($selected) -IndexLockPath (Join-Path $repo '.git/index.lock')) -ne 0) { throw 'Fixture staging failed' } }
+                finally { Pop-Location }
+                $arguments = @('-Paths', $selected)
+                if ($mode -eq 'PathList') {
+                    $list = $repo + '.paths'
+                    [IO.File]::WriteAllText($list, $selected)
+                    $arguments = @('-PathList', $list)
+                }
+                if ($fixMode) { $arguments = @('-Fix') + $arguments }
+                $env:GIT_TRACE2_EVENT = $trace
+                $result = Invoke-Preflight -RepoPath $repo -Arguments $arguments -UseCli
+                $queries = @(Get-Content -LiteralPath $trace | ForEach-Object { $_ | ConvertFrom-Json -AsHashtable } | Where-Object {
+                        $_.event -ceq 'start' -and (($_.argv -contains 'diff' -and $_.argv -notcontains '--cached') -or ($_.argv -contains 'ls-files' -and $_.argv -contains '--others'))
+                    })
+                Write-TestResult "DiscoveryScope_${mode}_Fix${fixMode}_QueriesObserved" ($queries.Count -ge 2) $result.Output
+                $unscoped = @($queries | Where-Object { $_.argv -notcontains '--' -or $_.argv -notcontains (':(literal)' + $selected) })
+                Write-TestResult "DiscoveryScope_${mode}_Fix${fixMode}_AllWorktreeQueriesScoped" ($unscoped.Count -eq 0) ($unscoped | ConvertTo-Json -Depth 6)
+            } finally {
+                $env:GIT_TRACE2_EVENT = $savedTrace
+                Remove-Item -LiteralPath $repo -Recurse -Force
+                foreach ($path in @($trace, ($repo + '.paths'))) { if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force } }
+            }
+        }
+    }
+    foreach ($kind in @('RelativeOutside', 'FileLinkInside', 'DirectoryLinkInside', 'FileLinkOutside', 'DirectoryLinkOutside', 'HardLinkInside', 'HardLinkOutside')) {
+        $repo = New-TestRepo -ConfigurePushDefaults
+        $outside = $repo + '-outside'
+        $links = [Collections.Generic.List[string]]::new()
+        try {
+            foreach ($directory in @((Join-Path $repo 'Runtime/Actual'), $outside)) { [void][IO.Directory]::CreateDirectory($directory) }
+            $actual = Join-Path $repo 'Runtime/Actual/Selected.png.meta'
+            $external = Join-Path $outside 'Selected.png.meta'
+            foreach ($path in @($actual, $external)) { [IO.File]::WriteAllText($path, "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nDefaultImporter:`n  userData:`n") }
+            Push-Location $repo
+            try { if ((Invoke-GitAddWithRetry -Items @('Runtime/Actual/Selected.png.meta') -IndexLockPath (Join-Path $repo '.git/index.lock')) -ne 0) { throw 'Fixture staging failed' } }
+            finally { Pop-Location }
+            [IO.File]::AppendAllText($actual, "  assetBundleName: user-unstaged`n")
+            $selection = '../' + [IO.Path]::GetFileName($outside) + '/Selected.png.meta'
+            if ($kind.StartsWith('HardLink')) {
+                $link = Join-Path $repo 'Runtime/HardAlias.png.meta'
+                $target = if ($kind.EndsWith('Outside')) { $external } else { $actual }
+                [void](New-Item -ItemType HardLink -Path $link -Target $target)
+                $selection = 'Runtime/HardAlias.png.meta'
+            } elseif ($kind.StartsWith('FileLink')) {
+                $link = Join-Path $repo 'Runtime/Alias.png.meta'
+                $target = if ($kind.EndsWith('Outside')) { $external } else { $actual }
+                [void](New-Item -ItemType SymbolicLink -Path $link -Target $target)
+                $links.Add($link); $selection = 'Runtime/Alias.png.meta'
+            } elseif ($kind.StartsWith('DirectoryLink')) {
+                $link = Join-Path $repo 'Runtime/Alias'
+                $target = if ($kind.EndsWith('Outside')) { $outside } else { Join-Path $repo 'Runtime/Actual' }
+                $linkKind = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
+                [void](New-Item -ItemType $linkKind -Path $link -Target $target)
+                $links.Add($link); $selection = 'Runtime/Alias/Selected.png.meta'
+            }
+            $before = @((Get-FileHash -LiteralPath $actual).Hash, (Get-FileHash -LiteralPath $external).Hash, (Get-FileHash -LiteralPath (Join-Path $repo '.git/index')).Hash)
+            $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '-Paths', $selection) -UseCli
+            $after = @((Get-FileHash -LiteralPath $actual).Hash, (Get-FileHash -LiteralPath $external).Hash, (Get-FileHash -LiteralPath (Join-Path $repo '.git/index')).Hash)
+            Write-TestResult "DiscoveryScope_${kind}_Rejected" ($result.ExitCode -ne 0) $result.Output
+            $expectedDiagnostic = if ($kind.StartsWith('HardLink')) { 'hard-link' } elseif ($kind.EndsWith('Inside')) { 'pre-existing unstaged changes' } else { 'outside the repository' }
+            Write-TestResult "DiscoveryScope_${kind}_ExpectedRefusal" ($result.Output.Contains($expectedDiagnostic)) $result.Output
+            Write-TestResult "DiscoveryScope_${kind}_BytesPreserved" (($before -join '|') -ceq ($after -join '|')) $result.Output
+        } finally {
+            foreach ($link in $links) {
+                if ([IO.Directory]::Exists($link)) { [IO.Directory]::Delete($link) } else { [IO.File]::Delete($link) }
+            }
+            Remove-Item -LiteralPath $repo, $outside -Recurse -Force
+        }
+    }
+    foreach ($selection in @('Runtime/[u]nícode space.png.meta', '--selected.png.meta', 'Runtime/Sub/../Literal.png.meta')) {
+        $repo = New-TestRepo -ConfigurePushDefaults
+        try {
+            [void][IO.Directory]::CreateDirectory((Join-Path $repo 'Runtime/Sub'))
+            $actual = [IO.Path]::GetFullPath($selection, $repo)
+            [IO.File]::WriteAllText($actual, "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`n")
+            $argument = if ($selection.StartsWith('-')) { './' + $selection } else { $selection }
+            $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '-Paths', $argument) -UseCli
+            Write-TestResult "DiscoveryScope_LiteralInput_${selection}_Accepted" ($result.ExitCode -eq 0) $result.Output
+            Write-TestResult "DiscoveryScope_LiteralInput_${selection}_SelectedFixed" ([IO.File]::ReadAllText($actual).Contains("`r`n")) $result.Output
+        } finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+    }
+    $repo = New-TestRepo -ConfigurePushDefaults
+    try {
+        $sources = @('Runtime/Selected/A.png', 'Runtime/Other/B.png')
+        $companions = @('Runtime/Selected/A.png.meta', 'Runtime/Other/B.png.meta', 'Runtime/Selected.meta', 'Runtime/Other.meta')
+        foreach ($path in $sources) {
+            [void][IO.Directory]::CreateDirectory((Split-Path (Join-Path $repo $path) -Parent))
+            [IO.File]::WriteAllBytes((Join-Path $repo $path), [byte[]]@(1, 2, 3))
+        }
+        foreach ($path in $companions) { [IO.File]::WriteAllText((Join-Path $repo $path), 'existing companion bytes') }
+        Push-Location $repo
+        try { if ((Invoke-GitAddWithRetry -Items $sources -IndexLockPath (Join-Path $repo '.git/index.lock')) -ne 0) { throw 'Fixture staging failed' } }
+        finally { Pop-Location }
+        $before = @($companions | ForEach-Object { (Get-FileHash -LiteralPath (Join-Path $repo $_)).Hash }) -join '|'
+        $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '-Paths', $sources[0]) -UseCli
+        $staged = @(Get-StagedPaths -RepoPath $repo)
+        Write-TestResult 'DiscoveryScope_AllStagedSourceMetadataRecovered' ($result.ExitCode -eq 0 -and @($companions | Where-Object { $staged -notcontains $_ }).Count -eq 0) $result.Output
+        $after = @($companions | ForEach-Object { (Get-FileHash -LiteralPath (Join-Path $repo $_)).Hash }) -join '|'
+        Write-TestResult 'DiscoveryScope_RecoveredMetadataBytesPreserved' ($before -ceq $after) $result.Output
+    } finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+    foreach ($phase in @('--version', '--write')) {
+        $repo = New-TestRepo -ConfigurePushDefaults
+        try {
+            Add-FakePrettierPackage -RepoPath $repo
+            $selected = Join-Path $repo 'selected.json'
+            [IO.File]::WriteAllText($selected, '{"selected":true}')
+            Push-Location $repo
+            try { if ((Invoke-GitAddWithRetry -Items @('selected.json') -IndexLockPath (Join-Path $repo '.git/index.lock')) -ne 0) { throw 'Fixture staging failed' } }
+            finally { Pop-Location }
+            $body = @'
+const fs = require('fs');
+const path = require('path');
+if (process.argv.includes('REPLACE_PHASE')) {
+  fs.writeFileSync(path.join(process.cwd(), '.git/index'), 'controlled late index failure');
+}
+if (process.argv.includes('--version')) console.log('3.8.3');
+'@
+            [IO.File]::WriteAllText((Join-Path $repo 'node_modules/prettier/bin/prettier.cjs'), $body.Replace('REPLACE_PHASE', $phase))
+            $before = (Get-FileHash -LiteralPath $selected).Hash
+            $result = Invoke-Preflight -RepoPath $repo -Arguments @('-Fix', '-Paths', 'selected.json') -UseCli
+            Write-TestResult "DiscoveryScope_LateFailure_${phase}_StatusAndDiagnostic" ($result.ExitCode -eq 128 -and $result.Output.Contains('index file smaller than expected') -and -not $result.Output.Contains('All relevant changed-file checks passed')) $result.Output
+            Write-TestResult "DiscoveryScope_LateFailure_${phase}_NoStageOrTargetWrite" ((Get-FileHash -LiteralPath $selected).Hash -ceq $before -and [IO.File]::ReadAllText((Join-Path $repo '.git/index')) -ceq 'controlled late index failure') $result.Output
+        } finally { Remove-Item -LiteralPath $repo -Recurse -Force }
+    }
+    Test-GeneratedPreflightSafety
+    $repo = New-TestRepo -ConfigurePushDefaults
+    $savedTrace = $env:GIT_TRACE2_EVENT
+    $trace = $repo + '.batch-trace.json'
+    try {
+        [IO.File]::WriteAllText((Join-Path $repo 'wanted.png'), 'wanted dirty input')
+        [IO.File]::WriteAllText((Join-Path $repo 'unrelated.png'), 'unrelated dirty input')
+        $sourceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        $errors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'scripts/agent-preflight.ps1'), [ref]$null, [ref]$errors)
+        if ($errors.Count -gt 0) { throw 'Actual preflight source did not parse.' }
+        $runner = [Collections.Generic.List[string]]::new()
+        $runner.Add('param([string]$RepoRoot,[string]$Mode)')
+        $runner.Add("Set-StrictMode -Version Latest`n`$ErrorActionPreference = 'Stop'")
+        foreach ($name in @('Split-NulPathText', 'Invoke-GitPathList', 'Get-GitUnstagedOrUntrackedPaths')) {
+            $functions = @($ast.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name }, $false))
+            if ($functions.Count -ne 1) { throw 'Actual helper ownership missing or duplicated.' }
+            $runner.Add($functions[0].Extent.Text)
+        }
+        $runner.Add(@'
+$scope = @('wanted.png') + @(1..1200 | ForEach-Object { "missing file $_ with a sufficiently long literal name.png" })
+if ($Mode -ceq 'LateFailure') { $scope += '../outside' }
+$result = if ($Mode -ceq 'Default') { Get-GitUnstagedOrUntrackedPaths -RepoRoot $RepoRoot } else { Get-GitUnstagedOrUntrackedPaths -RepoRoot $RepoRoot -PathScope $scope }
+@{ Paths = @($result); Continued = $true } | ConvertTo-Json -Compress
+'@)
+        $runnerPath = Join-Path $repo 'scripts/actual-discovery-helper.ps1'
+        [IO.File]::WriteAllText($runnerPath, ($runner -join "`n"))
+        foreach ($mode in @('Default', 'Bounded', 'LateFailure')) {
+            if (Test-Path -LiteralPath $trace) { Remove-Item -LiteralPath $trace -Force }
+            $env:GIT_TRACE2_EVENT = $trace
+            $result = Invoke-BoundedPipeProcess -FileName (Get-Command pwsh).Source -Arguments @('-NoProfile', '-File', $runnerPath, '-RepoRoot', $repo, '-Mode', $mode) -WorkingDirectory $repo
+            $queries = @(Get-Content -LiteralPath $trace | ForEach-Object { $_ | ConvertFrom-Json -AsHashtable } | Where-Object { $_.event -ceq 'start' })
+            if ($mode -ceq 'LateFailure') {
+                Write-TestResult 'DiscoveryScope_LaterBatchFailure_StopsWithGitDiagnostic' ($result.Completed -and $result.ExitCode -ne 0 -and $result.Stderr.Contains('outside repository') -and -not $result.Stdout.Contains('Continued')) ($result.Stdout + $result.Stderr)
+                Write-TestResult 'DiscoveryScope_LaterBatchFailure_EarlierQueriesReallyRan' ($queries.Count -gt 2) ($queries | ConvertTo-Json -Depth 6)
+            } else {
+                Write-TestResult "DiscoveryScope_${mode}_HelperCompletes" ($result.Completed -and $result.ExitCode -eq 0) ($result.Stdout + $result.Stderr)
+                $observed = $result.Stdout | ConvertFrom-Json -AsHashtable
+                if ($mode -ceq 'Default') {
+                    Write-TestResult 'DiscoveryScope_DefaultQueriesStayGlobal' ($queries.Count -eq 2 -and @($queries | Where-Object { $_.argv -contains '--' }).Count -eq 0 -and $observed.Paths -contains 'unrelated.png') $result.Stdout
+                } else {
+                    Write-TestResult 'DiscoveryScope_BoundedQueriesReturnOnlyScopedInputs' (@($observed.Paths).Count -eq 1 -and $observed.Paths[0] -ceq 'wanted.png') $result.Stdout
+                    Write-TestResult 'DiscoveryScope_BoundedQueriesReallyBatch' ($queries.Count -gt 2 -and @($queries | Where-Object { (($_.argv -join ' ').Length) -gt 16500 -or $_.argv -notcontains '--' }).Count -eq 0) 'Scoped Git query arguments must remain bounded and literal.'
+                }
+            }
+        }
+    } finally {
+        $env:GIT_TRACE2_EVENT = $savedTrace
+        Remove-Item -LiteralPath $repo -Recurse -Force
+        if (Test-Path -LiteralPath $trace) { Remove-Item -LiteralPath $trace -Force }
+    }
+    $repo = New-TestRepo -ConfigurePushDefaults
+    $link = Join-Path $repo '.agents/skills/linked-root'
+    try {
+        [void][IO.Directory]::CreateDirectory((Join-Path $repo '.agents/skills'))
+        [IO.File]::WriteAllText((Join-Path $repo 'SKILL.md'), 'user root skill')
+        $linkKind = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
+        [void](New-Item -ItemType $linkKind -Path $link -Target $repo)
+        foreach ($name in @('Resolve-PreflightPhysicalPath', 'Get-PreflightPhysicalRelativePath', 'Add-PreflightPhysicalAliases')) {
+            $functions = @($ast.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name }, $false))
+            if ($functions.Count -ne 1) { throw 'Actual destination helper missing or duplicated.' }
+            . ([ScriptBlock]::Create($functions[0].Extent.Text))
+        }
+        $scope = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        [void]$scope.Add('.agents/skills/linked-root')
+        $dirty = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        [void]$dirty.Add('SKILL.md')
+        Add-PreflightPhysicalAliases -RepoRoot $repo -Scope $scope -DirtyPaths $dirty
+        Write-TestResult 'DiscoveryScope_GeneratedAliasToRepositoryRoot_MapsActualDirtyInput' ($dirty.Contains('.agents/skills/linked-root/SKILL.md')) 'A directory alias to the repository root must retain the root file partial-staging identity.'
+    } finally {
+        if ([IO.Directory]::Exists($link)) { [IO.Directory]::Delete($link) }
+        Remove-Item -LiteralPath $repo -Recurse -Force
+    }
+
 }
 
 function Test-PathListAdmissionPreflight {
@@ -638,6 +1083,8 @@ function Test-PathListAdmissionPreflight {
 
 function Test-ArgumentAdmissionPreflight {
     Test-PathListAdmissionPreflight
+    Test-GitDiscoveryFailurePreflight
+    Test-ScopedSafetyDiscovery
     $repo = New-AdmissionRepo -UnsafeConfig
     try {
         foreach ($arguments in @(
@@ -865,6 +1312,30 @@ function Test-JavaScriptLibraryPreflight {
     finally {
         Remove-Item -LiteralPath $repoPath -Recurse -Force -ErrorAction SilentlyContinue
     }
+}
+
+if ($GeneratedSafetyOnly) {
+    Test-GeneratedPreflightSafety
+    if ($script:TestsFailed -gt 0) { exit 1 }
+    exit 0
+}
+
+if ($DestinationTransitionOnly) {
+    Test-ScopedDestinationTransition
+    if ($script:TestsFailed -gt 0) { exit 1 }
+    exit 0
+}
+
+if ($DiscoveryScopeOnly) {
+    Test-ScopedSafetyDiscovery
+    if ($script:TestsFailed -gt 0) { exit 1 }
+    exit 0
+}
+
+if ($GitDiscoveryOnly) {
+    Test-GitDiscoveryFailurePreflight
+    if ($script:TestsFailed -gt 0) { exit 1 }
+    exit 0
 }
 
 if ($JavaScriptLibraryOnly) {
@@ -1206,7 +1677,7 @@ MonoImporter:
 
     $staged6 = Get-StagedPaths -RepoPath $repo6
     Write-TestResult 'ScopedPaths_StagesScopedCompanion' ($staged6 -contains 'Runtime/ScopedA.cs.meta') 'Expected scoped .meta companion to be staged'
-    Write-TestResult 'ScopedPaths_DoesNotStageUnscopedCompanion' (-not ($staged6 -contains 'Runtime/ScopedB.cs.meta')) 'Did not expect unscoped .meta companion to be staged'
+    Write-TestResult 'ScopedPaths_StagesAllStagedSourceCompanions' ($staged6 -contains 'Runtime/ScopedB.cs.meta') 'Expected metadata recovery for every staged source'
 }
 finally {
     Remove-Item -Path $repo6 -Recurse -Force -ErrorAction SilentlyContinue

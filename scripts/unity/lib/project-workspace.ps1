@@ -112,6 +112,67 @@ function Resolve-UnityProjectWorkspace {
     }
 }
 
+function Move-UnityProjectWithMigrationResidue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$Project,
+        [switch]$ExplicitProject
+    )
+
+    $projectPath = [IO.Path]::GetFullPath($Project)
+    $retainedRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $projectPath)) 'retained-projects'
+    foreach ($path in @($projectPath, (Join-Path $projectPath 'Assets/Editor'),
+            (Join-Path $projectPath 'Library/WallstopOdinMigrationApply'), $retainedRoot)) {
+        $ancestor = $path
+        while (-not [string]::IsNullOrWhiteSpace($ancestor)) {
+            if (Test-Path -LiteralPath $ancestor -ErrorAction Stop) {
+                $item = Get-Item -LiteralPath $ancestor -Force -ErrorAction Stop
+                if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                    throw "Generated project isolation refuses linked paths: $ancestor"
+                }
+            }
+            $ancestor = Split-Path -Parent $ancestor
+        }
+    }
+    if (-not (Test-Path -LiteralPath $projectPath -PathType Container -ErrorAction Stop)) {
+        return
+    }
+
+    $reasons = New-Object System.Collections.Generic.List[string]
+    $pointerRelative = 'Library/WallstopOdinMigrationApply/active.txt'
+    if (Test-Path -LiteralPath (Join-Path $projectPath $pointerRelative) -ErrorAction Stop) {
+        $reasons.Add($pointerRelative)
+    }
+    $assets = Join-Path $projectPath 'Assets'
+    if (Test-Path -LiteralPath $assets -PathType Container -ErrorAction Stop) {
+        foreach ($entry in @(Get-ChildItem -LiteralPath $assets -Directory -Force -ErrorAction Stop)) {
+            if ($entry.Name -match '^Odin(ApplyIntegration|ImportVerification|BoundConversion|SceneScope|MigrationImport|MigrationReferences|PairedPreview|LiveAddress)-[0-9a-f]{32}$') {
+                $reasons.Add('Assets/' + $entry.Name)
+            }
+        }
+    }
+    if ($reasons.Count -eq 0) { return }
+    if ($ExplicitProject) {
+        throw "Migration residue remains in explicit project '$projectPath'. Preserve and isolate that project before running tests."
+    }
+    $configurator = Get-Item -LiteralPath (Join-Path $projectPath 'Assets/Editor/UhCiTestConfigurator.cs') -Force -ErrorAction Stop
+    if ($configurator.PSIsContainer -or ($configurator.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+        $configurator.Length -gt 65536 -or
+        [IO.File]::ReadAllText($configurator.FullName) -notmatch 'public static class UhCiTestConfigurator\b') {
+        throw 'Migration residue was found, but generated project provenance could not be established.'
+    }
+
+    $retainedPath = Join-Path $retainedRoot ((Split-Path -Leaf $projectPath) + '-' + [guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($retainedRoot)
+    [IO.Directory]::Move($projectPath, $retainedPath)
+    [pscustomobject]@{
+        OriginalPath = $projectPath
+        RetainedPath = $retainedPath
+        Reasons = $reasons.ToArray()
+        CapturedUtc = [datetime]::UtcNow.ToString('o')
+    }
+}
+
 function Get-PersistentProjectPruneOrder {
     <#
     .SYNOPSIS

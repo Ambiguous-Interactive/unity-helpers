@@ -6,6 +6,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . (Join-Path $repo 'scripts/unity/lib/native-global-flags.ps1')
+. (Join-Path $repo 'scripts/unity/lib/native-evidence.ps1')
 . (Join-Path $repo 'scripts/unity/lib/native-loader-flag-lease.ps1')
 if ($RequireWindowsRegistry -and -not $IsWindows) { throw 'Windows registry controls were required' }
 $source = Join-Path $repo 'scripts/unity/capture-native-fault.ps1'
@@ -13,7 +14,7 @@ $tokens = $null
 $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw ($errors | Out-String) }
-foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureLayout', 'Get-NativeCaptureExitEvent', 'Get-NativeCaptureXmlOutcome', 'Read-NativeCaptureTail', 'Test-NativeCaptureInputsUnchanged')) {
+foreach ($name in @('Invoke-NativeCaptureProcess', 'Get-NativeCaptureDebuggerCommandBudget', 'Get-NativeCaptureDebuggerCommand', 'Invoke-NativeStandaloneBuildCapture', 'Get-NativeCaptureLayout', 'Get-NativeCaptureExitEvent', 'Get-NativeCaptureXmlOutcome', 'Read-NativeCaptureTail', 'Test-NativeCaptureInputsUnchanged', 'Invoke-NativeEvidenceReadback')) {
     $function = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
     if ($null -eq $function) { throw "Missing shipping function $name" }
     . ([scriptblock]::Create($function.Extent.Text))
@@ -26,6 +27,290 @@ function Assert-Capture([bool]$Condition, [string]$Message) {
     ++$script:passed
 }
 try {
+    $readbackInput = Join-Path $root 'execution-diagnostics.json'
+    $captureId = '0123456789abcdef0123456789abcdef'
+    $captureDirectory = Join-Path $root $captureId
+    $null = [IO.Directory]::CreateDirectory($captureDirectory)
+    [IO.File]::WriteAllText((Join-Path $captureDirectory 'upm.log'), 'retained package log')
+    $savedProcess = [ordered]@{
+        State = 'observed'; MachineName = [Environment]::MachineName; ProcessId = 123
+        ExecutablePath = (Join-Path $root 'missing-editor/Unity.exe')
+        LaunchUtc = '2020-01-01T00:00:00.0000000Z'; EndObservedUtc = '2020-01-01T00:00:01.0000000Z'
+        RawExitCode = -1073741819; ReturnedExitCode = -1073741819; ExitOrigin = 'process-exit'; KillReason = $null
+        NativeEvidence = [ordered]@{ State = 'files-observed'; CaptureId = $captureId; CrashDirectory = $captureDirectory; UpmLogPath = (Join-Path $captureDirectory 'upm.log') }
+    }
+    $readbackJson = @{ Process = $savedProcess; CapturedUtc = '2020-01-01T00:00:01.0100000Z' } | ConvertTo-Json -Depth 8
+    [IO.File]::WriteAllText($readbackInput, $readbackJson)
+    $originalHash = (Get-FileHash -LiteralPath $readbackInput -Algorithm SHA256).Hash.ToLowerInvariant()
+    $originalEventCollector = ${function:Get-UnityProcessFailureEvents}
+    $originalFileCollector = ${function:Get-UnityNativeEvidence}
+    $originalCaptureProcess = ${function:Invoke-NativeCaptureProcess}
+    $originalGlobalFlags = ${function:Get-NativeGlobalFlagSnapshot}
+    $script:readbackEventCalls = 0
+    $script:readbackFileCalls = 0
+    $script:readbackEventIdentity = $null
+    function Get-UnityProcessFailureEvents {
+        param($ProcessObservation)
+        $script:readbackEventCalls++
+        $script:readbackEventIdentity = $ProcessObservation
+        return @{ State = 'no-matching-events'; Events = @(); Qualification = 'No events observed by this controlled collector.' }
+    }
+    function Get-UnityNativeEvidence {
+        param($Capture, $LogPath)
+        $script:readbackFileCalls++
+        return & $originalFileCollector -Capture $Capture -LogPath $LogPath
+    }
+    function Invoke-NativeCaptureProcess { throw 'Readback must not launch a capture process.' }
+    function Get-NativeGlobalFlagSnapshot { throw 'Readback must not inspect registry settings.' }
+    try {
+        $output = Join-Path $root 'readback-success'
+        $result = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath $output
+        Assert-Capture ($script:readbackEventCalls -eq 1 -and $script:readbackFileCalls -eq 1 -and $script:readbackEventIdentity.ProcessId -eq 123 -and
+            $script:readbackEventIdentity.ExecutablePath -ceq $savedProcess.ExecutablePath -and $script:readbackEventIdentity.LaunchUtc -ceq $savedProcess.LaunchUtc -and
+            $script:readbackEventIdentity.EndObservedUtc -ceq $savedProcess.EndObservedUtc) 'Readback collectors receive the saved process and capture identity'
+        Assert-Capture ($result.EvidenceOnly -and $result.Mode -ceq 'historical-readback' -and $result.State -ceq 'completed' -and
+            $result.WindowsEvents.State -ceq 'no-matching-events' -and $result.NativeEvidence.State -ceq 'files-observed' -and
+            $result.NativeEvidence.CaptureId -ceq $captureId -and $result.NativeEvidence.Files.Count -eq 1) 'Matching-host readback retains observation states without acceptance claims'
+        Assert-Capture ($result.OriginalSha256 -ceq $originalHash -and
+            (Get-FileHash -LiteralPath $readbackInput -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $originalHash -and
+            (Get-FileHash -LiteralPath (Join-Path $output 'execution-diagnostics.original.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $originalHash) 'Readback preserves original bytes and binds its retained copy by hash'
+        Assert-Capture ([DateTimeOffset]::Parse($result.StartedUtc) -le [DateTimeOffset]::Parse($result.NativeEvidence.CapturedUtc) -and
+            [DateTimeOffset]::Parse($result.NativeEvidence.CapturedUtc) -le [DateTimeOffset]::Parse($result.EndedUtc) -and
+            (Test-Path -LiteralPath (Join-Path $output 'receipt.json'))) 'Readback receipt records enclosing collection times'
+        $controlledEventCollector = ${function:Get-UnityProcessFailureEvents}
+        function Get-UnityProcessFailureEvents { param($ProcessObservation) throw 'controlled collection interruption' }
+        $interruptedOutput = Join-Path $root 'readback-interrupted'
+        $interrupted = $false
+        try { $null = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath $interruptedOutput }
+        catch { $interrupted = $_.Exception.Message -ceq 'controlled collection interruption' }
+        finally { ${function:Get-UnityProcessFailureEvents} = $controlledEventCollector }
+        $partial = [IO.File]::ReadAllText((Join-Path $interruptedOutput 'receipt.json')) | ConvertFrom-Json -AsHashtable
+        Assert-Capture ($interrupted -and $partial.EvidenceOnly -and $partial.State -ceq 'collecting' -and $null -eq $partial.EndedUtc -and
+            $partial.OriginalProcess.ProcessId -eq 123 -and $partial.OriginalSha256 -ceq $originalHash -and
+            (Get-FileHash -LiteralPath (Join-Path $interruptedOutput 'execution-diagnostics.original.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $originalHash) 'Interrupted event collection retains the original process receipt and unfinished collection state'
+        $eventsBefore = $script:readbackEventCalls
+        $filesBefore = $script:readbackFileCalls
+        $rejected = $false
+        try { $null = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath $output }
+        catch { $rejected = $_.Exception.Message -like '*must be fresh*' }
+        Assert-Capture ($rejected -and $script:readbackEventCalls -eq $eventsBefore -and $script:readbackFileCalls -eq $filesBefore -and
+            (Get-FileHash -LiteralPath (Join-Path $output 'execution-diagnostics.original.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $originalHash) 'Existing readback output is refused before collection and preserved'
+
+        $nestedOutput = Join-Path $captureDirectory 'readback-output'
+        $captureFilesBefore = @(Get-ChildItem -LiteralPath $captureDirectory -File -Recurse | ForEach-Object {
+                $_.FullName + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+            })
+        $rejected = $false
+        try { $null = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath $nestedOutput }
+        catch { $rejected = $_.Exception.Message -like '*outside the original native capture directory*' }
+        $captureFilesAfter = @(Get-ChildItem -LiteralPath $captureDirectory -File -Recurse | ForEach-Object {
+                $_.FullName + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+            })
+        Assert-Capture ($rejected -and $script:readbackEventCalls -eq $eventsBefore -and $script:readbackFileCalls -eq $filesBefore -and
+            -not (Test-Path -LiteralPath $nestedOutput) -and $captureFilesBefore.Count -eq 1 -and
+            ($captureFilesBefore -join '|') -ceq ($captureFilesAfter -join '|')) 'Readback output inside original capture is refused before collection without contaminating original evidence'
+
+        foreach ($mutation in @('expected-host', 'saved-host', 'both-foreign-hosts', 'process-state', 'pid-zero', 'pid-string', 'pid-array', 'executable-relative',
+                'invalid-time', 'reversed-time', 'future-time', 'numeric-time', 'exit-string', 'native-partial', 'native-id', 'native-path', 'native-upm', 'missing-native-paths', 'empty', 'malformed', 'oversize')) {
+            $changed = $readbackJson | ConvertFrom-Json -AsHashtable
+            $changed.Process.LaunchUtc = $savedProcess.LaunchUtc
+            $changed.Process.EndObservedUtc = $savedProcess.EndObservedUtc
+            $expectedMachine = [Environment]::MachineName
+            switch ($mutation) {
+                'expected-host' { $expectedMachine = 'different-readback-machine' }
+                'saved-host' { $changed.Process.MachineName = 'different-readback-machine' }
+                'both-foreign-hosts' { $expectedMachine = 'different-readback-machine'; $changed.Process.MachineName = $expectedMachine }
+                'process-state' { $changed.Process.State = 'unavailable' }
+                'pid-zero' { $changed.Process.ProcessId = 0 }
+                'pid-string' { $changed.Process.ProcessId = '123' }
+                'pid-array' { $changed.Process.ProcessId = @(123) }
+                'executable-relative' { $changed.Process.ExecutablePath = 'Unity.exe' }
+                'invalid-time' { $changed.Process.LaunchUtc = 'yesterday' }
+                'reversed-time' { $changed.Process.LaunchUtc = '2020-01-02T00:00:00Z' }
+                'future-time' { $changed.Process.EndObservedUtc = '9999-01-01T00:00:00Z' }
+                'numeric-time' { $changed.Process.LaunchUtc = 1 }
+                'exit-string' { $changed.Process.RawExitCode = '-1073741819' }
+                'native-partial' { [void]$changed.Process.NativeEvidence.Remove('UpmLogPath') }
+                'native-id' { $changed.Process.NativeEvidence.CaptureId = 'wrong' }
+                'native-path' { $changed.Process.NativeEvidence.CrashDirectory = Join-Path $root 'another-directory' }
+                'native-upm' { $changed.Process.NativeEvidence.UpmLogPath = Join-Path $root 'another.log' }
+                'missing-native-paths' { $changed.Process.NativeEvidence = @{ State = 'files-observed' } }
+            }
+            $changedJson = $changed | ConvertTo-Json -Depth 8
+            if ($mutation -eq 'empty') { $changedJson = '' }
+            if ($mutation -eq 'malformed') { $changedJson = '{' }
+            if ($mutation -eq 'oversize') { $changedJson = ' ' * 4194305 }
+            [IO.File]::WriteAllText($readbackInput, $changedJson)
+            $inputHash = (Get-FileHash -LiteralPath $readbackInput -Algorithm SHA256).Hash
+            $eventsBefore = $script:readbackEventCalls
+            $filesBefore = $script:readbackFileCalls
+            $rejected = $false
+            $negativeOutput = Join-Path $root ('readback-' + $mutation)
+            try { $null = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine $expectedMachine -ArtifactsPath $negativeOutput }
+            catch { $rejected = $true }
+            Assert-Capture ($rejected -and $script:readbackEventCalls -eq $eventsBefore -and $script:readbackFileCalls -eq $filesBefore -and
+                -not (Test-Path -LiteralPath $negativeOutput) -and (Get-FileHash -LiteralPath $readbackInput -Algorithm SHA256).Hash -ceq $inputHash) "Readback rejects $mutation before collection without changing input or creating output"
+        }
+        foreach ($unavailable in @('original-unavailable', 'missing-directory')) {
+            $changed = $readbackJson | ConvertFrom-Json -AsHashtable
+            $changed.Process.LaunchUtc = $savedProcess.LaunchUtc
+            $changed.Process.EndObservedUtc = $savedProcess.EndObservedUtc
+            if ($unavailable -eq 'original-unavailable') { $changed.Process.NativeEvidence = @{ State = 'capture-unavailable' } }
+            else { Remove-Item -LiteralPath $captureDirectory -Recurse -Force }
+            [IO.File]::WriteAllText($readbackInput, ($changed | ConvertTo-Json -Depth 8))
+            $result = Invoke-NativeEvidenceReadback -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath (Join-Path $root $unavailable)
+            Assert-Capture ($result.NativeEvidence.State -ceq 'capture-unavailable' -and $result.WindowsEvents.State -ceq 'no-matching-events' -and $result.EvidenceOnly) "Readback retains $unavailable without claiming the original process was healthy"
+        }
+    } finally {
+        ${function:Get-UnityProcessFailureEvents} = $originalEventCollector
+        ${function:Get-UnityNativeEvidence} = $originalFileCollector
+        ${function:Invoke-NativeCaptureProcess} = $originalCaptureProcess
+        ${function:Get-NativeGlobalFlagSnapshot} = $originalGlobalFlags
+    }
+    $cliOutput = Join-Path $root 'readback-cli'
+    $cliRecord = & $source -ExecutionDiagnosticsPath $readbackInput -ExpectedMachine ([Environment]::MachineName) -ArtifactsPath $cliOutput
+    Assert-Capture ($cliRecord.Mode -ceq 'historical-readback' -and $cliRecord.EvidenceOnly -and $cliRecord.State -ceq 'completed') 'Readback command completes without editor, project, assemblies, debugger download or process launch'
+    $parameterSets = (Get-Command $source).ParameterSets
+    $captureSet = @($parameterSets | Where-Object { $_.Name -ceq 'Capture' })
+    Assert-Capture ($captureSet.Count -eq 1 -and $captureSet[0].IsDefault -and
+        @($captureSet[0].Parameters | Where-Object { $_.IsMandatory -and $_.Name -in @('EditorPath', 'ProjectPath', 'ArtifactsPath', 'AssemblyNames') }).Count -eq 4) 'Capture remains the default parameter set with its original required inputs'
+
+    $selectionRun = @{ id = 39132725629L; repository = @{ full_name = 'wallstop/unity-helpers' }; status = 'completed'; run_attempt = 1; head_sha = 'a' * 40 }
+    $selectionArtifacts = @{ total_count = 2; artifacts = @(
+            @{ id = 12139481462L; name = 'unity-6000.6.0f1-acceptance'; expired = $false; size_in_bytes = 100; workflow_run = @{ id = 39132725629L; head_sha = 'a' * 40 } },
+            @{ id = 12138863641L; name = 'unity-6000.6.0f1-standalone'; expired = $false; size_in_bytes = 200; workflow_run = @{ id = 39132725629L; head_sha = 'a' * 40 } }
+        ) }
+    $oldRestFunction = Get-Item Function:Invoke-RestMethod -ErrorAction SilentlyContinue
+    $script:selectionCalls = [Collections.Generic.List[object]]::new()
+    function Invoke-RestMethod {
+        param($Method, $Uri, $Headers, $TimeoutSec)
+        $script:selectionCalls.Add(@{ Method = $Method; Uri = $Uri; Timeout = $TimeoutSec; Token = $Headers.Authorization })
+        if ($script:selectionNetworkFailure) { throw 'controlled metadata unavailable' }
+        if ($Uri.EndsWith('/artifacts?per_page=100')) { return $script:selectionArtifactsResponse }
+        return $script:selectionRunResponse
+    }
+    try {
+        foreach ($buildReceipt in @($false, $true)) {
+            foreach ($mutation in @('valid', 'wrong-run', 'string-run', 'wrong-repository', 'active-run', 'repeated-attempt', 'string-attempt', 'invalid-head',
+                    'missing-artifact', 'duplicate-artifact', 'expired-artifact', 'untyped-expired', 'artifact-run', 'artifact-head', 'artifact-id-string', 'artifact-size',
+                    'truncated-inventory', 'over-bound-inventory', 'string-count', 'network-failure', 'invalid-request')) {
+                $script:selectionRunResponse = $selectionRun | ConvertTo-Json -Depth 8 | ConvertFrom-Json -AsHashtable
+                $script:selectionArtifactsResponse = $selectionArtifacts | ConvertTo-Json -Depth 8 | ConvertFrom-Json -AsHashtable
+                if ($buildReceipt) { $script:selectionArtifactsResponse.artifacts = @($script:selectionArtifactsResponse.artifacts[1]); $script:selectionArtifactsResponse.total_count = 1 }
+                $script:selectionNetworkFailure = $false
+                $script:selectionCalls.Clear()
+                $request = '39132725629'
+                switch ($mutation) {
+                    'wrong-run' { $script:selectionRunResponse.id++ }
+                    'string-run' { $script:selectionRunResponse.id = '39132725629' }
+                    'wrong-repository' { $script:selectionRunResponse.repository.full_name = 'other/repository' }
+                    'active-run' { $script:selectionRunResponse.status = 'in_progress' }
+                    'repeated-attempt' { $script:selectionRunResponse.run_attempt = 2 }
+                    'string-attempt' { $script:selectionRunResponse.run_attempt = '1' }
+                    'invalid-head' { $script:selectionRunResponse.head_sha = 'a' * 39 }
+                    'missing-artifact' { $script:selectionArtifactsResponse.artifacts[0].name = 'different' }
+                    'duplicate-artifact' { $script:selectionArtifactsResponse.artifacts += $script:selectionArtifactsResponse.artifacts[0]; $script:selectionArtifactsResponse.total_count = @($script:selectionArtifactsResponse.artifacts).Count }
+                    'expired-artifact' { $script:selectionArtifactsResponse.artifacts[0].expired = $true }
+                    'untyped-expired' { $script:selectionArtifactsResponse.artifacts[0].expired = 'false' }
+                    'artifact-run' { $script:selectionArtifactsResponse.artifacts[0].workflow_run.id++ }
+                    'artifact-head' { $script:selectionArtifactsResponse.artifacts[0].workflow_run.head_sha = 'b' * 40 }
+                    'artifact-id-string' { $script:selectionArtifactsResponse.artifacts[0].id = '12139481462' }
+                    'artifact-size' { $script:selectionArtifactsResponse.artifacts[0].size_in_bytes = -1 }
+                    'truncated-inventory' { $script:selectionArtifactsResponse.total_count = 3 }
+                    'over-bound-inventory' { $script:selectionArtifactsResponse.total_count = 101 }
+                    'string-count' { $script:selectionArtifactsResponse.total_count = '2' }
+                    'network-failure' { $script:selectionNetworkFailure = $true }
+                    'invalid-request' { $request = '../latest' }
+                }
+                $selectionOutput = Join-Path $root ('selection-' + $mutation + '-' + $buildReceipt)
+                $rejected = $false
+                try { $selected = Get-NativeReadbackArtifactSelection -Repository 'wallstop/unity-helpers' -SourceRunId $request -ArtifactsPath $selectionOutput -Token 'controlled-actions-token' -BuildReceipt:$buildReceipt }
+                catch { $rejected = $true }
+                $selectionText = [IO.File]::ReadAllText((Join-Path $selectionOutput 'selection.json'))
+                $selectionReceipt = $selectionText | ConvertFrom-Json -AsHashtable
+                Assert-Capture ($selectionReceipt.EvidenceOnly -and -not $selectionText.Contains('controlled-actions-token') -and
+                    [DateTimeOffset]::Parse($selectionReceipt.StartedUtc) -le [DateTimeOffset]::Parse($selectionReceipt.EndedUtc)) "Selection retains diagnostic identity and times without credentials: $mutation"
+                if ($mutation -ceq 'valid') {
+                    Assert-Capture (-not $rejected -and $selected.State -ceq 'selected' -and $selected.RunId -eq 39132725629L -and $selected.RunAttempt -eq 1 -and
+                        $selected.HeadSha -ceq ('a' * 40) -and (($buildReceipt -and $null -eq $selected.AcceptanceArtifactId) -or (-not $buildReceipt -and $selected.AcceptanceArtifactId -eq 12139481462L)) -and $selected.StandaloneArtifactId -eq 12138863641L -and
+                        $selected.Artifacts.Count -eq $(if ($buildReceipt) { 1 } else { 2 })) 'Selection binds required exact artifact IDs to the requested completed run and head'
+                    Assert-Capture ($script:selectionCalls.Count -eq 2 -and $script:selectionCalls[0].Uri -ceq 'https://api.github.com/repos/wallstop/unity-helpers/actions/runs/39132725629' -and
+                        $script:selectionCalls[1].Uri -ceq 'https://api.github.com/repos/wallstop/unity-helpers/actions/runs/39132725629/artifacts?per_page=100' -and
+                        @($script:selectionCalls | Where-Object { $_.Method -cne 'Get' -or $_.Timeout -ne 30 -or $_.Token -cne 'Bearer controlled-actions-token' }).Count -eq 0) 'Selection performs only two bounded current-repository metadata GETs'
+                    $selectionHash = (Get-FileHash -LiteralPath (Join-Path $selectionOutput 'selection.json')).Hash
+                    $beforeCalls = $script:selectionCalls.Count
+                    $refusedExisting = $false
+                    try { $null = Get-NativeReadbackArtifactSelection -Repository 'wallstop/unity-helpers' -SourceRunId $request -ArtifactsPath $selectionOutput -Token 'controlled-actions-token' -BuildReceipt:$buildReceipt }
+                    catch { $refusedExisting = $_.Exception.Message -like '*must be fresh*' }
+                    Assert-Capture ($refusedExisting -and $script:selectionCalls.Count -eq $beforeCalls -and
+                        (Get-FileHash -LiteralPath (Join-Path $selectionOutput 'selection.json')).Hash -ceq $selectionHash) 'Selection preserves an existing attempt without network access'
+                } else {
+                    Assert-Capture ($rejected -and $selectionReceipt.State -ceq 'failed' -and -not [string]::IsNullOrWhiteSpace($selectionReceipt.Error)) "Selection refuses and retains $mutation"
+                    if ($mutation -ceq 'invalid-request') { Assert-Capture ($script:selectionCalls.Count -eq 0) 'Invalid requested run never invokes the API' }
+                }
+            }
+        }
+    } finally {
+        if ($null -eq $oldRestFunction) { Remove-Item Function:Invoke-RestMethod }
+        else { Set-Item Function:Invoke-RestMethod -Value $oldRestFunction.ScriptBlock }
+    }
+
+    $sourceProject = Join-Path $root '6000.6.0f1-standalone'
+    $sourcePackage = Join-Path $sourceProject 'Library/PackageCache/com.unity.test-framework@7a3849e09bd0'
+    $sourceLaunchers = Join-Path $sourcePackage 'UnityEditor.TestRunner/TestLaunchers'
+    $null = [IO.Directory]::CreateDirectory($sourceLaunchers)
+    $sourceLog = Join-Path $root 'ordinary-unity.log'
+    $sourceManifest = Join-Path $sourcePackage 'package.json'
+    $sourceContext = Join-Path $sourceLaunchers 'PlayerLauncherContextSettings.cs'
+    $sourceLauncher = Join-Path $sourceLaunchers 'PlayerLauncher.cs'
+    $sourceLogText = "COMMAND LINE: $($savedProcess.ExecutablePath)`n{`"processId`":123,`"label`":`"controlled`"}`nSuccessfully changed project path to: $sourceProject`n  com.unity.test-framework@1.8.0 (location: $sourcePackage)`n"
+    foreach ($mutation in @('valid', 'missing-source', 'oversize-source', 'wrong-manifest-version', 'wrong-manifest-name', 'malformed-manifest',
+            'wrong-cache', 'wrong-log-version', 'duplicate-package', 'wrong-pid', 'wrong-editor', 'relative-project', 'output-in-project', 'existing-output')) {
+        [IO.File]::WriteAllText($sourceManifest, '{"name":"com.unity.test-framework","version":"1.8.0"}')
+        [IO.File]::WriteAllText($sourceContext, 'controlled context source')
+        [IO.File]::WriteAllText($sourceLauncher, 'controlled launcher source')
+        $logText = $sourceLogText
+        $sourceOutput = Join-Path $root ('source-' + $mutation)
+        switch ($mutation) {
+            'missing-source' { Remove-Item -LiteralPath $sourceLauncher }
+            'oversize-source' { [IO.File]::WriteAllText($sourceLauncher, ('x' * 262145)) }
+            'wrong-manifest-version' { [IO.File]::WriteAllText($sourceManifest, '{"name":"com.unity.test-framework","version":"1.8.1"}') }
+            'wrong-manifest-name' { [IO.File]::WriteAllText($sourceManifest, '{"name":"another-package","version":"1.8.0"}') }
+            'malformed-manifest' { [IO.File]::WriteAllText($sourceManifest, '{') }
+            'wrong-cache' { $logText = $logText.Replace('7a3849e09bd0', '000000000000') }
+            'wrong-log-version' { $logText = $logText.Replace('@1.8.0 ', '@1.8.1 ') }
+            'duplicate-package' { $logText += "  com.unity.test-framework@1.8.0 (location: $sourcePackage)`n" }
+            'wrong-pid' { $logText = $logText.Replace('123,', '124,') }
+            'wrong-editor' { $logText = $logText.Replace($savedProcess.ExecutablePath, 'another-editor') }
+            'relative-project' { $logText = $logText.Replace("path to: $sourceProject", 'path to: 6000.6.0f1-standalone') }
+            'output-in-project' { $sourceOutput = Join-Path $sourceProject 'output' }
+            'existing-output' { $null = [IO.Directory]::CreateDirectory((Join-Path $sourceOutput 'test-framework-sources')) }
+        }
+        [IO.File]::WriteAllText($sourceLog, $logText)
+        $beforeSourceFiles = @(Get-ChildItem -LiteralPath $sourcePackage -File -Recurse | Sort-Object FullName | ForEach-Object { $_.FullName + ':' + (Get-FileHash -LiteralPath $_.FullName).Hash })
+        $sourceResult = $null
+        $rejected = $false
+        try { $sourceResult = Get-NativeTestFrameworkSources -LogPath $sourceLog -ProcessObservation ([hashtable]$savedProcess) -ArtifactsPath $sourceOutput }
+        catch { $rejected = $true }
+        $afterSourceFiles = @(Get-ChildItem -LiteralPath $sourcePackage -File -Recurse | Sort-Object FullName | ForEach-Object { $_.FullName + ':' + (Get-FileHash -LiteralPath $_.FullName).Hash })
+        Assert-Capture (($beforeSourceFiles -join '|') -ceq ($afterSourceFiles -join '|')) "Package source collection preserves the original package: $mutation"
+        if ($mutation -ceq 'valid') {
+            Assert-Capture (-not $rejected -and $sourceResult.State -ceq 'observed' -and $sourceResult.Files.Count -eq 3 -and
+                $sourceResult.Scope -ceq 'current-persistent-package-sources' -and -not $sourceResult.OriginalOwnedProjectBytesProven -and
+                $sourceResult.PackageVersion -ceq '1.8.0' -and $sourceResult.CacheIdentity -ceq '7a3849e09bd0' -and
+                $sourceResult.ObservedLogSha256 -ceq (Get-FileHash -LiteralPath $sourceLog -Algorithm SHA256).Hash.ToLowerInvariant()) 'Package copies bind the observed log and current persistent cache without claiming original owned bytes'
+            foreach ($file in $sourceResult.Files) {
+                $retainedSource = Join-Path $sourceOutput $file.SavedPath
+                Assert-Capture ((Get-FileHash -LiteralPath $retainedSource -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $file.Sha256 -and
+                    (Get-FileHash -LiteralPath $file.Path -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $file.Sha256 -and
+                    (Get-Item -LiteralPath $retainedSource).Length -eq $file.Length) 'Each of the three bounded source copies preserves and hashes exact bytes'
+            }
+        } else {
+            Assert-Capture ($rejected -or ($null -ne $sourceResult -and $sourceResult.State -ceq 'unavailable' -and $sourceResult.Files.Count -eq 0)) "Package source collection distinguishes unavailable or rejected $mutation"
+            if ($mutation -cne 'existing-output') { Assert-Capture (-not (Test-Path -LiteralPath (Join-Path $sourceOutput 'test-framework-sources'))) "Invalid package creates no source output: $mutation" }
+        }
+    }
+
     $editorInput = Join-Path $root 'editor-input.txt'
     $lockInput = Join-Path $root 'package-lock-input.json'
     [IO.File]::WriteAllText($editorInput, 'editor')
@@ -386,6 +671,292 @@ Start-Sleep -Seconds 300
     try { Invoke-NativeCaptureProcess -FilePath (Join-Path $root 'absent.exe') -Arguments @() -Directory $root -Seconds 1 -Observation $failed | Out-Null } catch { $rejected = $true }
     Assert-Capture ($rejected -and -not $failed.Reaped -and $null -eq $failed.RawExitCode) 'Failed launch cannot fabricate an exit'
 
+    $originalSymbolPath = [Environment]::GetEnvironmentVariable('_NT_SYMBOL_PATH', 'Process')
+    try {
+        $env:_NT_SYMBOL_PATH = 'native-build-symbol-canary'
+        [IO.File]::WriteAllText($child, '[Console]::Write($env:_NT_SYMBOL_PATH + "|" + [Environment]::CurrentDirectory)')
+        $preserved = @{}
+        $output = Invoke-NativeCaptureProcess -FilePath (Get-Process -Id $PID).Path -Arguments @('-NoProfile', '-File', $child) -Directory $root -Seconds 20 -Observation $preserved -PreserveSymbolPath
+        Assert-Capture ($output -ceq ('native-build-symbol-canary|' + $root) -and $preserved.RawExitCode -eq 0) 'Build capture preserves inherited symbol environment and requested working directory'
+    } finally {
+        [Environment]::SetEnvironmentVariable('_NT_SYMBOL_PATH', $originalSymbolPath, 'Process')
+    }
+
+    Assert-Capture ((Get-NativeCaptureDebuggerCommand -DumpPath 'C:\capture with spaces\fault.dmp').Contains('\"C:\\capture with spaces\\fault.dmp\"')) 'CDB command-string parsing preserves quoted Windows dump paths and separators'
+    $debuggerCommand = Get-NativeCaptureDebuggerCommand
+    Assert-Capture ($debuggerCommand.Contains('sx- -c ".if (@$t0 < 8)') -and $debuggerCommand.Contains('r @$t0=0;') -and $debuggerCommand.Contains('WUH_FIRST_CHANCE_AV') -and $debuggerCommand.Contains('r @$t0=@$t0+1')) 'First-chance AV records have an eight-event bound without changing break or handling policy'
+    Assert-Capture ($debuggerCommand.Contains('sxd -c2 ".exr -1;r;kv;lm;.dump /m fault.dmp;gn" av') -and $debuggerCommand.Contains('sx;.echo WUH_EXCEPTION_FILTERS_END')) 'Retain the second-chance dump policy and print actual exception filters before continuation'
+    Assert-Capture ($debuggerCommand.Contains('bu ntdll!NtTerminateProcess ".echo WUH_TERMINATE_REQUEST;r rcx,rdx;kv20;g"')) 'Capture the local native termination request status and caller stack'
+    Assert-Capture ($debuggerCommand.Contains('bu ntdll!RtlExitUserThread ".echo WUH_THREAD_EXIT;?@$tid;r rcx;kv20;~;.echo WUH_THREAD_EXIT_END;g"')) 'Record actual thread-exit status, OS thread identity, caller stack and stopped thread list'
+    Assert-Capture ($debuggerCommand.Contains('bu ntdll!NtTerminateThread ".echo WUH_THREAD_TERMINATE;?@$tid;r rcx,rdx;kv20;~;.echo WUH_THREAD_TERMINATE_END;g"')) 'Record native thread-termination handle and status without treating a process exit code as an exception'
+    Assert-Capture ($debuggerCommand.EndsWith(';.echo WUH_BREAKPOINTS_BEGIN;bl /L;.echo WUH_BREAKPOINTS_END;g')) 'Print process and thread breakpoint state before resuming'
+    $originalBuildCaptureProcess = ${function:Invoke-NativeCaptureProcess}
+    $script:buildCaptureCalls = @()
+    $script:buildSavedRecords = @()
+    $script:buildControllerExit = 0
+    $script:buildKillReason = $null
+    $script:buildThrowOnLaunch = $false
+    $script:buildTargetText = 'Last event: 2a.1: Exit process 0:2a, code c0000005'
+    function Save-NativeCaptureRecord { $script:buildSavedRecords += ($Record | ConvertTo-Json -Depth 12 -Compress) }
+    function Invoke-NativeCaptureProcess {
+        param($FilePath, $Arguments, $Directory, $Seconds, $Observation, $ReceiptPath, [switch]$PreserveSymbolPath)
+        $script:buildCaptureCalls += @{ FilePath = $FilePath; Arguments = @($Arguments); Directory = $Directory; Seconds = $Seconds; PreserveSymbolPath = [bool]$PreserveSymbolPath }
+        if ($script:buildThrowOnLaunch) { throw 'Controlled debugger launch failure.' }
+        $Observation.RawExitCode = $script:buildControllerExit
+        $Observation.Reaped = $true
+        $Observation.KillReason = $script:buildKillReason
+        $Observation.Pid = 888
+        return $script:buildTargetText
+    }
+    try {
+        $project = Join-Path $root 'project with spaces'
+        $buildArguments = @('-batchmode', '-nographics', '-projectPath', $project, '-runTests', '-testPlatform', 'StandaloneWindows64', '-assemblyNames', 'Exact.Assembly', '-testFilter', 'Exact.Case', '-logFile', '-')
+        $buildPrivate = Join-Path $root 'build capture private'
+        $buildRecord = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = 'old-editmode-case' }
+        Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory $buildPrivate -ArtifactsPath $root -LogPath (Join-Path $root 'build.log') -Seconds 123 -Record $buildRecord
+        Assert-Capture ($script:buildCaptureCalls.Count -eq 1 -and $buildRecord.Cases.Count -eq 1 -and $buildRecord.State -ceq 'completed') 'Build capture launches exactly one debugger build'
+        $call = $script:buildCaptureCalls[0]
+        $forwarded = @($call.Arguments | Select-Object -Skip 3)
+        Assert-Capture (($forwarded[0..($buildArguments.Count - 1)] -join [char]0) -ceq ($buildArguments -join [char]0) -and $forwarded.Count -eq $buildArguments.Count + 4) 'Every existing build argument is forwarded in order without replacement'
+        Assert-Capture ($call.Arguments[0] -ceq '-c' -and $call.Arguments[2] -ceq 'exact-editor.exe' -and $call.FilePath -ceq 'pinned-cdb.exe') 'Debugger wraps the selected editor once'
+        Assert-Capture ($call.Directory -ceq [Environment]::CurrentDirectory -and $call.PreserveSymbolPath -and $call.Seconds -eq 123) 'Build debugger retains caller working directory and symbol environment with the existing timeout'
+        Assert-Capture ($call.Arguments[1].Contains('\"' + (Join-Path $buildPrivate 'fault.dmp').Replace('\', '\\') + '\"')) 'Debugger dump stays in the private folder when the working directory is preserved'
+        Assert-Capture ($buildRecord.Cases[0].Process.Pid -eq 888 -and $buildRecord.Cases[0].Process.RawExitCode -eq 0 -and $buildRecord.Cases[0].TargetExitEvent.Pid -eq 42 -and $buildRecord.Cases[0].TargetExitEvent.ExitCodeHex -ceq 'C0000005') 'Debugger controller success cannot replace the target access violation'
+        Assert-Capture ($null -eq $buildRecord.TestFilter -and $buildRecord.Mode -ceq 'standalone-build' -and $buildRecord.ConsoleScope -ceq 'bounded-debugger-and-Unity-console-tail') 'Build record does not claim the unrelated default EditMode selection or a full console log'
+        Assert-Capture ($script:buildSavedRecords.Count -ge 3 -and (Test-Path -LiteralPath (Join-Path $root 'build.log'))) 'Build capture persists preparation and completed evidence'
+        $script:buildControllerExit = -1073741819
+        $matchingRecord = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = $null }
+        Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root 'matching-target-code') -ArtifactsPath $root -LogPath (Join-Path $root 'matching-target-code.log') -Seconds 123 -Record $matchingRecord
+        Assert-Capture ($matchingRecord.State -ceq 'completed' -and $matchingRecord.Cases[0].TargetExitCode -eq -1073741819 -and $matchingRecord.Cases[0].ControllerExitRelation -ceq 'matches-observed-target') 'A matching nonzero controller code preserves the observed target fault independently'
+        $standardRecord = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = $null }
+        $standardPrivate = Join-Path $root 'standard heap private'
+        $originalNoDebugHeap = [Environment]::GetEnvironmentVariable('_NO_DEBUG_HEAP', 'Process')
+        Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory $standardPrivate -ArtifactsPath $root -LogPath (Join-Path $root 'standard-heap.log') -Seconds 123 -Record $standardRecord -UseStandardHeap
+        $standardCall = $script:buildCaptureCalls[-1]
+        Assert-Capture ($standardCall.Arguments[0] -ceq '-hd' -and $standardCall.Arguments[1] -ceq '-c' -and $standardCall.Arguments[3] -ceq 'exact-editor.exe') 'Standard heap selection changes only CDB launch options'
+        $standardForwarded = @($standardCall.Arguments | Select-Object -Skip 4)
+        Assert-Capture (($standardForwarded[0..($buildArguments.Count - 1)] -join [char]0) -ceq ($buildArguments -join [char]0) -and $standardForwarded.Count -eq $buildArguments.Count + 4) 'Standard heap selection preserves every Unity argument and its order'
+        Assert-Capture ($standardRecord.DebuggerHeap.Requested -ceq 'standard' -and $buildRecord.DebuggerHeap.Requested -ceq 'debugger-default') 'Receipts distinguish requested standard heap from the unchanged debugger default'
+        Assert-Capture (($standardRecord.DebuggerArguments -join [char]0) -ceq ($standardCall.Arguments -join [char]0) -and ($buildRecord.DebuggerArguments -join [char]0) -ceq ($call.Arguments -join [char]0)) 'Receipts bind both requested policies to the actual CDB argument arrays'
+        Assert-Capture ($standardRecord.DebuggerHeap.TargetState -ceq 'unverified' -and [Environment]::GetEnvironmentVariable('_NO_DEBUG_HEAP', 'Process') -ceq $originalNoDebugHeap) 'Heap request does not claim target state or mutate inherited heap environment'
+        Assert-Capture ($standardRecord.Cases[0].TargetExitCode -eq -1073741819 -and $standardRecord.Cases[0].Process.RawExitCode -eq -1073741819 -and $standardCall.PreserveSymbolPath -and $standardCall.Directory -ceq [Environment]::CurrentDirectory) 'Standard heap capture preserves target/controller faults and environment boundaries'
+        $failedRecord = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = $null }
+        $savedBeforeLaunch = $script:buildSavedRecords.Count
+        $script:buildThrowOnLaunch = $true
+        $launchFailed = $false
+        try { Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root 'failed-standard-launch') -ArtifactsPath $root -LogPath (Join-Path $root 'failed-standard.log') -Seconds 123 -Record $failedRecord -UseStandardHeap }
+        catch { $launchFailed = $_.Exception.Message -ceq 'Controlled debugger launch failure.' }
+        finally { $script:buildThrowOnLaunch = $false }
+        Assert-Capture ($launchFailed -and $script:buildSavedRecords.Count -eq $savedBeforeLaunch + 1 -and $failedRecord.State -ceq 'preparing' -and $failedRecord.DebuggerArguments[0] -ceq '-hd' -and -not $failedRecord.Cases[0].Process.ContainsKey('RawExitCode')) 'Failed launch retains requested heap arguments before starting and cannot fabricate an exit'
+        foreach ($scenario in @('controller-failed', 'target-missing', 'target-ambiguous', 'timeout')) {
+            $script:buildControllerExit = if ($scenario -eq 'controller-failed') { 1 } else { 0 }
+            $script:buildKillReason = if ($scenario -eq 'timeout') { 'wall-clock-timeout' } else { $null }
+            $script:buildTargetText = if ($scenario -eq 'target-missing') { 'no target event' } elseif ($scenario -eq 'target-ambiguous') { "Last event: 2a.1: Exit process 0:2a, code 0`nLast event: 2a.1: Exit process 0:2a, code 0" } else { 'Last event: 2a.1: Exit process 0:2a, code 0' }
+            $record = [ordered]@{ State = 'preparing'; Cases = @(); TestFilter = $null }
+            $rejected = $false
+            try { Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root $scenario) -ArtifactsPath $root -LogPath (Join-Path $root ($scenario + '.log')) -Seconds 123 -Record $record } catch { $rejected = $true }
+            Assert-Capture ($rejected -and $record.State -cne 'completed' -and $record.Cases.Count -eq 1) "Unqualified build controller outcome refuses completion: $scenario"
+            Assert-Capture (Test-Path -LiteralPath (Join-Path $root ($scenario + '.log'))) "Failed build retains console evidence: $scenario"
+        }
+        foreach ($scenario in @('wrong-platform', 'wrong-project', 'changed-log', 'early-quit', 'duplicate-run', 'unbounded')) {
+            $arguments = @($buildArguments)
+            if ($scenario -eq 'wrong-platform') { $arguments[6] = 'editmode' }
+            if ($scenario -eq 'wrong-project') { $arguments[3] = 'another-project' }
+            if ($scenario -eq 'changed-log') { $arguments[-1] = 'another.log' }
+            if ($scenario -eq 'early-quit') { $arguments += '-quit' }
+            if ($scenario -eq 'duplicate-run') { $arguments += '-runTests' }
+            $before = $script:buildCaptureCalls.Count
+            $record = [ordered]@{ State = 'preparing'; Cases = @() }
+            $rejected = $false
+            try { Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $arguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root ('invalid-' + $scenario)) -ArtifactsPath $root -LogPath (Join-Path $root 'invalid.log') -Seconds $(if ($scenario -eq 'unbounded') { 0 } else { 123 }) -Record $record } catch { $rejected = $true }
+            Assert-Capture ($rejected -and $script:buildCaptureCalls.Count -eq $before -and $record.Cases.Count -eq 0) "Invalid build selection starts no process: $scenario"
+        }
+        $originalBudgetCommand = ${function:Get-NativeCaptureDebuggerCommand}
+        $script:buildKillReason = $null
+        $script:buildControllerExit = 0
+        $script:buildThrowOnLaunch = $false
+        $script:buildTargetText = 'Last event: 2a.1: Exit process 0:2a, code c0000005'
+        try {
+            foreach ($standardHeap in @($false, $true)) {
+                foreach ($length in @(4096, 4095, 4094)) {
+                    $script:controlledCommandLength = $length
+                    function Get-NativeCaptureDebuggerCommand { param($DumpPath) return (';' * $script:controlledCommandLength) }
+                    $record = [ordered]@{ State = 'preparing'; Cases = @() }
+                    $callsBefore = $script:buildCaptureCalls.Count
+                    $rejected = $false
+                    try {
+                        Invoke-NativeStandaloneBuildCapture -EditorPath 'exact-editor.exe' -ProjectPath $project -Arguments $buildArguments -DebuggerPath 'pinned-cdb.exe' -PrivateDirectory (Join-Path $root ('command-budget-' + $standardHeap + '-' + $length)) -ArtifactsPath $root -LogPath (Join-Path $root 'command-budget.log') -Seconds 123 -Record $record -UseStandardHeap:$standardHeap
+                    } catch {
+                        if ($_.Exception.Message -notlike '*4095-character*') { throw }
+                        $rejected = $true
+                    }
+                    $admitted = $length -le 4095
+                    Assert-Capture ($rejected -eq (-not $admitted) -and $script:buildCaptureCalls.Count -eq $callsBefore + [int]$admitted) "Complete debugger command length controls launch admission: $length"
+                    Assert-Capture ($record.DebuggerCommandBudget.Maximum -eq 4095 -and $record.DebuggerCommandBudget.Actual -eq $length -and $record.DebuggerCommandBudget.Admitted -eq $admitted) 'Persist the actual complete command budget before debugger launch'
+                    if (-not $admitted) {
+                        Assert-Capture ($record.Cases[0].Process.Count -eq 0 -and $record.State -ceq 'preparing' -and $record.DebuggerArguments[(1 + [int]$standardHeap)].Length -eq $length) 'Overlength rejection retains planned arguments without fabricating a debugger process'
+                    }
+                }
+            }
+            $legacyLoop = $ast.Find({ param($node) $node -is [Management.Automation.Language.ForEachStatementAst] -and $node.Variable.Extent.Text -ceq '$mode' }, $true)
+            $firstLegacy = @($legacyLoop.Body.Statements | Where-Object { $_.Extent.Text -ceq '$executable = $EditorPath' })[0]
+            $lastLegacy = @($legacyLoop.Body.Statements | Where-Object { $_.Extent.Text.StartsWith('$output = Invoke-NativeCaptureProcess -FilePath $executable') })[0]
+            $legacyLaunch = [scriptblock]::Create($ast.Extent.Text.Substring($firstLegacy.Extent.StartOffset, $lastLegacy.Extent.EndOffset - $firstLegacy.Extent.StartOffset))
+            foreach ($length in @(4096, 4095, 4094)) {
+                $script:controlledCommandLength = $length
+                $mode = 'debugger'; $EditorPath = 'exact-editor.exe'; $debugger = 'pinned-cdb.exe'
+                $unityArguments = $buildArguments; $privateCase = $root; $artifactRoot = $root; $TimeoutSeconds = 123; $CompareLoaderSnaps = $false
+                $record = [ordered]@{ Cases = @() }; $callsBefore = $script:buildCaptureCalls.Count; $rejected = $false
+                try { . $legacyLaunch } catch {
+                    if ($_.Exception.Message -notlike '*4095-character*') { throw }
+                    $rejected = $true
+                }
+                $admitted = $length -le 4095
+                Assert-Capture ($rejected -eq (-not $admitted) -and $script:buildCaptureCalls.Count -eq $callsBefore + [int]$admitted -and $record.Cases[0].DebuggerCommandBudget.Actual -eq $length) 'Legacy debugger launch applies the same complete command budget'
+            }
+            $mode = 'direct'; $callsBefore = $script:buildCaptureCalls.Count; $record = [ordered]@{ Cases = @() }
+            . $legacyLaunch
+            Assert-Capture ($script:buildCaptureCalls.Count -eq $callsBefore + 1 -and -not $record.Cases[0].ContainsKey('DebuggerCommandBudget')) 'Legacy Direct does not acquire a debugger command budget'
+        } finally { ${function:Get-NativeCaptureDebuggerCommand} = $originalBudgetCommand }
+    } finally { ${function:Invoke-NativeCaptureProcess} = $originalBuildCaptureProcess }
+
+    $runnerTokens = $null
+    $runnerErrors = $null
+    $runnerAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts/unity/run-ci-tests.ps1'), [ref]$runnerTokens, [ref]$runnerErrors)
+    Assert-Capture ($runnerErrors.Count -eq 0) 'Build integration parses'
+    $buildBranch = $runnerAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text -ceq '$StandaloneBuildCapture -ne ''None''' -and $node.Extent.Text.Contains('Invoke-UnityStandaloneBuildDiagnostic -Mode') }, $true)
+    Assert-Capture ($null -ne $buildBranch) 'Existing Standalone build has a diagnostic branch'
+    $script:diagnosticBuildCalls = 0
+    $script:diagnosticSnapshots = 0
+    $script:diagnosticPlayerCalls = 0
+    $script:diagnosticHeapRequests = @()
+    function Invoke-UnityStandaloneBuildDiagnostic { param($Mode, $EditorPath, $ProjectPath, $Arguments, $ArtifactsPath, $LogPath, $TimeoutSeconds, [switch]$UseStandardHeap, [switch]$AttachToDirect, [switch]$AttachAfterStartup, [switch]$AttachAfterShutdown) ++$script:diagnosticBuildCalls; $script:diagnosticHeapRequests += [bool]$UseStandardHeap; $script:diagnosticAttachRequests += [bool]$AttachToDirect; $script:diagnosticStartupRequests += [bool]$AttachAfterStartup; $script:diagnosticShutdownRequests += [bool]$AttachAfterShutdown }
+    $StandaloneBuildAttachToDirect = $false
+    $StandaloneBuildAttachAfterStartup = $false
+    $StandaloneBuildAttachAfterShutdown = $false
+    $script:diagnosticAttachRequests = @()
+    $script:diagnosticStartupRequests = @()
+    $script:diagnosticShutdownRequests = @()
+    function Add-FrozenPlayerProvenanceSnapshot { param($Context, $Stage, [switch]$IncludePayload) Assert-Capture ($Stage -ceq 'after-build' -and $IncludePayload) 'Diagnostic records the actual post-build inventory'; ++$script:diagnosticSnapshots }
+    function Get-StandaloneBuildTimeoutSeconds { return 123 }
+    function Invoke-StandaloneTestPlayer { ++$script:diagnosticPlayerCalls }
+    foreach ($selection in @(@{ Mode = 'Direct'; StandardHeap = $false; Attach = $false; Startup = $false; Shutdown = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $false; Startup = $false; Shutdown = $false }, @{ Mode = 'Debugger'; StandardHeap = $true; Attach = $false; Startup = $false; Shutdown = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $true; Startup = $false; Shutdown = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $true; Startup = $true; Shutdown = $false }, @{ Mode = 'Debugger'; StandardHeap = $false; Attach = $true; Startup = $false; Shutdown = $true })) {
+        $StandaloneBuildCapture = $selection.Mode
+        $StandaloneBuildDebuggerStandardHeap = $selection.StandardHeap
+        $StandaloneBuildAttachToDirect = $selection.Attach
+        $StandaloneBuildAttachAfterStartup = $selection.Startup
+        $StandaloneBuildAttachAfterShutdown = $selection.Shutdown
+        $UnityEditorPath = 'exact-editor.exe'; $ProjectPath = $project; $buildArgs = $buildArguments; $ArtifactsPath = $root; $logPath = Join-Path $root 'integration.log'; $frozenPlayerProvenance = @{}
+        $rejected = $false
+        try { & ([scriptblock]::Create($buildBranch.Extent.Text + '; Invoke-StandaloneTestPlayer')) } catch { $rejected = $_.Exception.Message -like 'Evidence-only Standalone build capture stops before player launch*' }
+        Assert-Capture ($rejected -and $script:diagnosticPlayerCalls -eq 0 -and $script:diagnosticHeapRequests[-1] -eq $selection.StandardHeap -and $script:diagnosticAttachRequests[-1] -eq $selection.Attach -and $script:diagnosticStartupRequests[-1] -eq $selection.Startup -and $script:diagnosticShutdownRequests[-1] -eq $selection.Shutdown) "Build-only route retains diagnostic selection and never launches a player: $($selection.Mode)/$($selection.StandardHeap)/$($selection.Attach)/$($selection.Startup)"
+    }
+    Assert-Capture ($script:diagnosticBuildCalls -eq 6 -and $script:diagnosticSnapshots -eq 6) 'Each diagnostic arm performs one existing build and one post-build inventory'
+    $StandaloneBuildCapture = 'None'
+    $StandaloneBuildDebuggerStandardHeap = $false
+    $StandaloneBuildAttachToDirect = $false
+    $StandaloneBuildAttachAfterStartup = $false
+    $StandaloneBuildAttachAfterShutdown = $false
+    & ([scriptblock]::Create($buildBranch.Extent.Text + '; Invoke-StandaloneTestPlayer'))
+    Assert-Capture ($script:diagnosticBuildCalls -eq 6 -and $script:diagnosticPlayerCalls -eq 1) 'Disabled diagnostic leaves the ordinary player path reachable'
+
+    $acceptanceTokens = $null
+    $acceptanceErrors = $null
+    $acceptanceAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts/unity/run-acceptance.ps1'), [ref]$acceptanceTokens, [ref]$acceptanceErrors)
+    Assert-Capture ($acceptanceErrors.Count -eq 0) 'Heap acceptance driver parses'
+    $shutdownTransfer = $acceptanceAst.Find({ param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -ceq '$parameters.StandaloneBuildAttachAfterShutdown' }, $true)
+    Assert-Capture ($null -ne $shutdownTransfer) 'Acceptance forwards the final telemetry attachment request'
+    foreach ($requested in @($false, $true)) {
+        $StandaloneBuildAttachAfterShutdown = $requested; $parameters = @{}
+        Invoke-Expression $shutdownTransfer.Extent.Text
+        Assert-Capture ($parameters.StandaloneBuildAttachAfterShutdown -is [bool] -and $parameters.StandaloneBuildAttachAfterShutdown -eq $requested) 'Final telemetry selection forwards as Boolean'
+    }
+    foreach ($driverAst in @($runnerAst, $acceptanceAst)) {
+        $shutdownGuard = $driverAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text.StartsWith('$StandaloneBuildAttachAfterShutdown -and') }, $true)
+        Assert-Capture ($null -ne $shutdownGuard) 'Actual driver admits only one attachment boundary'
+        foreach ($requested in @($false, $true)) {
+            foreach ($attach in @($false, $true)) {
+                foreach ($startup in @($false, $true)) {
+                    $StandaloneBuildAttachAfterShutdown = $requested; $StandaloneBuildAttachToDirect = $attach; $StandaloneBuildAttachAfterStartup = $startup
+                    $rejected = $false
+                    try { Invoke-Expression $shutdownGuard.Extent.Text } catch { $rejected = $_.Exception.Message -ceq 'Shutdown-delayed attachment requires Direct attachment without startup selection.' }
+                    Assert-Capture ($rejected -eq ($requested -and (-not $attach -or $startup))) 'Final telemetry selection refuses startup or unattached targets'
+                }
+            }
+        }
+    }
+    $StandaloneBuildAttachAfterShutdown = $false
+    $startupTransfer = $acceptanceAst.Find({ param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -ceq '$parameters.StandaloneBuildAttachAfterStartup' }, $true)
+    Assert-Capture ($null -ne $startupTransfer) 'Acceptance forwards the startup attachment request'
+    foreach ($requested in @($false, $true)) {
+        $StandaloneBuildAttachAfterStartup = $requested; $parameters = @{}
+        Invoke-Expression $startupTransfer.Extent.Text
+        Assert-Capture ($parameters.StandaloneBuildAttachAfterStartup -is [bool] -and $parameters.StandaloneBuildAttachAfterStartup -eq $requested) 'Startup selection is forwarded as an actual Boolean'
+    }
+    foreach ($driverAst in @($runnerAst, $acceptanceAst)) {
+        $startupGuard = $driverAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text.StartsWith('$StandaloneBuildAttachAfterStartup -and') }, $true)
+        Assert-Capture ($null -ne $startupGuard) 'Actual driver requires attachment for startup selection'
+        foreach ($requested in @($false, $true)) {
+            foreach ($attach in @($false, $true)) {
+                $StandaloneBuildAttachAfterStartup = $requested; $StandaloneBuildAttachToDirect = $attach
+                $rejected = $false
+                try { Invoke-Expression $startupGuard.Extent.Text } catch { $rejected = $_.Exception.Message -ceq 'Startup-delayed attachment requires Direct attachment.' }
+                Assert-Capture ($rejected -eq ($requested -and -not $attach)) 'Actual startup admission rejects an unattached target'
+            }
+        }
+    }
+    $attachTransfer = $acceptanceAst.Find({ param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -ceq '$parameters.StandaloneBuildAttachToDirect' }, $true)
+    Assert-Capture ($null -ne $attachTransfer) 'Acceptance forwards the attachment request to the runner'
+    foreach ($requested in @($false, $true)) {
+        $StandaloneBuildAttachToDirect = $requested
+        $parameters = @{}
+        Invoke-Expression $attachTransfer.Extent.Text
+        Assert-Capture ($parameters.StandaloneBuildAttachToDirect -is [bool] -and $parameters.StandaloneBuildAttachToDirect -eq $requested) 'Acceptance forwards the actual attachment request as a Boolean'
+    }
+    foreach ($driverAst in @($runnerAst, $acceptanceAst)) {
+        $attachGuard = $driverAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text.StartsWith('$StandaloneBuildAttachToDirect -and') }, $true)
+        Assert-Capture ($null -ne $attachGuard) 'Actual driver has a direct attachment admission guard'
+        foreach ($requested in @($false, $true)) {
+            foreach ($mode in @('None', 'Direct', 'Debugger')) {
+                foreach ($heapRequest in @($false, $true)) {
+                    foreach ($selection in @('wproto', 'all', 'intmap')) {
+                        $StandaloneBuildAttachToDirect = $requested; $StandaloneBuildCapture = $mode
+                        $StandaloneBuildDebuggerStandardHeap = $heapRequest; $Acceptance = $selection
+                        $rejected = $false
+                        try { Invoke-Expression $attachGuard.Extent.Text } catch { $rejected = $_.Exception.Message -like 'Direct attachment requires*' }
+                        $expected = $requested -and ($mode -cne 'Debugger' -or $heapRequest -or ($driverAst -eq $acceptanceAst -and $selection -cne 'wproto'))
+                        Assert-Capture ($rejected -eq $expected) "Actual driver attachment admission: $requested/$mode/$heapRequest/$selection"
+                    }
+                }
+            }
+        }
+    }
+    $heapTransfer = $acceptanceAst.Find({ param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -ceq '$parameters.StandaloneBuildDebuggerStandardHeap' }, $true)
+    Assert-Capture ($null -ne $heapTransfer) 'Acceptance forwards the heap request to the runner'
+    foreach ($requested in @($false, $true)) {
+        $StandaloneBuildDebuggerStandardHeap = $requested
+        $parameters = @{}
+        Invoke-Expression $heapTransfer.Extent.Text
+        Assert-Capture ($parameters.StandaloneBuildDebuggerStandardHeap -is [bool] -and $parameters.StandaloneBuildDebuggerStandardHeap -eq $requested) 'Acceptance forwards the actual heap request as a Boolean'
+    }
+    foreach ($driverAst in @($runnerAst, $acceptanceAst)) {
+        $heapGuard = $driverAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text.StartsWith('$StandaloneBuildDebuggerStandardHeap -and') }, $true)
+        Assert-Capture ($null -ne $heapGuard) 'Each driver refuses incompatible heap requests'
+        foreach ($requested in @($false, $true)) {
+            foreach ($mode in @('None', 'Direct', 'Debugger')) {
+                foreach ($selection in @('wproto', 'all', 'borrowed')) {
+                    $StandaloneBuildDebuggerStandardHeap = $requested
+                    $StandaloneBuildCapture = $mode
+                    $Acceptance = $selection
+                    $rejected = $false
+                    try { Invoke-Expression $heapGuard.Extent.Text } catch { $rejected = $_.Exception.Message -like 'Standard heap selection requires*' }
+                    $expected = $requested -and ($mode -cne 'Debugger' -or ($driverAst -eq $acceptanceAst -and $selection -cne 'wproto'))
+                    Assert-Capture ($rejected -eq $expected) "Actual driver heap admission: $requested/$mode/$selection"
+                }
+            }
+        }
+    }
+
     $workflow = [IO.File]::ReadAllText((Join-Path $repo '.github/workflows/unity-tests.yml'))
     Assert-Capture ($workflow -match '(?s)native-diagnostics:.*?default: false.*?type: boolean') 'Diagnostic input defaults off'
     $captureStep = [regex]::Match($workflow, '(?s)- name: Capture native exit diagnostics.*?(?=\n      - name:)').Value
@@ -402,6 +973,7 @@ Start-Sleep -Seconds 300
     $restoreSource = [IO.File]::ReadAllText((Join-Path $repo 'scripts/unity/restore-native-loader-snaps.ps1'))
     Assert-Capture ($restoreSource.Contains('Read-NativeLoaderFlagRecoveryLease') -and $restoreSource.Contains('Invoke-NativeLoaderFlagRecovery')) 'Independent recovery uses the phase-aware receipt and cleanup policy'
     Write-Host "$passed native capture controls passed"
+    & (Join-Path $PSScriptRoot 'test-native-attach.ps1')
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force
 }

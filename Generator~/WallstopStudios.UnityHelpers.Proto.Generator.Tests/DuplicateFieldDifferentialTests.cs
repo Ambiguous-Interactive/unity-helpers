@@ -182,6 +182,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(0, allocated);
         }
 
+        [TestCase(5, false)]
+        [TestCase(6, true)]
+        public void DuplicateMessageValidationConsumesRootTagBudget(int maximumTags, bool accepted)
+        {
+            WProtoReader reader = new WProtoReader(
+                Parse("1202080112021002"),
+                new WProtoReadLimits().WithTotalFieldCount(maximumTags)
+            );
+            Assert.AreEqual(
+                accepted,
+                WProtoFormatterProvider
+                    .Get<DuplicateHolder>()
+                    .TryRead(ref reader, out DuplicateHolder value)
+            );
+            Assert.AreEqual(!accepted, reader.Malformed);
+            if (accepted)
+            {
+                Assert.AreEqual(1, value.Child.A);
+                Assert.AreEqual(2, value.Child.B);
+                Assert.IsTrue(reader.End);
+            }
+            else
+            {
+                Assert.IsTrue(value == null);
+            }
+        }
+
         [Test]
         public void ADuplicatedSubMessageMergesRatherThanReplacing()
         {
@@ -536,6 +563,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 HookedContract.AfterDeserializationRuns - before,
                 "a merged member must not run its lifecycle hooks once per occurrence"
             );
+        }
+
+        [TestCase(5, false)]
+        [TestCase(6, true)]
+        public void GenericDuplicateValidationSharesRootBudget(int maximumTags, bool accepted)
+        {
+            WProtoReader reader = new WProtoReader(
+                Parse("0A0208010A021002"),
+                new WProtoReadLimits().WithTotalFieldCount(maximumTags)
+            );
+            Assert.AreEqual(
+                accepted,
+                WProtoFormatterProvider
+                    .Get<Box<DuplicateChild>>()
+                    .TryRead(ref reader, out Box<DuplicateChild> value)
+            );
+            Assert.AreEqual(!accepted, reader.Malformed);
+            if (accepted)
+            {
+                Assert.AreEqual(1, value.Value.A);
+                Assert.AreEqual(2, value.Value.B);
+            }
+            else
+            {
+                Assert.IsTrue(value == null);
+            }
         }
 
         [Test]

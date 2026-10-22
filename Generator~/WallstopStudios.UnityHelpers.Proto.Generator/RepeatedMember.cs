@@ -620,6 +620,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     "case " + Tag + " when " + Generic + ".Accepts(wireType):" + Writer.Open
                 );
                 writer.Indent();
+                EmitCollectionElementCharge(writer, qualifiedContract);
                 EmitSeed(writer);
                 writer.Line(
                     "if (!"
@@ -655,9 +656,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + Writer.Open
                 );
                 writer.Indent();
-                EmitSeed(writer);
                 writer.Line(
-                    "if (!reader.TryReadPackedRun("
+                    "if (!reader.TryReadPackedCollection("
                         + Generic
                         + ".WireType, out "
                         + Proto
@@ -670,6 +670,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 EmitReadFailure(writer, qualifiedContract);
                 Close(writer);
                 writer.Blank();
+                EmitSeed(writer);
                 EmitReserve(writer, ReserveFor(genericPacked, Generic + ".WireType"));
                 writer.Line("while (!" + genericPacked + ".End)" + Writer.Open);
                 writer.Indent();
@@ -698,6 +699,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             OpenCase(writer, _shape.WireType);
+            EmitCollectionElementCharge(writer, qualifiedContract);
             EmitSeed(writer);
             writer.Line(
                 "if (!reader."
@@ -727,9 +729,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // Accept both packed and loose forms so valid alternate encodings are not silently skipped.
             string packed = "packed" + Tag;
             OpenCase(writer, Proto + ".WProtoWireType.LengthDelimited");
-            EmitSeed(writer);
             writer.Line(
-                "if (!reader.TryReadPackedRun("
+                "if (!reader.TryReadPackedCollection("
                     + _shape.WireType
                     + ", out "
                     + Proto
@@ -742,6 +743,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             EmitReadFailure(writer, qualifiedContract);
             Close(writer);
             writer.Blank();
+            EmitSeed(writer);
             EmitReserve(writer, ReserveFor(packed, _shape.WireType));
             writer.Line("while (!" + packed + ".End)" + Writer.Open);
             writer.Indent();

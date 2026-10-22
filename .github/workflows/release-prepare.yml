@@ -69,7 +69,7 @@ jobs:
       - name: Generate auto-commit GitHub App token
         id: app-token
         if: ${{ !inputs.dry_run }}
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
           # The retained App ID is an accepted JWT issuer for this pinned action.
           client-id: ${{ secrets.AUTO_COMMIT_APP_ID }}

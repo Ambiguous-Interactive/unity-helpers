@@ -93,12 +93,25 @@ jobs:
           fi
 
       - name: Setup .NET for semantic safety checks
+        id: dotnet
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
-          dotnet-version: "9.0.306"
+          dotnet-version: "9.0.319"
 
       # The three check groups each record an outcome instead of ending the job, so one failure
       # never hides the other two. The gate at the end is what actually reds the run.
+      - name: Require the installed .NET SDK
+        shell: bash
+        env:
+          EXPECTED_DOTNET_SDK: ${{ steps.dotnet.outputs.dotnet-version }}
+        run: |
+          set -euo pipefail
+          selected_sdk="$(dotnet --version)"
+          printf 'Selected .NET SDK: %s\n' "$selected_sdk"
+          test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing installed SDK version}"
+
       - name: actionlint
         id: actionlint
         continue-on-error: true

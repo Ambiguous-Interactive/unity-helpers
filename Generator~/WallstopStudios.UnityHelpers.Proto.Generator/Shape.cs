@@ -386,9 +386,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     SizeExpression =
                         Proto + ".WProtoSizes.LengthDelimitedSize(" + Placeholder + ".Length)",
                     WriteMethod = "TryWriteBytes",
-                    ReadMethod = "TryReadBytes",
-                    ReadLocalType = "global::System.ReadOnlySpan<byte>",
-                    AssignExpression = Placeholder + ".ToArray()",
+                    ReadMethod = "TryReadByteArray",
+                    ReadLocalType = "byte[]",
+                    AssignExpression = Placeholder,
                     IsReference = true,
                 };
             }

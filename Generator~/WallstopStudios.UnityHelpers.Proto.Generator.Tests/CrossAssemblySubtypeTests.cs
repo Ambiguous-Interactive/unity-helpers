@@ -347,6 +347,54 @@ namespace Consumer {
         }
 
         [Test]
+        public void GeneratedReplacementForwardLatchesCustomFormatterFailure()
+        {
+            const string source =
+                @"
+namespace Consumer {
+    [WProtoContract] public partial class ReplacedValue { }
+    public sealed class RefusingFormatter : IWProtoReplacementFormatter<ReplacedValue> {
+        public bool CanWrite(Type type) { return true; }
+        public int Measure(in ReplacedValue value) { return 0; }
+        public bool Write(ref WProtoWriter writer, in ReplacedValue value) { return false; }
+        public bool TryRead(ref WProtoReader reader, out ReplacedValue value) {
+            value = new ReplacedValue();
+            return false;
+        }
+    }
+    public static class Probe {
+        public static void Run() {
+            WProtoFormatterProvider.RegisterReplacement(new RefusingFormatter());
+            WProtoReader reader = new WProtoReader(new byte[] { 0x08, 1 });
+            Assert.IsFalse(ReplacedValue.WProtoFormatter.Instance.TryRead(ref reader, out ReplacedValue value));
+            Assert.IsTrue(value == null);
+            Assert.IsTrue(reader.Malformed);
+            Assert.IsFalse(reader.TryReadTag(out _, out _));
+            Assert.AreEqual(0, reader.Position);
+        }
+    }
+}";
+            byte[] compiled = Emit(
+                Generate(
+                    "RefusingReplacement" + Guid.NewGuid().ToString("N"),
+                    source,
+                    out ImmutableArray<Diagnostic> diagnostics
+                )
+            );
+            Assert.IsEmpty(diagnostics);
+            using (MemoryStream stream = new MemoryStream(compiled))
+            {
+                Assembly loaded = AssemblyLoadContext.Default.LoadFromStream(stream);
+                Action run = (Action)
+                    loaded
+                        .GetType("Consumer.Probe", true)
+                        .GetMethod("Run")
+                        .CreateDelegate(typeof(Action));
+                run();
+            }
+        }
+
+        [Test]
         public void RepeatedOwnerIsIdempotentAndDifferentOwnerPermanentlyRefusesBothChains()
         {
             ReplacementA<ConflictContract> first = new ReplacementA<ConflictContract>();

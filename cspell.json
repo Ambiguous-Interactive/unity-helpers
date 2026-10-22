@@ -385,6 +385,8 @@
     {
       "name": "package-terms",
       "words": [
+        "inext",
+        "inextp",
         "ApplyEffect",
         "Approximately",
         "AssignRelationalComponents",
@@ -1252,5 +1254,32 @@
   "flagWords": [],
   "minWordLength": 3,
   "allowCompoundWords": true,
-  "caseSensitive": false
+  "caseSensitive": false,
+  "overrides": [
+    {
+      "filename": [
+        "cspell.json",
+        "Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/DoxRetainedInventory.v1.json",
+        "Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/README.md",
+        "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/CompatibilityCaseBindings.v1.json",
+        "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/CompatibilityClaimCatalog.v1.json"
+      ],
+      "words": [
+        "Assemblys",
+        "Entrys",
+        "FFFE",
+        "llo",
+        "wallstopproto",
+        "Dox",
+        "Isho",
+        "moduleinitializer",
+        "hostv",
+        "unemitted"
+      ]
+    },
+    {
+      "filename": ["scripts/unity/wproto-corpus.v1.json"],
+      "ignoreRegExpList": ["/\"sha256\":\\s*\"[A-Za-z0-9+/]{43}=\"/g"]
+    }
+  ]
 }

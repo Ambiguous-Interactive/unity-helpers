@@ -11,14 +11,28 @@ on:
       - main
     paths:
       - "Generator~/**"
-      - "Runtime/Analyzers/**"
-      - "Runtime/Core/Serialization/WallstopProto/**"
+      - "Runtime/**"
+      - "Editor/**"
+      - "Tests/**"
+      - "docs/features/serialization/serialization.md"
+      - "scripts/run-wproto-evidence.ps1"
+      - "scripts/verify-wproto-evidence.ps1"
+      - "scripts/unity/lib/test-result-evidence.ps1"
+      - "scripts/unity/lib/catastrophic-patterns.ps1"
+      - ".gitattributes"
       - ".github/workflows/wproto-generator.yml"
   pull_request:
     paths:
       - "Generator~/**"
-      - "Runtime/Analyzers/**"
-      - "Runtime/Core/Serialization/WallstopProto/**"
+      - "Runtime/**"
+      - "Editor/**"
+      - "Tests/**"
+      - "docs/features/serialization/serialization.md"
+      - "scripts/run-wproto-evidence.ps1"
+      - "scripts/verify-wproto-evidence.ps1"
+      - "scripts/unity/lib/test-result-evidence.ps1"
+      - "scripts/unity/lib/catastrophic-patterns.ps1"
+      - ".gitattributes"
       - ".github/workflows/wproto-generator.yml"
 
 permissions:
@@ -36,12 +50,25 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Setup .NET
+        id: dotnet
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
           # Pinned to a patch. The byte comparison below is only meaningful against the same
           # compiler, and every SDK patch ships its own Roslyn; 9.0.x floated onto a different one
           # and the gate failed for a reason no developer could reproduce.
-          dotnet-version: "9.0.306"
+          dotnet-version: "9.0.319"
+
+      - name: Require the installed .NET SDK
+        shell: bash
+        env:
+          EXPECTED_DOTNET_SDK: ${{ steps.dotnet.outputs.dotnet-version }}
+        run: |
+          set -euo pipefail
+          selected_sdk="$(dotnet --version)"
+          printf 'Selected .NET SDK: %s\n' "$selected_sdk"
+          test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing installed SDK version}"
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -68,9 +95,48 @@ jobs:
       - name: Test the generator against protobuf-net 3.2.56
         # The formatters under test are the shipped analyzer's own output, produced the way Unity
         # produces them, rather than a transcription of what it ought to emit.
-        run: dotnet test "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj" -c Release --nologo -p:ProtobufNetOracle=v3
+        shell: pwsh
+        run: ./scripts/run-wproto-evidence.ps1 -Oracle v3 -OutputRoot "$env:RUNNER_TEMP/wproto-evidence"
+
+      - name: Admit retained Dox consumer contracts against protobuf-net v3
+        run: >-
+          dotnet test
+          Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/WallstopStudios.UnityHelpers.DoxRetained.Tests.csproj
+          -c Release -p:ProtobufNetOracle=v3 --nologo
+          --logger "trx;LogFileName=dox-retained-v3.trx"
+          --results-directory "${{ runner.temp }}/wproto-evidence/dox-retained"
+
+      - name: Compile exported schemas and cross-read with protoc
+        env:
+          WPROTO_SCHEMA_EVIDENCE_ROOT: ${{ runner.temp }}/wproto-evidence/schema-conformance/processes
+        run: >-
+          dotnet test
+          Generator~/WallstopStudios.UnityHelpers.SchemaConformance.Tests/WallstopStudios.UnityHelpers.SchemaConformance.Tests.csproj
+          -c Release -p:ProtobufNetOracle=v3 --nologo
+          --logger "trx;LogFileName=schema-conformance.trx"
+          --results-directory "${{ runner.temp }}/wproto-evidence/schema-conformance"
+
+      - name: Compile consumers with the Roslyn 3.8 API floor
+        env:
+          WPROTO_COMPILER_EVIDENCE_ROOT: ${{ runner.temp }}/wproto-evidence/compiler-floor/processes
+        run: >-
+          dotnet test
+          Generator~/WallstopStudios.UnityHelpers.Proto.CompilerFloor.Tests/WallstopStudios.UnityHelpers.Proto.CompilerFloor.Tests.csproj
+          -c Release --nologo
+          --logger "trx;LogFileName=compiler-floor.trx"
+          --results-directory "${{ runner.temp }}/wproto-evidence/compiler-floor"
+          -- RunConfiguration.TreatNoTestsAsError=true
 
       - name: Test the generator against protobuf-net 2.4.9
         # The two oracle DLLs share an assembly name. A second process is the only reliable
         # isolation boundary; side-by-side aliases can silently bind both references to v3.
-        run: dotnet test "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj" -c Release --nologo -p:ProtobufNetOracle=v2
+        shell: pwsh
+        run: ./scripts/run-wproto-evidence.ps1 -Oracle v2 -OutputRoot "$env:RUNNER_TEMP/wproto-evidence"
+
+      - name: Retain oracle invocation evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: wproto-oracle-evidence
+          path: ${{ runner.temp }}/wproto-evidence
+          if-no-files-found: warn

@@ -149,6 +149,15 @@ run_final_newline_check() {
             esac
             # Check if file is non-empty and missing final newline
             if [[ -s "$file" ]] && [[ "$(tail -c 1 -- "$file" | wc -l)" -eq 0 ]]; then
+                local attributes
+                if ! attributes=$(git check-attr --cached text -- "$file"); then
+                    print_fail "$label: cannot inspect staged text attribute for $file"
+                    FAILED=1
+                    return 1
+                fi
+                if [[ "$attributes" == *': text: unset' ]]; then
+                    continue
+                fi
                 missing_newline_files+=("$file")
             fi
         done < <(git ls-files -z -- "$pat" 2>/dev/null)

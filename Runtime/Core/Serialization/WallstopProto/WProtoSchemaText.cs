@@ -23,11 +23,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// source generator synthesizes, rectangular arrays map to the <c>dims</c>/<c>values</c> wrapper
     /// from <see cref="WProtoRectangular"/>, maps map to proto3 <c>map</c> entries (or an explicit
     /// entry message where the key has no proto3 spelling), and a
-    /// <see cref="WProtoIncludeAttribute"/> subtype is emitted as a message holding the subtype's
-    /// members followed by the base's, exactly as the wire lays the bytes out. The BCL value types
+    /// <see cref="WProtoIncludeAttribute"/> subtype uses a payload message for its declared members.
+    /// Concrete roots and member references retain the full outermost contract envelope.
+    /// The BCL value types
     /// the formatters serve (<see cref="DateTime"/>, <see cref="TimeSpan"/>, <see cref="Guid"/>,
-    /// <see cref="decimal"/>, <see cref="Uri"/>) are emitted as the message shapes those formatters
-    /// actually write, which replicate protobuf-net's <c>.bcl.*</c> conventions.
+    /// <see cref="decimal"/>) are emitted as the message shapes those formatters
+    /// actually write, which replicate protobuf-net's <c>.bcl.*</c> conventions. URI members
+    /// use <c>string</c>, matching their raw UTF-8 payload without an inner message tag.
+    /// Enums backed by <see cref="uint"/>, <see cref="long"/>, or <see cref="ulong"/> use
+    /// the corresponding integer schema type to preserve values beyond proto3's int32 enum range.
     /// </para>
     /// <para>
     /// Explicit <see cref="WProtoMemberAttribute.IsPacked"/> opt-outs render as
@@ -114,19 +118,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         + "  uint64 low = 1;\n"
                         + "  uint32 high = 2;\n"
                         + "  uint32 sign_scale = 3;\n"
-                        + "}"
-                )
-            },
-            {
-                typeof(Uri),
-                (
-                    "BclUri",
-                    name =>
-                        "// Replicates protobuf-net's .bcl.Uri layout: the UTF-8 original string.\n"
-                        + "message "
-                        + name
-                        + " {\n"
-                        + "  string original_string = 1;\n"
                         + "}"
                 )
             },
@@ -336,13 +327,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private sealed class SchemaBuilder
         {
             private const BindingFlags MemberSearchFlags =
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+                BindingFlags.Instance
+                | BindingFlags.Public
+                | BindingFlags.NonPublic
+                | BindingFlags.DeclaredOnly;
             private const string MessageKeyPrefix = "message ";
             private const string EnumKeyPrefix = "enum ";
 
             public List<string> Diagnostics => _diagnostics;
 
-            public int MessageCount => _rendered.Count;
+            public int MessageCount => _contractNames.Count;
 
             private readonly IReadOnlyDictionary<Type, Type> _surrogates;
             private readonly Dictionary<Type, List<KeyValuePair<int, Type>>> _declaredSubtypes;
@@ -350,11 +344,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             private readonly Dictionary<string, string> _blocks = new Dictionary<string, string>(
                 StringComparer.Ordinal
             );
-            private readonly HashSet<Type> _rendered = new HashSet<Type>();
             private readonly HashSet<string> _usedNames = new HashSet<string>(
                 StringComparer.Ordinal
             );
             private readonly Dictionary<Type, string> _contractNames =
+                new Dictionary<Type, string>();
+            private readonly Dictionary<Type, string> _payloadNames =
                 new Dictionary<Type, string>();
             private readonly Dictionary<Type, string> _bclNames = new Dictionary<Type, string>();
             private readonly Dictionary<Type, string> _enumNames = new Dictionary<Type, string>();
@@ -562,9 +557,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             public string TryAddContract(Type contractType)
             {
-                if (_rendered.Contains(contractType))
+                if (_contractNames.TryGetValue(contractType, out string known))
                 {
-                    return SchemaNameOf(contractType);
+                    return known;
                 }
 
                 object[] contractMarkers = contractType.GetCustomAttributes(
@@ -576,47 +571,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return null;
                 }
 
-                _rendered.Add(contractType);
                 string messageName = SchemaIdentifierFor(
-                    ResolveSchemaName(contractType, (WProtoContractAttribute)contractMarkers[0]),
+                    ResolveContractName(contractType),
                     contractType.Name
                 );
                 _contractNames[contractType] = messageName;
 
-                List<IncludeEntry> includes = CollectIncludes(contractType);
-                List<MemberEntry> members = CollectMembers(contractType, messageName);
-                StringBuilder body = new StringBuilder();
-                body.Append("message ").Append(messageName).Append(" {").Append("\n");
-                AppendReserved(contractType, messageName, body, false);
-                foreach (MemberEntry member in members)
+                Type envelope = contractType;
+                while (
+                    envelope.BaseType != null
+                    && envelope.BaseType.IsDefined(typeof(WProtoContractAttribute), false)
+                )
                 {
-                    string line = RenderField(messageName, member);
-                    if (line != null)
-                    {
-                        body.Append("  ").Append(line).Append("\n");
-                    }
+                    envelope = envelope.BaseType;
                 }
-
-                foreach (IncludeEntry include in includes)
-                {
-                    body.Append("  // Subtype tag ")
-                        .Append(include.Tag.ToString(CultureInfo.InvariantCulture))
-                        .Append(" carries the whole ")
-                        .Append(include.SchemaName)
-                        .Append(" message on the wire.")
-                        .Append("\n");
-                    body.Append("  ")
-                        .Append(include.SchemaName)
-                        .Append(' ')
-                        .Append(FieldName(include.SchemaName))
-                        .Append(" = ")
-                        .Append(include.Tag.ToString(CultureInfo.InvariantCulture))
-                        .Append(";")
-                        .Append("\n");
-                }
-
-                body.Append("}");
-                _blocks[MessageKeyPrefix + messageName] = body.ToString();
+                RenderMessage(envelope, messageName);
                 return messageName;
             }
 
@@ -644,6 +613,60 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return schema.ToString();
             }
 
+            private void RenderMessage(Type contractType, string messageName)
+            {
+                List<IncludeEntry> includes = CollectIncludes(contractType);
+                List<MemberEntry> members = CollectMembers(contractType, messageName);
+                StringBuilder body = new StringBuilder();
+                HashSet<string> fieldNames = new HashSet<string>(StringComparer.Ordinal);
+                body.Append("message ").Append(messageName).Append(" {").Append("\n");
+                AppendReserved(contractType, messageName, body, false, fieldNames);
+                foreach (MemberEntry member in members)
+                {
+                    string line = RenderField(messageName, member);
+                    if (line != null)
+                    {
+                        body.Append("  ").Append(line).Append("\n");
+                        fieldNames.Add(member.SchemaName);
+                    }
+                }
+
+                foreach (IncludeEntry include in includes)
+                {
+                    string fieldName = include.MemberName;
+                    int suffix = 2;
+                    while (!fieldNames.Add(fieldName))
+                    {
+                        fieldName =
+                            include.MemberName + suffix.ToString(CultureInfo.InvariantCulture);
+                        ++suffix;
+                    }
+                    if (!string.Equals(fieldName, include.MemberName, StringComparison.Ordinal))
+                    {
+                        _diagnostics.Add(
+                            $"{messageName}: the field name {include.MemberName} is already in use; renamed to {fieldName}."
+                        );
+                    }
+                    body.Append("  // Subtype tag ")
+                        .Append(include.Tag.ToString(CultureInfo.InvariantCulture))
+                        .Append(" carries the whole ")
+                        .Append(include.SchemaName)
+                        .Append(" message on the wire.")
+                        .Append("\n");
+                    body.Append("  ")
+                        .Append(include.SchemaName)
+                        .Append(' ')
+                        .Append(fieldName)
+                        .Append(" = ")
+                        .Append(include.Tag.ToString(CultureInfo.InvariantCulture))
+                        .Append(";")
+                        .Append("\n");
+                }
+
+                body.Append("}");
+                _blocks[MessageKeyPrefix + messageName] = body.ToString();
+            }
+
             /// <summary>
             /// Writes the contract's <c>[WProtoReserved]</c> declarations as proto3 reservations.
             /// </summary>
@@ -654,6 +677,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             /// Whether the block is an <c>enum</c>, which reserves over a different range than a
             /// message does.
             /// </param>
+            /// <param name="fieldNames">Reserved field identifiers to exclude from include names.</param>
             /// <remarks>
             /// <para>
             /// Without these the exported schema permits, in the consumer's own toolchain, exactly
@@ -672,7 +696,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 Type contractType,
                 string messageName,
                 StringBuilder body,
-                bool forEnum
+                bool forEnum,
+                HashSet<string> fieldNames = null
             )
             {
                 object[] markers = contractType.GetCustomAttributes(
@@ -721,6 +746,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         if (!string.IsNullOrEmpty(name) && IsValidProtoIdentifier(name))
                         {
                             names.Add(name);
+                            if (fieldNames != null)
+                            {
+                                fieldNames.Add(name);
+                            }
                         }
                         else
                         {
@@ -771,6 +800,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             private string RenderField(string ownerName, MemberEntry member)
             {
                 Type memberType = member.MemberType;
+
+                if (TryResolveSurrogate(memberType, out Type surrogateType))
+                {
+                    string surrogateName = TryAddContract(surrogateType);
+                    return surrogateName == null
+                        ? null
+                        : $"{surrogateName} {member.SchemaName} = {member.Tag};";
+                }
 
                 if (RefusedTypes.TryGetValue(memberType, out string refusal))
                 {
@@ -835,15 +872,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return $"{rectName} {member.SchemaName} = {member.Tag};";
                 }
 
-                if (TryResolveSurrogate(memberType, out Type surrogateType))
-                {
-                    string surrogateName = TryAddContract(surrogateType);
-                    if (surrogateName != null)
-                    {
-                        return $"{surrogateName} {member.SchemaName} = {member.Tag};";
-                    }
-                }
-
                 object[] contractMarkers = memberType.GetCustomAttributes(
                     typeof(WProtoContractAttribute),
                     false
@@ -856,13 +884,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 if (TryShapeRepeated(memberType, member, ownerName, out string repeatedType))
                 {
+                    string repetition = repeatedType.StartsWith("map<", StringComparison.Ordinal)
+                        ? string.Empty
+                        : "repeated ";
                     string packingOption =
                         !member.IsPacked
                         && CanPackSchemaElement(GetElementType(memberType))
                         && !TryResolveSurrogate(GetElementType(memberType), out _)
                             ? " [packed = false]"
                             : string.Empty;
-                    return $"repeated {repeatedType} {member.SchemaName} = {member.Tag}{packingOption};";
+                    return $"{repetition}{repeatedType} {member.SchemaName} = {member.Tag}{packingOption};";
                 }
 
                 _diagnostics.Add(
@@ -1102,6 +1133,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             private string TryAddEnum(Type enumType)
             {
+                Type underlying = Enum.GetUnderlyingType(enumType);
+                if (underlying == typeof(uint))
+                {
+                    return "uint32";
+                }
+                if (underlying == typeof(long))
+                {
+                    return "int64";
+                }
+                if (underlying == typeof(ulong))
+                {
+                    return "uint64";
+                }
+
                 if (_enumNames.TryGetValue(enumType, out string known))
                 {
                     return known;
@@ -1293,82 +1338,38 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                     string derivedName = EnsureDerivedMessage(declaration.Value);
                     includes.Add(
-                        new IncludeEntry { Tag = declaration.Key, SchemaName = derivedName }
+                        new IncludeEntry
+                        {
+                            Tag = declaration.Key,
+                            SchemaName = derivedName,
+                            MemberName = FieldName(
+                                SanitizeIdentifier(ResolveContractName(declaration.Value))
+                            ),
+                        }
                     );
                 }
 
                 return includes;
             }
 
-            /// <summary>
-            /// Renders a subtype's message once, whoever asks for it: a base's include, the
-            /// subtype's own listing as a contract, a second base sharing the subtype, or a chain.
-            /// The body carries the subtype's members -- <see cref="CollectMembers"/> walks the
-            /// hierarchy, so that includes the base's -- followed by the subtype's own include
-            /// fields, because a chain writes the deeper tag inside the shallower message.
-            /// </summary>
             private string EnsureDerivedMessage(Type derived)
             {
-                if (
-                    _rendered.Contains(derived)
-                    && _contractNames.TryGetValue(derived, out string known)
-                )
+                if (_payloadNames.TryGetValue(derived, out string known))
                 {
                     return known;
                 }
 
-                string derivedName = SchemaIdentifierFor(
-                    ResolveContractName(derived),
-                    derived.Name
-                );
-                _rendered.Add(derived);
-                _contractNames[derived] = derivedName;
-
-                StringBuilder body = new StringBuilder();
-                body.Append("message ").Append(derivedName).Append(" {").Append("\n");
-                foreach (MemberEntry member in CollectMembers(derived, derivedName))
-                {
-                    string line = RenderField(derivedName, member);
-                    if (line != null)
-                    {
-                        body.Append("  ").Append(line).Append("\n");
-                    }
-                }
-
-                foreach (IncludeEntry nested in CollectIncludes(derived))
-                {
-                    body.Append("  // Subtype tag ")
-                        .Append(nested.Tag.ToString(CultureInfo.InvariantCulture))
-                        .Append(" carries the whole ")
-                        .Append(nested.SchemaName)
-                        .Append(" message on the wire.")
-                        .Append("\n");
-                    body.Append("  ")
-                        .Append(nested.SchemaName)
-                        .Append(' ')
-                        .Append(FieldName(nested.SchemaName))
-                        .Append(" = ")
-                        .Append(nested.Tag.ToString(CultureInfo.InvariantCulture))
-                        .Append(";")
-                        .Append("\n");
-                }
-
-                body.Append("}");
-                _blocks[MessageKeyPrefix + derivedName] = body.ToString();
-                return derivedName;
+                string desired = ResolveContractName(derived) + "Payload";
+                string payloadName = SchemaIdentifierFor(desired, derived.Name + "Payload");
+                _payloadNames[derived] = payloadName;
+                RenderMessage(derived, payloadName);
+                return payloadName;
             }
 
             private List<MemberEntry> CollectMembers(Type contractType, string messageName)
             {
                 List<MemberEntry> members = new List<MemberEntry>();
-                for (
-                    Type current = contractType;
-                    current != null && current != typeof(object);
-                    current = current.BaseType
-                )
-                {
-                    AppendDeclaredMembers(current, messageName, members);
-                }
+                AppendDeclaredMembers(contractType, messageName, members);
 
                 List<MemberEntry> unique = new List<MemberEntry>(members.Count);
                 HashSet<int> seenTags = new HashSet<int>();
@@ -1446,24 +1447,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             private bool TryResolveSurrogate(Type type, out Type surrogateType)
             {
                 return _surrogates.TryGetValue(type, out surrogateType) && surrogateType != null;
-            }
-
-            private string SchemaNameOf(Type contractType)
-            {
-                if (
-                    _contractNames.TryGetValue(contractType, out string rendered)
-                    && rendered != null
-                )
-                {
-                    return rendered;
-                }
-
-                return ResolveContractName(contractType);
-            }
-
-            private string ResolveSchemaName(Type type, WProtoContractAttribute marker)
-            {
-                return string.IsNullOrEmpty(marker.Name) ? ResolveContractName(type) : marker.Name;
             }
 
             private string NextName(string desired)
@@ -1553,7 +1536,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return "fixed64";
                 }
 
-                if (type == typeof(string))
+                if (type == typeof(string) || type == typeof(Uri))
                 {
                     return "string";
                 }
@@ -1616,6 +1599,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int Tag;
             public string SchemaName;
+            public string MemberName;
         }
 
         private sealed class MemberEntry

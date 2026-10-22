@@ -69,6 +69,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             if (!_surrogateFormatter.TryRead(ref reader, out TSurrogate surrogate))
             {
+                reader.MarkMalformed();
                 value = default;
                 return false;
             }

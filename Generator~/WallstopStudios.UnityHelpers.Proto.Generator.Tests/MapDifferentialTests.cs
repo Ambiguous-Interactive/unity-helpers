@@ -780,6 +780,55 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             return restored;
         }
 
+        [TestCase(7, false)]
+        [TestCase(8, true)]
+        public void MapDuplicateValidationSharesEntryBudgetAndRunsHooksOnce(
+            int maximumTags,
+            bool accepted
+        )
+        {
+            int before = HookedContract.AfterDeserializationRuns;
+            WProtoReader reader = new WProtoReader(
+                Parse("0A0A08011202080712020809"),
+                new WProtoReadLimits().WithTotalFieldCount(maximumTags)
+            );
+            Assert.AreEqual(
+                accepted,
+                WProtoFormatterProvider
+                    .Get<HookedMapContract>()
+                    .TryRead(ref reader, out HookedMapContract value)
+            );
+            Assert.AreEqual(accepted ? 1 : 0, HookedContract.AfterDeserializationRuns - before);
+            if (accepted)
+            {
+                Assert.IsTrue(value.ById.TryGetValue(1, out HookedContract child));
+                Assert.AreEqual(9, child.Value);
+                Assert.IsTrue(reader.End);
+            }
+            else
+            {
+                Assert.IsTrue(value == null);
+                Assert.IsTrue(reader.Malformed);
+            }
+        }
+
+        [Test]
+        public void MalformedDuplicateMapCannotContinueAtTheNextRootField()
+        {
+            WProtoReader reader = new WProtoReader(Parse("0A0808011201081201001001"));
+            Assert.IsFalse(
+                WProtoFormatterProvider
+                    .Get<HookedMapContract>()
+                    .TryRead(ref reader, out HookedMapContract value)
+            );
+            Assert.IsTrue(value == null);
+            Assert.AreEqual(2, reader.Remaining);
+            int refusedAt = reader.Position;
+            Assert.IsFalse(reader.TryReadTag(out _, out _));
+            Assert.IsTrue(reader.Malformed);
+            Assert.AreEqual(refusedAt, reader.Position);
+        }
+
         [Test]
         public void RepeatedMessageMapValuesRunDeserializationHooksOnce()
         {

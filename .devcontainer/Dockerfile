@@ -1,11 +1,27 @@
 # Use the .NET devcontainer base image
-FROM mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm
+FROM mcr.microsoft.com/devcontainers/dotnet:2.3.2-9.0-bookworm
 
 # Architecture for downloading binaries (supports amd64 and arm64)
 ARG TARGETARCH=amd64
 
 # Set non-interactive frontend for apt to avoid prompts
 ENV DEBIAN_FRONTEND=noninteractive
+
+# The current devcontainer base trails the supported .NET 9 servicing release.
+ENV DOTNET_SDK_VERSION=9.0.319 DOTNET_VERSION=9.0.21 ASPNET_VERSION=9.0.21
+RUN DOTNET_SDK_VERSION="9.0.319" \
+    && case "${TARGETARCH}" in \
+        amd64) DOTNET_SDK_ARCH="x64" ; DOTNET_SDK_SHA512="ed080b81dd2cca56a453c939468b0061a60a083a87eaf21e035794cd28a14fc00faf52d96a4e4116f3cc1de40e6289cd0f08a8fd478d49e4dc4f28570e2f602c" ;; \
+        arm64) DOTNET_SDK_ARCH="arm64" ; DOTNET_SDK_SHA512="940b056511b078c4ab15318f3a7a6114c57c6c636ab32027e90129e3f8b205236a1c6af794eb35a887d7bf3219ff49522da2cb9f9a6d5d26e390909c25536ed2" ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSL "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${DOTNET_SDK_ARCH}.tar.gz" -o /tmp/dotnet-sdk.tar.gz \
+    && echo "${DOTNET_SDK_SHA512}  /tmp/dotnet-sdk.tar.gz" | sha512sum -c - \
+    && rm -rf /usr/share/dotnet \
+    && mkdir -p /usr/share/dotnet \
+    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
+    && rm -f /tmp/dotnet-sdk.tar.gz \
+    && test "$(dotnet --version)" = "${DOTNET_SDK_VERSION}"
 
 # Fix: Remove the Yarn repository with expired GPG key
 # The base image includes yarn repo, but the GPG key (23E7166788B63E1E) expired.
@@ -64,7 +80,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install fd-find (faster alternative to find) from GitHub releases
 # fd respects .gitignore by default and has intuitive syntax
-RUN FD_VERSION="10.4.2" \
+RUN FD_VERSION="10.5.0" \
     && case "${TARGETARCH}" in \
         amd64) FD_ARCH="x86_64-unknown-linux-gnu" ;; \
         arm64) FD_ARCH="aarch64-unknown-linux-gnu" ;; \
@@ -86,7 +102,7 @@ RUN BAT_VERSION="0.26.1" \
     && chmod +x /usr/local/bin/bat
 
 # Install fzf (fuzzy finder) from GitHub releases
-RUN FZF_VERSION="0.70.0" \
+RUN FZF_VERSION="0.74.5" \
     && case "${TARGETARCH}" in \
         amd64) FZF_ARCH="linux_amd64" ;; \
         arm64) FZF_ARCH="linux_arm64" ;; \
@@ -97,7 +113,7 @@ RUN FZF_VERSION="0.70.0" \
     && chmod +x /usr/local/bin/fzf
 
 # Install delta (better git diff viewer) from GitHub releases
-RUN DELTA_VERSION="0.18.2" \
+RUN DELTA_VERSION="0.20.1" \
     && case "${TARGETARCH}" in \
         amd64) DELTA_ARCH="x86_64-unknown-linux-gnu" ;; \
         arm64) DELTA_ARCH="aarch64-unknown-linux-gnu" ;; \
@@ -108,7 +124,7 @@ RUN DELTA_VERSION="0.18.2" \
     && chmod +x /usr/local/bin/delta
 
 # Install eza (modern replacement for ls, successor to exa) from GitHub releases
-RUN EZA_VERSION="0.23.4" \
+RUN EZA_VERSION="0.23.5" \
     && case "${TARGETARCH}" in \
         amd64) EZA_ARCH="x86_64-unknown-linux-gnu" ;; \
         arm64) EZA_ARCH="aarch64-unknown-linux-gnu" ;; \
@@ -119,7 +135,7 @@ RUN EZA_VERSION="0.23.4" \
     && chmod +x /usr/local/bin/eza
 
 # Install zoxide (smarter cd command) from GitHub releases
-RUN ZOXIDE_VERSION="0.9.9" \
+RUN ZOXIDE_VERSION="0.10.0" \
     && case "${TARGETARCH}" in \
         amd64) ZOXIDE_ARCH="x86_64-unknown-linux-musl" ;; \
         arm64) ZOXIDE_ARCH="aarch64-unknown-linux-musl" ;; \
@@ -130,7 +146,7 @@ RUN ZOXIDE_VERSION="0.9.9" \
     && chmod +x /usr/local/bin/zoxide
 
 # Install yq (YAML processor, like jq for YAML) from GitHub releases
-RUN YQ_VERSION="4.52.4" \
+RUN YQ_VERSION="4.54.1" \
     && case "${TARGETARCH}" in \
         amd64) YQ_ARCH="linux_amd64" ;; \
         arm64) YQ_ARCH="linux_arm64" ;; \
@@ -163,7 +179,7 @@ RUN SD_VERSION="1.1.0" \
     && chmod +x /usr/local/bin/sd
 
 # Install dust (intuitive disk usage, better du) from GitHub releases
-RUN DUST_VERSION="1.2.4" \
+RUN DUST_VERSION="1.2.6" \
     && case "${TARGETARCH}" in \
         amd64) DUST_ARCH="x86_64-unknown-linux-gnu" ;; \
         arm64) DUST_ARCH="aarch64-unknown-linux-gnu" ;; \
@@ -174,7 +190,7 @@ RUN DUST_VERSION="1.2.4" \
     && chmod +x /usr/local/bin/dust
 
 # Install procs (modern replacement for ps) from GitHub releases
-RUN PROCS_VERSION="0.14.11" \
+RUN PROCS_VERSION="0.14.12" \
     && case "${TARGETARCH}" in \
         amd64) PROCS_ARCH="x86_64-linux" ;; \
         arm64) PROCS_ARCH="aarch64-linux" ;; \
@@ -187,6 +203,7 @@ RUN PROCS_VERSION="0.14.11" \
     && install -m 0755 "${PROCS_BIN}" /usr/local/bin/procs \
     && rm -rf /tmp/procs /tmp/procs.zip
 
+# Newer tokei releases publish no binaries; retain the last prebuilt release for both architectures.
 # Install tokei (code statistics) from GitHub releases
 RUN TOKEI_VERSION="12.1.2" \
     && case "${TARGETARCH}" in \
@@ -200,19 +217,19 @@ RUN TOKEI_VERSION="12.1.2" \
 
 # Install lychee (fast link checker) from GitHub releases
 # Version should match lychee-action in .github/workflows/lint-doc-links.yml
-RUN LYCHEE_VERSION="0.23.0" \
+RUN LYCHEE_VERSION="0.24.2" \
     && case "${TARGETARCH}" in \
-        amd64) LYCHEE_ARCH="x86_64-unknown-linux-gnu" ;; \
-        arm64) LYCHEE_ARCH="aarch64-unknown-linux-gnu" ;; \
+        amd64) LYCHEE_ARCH="x86_64-unknown-linux-musl" ;; \
+        arm64) LYCHEE_ARCH="aarch64-unknown-linux-musl" ;; \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
     && curl -fsSL "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-${LYCHEE_ARCH}.tar.gz" \
-    | tar -xz -C /usr/local/bin lychee \
+    | tar -xz --strip-components=1 -C /usr/local/bin "lychee-${LYCHEE_ARCH}/lychee" \
     && chmod +x /usr/local/bin/lychee
 
 # Install actionlint (GitHub Actions workflow linter) from GitHub releases
 # https://github.com/rhysd/actionlint - validates workflow syntax and detects common errors
-RUN ACTIONLINT_VERSION="1.7.11" \
+RUN ACTIONLINT_VERSION="1.7.12" \
     && case "${TARGETARCH}" in \
         amd64) ACTIONLINT_ARCH="linux_amd64" ;; \
         arm64) ACTIONLINT_ARCH="linux_arm64" ;; \
@@ -242,10 +259,10 @@ RUN command -v fd >/dev/null \
 COPY .devcontainer/requirements-tools.txt /tmp/requirements-tools.txt
 
 # Install PowerShell from GitHub releases to support both amd64 and arm64.
-RUN POWERSHELL_VERSION="7.5.3" \
+RUN POWERSHELL_VERSION="7.6.7" \
     && case "${TARGETARCH}" in \
-        amd64) POWERSHELL_ARCH="x64" ; POWERSHELL_SHA256="5C74E0BBAFD8BE59E72267F05700FD6615344D9CF4D30460D9B6D12CD4A88A8C" ;; \
-        arm64) POWERSHELL_ARCH="arm64" ; POWERSHELL_SHA256="4A6B656DD0E751E82C5DF9B9A4245BD1EC7D21DE5334AFBBD802DFD009595599" ;; \
+        amd64) POWERSHELL_ARCH="x64" ; POWERSHELL_SHA256="6896f9e3a6b0a354bf470835a96da76d2f801cd50dcf047ad7c4563bf93bf431" ;; \
+        arm64) POWERSHELL_ARCH="arm64" ; POWERSHELL_SHA256="ba465efdfb0984c1c5dc5ed9eb0b79a7e91a1b52c45f99377058c0659b84d3f1" ;; \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
     && curl -fsSL "https://github.com/PowerShell/PowerShell/releases/download/v${POWERSHELL_VERSION}/powershell-${POWERSHELL_VERSION}-linux-${POWERSHELL_ARCH}.tar.gz" -o /tmp/powershell.tar.gz \
@@ -274,19 +291,19 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
     python3-pip \
     python3-venv \
     && python3 -m venv /opt/python-tools \
-    && /opt/python-tools/bin/pip install --no-cache-dir "uv==0.12.10" \
+    && /opt/python-tools/bin/pip install --no-cache-dir "uv==0.13.4" \
     && /opt/python-tools/bin/uv pip install --python /opt/python-tools/bin/python --no-cache --requirement /tmp/requirements-tools.txt \
     && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \
-        /opt/python-tools/bin/uv tool install "mcp-server-git==2026.8.18" \
+        /opt/python-tools/bin/uv tool install "mcp-server-git==2026.10.19" \
     && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \
-        /opt/python-tools/bin/uv tool install "mcp-server-fetch==2026.8.18" \
+        /opt/python-tools/bin/uv tool install "mcp-server-fetch==2026.10.19" \
     && test -x /opt/python-tools/bin/uv \
     && ln -sf /opt/python-tools/bin/uv /usr/local/bin/uv \
     && test -x /usr/local/bin/mcp-server-git \
     && test -x /usr/local/bin/mcp-server-fetch \
     && ln -sf /opt/python-tools/bin/yamllint /usr/local/bin/yamllint \
     && git lfs install \
-    && npm install -g npm@10.9.2 \
+    && npm install -g npm@12.2.1 \
     && rm -f /tmp/requirements-tools.txt \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -308,7 +325,7 @@ RUN mkdir -p /home/vscode/.npm \
 
 # Install CSharpier as a global .NET tool for the vscode user
 USER vscode
-RUN dotnet tool install -g csharpier --version 1.2.6
+RUN dotnet tool install -g csharpier --version 1.3.0
 
 # Point npm's global prefix at a user-owned directory so `npm install -g` works
 # without sudo for the vscode user (npm docs: "resolving EACCES permissions
@@ -321,7 +338,7 @@ RUN npm config set prefix "${HOME}/.local"
 # built/rebuilt image has them even before post-create runs. post-create.sh and
 # post-start.sh refresh these to the latest versions, so this layer is a fast
 # offline-safe baseline rather than the source of truth.
-RUN npm install -g --no-fund --no-audit \
+RUN npm install -g --no-fund --no-audit --allow-scripts=opencode-ai \
     "@openai/codex@latest" \
     "opencode-ai@latest" \
     "@nanocollective/nanocoder@latest" \

@@ -24,6 +24,15 @@ and test doubles remain included. Each scope accepts files only from its corresp
 These commands retain source generators and compiler errors but omit performance analyzers.
 Run the normal applicable typecheck commands and changed-file preflight before publishing.
 
+The analyzer placement check evaluates MSBuild compiler inputs for each owned .NET project with
+both protobuf oracle settings. Each shipped analyzer must appear exactly once at its package
+path. Normal assembly references, including the compiler compatibility test reference, do not
+count as compiler inputs. Run it with `node scripts/tests/test-analyzer-placement.js`.
+
+The WProto compatibility inventory checks referenced enum values independently of source file
+order. Its regression compiles both declaration orders and requires the same inventory, including
+the enum underlying type and constants. Preserve the frozen inventory when fixing its collector.
+
 ### GitHub Credentials in the Container
 
 The container resolves github.com credentials from a cached token. The Dev Containers credential
@@ -54,6 +63,11 @@ The dev container includes these additional tools that are **not required** on y
 - **shellcheck**: Shell script linter
 - **yamllint**: YAML linter
 - **lychee**: Fast link checker
+
+The container also installs the coding agent CLIs at startup. With npm 12, the installer
+allows the OpenCode and Claude install scripts by package name, then checks that each
+launcher responds to `--version`. It repairs a broken launcher even when its package is
+already current. Registry failures remain nonfatal and are reported in the startup log.
 
 ### Required Tools (All Environments)
 
@@ -98,8 +112,11 @@ refused because they hide member names. Size and reference-identity queries rema
 The positive controls require plain, escaped, formatted and interpolated calls to be found.
 Separate sources exercise format characters without an ordinary spelling that could mask a prefilter regression.
 
-Stack-allocation and memory-access checks use the existing Roslyn policy tool and require .NET SDK 9.0.306.
-Repo Lint installs that SDK before running the checks. The compiler resolves constants and the actual length symbol;
+Stack-allocation and memory-access checks use the existing Roslyn policy tool and require .NET SDK 9.0.319.
+CI installs that SDK into an isolated runner directory and verifies the selected version.
+A newer SDK preinstalled on the runner cannot override the declared compiler.
+
+The compiler resolves constants and the actual length symbol;
 parameters, locals, readonly fields and properties cannot borrow an unrelated constant's name.
 Constant expressions and shared constants remain supported. The scan covers conditional branches
 and follows the declarations and base types used by a bound to include their conditional symbols.
@@ -124,7 +141,7 @@ write failures fail validation; an execution failure cannot be mistaken for a cl
 
 ## Python Tooling
 
-Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.12.10` and
+Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.13.4` and
 exposes it as `uv`. Documentation CI installs that same version with pip, then installs the
 fully pinned `requirements-docs.lock` with uv. `requirements-docs.txt` lists the direct
 constraints; the lock records their transitive versions. Run locally with:
@@ -235,6 +252,14 @@ matrix or provide performance measurements.
   Unsupported options such as `--files` fail before any mutation.
   Trailing paths require `-Paths`; prefix filenames starting with a hyphen with `./`, or use
   an absolute path. With no path arguments, preflight checks the changed-file set.
+  A failed required Git query stops preflight with Git's status and diagnostic. Initial index
+  queries run before any fixes.
+  Explicit selections use literal Git path scopes for their safety checks and known generated
+  outputs. Fixes must resolve inside the repository; linked targets keep partial-staging
+  protection. A linked destination that resolves to the repository root is refused before tools start. Changed destinations outside the checked scope and hard links with unknown
+  destinations fail before writing. Metadata recovery checks every staged source and its parent/file companions,
+  including sources outside the selected validation list. With no explicit selection, discovery
+  still covers the whole repository.
 - Enforce EOL/encoding: `npm run eol:check`
 - Lint GitHub Actions: `actionlint`
 - Verify Markdown/code links: `npm run lint:doc-links` (cross-platform wrapper that locates PowerShell automatically)

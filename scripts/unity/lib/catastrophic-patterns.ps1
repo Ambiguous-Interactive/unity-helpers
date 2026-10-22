@@ -42,27 +42,53 @@ function Get-CatastrophicPatterns {
     )
 }
 
+function Get-NativeReportSummary {
+    param([string]$LogPath)
+    $summary = [ordered]@{
+        State = 'missing-log'; NativeReportHeaderCount = 0; UnknownNativeConditionCount = 0
+        NativeReportHeaderLines = @(); UnknownNativeConditionLines = @(); LocationsTruncated = $false
+    }
+    if ([string]::IsNullOrWhiteSpace($LogPath) -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return $summary }
+    try {
+        $lineNumber = 0
+        foreach ($line in [IO.File]::ReadLines($LogPath)) {
+            ++$lineNumber
+            if (0 -le $line.IndexOf('Native Crash Reporting', [StringComparison]::OrdinalIgnoreCase)) {
+                ++$summary.NativeReportHeaderCount
+                if ($summary.NativeReportHeaderLines.Count -lt 8) { $summary.NativeReportHeaderLines += $lineNumber }
+                else { $summary.LocationsTruncated = $true }
+            }
+            if (0 -le $line.IndexOf('Got a UNKNOWN while executing native code', [StringComparison]::OrdinalIgnoreCase)) {
+                ++$summary.UnknownNativeConditionCount
+                if ($summary.UnknownNativeConditionLines.Count -lt 8) { $summary.UnknownNativeConditionLines += $lineNumber }
+                else { $summary.LocationsTruncated = $true }
+            }
+        }
+        $summary.State = 'observed'
+    } catch { $summary.State = 'unreadable-log' }
+    return $summary
+}
+
+
 # ENVIRONMENT WARNING PATTERNS: a Unity leg can pass every test and still be sick.
 #
 # Measured on run 33365150391 (issue #657): the runner's copy of
 # Unity.Licensing.Client.exe failed its own signature check, Unity logged
 # "LicensingClient has failed validation; ignoring" and carried on, so the suite ran
 # and every test passed -- and the leg then failed forty minutes later at
-# return-unity-license with "return-missing-positive-evidence", because there was no
-# licensing client left to report a return through. The cause is visible in the
-# editor log's first seconds and nothing was reading it.
+# return-unity-license with "return-missing-positive-evidence". Later runs observed
+# the same signature warning followed by confirmed cleanup. Report the observed
+# log message; the final cleanup receipt determines cleanup health.
 #
-# These are WARNINGS, never errors: the run is not wrong, the machine is, and reddening
-# a green suite on a host-level fault would be a worse trade than a slow diagnosis.
-# The point is that the next occurrence is named in the job summary instead of costing
-# an hour of log archaeology.
+# Keep these as WARNINGS. Preserve the observations in the job summary without
+# changing test acceptance or predicting the independent cleanup result.
 function Get-EnvironmentWarningPatterns {
     [CmdletBinding()]
     param()
 
     return @(
-        @{ Label = 'Licensing client failed signature validation (host fault; the seat cannot be returned and the leg will fail at return-unity-license -- issue #657)'; Pattern = 'while verifying Licensing Client signature'; UseSimple = $true }
-        @{ Label = 'Licensing client ignored after failing validation (host fault; see issue #657)'; Pattern = 'LicensingClient has failed validation'; UseSimple = $true }
-        @{ Label = 'Licensing IPC channel absent (the License Client never started on this runner -- issue #657)'; Pattern = 'failed because channel doesn''t exist'; UseSimple = $true }
+        @{ Label = 'Licensing client signature validation failed (issue #657; final cleanup is evaluated separately)'; Pattern = 'while verifying Licensing Client signature'; UseSimple = $true }
+        @{ Label = 'Licensing client ignored after failing validation (issue #657)'; Pattern = 'LicensingClient has failed validation'; UseSimple = $true }
+        @{ Label = 'Licensing IPC channel absent at connection attempt (issue #657)'; Pattern = 'failed because channel doesn''t exist'; UseSimple = $true }
     )
 }

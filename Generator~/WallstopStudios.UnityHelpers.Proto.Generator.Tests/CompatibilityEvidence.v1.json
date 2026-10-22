@@ -1,0 +1,158 @@
+{
+  "formatVersion": 1,
+  "contractInventory": "CompatibilityInventory.v1.json",
+  "baselineSourceRevision": "5b0252856a814f9bb6d87ecb4a37287da52125e2",
+  "umbrella": "https://github.com/Ambiguous-Interactive/unity-helpers/issues/343",
+  "correctnessAndPerformance": "https://github.com/Ambiguous-Interactive/unity-helpers/issues/647",
+  "writerVersions": [
+    "protobuf-net 2.4.9",
+    "protobuf-net 3.2.56",
+    "WProto at baselineSourceRevision"
+  ],
+  "backendEvidence": {
+    "CoreCLR": "Executable host witnesses, rerun separately against each pinned oracle; not Mono performance acceptance.",
+    "MonoFloor": "Unqualified by this ledger.",
+    "MonoLatest": "Unqualified by this ledger.",
+    "IL2CPP": "Unqualified by this ledger.",
+    "WebGLBrowser": "Unqualified by this ledger."
+  },
+  "scopeLimitations": [
+    "baselineSourceRevision records the original wire metadata and writer evidence. The expanded public source API inventory covers production declarations at 86ad85a3068e420ccef63b1bd08a60d3469e7921, retains all 1,150 original inventory records, and uses WALLSTOP_PROTO and UNITY_5_3_OR_NEWER. This expansion adds no backend or capability qualification.",
+    "The message-merge copy allowance API extends the 2,373-record inventory after source revision 4a7aaa2e: seven records add MaximumMessageMergeCopyBytes and WithMessageMergeCopyBytes while retaining every prior record. These additions were reviewed as an uncommitted candidate; matching source/build receipts identify execution evidence. No backend or performance qualification is added.",
+    "Inventory covers Runtime source contracts and Tests/Runtime/Serialization/ConsumerMigration declarations with WALLSTOP_PROTO and UNITY_5_3_OR_NEWER.",
+    "Metadata and signatures are frozen, not arbitrary constructor/hook/formatter implementation bodies or runtime model registrations.",
+    "Capability witnesses are a curated initial set, not complete coverage of every advertised capability.",
+    "Shiro, DoxReloaded and IshoBoy full deployments, native-process faults, allocation/retention/code-size qualification and Mono throughput remain separate release gates.",
+    "Several package-shape witnesses compare reader results by oracle re-encoding; this ledger does not upgrade those checks to independent semantic assertions."
+  ],
+  "capabilities": [
+    {
+      "id": "ReadonlySurrogates",
+      "classification": "identical-bytes",
+      "witness": "PackageContractShapeTests.ReadonlySurrogatedMembersEncodeAsTheOracleEncodesThem",
+      "claim": "Both oracles and WProto write identical field bytes for retained readonly geometry shapes.",
+      "readerDirections": ["legacy-write/current-read", "current-write/legacy-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "GenericRanges",
+      "classification": "identical-bytes",
+      "witness": "PackageContractShapeTests.EveryRangeClosureEncodesAsTheOracleEncodesIt",
+      "claim": "Closed generic range contracts retain field numbers and scalar omission.",
+      "readerDirections": ["legacy-write/current-read", "current-write/legacy-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "NullablePresence",
+      "classification": "identical-bytes",
+      "witness": "PackageContractShapeTests.ANullableShapeEncodesAsTheOracleEncodesIt",
+      "claim": "Nullable wrappers retain absence versus present default.",
+      "readerDirections": ["legacy-write/current-read", "current-write/legacy-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "PackedListCompatibility",
+      "classification": "readable-alternate",
+      "witness": "PackageContractShapeTests.AListShapedContractInteroperatesInBothDirections",
+      "claim": "WProto packs scalar lists; the legacy writer need not pack. Matching output bytes are not required.",
+      "readerDirections": ["legacy-write/current-read", "current-write/legacy-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "SubtypeRootEncoding",
+      "classification": "identical-bytes",
+      "witness": "PackageContractShapeTests.ASubtypeEncodesTheSameUnderItsOwnDeclaredTypeAsUnderItsBase",
+      "claim": "Declared leaf and base encode through the same subtype envelope.",
+      "readerDirections": ["legacy-write/current-read", "current-write/legacy-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "LegacyWrapperRead",
+      "classification": "readable-alternate",
+      "witness": "RootMarshalTests.TheMarshalReadsWhatTheShippedWrapperPathWrote",
+      "claim": "Root marshal reads the legacy wrapper contract; member encoding remains separate.",
+      "readerDirections": ["legacy-write/current-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "LegacyWrapperRollback",
+      "classification": "readable-alternate",
+      "witness": "RootMarshalTests.TheOracleDecodesWhatTheMarshalWrote",
+      "claim": "Legacy oracle reads the generated root marshal payload.",
+      "readerDirections": ["current-write/legacy-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "RetainedConsumerGolden",
+      "classification": "identical-bytes",
+      "witness": "WProtoConsumerMigrationTests.CombinedMigrationReadsRetainedGoldenBytes",
+      "claim": "Retained runtime-model migration payloads combine generic identifiers, inheritance, surrogate values, and explicit defaults. These are representative shapes, not complete consumer deployments.",
+      "readerDirections": ["retained-golden/current-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "RuntimeModelDefaults",
+      "classification": "identical-bytes",
+      "witness": "RuntimeModelConsumerMigrationTests.RuntimeDefaultsHaveGoldenBytesAndAChangedDefaultIsDetectable",
+      "claim": "Explicit default migration has literal goldens and a changed-default control.",
+      "readerDirections": ["retained-golden/current-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "MixedPackedRuns",
+      "classification": "readable-alternate",
+      "witness": "PackingOptOutTests.UnpackedEnumWritePolicyReadsMixedRuns",
+      "claim": "An unpacked writer policy accepts interleaved packed and unpacked enum runs.",
+      "readerDirections": ["alternate-encoding/current-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "V2StructMapOraclePreparation",
+      "classification": "known-oracle-defect",
+      "witness": "MapDifferentialTests.AValueEqualToItsDefaultIsOmittedFromTheEntry",
+      "claim": "The v2 model cannot reliably prepare a struct-valued map after model freezing. Its retained 12020807 golden is decoded directly; v3 uses the live oracle. This is not a claim that v2 execution passed for that shape.",
+      "readerDirections": ["v2-retained-golden/current-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "CorruptFacadeDoesNotFallback",
+      "classification": "behavior",
+      "witness": "FacadeTests.ACorruptPayloadIsReportedRatherThanHandedBackToProtobufNet",
+      "claim": "A served corrupt payload throws from WProtoFacade.TryDeserialize; false means no serving formatter.",
+      "readerDirections": ["malformed-input/refusal"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "FormatterReplacement",
+      "classification": "behavior",
+      "witness": "RootMarshalTests.RegisterAfterGenericResolutionReplacesTheCachedFormatter",
+      "claim": "Replacing a formatter after generic resolution changes subsequent operations.",
+      "readerDirections": ["registration/measurement"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "V3MapWriterPolicy",
+      "classification": "readable-alternate",
+      "witness": "MapDifferentialTests.EnumDoubleMapMatchesPinnedV3Bytes",
+      "claim": "Zero enum key with zero double value writes 32020800. v2 writes 320B0800110000000000000000; both readers accept current output.",
+      "readerDirections": ["current-write/legacy-read"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "PartialDeclarationRequired",
+      "classification": "unsupported",
+      "witness": "DiagnosticTests.ANonPartialContractIsAnError",
+      "claim": "Source generation requires partial contract declarations; the diagnostic remains a named regression.",
+      "readerDirections": ["source-declaration/diagnostic"],
+      "oracles": ["v2", "v3"]
+    },
+    {
+      "id": "NestedGenericContainerUnsupported",
+      "classification": "unsupported",
+      "witness": "DiagnosticTests.AContractNestedInsideAGenericTypeIsARefusalToo",
+      "claim": "A contract nested inside a generic containing type is refused with a diagnostic.",
+      "readerDirections": ["source-declaration/diagnostic"],
+      "oracles": ["v2", "v3"]
+    }
+  ]
+}

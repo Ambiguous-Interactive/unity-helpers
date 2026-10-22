@@ -1,0 +1,52 @@
+[
+  {
+    "Id": "001",
+    "Solved": 1,
+    "ProgressJson": "{\"Id\":\"001\",\"Moves\":[{\"MoveIndex\":902,\"source\":{\"configuration\":{\"type\":\"Solid\",\"direction\":\"None\"},\"disableCount\":0,\"preventedByNext\":false,\"preventedByFollow\":false,\"mustUseByFollow\":false,\"mustUseByNext\":false},\"sourceLocation\":{\"x\":2,\"y\":4},\"interactionLocation\":null}],\"LevelAvailability\":\"Solved\",\"TotalMovesTried\":1,\"MoveHashes\":[7499666778938972168]}"
+  },
+  {
+    "Id": "002",
+    "Solved": 0,
+    "ProgressJson": "{\"Id\":\"002\",\"Moves\":[],\"LevelAvailability\":\"Available\",\"TotalMovesTried\":0,\"MoveHashes\":[]}"
+  },
+  {
+    "Id": "003",
+    "Solved": 0,
+    "ProgressJson": "{\"Id\":\"003\",\"Moves\":[],\"LevelAvailability\":\"Available\",\"TotalMovesTried\":0,\"MoveHashes\":[]}"
+  },
+  {
+    "Id": "004",
+    "Solved": 0,
+    "ProgressJson": "{\"Id\":\"004\",\"Moves\":[],\"LevelAvailability\":\"Available\",\"TotalMovesTried\":0,\"MoveHashes\":[]}"
+  },
+  {
+    "Id": "005",
+    "Solved": 0,
+    "ProgressJson": "{\"Id\":\"005\",\"Moves\":[],\"LevelAvailability\":\"Available\",\"TotalMovesTried\":0,\"MoveHashes\":[]}"
+  },
+  {
+    "Id": "006",
+    "Solved": 0,
+    "ProgressJson": "{\"Id\":\"006\",\"Moves\":[],\"LevelAvailability\":\"Foreshadowed\",\"TotalMovesTried\":0,\"MoveHashes\":[]}"
+  },
+  {
+    "Id": "007",
+    "Solved": 0,
+    "ProgressJson": "{\"Id\":\"007\",\"Moves\":[],\"LevelAvailability\":\"Foreshadowed\",\"TotalMovesTried\":0,\"MoveHashes\":[]}"
+  },
+  {
+    "Id": "008",
+    "Solved": 0,
+    "ProgressJson": "{\"Id\":\"008\",\"Moves\":[],\"LevelAvailability\":\"Foreshadowed\",\"TotalMovesTried\":0,\"MoveHashes\":[]}"
+  },
+  {
+    "Id": "009",
+    "Solved": 0,
+    "ProgressJson": "{\"Id\":\"009\",\"Moves\":[],\"LevelAvailability\":\"Foreshadowed\",\"TotalMovesTried\":0,\"MoveHashes\":[]}"
+  },
+  {
+    "Id": "010",
+    "Solved": 0,
+    "ProgressJson": "{\"Id\":\"010\",\"Moves\":[],\"LevelAvailability\":\"Foreshadowed\",\"TotalMovesTried\":0,\"MoveHashes\":[]}"
+  }
+]

@@ -1,16 +1,21 @@
 #!/usr/bin/env pwsh
+# lint-pwsh-invocations: allow-subprocess-pwsh -- Verify library dependencies without inherited runner functions.
 [CmdletBinding()]
 param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+& ([Environment]::ProcessPath) -NoProfile -File (Join-Path $PSScriptRoot 'test-wproto-replay-dependencies.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'Fresh-process WProto replay dependency controls failed.' }
+. (Join-Path $PSScriptRoot '../unity/lib/test-result-evidence.ps1')
+. (Join-Path $PSScriptRoot '../unity/lib/wproto-player-provenance.ps1')
 $runner = Join-Path $PSScriptRoot '../unity/run-ci-tests.ps1'
 $source = Get-Content -LiteralPath $runner -Raw
 $tokens = $null
 $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($source, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count -ne 0) { throw 'Unity runner must parse.' }
-foreach ($name in @('Assert-FrozenPlayerRegularPath', 'Get-FrozenPlayerFileInventory', 'Read-FrozenPlayerDeclaration', 'Start-FrozenPlayerProvenance',
-        'New-FrozenPlayerAnchor', 'Get-FrozenPlayerRuntimeJoin', 'Add-FrozenPlayerProvenanceSnapshot', 'Get-FrozenPlayerJointCorrectness', 'Complete-FrozenPlayerProvenance', 'Invoke-StandaloneTestPlayer')) {
+foreach ($name in @('Read-FrozenPlayerDeclaration', 'Start-FrozenPlayerProvenance',
+        'New-FrozenPlayerAnchor', 'New-WProtoBuildPreparationSource', 'Get-FrozenPlayerRuntimeJoin', 'Add-FrozenPlayerProvenanceSnapshot', 'Get-FrozenPlayerJointCorrectness', 'Complete-FrozenPlayerProvenance', 'Invoke-StandaloneTestPlayer')) {
     $function = $ast.Find({ param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
         }, $true)
@@ -55,12 +60,17 @@ function Read-ControlDeclaration {
     Read-FrozenPlayerDeclaration -Path $Fixture.Path -Mode standalone -UnityVersion '6000.6.0f1' -Backend Mono2x -ArtifactsPath $Fixture.Root -RepoRoot $Fixture.Root
 }
 function Start-ControlContext {
-    param($Fixture)
+    param($Fixture, [switch]$TransientSettings)
     $declaration = Read-ControlDeclaration $Fixture
     $context = Start-FrozenPlayerProvenance -Declaration $declaration -RepoRoot $Fixture.Root -PayloadRoot $Fixture.Payload
     if ($null -ne $declaration.CanonicalCorpus) { New-FrozenPlayerAnchor -Context $context -ProjectPath (Join-Path $Fixture.Root 'generated project') }
+    if ($TransientSettings) { [IO.File]::WriteAllText((Join-Path $context.GeneratedRoot 'ProjectSettings/ProjectSettings.asset'), $script:stablePlayerSettings) }
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'before-configure'
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'after-configure'
+    if ($declaration.CampaignKind -ceq 'wproto-seven-families-v1') {
+        $preparation = New-ControlBuildPreparation $context -TransientSettings:$TransientSettings
+        [IO.File]::WriteAllText((Join-Path $declaration.ReportDirectory 'build-preparation.json'), (ConvertTo-Json -InputObject $preparation -Depth 12))
+    }
     Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'after-build' -IncludePayload
     return $context
 }
@@ -108,7 +118,128 @@ function Write-RuntimeRecords {
     $lines = if ($CorrectnessFirst) { @($correctness, $preflight) } else { @($preflight, $correctness) }
     [IO.File]::WriteAllText($Path, ($lines -join "`n") + "`n")
 }
+function New-WProtoFixture {
+    param([string]$RunId)
+    $fixture = New-CanonicalFixture $RunId
+    foreach ($directory in @('Runtime/Protobuf-Net', 'Editor', 'Tests', 'Generator~', 'scripts/unity/lib', '.github/workflows', 'generated project/Assets/Editor', 'generated project/Packages', 'generated project/ProjectSettings')) {
+        $null = New-Item -ItemType Directory -Path (Join-Path $fixture.Root $directory) -Force
+    }
+    foreach ($relative in @('package.json', '.github/unity-versions.json', '.github/workflows/unity-tests.yml',
+            'scripts/unity/run-ci-tests.ps1', 'scripts/unity/run-acceptance.ps1', 'scripts/unity/verify-acceptance.ps1',
+            'scripts/unity/verify-wproto-corpus.js', 'scripts/unity/wproto-corpus.v1.json',
+            'scripts/unity/lib/wproto-player-provenance.ps1', 'scripts/unity/lib/wproto-player-provenance.ps1.meta',
+            'generated project/Packages/manifest.json', 'generated project/ProjectSettings/ProjectSettings.asset')) {
+        [IO.File]::WriteAllText((Join-Path $fixture.Root $relative), 'controlled ' + $relative)
+    }
+    $managed = Join-Path $fixture.Payload 'Player_Data/Managed'
+    $null = New-Item -ItemType Directory -Path $managed -Force
+    foreach ($name in @('protobuf-net', 'protobuf-net.Core')) {
+        $bytes = [Text.Encoding]::UTF8.GetBytes('controlled oracle ' + $name)
+        [IO.File]::WriteAllBytes((Join-Path $fixture.Root "Runtime/Protobuf-Net/$name.dll"), $bytes)
+        [IO.File]::WriteAllBytes((Join-Path $managed "$name.dll"), $bytes)
+    }
+    $fixture.Manifest.CampaignKind = 'wproto-seven-families-v1'
+    $fixture.Manifest.SourceCommit = '1' * 40
+    $fixture.Manifest.SourceFiles = @(Get-WProtoPlayerSourceFiles -Repository $fixture.Root)
+    $fixture.Manifest.CanonicalCorpusPath = 'scripts/unity/wproto-corpus.v1.json'
+    $fixture.Manifest.CorpusFiles = @(@{ Path = $fixture.Manifest.CanonicalCorpusPath; Sha256 = (Get-FileHash -LiteralPath (Join-Path $fixture.Root $fixture.Manifest.CanonicalCorpusPath)).Hash.ToLowerInvariant() })
+    [IO.File]::WriteAllText($fixture.Path, (ConvertTo-Json -InputObject $fixture.Manifest -Depth 8))
+    return $fixture
+}
+$stablePlayerSettings = @'
+%YAML 1.1
+PlayerSettings:
+  companyName: preserved
+  runInBackground: 0
+  fullscreenMode: 1
+  resizableWindow: 0
+  m_ShowUnitySplashScreen: 1
+  m_ShowUnitySplashLogo: 1
+  aotOptions:
+  managedCodeVariant:
+    Standalone: 3
+'@
+$preparedPlayerSettings = @'
+%YAML 1.1
+PlayerSettings:
+  companyName: preserved
+  runInBackground: 1
+  fullscreenMode: 3
+  resizableWindow: 1
+  m_ShowUnitySplashScreen: 0
+  m_ShowUnitySplashLogo: 0
+  aotOptions:
+  managedCodeVariant:
+    Standalone: 3
+'@
+$stablePlayerSettings = $stablePlayerSettings.Replace('  aotOptions:', '  aotOptions: ')
+$preparedPlayerSettings = $preparedPlayerSettings.Replace('  aotOptions:', '  aotOptions: ')
+function New-ControlBuildPreparation {
+    param($Context, [switch]$TransientSettings)
+    $scene = 'Assets/InitTestScene01234567-89ab-cdef-0123-456789abcdef.unity'
+    foreach ($relative in @($scene, ($scene + '.meta'), 'ProjectSettings/SceneTemplateSettings.json', 'ProjectSettings/UnityHelpersSettings.asset')) {
+        $path = Join-Path $Context.GeneratedRoot $relative
+        if (-not (Test-Path -LiteralPath $path)) { [IO.File]::WriteAllText($path, 'generated ' + $relative) }
+    }
+    $settingsPath = Join-Path $Context.GeneratedRoot 'ProjectSettings/ProjectSettings.asset'
+    if ($TransientSettings) {
+        [IO.File]::WriteAllText($settingsPath, $script:preparedPlayerSettings)
+        [IO.File]::Copy($settingsPath, (Join-Path $Context.Declaration.ReportDirectory 'build-player-settings.asset'))
+    }
+    $preparation = [pscustomobject][ordered]@{
+        SchemaVersion = $(if ($TransientSettings) { 2 } else { 1 }); RunId = $Context.Declaration.Value.RunId; DeclarationSha256 = $Context.Declaration.Sha256
+        SourceCommit = $Context.Declaration.Value.SourceCommit
+        Scenes = @($scene, 'Packages/com.wallstop-studios.unity-helpers/Tests/Runtime/Scenes/Test1.unity')
+        ProjectInputs = @(Get-WProtoProjectInputs -ProjectPath $Context.GeneratedRoot)
+    }
+    if ($TransientSettings) { [IO.File]::WriteAllText($settingsPath, $script:stablePlayerSettings) }
+    return $preparation
+}
+function Write-WProtoResults {
+    param([string]$Path, [switch]$OmitLast, [switch]$Duplicate, [string]$Result = 'Passed')
+    $names = @(Get-WProtoFrozenOperationNames)
+    if ($OmitLast) { $names = $names[0..8] }
+    if ($Duplicate) { $names[9] = $names[0] }
+    $leaves = ($names | ForEach-Object {
+            $name = [Security.SecurityElement]::Escape('WallstopStudios.UnityHelpers.Tests.Runtime.Performance.ProtoSerializationPerformanceTests.CompareFrozenSevenFamilyCorpus("' + $_ + '")')
+            "<test-case fullname=`"$name`" result=`"$Result`"/>"
+        }) -join ''
+    $count = $names.Count
+    $passed = if ($Result -eq 'Passed') { $count } else { 0 }
+    $skipped = $count - $passed
+    [IO.File]::WriteAllText($Path, "<test-run result=`"Passed`" testcasecount=`"$count`" total=`"$count`" passed=`"$passed`" failed=`"0`" skipped=`"$skipped`" inconclusive=`"0`">$leaves</test-run>")
+}
+function New-WProtoSummary {
+    param($Context)
+    $records = [ordered]@{}
+    foreach ($operation in @(Get-WProtoFrozenOperationNames)) {
+        $oracles = @(foreach ($name in @('protobuf-net', 'protobuf-net.Core')) {
+                $file = @($Context.Declaration.Value.SourceFiles | Where-Object { $_.Path -ceq "Runtime/Protobuf-Net/$name.dll" })
+                [pscustomobject]@{ Name = $name; Version = '3.2.56.0'; Sha256 = $file[0].Sha256 }
+            })
+        $records[$operation] = [pscustomobject]@{
+            SchemaVersion = 1; FrozenRunId = $Context.Declaration.Value.RunId; FrozenDeclarationSha256 = $Context.Declaration.Sha256
+            FrozenCorpusSha256 = $Context.Declaration.CanonicalCorpus.Sha256; SourceCommit = $Context.Declaration.Value.SourceCommit
+            RuntimeIdentity = [pscustomobject]@{ UnityVersion = '6000.6.0f1'; Backend = 'Mono'; Platform = 'WindowsPlayer'; ProcessBits = 64; IsEditor = $false; DevelopmentBuild = $false; WallstopProto = $true }
+            OracleAssemblies = $oracles
+        }
+    }
+    return [pscustomobject]@{ schemaVersion = 1; corpusVersion = 'wproto-seven-families-v1'; scope = 'synthetic-timing-only'; strictRecordValidity = $true; timingQualified = $true; timingTwofoldTarget = $true; runtimeRecords = [pscustomobject]$records }
+}
+
 try {
+    foreach ($backend in @('Mono2x', 'IL2CPP')) {
+        $fixture = New-WProtoFixture ('build-only-backend-' + $backend)
+        $fixture.Manifest.Backend = $backend
+        [IO.File]::WriteAllText($fixture.Path, (ConvertTo-Json -InputObject $fixture.Manifest -Depth 8))
+        $declaration = Read-FrozenPlayerDeclaration -Path $fixture.Path -Mode standalone -UnityVersion '6000.6.0f1' -Backend $backend -ArtifactsPath $fixture.Root -RepoRoot $fixture.Root -BuildCaptureOnly
+        Assert-Control ($declaration.Value.Backend -ceq $backend -and $declaration.CampaignKind -ceq 'wproto-seven-families-v1') "Explicit build-only capture retains backend $backend"
+        if ($backend -ceq 'IL2CPP') {
+            Assert-Rejected { Read-FrozenPlayerDeclaration -Path $fixture.Path -Mode standalone -UnityVersion '6000.6.0f1' -Backend $backend -ArtifactsPath $fixture.Root -RepoRoot $fixture.Root } 'Ordinary WProto admission still refuses IL2CPP' 'explicit IL2CPP build-only capture'
+            Assert-Rejected { Read-FrozenPlayerDeclaration -Path $fixture.Path -Mode standalone -UnityVersion '6000.6.0f1' -Backend $backend -ArtifactsPath $fixture.Root -RepoRoot $fixture.Root -BuildCaptureOnly:$false } 'False build-only flag cannot admit IL2CPP' 'explicit IL2CPP build-only capture'
+        }
+    }
+    Assert-Control ($source.Contains('-BuildCaptureOnly:($StandaloneBuildCapture -ne ''None'')')) 'The existing declaration read derives build-only authority from the actual diagnostic mode'
     $originalAllocatorDiagnostics = $env:UH_NATIVE_ALLOCATOR_DIAGNOSTICS
     function Invoke-ProcessWithTreeKillTimeout {
         param($FilePath, $Arguments, $TimeoutSeconds, $LogPath, $Label)
@@ -418,6 +549,300 @@ try {
     $report = Get-Content -LiteralPath $frozenPlayerProvenance.ReportPath -Raw | ConvertFrom-Json
     Assert-Control ($report.ExecutionError.Contains('original synthetic startup failure') -and -not $report.InvocationObserved -and
         $report.JointCorrectness.State -eq 'rejected' -and $report.EvidenceFiles.Count -eq 4) 'real lifecycle retains failure evidence without claiming native invocation'
+    # The parser's numerical/JSON controls run in its own ordinary Node suite. These
+    # controls replace only that external process boundary, retaining real provenance joins.
+    # Model the observed UTF scene/meta and deferred settings additions before the build.
+    $preparationFixture = New-WProtoFixture 'preparation-transition'
+    $preparationContext = Start-ControlContext $preparationFixture
+    $configuredInputs = $preparationContext.Snapshots[1].ProjectInputs
+    $builtInputs = $preparationContext.Snapshots[2].ProjectInputs
+    $preparationJson = Get-Content -LiteralPath (Join-Path $preparationContext.Declaration.ReportDirectory 'build-preparation.json') -Raw
+    $preparation = $preparationJson | ConvertFrom-Json
+    Assert-WProtoBuildPreparation -Preparation $preparation -ConfiguredInputs $configuredInputs -BuiltInputs $builtInputs `
+        -Declaration $preparationContext.Declaration.Value -DeclarationSha256 $preparationContext.Declaration.Sha256
+    Assert-Control ($builtInputs.Count -eq $configuredInputs.Count + 4) 'the observed four preparation additions are admitted before the build'
+    foreach ($preexisting in @('ProjectSettings/UnityHelpersSettings.asset', 'ProjectSettings/SceneTemplateSettings.json', 'both')) {
+        $settings = @($builtInputs | Where-Object {
+                $_.Path -ceq $preexisting -or ($preexisting -eq 'both' -and $_.Path -in @('ProjectSettings/UnityHelpersSettings.asset', 'ProjectSettings/SceneTemplateSettings.json'))
+            })
+        Assert-WProtoBuildPreparation -Preparation $preparation -ConfiguredInputs @($configuredInputs + $settings) -BuiltInputs $builtInputs `
+            -Declaration $preparationContext.Declaration.Value -DeclarationSha256 $preparationContext.Declaration.Sha256
+        Assert-Control $true "already materialized $preexisting settings remain frozen"
+    }
+    $transientFixture = New-WProtoFixture 'transient-settings-transition'
+    $transientContext = Start-ControlContext $transientFixture -TransientSettings
+    Assert-Control ($transientContext.Snapshots[2].State -ceq 'passed') 'version2 admits actual prepared settings followed by exact restoration'
+
+    $stableSettingsPath = Join-Path $transientContext.GeneratedRoot 'ProjectSettings/ProjectSettings.asset'
+    $preparedSettingsPath = Join-Path $transientContext.Declaration.ReportDirectory 'build-player-settings.asset'
+    foreach ($settingsBackend in @('Mono2x', 'IL2CPP')) {
+        foreach ($settingCase in @('lf', 'crlf', 'bom', 'floor', 'wrong-prepared-variant', 'configured-checked', 'unrelated', 'restored-change',
+                'duplicate-key', 'missing-key', 'malformed-key', 'changed-line-endings', 'oversized', 'empty', 'invalid-utf8',
+                'prepared-hash', 'prepared-length', 'restored-hash', 'prepared-kind', 'missing-prepared', 'missing-restored',
+                'late-source', 'late-scene', 'wrong-run', 'wrong-version', 'wrong-backend', 'invalid-backend', 'missing-backend',
+                'other-map', 'other-map-change', 'other-managed-target', 'duplicate-variant', 'duplicate-empty-variant',
+                'duplicate-malformed-standalone', 'missing-variant', 'malformed-variant')) {
+            $recipeV2 = $transientContext.BuildPreparation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+            $configuredV2 = $transientContext.Snapshots[1].ProjectInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+            $builtV2 = $transientContext.Snapshots[2].ProjectInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+            $declarationV2 = $transientContext.Declaration.Value | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+            $declarationV2.Backend = $settingsBackend
+            $stableText = $stablePlayerSettings.Replace("`r`n", "`n")
+            $preparedText = $preparedPlayerSettings.Replace("`r`n", "`n")
+            $preparedVariant = if ($settingsBackend -ceq 'IL2CPP' -and $settingCase -cne 'floor') { '1' } else { '3' }
+            $preparedText = $preparedText.Replace('    Standalone: 3', "    Standalone: $preparedVariant")
+            switch ($settingCase) {
+                'crlf' { $stableText = $stableText.Replace("`n", "`r`n"); $preparedText = $preparedText.Replace("`n", "`r`n") }
+                'bom' { $stableText = [char]0xfeff + $stableText; $preparedText = [char]0xfeff + $preparedText }
+                'floor' { $declarationV2.UnityVersion = '2021.3.45f1'; $preparedText = $preparedText.Replace('  aotOptions: ', '  aotOptions: nimt-trampolines=1024') }
+                'wrong-prepared-variant' { $wrongVariant = if ($preparedVariant -ceq '1') { '3' } else { '1' }; $preparedText = $preparedText.Replace("    Standalone: $preparedVariant", "    Standalone: $wrongVariant") }
+                'configured-checked' { $stableText = $stableText.Replace('    Standalone: 3', '    Standalone: 1'); $preparedText = $preparedText.Replace('    Standalone: 3', '    Standalone: 1') }
+                'unrelated' { $preparedText = $preparedText.Replace('companyName: preserved', 'companyName: changed') }
+                'restored-change' { $stableText = $stableText.Replace('companyName: preserved', 'companyName: changed') }
+                'duplicate-key' { $stableText += "`n  runInBackground: 0"; $preparedText += "`n  runInBackground: 1" }
+                'missing-key' { $stableText = $stableText.Replace("  resizableWindow: 0`n", ''); $preparedText = $preparedText.Replace("  resizableWindow: 1`n", '') }
+                'malformed-key' { $stableText = $stableText.Replace('runInBackground: 0', 'runInBackground: false') }
+                'changed-line-endings' { $preparedText = $preparedText.Replace("`n", "`r`n") }
+                'oversized' { $preparedText = 'x' * 1048577 }
+                'empty' { $preparedText = '' }
+                'wrong-run' { $recipeV2.RunId = 'other' }
+                'wrong-version' { $declarationV2.UnityVersion = 'invalid' }
+                'wrong-backend' { $declarationV2.Backend = if ($settingsBackend -ceq 'IL2CPP') { 'Mono2x' } else { 'IL2CPP' } }
+                'invalid-backend' { $declarationV2.Backend = 'unknown' }
+                'missing-backend' { $declarationV2.PSObject.Properties.Remove('Backend') }
+                'other-map' { $stableText += "`n  scriptingBackend:`n    Standalone: 3`n"; $preparedText += "`n  scriptingBackend:`n    Standalone: 3`n" }
+                'other-map-change' { $stableText += "`n  scriptingBackend:`n    Standalone: 3`n"; $preparedText += "`n  scriptingBackend:`n    Standalone: 1`n" }
+                'duplicate-variant' { $stableText += "`n  managedCodeVariant:`n    Standalone: 3`n"; $preparedText += "`n  managedCodeVariant:`n    Standalone: $preparedVariant`n" }
+                'duplicate-empty-variant' { $stableText += "`n  managedCodeVariant: {}`n"; $preparedText += "`n  managedCodeVariant: {}`n" }
+                'duplicate-malformed-standalone' { $stableText += "`n    Standalone: Release`n"; $preparedText += "`n    Standalone: Release`n" }
+                'other-managed-target' { $stableText += "`n    Android: 3`n"; $preparedText += "`n    Android: 3`n" }
+                'missing-variant' { $stableText = $stableText.Replace("  managedCodeVariant:`n    Standalone: 3", '  managedCodeVariant: {}'); $preparedText = $preparedText.Replace("  managedCodeVariant:`n    Standalone: $preparedVariant", '  managedCodeVariant: {}') }
+                'malformed-variant' { $stableText = $stableText.Replace('    Standalone: 3', '    Standalone: Release') }
+            }
+            [IO.File]::WriteAllText($stableSettingsPath, $stableText)
+            [IO.File]::WriteAllText($preparedSettingsPath, $preparedText)
+            if ($settingCase -eq 'invalid-utf8') { [IO.File]::WriteAllBytes($stableSettingsPath, [byte[]]@(0xff, 0xfe, 0xff)) }
+            foreach ($entry in @($configuredV2 + $builtV2 | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' })) {
+                $entry.Length = (Get-Item -LiteralPath $stableSettingsPath).Length
+                $entry.Sha256 = (Get-FileHash -LiteralPath $stableSettingsPath).Hash.ToLowerInvariant()
+            }
+            $preparedEntry = $recipeV2.ProjectInputs | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' }
+            $preparedEntry.Length = (Get-Item -LiteralPath $preparedSettingsPath).Length
+            $preparedEntry.Sha256 = (Get-FileHash -LiteralPath $preparedSettingsPath).Hash.ToLowerInvariant()
+            switch ($settingCase) {
+                'prepared-hash' { $preparedEntry.Sha256 = '0' * 64 }
+                'prepared-length' { $preparedEntry.Length++ }
+                'restored-hash' { ($configuredV2 | Where-Object { $_.Path -ceq 'ProjectSettings/ProjectSettings.asset' }).Sha256 = '0' * 64 }
+                'prepared-kind' { $preparedEntry.Kind = 'directory'; $preparedEntry.Length = $null; $preparedEntry.Sha256 = $null }
+                'missing-prepared' { Remove-Item -LiteralPath $preparedSettingsPath }
+                'missing-restored' { Remove-Item -LiteralPath $stableSettingsPath }
+                'late-source' { $builtV2 += [pscustomobject]@{ Path = 'Assets/late.cs'; Kind = 'file'; Length = 1; Sha256 = 'a' * 64 } }
+                'late-scene' { ($builtV2 | Where-Object { $_.Path -ceq $recipeV2.Scenes[0] }).Sha256 = '0' * 64 }
+            }
+            $verifySettings = {
+                Assert-WProtoBuildPreparation -Preparation $recipeV2 -ConfiguredInputs $configuredV2 -BuiltInputs $builtV2 `
+                    -Declaration $declarationV2 -DeclarationSha256 $transientContext.Declaration.Sha256 `
+                    -RestoredPlayerSettingsPath $stableSettingsPath -PreparedPlayerSettingsPath $preparedSettingsPath
+            }
+            if ($settingCase -in @('lf', 'crlf', 'bom', 'floor', 'other-map', 'other-managed-target')) {
+                & $verifySettings
+                Assert-Control $true "version2 admits exact $settingsBackend/$settingCase framework transition"
+            } else {
+                Assert-Rejected $verifySettings "version2 rejects $settingsBackend/$settingCase prepared settings"
+            }
+        }
+    }
+
+    foreach ($mutation in @('missing', 'schema', 'schema-string', 'run', 'declaration', 'commit', 'scene-scalar', 'scene-duplicate',
+            'scene-unreferenced', 'scene-path', 'scene-missing', 'scene-second', 'scene-guid', 'meta-missing', 'old-changed', 'old-removed',
+            'unknown-source', 'unknown-asmdef', 'unknown-response', 'unknown-meta', 'new-directory', 'duplicate', 'case-collision', 'path-traversal',
+            'negative-length', 'string-length', 'bad-hash', 'directory-length', 'late-change', 'late-addition', 'late-removal')) {
+        $changed = $preparationJson | ConvertFrom-Json
+        $built = $builtInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $oldPath = 'ProjectSettings/ProjectSettings.asset'
+        $scenePath = $changed.Scenes[0]
+        switch ($mutation) {
+            'missing' { $changed = $null }
+            'schema' { $changed.SchemaVersion = 3 }
+            'schema-string' { $changed.SchemaVersion = '1' }
+            'run' { $changed.RunId = 'other' }
+            'declaration' { $changed.DeclarationSha256 = '0' * 64 }
+            'commit' { $changed.SourceCommit = '0' * 40 }
+            'scene-scalar' { $changed.Scenes = $scenePath }
+            'scene-duplicate' { $changed.Scenes += $scenePath }
+            'scene-unreferenced' { $changed.Scenes = @($changed.Scenes[1]) }
+            'scene-path' { $changed.Scenes[0] = '../Assets/scene.unity' }
+            'scene-missing' { $changed.ProjectInputs = @($changed.ProjectInputs | Where-Object { $_.Path -cne $scenePath }) }
+            'scene-second' { $entry = $changed.ProjectInputs | Where-Object { $_.Path -ceq $scenePath }; $extra = $entry | ConvertTo-Json | ConvertFrom-Json; $extra.Path = $scenePath.Replace('01234567-', '11234567-'); $changed.ProjectInputs += $extra }
+            'scene-guid' { ($changed.ProjectInputs | Where-Object { $_.Path -ceq $scenePath }).Path = 'Assets/InitTestScenenot-a-guid.unity' }
+            'meta-missing' { $changed.ProjectInputs = @($changed.ProjectInputs | Where-Object { $_.Path -cne ($scenePath + '.meta') }) }
+            'old-changed' { ($changed.ProjectInputs | Where-Object { $_.Path -ceq $oldPath }).Sha256 = '0' * 64 }
+            'old-removed' { $changed.ProjectInputs = @($changed.ProjectInputs | Where-Object { $_.Path -cne $oldPath }) }
+            { $_ -in @('unknown-source', 'unknown-asmdef', 'unknown-response', 'unknown-meta') } {
+                $extension = @{ 'unknown-source' = 'cs'; 'unknown-asmdef' = 'asmdef'; 'unknown-response' = 'rsp'; 'unknown-meta' = 'meta' }[$mutation]
+                $changed.ProjectInputs += [pscustomobject]@{ Path = "Assets/unexpected.$extension"; Kind = 'file'; Length = 1; Sha256 = 'a' * 64 }
+            }
+            'new-directory' { $changed.ProjectInputs += [pscustomobject]@{ Path = 'Assets/new'; Kind = 'directory'; Length = $null; Sha256 = $null } }
+            'duplicate' { $changed.ProjectInputs += $changed.ProjectInputs[0] }
+            'case-collision' { $extra = $changed.ProjectInputs[0] | ConvertTo-Json | ConvertFrom-Json; $extra.Path = $extra.Path.ToUpperInvariant(); $changed.ProjectInputs += $extra }
+            'path-traversal' { $changed.ProjectInputs[0].Path = 'Assets/../changed.cs' }
+            'negative-length' { ($changed.ProjectInputs | Where-Object { $_.Path -ceq $oldPath }).Length = -1 }
+            'string-length' { ($changed.ProjectInputs | Where-Object { $_.Path -ceq $oldPath }).Length = '1' }
+            'bad-hash' { ($changed.ProjectInputs | Where-Object { $_.Path -ceq $oldPath }).Sha256 = 'bad' }
+            'directory-length' { ($changed.ProjectInputs | Where-Object { $_.Kind -ceq 'directory' } | Select-Object -First 1).Length = 0 }
+            'late-change' { ($built | Where-Object { $_.Path -ceq $scenePath }).Sha256 = '0' * 64 }
+            'late-addition' { $built += [pscustomobject]@{ Path = 'Assets/late.cs'; Kind = 'file'; Length = 1; Sha256 = 'a' * 64 } }
+            'late-removal' { $built = @($built | Where-Object { $_.Path -cne $oldPath }) }
+        }
+        if ($null -ne $changed -and -not $mutation.StartsWith('late-')) {
+            $built = $changed.ProjectInputs | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        }
+        Assert-Rejected { Assert-WProtoBuildPreparation -Preparation $changed -ConfiguredInputs $configuredInputs -BuiltInputs $built `
+                -Declaration $preparationContext.Declaration.Value -DeclarationSha256 $preparationContext.Declaration.Sha256 } "build preparation rejects $mutation"
+    }
+
+    $realCorpusInvoker = ${function:Invoke-WProtoCorpusVerifier}
+    function Invoke-WProtoCorpusVerifier { param($Repository, $PlayerLogPath, $Commit, $UnityVersion) return $script:wprotoSummary }
+    try {
+        foreach ($mutation in @('none', 'transient-settings', 'unstable', 'upm-support', 'unavailable-capture', 'truncated-capture', 'upm-fault', 'timeout', 'nonzero', 'build-exit', 'configure-exit', 'configure-retry',
+                'execution-error', 'missing-stage', 'reordered-stage', 'missing-case', 'duplicate-case', 'skip-case',
+                'late-preparation', 'late-prepared-settings', 'wrong-run', 'wrong-declaration', 'wrong-corpus', 'wrong-commit', 'host-runtime', 'il2cpp-runtime', 'editor', 'development',
+                'missing-define', 'fault-header', 'fault-pattern', 'configure-dump', 'build-dump', 'string-launch', 'array-invocation', 'wrong-oracle', 'missing-oracle', 'wrong-oracle-payload', 'missing-operation', 'bad-records')) {
+            $fixture = New-WProtoFixture ('wproto-' + $mutation)
+            $context = Start-ControlContext $fixture -TransientSettings:($mutation -in @('transient-settings', 'late-prepared-settings'))
+            Add-FrozenPlayerProvenanceSnapshot -Context $context -Stage 'before-launch' -IncludePayload
+            $context.LaunchAttempted = $true
+            $context.InvocationObserved = $true
+            $context.ResultsValidated = $true
+            $context.PlayerOutcome = @{ ExitCode = 0; TimedOut = $false }
+            $context.BuildOutcome = @{ ExitCode = 0; TimedOut = $false }
+            $context.ConfigureOutcomes.Add([pscustomobject]@{ State = 'observed'; ReturnedExitCode = 0; RawExitCode = 0; ExitOrigin = 'process-exit'; KillReason = ''; ExceptionType = ''; NativeEvidence = @{ State = 'no-files-at-capture'; FileLimitReached = $false; Files = @() } })
+            $context.BuildObservation = [pscustomobject]@{ State = 'observed'; ReturnedExitCode = 0; RawExitCode = 0; ExitOrigin = 'process-exit'; KillReason = ''; ExceptionType = ''; NativeEvidence = @{ State = 'no-files-at-capture'; FileLimitReached = $false; Files = @() } }
+            $configureLog = Join-Path $fixture.Root 'configure.log'
+            $buildLog = Join-Path $fixture.Root 'build.log'
+            [IO.File]::WriteAllText($configureLog, 'Clean synthetic configure')
+            [IO.File]::WriteAllText($buildLog, 'Clean synthetic build')
+            $results = Join-Path $fixture.Root 'wproto-results.xml'
+            Write-WProtoResults $results
+            $log = Join-Path $fixture.Root 'wproto-player.log'
+            [IO.File]::WriteAllText($log, "Support path /private/source`r`nWPROTO_CORPUS_UNKNOWN retain malformed records too`r`nWPROTO_CORPUS_RUNTIME synthetic parser boundary")
+            $script:wprotoSummary = New-WProtoSummary $context
+            if ($mutation -in @('upm-support', 'upm-fault', 'truncated-capture')) {
+                $upm = Join-Path $fixture.Root 'upm.log'
+                $upmText = if ($mutation -eq 'upm-fault') { 'Native Crash Reporting' } else { 'Healthy synthetic UPM support log' }
+                [IO.File]::WriteAllText($upm, $upmText)
+                $artifact = 'native-' + ('a' * 32) + '-1.txt'
+                $context.BuildObservation.NativeEvidence = @{
+                    State = 'files-observed'; FileLimitReached = $false; UpmLogPath = $upm; UpmTextArtifact = $artifact
+                    Files = @(@{ RelativePath = 'upm.log'; HashState = 'observed'; Sha256 = (Get-FileHash -LiteralPath $upm -Algorithm SHA256).Hash.ToLowerInvariant()
+                            Length = (Get-Item -LiteralPath $upm).Length; TextTruncated = ($mutation -eq 'truncated-capture'); TextArtifact = $artifact })
+                }
+            }
+            $first = $script:wprotoSummary.runtimeRecords.'read-memory'
+            switch ($mutation) {
+                'unstable' { $script:wprotoSummary.timingQualified = $false; $script:wprotoSummary.timingTwofoldTarget = $false }
+                'unavailable-capture' { $context.BuildObservation.NativeEvidence.State = 'capture-unavailable' }
+                'timeout' { $context.PlayerOutcome = @{ ExitCode = 124; TimedOut = $true } }
+                'nonzero' { $context.PlayerOutcome.ExitCode = -1073741819 }
+                'build-exit' { $context.BuildOutcome.ExitCode = 255 }
+                'configure-exit' { $context.ConfigureOutcomes[0].RawExitCode = 255 }
+                'configure-retry' { $context.ConfigureOutcomes.Add($context.ConfigureOutcomes[0]) }
+                'execution-error' { $context.ExecutionError = 'synthetic earlier failure' }
+                'missing-stage' { $context.Snapshots.RemoveAt(0) }
+                'reordered-stage' { $context.Snapshots[0].Stage = 'after-configure'; $context.Snapshots[1].Stage = 'before-configure' }
+                'missing-case' { Write-WProtoResults $results -OmitLast }
+                'duplicate-case' { Write-WProtoResults $results -Duplicate }
+                'skip-case' { Write-WProtoResults $results -Result 'Skipped' }
+                'late-preparation' { [IO.File]::AppendAllText((Join-Path $context.Declaration.ReportDirectory 'build-preparation.json'), ' ') }
+                'late-prepared-settings' { [IO.File]::AppendAllText((Join-Path $context.Declaration.ReportDirectory 'build-player-settings.asset'), ' ') }
+                'wrong-run' { $first.FrozenRunId = 'another-run' }
+                'wrong-declaration' { $first.FrozenDeclarationSha256 = '0' * 64 }
+                'wrong-corpus' { $first.FrozenCorpusSha256 = '0' * 64 }
+                'wrong-commit' { $first.SourceCommit = '0' * 40 }
+                'host-runtime' { $first.RuntimeIdentity.Backend = '.NET' }
+                'il2cpp-runtime' { $first.RuntimeIdentity.Backend = 'IL2CPP' }
+                'editor' { $first.RuntimeIdentity.IsEditor = $true }
+                'development' { $first.RuntimeIdentity.DevelopmentBuild = $true }
+                'missing-define' { $first.RuntimeIdentity.WallstopProto = $false }
+                'fault-header' { [IO.File]::AppendAllText($log, "`nNative Crash Reporting`n") }
+                'fault-pattern' { [IO.File]::AppendAllText($buildLog, "`nfatal error in the mono runtime`n") }
+                'configure-dump' { $context.ConfigureOutcomes[0].NativeEvidence.Files = @(@{ RelativePath = 'crash.dmp' }) }
+                'build-dump' { $context.BuildObservation.NativeEvidence.Files = @(@{ RelativePath = 'crash.dmp' }) }
+                'string-launch' { $context.LaunchAttempted = 'false' }
+                'array-invocation' { $context.InvocationObserved = @($true) }
+                'wrong-oracle' { $first.OracleAssemblies[0].Sha256 = '0' * 64 }
+                'missing-oracle' { $first.OracleAssemblies = @($first.OracleAssemblies[0]) }
+                'wrong-oracle-payload' { [IO.File]::WriteAllText((Join-Path $fixture.Payload 'Player_Data/Managed/protobuf-net.dll'), 'changed') }
+                'missing-operation' { $script:wprotoSummary.runtimeRecords.PSObject.Properties.Remove('write-public') }
+                'bad-records' { $script:wprotoSummary.strictRecordValidity = $false }
+            }
+            if ($mutation -in @('none', 'transient-settings', 'unstable', 'upm-support')) {
+                Complete-FrozenPlayerProvenance -Context $context -ResultsPath $results -EvidencePaths @($results, $log, $configureLog, $buildLog) -PlayerLogPath $log
+                $report = Get-Content -LiteralPath $context.ReportPath -Raw | ConvertFrom-Json
+                Assert-Control ($report.CapturedEvidenceValid -and -not $report.AdoptionEligible -and -not $report.FullQualification) "valid $mutation WProto capture remains scoped"
+                Assert-Control ($report.SyntheticTimingQualified -eq ($mutation -ne 'unstable')) "WProto $mutation timing state is independent of capture validity"
+                Remove-Item -LiteralPath $context.GeneratedRoot -Recurse -Force
+                Remove-Item -LiteralPath $context.PayloadRoot -Recurse -Force
+                $readback = Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1'
+                Assert-Control ($readback.strictRecordValidity -and $readback.timingQualified -eq ($mutation -ne 'unstable')) 'retained source/build bytes support readback after original project cleanup'
+                [IO.File]::WriteAllText($log, 'Redacted support log')
+                $null = Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1'
+                $retainedRecords = [IO.File]::ReadAllText((Join-Path $context.Declaration.ReportDirectory 'retained/corpus-records.txt'))
+                Assert-Control ($retainedRecords -ceq "WPROTO_CORPUS_UNKNOWN retain malformed records too`r`nWPROTO_CORPUS_RUNTIME synthetic parser boundary") 'retention preserves every marker line and original line endings, including unknown records'
+                $tamperPaths = @('corpus-records.txt', 'results.xml', 'build-preparation.json', 'player/Player_Data/Managed/protobuf-net.dll', 'project-inputs/ProjectSettings/ProjectSettings.asset', 'project-inputs/Assets/FrozenPlayerAnchor/ProtoSerializationPerformanceTests.Anchor.cs')
+                if ($mutation -ceq 'transient-settings') { $tamperPaths += 'build-player-settings.asset' }
+                foreach ($relative in $tamperPaths) {
+                    $retainedPath = Join-Path (Join-Path $context.Declaration.ReportDirectory 'retained') $relative
+                    $original = [IO.File]::ReadAllBytes($retainedPath)
+                    [IO.File]::WriteAllText($retainedPath, 'changed retained bytes')
+                    Assert-Rejected { Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1' } "reject changed retained $relative"
+                    [IO.File]::WriteAllBytes($retainedPath, $original)
+                }
+                if ($mutation -in @('none', 'transient-settings')) {
+                    $reportBytes = [IO.File]::ReadAllBytes($context.ReportPath)
+                    try {
+                        foreach ($change in @('declaration', 'source-hash', 'source-missing', 'source-duplicate', 'corpus-hash', 'anchor-hash', 'project-inputs', 'payload', 'early-payload')) {
+                            $changed = [Text.Encoding]::UTF8.GetString($reportBytes) | ConvertFrom-Json
+                            switch ($change) {
+                                'declaration' { $changed.Snapshots[1].DeclarationSha256 = '0' * 64 }
+                                'source-hash' { $changed.Snapshots[1].SourceFiles[0].Sha256 = '0' * 64 }
+                                'source-missing' { $changed.Snapshots[1].SourceFiles = @($changed.Snapshots[1].SourceFiles | Select-Object -Skip 1) }
+                                'source-duplicate' { $changed.Snapshots[1].SourceFiles[1] = $changed.Snapshots[1].SourceFiles[0] }
+                                'corpus-hash' { $changed.Snapshots[4].CorpusFiles[0].Sha256 = '0' * 64 }
+                                'anchor-hash' { $changed.Snapshots[0].GeneratedAnchorFiles[0].Sha256 = '0' * 64 }
+                                'project-inputs' { $changed.Snapshots[3].ProjectInputs = @() }
+                                'payload' { $changed.Snapshots[4].PayloadFiles = @() }
+                                'early-payload' { $changed.Snapshots[0].PayloadFiles = $changed.Snapshots[2].PayloadFiles }
+                            }
+                            [IO.File]::WriteAllText($context.ReportPath, (ConvertTo-Json -InputObject $changed -Depth 32))
+                            Assert-Rejected { Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $context.Declaration.ReportDirectory -Commit ('1' * 40) -UnityVersion '6000.6.0f1' } "reject altered snapshot $change" 'WProto snapshot'
+                        }
+                    } finally { [IO.File]::WriteAllBytes($context.ReportPath, $reportBytes) }
+                }
+                $relocated = Join-Path $fixture.Root 'relocated-report'
+                Move-Item -LiteralPath $context.Declaration.ReportDirectory -Destination $relocated
+                $null = Assert-WProtoPlayerProvenance -Repository $fixture.Root -Directory $relocated -Commit ('1' * 40) -UnityVersion '6000.6.0f1'
+                Assert-Control $true 'relative retained evidence survives report-directory relocation'
+            } else {
+                Assert-Rejected { Complete-FrozenPlayerProvenance -Context $context -ResultsPath $results -EvidencePaths @($results, $log, $configureLog, $buildLog) -PlayerLogPath $log } "WProto provenance rejects $mutation"
+                $report = Get-Content -LiteralPath $context.ReportPath -Raw | ConvertFrom-Json
+                Assert-Control (-not $report.CapturedEvidenceValid -and -not $report.SyntheticTimingQualified) "rejected $mutation retains nonqualifying report"
+            }
+        }
+        foreach ($mutation in @('unknown-kind', 'array-kind', 'non-mono', 'missing-source', 'new-source', 'wrong-canonical')) {
+            $fixture = New-WProtoFixture ('declaration-' + $mutation)
+            switch ($mutation) {
+                'unknown-kind' { $fixture.Manifest.CampaignKind = 'unknown' }
+                'array-kind' { $fixture.Manifest.CampaignKind = @('wproto-seven-families-v1') }
+                'non-mono' { $fixture.Manifest.Backend = 'IL2CPP' }
+                'missing-source' { $fixture.Manifest.SourceFiles = @($fixture.Manifest.SourceFiles | Select-Object -Skip 1) }
+                'new-source' { [IO.File]::WriteAllText((Join-Path $fixture.Root 'Runtime/new.cs'), 'new authored input') }
+                'wrong-canonical' { $fixture.Manifest.CanonicalCorpusPath = 'corpus.json' }
+            }
+            [IO.File]::WriteAllText($fixture.Path, (ConvertTo-Json -InputObject $fixture.Manifest -Depth 8))
+            Assert-Rejected { Read-ControlDeclaration $fixture } "WProto declaration rejects $mutation"
+        }
+    } finally { ${function:Invoke-WProtoCorpusVerifier} = $realCorpusInvoker }
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force
 }

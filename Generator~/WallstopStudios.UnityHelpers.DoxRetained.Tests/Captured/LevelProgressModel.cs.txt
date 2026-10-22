@@ -1,0 +1,52 @@
+#if UNITY_WEBGL && !UNITY_EDITOR
+#define WEB_STUFF
+#endif
+
+namespace Data.Persistence.Models
+{
+    using System;
+    using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using PreserveAttribute = UnityEngine.Scripting.PreserveAttribute;
+    using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
+#if !WEB_STUFF
+    using SQLite;
+#endif
+
+    [Serializable]
+    [WProtoContract]
+    [Preserve]
+    public sealed partial class LevelProgressModel
+    {
+#if !WEB_STUFF
+        [PrimaryKey]
+#endif
+        [WProtoMember(1)]
+        [Preserve]
+        public string Id { get; set; }
+
+        [WProtoMember(2)]
+        [Preserve]
+        public bool Solved { get; set; }
+
+        [WProtoMember(3)]
+        [Preserve]
+        public string ProgressJson { get; set; }
+
+        [Preserve]
+        public LevelProgressModel() { }
+
+        [Preserve]
+        public LevelProgressModel(LevelProgress progress)
+        {
+            Id = progress.Id;
+            Solved = progress.LevelAvailability == LevelAvailability.Solved;
+            ProgressJson = progress.ToJson();
+        }
+
+        public LevelProgress ToLevelProgress()
+        {
+            return Serializer.JsonDeserialize<LevelProgress>(ProgressJson);
+        }
+    }
+}

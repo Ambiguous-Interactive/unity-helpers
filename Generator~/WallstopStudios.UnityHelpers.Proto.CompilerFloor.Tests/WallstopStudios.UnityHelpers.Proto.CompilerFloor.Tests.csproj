@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <NetStandardReferenceDirectory>$(NetCoreTargetingPackRoot)/NETStandard.Library.Ref/2.1.0/ref/netstandard2.1</NetStandardReferenceDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference
+      Include="../WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj"
+      ReferenceOutputAssembly="false"
+    />
+    <Reference Include="WallstopStudios.UnityHelpers.Proto.Generator">
+      <HintPath>../../Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll</HintPath>
+    </Reference>
+    <None
+      Include="../WallstopStudios.UnityHelpers.TypeCheck/bin/$(Configuration)/netstandard2.1/WallstopStudios.UnityHelpers.TypeCheck.dll"
+      Link="CompilerReferences/WallstopStudios.UnityHelpers.TypeCheck.dll"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+    <None
+      Include="$(NetStandardReferenceDirectory)/*.dll"
+      Link="NetStandardReferences/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.8.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="6.3.1" />
+  </ItemGroup>
+  <Target Name="RequireNetStandardReferences" BeforeTargets="PrepareForBuild">
+    <Error
+      Condition="!Exists('$(NetStandardReferenceDirectory)/netstandard.dll')"
+      Text="The pinned .NET Standard 2.1.0 reference pack is required for compiler-floor tests."
+    />
+  </Target>
+</Project>

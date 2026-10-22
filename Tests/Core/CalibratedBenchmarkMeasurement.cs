@@ -7,9 +7,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
     using System.IO;
+    using System.Runtime.InteropServices;
     using System.Text;
     using System.Text.Json;
+#if UNITY_5_3_OR_NEWER
     using UnityEngine;
+#endif
 
     /// <summary>Immutable raw timings and reproducible paired bootstrap statistics.</summary>
     public sealed class CalibratedBenchmarkMeasurement
@@ -246,10 +249,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
         private static ReadOnlyDictionary<string, string> CaptureEnvironment()
         {
-#if ENABLE_IL2CPP
-            const string backend = "IL2CPP";
+#if UNITY_5_3_OR_NEWER
+            string unityVersion = Application.unityVersion;
+            string buildConfiguration = Debug.isDebugBuild ? "Development" : "Release";
+            string operatingSystem = SystemInfo.operatingSystem;
+            string cpu = SystemInfo.processorType;
+            string platform = Application.platform.ToString();
+            string isEditor = Application.isEditor.ToString();
 #else
-            const string backend = "Mono";
+            const string unityVersion = "not-unity";
+#if DEBUG
+            const string buildConfiguration = "Debug";
+#else
+            const string buildConfiguration = "Release";
+#endif
+            string operatingSystem = RuntimeInformation.OSDescription;
+            const string cpu = "unknown";
+            const string platform = "non-Unity";
+            string isEditor = bool.FalseString;
 #endif
             return new ReadOnlyDictionary<string, string>(
                 new Dictionary<string, string>
@@ -257,18 +274,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     ["commit"] = Environment.GetEnvironmentVariable("UH_PERF_COMMIT") ?? "unknown",
                     ["baseCommit"] =
                         Environment.GetEnvironmentVariable("UH_PERF_BASE_COMMIT") ?? "unknown",
-                    ["unityVersion"] = Application.unityVersion,
-                    ["backend"] = backend,
+                    ["unityVersion"] = unityVersion,
+                    ["backend"] = BenchmarkRuntimeIdentity.Backend,
+                    ["frameworkDescription"] = RuntimeInformation.FrameworkDescription,
                     ["codeGeneration"] =
                         Environment.GetEnvironmentVariable("UH_PERF_CODE_GENERATION") ?? "unknown",
                     ["optimization"] =
                         Environment.GetEnvironmentVariable("UH_PERF_OPTIMIZATION") ?? "unknown",
-                    ["buildConfiguration"] = Debug.isDebugBuild ? "Development" : "Release",
-                    ["operatingSystem"] = SystemInfo.operatingSystem,
-                    ["cpu"] = SystemInfo.processorType,
+                    ["buildConfiguration"] = buildConfiguration,
+                    ["operatingSystem"] = operatingSystem,
+                    ["cpu"] = cpu,
                     ["processBits"] = (IntPtr.Size * 8).ToString(),
-                    ["platform"] = Application.platform.ToString(),
-                    ["isEditor"] = Application.isEditor.ToString(),
+                    ["platform"] = platform,
+                    ["isEditor"] = isEditor,
                     ["allocationMetric"] = "unsupported: counter not calibrated",
                     ["retentionMetric"] = "unsupported: workload probe required",
                     ["codeSizeMetric"] = "unsupported: player build report required",

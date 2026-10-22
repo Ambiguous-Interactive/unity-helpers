@@ -63,8 +63,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 + "hand-written formatter; both recompute the cached hash on read rather than trusting "
                 + "the wire, which a generated formatter would not do.",
             ["FastVector3Int"] =
-                "As FastVector2Int, through FastVector3IntSurrogate, including its deliberate "
-                + "out-of-order 3=hash/4=z tags.",
+                "As FastVector2Int, through FastVector3IntSurrogate; z retains field 4 and the "
+                + "retired hash field 3 is ignored on read.",
             ["Parabola"] =
                 "protobuf-net reaches it through ParabolaSurrogate, which bypasses the public "
                 + "constructor's positivity validation; WProtoUnitySurrogateRegistrations registers the "

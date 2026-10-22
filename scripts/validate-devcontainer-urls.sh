@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validates that all GitHub release download URLs in the devcontainer Dockerfile
+# Validates that all versioned download URLs in the devcontainer Dockerfile
 # are reachable (HTTP 200). This catches broken URLs (wrong version, wrong arch
 # suffix like gnu vs musl, yanked releases) before they break the container build.
 #
@@ -136,7 +136,7 @@ PASSED=0
 CHECKED=0
 
 # Extract tool definitions: VERSION, ARCH mappings, and URL template
-# Each RUN block that downloads from GitHub follows a pattern:
+# Each RUN block with a versioned download follows a pattern:
 #   *_VERSION="X.Y.Z"
 #   case ... amd64) *_ARCH="..." ;; arm64) *_ARCH="..." ;;
 #   curl ... "https://github.com/.../${VERSION}/...-${ARCH}..."
@@ -179,7 +179,7 @@ extract_tools() {
             fi
 
             # Extract URL template from curl command
-            if [[ "$line" =~ curl[[:space:]]+-[a-zA-Z]*[[:space:]]+\"(https://github\.com/[^\"]+)\" ]]; then
+            if [[ "$line" =~ curl[[:space:]]+-[a-zA-Z]*[[:space:]]+\"(https://(github\.com|builds\.dotnet\.microsoft\.com)/[^\"]+)\" ]]; then
                 url_template="${BASH_REMATCH[1]}"
 
                 # Replace variable references with placeholders

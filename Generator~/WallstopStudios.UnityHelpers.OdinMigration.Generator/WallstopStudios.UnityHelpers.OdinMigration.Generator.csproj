@@ -27,6 +27,7 @@
     />
     <Compile Include="../WallstopStudios.UnityHelpers.Proto.Generator/Writer.cs" Link="Writer.cs" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.8.0" PrivateAssets="all" />
+    <!-- Newer analyzer packages ban the source-generator APIs required by the Unity Roslyn 3.8 floor (RS1035). -->
     <PackageReference
       Include="Microsoft.CodeAnalysis.Analyzers"
       Version="3.3.4"
