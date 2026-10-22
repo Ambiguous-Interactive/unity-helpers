@@ -16,6 +16,8 @@ on:
       - "Tests/**"
       - "docs/features/serialization/serialization.md"
       - "scripts/run-wproto-evidence.ps1"
+      - "scripts/build-protobuf-candidate.py"
+      - "scripts/tests/test-protobuf-candidate.py"
       - "scripts/verify-wproto-evidence.ps1"
       - "scripts/unity/lib/test-result-evidence.ps1"
       - "scripts/unity/lib/catastrophic-patterns.ps1"
@@ -29,6 +31,8 @@ on:
       - "Tests/**"
       - "docs/features/serialization/serialization.md"
       - "scripts/run-wproto-evidence.ps1"
+      - "scripts/build-protobuf-candidate.py"
+      - "scripts/tests/test-protobuf-candidate.py"
       - "scripts/verify-wproto-evidence.ps1"
       - "scripts/unity/lib/test-result-evidence.ps1"
       - "scripts/unity/lib/catastrophic-patterns.ps1"
@@ -132,6 +136,37 @@ jobs:
         # isolation boundary; side-by-side aliases can silently bind both references to v3.
         shell: pwsh
         run: ./scripts/run-wproto-evidence.ps1 -Oracle v2 -OutputRoot "$env:RUNNER_TEMP/wproto-evidence"
+
+      - name: Test candidate build controls
+        run: python3 scripts/tests/test-protobuf-candidate.py
+
+      - name: Build the pinned current protobuf candidate
+        run: >-
+          python3 scripts/build-protobuf-candidate.py
+          --output "${{ runner.temp }}/protobuf-candidate"
+
+      - name: Test the generator against the current protobuf candidate
+        run: >-
+          dotnet test
+          Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/WallstopStudios.UnityHelpers.Proto.Generator.Tests.csproj
+          -c Release -p:ProtobufNetOracle=candidate
+          -p:ProtobufNetCandidateRoot="${{ runner.temp }}/protobuf-candidate/assemblies"
+          -p:UseSharedCompilation=false --nologo
+          --logger "trx;LogFileName=candidate.trx"
+          --results-directory "${{ runner.temp }}/protobuf-candidate/results"
+          -- RunConfiguration.TreatNoTestsAsError=true
+
+      - name: Retain current protobuf candidate evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: protobuf-candidate-evidence
+          path: |
+            ${{ runner.temp }}/protobuf-candidate/*.log
+            ${{ runner.temp }}/protobuf-candidate/*.json
+            ${{ runner.temp }}/protobuf-candidate/assemblies
+            ${{ runner.temp }}/protobuf-candidate/results
+          if-no-files-found: warn
 
       - name: Retain oracle invocation evidence
         if: always()

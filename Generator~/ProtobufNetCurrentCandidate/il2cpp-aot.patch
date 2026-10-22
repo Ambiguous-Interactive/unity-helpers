@@ -1,0 +1,2714 @@
+diff --git a/src/protobuf-net.Core/ISerializationWriteScope.cs b/src/protobuf-net.Core/ISerializationWriteScope.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net.Core/ISerializationWriteScope.cs
+@@ -0,0 +1,12 @@
++namespace ProtoBuf
++{
++    /// <summary>Owns temporary resources for one reference type contract write, including callbacks.</summary>
++    public interface ISerializationWriteScope
++    {
++        /// <summary>Begins one write scope; nested writes must preserve the enclosing scope.</summary>
++        void BeginSerialization();
++
++        /// <summary>Releases the current scope and restores its enclosing scope without throwing.</summary>
++        void EndSerialization();
++    }
++}
+diff --git a/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs b/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net.Core/Internal/IMapSerializerBridge.cs
+@@ -0,0 +1,20 @@
++namespace ProtoBuf.Internal
++{
++    using System;
++    using ProtoBuf.Serializers;
++
++    internal interface IMapSerializerBridge
++    {
++        Type CollectionType { get; }
++        Type KeyType { get; }
++        Type ValueType { get; }
++
++        object ReadMap(ref ProtoReader.State state, object value, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat);
++
++        void WriteMap(ref ProtoWriter.State state, object value, int fieldNumber, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat);
++    }
++}
+diff --git a/src/protobuf-net.Core/Internal/KeyValuePairSerializer.cs b/src/protobuf-net.Core/Internal/KeyValuePairSerializer.cs
+--- a/src/protobuf-net.Core/Internal/KeyValuePairSerializer.cs
++++ b/src/protobuf-net.Core/Internal/KeyValuePairSerializer.cs
+@@ -80,11 +80,15 @@
+         public void Write(ref ProtoWriter.State state, KeyValuePair<TKey, TValue> value)
+         {
+             // this deals with nulls and implicit zeros
+-            if (TypeHelper<TKey>.ValueChecker.HasNonTrivialValue(value.Key))
++            if (TypeHelper<TKey>.CanBeNull && !TypeHelper<TKey>.IsReferenceType
++                ? !TypeHelper<TKey>.ValueChecker.IsNull(value.Key)
++                : TypeHelper<TKey>.ValueChecker.HasNonTrivialValue(value.Key))
+                 state.WriteAny(1, _keyFeatures, value.Key, _keySerializer);
+ 
+             // this deals with nulls and implicit zeros
+-            if (TypeHelper<TValue>.ValueChecker.HasNonTrivialValue(value.Value))
++            if (TypeHelper<TValue>.CanBeNull && !TypeHelper<TValue>.IsReferenceType
++                ? !TypeHelper<TValue>.ValueChecker.IsNull(value.Value)
++                : TypeHelper<TValue>.ValueChecker.HasNonTrivialValue(value.Value))
+                 state.WriteAny(2, _valueFeatures, value.Value, _valueSerializer);
+         }
+     }
+diff --git a/src/protobuf-net.Core/Internal/TypeHelperNonTrivialDefault.cs b/src/protobuf-net.Core/Internal/TypeHelperNonTrivialDefault.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net.Core/Internal/TypeHelperNonTrivialDefault.cs
+@@ -0,0 +1,13 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal
++{
++    internal static class TypeHelperNonTrivialDefault<T>
++    {
++        internal static readonly T Value =
++            TypeHelper<T>.Default ?? (T)TypeHelper.CreateNonTrivialDefault(typeof(T));
++
++        static TypeHelperNonTrivialDefault() { }
++    }
++}
+diff --git a/src/protobuf-net.Core/Internal/TypeHelperT.cs b/src/protobuf-net.Core/Internal/TypeHelperT.cs
+--- a/src/protobuf-net.Core/Internal/TypeHelperT.cs
++++ b/src/protobuf-net.Core/Internal/TypeHelperT.cs
+@@ -180,7 +180,7 @@
+ 
+         public static readonly T Default = typeof(T) == typeof(string) ? (T)(object)"" : default;
+ 
+-        public static readonly T NonTrivialDefault = Default ?? (T)TypeHelper.CreateNonTrivialDefault(typeof(T));
++        public static T NonTrivialDefault => TypeHelperNonTrivialDefault<T>.Value;
+ 
+         // make sure we don't cast null value-types to NREs
+         [MethodImpl(ProtoReader.HotPath)]
+diff --git a/src/protobuf-net.Core/Serializers/MapSerializer.cs b/src/protobuf-net.Core/Serializers/MapSerializer.cs
+--- a/src/protobuf-net.Core/Serializers/MapSerializer.cs
++++ b/src/protobuf-net.Core/Serializers/MapSerializer.cs
+@@ -40,7 +40,7 @@
+     /// <c>??=</c> fallback in <see cref="GetSerializer"/>, which a generated model never reaches, and
+     /// <see cref="TypeModel.ResolveSerializer"/> confines that demand to the arm ILC removes.
+     /// </remarks>
+-    public abstract class MapSerializer<TCollection, TKey, TValue> : IRepeatedSerializer<TCollection>, IFactory<TCollection>
++    public abstract class MapSerializer<TCollection, TKey, TValue> : IRepeatedSerializer<TCollection>, IFactory<TCollection>, IMapSerializerBridge
+     {
+         SerializerFeatures ISerializer<TCollection>.Features => SerializerFeatures.CategoryRepeated;
+ 
+@@ -60,6 +60,28 @@
+ 
+         TCollection IRepeatedSerializer<TCollection>.ReadRepeated(ref ProtoReader.State state, SerializerFeatures features, TCollection values)
+             => ReadMap(ref state, features, values, default, default, default, default);
++
++        Type IMapSerializerBridge.CollectionType => typeof(TCollection);
++        Type IMapSerializerBridge.KeyType => typeof(TKey);
++        Type IMapSerializerBridge.ValueType => typeof(TValue);
++
++        object IMapSerializerBridge.ReadMap(ref ProtoReader.State state, object value, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat)
++        {
++            return ReadMap(ref state, features, (TCollection)value, keyFeatures, valueFeatures,
++                TypeModel.GetInbuiltSerializer<TKey>(keyCompatibilityLevel, keyDataFormat),
++                TypeModel.GetInbuiltSerializer<TValue>(valueCompatibilityLevel, valueDataFormat));
++        }
++
++        void IMapSerializerBridge.WriteMap(ref ProtoWriter.State state, object value, int fieldNumber, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat)
++        {
++            WriteMap(ref state, fieldNumber, features, (TCollection)value, keyFeatures, valueFeatures,
++                TypeModel.GetInbuiltSerializer<TKey>(keyCompatibilityLevel, keyDataFormat),
++                TypeModel.GetInbuiltSerializer<TValue>(valueCompatibilityLevel, valueDataFormat));
++        }
+ 
+         static KeyValuePairSerializer<TKey, TValue> GetSerializer(
+             TypeModel model, SerializerFeatures keyFeatures, SerializerFeatures valueFeatures, ISerializer<TKey> keySerializer, ISerializer<TValue> valueSerializer)
+diff --git a/src/protobuf-net.Core/Serializers/RepeatedSerializer.cs b/src/protobuf-net.Core/Serializers/RepeatedSerializer.cs
+--- a/src/protobuf-net.Core/Serializers/RepeatedSerializer.cs
++++ b/src/protobuf-net.Core/Serializers/RepeatedSerializer.cs
+@@ -38,7 +38,7 @@
+         /// <summary>Create a serializer that operates on lists</summary>
+         [MethodImpl(ProtoReader.HotPath)]
+         public static RepeatedSerializer<List<T>, T> CreateList<T>()
+-            => SerializerCache<ListSerializer<T>>.InstanceField;
++            => ListSerializer<T>.Instance;
+ 
+         /// <summary>Create a serializer that operates on lists</summary>
+         [MethodImpl(ProtoReader.HotPath)]
+@@ -50,19 +50,19 @@
+         [MethodImpl(ProtoReader.HotPath)]
+         public static RepeatedSerializer<TCollection, T> CreateEnumerable<[DynamicallyAccessedMembers(DynamicAccess.Activated)] TCollection, T>()
+             where TCollection : class, IEnumerable<T>
+-            => SerializerCache<EnumerableSerializer<TCollection, TCollection, T>>.InstanceField;
++            => EnumerableSerializer<TCollection, TCollection, T>.Instance;
+ 
+         /// <summary>Create a serializer that operates on most common collections</summary>
+         [MethodImpl(ProtoReader.HotPath)]
+         public static RepeatedSerializer<TCollection, T> CreateEnumerable<TCollection, [DynamicallyAccessedMembers(DynamicAccess.Activated)] TCreate, T>()
+             where TCollection : class, IEnumerable<T>
+             where TCreate : TCollection
+-            => SerializerCache<EnumerableSerializer<TCollection, TCreate, T>>.InstanceField;
++            => EnumerableSerializer<TCollection, TCreate, T>.Instance;
+ 
+         /// <summary>Create a serializer that operates on lists</summary>
+         [MethodImpl(ProtoReader.HotPath)]
+         public static RepeatedSerializer<T[], T> CreateVector<T>()
+-            => SerializerCache<VectorSerializer<T>>.InstanceField;
++            => VectorSerializer<T>.Instance;
+ 
+         /// <summary>Create a serializer that operates on lists</summary>
+         [MethodImpl(ProtoReader.HotPath)]
+@@ -423,6 +423,7 @@
+ 
+     sealed class ListSerializer<T> : ListSerializer<List<T>, T>
+     {
++        internal static readonly ListSerializer<T> Instance = new ListSerializer<T>();
+         protected override List<T> Initialize(List<T> values, ISerializationContext context)
+             => values ?? new List<T>();
+     }
+@@ -467,6 +468,7 @@
+         where TCollection : class, IEnumerable<T>
+         where TCreate : TCollection
+     {
++        internal static readonly EnumerableSerializer<TCollection, TCreate, T> Instance = new EnumerableSerializer<TCollection, TCreate, T>();
+         protected override TCollection Initialize(TCollection values, ISerializationContext context)
+             // note: don't call TypeModel.CreateInstance: *we are the factory*
+             => values ?? (typeof(TCreate).IsInterface ? (TCollection)(object)new List<T>() : TypeModel.ActivatorCreate<TCreate>());
+@@ -555,6 +557,7 @@
+ 
+     sealed class VectorSerializer<T> : RepeatedSerializer<T[], T>
+     {
++        internal static readonly VectorSerializer<T> Instance = new VectorSerializer<T>();
+         protected override T[] Initialize(T[] values, ISerializationContext context)
+             => values ?? Array.Empty<T>();
+         protected override T[] Clear(T[] values, ISerializationContext context)
+diff --git a/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs b/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net.Core/Serializers/TypedRepeatedProviderAttribute.cs
+@@ -0,0 +1,12 @@
++using System;
++
++namespace ProtoBuf.Serializers
++{
++    /// <summary>
++    /// Opts a collection into initializing its typed repeated providers before serializer metadata is built.
++    /// </summary>
++    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
++    public sealed class TypedRepeatedProviderAttribute : Attribute
++    {
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/ExternalSerializer.cs b/src/protobuf-net/Internal/Serializers/ExternalSerializer.cs
+--- a/src/protobuf-net/Internal/Serializers/ExternalSerializer.cs
++++ b/src/protobuf-net/Internal/Serializers/ExternalSerializer.cs
+@@ -1,4 +1,4 @@
+-﻿using ProtoBuf.Compiler;
++using ProtoBuf.Compiler;
+ using ProtoBuf.Meta;
+ using ProtoBuf.Serializers;
+ using System;
+@@ -9,6 +9,11 @@
+     {
+         internal static IProtoTypeSerializer Create(Type target, Type serializer)
+         {
++            IProtoTypeSerializer registered = ExternalSerializerFactories.TryCreate(serializer, target);
++            if (registered is not null)
++            {
++                return registered;
++            }
+             return (IProtoTypeSerializer)Activator.CreateInstance(
+                 typeof(ExternalSerializer<,>).MakeGenericType(serializer, target), nonPublic: true);
+         }
+@@ -26,7 +31,8 @@
+         where TProvider : class
+     {
+         object IExternalSerializer.Service => Serializer;
+-        private static ISerializer<T> Serializer => SerializerCache<TProvider, T>.InstanceField;
++        private readonly ISerializer<T> suppliedSerializer;
++        private ISerializer<T> Serializer => suppliedSerializer ?? SerializerCache<TProvider, T>.InstanceField;
+ 
+         public Type ExpectedType => typeof(T);
+ 
+@@ -35,6 +41,11 @@
+         bool IRuntimeProtoSerializerNode.ReturnsValue => true;
+ 
+         public ExternalSerializer() { }
++
++        internal ExternalSerializer(ISerializer<T> suppliedSerializer)
++        {
++            this.suppliedSerializer = suppliedSerializer;
++        }
+ 
+         void IRuntimeProtoSerializerNode.Write(ref ProtoWriter.State state, object value)
+             => Serializer.Write(ref state, TypeHelper<T>.FromObject(value));
+@@ -80,7 +91,7 @@
+             using var loc = ctx.GetLocalWithValue(typeof(T), valueFrom);
+ 
+             // get the serializer
+-            if (ctx.NonPublic || RuntimeTypeModel.IsFullyPublic(typeof(TProvider)))
++            if (suppliedSerializer is null && (ctx.NonPublic || RuntimeTypeModel.IsFullyPublic(typeof(TProvider))))
+             {
+                 ctx.EmitCall(typeof(SerializerCache).GetMethod(nameof(SerializerCache.Get)).MakeGenericMethod(typeof(TProvider), typeof(T)));
+             }
+@@ -104,7 +115,7 @@
+             using var loc = ctx.GetLocalWithValue(typeof(T), entity);
+ 
+             // get the serializer
+-            if (ctx.NonPublic || RuntimeTypeModel.IsFullyPublic(typeof(TProvider)))
++            if (suppliedSerializer is null && (ctx.NonPublic || RuntimeTypeModel.IsFullyPublic(typeof(TProvider))))
+             {
+                 ctx.EmitCall(typeof(SerializerCache).GetMethod(nameof(SerializerCache.Get)).MakeGenericMethod(typeof(TProvider), typeof(T)));
+             }
+diff --git a/src/protobuf-net/Internal/Serializers/ExternalSerializerFactories.cs b/src/protobuf-net/Internal/Serializers/ExternalSerializerFactories.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/ExternalSerializerFactories.cs
+@@ -0,0 +1,87 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using System;
++    using System.Collections.Generic;
++    using ProtoBuf.Serializers;
++
++    internal static class ExternalSerializerFactories
++    {
++        private static readonly Dictionary<
++            (Type Provider, Type Target),
++            Func<IProtoTypeSerializer>
++        > factories = new();
++        private static readonly Dictionary<
++            (Type Provider, Type Target),
++            Func<object, IProtoTypeSerializer>
++        > nullableFactories = new();
++
++        internal static void Register<TProvider, T>()
++            where TProvider : class
++        {
++            lock (factories)
++            {
++                (Type, Type) key = (typeof(TProvider), typeof(T));
++                if (!factories.ContainsKey(key))
++                {
++                    factories.Add(key, static () => new ExternalSerializer<TProvider, T>());
++                }
++            }
++        }
++
++        internal static void RegisterNullable<TProvider, T>()
++            where TProvider : class
++            where T : struct
++        {
++            Register<TProvider, T>();
++            lock (factories)
++            {
++                (Type, Type) key = (typeof(TProvider), typeof(T?));
++                if (!nullableFactories.ContainsKey(key))
++                {
++                    nullableFactories.Add(
++                        key,
++                        static service =>
++                            service is ISerializer<T?> typed
++                                ? new ExternalSerializer<TProvider, T?>(typed)
++                                : null
++                    );
++                }
++            }
++        }
++
++        internal static bool IsRegistered(Type provider, Type target)
++        {
++            lock (factories)
++            {
++                return factories.ContainsKey((provider, target));
++            }
++        }
++
++        internal static IProtoTypeSerializer TryCreate(Type provider, Type target)
++        {
++            Func<IProtoTypeSerializer> factory;
++            lock (factories)
++            {
++                factories.TryGetValue((provider, target), out factory);
++            }
++            return factory?.Invoke();
++        }
++
++        internal static IProtoTypeSerializer TryCreateNullable(
++            Type provider,
++            Type target,
++            object service
++        )
++        {
++            Func<object, IProtoTypeSerializer> factory;
++            lock (factories)
++            {
++                nullableFactories.TryGetValue((provider, target), out factory);
++            }
++            return factory?.Invoke(service);
++        }
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/MapDecorator.cs b/src/protobuf-net/Internal/Serializers/MapDecorator.cs
+--- a/src/protobuf-net/Internal/Serializers/MapDecorator.cs
++++ b/src/protobuf-net/Internal/Serializers/MapDecorator.cs
+@@ -5,21 +5,94 @@
+ 
+ namespace ProtoBuf.Internal.Serializers
+ {
+-    internal static class MapDecorator
++    internal sealed class MapDecorator : IRuntimeProtoSerializerNode, ICompiledSerializer
+     {
++        private readonly RepeatedSerializerStub _provider;
++        private readonly Type _keyType, _valueType;
++        private readonly int _fieldNumber;
++        private readonly SerializerFeatures _features, _keyFeatures, _valueFeatures;
++        private readonly CompatibilityLevel _keyCompatibilityLevel, _valueCompatibilityLevel;
++        private readonly DataFormat _keyDataFormat, _valueDataFormat;
++
++        private MapDecorator(RepeatedSerializerStub provider, Type keyType, Type valueType,
++            int fieldNumber, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat)
++        {
++            _provider = provider;
++            _keyType = keyType;
++            _valueType = valueType;
++            _fieldNumber = fieldNumber;
++            _features = features;
++            _keyFeatures = keyFeatures;
++            _keyCompatibilityLevel = keyCompatibilityLevel;
++            _keyDataFormat = keyDataFormat;
++            _valueFeatures = valueFeatures;
++            _valueCompatibilityLevel = valueCompatibilityLevel;
++            _valueDataFormat = valueDataFormat;
++        }
++
+         public static IRuntimeProtoSerializerNode Create(RepeatedSerializerStub provider, Type keyType, Type valueType,
+             int fieldNumber, SerializerFeatures features,
+             SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
+             SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat)
+         {
+             if (provider is null) ThrowHelper.ThrowArgumentNullException(nameof(provider));
+-            _ = provider.Serializer; // primes and validates
++            _ = provider.Serializer;
++            return new MapDecorator(provider, keyType, valueType, fieldNumber, features,
++                keyFeatures, keyCompatibilityLevel, keyDataFormat,
++                valueFeatures, valueCompatibilityLevel, valueDataFormat);
++        }
++
++        public Type ExpectedType => _provider.ForType;
++        bool IRuntimeProtoSerializerNode.IsScalar => false;
++        bool IRuntimeProtoSerializerNode.ReturnsValue => true;
++        public bool RequiresOldValue => true;
++        private IMapSerializerBridge Serializer
++        {
++            get
++            {
++                IMapSerializerBridge serializer = (IMapSerializerBridge)_provider.Serializer;
++                if (serializer.CollectionType != ExpectedType || serializer.KeyType != _keyType || serializer.ValueType != _valueType)
++                {
++                    throw new InvalidCastException();
++                }
++                return serializer;
++            }
++        }
++
++        public object Read(ref ProtoReader.State state, object value)
++        {
++            return Serializer.ReadMap(ref state, value, _features,
++                _keyFeatures, _keyCompatibilityLevel, _keyDataFormat,
++                _valueFeatures, _valueCompatibilityLevel, _valueDataFormat);
++        }
++
++        public void Write(ref ProtoWriter.State state, object value)
++        {
++            Serializer.WriteMap(ref state, value, _fieldNumber, _features,
++                _keyFeatures, _keyCompatibilityLevel, _keyDataFormat,
++                _valueFeatures, _valueCompatibilityLevel, _valueDataFormat);
++        }
++
++        private IRuntimeProtoSerializerNode CreateEmitter()
++        {
+             return (IRuntimeProtoSerializerNode)Activator.CreateInstance(
+-                typeof(MapDecorator<,,>).MakeGenericType(provider.ForType, keyType, valueType),
+-                new object[] { fieldNumber, features,
+-                    keyFeatures, keyCompatibilityLevel, keyDataFormat,
+-                    valueFeatures, valueCompatibilityLevel, valueDataFormat,
+-                    provider });
++                typeof(MapDecorator<,,>).MakeGenericType(ExpectedType, _keyType, _valueType),
++                new object[] { _fieldNumber, _features,
++                    _keyFeatures, _keyCompatibilityLevel, _keyDataFormat,
++                    _valueFeatures, _valueCompatibilityLevel, _valueDataFormat,
++                    _provider });
++        }
++
++        public void EmitWrite(CompilerContext ctx, Local valueFrom)
++        {
++            CreateEmitter().EmitWrite(ctx, valueFrom);
++        }
++
++        public void EmitRead(CompilerContext ctx, Local valueFrom)
++        {
++            CreateEmitter().EmitRead(ctx, valueFrom);
+         }
+     }
+     internal class MapDecorator<TCollection, TKey, TValue> : IRuntimeProtoSerializerNode, ICompiledSerializer
+diff --git a/src/protobuf-net/Internal/Serializers/NullableContractSerializer.cs b/src/protobuf-net/Internal/Serializers/NullableContractSerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/NullableContractSerializer.cs
+@@ -0,0 +1,32 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using ProtoBuf.Serializers;
++
++    internal sealed class NullableContractSerializer<TNullable> : ISerializer<TNullable>
++    {
++        private readonly IProtoTypeSerializer contract;
++
++        internal NullableContractSerializer(IProtoTypeSerializer contract)
++        {
++            this.contract = contract;
++        }
++
++        public SerializerFeatures Features => contract.Features;
++
++        public TNullable Read(ref ProtoReader.State state, TNullable value)
++        {
++            return TypeHelper<TNullable>.FromObject(contract.Read(ref state, value));
++        }
++
++        public void Write(ref ProtoWriter.State state, TNullable value)
++        {
++            if (!TypeHelper<TNullable>.ValueChecker.IsNull(value))
++            {
++                contract.Write(ref state, value);
++            }
++        }
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/PrimarySerializerFeatures.cs b/src/protobuf-net/Internal/Serializers/PrimarySerializerFeatures.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/PrimarySerializerFeatures.cs
+@@ -0,0 +1,216 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using System;
++    using ProtoBuf.Serializers;
++
++    internal static class PrimarySerializerFeatures
++    {
++        internal static SerializerFeatures Get(Type type)
++        {
++            if (type == typeof(string))
++            {
++                return Features<string>();
++            }
++            if (type == typeof(int))
++            {
++                return Features<int>();
++            }
++            if (type == typeof(long))
++            {
++                return Features<long>();
++            }
++            if (type == typeof(bool))
++            {
++                return Features<bool>();
++            }
++            if (type == typeof(float))
++            {
++                return Features<float>();
++            }
++            if (type == typeof(double))
++            {
++                return Features<double>();
++            }
++            if (type == typeof(byte[]))
++            {
++                return Features<byte[]>();
++            }
++            if (type == typeof(ArraySegment<byte>))
++            {
++                return Features<ArraySegment<byte>>();
++            }
++            if (type == typeof(Memory<byte>))
++            {
++                return Features<Memory<byte>>();
++            }
++            if (type == typeof(ReadOnlyMemory<byte>))
++            {
++                return Features<ReadOnlyMemory<byte>>();
++            }
++            if (type == typeof(byte))
++            {
++                return Features<byte>();
++            }
++            if (type == typeof(ushort))
++            {
++                return Features<ushort>();
++            }
++            if (type == typeof(uint))
++            {
++                return Features<uint>();
++            }
++            if (type == typeof(ulong))
++            {
++                return Features<ulong>();
++            }
++            if (type == typeof(sbyte))
++            {
++                return Features<sbyte>();
++            }
++            if (type == typeof(short))
++            {
++                return Features<short>();
++            }
++            if (type == typeof(char))
++            {
++                return Features<char>();
++            }
++            if (type == typeof(Uri))
++            {
++                return Features<Uri>();
++            }
++            if (type == typeof(Type))
++            {
++                return Features<Type>();
++            }
++            if (type == typeof(IntPtr))
++            {
++                return Features<IntPtr>();
++            }
++            if (type == typeof(UIntPtr))
++            {
++                return Features<UIntPtr>();
++            }
++            if (type == typeof(decimal))
++            {
++                return Features<decimal>();
++            }
++            if (type == typeof(Guid))
++            {
++                return Features<Guid>();
++            }
++            if (type == typeof(DateTime))
++            {
++                return Features<DateTime>();
++            }
++            if (type == typeof(TimeSpan))
++            {
++                return Features<TimeSpan>();
++            }
++            if (type == typeof(PrimaryTypeProvider.ScaledTicks))
++            {
++                return Features<PrimaryTypeProvider.ScaledTicks>();
++            }
++            if (type == typeof(int?))
++            {
++                return Features<int?>();
++            }
++            if (type == typeof(long?))
++            {
++                return Features<long?>();
++            }
++            if (type == typeof(bool?))
++            {
++                return Features<bool?>();
++            }
++            if (type == typeof(float?))
++            {
++                return Features<float?>();
++            }
++            if (type == typeof(double?))
++            {
++                return Features<double?>();
++            }
++            if (type == typeof(byte?))
++            {
++                return Features<byte?>();
++            }
++            if (type == typeof(ushort?))
++            {
++                return Features<ushort?>();
++            }
++            if (type == typeof(uint?))
++            {
++                return Features<uint?>();
++            }
++            if (type == typeof(ulong?))
++            {
++                return Features<ulong?>();
++            }
++            if (type == typeof(sbyte?))
++            {
++                return Features<sbyte?>();
++            }
++            if (type == typeof(short?))
++            {
++                return Features<short?>();
++            }
++            if (type == typeof(char?))
++            {
++                return Features<char?>();
++            }
++            if (type == typeof(IntPtr?))
++            {
++                return Features<IntPtr?>();
++            }
++            if (type == typeof(UIntPtr?))
++            {
++                return Features<UIntPtr?>();
++            }
++            if (type == typeof(decimal?))
++            {
++                return Features<decimal?>();
++            }
++            if (type == typeof(Guid?))
++            {
++                return Features<Guid?>();
++            }
++            if (type == typeof(DateTime?))
++            {
++                return Features<DateTime?>();
++            }
++            if (type == typeof(TimeSpan?))
++            {
++                return Features<TimeSpan?>();
++            }
++#if NET6_0_OR_GREATER
++            if (type == typeof(DateOnly))
++            {
++                return Features<DateOnly>();
++            }
++            if (type == typeof(TimeOnly))
++            {
++                return Features<TimeOnly>();
++            }
++            if (type == typeof(DateOnly?))
++            {
++                return Features<DateOnly?>();
++            }
++            if (type == typeof(TimeOnly?))
++            {
++                return Features<TimeOnly?>();
++            }
++#endif
++            // Preserve the original unsupported-primary error path, including its inner exception.
++            return ExternalSerializer.Create(type, typeof(PrimaryTypeProvider)).Features;
++        }
++
++        private static SerializerFeatures Features<T>()
++        {
++            return SerializerCache<PrimaryTypeProvider, T>.InstanceField.Features;
++        }
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/RepeatedDecorator.cs b/src/protobuf-net/Internal/Serializers/RepeatedDecorator.cs
+--- a/src/protobuf-net/Internal/Serializers/RepeatedDecorator.cs
++++ b/src/protobuf-net/Internal/Serializers/RepeatedDecorator.cs
+@@ -12,6 +12,8 @@
+         {
+             if (stub is null) ThrowHelper.ThrowArgumentNullException(nameof(stub), $"No suitable repeated serializer resolved for stub");
+             _ = stub.Serializer; // primes and validates
++            var typed = RepeatedSerializers.TryCreateTypedDecorator(stub, fieldNumber, features, compatibilityLevel, dataFormat);
++            if (typed is not null) return typed;
+             return (IRuntimeProtoSerializerNode)Activator.CreateInstance(typeof(RepeatedDecorator<,>).MakeGenericType(stub.ForType, stub.ItemType),
+                 new object[] { fieldNumber, features, compatibilityLevel, dataFormat, stub });
+         }
+diff --git a/src/protobuf-net/Internal/Serializers/RuntimeCollectionItemSerializer.cs b/src/protobuf-net/Internal/Serializers/RuntimeCollectionItemSerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/RuntimeCollectionItemSerializer.cs
+@@ -0,0 +1,29 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using ProtoBuf.Serializers;
++
++    internal sealed class RuntimeCollectionItemSerializer<T> : ISerializer<T>
++    {
++        public SerializerFeatures Features => slot.Features;
++
++        private readonly RuntimeMapSlot slot;
++
++        internal RuntimeCollectionItemSerializer(RuntimeMapSlot slot)
++        {
++            this.slot = slot;
++        }
++
++        public T Read(ref ProtoReader.State state, T value)
++        {
++            return TypeHelper<T>.FromObject(slot.Read(ref state, value));
++        }
++
++        public void Write(ref ProtoWriter.State state, T value)
++        {
++            slot.Write(ref state, value);
++        }
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/RuntimeContractSerializer.cs b/src/protobuf-net/Internal/Serializers/RuntimeContractSerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/RuntimeContractSerializer.cs
+@@ -0,0 +1,34 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using ProtoBuf.Serializers;
++
++    internal sealed class RuntimeContractSerializer<T> : ISerializer<T>, IFactory<T>
++    {
++        public SerializerFeatures Features => contract.Features;
++
++        private readonly IProtoTypeSerializer contract;
++
++        internal RuntimeContractSerializer(IProtoTypeSerializer contract)
++        {
++            this.contract = contract;
++        }
++
++        public T Read(ref ProtoReader.State state, T value)
++        {
++            return TypeHelper<T>.FromObject(contract.Read(ref state, value));
++        }
++
++        public void Write(ref ProtoWriter.State state, T value)
++        {
++            contract.Write(ref state, value);
++        }
++
++        public T Create(ISerializationContext context)
++        {
++            return TypeHelper<T>.FromObject(contract.CreateInstance(context));
++        }
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/RuntimeMapBoundary.cs b/src/protobuf-net/Internal/Serializers/RuntimeMapBoundary.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/RuntimeMapBoundary.cs
+@@ -0,0 +1,39 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using System;
++    using System.Collections;
++    using System.Reflection;
++    using ProtoBuf.Meta;
++    using ProtoBuf.Serializers;
++
++    internal sealed class RuntimeMapBoundary<T> : IRepeatedSerializer<T>, IFactory<T>
++    {
++        private readonly RuntimeMapSerializer map;
++        internal RuntimeMapBoundary(RuntimeMapSerializer map) { this.map = map; }
++        public SerializerFeatures Features => SerializerFeatures.CategoryRepeated;
++        public T Create(ISerializationContext context)
++        {
++            return TypeHelper<T>.FromObject(map.Initialize(null));
++        }
++        public T Read(ref ProtoReader.State state, T value)
++        {
++            throw new InvalidOperationException("Use ReadRepeated for map serialization.");
++        }
++        public void Write(ref ProtoWriter.State state, T value)
++        {
++            throw new InvalidOperationException("Use WriteRepeated for map serialization.");
++        }
++        public T ReadRepeated(ref ProtoReader.State state, SerializerFeatures features, T value)
++        {
++            return TypeHelper<T>.FromObject(map.ReadMap(ref state, value, features, default, default, default, default, default, default));
++        }
++        public void WriteRepeated(ref ProtoWriter.State state, int fieldNumber, SerializerFeatures features, T value)
++        {
++            map.WriteMap(ref state, value, fieldNumber, features, default, default, default, default, default, default);
++        }
++    }
++
++}
+diff --git a/src/protobuf-net/Internal/Serializers/RuntimeMapPairSerializer.cs b/src/protobuf-net/Internal/Serializers/RuntimeMapPairSerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/RuntimeMapPairSerializer.cs
+@@ -0,0 +1,38 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using System;
++    using System.Collections;
++    using System.Reflection;
++    using ProtoBuf.Meta;
++    using ProtoBuf.Serializers;
++
++    internal sealed class RuntimeMapPairSerializer : ISerializer<DictionaryEntry>
++    {
++        private readonly RuntimeMapSlot key, value;
++        internal RuntimeMapPairSerializer(RuntimeMapSlot key, RuntimeMapSlot value) { this.key = key; this.value = value; }
++        public SerializerFeatures Features => SerializerFeatures.CategoryMessage | SerializerFeatures.WireTypeString;
++        public DictionaryEntry Read(ref ProtoReader.State state, DictionaryEntry old)
++        {
++            object k = key.DefaultValue(), v = value.DefaultValue();
++            int field;
++            while (0 < (field = state.ReadFieldHeader()))
++            {
++                switch (field)
++                {
++                    case 1: k = key.ReadSlot(ref state, k); break;
++                    case 2: v = value.ReadSlot(ref state, v); break;
++                    default: state.SkipField(); break;
++                }
++            }
++            return new DictionaryEntry(key.CompleteMissing(state.Context, k), value.CompleteMissing(state.Context, v));
++        }
++        public void Write(ref ProtoWriter.State state, DictionaryEntry entry)
++        {
++            if (key.ShouldWrite(entry.Key)) key.WriteSlot(ref state, 1, entry.Key);
++            if (value.ShouldWrite(entry.Value)) value.WriteSlot(ref state, 2, entry.Value);
++        }
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/RuntimeMapSerializer.cs b/src/protobuf-net/Internal/Serializers/RuntimeMapSerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/RuntimeMapSerializer.cs
+@@ -0,0 +1,167 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using System;
++    using System.Collections;
++    using System.Reflection;
++    using ProtoBuf.Meta;
++    using ProtoBuf.Serializers;
++
++    #pragma warning disable CS0618 // Existing state sub-item APIs preserve nongeneric wrapper semantics.
++
++    // Source-only experiment: mutable built-in dictionaries on runtimes without dynamic code.
++    internal sealed class RuntimeMapSerializer : IMapSerializerBridge
++    {
++        public Type CollectionType { get; }
++        public Type KeyType { get; }
++        public Type ValueType { get; }
++        private readonly Func<object> factory;
++        private readonly RepeatedSerializerStub authoritativeStub;
++
++        private RuntimeMapSerializer(Type collectionType, Type keyType, Type valueType, Func<object> factory, RepeatedSerializerStub authoritativeStub)
++        {
++            CollectionType = collectionType;
++            KeyType = keyType;
++            ValueType = valueType;
++            this.factory = factory;
++            this.authoritativeStub = authoritativeStub;
++        }
++
++        internal static RuntimeMapSerializer TryCreate(RepeatedSerializerStub stub)
++        {
++            if (!stub.IsMap || stub.ForType.IsInterface || stub.ForType.IsAbstract
++                || !typeof(IDictionary).IsAssignableFrom(stub.ForType)) return null;
++            var provider = RuntimeTypeModel.GetUnderlyingProvider(stub.Provider, stub.ForType);
++            if (provider is not MethodInfo method || method.DeclaringType != typeof(MapSerializer)
++                || method.Name != nameof(MapSerializer.CreateDictionary)) return null;
++            stub.ResolveMapTypes(out Type keyType, out Type valueType);
++            if (!SupportsSlot(keyType) || !SupportsSlot(valueType)) return null;
++            var factory = RepeatedSerializers.ResolveMapFactory(stub.ForType, stub.Provider);
++            if (RequiresTypedFactory(stub.ForType) && factory is null) return null;
++            return new RuntimeMapSerializer(stub.ForType, keyType, valueType, factory, stub);
++        }
++
++        private static bool RequiresTypedFactory(Type type)
++        {
++            for (Type current = type; current is not null; current = current.BaseType)
++                if (current.IsDefined(typeof(TypedRepeatedProviderAttribute), false)) return true;
++            return false;
++        }
++
++        private static bool SupportsSlot(Type type)
++        {
++            // Service-dependent reference eligibility is checked against the current model before any I/O.
++            return !type.IsPointer && !type.IsByRef && !type.ContainsGenericParameters;
++        }
++
++        private IMapSerializerBridge GetAuthoritativeProvider()
++        {
++            // Unsupported services retain their original provider and exceptions; no fallback catches them.
++            return authoritativeStub.CreateAuthoritativeSerializer() as IMapSerializerBridge
++                ?? throw new InvalidCastException("The authoritative map provider has no runtime map bridge.");
++        }
++
++        internal object Initialize(object value)
++        {
++            if (value is null)
++            {
++                if (factory is not null) value = factory();
++                else
++                {
++                    if (RequiresTypedFactory(CollectionType))
++                        throw new InvalidOperationException("A typed runtime map factory is required.");
++                    value = Activator.CreateInstance(CollectionType, nonPublic: true);
++                }
++            }
++            if (value is not IDictionary dictionary || dictionary.IsReadOnly || dictionary.IsFixedSize)
++                throw new NotSupportedException("Runtime dictionary serialization requires a mutable IDictionary.");
++            return value;
++        }
++
++        public object ReadMap(ref ProtoReader.State state, object value, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat)
++        {
++            if (!TryCreatePair(state.Model, keyFeatures, keyCompatibilityLevel, keyDataFormat,
++                valueFeatures, valueCompatibilityLevel, valueDataFormat, out var pair))
++                return GetAuthoritativeProvider().ReadMap(ref state, value, features, keyFeatures,
++                    keyCompatibilityLevel, keyDataFormat, valueFeatures, valueCompatibilityLevel, valueDataFormat);
++            if (features.HasAny(SerializerFeatures.OptionWrappedCollection))
++            {
++                features &= ~(SerializerFeatures.OptionWrappedCollection | SerializerFeatures.OptionWrappedCollectionGroup);
++                var token = state.StartSubItem();
++                bool found = false;
++                int field;
++                while (0 < (field = state.ReadFieldHeader()))
++                {
++                    if (field == TypeModel.ListItemTag)
++                    {
++                        value = ReadMap(ref state, value, features, keyFeatures, keyCompatibilityLevel,
++                            keyDataFormat, valueFeatures, valueCompatibilityLevel, valueDataFormat);
++                        found = true;
++                    }
++                    else state.SkipField();
++                }
++                state.EndSubItem(token);
++                return found ? value : Initialize(value);
++            }
++            features.InheritFrom(pair.Features);
++            value = Initialize(value);
++            var dictionary = (IDictionary)value;
++            using var buffer = state.FillBuffer<RuntimeMapPairSerializer, DictionaryEntry>(features, pair, default);
++            if (features.HasAny(SerializerFeatures.OptionClearCollection)) dictionary.Clear();
++            foreach (var entry in buffer.Segment.AsSpan())
++            {
++                if (features.HasAny(SerializerFeatures.OptionFailOnDuplicateKey)) dictionary.Add(entry.Key, entry.Value);
++                else dictionary[entry.Key] = entry.Value;
++            }
++            return value;
++        }
++
++        public void WriteMap(ref ProtoWriter.State state, object value, int fieldNumber, SerializerFeatures features,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat)
++        {
++            if (!TryCreatePair(state.Model, keyFeatures, keyCompatibilityLevel, keyDataFormat,
++                valueFeatures, valueCompatibilityLevel, valueDataFormat, out var pair))
++            {
++                GetAuthoritativeProvider().WriteMap(ref state, value, fieldNumber, features, keyFeatures,
++                    keyCompatibilityLevel, keyDataFormat, valueFeatures, valueCompatibilityLevel, valueDataFormat);
++                return;
++            }
++            if (features.HasAny(SerializerFeatures.OptionWrappedCollection))
++            {
++                state.WriteFieldHeader(fieldNumber, ProtoWriter.State.AssertWrappedAndGetWireType(ref features, out _));
++                var token = state.StartSubItem(null);
++                WriteMap(ref state, value, TypeModel.ListItemTag, features, keyFeatures, keyCompatibilityLevel,
++                    keyDataFormat, valueFeatures, valueCompatibilityLevel, valueDataFormat);
++                state.EndSubItem(token);
++                return;
++            }
++            if (value is null) return;
++            features.InheritFrom(pair.Features);
++            var iterator = ((IDictionary)value).GetEnumerator();
++            try
++            {
++                while (iterator.MoveNext()) state.WriteAny(fieldNumber, features, iterator.Entry, pair);
++            }
++            finally { (iterator as IDisposable)?.Dispose(); }
++        }
++
++        private bool TryCreatePair(TypeModel model,
++            SerializerFeatures keyFeatures, CompatibilityLevel keyCompatibilityLevel, DataFormat keyDataFormat,
++            SerializerFeatures valueFeatures, CompatibilityLevel valueCompatibilityLevel, DataFormat valueDataFormat,
++            out RuntimeMapPairSerializer pair)
++        {
++            pair = null;
++            if (model is not RuntimeTypeModel runtime) return false;
++            if (!RuntimeMapSlot.TryCreate(runtime, KeyType, keyFeatures, keyCompatibilityLevel, keyDataFormat, out var key)
++                || !RuntimeMapSlot.TryCreate(runtime, ValueType, valueFeatures, valueCompatibilityLevel, valueDataFormat, out var value)) return false;
++            pair = new RuntimeMapPairSerializer(key, value);
++            return true;
++        }
++    }
++
++}
+diff --git a/src/protobuf-net/Internal/Serializers/RuntimeMapSlot.cs b/src/protobuf-net/Internal/Serializers/RuntimeMapSlot.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/RuntimeMapSlot.cs
+@@ -0,0 +1,233 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using System;
++    using ProtoBuf.Meta;
++    using ProtoBuf.Serializers;
++
++    internal sealed class RuntimeMapSlot : ISerializer<object>
++    {
++        private readonly Type type;
++        private readonly IRuntimeProtoSerializerNode node;
++        public SerializerFeatures SlotFeatures { get; }
++        public SerializerFeatures Features { get; }
++
++        private RuntimeMapSlot(Type type, IRuntimeProtoSerializerNode node,
++            SerializerFeatures features, SerializerFeatures slotFeatures)
++        {
++            this.type = type;
++            this.node = node;
++            Features = features;
++            slotFeatures.InheritFrom(features);
++            SlotFeatures = slotFeatures;
++        }
++
++        internal static bool TryCreate(RuntimeTypeModel model, Type type,
++            SerializerFeatures features, CompatibilityLevel compatibility, DataFormat format, out RuntimeMapSlot slot)
++        {
++            slot = null;
++            Type effective = Nullable.GetUnderlyingType(type) ?? type;
++            bool nullable = effective != type;
++            if (nullable && (effective == typeof(Memory<byte>) || effective == typeof(ReadOnlyMemory<byte>)
++                || effective == typeof(ArraySegment<byte>))) return false;
++            if (effective.IsEnum)
++            {
++                slot = new RuntimeMapSlot(type, new EnumMemberSerializer(effective),
++                    SerializerFeatures.CategoryScalar | SerializerFeatures.WireTypeVarint, features);
++                return true;
++            }
++
++            bool primaryReference = effective == typeof(string) || effective == typeof(byte[])
++                || effective == typeof(Uri) || effective == typeof(Type);
++            if (!effective.IsValueType && !primaryReference)
++            {
++                // Ordinary contracts use authoritative object serialization. Custom ref-struct service bridges
++                // are unsupported here and must retain their original map provider path.
++                var meta = model[effective];
++                if (meta.SerializerType is not null || meta.HasSurrogate || meta.IsAutoTuple) return false;
++                var contract = meta.Serializer;
++                if (contract.Features.GetCategory() != SerializerFeatures.CategoryMessage) return false;
++                slot = new RuntimeMapSlot(type, contract, contract.Features, features);
++                return true;
++            }
++            var node = ValueMember.TryGetCoreSerializer(model, format, compatibility, effective,
++                out WireType wireType, false, false, false, false);
++            SerializerFeatures serializerFeatures;
++            if (node is null)
++            {
++                // Existing external/surrogate metadata is authoritative. Do not bypass it on failure.
++                var meta = model[effective];
++                if (nullable && meta.SerializerType is not null
++                    && !ExternalSerializerFactories.IsRegistered(meta.SerializerType, effective))
++                {
++                    return false;
++                }
++                IProtoTypeSerializer contract = meta.Serializer;
++                if (nullable && contract is IExternalSerializer external)
++                {
++                    IProtoTypeSerializer supplied = ExternalSerializerFactories.TryCreateNullable(
++                        meta.SerializerType, type, external.Service);
++                    if (supplied is not null)
++                    {
++                        contract = supplied;
++                    }
++                }
++                node = contract;
++                serializerFeatures = contract.Features;
++            }
++            else
++            {
++                if (effective == typeof(Uri)) node = new UriDecorator(node);
++                serializerFeatures = GetDefaultWireType(effective, wireType).AsFeatures() | SerializerFeatures.CategoryScalar;
++            }
++            slot = new RuntimeMapSlot(type, node, serializerFeatures, features);
++            return true;
++        }
++
++        private static WireType GetDefaultWireType(Type type, WireType memberWireType)
++        {
++            if (type == typeof(Guid) || type == typeof(TimeSpan)) return WireType.String;
++            if (type == typeof(IntPtr) || type == typeof(UIntPtr)) return WireType.Varint;
++            return Type.GetTypeCode(type) switch
++            {
++                TypeCode.Boolean => WireType.Varint,
++                TypeCode.Byte => WireType.Varint,
++                TypeCode.SByte => WireType.Varint,
++                TypeCode.Int16 => WireType.Varint,
++                TypeCode.UInt16 => WireType.Varint,
++                TypeCode.Int32 => WireType.Varint,
++                TypeCode.UInt32 => WireType.Varint,
++                TypeCode.Int64 => WireType.Varint,
++                TypeCode.UInt64 => WireType.Varint,
++                TypeCode.Char => WireType.Varint,
++                TypeCode.DateTime => WireType.String,
++                _ => memberWireType,
++            };
++        }
++
++        public object Read(ref ProtoReader.State state, object value)
++        {
++            return node.Read(ref state, node.RequiresOldValue ? value : null);
++        }
++
++        public void Write(ref ProtoWriter.State state, object value)
++        {
++            node.Write(ref state, value);
++        }
++
++        internal object ReadSlot(ref ProtoReader.State state, object value)
++        {
++            var features = SlotFeatures;
++            if (!features.HasAny(SerializerFeatures.OptionWrappedValue))
++                return state.ReadAny(features, value, this);
++            ProtoWriter.State.AssertWrappedAndGetWireType(ref features, out bool fieldPresence);
++            var token = state.StartSubItem();
++            int field;
++            while (0 < (field = state.ReadFieldHeader()))
++            {
++                if (field == TypeModel.ListItemTag) value = state.ReadAny(features, value, this);
++                else state.SkipField();
++            }
++            state.EndSubItem(token);
++            return !fieldPresence && value is null ? TypeHelper.CreateNonTrivialDefault(type) : value;
++        }
++
++        internal object DefaultValue()
++        {
++            if (Nullable.GetUnderlyingType(type) is not null) return null;
++            if (type.IsValueType) return BclHelpers.GetUninitializedObject(type);
++            return null;
++        }
++
++        internal object CompleteMissing(ISerializationContext context, object value)
++        {
++            if (value is not null || type.IsValueType || SlotFeatures.HasAny(SerializerFeatures.OptionWrappedValue)) return value;
++            if (Features.GetCategory() == SerializerFeatures.CategoryMessage)
++            {
++                var state = ProtoReader.State.Create(default(ReadOnlyMemory<byte>), context?.Model, context?.UserState);
++                try { return Read(ref state, null); }
++                finally { state.Dispose(); }
++            }
++            // Mirror original primary factory and failure semantics, rather than treating unknown references as null.
++            if (type == typeof(string)) return TypeModel.CreateInstance<string>(context);
++            if (type == typeof(byte[])) return TypeModel.CreateInstance<byte[]>(context);
++            if (type == typeof(Uri)) return TypeModel.CreateInstance<Uri>(context);
++            if (type == typeof(Type)) return TypeModel.CreateInstance<Type>(context);
++            if (node is IProtoTypeSerializer contract && contract.CanCreateInstance())
++            {
++                value = contract.CreateInstance(context);
++                if (value is not null) return value;
++            }
++            // Unknown scalar reference factories require an authoritative typed production bridge.
++            throw new NotSupportedException("Runtime map scalar reference default factory requires a typed provider bridge.");
++        }
++
++        internal void WriteSlot(ref ProtoWriter.State state, int fieldNumber, object value)
++        {
++            var features = SlotFeatures;
++            if (!features.HasAny(SerializerFeatures.OptionWrappedValue))
++            {
++                state.WriteAny(fieldNumber, features, value, this);
++                return;
++            }
++            var wireType = ProtoWriter.State.AssertWrappedAndGetWireType(ref features, out bool fieldPresence);
++            bool isNull = value is null && (!type.IsValueType || Nullable.GetUnderlyingType(type) is not null);
++            if (isNull && !fieldPresence) return;
++            state.WriteFieldHeader(fieldNumber, wireType);
++#pragma warning disable CS0618 // Match existing nongeneric wrapped-item state operations.
++            bool writeInner = !isNull && (fieldPresence || HasNonTrivialValue(value));
++            var token = state.StartSubItem(writeInner && !type.IsValueType && features.ApplyRecursionCheck() ? value : null);
++            if (writeInner) state.WriteAny(TypeModel.ListItemTag, features, value, this);
++            state.EndSubItem(token);
++#pragma warning restore CS0618
++        }
++
++        internal bool ShouldWrite(object value)
++        {
++            return Nullable.GetUnderlyingType(type) is not null ? value is not null : HasNonTrivialValue(value);
++        }
++
++        private bool HasNonTrivialValue(object value)
++        {
++            Type type = Nullable.GetUnderlyingType(this.type) ?? this.type;
++            if (type.IsEnum) return value is not null;
++            // Reuse the original concrete primary checkers, including special reference policies.
++            if (type == typeof(byte[])) return Check<byte[]>(value);
++            if (type == typeof(Uri)) return Check<Uri>(value);
++            if (type == typeof(Type)) return Check<Type>(value);
++            if (type == typeof(Guid)) return Check<Guid>(value);
++            if (type == typeof(TimeSpan)) return Check<TimeSpan>(value);
++            if (type == typeof(IntPtr)) return Check<IntPtr>(value);
++            if (type == typeof(UIntPtr)) return Check<UIntPtr>(value);
++            if (type == typeof(ArraySegment<byte>)) return Check<ArraySegment<byte>>(value);
++            if (type == typeof(Memory<byte>)) return Check<Memory<byte>>(value);
++            if (type == typeof(ReadOnlyMemory<byte>)) return Check<ReadOnlyMemory<byte>>(value);
++            return Type.GetTypeCode(type) switch
++            {
++                TypeCode.Boolean => Check<bool>(value),
++                TypeCode.Byte => Check<byte>(value),
++                TypeCode.SByte => Check<sbyte>(value),
++                TypeCode.Int16 => Check<short>(value),
++                TypeCode.UInt16 => Check<ushort>(value),
++                TypeCode.Int32 => Check<int>(value),
++                TypeCode.UInt32 => Check<uint>(value),
++                TypeCode.Int64 => Check<long>(value),
++                TypeCode.UInt64 => Check<ulong>(value),
++                TypeCode.Char => Check<char>(value),
++                TypeCode.Single => Check<float>(value),
++                TypeCode.Double => Check<double>(value),
++                TypeCode.Decimal => Check<decimal>(value),
++                TypeCode.DateTime => Check<DateTime>(value),
++                TypeCode.String => Check<string>(value),
++                _ => type.IsValueType || value is not null,
++            };
++        }
++
++        private static bool Check<T>(object value)
++        {
++            return TypeHelper<T>.ValueChecker.HasNonTrivialValue(TypeHelper<T>.FromObject(value));
++        }
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/RuntimeTypeSerializer.cs b/src/protobuf-net/Internal/Serializers/RuntimeTypeSerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/RuntimeTypeSerializer.cs
+@@ -0,0 +1,42 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using System;
++    using System.Runtime.CompilerServices;
++
++    internal sealed class RuntimeTypeSerializer : TypeSerializer<object>
++    {
++        public override Type ExpectedType => expectedType;
++
++        internal override Type BaseType => expectedType;
++
++        private readonly Type expectedType;
++
++        internal RuntimeTypeSerializer(Type expectedType)
++        {
++            this.expectedType = expectedType;
++        }
++
++        public override void Write(ref ProtoWriter.State state, object value)
++        {
++            if (expectedType.IsValueType && value is not null)
++            {
++                value = RuntimeHelpers.GetObjectValue(value);
++            }
++            base.Write(ref state, value);
++        }
++
++        public override object Read(ref ProtoReader.State state, object value)
++        {
++            if (expectedType.IsValueType)
++            {
++                value = value is null
++                    ? BclHelpers.GetUninitializedObject(expectedType)
++                    : RuntimeHelpers.GetObjectValue(value);
++            }
++            return base.Read(ref state, value);
++        }
++    }
++}
+diff --git a/src/protobuf-net/Internal/Serializers/SurrogateSerializer.cs b/src/protobuf-net/Internal/Serializers/SurrogateSerializer.cs
+--- a/src/protobuf-net/Internal/Serializers/SurrogateSerializer.cs
++++ b/src/protobuf-net/Internal/Serializers/SurrogateSerializer.cs
+@@ -5,7 +5,7 @@
+ 
+ namespace ProtoBuf.Internal.Serializers
+ {
+-    internal sealed class SurrogateSerializer<T> : IProtoTypeSerializer, ISerializer<T>
++    internal class SurrogateSerializer : IProtoTypeSerializer
+     {
+         public SerializerFeatures Features => features;
+         bool IProtoTypeSerializer.IsSubType => false;
+@@ -22,35 +22,40 @@
+         void IProtoTypeSerializer.Callback(object value, ProtoBuf.Meta.TypeModel.CallbackType callbackType, ISerializationContext context) { }
+ 
+ 
+-        T ISerializer<T>.Read(ref ProtoReader.State state, T value)
+-            => (T)Read(ref state, value);
+-
+-        void ISerializer<T>.Write(ref ProtoWriter.State state, T value)
+-            => Write(ref state, value);
+-
+         public bool ReturnsValue => rootTail.ReturnsValue;
+ 
+         public bool RequiresOldValue => rootTail.RequiresOldValue;
+ 
+-        public Type ExpectedType => typeof(T);
++        public Type ExpectedType => expectedType;
+         Type IProtoTypeSerializer.BaseType => ExpectedType;
+ 
+-        private readonly Type declaredType;
++        private readonly Type expectedType, declaredType;
+         private readonly MethodInfo toTail, fromTail;
+         private readonly IRuntimeProtoSerializerNode rootTail;
+         private readonly SerializerFeatures features;
+ 
+-        public SurrogateSerializer(Type declaredType, MethodInfo toTail, MethodInfo fromTail, IRuntimeProtoSerializerNode rootTail, SerializerFeatures features)
++        public SurrogateSerializer(Type expectedType, Type declaredType, MethodInfo toTail, MethodInfo fromTail, IRuntimeProtoSerializerNode rootTail, SerializerFeatures features)
+         {
+             Debug.Assert(declaredType is not null, "declaredType");
+             Debug.Assert(rootTail is object, "rootTail");
+             Debug.Assert(declaredType == rootTail.ExpectedType || Helpers.IsSubclassOf(declaredType, rootTail.ExpectedType), "surrogate type mismatch");
++            this.expectedType = expectedType;
+             this.declaredType = declaredType;
+             this.rootTail = rootTail;
+             this.toTail = toTail ?? GetConversion(true);
+             this.fromTail = fromTail ?? GetConversion(false);
+             this.features = features;
+         }
++        protected SurrogateSerializer(SurrogateSerializer source)
++        {
++            expectedType = source.expectedType;
++            declaredType = source.declaredType;
++            rootTail = source.rootTail;
++            toTail = source.toTail;
++            fromTail = source.fromTail;
++            features = source.features;
++        }
++
+         private static bool HasCast(Type type, Type from, Type to, out MethodInfo op)
+         {
+             const BindingFlags flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+diff --git a/src/protobuf-net/Internal/Serializers/TypeSerializer.cs b/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
+--- a/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
++++ b/src/protobuf-net/Internal/Serializers/TypeSerializer.cs
+@@ -12,11 +12,33 @@
+ {
+     internal abstract class TypeSerializer
+     {
++        private static readonly Dictionary<Type, Func<TypeSerializer>> s_typedFactories = new Dictionary<Type, Func<TypeSerializer>>();
++
++        protected static ISerializationWriteScope ResolveWriteScope(object value)
++        {
++            return value as ISerializationWriteScope;
++        }
++
++        internal static void Register<T>()
++        {
++            lock (s_typedFactories)
++            {
++                if (!s_typedFactories.ContainsKey(typeof(T)))
++                    s_typedFactories.Add(typeof(T), () => new TypeSerializer<T>());
++            }
++        }
++
+         public static IProtoTypeSerializer Create(Type forType, int[] fieldNumbers, IRuntimeProtoSerializerNode[] serializers, MethodInfo[] baseCtorCallbacks, bool isRootType, bool useConstructor, bool assertKnownType, CallbackSet callbacks, Type constructType, MethodInfo factory, Type rootType, SerializerFeatures features)
+         {
+-            var obj = (TypeSerializer)(rootType is not null
++            Func<TypeSerializer> factoryForType = null;
++            if (rootType is null)
++            {
++                lock (s_typedFactories)
++                    s_typedFactories.TryGetValue(forType, out factoryForType);
++            }
++            var obj = factoryForType is not null ? factoryForType() : (TypeSerializer)(rootType is not null
+                 ? Activator.CreateInstance(typeof(InheritanceTypeSerializer<,>).MakeGenericType(rootType, forType), nonPublic: true)
+-                : Activator.CreateInstance(typeof(TypeSerializer<>).MakeGenericType(forType), nonPublic: true));
++                : new RuntimeTypeSerializer(forType));
+             
+             obj.Init(fieldNumbers, serializers, baseCtorCallbacks, isRootType, useConstructor, assertKnownType, callbacks, constructType, factory, features);
+             return (IProtoTypeSerializer)obj;
+@@ -147,7 +169,7 @@
+         }
+ 
+         private Type constructType;
+-        public Type ExpectedType => typeof(T);
++        public virtual Type ExpectedType => typeof(T);
+ 
+         internal virtual Type BaseType => typeof(T);
+         Type IProtoTypeSerializer.BaseType => BaseType;
+@@ -189,6 +211,8 @@
+             bool isRootType, bool useConstructor, bool assertKnownType,
+             CallbackSet callbacks, Type constructType, MethodInfo factory, SerializerFeatures features)
+         {
++            if (ExpectedType.IsValueType && typeof(ISerializationWriteScope).IsAssignableFrom(ExpectedType))
++                throw new NotSupportedException("Serialization write scope ownership requires a reference type contract.");
+             Debug.Assert(fieldNumbers is not null);
+             Debug.Assert(serializers is not null);
+             Debug.Assert(fieldNumbers.Length == serializers.Length);
+@@ -330,37 +354,47 @@
+ 
+         protected void SerializeImpl(ref ProtoWriter.State state, T value)
+         {
+-            Callback(ref value, TypeModel.CallbackType.BeforeSerialize, state.Context);
+-
+-            // write inheritance first
+-            if (CanHaveInheritance)
+-            {
+-                IRuntimeProtoSerializerNode next = GetMoreSpecificSerializer(value);
+-                if (next is object) next.Write(ref state, value);
+-            }
+-
+-            // write all actual fields
+-            //Debug.WriteLine(">> Writing fields for " + forType.FullName);
+-            for (int i = 0; i < serializers.Length; i++)
+-            {
+-                IRuntimeProtoSerializerNode ser = serializers[i];
+-                if (!(ser is IProtoTypeSerializer ts && ts.IsSubType))
+-                {
+-                    //Debug.WriteLine(": " + ser.ToString());
+-                    ser.Write(ref state, value);
+-                }
+-            }
+-            //Debug.WriteLine("<< Writing fields for " + forType.FullName);
+-
+-            if (UseTypedExtensible)
+-            {
+-                state.AppendExtensionData((ITypedExtensible)value, ExpectedType);
+-            }
+-            else if (GetFlag(StateFlags.IsExtensible))
+-            {
+-                state.AppendExtensionData((IExtensible)value);
+-            }
+-            Callback(ref value, TypeModel.CallbackType.AfterSerialize, state.Context);
++            ISerializationWriteScope scope = GetFlag(StateFlags.IsRootType) && !ExpectedType.IsValueType
++                ? ResolveWriteScope(value) : null;
++            scope?.BeginSerialization();
++            try
++            {
++                Callback(ref value, TypeModel.CallbackType.BeforeSerialize, state.Context);
++
++                // write inheritance first
++                if (CanHaveInheritance)
++                {
++                    IRuntimeProtoSerializerNode next = GetMoreSpecificSerializer(value);
++                    if (next is object) next.Write(ref state, value);
++                }
++
++                // write all actual fields
++                //Debug.WriteLine(">> Writing fields for " + forType.FullName);
++                for (int i = 0; i < serializers.Length; i++)
++                {
++                    IRuntimeProtoSerializerNode ser = serializers[i];
++                    if (!(ser is IProtoTypeSerializer ts && ts.IsSubType))
++                    {
++                        //Debug.WriteLine(": " + ser.ToString());
++                        ser.Write(ref state, value);
++                    }
++                }
++                //Debug.WriteLine("<< Writing fields for " + forType.FullName);
++
++                if (UseTypedExtensible)
++                {
++                    state.AppendExtensionData((ITypedExtensible)value, ExpectedType);
++                }
++                else if (GetFlag(StateFlags.IsExtensible))
++                {
++                    state.AppendExtensionData((IExtensible)value);
++                }
++                Callback(ref value, TypeModel.CallbackType.AfterSerialize, state.Context);
++            }
++            finally
++            {
++                scope?.EndSerialization();
++            }
+         }
+ 
+         protected Action<T, ISerializationContext> _subTypeOnBeforeDeserialize;
+@@ -553,6 +587,23 @@
+         {
+             Type expected = ExpectedType;
+             using Compiler.Local loc = ctx.GetLocalWithValue(expected, valueFrom);
++            bool ownsScope = GetFlag(StateFlags.IsRootType) && !expected.IsValueType
++                && (typeof(ISerializationWriteScope).IsAssignableFrom(expected) || !expected.IsSealed);
++            using Compiler.Local scope = ownsScope ? new Compiler.Local(ctx, typeof(ISerializationWriteScope)) : null;
++            Compiler.CodeLabel scopeEnd = default;
++            if (ownsScope)
++            {
++                ctx.LoadValue(loc);
++                ctx.TryCast(typeof(ISerializationWriteScope));
++                ctx.StoreValue(scope);
++                Compiler.CodeLabel noScope = ctx.DefineLabel();
++                ctx.LoadValue(scope);
++                ctx.BranchIfFalse(noScope, false);
++                ctx.LoadValue(scope);
++                ctx.EmitCall(typeof(ISerializationWriteScope).GetMethod(nameof(ISerializationWriteScope.BeginSerialization)));
++                ctx.MarkLabel(noScope);
++                scopeEnd = ctx.BeginTry();
++            }
+             // pre-callbacks
+             EmitCallbackIfNeeded(ctx, loc, TypeModel.CallbackType.BeforeSerialize);
+ 
+@@ -566,7 +617,7 @@
+                 {
+                     ctx.LoadValue(loc);
+                     ctx.EmitCall(typeof(TypeModel).GetMethod(nameof(TypeModel.IsSubType), BindingFlags.Static | BindingFlags.Public)
+-                        .MakeGenericMethod(typeof(T)));
++                        .MakeGenericMethod(ExpectedType));
+                     ctx.BranchIfFalse(startFields, false);
+ 
+                     for (int i = 0; i < serializers.Length; i++)
+@@ -646,6 +697,18 @@
+ 
+             // post-callbacks
+             EmitCallbackIfNeeded(ctx, loc, TypeModel.CallbackType.AfterSerialize);
++            if (ownsScope)
++            {
++                ctx.EndTry(scopeEnd, false);
++                ctx.BeginFinally();
++                Compiler.CodeLabel noScope = ctx.DefineLabel();
++                ctx.LoadValue(scope);
++                ctx.BranchIfFalse(noScope, false);
++                ctx.LoadValue(scope);
++                ctx.EmitCall(typeof(ISerializationWriteScope).GetMethod(nameof(ISerializationWriteScope.EndSerialization)));
++                ctx.MarkLabel(noScope);
++                ctx.EndFinally();
++            }
+         }
+ 
+         private bool UseTypedExtensible => GetFlag(StateFlags.IsTypedExtensible) && (HasInheritance || !GetFlag(StateFlags.IsExtensible));
+diff --git a/src/protobuf-net/Internal/Serializers/TypedSurrogateSerializer.cs b/src/protobuf-net/Internal/Serializers/TypedSurrogateSerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Internal/Serializers/TypedSurrogateSerializer.cs
+@@ -0,0 +1,34 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Internal.Serializers
++{
++    using System;
++    using System.Reflection;
++    using ProtoBuf.Serializers;
++
++    internal sealed class SurrogateSerializer<T> : SurrogateSerializer, ISerializer<T>
++    {
++        public SurrogateSerializer(
++            Type declaredType,
++            MethodInfo toTail,
++            MethodInfo fromTail,
++            IRuntimeProtoSerializerNode rootTail,
++            SerializerFeatures features
++        )
++            : base(typeof(T), declaredType, toTail, fromTail, rootTail, features) { }
++
++        internal SurrogateSerializer(SurrogateSerializer source)
++            : base(source) { }
++
++        T ISerializer<T>.Read(ref ProtoReader.State state, T value)
++        {
++            return (T)Read(ref state, value);
++        }
++
++        void ISerializer<T>.Write(ref ProtoWriter.State state, T value)
++        {
++            Write(ref state, value);
++        }
++    }
++}
+diff --git a/src/protobuf-net/Meta/MetaType.cs b/src/protobuf-net/Meta/MetaType.cs
+--- a/src/protobuf-net/Meta/MetaType.cs
++++ b/src/protobuf-net/Meta/MetaType.cs
+@@ -417,6 +417,8 @@
+             if (model is null) throw new ArgumentNullException(nameof(model));
+             if (type is null) throw new ArgumentNullException(nameof(type));
+ 
++            RepeatedSerializers.EnsureTypedProviderInitialized(type);
++
+             IRuntimeProtoSerializerNode coreSerializer = model.TryGetBasicTypeSerializer(type);
+             if (coreSerializer is object)
+             {
+@@ -545,7 +547,7 @@
+                 {
+                     try
+                     {
+-                        features = ExternalSerializer.Create(surrogateType, typeof(PrimaryTypeProvider)).Features;
++                        features = PrimarySerializerFeatures.Get(surrogateType);
+                     }
+                     catch (Exception ex)
+                     {
+@@ -563,6 +565,19 @@
+                     var ser = mt.Serializer;
+                     features = ser.Features;
+                     serializer = ser;
++                }
++                if (!RuntimeTypeModel.DynamicCodeAvailable)
++                {
++                    try
++                    {
++                        return new SurrogateSerializer(Type, surrogateType, underlyingToSurrogate,
++                            surrogateToUnderlying, serializer, features);
++                    }
++                    catch (Exception ex)
++                    {
++                        // Match the constructor exception wrapper from the original Activator path.
++                        throw new TargetInvocationException(ex);
++                    }
+                 }
+                 return (IProtoTypeSerializer)Activator.CreateInstance(typeof(SurrogateSerializer<>).MakeGenericType(Type),
+                     args: new object[] { surrogateType, underlyingToSurrogate, surrogateToUnderlying, serializer, features });
+@@ -988,6 +1003,13 @@
+             if (ctors.Length == 0 || (ctors.Length == 1 && ctors[0].GetParameters().Length == 0)) return null;
+ 
+             MemberInfo[] fieldsPropsUnfiltered = Helpers.GetInstanceFieldsAndProperties(type, true);
++            foreach (MemberInfo member in fieldsPropsUnfiltered)
++            {
++                if (member is PropertyInfo property && property.GetIndexParameters().Length != 0)
++                {
++                    return null;
++                }
++            }
+             var memberList = new List<MemberInfo>();
+             // for most types we'll enforce that you need readonly, because that is what protobuf-net
+             // always did historically; but: if you smell so much like a Tuple that it is *in your name*,
+diff --git a/src/protobuf-net/Meta/RuntimeTypeModel.cs b/src/protobuf-net/Meta/RuntimeTypeModel.cs
+--- a/src/protobuf-net/Meta/RuntimeTypeModel.cs
++++ b/src/protobuf-net/Meta/RuntimeTypeModel.cs
+@@ -1,4 +1,4 @@
+-﻿using ProtoBuf.Compiler;
++using ProtoBuf.Compiler;
+ using ProtoBuf.Internal;
+ using ProtoBuf.Internal.Serializers;
+ using ProtoBuf.Serializers;
+@@ -602,8 +602,18 @@
+             if (!string.IsNullOrWhiteSpace(name)) _name = name;
+         }
+ 
++        private static readonly bool s_dynamicCodeAvailable = ProbeDynamicCode();
++
++        internal static bool DynamicCodeAvailable => s_dynamicCodeAvailable;
++
+         [MethodImpl(MethodImplOptions.NoInlining)]
+         internal static bool EnableAutoCompile()
++        {
++            return DynamicCodeAvailable;
++        }
++
++        [MethodImpl(MethodImplOptions.NoInlining)]
++        private static bool ProbeDynamicCode()
+         {
+             try
+             {
+@@ -1006,8 +1016,85 @@
+ 
+         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+         private object GetServices<T>(CompatibilityLevel ambient)
+-            => (_serviceCache[typeof(T)] ?? GetServicesSlow(typeof(T), ambient));
+-
++        {
++            object service = _serviceCache[typeof(T)] ?? GetServicesSlow(typeof(T), ambient);
++            if (service is ISerializer<T>) return service;
++            if (service is RuntimeMapSerializer runtimeMap && runtimeMap.CollectionType == typeof(T))
++            {
++                ISerializer<T> typedMap = new RuntimeMapBoundary<T>(runtimeMap);
++                lock (_serviceCache)
++                {
++                    if (_serviceCache[typeof(T)] is ISerializer<T> existing) return existing;
++                    _serviceCache[typeof(T)] = typedMap;
++                }
++                return typedMap;
++            }
++            Type underlying = Nullable.GetUnderlyingType(typeof(T));
++            if (underlying is not null && !underlying.IsEnum)
++            {
++                IProtoTypeSerializer contract = service as IProtoTypeSerializer;
++                if (contract is null)
++                {
++                    int index = FindOrAddAuto(underlying, false, true, false, ambient);
++                    if (index >= 0) contract = ((MetaType)types[index]).Serializer;
++                }
++                if (contract is null || contract.ExpectedType != underlying) return service;
++                ISerializer<T> nullable = new NullableContractSerializer<T>(contract);
++                lock (_serviceCache)
++                {
++                    if (_serviceCache[typeof(T)] is ISerializer<T> existing) return existing;
++                    _serviceCache[typeof(T)] = nullable;
++                }
++                return nullable;
++            }
++            if (service is RuntimeTypeSerializer runtimeContract && runtimeContract.ExpectedType == typeof(T))
++            {
++                ISerializer<T> typed = new RuntimeContractSerializer<T>(runtimeContract);
++                lock (_serviceCache)
++                {
++                    if (_serviceCache[typeof(T)] is ISerializer<T> existing) return existing;
++                    _serviceCache[typeof(T)] = typed;
++                }
++                return typed;
++            }
++            if (service is SurrogateSerializer surrogate && surrogate.ExpectedType == typeof(T))
++            {
++                ISerializer<T> typed = new SurrogateSerializer<T>(surrogate);
++                lock (_serviceCache)
++                {
++                    if (_serviceCache[typeof(T)] is ISerializer<T> existing) return existing;
++                    _serviceCache[typeof(T)] = typed;
++                }
++                return typed;
++            }
++            return service;
++        }
++
++        private readonly HashSet<Type> nullableContractTypes = new HashSet<Type>();
++
++        internal void NoteNullableContract(Type type, CompatibilityLevel compatibilityLevel)
++        {
++            Type underlying = Nullable.GetUnderlyingType(type);
++            if (underlying is null || underlying.IsEnum) return;
++            if (ValueMember.TryGetCoreSerializer(this, DataFormat.Default, compatibilityLevel, underlying,
++                out _, false, false, false, false) is not null) return;
++            if (FindOrAddAuto(underlying, false, true, false, compatibilityLevel) < 0) return;
++            lock (_serviceCache)
++            {
++                nullableContractTypes.Add(type);
++            }
++        }
++
++
++        internal void NoteNullableEnum(Type type, CompatibilityLevel compatibilityLevel)
++        {
++            RepeatedSerializerStub repeated = TryGetRepeatedProvider(type, compatibilityLevel);
++            Type underlying = Nullable.GetUnderlyingType(repeated is null ? type : repeated.ItemType);
++            if (underlying is not null && underlying.IsEnum)
++            {
++                FindOrAddAuto(underlying, true, false, true, compatibilityLevel);
++            }
++        }
+ 
+         private readonly Hashtable _serviceCache = [];
+         internal void ResetServiceCache(Type type)
+@@ -1017,6 +1104,16 @@
+                 lock (_serviceCache)
+                 {
+                     _serviceCache.Remove(type);
++                    lock (_runtimeDictionaryEnumItems)
++                    {
++                        _runtimeDictionaryEnumItems.Remove(type);
++                        if (type.IsValueType && Nullable.GetUnderlyingType(type) is null)
++                        {
++                            Type nullableType = typeof(Nullable<>).MakeGenericType(type);
++                            _serviceCache.Remove(nullableType);
++                            _runtimeDictionaryEnumItems.Remove(nullableType);
++                        }
++                    }
+                 }
+             }
+         }
+@@ -1076,7 +1173,18 @@
+ 
+                 // rule out repeated (this has an internal cache etc)
+                 var repeated = model.TryGetRepeatedProvider(type); // this handles ignores, etc
+-                if (repeated is not null) return repeated.Serializer;
++                if (repeated is not null)
++                {
++                    if (repeated.IsMap)
++                    {
++                        repeated.ResolveMapTypes(out Type keyType, out Type valueType);
++                        model.NoteNullableEnum(keyType, ambient);
++                        model.NoteNullableEnum(valueType, ambient);
++                        model.NoteNullableContract(keyType, ambient);
++                        model.NoteNullableContract(valueType, ambient);
++                    }
++                    return repeated.Serializer;
++                }
+ 
+                 int typeIndex = model.FindOrAddAuto(type, false, true, false, ambient);
+                 if (typeIndex >= 0)
+@@ -1508,7 +1616,9 @@
+                 }
+                 else if (ShouldEmitCustomSerializerProxy(metaType.SerializerType))
+                 {
+-                    AddProxy(type, runtimeType, metaType.SerializerType, false);
++                    bool includeNullable = runtimeType.IsValueType
++                        && HasNullableExternalService(metaType, typeof(Nullable<>).MakeGenericType(runtimeType));
++                    AddProxy(type, runtimeType, metaType.SerializerType, includeNullable);
+                 }
+                 else if ((repeated = TryGetRepeatedProvider(runtimeType)) is not null)
+                 {
+@@ -1574,6 +1684,10 @@
+             return repeated;
+         }
+ 
++        private static bool HasNullableExternalService(MetaType metaType, Type nullableType)
++            => metaType.Serializer is IExternalSerializer external
++                && typeof(ISerializer<>).MakeGenericType(nullableType).IsInstanceOfType(external.Service);
++
+         private static void AddProxy(TypeBuilder building, Type proxying, MemberInfo provider, bool includeNullable)
+         {
+             provider = GetUnderlyingProvider(provider, proxying);
+@@ -1591,6 +1705,7 @@
+                     building.AddInterfaceImplementation(iType);
+                     il = CompilerContextScope.Implement(building, iType, "get_" + nameof(ISerializerProxy<string>.Serializer));
+                     EmitProvider(provider, il);
++                    il.Emit(OpCodes.Castclass, typeof(ISerializer<>).MakeGenericType(typeof(Nullable<>).MakeGenericType(proxying)));
+                     il.Emit(OpCodes.Ret);
+                 }
+             }
+@@ -1616,6 +1731,50 @@
+                 return method;
+             }
+ 
++            void WriteNullableSerializer(MetaType metaType, IProtoTypeSerializer serializer)
++            {
++                Type runtimeType = metaType.Type;
++                if (runtimeType.IsValueType)
++                {
++                    Type nullableType = typeof(Nullable<>).MakeGenericType(runtimeType);
++                    bool needsNullableService;
++                    lock (_serviceCache)
++                    {
++                        needsNullableService = nullableContractTypes.Contains(nullableType);
++                    }
++                    if (needsNullableService
++                        && (metaType.SerializerType is null
++                            || !HasNullableExternalService(metaType, nullableType)))
++                    {
++                        Type nullableService = typeof(ISerializer<>).MakeGenericType(nullableType);
++                        type.AddInterfaceImplementation(nullableService);
++                        ILGenerator nullableReader = CompilerContextScope.Implement(type, nullableService, nameof(ISerializer<string>.Read));
++                        using (CompilerContext context = new CompilerContext(scope, nullableReader, false,
++                            CompilerContext.SignatureType.ReaderScope_Input, this, nullableType, nameof(ISerializer<string>.Read)))
++                        {
++                            using Local underlyingValue = new Local(context, runtimeType);
++                            context.LoadAddress(context.InputValue, nullableType);
++                            context.EmitCall(nullableType.GetMethod(nameof(Nullable<int>.GetValueOrDefault), Type.EmptyTypes));
++                            context.StoreValue(underlyingValue);
++                            serializer.EmitRead(context, underlyingValue);
++                            context.LoadValue(underlyingValue);
++                            context.EmitCtor(nullableType, runtimeType);
++                            context.Return();
++                        }
++                        ILGenerator nullableWriter = CompilerContextScope.Implement(type, nullableService, nameof(ISerializer<string>.Write));
++                        using (CompilerContext context = new CompilerContext(scope, nullableWriter, false,
++                            CompilerContext.SignatureType.WriterScope_Input, this, nullableType, nameof(ISerializer<string>.Write)))
++                        {
++                            context.WriteNullCheckedTail(nullableType, serializer, context.InputValue);
++                            context.Return();
++                        }
++                        type.DefineMethodOverride(GetFeaturesMethod(serializer.Features),
++                            nullableService.GetProperty(nameof(ISerializer<string>.Features)).GetGetMethod());
++                    }
++                }
++
++            }
++
+             for (int index = 0; index < types.Count; index++)
+             {
+                 var metaType = (MetaType)types[index];
+@@ -1625,6 +1784,7 @@
+                 metaType.Validate();
+                 if (runtimeType.IsEnum || metaType.SerializerType is not null || TryGetRepeatedProvider(metaType.Type) is not null)
+                 {   // we don't implement these
++                    if (metaType.SerializerType is not null) WriteNullableSerializer(metaType, serializer);
+                     continue;
+                 }
+                 if (!IsFullyPublic(runtimeType, out var problem))
+@@ -1663,6 +1823,8 @@
+ 
+                 var featuresGetter = serType.GetProperty(nameof(ISerializer<string>.Features)).GetGetMethod();
+                 type.DefineMethodOverride(GetFeaturesMethod(serializer.Features), featuresGetter);
++
++                WriteNullableSerializer(metaType, serializer);
+ 
+                 // and we emit the sub-type serializer whenever inheritance is involved
+                 if (serializer.HasInheritance)
+@@ -2309,6 +2471,105 @@
+                 return value.Method;
+             }
+         }
++        /// <summary>Registers an existing typed repeated provider for runtime AOT serialization.</summary>
++        public static void RegisterRepeatedSerializer<TCollection, TItem>(RepeatedSerializer<TCollection, TItem> serializer)
++        {
++            RepeatedSerializers.Register(serializer);
++            TypeSerializer.Register<TItem>();
++        }
++
++        /// <summary>Registers a functional keys-and-values root wrapper reached through the collection lifecycle.</summary>
++        public static void RegisterCollectionWrapperSerializer<TCollection, TKey, TValue>(
++            CollectionWrapperSerializer<TCollection, TKey, TValue> serializer
++        )
++            where TCollection : class
++        {
++            CollectionWrapperSerializers.Register(serializer);
++        }
++
++        /// <summary>Writes a registered collection root without reflected wrapper construction when dynamic code is unavailable.</summary>
++        public bool TrySerializeCollectionWrapper<TCollection>(
++            Stream destination,
++            TCollection collection
++        )
++        {
++            if (DynamicCodeAvailable)
++                return false;
++            var serializer = CollectionWrapperSerializers.Resolve(typeof(TCollection));
++            return serializer is not null && serializer.TryWrite(this, destination, collection);
++        }
++
++        /// <summary>Reads a registered collection root without reflected wrapper construction when dynamic code is unavailable.</summary>
++        public bool TryDeserializeCollectionWrapper(
++            Type collectionType,
++            Stream source,
++            out object collection
++        )
++        {
++            collection = null;
++            if (DynamicCodeAvailable)
++                return false;
++            var serializer = CollectionWrapperSerializers.Resolve(collectionType);
++            return serializer is not null && serializer.TryRead(this, source, out collection);
++        }
++
++        /// <summary>Preserves an explicit dictionary codec while avoiding reflected enum factories when runtime compilation is unavailable.</summary>
++        public IRepeatedSerializer<TCollection> AdaptDictionarySerializerForRuntimeEnums<TCollection, TKey, TValue>(
++            MapSerializer<TCollection, TKey, TValue> serializer)
++            where TCollection : IDictionary<TKey, TValue>
++        {
++            if (serializer is null || DynamicCodeAvailable || !IsDictionaryEnum(typeof(TKey)) && !IsDictionaryEnum(typeof(TValue)))
++                return serializer;
++            return RuntimeEnumDictionarySerializer<TCollection, TKey, TValue>.Get(serializer);
++        }
++
++        private static bool IsDictionaryEnum(Type type)
++        {
++            return (Nullable.GetUnderlyingType(type) ?? type).IsEnum;
++        }
++
++        private readonly Hashtable _runtimeDictionaryEnumItems = new Hashtable();
++
++        internal ISerializer<T> GetRuntimeDictionaryEnumItem<T>()
++        {
++            Type type = typeof(T);
++            Type underlying = Nullable.GetUnderlyingType(type) ?? type;
++            if (!underlying.IsEnum) return null;
++            lock (_serviceCache)
++            {
++                object service = _serviceCache[type] ?? _serviceCache[underlying];
++                if (service is not null) return service as ISerializer<T>;
++            }
++            lock (_runtimeDictionaryEnumItems)
++            {
++                if (_runtimeDictionaryEnumItems[type] is ISerializer<T> existing) return existing;
++                if (!RuntimeMapSlot.TryCreate(this, type, default, DefaultCompatibilityLevel,
++                    DataFormat.Default, out RuntimeMapSlot slot)) return null;
++                ISerializer<T> serializer = new RuntimeCollectionItemSerializer<T>(slot);
++                _runtimeDictionaryEnumItems[type] = serializer;
++                return serializer;
++            }
++        }
++
++        /// <summary>Registers a real construction factory for an existing mutable dictionary provider on runtimes without dynamic code.</summary>
++        public static void RegisterRepeatedSerializer<TCollection, TKey, TValue>(Func<TCollection> factory)
++            where TCollection : class, IDictionary<TKey, TValue>, System.Collections.IDictionary
++        {
++            RepeatedSerializers.RegisterMapFactory<TCollection, TKey, TValue>(factory);
++        }
++
++        /// <summary>Registers the functional factory for a declared external serializer provider.</summary>
++        public static void RegisterExternalSerializer<TProvider, T>() where TProvider : class
++        {
++            ExternalSerializerFactories.Register<TProvider, T>();
++        }
++
++        /// <summary>Registers the declared provider and its supplied nullable service bridge.</summary>
++        public static void RegisterNullableExternalSerializer<TProvider, T>() where TProvider : class where T : struct
++        {
++            ExternalSerializerFactories.RegisterNullable<TProvider, T>();
++        }
++
+         private Hashtable _externalProviders = null;
+         /// <summary>
+         /// Add an externally defined serializer
+diff --git a/src/protobuf-net/Meta/ValueMember.cs b/src/protobuf-net/Meta/ValueMember.cs
+--- a/src/protobuf-net/Meta/ValueMember.cs
++++ b/src/protobuf-net/Meta/ValueMember.cs
+@@ -433,6 +433,10 @@
+             var valueCompatibilityLevel = GetEffectiveCompatibilityLevel(compatibilityLevel, valueFormat);
+ 
+             repeated.ResolveMapTypes(out var keyType, out var valueType);
++            model.NoteNullableEnum(keyType, keyCompatibilityLevel);
++            model.NoteNullableEnum(valueType, valueCompatibilityLevel);
++            model.NoteNullableContract(keyType, keyCompatibilityLevel);
++            model.NoteNullableContract(valueType, valueCompatibilityLevel);
+             _ = TryGetCoreSerializer(model, keyFormat, keyCompatibilityLevel, FlattenRepeated(model, keyType), out var keyWireType, false, false, false, true);
+             _ = TryGetCoreSerializer(model, valueFormat, valueCompatibilityLevel, FlattenRepeated(model, valueType), out var valueWireType, asReference, dynamicType, false, true);
+ 
+@@ -606,6 +610,7 @@
+             bool asReference, bool dynamicType, bool overwriteList, bool allowComplexTypes)
+         {
+             compatibilityLevel = ValueMember.GetEffectiveCompatibilityLevel(compatibilityLevel, dataFormat);
++            type = Nullable.GetUnderlyingType(type) ?? type;
+             type = DynamicStub.GetEffectiveType(type);
+             if (type.IsEnum)
+             {
+diff --git a/src/protobuf-net/Serializers/CollectionWrapperSerializer.Generic.cs b/src/protobuf-net/Serializers/CollectionWrapperSerializer.Generic.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Serializers/CollectionWrapperSerializer.Generic.cs
+@@ -0,0 +1,180 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Serializers
++{
++    using System;
++    using System.IO;
++    using ProtoBuf.Internal.Serializers;
++    using ProtoBuf.Meta;
++
++    /// <summary>Encodes the existing keys, values and optional nullable-presence root fields through typed array operations.</summary>
++    public abstract class CollectionWrapperSerializer<TCollection, TKey, TValue>
++        : CollectionWrapperSerializer
++        where TCollection : class
++    {
++        internal override Type CollectionType => typeof(TCollection);
++
++        private static bool TryResolveSlots(
++            RuntimeTypeModel model,
++            out RuntimeCollectionItemSerializer<TKey> key,
++            out RuntimeCollectionItemSerializer<TValue> value
++        )
++        {
++            key = null;
++            value = null;
++            if (
++                !RuntimeMapSlot.TryCreate(
++                    model,
++                    typeof(TKey),
++                    default,
++                    model.DefaultCompatibilityLevel,
++                    DataFormat.Default,
++                    out RuntimeMapSlot keySlot
++                )
++                || !RuntimeMapSlot.TryCreate(
++                    model,
++                    typeof(TValue),
++                    default,
++                    model.DefaultCompatibilityLevel,
++                    DataFormat.Default,
++                    out RuntimeMapSlot valueSlot
++                )
++            )
++            {
++                return false;
++            }
++            key = new RuntimeCollectionItemSerializer<TKey>(keySlot);
++            value = new RuntimeCollectionItemSerializer<TValue>(valueSlot);
++            return true;
++        }
++
++        /// <summary>Prepares typed arrays and optional nullable presence data for the owned collection.</summary>
++        protected abstract void Prepare(
++            TCollection collection,
++            out TKey[] keys,
++            out TValue[] values,
++            out byte[] presence
++        );
++        /// <summary>Restores an owned collection from validated typed arrays and optional presence data.</summary>
++        protected abstract TCollection Restore(TKey[] keys, TValue[] values, byte[] presence);
++
++        internal override bool TryWrite(
++            RuntimeTypeModel model,
++            Stream destination,
++            object collection
++        )
++        {
++            if (
++                !TryResolveSlots(
++                    model,
++                    out RuntimeCollectionItemSerializer<TKey> key,
++                    out RuntimeCollectionItemSerializer<TValue> value
++                )
++            )
++            {
++                return false;
++            }
++            Prepare(
++                (TCollection)collection,
++                out TKey[] keys,
++                out TValue[] values,
++                out byte[] presence
++            );
++            ProtoWriter.State state = ProtoWriter.State.Create(destination, model);
++            try
++            {
++                RepeatedSerializer
++                    .CreateVector<TKey>()
++                    .WriteRepeated(
++                        ref state,
++                        1,
++                        SerializerFeatures.OptionPackedDisabled,
++                        keys,
++                        key
++                    );
++                RepeatedSerializer
++                    .CreateVector<TValue>()
++                    .WriteRepeated(
++                        ref state,
++                        2,
++                        SerializerFeatures.OptionPackedDisabled,
++                        values,
++                        value
++                    );
++                if (presence != null && 0 < presence.Length)
++                {
++                    state.WriteFieldHeader(3, WireType.String);
++                    state.WriteBytes(presence);
++                }
++                state.Close();
++                return true;
++            }
++            finally
++            {
++                state.Dispose();
++            }
++        }
++
++        internal override bool TryRead(RuntimeTypeModel model, Stream source, out object collection)
++        {
++            collection = null;
++            if (
++                !TryResolveSlots(
++                    model,
++                    out RuntimeCollectionItemSerializer<TKey> key,
++                    out RuntimeCollectionItemSerializer<TValue> value
++                )
++            )
++            {
++                return false;
++            }
++            TKey[] keys = null;
++            TValue[] values = null;
++            byte[] presence = null;
++            ProtoReader.State state = ProtoReader.State.Create(source, model);
++            try
++            {
++                int field;
++                while (0 < (field = state.ReadFieldHeader()))
++                {
++                    switch (field)
++                    {
++                        case 1:
++                            keys = RepeatedSerializer
++                                .CreateVector<TKey>()
++                                .ReadRepeated(
++                                    ref state,
++                                    SerializerFeatures.OptionClearCollection,
++                                    keys,
++                                    key
++                                );
++                            break;
++                        case 2:
++                            values = RepeatedSerializer
++                                .CreateVector<TValue>()
++                                .ReadRepeated(
++                                    ref state,
++                                    SerializerFeatures.OptionClearCollection,
++                                    values,
++                                    value
++                                );
++                            break;
++                        case 3:
++                            presence = state.AppendBytes((byte[])null);
++                            break;
++                        default:
++                            state.SkipField();
++                            break;
++                    }
++                }
++                collection = Restore(keys, values, presence);
++                return true;
++            }
++            finally
++            {
++                state.Dispose();
++            }
++        }
++    }
++}
+diff --git a/src/protobuf-net/Serializers/CollectionWrapperSerializer.cs b/src/protobuf-net/Serializers/CollectionWrapperSerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Serializers/CollectionWrapperSerializer.cs
+@@ -0,0 +1,25 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Serializers
++{
++    using System;
++    using System.IO;
++    using ProtoBuf.Meta;
++
++    /// <summary>Provides real construction and array access for a registered keys-and-values root wrapper.</summary>
++    public abstract class CollectionWrapperSerializer
++    {
++        internal abstract Type CollectionType { get; }
++        internal abstract bool TryWrite(
++            RuntimeTypeModel model,
++            Stream destination,
++            object collection
++        );
++        internal abstract bool TryRead(
++            RuntimeTypeModel model,
++            Stream source,
++            out object collection
++        );
++    }
++}
+diff --git a/src/protobuf-net/Serializers/CollectionWrapperSerializers.cs b/src/protobuf-net/Serializers/CollectionWrapperSerializers.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Serializers/CollectionWrapperSerializers.cs
+@@ -0,0 +1,60 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Serializers
++{
++    using System;
++    using System.Collections.Generic;
++    using ProtoBuf.Internal;
++
++    internal static class CollectionWrapperSerializers
++    {
++        private static readonly Dictionary<Type, CollectionWrapperSerializer> serializers =
++            new Dictionary<Type, CollectionWrapperSerializer>();
++
++        internal static void Register(CollectionWrapperSerializer serializer)
++        {
++            if (serializer is null)
++            {
++                ThrowHelper.ThrowArgumentNullException(nameof(serializer));
++            }
++            lock (serializers)
++            {
++                if (
++                    serializers.TryGetValue(
++                        serializer.CollectionType,
++                        out CollectionWrapperSerializer existing
++                    )
++                )
++                {
++                    if (!ReferenceEquals(existing, serializer))
++                    {
++                        ThrowHelper.ThrowInvalidOperationException(
++                            "A different collection wrapper serializer is already registered."
++                        );
++                    }
++                    return;
++                }
++                serializers.Add(serializer.CollectionType, serializer);
++            }
++        }
++
++        internal static CollectionWrapperSerializer Resolve(Type collectionType)
++        {
++            if (collectionType is null)
++            {
++                return null;
++            }
++            RepeatedSerializers.EnsureTypedProviderInitialized(collectionType);
++            lock (serializers)
++            {
++                return serializers.TryGetValue(
++                    collectionType,
++                    out CollectionWrapperSerializer serializer
++                )
++                    ? serializer
++                    : null;
++            }
++        }
++    }
++}
+diff --git a/src/protobuf-net/Serializers/RepeatedSerializerStub.cs b/src/protobuf-net/Serializers/RepeatedSerializerStub.cs
+--- a/src/protobuf-net/Serializers/RepeatedSerializerStub.cs
++++ b/src/protobuf-net/Serializers/RepeatedSerializerStub.cs
+@@ -64,6 +64,13 @@
+         {
+             try
+             {
++                _serializer = RepeatedSerializers.TryGetTypedProvider(ForType, Provider);
++                if (_serializer is not null) return _serializer;
++                if (!RuntimeTypeModel.DynamicCodeAvailable)
++                {
++                    _serializer = ProtoBuf.Internal.Serializers.RuntimeMapSerializer.TryCreate(this);
++                    if (_serializer is not null) return _serializer;
++                }
+                 _serializer = RuntimeTypeModel.GetUnderlyingProvider(Provider, ForType) switch
+                 {
+                     FieldInfo field when field.IsStatic => field.GetValue(null),
+@@ -74,6 +81,27 @@
+             }
+             catch(TargetInvocationException tie) when (tie.InnerException is not null)
+             {
++                throw tie.InnerException;
++            }
++        }
++
++        private object _authoritativeSerializer;
++        internal object CreateAuthoritativeSerializer()
++        {
++            if (_authoritativeSerializer is not null) return _authoritativeSerializer;
++            try
++            {
++                _authoritativeSerializer = RuntimeTypeModel.GetUnderlyingProvider(Provider, ForType) switch
++                {
++                    FieldInfo field when field.IsStatic => field.GetValue(null),
++                    MethodInfo method when method.IsStatic => method.Invoke(null, null),
++                    _ => null,
++                };
++                return _authoritativeSerializer;
++            }
++            catch (TargetInvocationException tie) when (tie.InnerException is not null)
++            {
++                // Preserve the original CreateSerializer exception contract; this does not select a fallback.
+                 throw tie.InnerException;
+             }
+         }
+diff --git a/src/protobuf-net/Serializers/RepeatedSerializers.cs b/src/protobuf-net/Serializers/RepeatedSerializers.cs
+--- a/src/protobuf-net/Serializers/RepeatedSerializers.cs
++++ b/src/protobuf-net/Serializers/RepeatedSerializers.cs
+@@ -16,6 +16,9 @@
+     internal static partial class RepeatedSerializers
+     {
+         private static readonly Hashtable s_providers;
++        private static readonly Hashtable s_typedProviders = new Hashtable();
++        private static readonly Dictionary<Type, (MemberInfo Provider, Func<object> Factory, Delegate Source)> s_mapFactories = new();
++        private static readonly HashSet<Type> s_resolvedRuntimeMaps = new();
+ 
+         private static readonly Hashtable s_methodsPerDeclaringType = new Hashtable(), s_knownTypes = new Hashtable();
+         internal static MemberInfo Resolve(Type declaringType, string methodName, Type[] targs)
+@@ -104,6 +107,133 @@
+ 
+             // fallbacks, these should be at the end
+             Add(typeof(IEnumerable<>), (root, current, targs) => Resolve(typeof(RepeatedSerializer), nameof(RepeatedSerializer.CreateEnumerable), new[] { root, targs[0] }), false);
++
++            RegisterIntrinsic<bool>();
++            RegisterIntrinsic<bool?>();
++            RegisterIntrinsic<byte>();
++            RegisterIntrinsic<byte?>();
++            RegisterIntrinsic<sbyte>();
++            RegisterIntrinsic<sbyte?>();
++            RegisterIntrinsic<short>();
++            RegisterIntrinsic<short?>();
++            RegisterIntrinsic<ushort>();
++            RegisterIntrinsic<ushort?>();
++            RegisterIntrinsic<int>();
++            RegisterIntrinsic<int?>();
++            RegisterIntrinsic<uint>();
++            RegisterIntrinsic<uint?>();
++            RegisterIntrinsic<long>();
++            RegisterIntrinsic<long?>();
++            RegisterIntrinsic<ulong>();
++            RegisterIntrinsic<ulong?>();
++            RegisterIntrinsic<char>();
++            RegisterIntrinsic<char?>();
++            RegisterIntrinsic<float>();
++            RegisterIntrinsic<float?>();
++            RegisterIntrinsic<double>();
++            RegisterIntrinsic<double?>();
++            RegisterIntrinsic<decimal>();
++            RegisterIntrinsic<decimal?>();
++            RegisterIntrinsic<DateTime>();
++            RegisterIntrinsic<DateTime?>();
++            RegisterIntrinsic<TimeSpan>();
++            RegisterIntrinsic<TimeSpan?>();
++            RegisterIntrinsic<Guid>();
++            RegisterIntrinsic<Guid?>();
++            RegisterIntrinsic<IntPtr>();
++            RegisterIntrinsic<IntPtr?>();
++            RegisterIntrinsic<UIntPtr>();
++            RegisterIntrinsic<UIntPtr?>();
++            RegisterIntrinsic<byte[]>();
++            RegisterIntrinsic<ArraySegment<byte>>();
++            RegisterIntrinsic<Memory<byte>>();
++            RegisterIntrinsic<ReadOnlyMemory<byte>>();
++            RegisterIntrinsic<string>();
++            RegisterIntrinsic<Uri>();
++            RegisterIntrinsic<Type>();
++        }
++
++        private static void RegisterIntrinsic<T>()
++        {
++            Register(RepeatedSerializer.CreateList<T>());
++            if (typeof(T) != typeof(byte)) Register(RepeatedSerializer.CreateVector<T>());
++        }
++
++        internal static void Register<TCollection, TItem>(RepeatedSerializer<TCollection, TItem> serializer)
++        {
++            if (serializer is null) ThrowHelper.ThrowArgumentNullException(nameof(serializer));
++            var type = typeof(TCollection);
++            var provider = GetProviderForType(type, null);
++            if (provider is null) ThrowHelper.ThrowArgumentException("The collection has no repeated provider.", nameof(serializer));
++            var metadata = RepeatedSerializerStub.Create(type, provider);
++            if (metadata.ItemType != typeof(TItem) || metadata.IsMap)
++                ThrowHelper.ThrowArgumentException("The serializer does not match the collection item type.", nameof(serializer));
++            lock (s_typedProviders)
++            {
++                var existing = (TypedProvider)s_typedProviders[type];
++                if (existing is not null && (!Equals(existing.Provider, provider) || !ReferenceEquals(existing.Serializer, serializer)))
++                    ThrowHelper.ThrowInvalidOperationException("A different typed repeated provider is already registered.");
++                s_typedProviders[type] = new TypedProvider(provider, serializer,
++                    (fieldNumber, features, compatibilityLevel, dataFormat, stub) =>
++                        new ProtoBuf.Internal.Serializers.RepeatedDecorator<TCollection, TItem>(fieldNumber, features, compatibilityLevel, dataFormat, stub));
++            }
++        }
++
++        internal static void RegisterMapFactory<TCollection, TKey, TValue>(Func<TCollection> factory)
++            where TCollection : class, IDictionary<TKey, TValue>, IDictionary
++        {
++            if (factory is null) ThrowHelper.ThrowArgumentNullException(nameof(factory));
++            Type type = typeof(TCollection);
++            MemberInfo provider = GetProviderForType(type, null);
++            var metadata = RepeatedSerializerStub.Create(type, provider);
++            if (!metadata.IsMap) ThrowHelper.ThrowArgumentException("The collection has no map provider.", nameof(factory));
++            metadata.ResolveMapTypes(out Type keyType, out Type valueType);
++            if (keyType != typeof(TKey) || valueType != typeof(TValue))
++                ThrowHelper.ThrowArgumentException("The factory does not match the map key and value types.", nameof(factory));
++            lock (s_mapFactories)
++            {
++                if (s_mapFactories.TryGetValue(type, out var existing))
++                {
++                    if (!Equals(existing.Provider, provider) || !Equals(existing.Source, factory))
++                        ThrowHelper.ThrowInvalidOperationException("A different map factory is already registered.");
++                    return;
++                }
++                if (s_resolvedRuntimeMaps.Contains(type))
++                    ThrowHelper.ThrowInvalidOperationException("Register the map factory before runtime map metadata is resolved.");
++                s_mapFactories.Add(type, (provider, () => factory(), factory));
++            }
++        }
++
++        internal static Func<object> ResolveMapFactory(Type type, MemberInfo provider)
++        {
++            lock (s_mapFactories)
++            {
++                // Lookup and resolution marking are atomic: late registration cannot race a cached null factory.
++                s_resolvedRuntimeMaps.Add(type);
++                return s_mapFactories.TryGetValue(type, out var registration) && Equals(registration.Provider, provider)
++                    ? registration.Factory : null;
++            }
++        }
++
++        internal static object TryGetTypedProvider(Type type, MemberInfo provider)
++        {
++            lock (s_typedProviders)
++            {
++                var typed = (TypedProvider)s_typedProviders[type];
++                return typed is not null && Equals(typed.Provider, provider) ? typed.Serializer : null;
++            }
++        }
++
++        internal static ProtoBuf.Internal.Serializers.IRuntimeProtoSerializerNode TryCreateTypedDecorator(
++            RepeatedSerializerStub stub, int fieldNumber, SerializerFeatures features, CompatibilityLevel compatibilityLevel, DataFormat dataFormat)
++        {
++            TypedProvider typed;
++            lock (s_typedProviders)
++            {
++                typed = (TypedProvider)s_typedProviders[stub.ForType];
++            }
++            return typed is not null && Equals(typed.Provider, stub.Provider)
++                ? typed.CreateDecorator(fieldNumber, features, compatibilityLevel, dataFormat, stub) : null;
+         }
+ 
+         public static void Add(Type type, Func<Type, Type, Type[], MemberInfo> implementation, bool exactOnly = true, Hashtable externalProviders = null)
+@@ -121,9 +251,23 @@
+             }
+         }
+ 
++        internal static void EnsureTypedProviderInitialized(Type type)
++        {
++            if (type is null || type.ContainsGenericParameters) return;
++            for (Type current = type; current is not null; current = current.BaseType)
++            {
++                if (current.IsDefined(typeof(TypedRepeatedProviderAttribute), false))
++                {
++                    System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(current.TypeHandle);
++                    return;
++                }
++            }
++        }
++
+         internal static RepeatedSerializerStub TryGetRepeatedProvider(Type type, Hashtable externalProvders = null)
+         {
+             if (type is null || type == typeof(string)) return null;
++            EnsureTypedProviderInitialized(type);
+ 
+             var known = (RepeatedSerializerStub)s_knownTypes[type];
+             if (known is null)
+@@ -305,6 +449,19 @@
+             return true;
+         }
+ 
++        private sealed class TypedProvider
++        {
++            internal MemberInfo Provider { get; }
++            internal object Serializer { get; }
++            internal Func<int, SerializerFeatures, CompatibilityLevel, DataFormat, RepeatedSerializerStub, ProtoBuf.Internal.Serializers.IRuntimeProtoSerializerNode> CreateDecorator { get; }
++            internal TypedProvider(MemberInfo provider, object serializer, Func<int, SerializerFeatures, CompatibilityLevel, DataFormat, RepeatedSerializerStub, ProtoBuf.Internal.Serializers.IRuntimeProtoSerializerNode> createDecorator)
++            {
++                Provider = provider;
++                Serializer = serializer;
++                CreateDecorator = createDecorator;
++            }
++        }
++
+         private sealed class Registration
+         {
+             public MemberInfo Resolve(Type root, Type current)
+diff --git a/src/protobuf-net/Serializers/RuntimeEnumDictionarySerializer.cs b/src/protobuf-net/Serializers/RuntimeEnumDictionarySerializer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/protobuf-net/Serializers/RuntimeEnumDictionarySerializer.cs
+@@ -0,0 +1,115 @@
++// MIT License - Copyright (c) 2026 wallstop
++// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
++
++namespace ProtoBuf.Serializers
++{
++    using System.Collections.Generic;
++    using System.Runtime.CompilerServices;
++    using ProtoBuf.Meta;
++
++    /// <summary>Retains an explicit dictionary codec while using runtime enum items for its real enum slots.</summary>
++    public sealed class RuntimeEnumDictionarySerializer<TCollection, TKey, TValue>
++        : IRepeatedSerializer<TCollection>,
++            IFactory<TCollection>
++        where TCollection : IDictionary<TKey, TValue>
++    {
++        private static readonly ConditionalWeakTable<
++            MapSerializer<TCollection, TKey, TValue>,
++            RuntimeEnumDictionarySerializer<TCollection, TKey, TValue>
++        > s_instances =
++            new ConditionalWeakTable<
++                MapSerializer<TCollection, TKey, TValue>,
++                RuntimeEnumDictionarySerializer<TCollection, TKey, TValue>
++            >();
++        private static readonly ConditionalWeakTable<
++            MapSerializer<TCollection, TKey, TValue>,
++            RuntimeEnumDictionarySerializer<TCollection, TKey, TValue>
++        >.CreateValueCallback s_create = Create;
++
++        /// <inheritdoc/>
++        public SerializerFeatures Features => ((ISerializer<TCollection>)_original).Features;
++
++        private readonly MapSerializer<TCollection, TKey, TValue> _original;
++
++        /// <summary>Adapts only enum slots; all other item resolution stays with the supplied codec and model.</summary>
++        public RuntimeEnumDictionarySerializer(MapSerializer<TCollection, TKey, TValue> original)
++        {
++            _original = original;
++        }
++
++        /// <summary>Reuses the stateless adapter for the same exact codec instance; null retains optional codec resolution.</summary>
++        public static RuntimeEnumDictionarySerializer<TCollection, TKey, TValue> Get(
++            MapSerializer<TCollection, TKey, TValue> original
++        )
++        {
++            if (original is null)
++                return null;
++            return s_instances.GetValue(original, s_create);
++        }
++
++        private static RuntimeEnumDictionarySerializer<TCollection, TKey, TValue> Create(
++            MapSerializer<TCollection, TKey, TValue> original
++        )
++        {
++            return new RuntimeEnumDictionarySerializer<TCollection, TKey, TValue>(original);
++        }
++
++        /// <inheritdoc/>
++        public TCollection Create(ISerializationContext context)
++        {
++            return ((IFactory<TCollection>)_original).Create(context);
++        }
++
++        /// <inheritdoc/>
++        public TCollection Read(ref ProtoReader.State state, TCollection value)
++        {
++            return ((ISerializer<TCollection>)_original).Read(ref state, value);
++        }
++
++        /// <inheritdoc/>
++        public void Write(ref ProtoWriter.State state, TCollection value)
++        {
++            ((ISerializer<TCollection>)_original).Write(ref state, value);
++        }
++
++        /// <inheritdoc/>
++        public TCollection ReadRepeated(
++            ref ProtoReader.State state,
++            SerializerFeatures features,
++            TCollection value
++        )
++        {
++            RuntimeTypeModel model = state.Model as RuntimeTypeModel;
++            return _original.ReadMap(
++                ref state,
++                features,
++                value,
++                default,
++                default,
++                model is null ? null : model.GetRuntimeDictionaryEnumItem<TKey>(),
++                model is null ? null : model.GetRuntimeDictionaryEnumItem<TValue>()
++            );
++        }
++
++        /// <inheritdoc/>
++        public void WriteRepeated(
++            ref ProtoWriter.State state,
++            int fieldNumber,
++            SerializerFeatures features,
++            TCollection value
++        )
++        {
++            RuntimeTypeModel model = state.Model as RuntimeTypeModel;
++            _original.WriteMap(
++                ref state,
++                fieldNumber,
++                features,
++                value,
++                default,
++                default,
++                model is null ? null : model.GetRuntimeDictionaryEnumItem<TKey>(),
++                model is null ? null : model.GetRuntimeDictionaryEnumItem<TValue>()
++            );
++        }
++    }
++}

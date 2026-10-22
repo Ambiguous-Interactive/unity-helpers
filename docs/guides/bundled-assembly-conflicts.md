@@ -89,19 +89,41 @@ Below `6000.5` (including every `6000.0` through `6000.4` release), Unity ships 
 this package's copies are required. `System.IO.Pipelines` is never provided by Unity and ships
 unconditionally.
 
-## What this package deliberately does not ship
+## Unsafe and Immutable dependencies
 
 `System.Runtime.CompilerServices.Unsafe` is used across the runtime (`EnumExtensions`,
-`ReflectionHelpers`, `Objects`, `AbstractRandom`, `RuntimeSingleton`) and is **not** bundled. Every
-editor in the support matrix provides it, which the CI matrix demonstrates on every run: 2021.3,
-2022.3, 6000.5, and 6000.6 all compile the package. CI rejects package-owned compiler and analyzer
-warnings emitted by the supported-version test runs and the staged release export. Test assembly
-and third-party dependency diagnostics remain outside that consumer-facing gate. Adding a copy
-would put a fourth source in play
-for a contested name, and competing sources are the mechanism behind every failure on this page.
+`ReflectionHelpers`, `Objects`, `AbstractRandom`, `RuntimeSingleton`). The package already
+contains an overridable Unsafe **6.1.2** assembly under `Runtime/Protobuf-Net/`, alongside
+Immutable **9.0.8**. The Unsafe importer disables the Editor platform; the Immutable importer
+enables it. Check the actual winning assembly path and references in the consuming editor.
+Importer settings alone do not identify an assembly already loaded into a running domain.
 
-Both decisions (which assemblies are constrained and which are deliberately absent) are enforced
+Do not add another Unsafe DLL under `Runtime/Binaries/`. Unity also supplies this name,
+and adding another competing source can change assembly resolution. The linter's deliberate
+absence rule applies to `Runtime/Binaries/`; it does not inventory the separate protobuf
+dependency directory.
+
+The constraints and absence rules for `Runtime/Binaries/` are enforced
 by `scripts/lint-bundled-assemblies.ps1`. That matters because the fix here is invisible: a NuGet
 refresh that regenerates an importer without its constraint, or drops in a new DLL, would silently
 restore the conflict. The linter fails on an unclassified DLL, so a refresh cannot proceed without a
 conscious decision recorded here.
+
+## Dependency upgrade candidates
+
+Dependency updates need tests against Unity's actual assembly set before publication.
+A NuGet package's .NET Standard target does not prove that its dependency versions
+or APIs match every supported Unity editor and player.
+
+The protobuf-net 3.4.40 candidate can be built with
+`python3 scripts/build-protobuf-candidate.py --output /tmp/protobuf-candidate`.
+It requires SDK 9.0.319 and produces isolated binaries and a build receipt. The
+host differential project selects those binaries with `ProtobufNetOracle=candidate`
+and `ProtobufNetCandidateRoot=/tmp/protobuf-candidate/assemblies`. The frozen v2/v3
+lanes continue to use their original binaries.
+
+This candidate requires newer Immutable and the existing Unsafe 6.1.2 version. Its host test
+lane resolves those through NuGet; that result does not authorize bundling new
+Unity assemblies. The package continues to ship its existing runtime dependencies
+until the candidate passes the supported compiler, Unity, retained-save and native
+health gates tracked in [#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052).

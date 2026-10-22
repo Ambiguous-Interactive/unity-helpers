@@ -339,6 +339,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   const runElsewhere = new Map([
     ["scripts/tests/test-lint-skill-sizes.ps1", "workflow"],
     ["scripts/tests/test-llm-instructions-lint.ps1", "workflow"],
+    ["scripts/tests/test-protobuf-candidate.py", "workflow"],
     ["scripts/tests/test-sync-issue-template-versions.ps1", "workflow"]
   ]);
   const owners = new Map([

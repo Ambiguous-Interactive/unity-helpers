@@ -24,15 +24,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     {
 #if !PROTOBUF_NET_ORACLE_V2
         [Test]
+#if PROTOBUF_NET_ORACLE_CANDIDATE
+        public void MapOracleIsPinnedToCurrentCandidate()
+#else
         public void MapOracleIsPinnedToVersionThreeTwoFiftySix()
+#endif
         {
             System.Diagnostics.FileVersionInfo version =
                 System.Diagnostics.FileVersionInfo.GetVersionInfo(
                     typeof(ProtoBuf.Serializer).Assembly.Location
                 );
             Assert.AreEqual(3, version.FileMajorPart);
+#if PROTOBUF_NET_ORACLE_CANDIDATE
+            Assert.AreEqual(4, version.FileMinorPart);
+            Assert.AreEqual(40, version.FileBuildPart);
+#else
             Assert.AreEqual(2, version.FileMinorPart);
             Assert.AreEqual(56, version.FileBuildPart);
+#endif
         }
 #endif
 

@@ -23,8 +23,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [Category("Fast")]
     public sealed class SceneHelperNativeFailureTests : CommonTestBase
     {
+        private const int MaxCleanupFrames = 10;
+
         private const string PackedScenePath =
             "Packages/com.wallstop-studios.unity-helpers/Tests/Runtime/Scenes/Test1.unity";
+
+        private string _ownedFolderPath;
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static (
@@ -61,6 +65,57 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             return new WeakReference(new object());
         }
 
+        [TearDown]
+        public override void TearDown()
+        {
+            try
+            {
+                base.TearDown();
+            }
+            finally
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+        }
+
+        [UnityTearDown]
+        public override IEnumerator UnityTearDown()
+        {
+            yield return base.UnityTearDown();
+            if (string.IsNullOrEmpty(_ownedFolderPath))
+            {
+                yield break;
+            }
+
+            string absoluteFolder = Path.Combine(
+                Path.GetDirectoryName(Application.dataPath),
+                _ownedFolderPath
+            );
+            for (int frame = 0; frame < MaxCleanupFrames; ++frame)
+            {
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                if (
+                    !AssetDatabase.IsValidFolder(_ownedFolderPath)
+                    && !Directory.Exists(absoluteFolder)
+                    && !File.Exists(absoluteFolder + ".meta")
+                )
+                {
+                    yield break;
+                }
+                yield return null;
+            }
+
+            Assert.IsFalse(AssetDatabase.IsValidFolder(_ownedFolderPath));
+            Assert.IsFalse(
+                Directory.Exists(absoluteFolder),
+                "The owned scene folder must be removed."
+            );
+            Assert.IsFalse(
+                File.Exists(absoluteFolder + ".meta"),
+                "The owned folder importer must be removed."
+            );
+        }
+
         [UnityTest]
         public IEnumerator NativeLoadFailureSettlesAndReleasesCallbackAndHandler()
         {
@@ -84,6 +139,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(rooted.IsAlive);
             Assert.IsFalse(released.IsAlive);
             string folder = "Assets/SceneFailureProbe" + Guid.NewGuid().ToString("N");
+            _ownedFolderPath = folder;
             EnsureFolder(folder);
             string assetPath = folder + "/Owned.unity";
             TrackAssetPath(assetPath);

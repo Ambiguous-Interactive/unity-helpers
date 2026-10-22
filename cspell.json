@@ -529,7 +529,8 @@
         "stcf",
         "wvalue",
         "rebitcast",
-        "PREFS"
+        "PREFS",
+        "Dox"
       ]
     },
     {
@@ -956,7 +957,8 @@
         "symsrv",
         "ntdll",
         "rcx",
-        "dmp"
+        "dmp",
+        "killpg"
       ]
     }
   ],
