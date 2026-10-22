@@ -23,6 +23,16 @@ then explicitly call `CleanupTrackedFoldersAndAssets`. Batched fixtures must tra
 tracked paths before calling the base `OneTimeTearDown`, which removes the deferred paths.
 Check the database, directory and importer metadata after cleanup.
 
+Create fixture roots through `ExecuteWithImmediateImport` before using them in a batch.
+Creating a directory on disk while its import is deferred can make Unity create a second
+folder with a numeric suffix. For a root containing a unique identifier,
+`EditorAssetFolderAssertions.AssertUniqueRootRemoved` also checks for these siblings.
+Keep this assertion in fixture teardown so passing test cases cannot hide a cleanup failure.
+
+Drain deferred asset actions between independent import-heavy test cases. A fixture must not
+accumulate their unrelated import batches into one recursive-change window. Reset that window
+only after draining, so a genuine loop within one case still fails visibly.
+
 When a fixture exercises a tool that persists a shared settings or cache asset, use the
 test-only `EditorAssetFileScope` with those exact asset paths. Capture it before the tool runs
 and dispose it after fixture teardown, including failure paths. It restores existing file and

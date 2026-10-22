@@ -20,19 +20,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Integration")]
     public sealed class HelpersTests : BatchedEditorTestBase
     {
-        private const string PrefabFolder = "Assets/TempHelpersPrefabs";
-        private const string ScriptableFolder = "Assets/TempHelpersScriptables";
+        private readonly string _prefabFolder =
+            "Assets/TempHelpersPrefabs-" + Guid.NewGuid().ToString("N");
+        private readonly string _scriptableFolder =
+            "Assets/TempHelpersScriptables-" + Guid.NewGuid().ToString("N");
 
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
 
-            EnsureFolder(PrefabFolder);
-            TrackFolder(PrefabFolder);
+            ExecuteWithImmediateImport(() =>
+            {
+                EnsureFolder(_prefabFolder);
+                TrackFolder(_prefabFolder);
+            });
 
-            EnsureFolder(ScriptableFolder);
-            TrackFolder(ScriptableFolder);
+            ExecuteWithImmediateImport(() =>
+            {
+                EnsureFolder(_scriptableFolder);
+                TrackFolder(_scriptableFolder);
+            });
         }
 
         [SetUp]
@@ -47,6 +55,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             base.TearDown();
         }
 
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+            EditorAssetFolderAssertions.AssertUniqueRootRemoved(_prefabFolder);
+            EditorAssetFolderAssertions.AssertUniqueRootRemoved(_scriptableFolder);
+        }
+
         [Test]
         public void EnumeratePrefabsFindsGeneratedPrefab()
         {
@@ -55,7 +78,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.Ignore("AssetDatabase access requires edit mode.");
             }
 
-            string assetPath = Path.Combine(PrefabFolder, "TestPrefab.prefab").SanitizePath();
+            string assetPath = Path.Combine(_prefabFolder, "TestPrefab.prefab").SanitizePath();
             TrackAssetPath(assetPath);
             GameObject prefabSource = Track(new GameObject("Helpers_PrefabSource"));
 
@@ -67,7 +90,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(prefab != null);
 
             HashSet<string> names = Helpers
-                .EnumeratePrefabs(new[] { PrefabFolder })
+                .EnumeratePrefabs(new[] { _prefabFolder })
                 .Select(go => go.name)
                 .ToHashSet(StringComparer.Ordinal);
             Assert.Contains(prefab.name, names.ToList());
@@ -81,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.Ignore("AssetDatabase access requires edit mode.");
             }
 
-            string assetPath = Path.Combine(ScriptableFolder, "Dummy.asset").SanitizePath();
+            string assetPath = Path.Combine(_scriptableFolder, "Dummy.asset").SanitizePath();
             TrackAssetPath(assetPath);
             DummyScriptableObject asset = Track(
                 ScriptableObject.CreateInstance<DummyScriptableObject>()
@@ -94,7 +117,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             });
 
             HashSet<string> guids = Helpers
-                .EnumerateScriptableObjects<DummyScriptableObject>(new[] { ScriptableFolder })
+                .EnumerateScriptableObjects<DummyScriptableObject>(new[] { _scriptableFolder })
                 .Select(so => AssetDatabase.GetAssetPath(so))
                 .ToHashSet(StringComparer.Ordinal);
             Assert.Contains(assetPath, guids.ToList());

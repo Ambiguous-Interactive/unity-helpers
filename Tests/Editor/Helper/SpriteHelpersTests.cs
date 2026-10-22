@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
+    using System;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
@@ -15,8 +16,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Integration")]
     public sealed class SpriteHelpersTests : BatchedEditorTestBase
     {
-        private const string TestFolder = "Assets/TempSpriteHelpersTests";
         private static readonly int[] TextureSizeCases = { 1, 2, 4, 16, 64, 256, 512 };
+        private readonly string _testFolder =
+            "Assets/TempSpriteHelpersTests-" + Guid.NewGuid().ToString("N");
         private string _testTexturePath;
         private Texture2D _testTexture;
 
@@ -29,8 +31,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 return;
             }
 
-            EnsureFolder(TestFolder);
-            TrackFolder(TestFolder);
+            ExecuteWithImmediateImport(() =>
+            {
+                EnsureFolder(_testFolder);
+                TrackFolder(_testFolder);
+            });
         }
 
         [SetUp]
@@ -51,6 +56,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 TrackAssetPath(_testTexturePath);
             }
+        }
+
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+            EditorAssetFolderAssertions.AssertUniqueRootRemoved(_testFolder);
         }
 
         [Test]
@@ -298,7 +317,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         private void CreateTestTexture(bool readable, int width = 4, int height = 4)
         {
-            _testTexturePath = Path.Combine(TestFolder, $"TestTexture_{System.Guid.NewGuid()}.png")
+            _testTexturePath = Path.Combine(_testFolder, $"TestTexture_{System.Guid.NewGuid()}.png")
                 .SanitizePath();
 
             Texture2D tempTexture = Track(

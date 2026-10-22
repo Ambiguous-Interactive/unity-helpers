@@ -30,6 +30,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class SerializableSetPropertyDrawerTests : BatchedEditorTestBase
     {
+        private readonly string _migrationFolder =
+            "Assets/SerializedFieldMigration-" + Guid.NewGuid().ToString("N");
         private StringSetHost _sharedHost;
         private SerializedObject _sharedSerializedObject;
 
@@ -191,6 +193,20 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
 
             _sharedHost.Destroy();
+        }
+
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+            EditorAssetFolderAssertions.AssertUniqueRootRemoved(_migrationFolder);
         }
 
         [Test]
@@ -5676,9 +5692,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
         private string CreateMigrationAssetPath(string fileName)
         {
-            const string Folder = "Assets/Temp/SerializedFieldMigration";
-            EnsureFolder(Folder);
-            string assetPath = AssetDatabase.GenerateUniqueAssetPath(Folder + "/" + fileName);
+            EnsureFolder(_migrationFolder);
+            string assetPath = AssetDatabase.GenerateUniqueAssetPath(
+                _migrationFolder + "/" + fileName
+            );
             TrackAssetPath(assetPath);
             return assetPath;
         }

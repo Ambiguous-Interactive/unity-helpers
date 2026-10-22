@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
+    using System;
     using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
@@ -16,7 +17,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Integration")]
     public sealed class SpriteSettingsApplierTests : BatchedEditorTestBase
     {
-        private const string TestFolder = "Assets/TempSpriteApplierTests";
+        private readonly string _testFolder =
+            "Assets/TempSpriteApplierTests-" + Guid.NewGuid().ToString("N");
         private string _assetPath;
 
         [OneTimeSetUp]
@@ -27,8 +29,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 return;
             }
-            EnsureFolder(TestFolder);
-            TrackFolder(TestFolder);
+            ExecuteWithImmediateImport(() =>
+            {
+                EnsureFolder(_testFolder);
+                TrackFolder(_testFolder);
+            });
         }
 
         [SetUp]
@@ -48,6 +53,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 TrackAssetPath(_assetPath);
             }
+        }
+
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+            EditorAssetFolderAssertions.AssertUniqueRootRemoved(_testFolder);
         }
 
         [Test]
@@ -180,7 +199,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             Texture2D tex = Track(new Texture2D(4, 4, TextureFormat.RGBA32, mipChain: false));
             byte[] png = tex.EncodeToPNG();
-            string path = Path.Combine(TestFolder, "ui_button.png");
+            string path = Path.Combine(_testFolder, "ui_button.png");
             File.WriteAllBytes(path, png);
 
             ExecuteWithImmediateImport(() =>

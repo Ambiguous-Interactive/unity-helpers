@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Sprites
 {
 #if UNITY_EDITOR
+    using System;
     using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
@@ -28,7 +29,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     [NUnit.Framework.Category("Integration")]
     public sealed class SpriteSettingsApplierWindowTests : BatchedEditorTestBase
     {
-        private const string Root = "Assets/Temp/SpriteSettingsApplierWindowTests";
+        private readonly string _root =
+            "Assets/SpriteSettingsApplierWindowTests-" + Guid.NewGuid().ToString("N");
 
         private static string RelToFull(string rel)
         {
@@ -58,14 +60,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
-            EnsureFolder(Root);
-            TrackFolder(Root);
+            ExecuteWithImmediateImport(() =>
+            {
+                EnsureFolder(_root);
+                TrackFolder(_root);
+            });
+        }
+
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+            EditorAssetFolderAssertions.AssertUniqueRootRemoved(_root);
         }
 
         [Test]
         public void GetMatchingFilePathsWithSingleDirectorySucceeds()
         {
-            string dir = (Root + "/SingleDir").SanitizePath();
+            string dir = (_root + "/SingleDir").SanitizePath();
             EnsureFolder(dir);
             string texPath = (dir + "/sprite.png").SanitizePath();
             CreatePng(texPath, 8, 8, Color.white);
@@ -104,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             for (int i = 0; i < dirs.Length; ++i)
             {
-                dirs[i] = (Root + "/MultiDir" + i).SanitizePath();
+                dirs[i] = (_root + "/MultiDir" + i).SanitizePath();
                 EnsureFolder(dirs[i]);
                 textures[i] = (dirs[i] + "/sprite" + i + ".png").SanitizePath();
                 CreatePng(textures[i], 4, 4, Color.white);
@@ -153,7 +172,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void GetMatchingFilePathsWithEmptyDirectoriesListSucceeds()
         {
-            string texPath = (Root + "/solo.png").SanitizePath();
+            string texPath = (_root + "/solo.png").SanitizePath();
             CreatePng(texPath, 8, 8, Color.white);
 
             Sprite sprite = null;
@@ -184,7 +203,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void GetMatchingFilePathsWithNullDirectoryEntriesSucceeds()
         {
-            string dir = (Root + "/ValidDir").SanitizePath();
+            string dir = (_root + "/ValidDir").SanitizePath();
             EnsureFolder(dir);
             string texPath = (dir + "/valid.png").SanitizePath();
             CreatePng(texPath, 8, 8, Color.white);
@@ -219,7 +238,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void GetMatchingFilePathsWithEmptyDirectorySucceeds()
         {
-            string emptyDir = (Root + "/EmptyDir").SanitizePath();
+            string emptyDir = (_root + "/EmptyDir").SanitizePath();
             EnsureFolder(emptyDir);
 
             SpriteSettingsApplierWindow window = Track(
@@ -387,8 +406,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             out string secondPath
         )
         {
-            firstPath = (Root + "/" + prefix + "_first.png").SanitizePath();
-            secondPath = (Root + "/" + prefix + "_second.png").SanitizePath();
+            firstPath = (_root + "/" + prefix + "_first.png").SanitizePath();
+            secondPath = (_root + "/" + prefix + "_second.png").SanitizePath();
             string localFirstPath = firstPath;
             string localSecondPath = secondPath;
             ExecuteWithImmediateImport(() =>
