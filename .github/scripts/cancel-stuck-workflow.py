@@ -63,7 +63,7 @@ def eligible_run(run, expected, run_id: int, minimum_age: int, now) -> bool:
         return False
 
 
-def never_started_jobs(pages, run_id: int) -> bool:
+def never_started_jobs(pages, run_id: int, *, run_attempt: int = 1) -> bool:
     if not isinstance(pages, list) or not pages:
         return False
     jobs = []
@@ -86,19 +86,34 @@ def never_started_jobs(pages, run_id: int) -> bool:
     for job in jobs:
         if not isinstance(job, dict):
             return False
+        try:
+            created = datetime.datetime.fromisoformat(job.get("created_at", ""))
+            if created.tzinfo is None:
+                return False
+        except (ValueError, TypeError):
+            return False
         identifier = job.get("id")
         if type(identifier) is not int or identifier < 1 or identifier in seen:
             return False
         seen.add(identifier)
         if (
             job.get("run_id") != run_id
+            or type(job.get("run_attempt")) is not int
+            or job["run_attempt"] != run_attempt
             or job.get("status") != "queued"
             or any(
                 field not in job or job[field] is not None
-                for field in ("started_at", "completed_at", "conclusion")
+                for field in ("completed_at", "conclusion")
             )
-            or type(job.get("runner_id")) is not int
-            or job["runner_id"] != 0
+            or "started_at" not in job
+            or (
+                job["started_at"] is not None and job["started_at"] != job["created_at"]
+            )
+            or "runner_id" not in job
+            or (
+                job["runner_id"] is not None
+                and (type(job["runner_id"]) is not int or job["runner_id"] != 0)
+            )
             or job.get("runner_name") not in (None, "")
             or job.get("steps") != []
             or not isinstance(job.get("labels"), list)
@@ -118,11 +133,13 @@ def cancel_if_eligible(
     if not eligible_run(run, expected, run_id, minimum_age, now):
         return False
     if not isinstance(expected_jobs, list) or not never_started_jobs(
-        [{"total_count": len(expected_jobs), "jobs": expected_jobs}], run_id
+        [{"total_count": len(expected_jobs), "jobs": expected_jobs}],
+        run_id,
+        run_attempt=expected["run_attempt"],
     ):
         return False
     pages = read_api(f"{endpoint}/jobs?filter=latest&per_page=100", paginate=True)
-    if not never_started_jobs(pages, run_id):
+    if not never_started_jobs(pages, run_id, run_attempt=expected["run_attempt"]):
         return False
     current_jobs = [job for page in pages for job in page["jobs"]]
     if sorted(current_jobs, key=lambda job: job["id"]) != sorted(

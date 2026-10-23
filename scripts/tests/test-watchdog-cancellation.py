@@ -39,12 +39,19 @@ def run_metadata(path=".github/workflows/build-publish-devcontainer.yml"):
 
 
 def queued_job(identifier=1):
+    created = (
+        (NOW - datetime.timedelta(hours=1))
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
     return {
         "id": identifier,
         "run_id": RUN_ID,
+        "run_attempt": 1,
+        "created_at": created,
         "status": "queued",
         "conclusion": None,
-        "started_at": None,
+        "started_at": created,
         "completed_at": None,
         "runner_id": 0,
         "runner_name": None,
@@ -54,6 +61,28 @@ def queued_job(identifier=1):
 
 
 class CancellationPolicyTests(unittest.TestCase):
+    def test_queued_creation_timestamp_does_not_mean_runner_assignment(self):
+        job = queued_job()
+        self.assertEqual(job["created_at"], job["started_at"])
+        self.assertTrue(
+            GUARD.never_started_jobs([{"total_count": 1, "jobs": [job]}], RUN_ID)
+        )
+        self.assertFalse(
+            GUARD.never_started_jobs(
+                [{"total_count": 1, "jobs": [job]}], RUN_ID, run_attempt=2
+            )
+        )
+
+    def test_explicit_null_runner_id_is_unassigned_but_missing_is_unknown(self):
+        job = {**queued_job(), "runner_id": None}
+        self.assertTrue(
+            GUARD.never_started_jobs([{"total_count": 1, "jobs": [job]}], RUN_ID)
+        )
+        del job["runner_id"]
+        self.assertFalse(
+            GUARD.never_started_jobs([{"total_count": 1, "jobs": [job]}], RUN_ID)
+        )
+
     def test_never_started_work_remains_eligible(self):
         run = run_metadata()
         self.assertTrue(GUARD.eligible_run(run, run, RUN_ID, 300, NOW))
@@ -357,6 +386,15 @@ class WorkflowSchedulingTests(unittest.TestCase):
         self.assertEqual(cancelled, [["run", "cancel", "123", "--repo", "owner/repo"]])
         self.assertEqual(
             sum(call[-1].endswith("/actions/runs/123") for call in calls), 2
+        )
+
+    def test_rest_api_null_runner_id_preserves_never_started_recovery(self):
+        job = {**queued_job(), "runner_id": None}
+        cancelled, _, output = self.execute_workflow(
+            {"run": run_metadata(), "jobs": [job]}
+        )
+        self.assertEqual(
+            cancelled, [["run", "cancel", "123", "--repo", "owner/repo"]], output
         )
 
     def test_final_attempt_and_state_changes_refuse_cancellation(self):

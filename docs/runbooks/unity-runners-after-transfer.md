@@ -92,6 +92,8 @@ If the preflight passes but the matrix job still stays queued, the cause may be 
 
 For other workflows, automatic cancellation requires fresh metadata for the same queued run, head and attempt, plus a complete current job list in which every job is queued, unassigned and has never started. Missing, changed or unreadable state refuses cancellation. The watchdog checks the run again immediately before requesting cancellation; this is not an atomic scheduling lock. Licensed workflows remain protected even when all jobs appear unassigned. Existing exclusions, matching-idle-runner checks and daily cancellation limits still apply. Refused or unconfirmed requests appear in the operator section of the step summary. Only a confirmed cancellation advances the stored counter or starts recovery.
 
+GitHub can represent an unassigned runner ID as explicit `null` or integer zero. An absent ID is unknown and refuses cancellation. Queued jobs can also carry `started_at` equal to `created_at` before assignment. The guard accepts that queue timestamp only alongside an unassigned runner, empty steps, no completion and the expected attempt; another start timestamp refuses cancellation.
+
 Run `npm run test:watchdog-cancellation` to exercise the real watchdog shell with offline GitHub and Git commands. These controls reproduce the between-job gap and assignment after the first snapshot, verify refusal on stale or incomplete state, and preserve recovery of never-started work. They do not cancel live runs or prove native license cleanup; retain that evidence separately.
 
 ### The watchdog's second recovery mode
