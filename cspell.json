@@ -536,6 +536,7 @@
     {
       "name": "tech-terms",
       "words": [
+        "KaTeX",
         "SARIF",
         "msbuild",
         "CJK",

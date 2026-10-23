@@ -3242,6 +3242,17 @@ An unexplained nonzero sample remains a failure even when a later process passes
 sample and use stack evidence or a distinguishing causal control before attributing it or accepting
 its timings. Module identity and allocation totals alone do not identify an allocation site.
 
+Each of the four representative host measurements reserves a 128 MiB no-GC region before its
+clock and allocation markers. The sample fails if the region cannot start or a collection invalidates
+it. The zero-byte maximum, fixed warmup and allocating-clock control remain in place; real object
+allocations still count. This prevents background collection from changing the counter through
+[allocation-context retirement](https://github.com/dotnet/runtime/blob/v9.0.21/src/coreclr/gc/gc.cpp#L7947):
+CoreCLR computes the thread's count by subtracting its
+[unused allocation space](https://github.com/dotnet/runtime/blob/v9.0.21/src/coreclr/vm/comutilnative.cpp#L920),
+which disappears when the collector clears that context. These host samples use the same region
+policy for both serializers and both directions. They do not qualify Unity's allocation channel or
+explain older failures without matching evidence.
+
 For CoreCLR allocation-stack diagnostics, enable the allocation provider before runtime startup.
 The [.NET 9 runtime snapshots that state](https://github.com/dotnet/runtime/blob/v9.0.21/src/coreclr/vm/eventtrace.cpp#L816)
 when it chooses the allocation helpers; attaching later can miss small allocations. Calibrate the

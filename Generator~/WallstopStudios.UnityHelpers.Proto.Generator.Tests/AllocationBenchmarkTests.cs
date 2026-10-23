@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
     [TestFixture]
     [Category("Performance")]
+    [NonParallelizable]
     public sealed partial class AllocationBenchmarkTests
     {
         private const int WarmupIterations = 100;
@@ -56,6 +57,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Func<long> timestamp
         )
         {
+            using AllocationMeasurementScope scope = AllocationMeasurementScope.Start();
             long started = timestamp();
             long before = GC.GetAllocatedBytesForCurrentThread();
             for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
@@ -77,6 +79,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             MemoryStream destination
         )
         {
+            using AllocationMeasurementScope scope = AllocationMeasurementScope.Start();
             long started = Stopwatch.GetTimestamp();
             long before = GC.GetAllocatedBytesForCurrentThread();
             for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
@@ -94,6 +97,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static Measurement MeasureWallstopProtoDeserialize(byte[] payload)
         {
             AllocationContract restored = null;
+            using AllocationMeasurementScope scope = AllocationMeasurementScope.Start();
             long started = Stopwatch.GetTimestamp();
             long before = GC.GetAllocatedBytesForCurrentThread();
             for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
@@ -113,6 +117,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static Measurement MeasureProtobufNetDeserialize(MemoryStream source)
         {
             AllocationContract restored = null;
+            using AllocationMeasurementScope scope = AllocationMeasurementScope.Start();
             long started = Stopwatch.GetTimestamp();
             long before = GC.GetAllocatedBytesForCurrentThread();
             for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
