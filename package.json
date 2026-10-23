@@ -393,7 +393,7 @@
     "test:auto-publish-release": "node scripts/tests/test-auto-publish-release.js"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "1.32.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "cspell": "10.4.0",
     "markdownlint-cli": "0.49.1",
     "prettier": "3.9.10",
